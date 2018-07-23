@@ -1,4 +1,4 @@
-// Copyright 2018 gopc-ua authors. All rights reserved.
+// Copyright 2018 gopcua authors. All rights reserved.
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
@@ -18,6 +18,7 @@ type Hello struct {
 	ReceiveBufSize uint32
 	MaxMessageSize uint32
 	MaxChunkCount  uint32
+	PayloadSize    uint32
 	EndPointURL    []byte
 }
 
@@ -69,6 +70,7 @@ func (h *Hello) DecodeFromBytes(b []byte) error {
 	h.ReceiveBufSize = binary.LittleEndian.Uint32(b[8:12])
 	h.MaxMessageSize = binary.LittleEndian.Uint32(b[12:16])
 	h.MaxChunkCount = binary.LittleEndian.Uint32(b[16:20])
+	h.PayloadSize = binary.LittleEndian.Uint32(b[16:20])
 	h.EndPointURL = b[24:]
 
 	return nil
@@ -95,7 +97,7 @@ func (h *Hello) SerializeTo(b []byte) error {
 	binary.LittleEndian.PutUint32(h.Header.Payload[8:12], h.ReceiveBufSize)
 	binary.LittleEndian.PutUint32(h.Header.Payload[12:16], h.MaxMessageSize)
 	binary.LittleEndian.PutUint32(h.Header.Payload[16:20], h.MaxChunkCount)
-	copy(h.Header.Payload[20:24], []byte{0x2f, 0x00, 0x00, 0x00})
+	binary.LittleEndian.PutUint32(h.Header.Payload[20:24], h.PayloadSize)
 	copy(h.Header.Payload[24:], h.EndPointURL)
 
 	h.Header.SetLength()
@@ -119,12 +121,13 @@ func (h *Hello) Len() int {
 // SetLength sets the length of Hello.
 func (h *Hello) SetLength() {
 	h.MessageSize = uint32(32 + len(h.EndPointURL))
+	h.PayloadSize = uint32(len(h.EndPointURL))
 }
 
 // String returns Hello in string.
 func (h *Hello) String() string {
 	return fmt.Sprintf(
-		"MessageType: %d, ChunkType: %d, MessageSize: %d, Version: %d, SendBufSize: %d, ReceiveBufSize: %d, MaxMessageSize: %d, MaxChunkCount: %d, EndPointURL: %s",
+		"MessageType: %d, ChunkType: %d, MessageSize: %d, Version: %d, SendBufSize: %d, ReceiveBufSize: %d, MaxMessageSize: %d, MaxChunkCount: %d, PayloadSize: %d, EndPointURL: %s",
 		h.MessageType,
 		h.ChunkType,
 		h.MessageSize,
@@ -133,6 +136,7 @@ func (h *Hello) String() string {
 		h.ReceiveBufSize,
 		h.MaxMessageSize,
 		h.MaxChunkCount,
+		h.PayloadSize,
 		h.EndPointURL,
 	)
 }

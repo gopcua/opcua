@@ -1,6 +1,6 @@
-# gopc-ua
+# gopcua
 
-Easy and painless implementation of OPC UA protocol in Golang.
+gopcua provides easy and painless encoding/decoding of OPC UA protocol in pure Golang.
 
 **THIS IS STILL EXPERIMENTAL PROJECT, ANY IMPLEMENTATION MAY CHANGE DRASTICALLY IN FUTURE**
 

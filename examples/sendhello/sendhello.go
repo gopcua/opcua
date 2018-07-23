@@ -6,7 +6,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/wmnsk/gopc-ua/connection"
+	"github.com/wmnsk/gopcua/connection"
 )
 
 func main() {
