@@ -8,14 +8,14 @@ import (
 	"testing"
 )
 
-var testHelloBytes = [][]byte{
-	{ // Hello message
-		// MessageType: HEL
-		0x48, 0x45, 0x4c,
+var testAcknowledgeBytes = [][]byte{
+	{ // Acknowledge message
+		// MessageType: ACK
+		0x41, 0x43, 0x4b,
 		// Chunk Type: F
 		0x46,
-		// MessageSize: 70
-		0x46, 0x00, 0x00, 0x00,
+		// MessageSize: 28
+		0x1c, 0x00, 0x00, 0x00,
 		// Version: 0
 		0x00, 0x00, 0x00, 0x00,
 		// ReceiveBufSize: 65535
@@ -26,32 +26,24 @@ var testHelloBytes = [][]byte{
 		0xa0, 0x0f, 0x00, 0x00,
 		// MaxChunkCount: 0
 		0x00, 0x00, 0x00, 0x00,
-		// PayloadSize
-		0x26, 0x00, 0x00, 0x00,
-		// EndPointURL
-		0x6f, 0x70, 0x63, 0x2e, 0x74, 0x63, 0x70, 0x3a,
-		0x2f, 0x2f, 0x77, 0x6f, 0x77, 0x2e, 0x69, 0x74,
-		0x73, 0x2e, 0x65, 0x61, 0x73, 0x79, 0x3a, 0x31,
-		0x31, 0x31, 0x31, 0x31, 0x2f, 0x55, 0x41, 0x2f,
-		0x53, 0x65, 0x72, 0x76, 0x65, 0x72,
 	},
 	{},
 	{},
 }
 
-func TestDecodeHello(t *testing.T) {
-	h, err := DecodeHello(testHelloBytes[0])
+func TestDecodeAcknowledge(t *testing.T) {
+	h, err := DecodeAcknowledge(testAcknowledgeBytes[0])
 	if err != nil {
-		t.Fatalf("Failed to decode Hello: %s", err)
+		t.Fatalf("Failed to decode Acknowledge: %s", err)
 	}
 
 	switch {
-	case h.MessageTypeValue() != MessageTypeHello:
-		t.Errorf("MessageType doesn't match. Want: %s, Got: %s", MessageTypeHello, h.MessageTypeValue())
+	case h.MessageTypeValue() != MessageTypeAcknowledge:
+		t.Errorf("MessageType doesn't match. Want: %s, Got: %s", MessageTypeAcknowledge, h.MessageTypeValue())
 	case h.ChunkTypeValue() != ChunkTypeFinal:
 		t.Errorf("ChunkType doesn't match. Want: %s, Got: %s", ChunkTypeFinal, h.ChunkTypeValue())
-	case h.MessageSize != 70:
-		t.Errorf("MessageSize doesn't match. Want: %d, Got: %d", 70, h.MessageSize)
+	case h.MessageSize != 28:
+		t.Errorf("MessageSize doesn't match. Want: %d, Got: %d", 28, h.MessageSize)
 	case h.Version != 0:
 		t.Errorf("Version doesn't match. Want: %d, Got: %d", 0, h.Version)
 	case h.SendBufSize != 65535:
@@ -62,30 +54,25 @@ func TestDecodeHello(t *testing.T) {
 		t.Errorf("MaxMessageSize doesn't match. Want: %d, Got: %d", 4000, h.MaxMessageSize)
 	case h.MaxChunkCount != 0:
 		t.Errorf("MaxChunkCount doesn't match. Want: %d, Got: %d", 0, h.MaxChunkCount)
-	case h.PayloadSize != 38:
-		t.Errorf("PayloadSize doesn't match. Want: %d, Got: %d", 38, h.PayloadSize)
-	case h.EndPointURLString() != "opc.tcp://wow.its.easy:11111/UA/Server":
-		t.Errorf("EndPointURLString doesn't match. Want: %s, Got: %s", "opc.tcp://wow.its.easy:11111/UA/Server", h.EndPointURLString())
 	}
 	t.Log(h)
 }
 
-func TestSerializeHello(t *testing.T) {
-	h := NewHello(
+func TestSerializeAcknowledge(t *testing.T) {
+	h := NewAcknowledge(
 		0,      //Version
 		0xffff, // SendBufSize
 		0xffff, // ReceiveBufSize
 		4000,   // MaxMessageSize
-		"opc.tcp://wow.its.easy:11111/UA/Server", // EndPointURL
 	)
 
 	serialized, err := h.Serialize()
 	if err != nil {
-		t.Fatalf("Failed to serialize Hello: %s", err)
+		t.Fatalf("Failed to serialize Acknowledge: %s", err)
 	}
 
 	for i, s := range serialized {
-		x := testHelloBytes[0][i]
+		x := testAcknowledgeBytes[0][i]
 		if s != x {
 			t.Errorf("Bytes doesn't match. Want: %#x, Got: %#x at %dth", x, s, i)
 		}
