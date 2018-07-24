@@ -6,17 +6,20 @@ import (
 	"net"
 	"time"
 
-	"github.com/wmnsk/gopcua/connection"
+	"github.com/wmnsk/gopcua/uacp"
 )
 
 func main() {
 	var (
-		ip   = flag.String("ip", "127.0.0.1", "Destination IP Address.")
-		port = flag.String("port", "11111", "Destination Port Number.")
-		url  = flag.String("url", "opc.tcp://deadbeef.example/foo/bar", "OPC UA Endpoint URL.")
+		ip     = flag.String("ip", "127.0.0.1", "Destination IP Address")
+		port   = flag.String("port", "11111", "Destination Port Number")
+		sndBuf = flag.Int("sndbuf", 65535, "SendBufferSize")
+		rcvBuf = flag.Int("rcvbuf", 65535, "ReceiveBufferSize")
+		maxMsg = flag.Int("maxmsg", 0, "MaxMessageSize")
+		url    = flag.String("url", "opc.tcp://deadbeef.example/foo/bar", "OPC UA Endpoint URL")
 	)
 	flag.Parse()
-	hello := connection.NewHello(0, 10, 20, 1024, *url)
+	hello := uacp.NewHello(0, uint32(*sndBuf), uint32(*rcvBuf), uint32(*maxMsg), *url)
 	helloBytes, err := hello.Serialize()
 	if err != nil {
 		log.Fatalf("Failed to serialize Hello: %s", err)

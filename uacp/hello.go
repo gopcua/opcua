@@ -2,7 +2,7 @@
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
-package connection
+package uacp
 
 import (
 	"encoding/binary"
@@ -70,7 +70,7 @@ func (h *Hello) DecodeFromBytes(b []byte) error {
 	h.ReceiveBufSize = binary.LittleEndian.Uint32(b[8:12])
 	h.MaxMessageSize = binary.LittleEndian.Uint32(b[12:16])
 	h.MaxChunkCount = binary.LittleEndian.Uint32(b[16:20])
-	h.PayloadSize = binary.LittleEndian.Uint32(b[16:20])
+	h.PayloadSize = binary.LittleEndian.Uint32(b[20:24])
 	h.EndPointURL = b[24:]
 
 	return nil

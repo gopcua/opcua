@@ -2,7 +2,7 @@
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
-package connection
+package uacp
 
 import (
 	"encoding/binary"
@@ -10,6 +10,21 @@ import (
 	"fmt"
 
 	"github.com/wmnsk/gopcua/utils"
+)
+
+// MessageType definitions.
+const (
+	MessageTypeHello        = "HEL"
+	MessageTypeAcknowledge  = "ACK"
+	MessageTypeError        = "ERR"
+	MessageTypeReverseHello = "RHE"
+)
+
+// ChunkType definitions.
+const (
+	ChunkTypeIntermediate = "C"
+	ChunkTypeFinal        = "F"
+	ChunkTypeError        = "A"
 )
 
 // Header represents a OPC UA Connection Header.
@@ -76,17 +91,6 @@ func (h *Header) SerializeTo(b []byte) error {
 	return nil
 }
 
-// MessageTypeString returns MessageType in string.
-func (h *Header) MessageTypeString() string {
-	if h == nil {
-		return ""
-	}
-
-	x := make([]byte, 4)
-	binary.BigEndian.PutUint32(x, h.MessageType)
-	return string(x[1:])
-}
-
 // Len returns the actual length of Header in int.
 func (h *Header) Len() int {
 	return 8 + len(h.Payload)
@@ -97,8 +101,19 @@ func (h *Header) SetLength() {
 	h.MessageSize = uint32(8 + len(h.Payload))
 }
 
-// ChunkTypeString returns ChunkType in string.
-func (h *Header) ChunkTypeString() string {
+// MessageTypeValue returns MessageType in string.
+func (h *Header) MessageTypeValue() string {
+	if h == nil {
+		return ""
+	}
+
+	x := make([]byte, 4)
+	binary.BigEndian.PutUint32(x, h.MessageType)
+	return string(x[1:])
+}
+
+// ChunkTypeValue returns ChunkType in string.
+func (h *Header) ChunkTypeValue() string {
 	if h == nil {
 		return ""
 	}

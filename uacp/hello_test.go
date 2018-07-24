@@ -2,7 +2,7 @@
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
-package connection
+package uacp
 
 import (
 	"testing"
@@ -46,10 +46,10 @@ func TestDecodeHello(t *testing.T) {
 	}
 
 	switch {
-	case h.MessageTypeString() != "HEL":
-		t.Errorf("MessageType doesn't match. Want: %s, Got: %s", "HEL", h.MessageTypeString())
-	case h.ChunkTypeString() != "F":
-		t.Errorf("ChunkType doesn't match. Want: %s, Got: %s", "F", h.ChunkTypeString())
+	case h.MessageTypeValue() != "HEL":
+		t.Errorf("MessageType doesn't match. Want: %s, Got: %s", "HEL", h.MessageTypeValue())
+	case h.ChunkTypeValue() != "F":
+		t.Errorf("ChunkType doesn't match. Want: %s, Got: %s", "F", h.ChunkTypeValue())
 	case h.MessageSize != 70:
 		t.Errorf("MessageSize doesn't match. Want: %d, Got: %d", 70, h.MessageSize)
 	case h.Version != 0:
@@ -62,6 +62,8 @@ func TestDecodeHello(t *testing.T) {
 		t.Errorf("MaxMessageSize doesn't match. Want: %d, Got: %d", 4000, h.MaxMessageSize)
 	case h.MaxChunkCount != 0:
 		t.Errorf("MaxChunkCount doesn't match. Want: %d, Got: %d", 0, h.MaxChunkCount)
+	case h.PayloadSize != 38:
+		t.Errorf("PayloadSize doesn't match. Want: %d, Got: %d", 38, h.PayloadSize)
 	case h.EndPointURLString() != "opc.tcp://wow.its.easy:11111/UA/Server":
 		t.Errorf("EndPointURLString doesn't match. Want: %s, Got: %s", "opc.tcp://wow.its.easy:11111/UA/Server", h.EndPointURLString())
 	}
