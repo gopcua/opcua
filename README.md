@@ -1,5 +1,7 @@
 # gopcua
 
+[![CircleCI](https://circleci.com/gh/wmnsk/gopcua.svg?style=svg)](https://circleci.com/gh/wmnsk/gopcua)
+
 gopcua provides easy and painless encoding/decoding of OPC UA protocol in pure Golang.
 
 **THIS IS STILL EXPERIMENTAL PROJECT, ANY IMPLEMENTATION MAY CHANGE DRASTICALLY IN FUTURE**
