@@ -22,7 +22,7 @@ type Acknowledge struct {
 
 // NewAcknowledge creates a new OPC UA Acknowledge.
 func NewAcknowledge(ver, sndBuf, rcvBuf, maxMsg uint32) *Acknowledge {
-	h := &Acknowledge{
+	a := &Acknowledge{
 		Header: NewHeader(
 			MessageTypeAcknowledge,
 			ChunkTypeFinal,
@@ -34,47 +34,47 @@ func NewAcknowledge(ver, sndBuf, rcvBuf, maxMsg uint32) *Acknowledge {
 		MaxMessageSize: maxMsg,
 		MaxChunkCount:  0,
 	}
-	h.SetLength()
+	a.SetLength()
 
-	return h
+	return a
 }
 
 // DecodeAcknowledge decodes given bytes into OPC UA Acknowledge.
 func DecodeAcknowledge(b []byte) (*Acknowledge, error) {
-	h := &Acknowledge{}
-	if err := h.DecodeFromBytes(b); err != nil {
+	a := &Acknowledge{}
+	if err := a.DecodeFromBytes(b); err != nil {
 		return nil, err
 	}
 
-	return h, nil
+	return a, nil
 }
 
 // DecodeFromBytes decodes given bytes into OPC UA Acknowledge.
-func (h *Acknowledge) DecodeFromBytes(b []byte) error {
+func (a *Acknowledge) DecodeFromBytes(b []byte) error {
 	var err error
 	if len(b) < 20 {
 		return errors.New("Too short to decode Acknowledge")
 	}
 
-	h.Header, err = DecodeHeader(b)
+	a.Header, err = DecodeHeader(b)
 	if err != nil {
 		return err
 	}
-	b = h.Header.Payload
+	b = a.Header.Payload
 
-	h.Version = binary.LittleEndian.Uint32(b[:4])
-	h.SendBufSize = binary.LittleEndian.Uint32(b[4:8])
-	h.ReceiveBufSize = binary.LittleEndian.Uint32(b[8:12])
-	h.MaxMessageSize = binary.LittleEndian.Uint32(b[12:16])
-	h.MaxChunkCount = binary.LittleEndian.Uint32(b[16:20])
+	a.Version = binary.LittleEndian.Uint32(b[:4])
+	a.SendBufSize = binary.LittleEndian.Uint32(b[4:8])
+	a.ReceiveBufSize = binary.LittleEndian.Uint32(b[8:12])
+	a.MaxMessageSize = binary.LittleEndian.Uint32(b[12:16])
+	a.MaxChunkCount = binary.LittleEndian.Uint32(b[16:20])
 
 	return nil
 }
 
 // Serialize serializes OPC UA Acknowledge into bytes.
-func (h *Acknowledge) Serialize() ([]byte, error) {
-	b := make([]byte, int(h.MessageSize))
-	if err := h.SerializeTo(b); err != nil {
+func (a *Acknowledge) Serialize() ([]byte, error) {
+	b := make([]byte, int(a.MessageSize))
+	if err := a.SerializeTo(b); err != nil {
 		return nil, err
 	}
 	return b, nil
@@ -82,41 +82,41 @@ func (h *Acknowledge) Serialize() ([]byte, error) {
 
 // SerializeTo serializes OPC UA Acknowledge into given bytes.
 // TODO: add error handling.
-func (h *Acknowledge) SerializeTo(b []byte) error {
-	if h == nil {
+func (a *Acknowledge) SerializeTo(b []byte) error {
+	if a == nil {
 		return errors.New("Acknowledge is nil")
 	}
-	h.Header.Payload = make([]byte, h.Len()-8)
+	a.Header.Payload = make([]byte, a.Len()-8)
 
-	binary.LittleEndian.PutUint32(h.Header.Payload[:4], h.Version)
-	binary.LittleEndian.PutUint32(h.Header.Payload[4:8], h.SendBufSize)
-	binary.LittleEndian.PutUint32(h.Header.Payload[8:12], h.ReceiveBufSize)
-	binary.LittleEndian.PutUint32(h.Header.Payload[12:16], h.MaxMessageSize)
-	binary.LittleEndian.PutUint32(h.Header.Payload[16:20], h.MaxChunkCount)
+	binary.LittleEndian.PutUint32(a.Header.Payload[:4], a.Version)
+	binary.LittleEndian.PutUint32(a.Header.Payload[4:8], a.SendBufSize)
+	binary.LittleEndian.PutUint32(a.Header.Payload[8:12], a.ReceiveBufSize)
+	binary.LittleEndian.PutUint32(a.Header.Payload[12:16], a.MaxMessageSize)
+	binary.LittleEndian.PutUint32(a.Header.Payload[16:20], a.MaxChunkCount)
 
-	h.Header.SetLength()
-	return h.Header.SerializeTo(b)
+	a.Header.SetLength()
+	return a.Header.SerializeTo(b)
 }
 
 // Len returns the actual length of Acknowledge in int.
-func (h *Acknowledge) Len() int {
+func (a *Acknowledge) Len() int {
 	return 28
 }
 
 // SetLength sets the length of Acknowledge.
-func (h *Acknowledge) SetLength() {
-	h.MessageSize = 28
+func (a *Acknowledge) SetLength() {
+	a.MessageSize = 28
 }
 
 // String returns Acknowledge in string.
-func (h *Acknowledge) String() string {
+func (a *Acknowledge) String() string {
 	return fmt.Sprintf(
 		"Header: %v, Version: %d, SendBufSize: %d, ReceiveBufSize: %d, MaxMessageSize: %d, MaxChunkCount: %d",
-		h.Header,
-		h.Version,
-		h.SendBufSize,
-		h.ReceiveBufSize,
-		h.MaxMessageSize,
-		h.MaxChunkCount,
+		a.Header,
+		a.Version,
+		a.SendBufSize,
+		a.ReceiveBufSize,
+		a.MaxMessageSize,
+		a.MaxChunkCount,
 	)
 }

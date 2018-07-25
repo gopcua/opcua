@@ -49,7 +49,7 @@ type Error struct {
 
 // NewError creates a new OPC UA Error.
 func NewError(err uint32, reason string) *Error {
-	h := &Error{
+	e := &Error{
 		Header: NewHeader(
 			MessageTypeError,
 			ChunkTypeFinal,
@@ -58,45 +58,45 @@ func NewError(err uint32, reason string) *Error {
 		Error:  err,
 		Reason: []byte(reason),
 	}
-	h.SetLength()
+	e.SetLength()
 
-	return h
+	return e
 }
 
 // DecodeError decodes given bytes into OPC UA Error.
 func DecodeError(b []byte) (*Error, error) {
-	h := &Error{}
-	if err := h.DecodeFromBytes(b); err != nil {
+	e := &Error{}
+	if err := e.DecodeFromBytes(b); err != nil {
 		return nil, err
 	}
 
-	return h, nil
+	return e, nil
 }
 
 // DecodeFromBytes decodes given bytes into OPC UA Error.
-func (h *Error) DecodeFromBytes(b []byte) error {
+func (e *Error) DecodeFromBytes(b []byte) error {
 	var err error
 	if len(b) < 8 {
 		return errors.New("Too short to decode Error")
 	}
 
-	h.Header, err = DecodeHeader(b)
+	e.Header, err = DecodeHeader(b)
 	if err != nil {
 		return err
 	}
-	b = h.Header.Payload
+	b = e.Header.Payload
 
-	h.Error = binary.LittleEndian.Uint32(b[:4])
-	h.ReasonSize = binary.LittleEndian.Uint32(b[4:8])
-	h.Reason = b[8:]
+	e.Error = binary.LittleEndian.Uint32(b[:4])
+	e.ReasonSize = binary.LittleEndian.Uint32(b[4:8])
+	e.Reason = b[8:]
 
 	return nil
 }
 
 // Serialize serializes OPC UA Error into bytes.
-func (h *Error) Serialize() ([]byte, error) {
-	b := make([]byte, int(h.MessageSize))
-	if err := h.SerializeTo(b); err != nil {
+func (e *Error) Serialize() ([]byte, error) {
+	b := make([]byte, int(e.MessageSize))
+	if err := e.SerializeTo(b); err != nil {
 		return nil, err
 	}
 	return b, nil
@@ -104,37 +104,37 @@ func (h *Error) Serialize() ([]byte, error) {
 
 // SerializeTo serializes OPC UA Error into given bytes.
 // TODO: add error handling.
-func (h *Error) SerializeTo(b []byte) error {
-	if h == nil {
+func (e *Error) SerializeTo(b []byte) error {
+	if e == nil {
 		return errors.New("Error is nil")
 	}
-	h.Header.Payload = make([]byte, h.Len()-8)
+	e.Header.Payload = make([]byte, e.Len()-8)
 
-	binary.LittleEndian.PutUint32(h.Header.Payload[:4], h.Error)
-	binary.LittleEndian.PutUint32(h.Header.Payload[4:8], h.ReasonSize)
-	copy(h.Header.Payload[8:], h.Reason)
+	binary.LittleEndian.PutUint32(e.Header.Payload[:4], e.Error)
+	binary.LittleEndian.PutUint32(e.Header.Payload[4:8], e.ReasonSize)
+	copy(e.Header.Payload[8:], e.Reason)
 
-	h.Header.SetLength()
-	return h.Header.SerializeTo(b)
+	e.Header.SetLength()
+	return e.Header.SerializeTo(b)
 }
 
 // Len returns the actual length of Error in int.
-func (h *Error) Len() int {
-	return 16 + len(h.Reason)
+func (e *Error) Len() int {
+	return 16 + len(e.Reason)
 }
 
 // SetLength sets the length of Error.
-func (h *Error) SetLength() {
-	h.MessageSize = uint32(16 + len(h.Reason))
-	h.ReasonSize = uint32(len(h.Reason))
+func (e *Error) SetLength() {
+	e.MessageSize = uint32(16 + len(e.Reason))
+	e.ReasonSize = uint32(len(e.Reason))
 }
 
 // String returns Error in string.
-func (h *Error) String() string {
+func (e *Error) String() string {
 	return fmt.Sprintf(
 		"Header: %v, Error: %d, Reason: %s",
-		h.Header,
-		h.Error,
-		h.Reason,
+		e.Header,
+		e.Error,
+		e.Reason,
 	)
 }

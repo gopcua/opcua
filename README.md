@@ -7,40 +7,44 @@ gopcua provides easy and painless encoding/decoding of OPC UA protocol in pure G
 **THIS IS STILL EXPERIMENTAL PROJECT, ANY IMPLEMENTATION MAY CHANGE DRASTICALLY IN FUTURE**
 
 
-## Example
+## Quickstart
 
-```go
-    // Create Hello (Version, SendBufSize, ReceiveBufSize, MaxMessageSize, EndPointURL)
-    hello := connection.NewHello(0, 10, 20, 1024, "opc.tcp://endpoint.example/foo/bar")
+See example directory for sample codes.
 
-    // Serialize to write on TCP connection
-    helloBytes, err := hello.Serialize()
-    if err != nil {
-        log.Fatalf("Failed to serialize Hello: %s", err)
-    }
+### Run
 
-    // Setup TCP connection
-    raddr, err := net.ResolveTCPAddr("tcp", "10.0.0.1:11111")
-    if err != nil {
-        log.Fatalf("Failed to resolve TCP Address: %s", err)
-    }
-
-    conn, err := net.DialTCP("tcp", nil, raddr)
-    if err != nil {
-        log.Fatalf("Failed to open TCP connection: %s", err)
-    }
-    defer conn.Close()
-
-    // Write on TCP connection once per 3 sec.
-    for {
-        if _, err := conn.Write(helloBytes); err != nil {
-            log.Fatalf("Failed to write Hello: %s", err)
-        }
-        log.Printf("Successfully sent Hello: %s", hello.String())
-
-        time.Sleep(3 * time.Second)
-    }
+```shell-session
+$ git clone git@github.com:wmnsk/gopcua.git
+$ cd examples/sender
+$ go run sender.go --ip <dst IP> --port <dst Port> --url "opc.tcp://endpoint.example/gopcua/server"
 ```
+
+## Roadmap
+
+(To be written more precisely...)
+
+- [ ] Protocol definitions
+    - [ ] OPC UA Connection Protocol
+        - [x] Interface to handle all messages
+        - [x] Header
+        - [x] Hello
+        - [x] Acknowledge
+        - [x] Error
+        - [ ] Reverse Hello
+    - [ ] OPC UA Secure Conversation
+        - [ ] Interface to handle all messages
+        - [x] Message Header
+        - [ ] Asymmetric algorithm Security header
+        - [ ] Symmetric algorithm Security header
+        - [ ] Sequence Header
+        - [ ] Message footer
+- [ ] State Machine
+    - [ ] Implement `net.Conn`
+    - [ ] XXX...
+- [ ] Others
+    - [ ] Documentation(GoDoc, README)
+    - [ ] Integrated way to handle common errors
+
 
 ## Author
 
