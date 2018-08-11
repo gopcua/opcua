@@ -1,3 +1,7 @@
+// Copyright 2018 gopcua authors. All rights reserved.
+// Use of this source code is governed by a MIT-style license that can be
+// found in the LICENSE file.
+
 package uasc
 
 import (
@@ -120,7 +124,7 @@ func (a *AsymmetricSecurityHeader) SerializeTo(b []byte) error {
 
 // Len returns the actual length of AsymmetricSecurityHeader in int.
 func (a *AsymmetricSecurityHeader) Len() int {
-	return 12 + len(a.SecurityPolicyURI) + len(a.SenderCertificate) + len(a.ReceiverCertificateThumbprint)
+	return 12 + len(a.SecurityPolicyURI) + len(a.SenderCertificate) + len(a.ReceiverCertificateThumbprint) + len(a.Payload)
 }
 
 // SetLength sets each length field in AsymmetricSecurityHeader.
