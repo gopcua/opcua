@@ -60,8 +60,14 @@ func (r *RequestHeader) DecodeFromBytes(b []byte) error {
 	offset += r.AuditEntryID.Len()
 
 	r.TimeoutHint = binary.LittleEndian.Uint32(b[offset : offset+4])
-	// r.AdditionalHeader = XXX
-	// copy(r.Payload, b[XXX:])
+	offset += 4
+
+	if err := r.AdditionalHeader.DecodeFromBytes(b[offset:]); err != nil {
+		return err
+	}
+	offset += r.AdditionalHeader.Len()
+
+	copy(r.Payload, b[offset:])
 
 	return nil
 }

@@ -21,3 +21,8 @@ func (a *AdditionalHeader) DecodeFromBytes(b []byte) error {
 
 	return nil
 }
+
+// Len returns the actual length of AdditionalHeader in int.
+func (a *AdditionalHeader) Len() int {
+	return 1 + a.TypeID.Len()
+}
