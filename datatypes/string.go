@@ -16,6 +16,16 @@ type String struct {
 	Value  []byte
 }
 
+// NewString creates a new String.
+func NewString(str string) *String {
+	s := &String{
+		Value: []byte(str),
+	}
+	s.Length = uint32(len(s.Value))
+
+	return s
+}
+
 // DecodeFromBytes decodes given bytes into OPC UA String.
 func (s *String) DecodeFromBytes(b []byte) error {
 	if len(b) < 4 {
@@ -23,7 +33,19 @@ func (s *String) DecodeFromBytes(b []byte) error {
 	}
 
 	s.Length = binary.LittleEndian.Uint32(b[:4])
-	copy(s.Value, b[4:int(s.Length)])
+	s.Value = b[4 : 4+int(s.Length)]
+	return nil
+}
+
+// SerializeTo serializes String into bytes.
+func (s *String) SerializeTo(b []byte) error {
+	if len(b) < s.Len() {
+		return &errors.ErrInvalidLength{s, "bytes should be longer"}
+	}
+
+	binary.LittleEndian.PutUint32(b[:4], s.Length)
+	copy(b[4:s.Len()], s.Value)
+
 	return nil
 }
 
@@ -37,8 +59,8 @@ func (s *String) Get() string {
 	return string(s.Value)
 }
 
-// Put puts the string value in String and calcurate length.
-func (s *String) Put(str string) {
+// Set sets the string value in String and calcurate length.
+func (s *String) Set(str string) {
 	s.Value = []byte(str)
 	s.Length = uint32(len(s.Value))
 }
