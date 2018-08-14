@@ -26,6 +26,16 @@ func NewString(str string) *String {
 	return s
 }
 
+// DecodeString decodes given bytes into String.
+func DecodeString(b []byte) (*String, error) {
+	s := &String{}
+	if err := s.DecodeFromBytes(b); err != nil {
+		return nil, err
+	}
+
+	return s, nil
+}
+
 // DecodeFromBytes decodes given bytes into OPC UA String.
 func (s *String) DecodeFromBytes(b []byte) error {
 	if len(b) < 4 {
