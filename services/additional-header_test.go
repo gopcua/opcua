@@ -5,7 +5,6 @@
 package services
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/wmnsk/gopcua/datatypes"
@@ -52,7 +51,6 @@ func TestSerializeAdditionalHeader(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to serialize AdditionalHeader: %s", err)
 	}
-	fmt.Printf("%x\n%x\n", serialized, testAdditionalHeaderBytes[0])
 
 	for i, s := range serialized {
 		x := testAdditionalHeaderBytes[0][i]
