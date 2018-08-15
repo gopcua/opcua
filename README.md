@@ -34,10 +34,15 @@ $ go run sender.go --ip <dst IP> --port <dst Port> --url "opc.tcp://endpoint.exa
     - [ ] OPC UA Secure Conversation
         - [ ] Interface to handle all messages
         - [x] Message Header
-        - [ ] Asymmetric algorithm Security header
-        - [ ] Symmetric algorithm Security header
-        - [ ] Sequence Header
+        - [x] Asymmetric algorithm Security header
+        - [x] Symmetric algorithm Security header
+        - [x] Sequence Header
         - [ ] Message footer
+        - [ ] Message Implementation
+            - [ ] Open Secure Channel Request / Response
+            - [ ] Close Secure Channel Request / Response
+            - [ ] Get Endpoint Request / Response
+            - [ ] XXX...
 - [ ] State Machine
     - [ ] Implement `net.Conn`
     - [ ] XXX...
