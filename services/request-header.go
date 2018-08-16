@@ -7,14 +7,16 @@ package services
 import (
 	"encoding/binary"
 	"fmt"
+	"time"
 
 	"github.com/wmnsk/gopcua/datatypes"
+	"github.com/wmnsk/gopcua/utils"
 )
 
 // RequestHeader represents a Request Header in each services.
 type RequestHeader struct {
 	AuthenticationToken datatypes.NodeID
-	Timestamp           uint64
+	Timestamp           time.Time
 	RequestHandle       uint32
 	ReturnDiagnostics   uint32
 	AuditEntryID        *datatypes.String
@@ -25,7 +27,7 @@ type RequestHeader struct {
 
 // NewRequestHeader creates a new RequestHeader.
 // TODO: impl better time handling
-func NewRequestHeader(authToken datatypes.NodeID, timestamp uint64, handle, diag, timeout uint32, auditID string, additionalHeader *AdditionalHeader, payload []byte) *RequestHeader {
+func NewRequestHeader(authToken datatypes.NodeID, timestamp time.Time, handle, diag, timeout uint32, auditID string, additionalHeader *AdditionalHeader, payload []byte) *RequestHeader {
 	return &RequestHeader{
 		AuthenticationToken: authToken,
 		Timestamp:           timestamp,
@@ -61,7 +63,7 @@ func (r *RequestHeader) DecodeFromBytes(b []byte) error {
 	}
 	offset += r.AuthenticationToken.Len()
 
-	r.Timestamp = binary.LittleEndian.Uint64(b[offset : offset+8])
+	r.Timestamp = utils.DecodeTimestamp(b[offset : offset+8])
 	offset += 8
 
 	r.RequestHandle = binary.LittleEndian.Uint32(b[offset : offset+4])
@@ -108,7 +110,7 @@ func (r *RequestHeader) SerializeTo(b []byte) error {
 	}
 	offset += r.AuthenticationToken.Len()
 
-	binary.LittleEndian.PutUint64(b[offset:offset+8], r.Timestamp)
+	utils.EncodeTimestamp(b[offset:offset+8], r.Timestamp)
 	offset += 8
 	binary.LittleEndian.PutUint32(b[offset:offset+4], r.RequestHandle)
 	offset += 4
@@ -138,9 +140,141 @@ func (r *RequestHeader) Len() int {
 	return 20 + r.AuthenticationToken.Len() + r.AuditEntryID.Len() + r.AdditionalHeader.Len() + len(r.Payload)
 }
 
+// SetDiagServiceLevelSymboricID sets the ServiceLevelSymboricID bit in ReturnDiagnostics.
+func (r *RequestHeader) SetDiagServiceLevelSymboricID() {
+	r.ReturnDiagnostics |= 0x1
+}
+
+// RequestsServiceLevelSymboricID checks if the ServiceLevelSymboricID is requested in ReturnDiagnostics.
+func (r *RequestHeader) RequestsServiceLevelSymboricID() bool {
+	return r.ReturnDiagnostics&0x1 == 1
+}
+
+// SetDiagServiceLevelLocalizedText sets the ServiceLevelLocalizedText bit in ReturnDiagnostics.
+func (r *RequestHeader) SetDiagServiceLevelLocalizedText() {
+	r.ReturnDiagnostics |= 0x2
+}
+
+// RequestsServiceLevelLocalizedText checks if the ServiceLevelLocalizedText is requested in ReturnDiagnostics.
+func (r *RequestHeader) RequestsServiceLevelLocalizedText() bool {
+	return (r.ReturnDiagnostics>>1)&0x1 == 1
+}
+
+// SetDiagServiceLevelAdditionalInfo sets the ServiceLevelAdditionalInfo bit in ReturnDiagnostics.
+func (r *RequestHeader) SetDiagServiceLevelAdditionalInfo() {
+	r.ReturnDiagnostics |= 0x4
+}
+
+// RequestsServiceLevelAdditionalInfo checks if the ServiceLevelAdditionalInfo is requested in ReturnDiagnostics.
+func (r *RequestHeader) RequestsServiceLevelAdditionalInfo() bool {
+	return (r.ReturnDiagnostics>>2)&0x1 == 1
+}
+
+// SetDiagServiceLevelInnerStatusCode sets the ServiceLevelInnerStatusCode bit in ReturnDiagnostics.
+func (r *RequestHeader) SetDiagServiceLevelInnerStatusCode() {
+	r.ReturnDiagnostics |= 0x8
+}
+
+// RequestsServiceLevelInnerStatusCode checks if the ServiceLevelInnerStatusCode is requested in ReturnDiagnostics.
+func (r *RequestHeader) RequestsServiceLevelInnerStatusCode() bool {
+	return (r.ReturnDiagnostics>>3)&0x1 == 1
+}
+
+// SetDiagServiceLevelInnerDiagnostics sets the ServiceLevelInnerDiagnostics bit in ReturnDiagnostics.
+func (r *RequestHeader) SetDiagServiceLevelInnerDiagnostics() {
+	r.ReturnDiagnostics |= 0x10
+}
+
+// RequestsServiceLevelInnerDiagnostics checks if the ServiceLevelInnerDiagnostics is requested in ReturnDiagnostics.
+func (r *RequestHeader) RequestsServiceLevelInnerDiagnostics() bool {
+	return (r.ReturnDiagnostics>>4)&0x1 == 1
+}
+
+// SetDiagOperationLevelSymboricID sets the OperationLevelSymbolicID bit in ReturnDiagnostics.
+func (r *RequestHeader) SetDiagOperationLevelSymboricID() {
+	r.ReturnDiagnostics |= 0x20
+}
+
+// RequestsOperationLevelSymboricID checks if the OperationLevelSymboricID is requested in ReturnDiagnostics.
+func (r *RequestHeader) RequestsOperationLevelSymboricID() bool {
+	return (r.ReturnDiagnostics>>5)&0x1 == 1
+}
+
+// SetDiagOperationLevelLocalizedText sets the OperationLevelLocalizedText bit in ReturnDiagnostics.
+func (r *RequestHeader) SetDiagOperationLevelLocalizedText() {
+	r.ReturnDiagnostics |= 0x40
+}
+
+// RequestsOperationLevelLocalizedText checks if the OperationLevelLocalizedText is requested in ReturnDiagnostics.
+func (r *RequestHeader) RequestsOperationLevelLocalizedText() bool {
+	return (r.ReturnDiagnostics>>6)&0x1 == 1
+}
+
+// SetDiagOperationLevelAdditionalInfo sets the OperationLevelAdditionalInfo bit in ReturnDiagnostics.
+func (r *RequestHeader) SetDiagOperationLevelAdditionalInfo() {
+	r.ReturnDiagnostics |= 0x80
+}
+
+// RequestsOperationLevelAdditionalInfo checks if the OperationLevelAdditionalInfo is requested in ReturnDiagnostics.
+func (r *RequestHeader) RequestsOperationLevelAdditionalInfo() bool {
+	return (r.ReturnDiagnostics>>7)&0x1 == 1
+}
+
+// SetDiagOperationLevelInnerStatusCode sets the OperationLevelInnerStatusCode bit in ReturnDiagnostics.
+func (r *RequestHeader) SetDiagOperationLevelInnerStatusCode() {
+	r.ReturnDiagnostics |= 0x100
+}
+
+// RequestsOperationLevelInnerStatusCode checks if the OperationLevelInnerStatusCode is requested in ReturnDiagnostics.
+func (r *RequestHeader) RequestsOperationLevelInnerStatusCode() bool {
+	return (r.ReturnDiagnostics>>8)&0x1 == 1
+}
+
+// SetDiagOperationLevelInnerDiagnostics sets the OperationLevelInnerDiagnostics bit in ReturnDiagnostics.
+func (r *RequestHeader) SetDiagOperationLevelInnerDiagnostics() {
+	r.ReturnDiagnostics |= 0x200
+}
+
+// RequestsOperationLevelInnerDiagnostics checks if the OperationLevelInnerDiagnostics is requested in ReturnDiagnostics.
+func (r *RequestHeader) RequestsOperationLevelInnerDiagnostics() bool {
+	return (r.ReturnDiagnostics>>9)&0x1 == 1
+}
+
+// SetDiagServiceAll sets all the service level bit in ReturnDiagnostics.
+func (r *RequestHeader) SetDiagServiceAll() {
+	r.SetDiagServiceLevelSymboricID()
+	r.SetDiagServiceLevelLocalizedText()
+	r.SetDiagServiceLevelAdditionalInfo()
+	r.SetDiagServiceLevelInnerStatusCode()
+	r.SetDiagServiceLevelInnerDiagnostics()
+}
+
+// SetDiagOperationAll sets all the operation level bit in ReturnDiagnostics.
+func (r *RequestHeader) SetDiagOperationAll() {
+	r.SetDiagOperationLevelSymboricID()
+	r.SetDiagOperationLevelLocalizedText()
+	r.SetDiagOperationLevelAdditionalInfo()
+	r.SetDiagOperationLevelInnerStatusCode()
+	r.SetDiagOperationLevelInnerDiagnostics()
+}
+
+// SetDiagAll sets all the bit in ReturnDiagnostics.
+func (r *RequestHeader) SetDiagAll() {
+	r.SetDiagServiceLevelSymboricID()
+	r.SetDiagServiceLevelLocalizedText()
+	r.SetDiagServiceLevelAdditionalInfo()
+	r.SetDiagServiceLevelInnerStatusCode()
+	r.SetDiagServiceLevelInnerDiagnostics()
+	r.SetDiagOperationLevelSymboricID()
+	r.SetDiagOperationLevelLocalizedText()
+	r.SetDiagOperationLevelAdditionalInfo()
+	r.SetDiagOperationLevelInnerStatusCode()
+	r.SetDiagOperationLevelInnerDiagnostics()
+}
+
 // String returns RequestHeader in string.
 func (r *RequestHeader) String() string {
-	return fmt.Sprintf("%v, %d, %d, %x, %v, %d, %v, %x",
+	return fmt.Sprintf("%v, %v, %d, %x, %v, %d, %v, %x",
 		r.AuthenticationToken,
 		r.Timestamp,
 		r.RequestHandle,

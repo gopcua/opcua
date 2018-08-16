@@ -7,16 +7,18 @@ package services
 import (
 	"encoding/binary"
 	"fmt"
+	"time"
 
 	"github.com/wmnsk/gopcua/datatypes"
+	"github.com/wmnsk/gopcua/utils"
 )
 
 // ResponseHeader represents a Response Header in each services.
 type ResponseHeader struct {
-	Timestamp          uint64
+	Timestamp          time.Time
 	RequestHandle      uint32
 	ServiceResult      uint32
-	ServiceDiagnostics *datatypes.DiagnosticInfo
+	ServiceDiagnostics *DiagnosticInfo
 	StringTable        *datatypes.StringTable
 	AdditionalHeader   *AdditionalHeader
 	Payload            []byte
@@ -24,7 +26,7 @@ type ResponseHeader struct {
 
 // NewResponseHeader creates a new ResponseHeader.
 // TODO: impl better time handling
-func NewResponseHeader(timestamp uint64, handle, code uint32, diag *datatypes.DiagnosticInfo, strs []string, additionalHeader *AdditionalHeader, payload []byte) *ResponseHeader {
+func NewResponseHeader(timestamp time.Time, handle, code uint32, diag *DiagnosticInfo, strs []string, additionalHeader *AdditionalHeader, payload []byte) *ResponseHeader {
 	return &ResponseHeader{
 		Timestamp:          timestamp,
 		RequestHandle:      handle,
@@ -50,14 +52,14 @@ func DecodeResponseHeader(b []byte) (*ResponseHeader, error) {
 func (r *ResponseHeader) DecodeFromBytes(b []byte) error {
 	var offset = 0
 
-	r.Timestamp = binary.LittleEndian.Uint64(b[offset : offset+8])
+	r.Timestamp = utils.DecodeTimestamp(b[offset : offset+8])
 	offset += 8
 	r.RequestHandle = binary.LittleEndian.Uint32(b[offset : offset+4])
 	offset += 4
 	r.ServiceResult = binary.LittleEndian.Uint32(b[offset : offset+4])
 	offset += 4
 
-	r.ServiceDiagnostics = &datatypes.DiagnosticInfo{}
+	r.ServiceDiagnostics = &DiagnosticInfo{}
 	if err := r.ServiceDiagnostics.DecodeFromBytes(b[offset:]); err != nil {
 		return err
 	}
@@ -93,7 +95,7 @@ func (r *ResponseHeader) Serialize() ([]byte, error) {
 // SerializeTo serializes ResponseHeader into bytes.
 func (r *ResponseHeader) SerializeTo(b []byte) error {
 	var offset = 0
-	binary.LittleEndian.PutUint64(b[offset:offset+8], r.Timestamp)
+	utils.EncodeTimestamp(b[offset:offset+8], r.Timestamp)
 	offset += 8
 	binary.LittleEndian.PutUint32(b[offset:offset+4], r.RequestHandle)
 	offset += 4
@@ -127,7 +129,7 @@ func (r *ResponseHeader) Len() int {
 
 // String returns ResponseHeader in string.
 func (r *ResponseHeader) String() string {
-	return fmt.Sprintf("%d, %d, %v, %v, %v, %v, %x",
+	return fmt.Sprintf("%v, %d, %v, %v, %v, %v, %x",
 		r.Timestamp,
 		r.RequestHandle,
 		r.ServiceResult,

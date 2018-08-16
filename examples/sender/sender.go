@@ -6,7 +6,6 @@ import (
 	"net"
 	"time"
 
-	"github.com/wmnsk/gopcua/datatypes"
 	"github.com/wmnsk/gopcua/services"
 	"github.com/wmnsk/gopcua/uacp"
 	"github.com/wmnsk/gopcua/uasc"
@@ -33,22 +32,14 @@ func main() {
 	payload = append(payload, hello)
 
 	// Setup OpenSecureChannel
-	opn, err := services.NewOpenSecureChannelRequest(
-		services.NewRequestHeader(
-			datatypes.NewTwoByteNodeID(0),
-			0xff010100, 1, 0x000003ff, 1000, "",
-			services.NewAdditionalHeader(
-				datatypes.NewExpandedNodeID(
-					false, false,
-					datatypes.NewTwoByteNodeID(0x00),
-					"", 0,
-				),
-				0x00,
-			),
-			nil,
-		),
-		0, 0, 1, 10000, nil,
-	).Serialize()
+	o := services.NewOpenSecureChannelRequest(
+		time.Now(),
+		0, 1, 0, 0, "",
+		0, services.ReqTypeIssue, services.SecModeNone, 6000000, nil,
+	)
+	o.RequestHeader.SetDiagAll()
+
+	opn, err := o.Serialize()
 	if err != nil {
 		log.Fatalf("Failed to serialize OpenSecureChannelRequest: %s", err)
 	}
@@ -75,6 +66,9 @@ func main() {
 	}
 
 	payload = append(payload, hdr)
+
+	//x, _ := hex.DecodeString("4f504e4684000000000000002f000000687474703a2f2f6f7063666f756e646174696f6e2e6f72672f55412f5365637572697479506f6c696379234e6f6e65000000000000000001000000010000000100be010000803553e02401000001000000ff030000ffffffff00000000000000000000000000000001000000ffffffff808d5b00")
+	//payload = append(payload, x)
 
 	raddr, err := net.ResolveTCPAddr("tcp", *ip+":"+*port)
 	if err != nil {

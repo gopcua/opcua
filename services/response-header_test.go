@@ -7,6 +7,7 @@ package services
 import (
 	"encoding/hex"
 	"testing"
+	"time"
 
 	"github.com/wmnsk/gopcua/datatypes"
 )
@@ -14,7 +15,7 @@ import (
 var testResponseHeaderBytes = [][]byte{
 	{
 		// Timestamp
-		0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x98, 0x67, 0xdd, 0xfd, 0x30, 0xd4, 0x01,
 		// RequestHandle
 		0x01, 0x00, 0x00, 0x00,
 		// ServiceResult
@@ -42,8 +43,8 @@ func TestDecodeResponseHeader(t *testing.T) {
 
 	dummyStr := hex.EncodeToString(r.Payload)
 	switch {
-	case r.Timestamp != 0x00000001:
-		t.Errorf("Timestamp doesn't match. Want: %d, Got: %d", 0x00000001, r.Timestamp)
+	case r.Timestamp.UnixNano() != 1533942000000000000:
+		t.Errorf("Timestamp doesn't match. Want: %d, Got: %d", 1533942000000000000, r.Timestamp.UnixNano())
 	case r.RequestHandle != 1:
 		t.Errorf("RequestHandle doesn't match. Want: %d, Got: %d", 1, r.RequestHandle)
 	case r.ServiceResult != 0x00000000:
@@ -62,10 +63,10 @@ func TestDecodeResponseHeader(t *testing.T) {
 
 func TestSerializeResponseHeader(t *testing.T) {
 	r := NewResponseHeader(
-		0x00000001,
+		time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
 		1,
 		0x00000000,
-		datatypes.NewDiagnosticInfo(
+		NewDiagnosticInfo(
 			false, false, false, false, false, false, false,
 			0, 0, 0, 0, nil, 0, nil,
 		),
