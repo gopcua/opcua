@@ -6,7 +6,10 @@ import (
 	"net"
 	"time"
 
+	"github.com/wmnsk/gopcua/datatypes"
+	"github.com/wmnsk/gopcua/services"
 	"github.com/wmnsk/gopcua/uacp"
+	"github.com/wmnsk/gopcua/uasc"
 )
 
 func main() {
@@ -17,7 +20,7 @@ func main() {
 		rcvBuf = flag.Int("rcvbuf", 65535, "ReceiveBufferSize")
 		maxMsg = flag.Int("maxmsg", 0, "MaxMessageSize")
 		url    = flag.String("url", "opc.tcp://deadbeef.example/foo/bar", "OPC UA Endpoint URL")
-		reason = flag.String("reason", "Something went wrong", "Error reason")
+		uri    = flag.String("uri", "http://opcfoundation.org/UA/SecurityPolicy#None", "OPC UA Secure Policy URI")
 	)
 	flag.Parse()
 
@@ -29,19 +32,49 @@ func main() {
 	}
 	payload = append(payload, hello)
 
-	// Setup Acknowledge
-	ack, err := uacp.NewAcknowledge(0, uint32(*sndBuf), uint32(*rcvBuf), uint32(*maxMsg)).Serialize()
+	// Setup OpenSecureChannel
+	opn, err := services.NewOpenSecureChannelRequest(
+		services.NewRequestHeader(
+			datatypes.NewTwoByteNodeID(0),
+			0xff010100, 1, 0x000003ff, 1000, "",
+			services.NewAdditionalHeader(
+				datatypes.NewExpandedNodeID(
+					false, false,
+					datatypes.NewTwoByteNodeID(0x00),
+					"", 0,
+				),
+				0x00,
+			),
+			nil,
+		),
+		0, 0, 1, 10000, nil,
+	).Serialize()
 	if err != nil {
-		log.Fatalf("Failed to serialize Acknowledge: %s", err)
+		log.Fatalf("Failed to serialize OpenSecureChannelRequest: %s", err)
 	}
-	payload = append(payload, ack)
 
-	// Setup Error
-	e, err := uacp.NewError(uacp.BadSecureChannelClosed, *reason).Serialize()
+	seqHdr, err := uasc.NewSequenceHeader(
+		1, 1, opn,
+	).Serialize()
 	if err != nil {
-		log.Fatalf("Failed to serialize Error: %s", err)
+		log.Fatalf("Failed to serialize SequenceHeader: %s", err)
 	}
-	payload = append(payload, e)
+
+	asyHdr, err := uasc.NewAsymmetricSecurityHeader(
+		*uri, "", "", seqHdr,
+	).Serialize()
+	if err != nil {
+		log.Fatalf("Failed to serialize AsymmetricHeader: %s", err)
+	}
+
+	hdr, err := uasc.NewHeader(
+		"OPN", "F", 0, asyHdr,
+	).Serialize()
+	if err != nil {
+		log.Fatalf("Failed to serialize MessageHeader: %s", err)
+	}
+
+	payload = append(payload, hdr)
 
 	raddr, err := net.ResolveTCPAddr("tcp", *ip+":"+*port)
 	if err != nil {
