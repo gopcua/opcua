@@ -5,8 +5,9 @@
 package uacp
 
 import (
-	"errors"
 	"fmt"
+
+	"github.com/wmnsk/gopcua/errors"
 )
 
 // Generic is an alias of OPC UA Header.
@@ -43,7 +44,7 @@ func DecodeGeneric(b []byte) (*Generic, error) {
 func (g *Generic) DecodeFromBytes(b []byte) error {
 	var err error
 	if len(b) < 8 {
-		return errors.New("Too short to decode Generic")
+		return &errors.ErrTooShortToDecode{g, "should be longer than 8 bytes"}
 	}
 
 	g.Header, err = DecodeHeader(b)

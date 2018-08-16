@@ -6,8 +6,9 @@ package uasc
 
 import (
 	"encoding/binary"
-	"errors"
 	"fmt"
+
+	"github.com/wmnsk/gopcua/errors"
 )
 
 // SequenceHeader represents a Sequence Header in OPC UA Secure Conversation.
@@ -44,7 +45,7 @@ func DecodeSequenceHeader(b []byte) (*SequenceHeader, error) {
 func (s *SequenceHeader) DecodeFromBytes(b []byte) error {
 	l := len(b)
 	if l < 8 {
-		return errors.New("Too short to decode SequenceHeader")
+		return &errors.ErrTooShortToDecode{s, "should be longer than 8 bytes"}
 	}
 	s.SequenceNumber = binary.LittleEndian.Uint32(b[:4])
 	s.RequestID = binary.LittleEndian.Uint32(b[4:8])

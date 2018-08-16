@@ -6,9 +6,9 @@ package uacp
 
 import (
 	"encoding/binary"
-	"errors"
 	"fmt"
 
+	"github.com/wmnsk/gopcua/errors"
 	"github.com/wmnsk/gopcua/utils"
 )
 
@@ -60,7 +60,7 @@ func DecodeHeader(b []byte) (*Header, error) {
 // DecodeFromBytes decodes given bytes into OPC UA Header.
 func (h *Header) DecodeFromBytes(b []byte) error {
 	if len(b) < 8 {
-		return errors.New("Too short to decode Header")
+		return &errors.ErrTooShortToDecode{h, "should be longer than 8 bytes"}
 	}
 
 	h.MessageType = utils.Uint24To32(b[:3])
@@ -83,6 +83,9 @@ func (h *Header) Serialize() ([]byte, error) {
 // SerializeTo serializes OPC UA Connection Header into given bytes.
 // TODO: add error handling.
 func (h *Header) SerializeTo(b []byte) error {
+	if h == nil {
+		return &errors.ErrReceiverNil{h}
+	}
 	copy(b[:3], utils.Uint32To24(h.MessageType))
 	b[3] = h.ChunkType
 	binary.LittleEndian.PutUint32(b[4:8], h.MessageSize)

@@ -6,8 +6,9 @@ package uasc
 
 import (
 	"encoding/binary"
-	"errors"
 	"fmt"
+
+	"github.com/wmnsk/gopcua/errors"
 )
 
 // AsymmetricSecurityHeader represents a Asymmetric Algorithm Security Header in OPC UA Secure Conversation.
@@ -49,7 +50,7 @@ func DecodeAsymmetricSecurityHeader(b []byte) (*AsymmetricSecurityHeader, error)
 func (a *AsymmetricSecurityHeader) DecodeFromBytes(b []byte) error {
 	l := len(b)
 	if l < 12 {
-		return errors.New("Too short to decode AsymmetricSecurityHeader")
+		return &errors.ErrTooShortToDecode{a, "should be longer than 12 bytes"}
 	}
 
 	var offset = 4
@@ -59,7 +60,7 @@ func (a *AsymmetricSecurityHeader) DecodeFromBytes(b []byte) error {
 		offset += int(a.SecurityPolicyURILength)
 	}
 	if l < offset+4 {
-		return errors.New("Too short to decode AsymmetricSecurityHeader")
+		return &errors.ErrTooShortToDecode{a, "should be longer"}
 	}
 
 	a.SenderCertificateLength = int32(binary.LittleEndian.Uint32(b[offset : offset+4]))
@@ -69,7 +70,7 @@ func (a *AsymmetricSecurityHeader) DecodeFromBytes(b []byte) error {
 		offset += int(a.SenderCertificateLength)
 	}
 	if l < offset+4 {
-		return errors.New("Too short to decode AsymmetricSecurityHeader")
+		return &errors.ErrTooShortToDecode{a, "should be longer"}
 	}
 
 	a.ReceiverCertificateThumbprintLength = int32(binary.LittleEndian.Uint32(b[offset : offset+4]))

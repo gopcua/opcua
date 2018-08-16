@@ -6,8 +6,9 @@ package uacp
 
 import (
 	"encoding/binary"
-	"errors"
 	"fmt"
+
+	"github.com/wmnsk/gopcua/errors"
 )
 
 // Hello represents a OPC UA Hello.
@@ -56,7 +57,7 @@ func DecodeHello(b []byte) (*Hello, error) {
 func (h *Hello) DecodeFromBytes(b []byte) error {
 	var err error
 	if len(b) < 24 {
-		return errors.New("Too short to decode Hello")
+		return &errors.ErrTooShortToDecode{h, "should be longer than 24 bytes"}
 	}
 
 	h.Header, err = DecodeHeader(b)
@@ -89,7 +90,7 @@ func (h *Hello) Serialize() ([]byte, error) {
 // TODO: add error handling.
 func (h *Hello) SerializeTo(b []byte) error {
 	if h == nil {
-		return errors.New("Hello is nil")
+		return &errors.ErrReceiverNil{h}
 	}
 	h.Header.Payload = make([]byte, h.Len()-8)
 

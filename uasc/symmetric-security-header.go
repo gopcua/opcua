@@ -6,8 +6,9 @@ package uasc
 
 import (
 	"encoding/binary"
-	"errors"
 	"fmt"
+
+	"github.com/wmnsk/gopcua/errors"
 )
 
 // SymmetricSecurityHeader represents a Symmetric Algorithm Security Header in OPC UA Secure Conversation.
@@ -42,7 +43,7 @@ func DecodeSymmetricSecurityHeader(b []byte) (*SymmetricSecurityHeader, error) {
 func (s *SymmetricSecurityHeader) DecodeFromBytes(b []byte) error {
 	l := len(b)
 	if l < 4 {
-		return errors.New("Too short to decode SymmetricSecurityHeader")
+		return &errors.ErrTooShortToDecode{s, "should be longer than 4 bytes"}
 	}
 	s.TokenID = binary.LittleEndian.Uint32(b[:4])
 	s.Payload = b[4:]

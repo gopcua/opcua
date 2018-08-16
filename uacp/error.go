@@ -6,8 +6,9 @@ package uacp
 
 import (
 	"encoding/binary"
-	"errors"
 	"fmt"
+
+	"github.com/wmnsk/gopcua/errors"
 )
 
 // Error definitions.
@@ -77,7 +78,7 @@ func DecodeError(b []byte) (*Error, error) {
 func (e *Error) DecodeFromBytes(b []byte) error {
 	var err error
 	if len(b) < 8 {
-		return errors.New("Too short to decode Error")
+		return &errors.ErrTooShortToDecode{e, "should be longer than 8 bytes"}
 	}
 
 	e.Header, err = DecodeHeader(b)
@@ -106,7 +107,7 @@ func (e *Error) Serialize() ([]byte, error) {
 // TODO: add error handling.
 func (e *Error) SerializeTo(b []byte) error {
 	if e == nil {
-		return errors.New("Error is nil")
+		return &errors.ErrReceiverNil{e}
 	}
 	e.Header.Payload = make([]byte, e.Len()-8)
 
