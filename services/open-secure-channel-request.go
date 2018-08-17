@@ -6,9 +6,24 @@ package services
 
 import (
 	"encoding/binary"
+	"time"
 
 	"github.com/wmnsk/gopcua/datatypes"
 	"github.com/wmnsk/gopcua/errors"
+)
+
+// SecurityTokenRequestType definitions.
+const (
+	ReqTypeIssue uint32 = iota
+	ReqTypeRenew
+)
+
+// MessageSecurityMode definitions.
+const (
+	SecModeInvalid uint32 = iota
+	SecModeNone
+	SecModeSign
+	SecModeSignAndEncrypt
 )
 
 // OpenSecureChannelRequest represents an OpenSecureChannelRequest.
@@ -23,7 +38,7 @@ type OpenSecureChannelRequest struct {
 }
 
 // NewOpenSecureChannelRequest creates an OpenSecureChannelRequest.
-func NewOpenSecureChannelRequest(hdr *RequestHeader, ver, tokenType, securityMode, lifetime uint32, nonce []byte) *OpenSecureChannelRequest {
+func NewOpenSecureChannelRequest(ts time.Time, authToken uint8, handle, diag, timeout uint32, auditID string, ver, tokenType, securityMode, lifetime uint32, nonce []byte) *OpenSecureChannelRequest {
 	o := &OpenSecureChannelRequest{
 		TypeID: datatypes.NewExpandedNodeID(
 			false, false,
@@ -32,7 +47,23 @@ func NewOpenSecureChannelRequest(hdr *RequestHeader, ver, tokenType, securityMod
 			),
 			"", 0,
 		),
-		RequestHeader:            hdr,
+		RequestHeader: NewRequestHeader(
+			datatypes.NewTwoByteNodeID(authToken),
+			ts,
+			handle,
+			diag,
+			timeout,
+			auditID,
+			NewAdditionalHeader(
+				datatypes.NewExpandedNodeID(
+					false, false,
+					datatypes.NewTwoByteNodeID(0),
+					"", 0,
+				),
+				0x00,
+			),
+			nil,
+		),
 		ClientProtocolVersion:    ver,
 		SecurityTokenRequestType: tokenType,
 		MessageSecurityMode:      securityMode,

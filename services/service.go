@@ -25,8 +25,8 @@ type Service interface {
 	ServiceType() uint16
 }
 
-// DecodeService decodes given bytes into Service, depending on the type of service.
-func DecodeService(b []byte) (Service, error) {
+// Decode decodes given bytes into Service, depending on the type of service.
+func Decode(b []byte) (Service, error) {
 	var s Service
 
 	typeID, err := datatypes.DecodeExpandedNodeID(b)

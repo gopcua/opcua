@@ -2,11 +2,13 @@
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
-package datatypes
+package services
 
 import (
 	"encoding/binary"
 	"fmt"
+
+	"github.com/wmnsk/gopcua/datatypes"
 )
 
 // DiagnosticInfo represents the DiagnosticInfo.
@@ -16,13 +18,13 @@ type DiagnosticInfo struct {
 	NamespaceURI        int32
 	Locale              int32
 	LocalizedText       int32
-	AdditionalInfo      *String
+	AdditionalInfo      *datatypes.String
 	InnerStatusCode     uint32
 	InnerDiagnosticInfo *DiagnosticInfo
 }
 
 // NewDiagnosticInfo creates a new DiagnosticInfo.
-func NewDiagnosticInfo(hasSymID, hasURI, hasText, hasLocale, hasInfo, hasInnerStatus, hasInnerDiag bool, symID, uri, locale, text int32, info *String, code uint32, diag *DiagnosticInfo) *DiagnosticInfo {
+func NewDiagnosticInfo(hasSymID, hasURI, hasText, hasLocale, hasInfo, hasInnerStatus, hasInnerDiag bool, symID, uri, locale, text int32, info *datatypes.String, code uint32, diag *DiagnosticInfo) *DiagnosticInfo {
 	d := &DiagnosticInfo{
 		SymboricID:          symID,
 		NamespaceURI:        uri,
@@ -58,6 +60,14 @@ func NewDiagnosticInfo(hasSymID, hasURI, hasText, hasLocale, hasInfo, hasInnerSt
 	return d
 }
 
+// NewNullDiagnosticInfo creates a DiagnosticInfo without any info.
+func NewNullDiagnosticInfo() *DiagnosticInfo {
+	return NewDiagnosticInfo(
+		false, false, false, false, false, false, false,
+		0, 0, 0, 0, nil, 0, nil,
+	)
+}
+
 // DecodeDiagnosticInfo decodes given bytes into DiagnosticInfo.
 func DecodeDiagnosticInfo(b []byte) (*DiagnosticInfo, error) {
 	d := &DiagnosticInfo{}
@@ -89,7 +99,7 @@ func (d *DiagnosticInfo) DecodeFromBytes(b []byte) error {
 		offset += 4
 	}
 	if d.HasAdditionalInfo() {
-		d.AdditionalInfo = &String{}
+		d.AdditionalInfo = &datatypes.String{}
 		if err := d.AdditionalInfo.DecodeFromBytes(b[offset:]); err != nil {
 			return err
 		}
@@ -262,7 +272,7 @@ func (d *DiagnosticInfo) SetInnerDiagnosticInfoFlag() {
 	d.EncodingMask |= 0x40
 }
 
-// String returns DiagnosticInfo in string.
+// datatypes.String returns DiagnosticInfo in string.
 func (d *DiagnosticInfo) String() string {
 	var str []string
 	str = append(str, fmt.Sprintf("%x", d.EncodingMask))

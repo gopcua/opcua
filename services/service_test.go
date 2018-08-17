@@ -6,8 +6,7 @@ package services
 
 import (
 	"testing"
-
-	"github.com/wmnsk/gopcua/datatypes"
+	"time"
 )
 
 var testServiceBytes = [][]byte{
@@ -15,8 +14,8 @@ var testServiceBytes = [][]byte{
 		// TypeID
 		0x01, 0x00, 0xbe, 0x01,
 		// RequestHeader
-		0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0xff, 0x03,
+		0x00, 0x00, 0x00, 0x98, 0x67, 0xdd, 0xfd, 0x30,
+		0xd4, 0x01, 0x01, 0x00, 0x00, 0x00, 0xff, 0x03,
 		0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x00, 0x00,
 		// ClientProtocolVersion
@@ -34,11 +33,11 @@ var testServiceBytes = [][]byte{
 		// TypeID
 		0x01, 0x00, 0xc1, 0x01,
 		// ResponseHeader
-		0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x98, 0x67, 0xdd, 0xfd, 0x30, 0xd4, 0x01,
 		0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 		0x00, 0x02, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00,
 		0x00, 0x66, 0x6f, 0x6f, 0x03, 0x00, 0x00, 0x00,
-		0x62, 0x61, 0x72, 0x00, 0xff, 0x00,
+		0x62, 0x61, 0x72, 0x00, 0x00, 0x00,
 		// ServerProtocolVersion
 		0x00, 0x00, 0x00, 0x00,
 		// SecurityToken
@@ -53,10 +52,10 @@ var testServiceBytes = [][]byte{
 	{},
 }
 
-func TestDecodeServices(t *testing.T) {
+func TestDecode(t *testing.T) {
 	t.Run("open-sec-chan-req", func(t *testing.T) {
 		t.Parallel()
-		o, err := DecodeService(testServiceBytes[0])
+		o, err := Decode(testServiceBytes[0])
 		if err != nil {
 			t.Fatalf("Failed to decode Service: %s", err)
 		}
@@ -84,7 +83,7 @@ func TestDecodeServices(t *testing.T) {
 	})
 	t.Run("open-sec-chan-res", func(t *testing.T) {
 		t.Parallel()
-		o, err := DecodeService(testServiceBytes[1])
+		o, err := Decode(testServiceBytes[1])
 		if err != nil {
 			t.Fatalf("Failed to decode Service: %s", err)
 		}
@@ -118,25 +117,11 @@ func TestSerializeServices(t *testing.T) {
 	t.Run("open-sec-chan-req", func(t *testing.T) {
 		t.Parallel()
 		o := NewOpenSecureChannelRequest(
-			NewRequestHeader(
-				datatypes.NewTwoByteNodeID(0),
-				1,
-				1,
-				0x000003ff,
-				0,
-				"",
-				NewAdditionalHeader(
-					datatypes.NewExpandedNodeID(
-						false, false,
-						datatypes.NewTwoByteNodeID(0),
-						"", 0,
-					),
-					0x00,
-				),
-				nil,
-			),
-			0, 0, 1, 6000000, nil,
+			time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
+			0, 1, 0, 0, "",
+			0, ReqTypeIssue, SecModeNone, 6000000, nil,
 		)
+		o.RequestHeader.SetDiagAll()
 
 		serialized, err := o.Serialize()
 		if err != nil {
@@ -154,25 +139,11 @@ func TestSerializeServices(t *testing.T) {
 	t.Run("open-sec-chan-res", func(t *testing.T) {
 		t.Parallel()
 		o := NewOpenSecureChannelResponse(
-			NewResponseHeader(
-				1,
-				1,
-				0x00000000,
-				datatypes.NewDiagnosticInfo(
-					false, false, false, false, false, false, false,
-					0, 0, 0, 0, nil, 0, nil,
-				),
-				[]string{"foo", "bar"},
-				NewAdditionalHeader(
-					datatypes.NewExpandedNodeID(
-						false, false,
-						datatypes.NewTwoByteNodeID(0xff),
-						"", 0,
-					),
-					0x00,
-				),
-				nil,
-			),
+			time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
+			1,
+			0x00000000,
+			NewNullDiagnosticInfo(),
+			[]string{"foo", "bar"},
 			0,
 			NewChannelSecurityToken(
 				1, 2, 1, 6000000,

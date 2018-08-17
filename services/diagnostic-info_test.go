@@ -2,10 +2,12 @@
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
-package datatypes
+package services
 
 import (
 	"testing"
+
+	"github.com/wmnsk/gopcua/datatypes"
 )
 
 var testDiagnosticInfoBytes = [][]byte{
@@ -197,10 +199,7 @@ func TestDecodeDiagnosticInfo(t *testing.T) {
 
 func TestSerializeDiagnosticInfo(t *testing.T) {
 	t.Run("nothing", func(t *testing.T) {
-		d := NewDiagnosticInfo(
-			false, false, false, false, false, false, false,
-			0, 0, 0, 0, nil, 0, nil,
-		)
+		d := NewNullDiagnosticInfo()
 
 		serialized, err := d.Serialize()
 		if err != nil {
@@ -295,7 +294,7 @@ func TestSerializeDiagnosticInfo(t *testing.T) {
 		d := NewDiagnosticInfo(
 			false, false, false, false, true, false, false,
 			0, 0, 0, 0,
-			NewString("foobar"),
+			datatypes.NewString("foobar"),
 			0, nil,
 		)
 
@@ -358,7 +357,7 @@ func TestSerializeDiagnosticInfo(t *testing.T) {
 		d := NewDiagnosticInfo(
 			true, true, true, true, true, true, true,
 			1, 2, 4, 3,
-			NewString("foobar"),
+			datatypes.NewString("foobar"),
 			6,
 			NewDiagnosticInfo(
 				true, false, false, false, false, false, false,

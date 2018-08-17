@@ -7,6 +7,7 @@ package services
 import (
 	"encoding/hex"
 	"testing"
+	"time"
 
 	"github.com/wmnsk/gopcua/datatypes"
 )
@@ -16,7 +17,7 @@ var testRequestHeaderBytes = [][]byte{
 		// AuthenticationToken
 		0x01, 0x00, 0xf0, 0x80,
 		// Timestamp
-		0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x98, 0x67, 0xdd, 0xfd, 0x30, 0xd4, 0x01,
 		// RequestHandle
 		0x01, 0x00, 0x00, 0x00,
 		// ReturnDiagnostics
@@ -45,8 +46,8 @@ func TestDecodeRequestHeader(t *testing.T) {
 	switch {
 	case r.AuthenticationToken.EncodingMaskValue() != datatypes.TypeFourByte:
 		t.Errorf("AuthenticationToken doesn't match. Want: %x, Got: %x", datatypes.TypeFourByte, r.AuthenticationToken.EncodingMaskValue())
-	case r.Timestamp != 0x01:
-		t.Errorf("Timestamp doesn't match. Want: %d, Got: %d", 0x01, r.Timestamp)
+	case r.Timestamp.UnixNano() != 1533942000000000000:
+		t.Errorf("Timestamp doesn't match. Want: %d, Got: %d", 1533942000000000000, r.Timestamp.UnixNano())
 	case r.RequestHandle != 0x01:
 		t.Errorf("RequestHandle doesn't match. Want: %d, Got: %d", 0x01, r.RequestHandle)
 	case r.ReturnDiagnostics != 0x03ff:
@@ -66,9 +67,9 @@ func TestDecodeRequestHeader(t *testing.T) {
 func TestSerializeRequestHeader(t *testing.T) {
 	r := NewRequestHeader(
 		datatypes.NewFourByteNodeID(0, 33008),
-		0x00000001,
+		time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
 		1,
-		0x000003ff,
+		0,
 		0,
 		"foobar",
 		NewAdditionalHeader(
@@ -81,6 +82,7 @@ func TestSerializeRequestHeader(t *testing.T) {
 		),
 		[]byte{0xde, 0xad, 0xbe, 0xef},
 	)
+	r.SetDiagAll()
 
 	serialized, err := r.Serialize()
 	if err != nil {
