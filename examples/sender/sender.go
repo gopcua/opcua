@@ -41,22 +41,25 @@ func main() {
 		services.ReqTypeIssue, services.SecModeNone,
 		6000000, nil,
 	)
-	o.RequestHeader.SetDiagAll()
+	o.SetDiagAll()
 	opn, err := uasc.New(o, cfg).Serialize()
+	if err != nil {
+		log.Fatalf("Failed to serialize OpenSecureChannel: %s", err)
+	}
 
+	// Prepare TCP connection
 	raddr, err := net.ResolveTCPAddr("tcp", *ip+":"+*port)
 	if err != nil {
 		log.Fatalf("Failed to resolve TCP Address: %s", err)
 	}
 
-	// Prepare TCP connection
 	conn, err := net.DialTCP("tcp", nil, raddr)
 	if err != nil {
 		log.Fatalf("Failed to open TCP connection: %s", err)
 	}
 	defer conn.Close()
 
-	// Send Hello and wait for response to come
+	// Send Hello and wait for Acknowledge to come
 	if _, err := conn.Write(hello); err != nil {
 		log.Fatalf("Failed to write Hello: %s", err)
 	}
@@ -68,7 +71,6 @@ func main() {
 		log.Fatalf("Failed to read from conn: %s", err)
 	}
 
-	// Send Hello and wait for Acknowledge to come
 	cp, err := uacp.Decode(buf[:n])
 	if err != nil {
 		log.Fatalf("Something went wrong: %s", err)
@@ -90,12 +92,13 @@ func main() {
 		}
 
 		sc, err := uasc.Decode(buf[:m])
+		if err != nil {
+			log.Fatalf("Something went wrong: %s", err)
+		}
 		log.Printf("Received: %s", sc)
 	case uacp.MessageTypeError:
 		log.Fatalf("Received Error, closing: %s", cp)
-		conn.Close()
 	default:
 		log.Fatalf("Received unexpected message, closing: %s", cp)
-		conn.Close()
 	}
 }
