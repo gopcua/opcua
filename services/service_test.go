@@ -7,8 +7,6 @@ package services
 import (
 	"testing"
 	"time"
-
-	"github.com/wmnsk/gopcua/datatypes"
 )
 
 var testServiceBytes = [][]byte{
@@ -39,7 +37,7 @@ var testServiceBytes = [][]byte{
 		0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 		0x00, 0x02, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00,
 		0x00, 0x66, 0x6f, 0x6f, 0x03, 0x00, 0x00, 0x00,
-		0x62, 0x61, 0x72, 0x00, 0xff, 0x00,
+		0x62, 0x61, 0x72, 0x00, 0x00, 0x00,
 		// ServerProtocolVersion
 		0x00, 0x00, 0x00, 0x00,
 		// SecurityToken
@@ -54,10 +52,10 @@ var testServiceBytes = [][]byte{
 	{},
 }
 
-func TestDecodeServices(t *testing.T) {
+func TestDecode(t *testing.T) {
 	t.Run("open-sec-chan-req", func(t *testing.T) {
 		t.Parallel()
-		o, err := DecodeService(testServiceBytes[0])
+		o, err := Decode(testServiceBytes[0])
 		if err != nil {
 			t.Fatalf("Failed to decode Service: %s", err)
 		}
@@ -85,7 +83,7 @@ func TestDecodeServices(t *testing.T) {
 	})
 	t.Run("open-sec-chan-res", func(t *testing.T) {
 		t.Parallel()
-		o, err := DecodeService(testServiceBytes[1])
+		o, err := Decode(testServiceBytes[1])
 		if err != nil {
 			t.Fatalf("Failed to decode Service: %s", err)
 		}
@@ -141,22 +139,11 @@ func TestSerializeServices(t *testing.T) {
 	t.Run("open-sec-chan-res", func(t *testing.T) {
 		t.Parallel()
 		o := NewOpenSecureChannelResponse(
-			NewResponseHeader(
-				time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-				1,
-				0x00000000,
-				NewNullDiagnosticInfo(),
-				[]string{"foo", "bar"},
-				NewAdditionalHeader(
-					datatypes.NewExpandedNodeID(
-						false, false,
-						datatypes.NewTwoByteNodeID(0xff),
-						"", 0,
-					),
-					0x00,
-				),
-				nil,
-			),
+			time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
+			1,
+			0x00000000,
+			NewNullDiagnosticInfo(),
+			[]string{"foo", "bar"},
 			0,
 			NewChannelSecurityToken(
 				1, 2, 1, 6000000,

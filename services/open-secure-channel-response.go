@@ -6,6 +6,7 @@ package services
 
 import (
 	"encoding/binary"
+	"time"
 
 	"github.com/wmnsk/gopcua/datatypes"
 	"github.com/wmnsk/gopcua/errors"
@@ -21,7 +22,7 @@ type OpenSecureChannelResponse struct {
 }
 
 // NewOpenSecureChannelResponse creates an OpenSecureChannelResponse.
-func NewOpenSecureChannelResponse(hdr *ResponseHeader, ver uint32, secToken *ChannelSecurityToken, nonce []byte) *OpenSecureChannelResponse {
+func NewOpenSecureChannelResponse(timestamp time.Time, handle, code uint32, diag *DiagnosticInfo, strs []string, ver uint32, secToken *ChannelSecurityToken, nonce []byte) *OpenSecureChannelResponse {
 	o := &OpenSecureChannelResponse{
 		TypeID: datatypes.NewExpandedNodeID(
 			false, false,
@@ -30,7 +31,17 @@ func NewOpenSecureChannelResponse(hdr *ResponseHeader, ver uint32, secToken *Cha
 			),
 			"", 0,
 		),
-		ResponseHeader:        hdr,
+		ResponseHeader: NewResponseHeader(
+			timestamp, handle, code, diag, strs,
+			NewAdditionalHeader(
+				datatypes.NewExpandedNodeID(
+					false, false,
+					datatypes.NewTwoByteNodeID(0),
+					"", 0,
+				),
+				0x00,
+			), nil,
+		),
 		ServerProtocolVersion: ver,
 		SecurityToken:         secToken,
 		ServerNonce:           datatypes.NewByteString(nonce),
