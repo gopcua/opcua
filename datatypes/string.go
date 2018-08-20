@@ -6,6 +6,7 @@ package datatypes
 
 import (
 	"encoding/binary"
+	"fmt"
 
 	"github.com/wmnsk/gopcua/errors"
 )
@@ -95,16 +96,28 @@ func (s *String) Set(str string) {
 	s.Length = int32(len(s.Value))
 }
 
-// StringTable represents the StringTable.
-type StringTable struct {
-	ArraySize uint32
+// String returns String in string.
+func (s *String) String() string {
+	return fmt.Sprintf("%d, %s", s.Length, s.Get())
+}
+
+// StringArray represents the StringArray.
+type StringArray struct {
+	ArraySize int32
 	Strings   []*String
 }
 
-// NewStringTable creates a new StringTable from multiple strings.
-func NewStringTable(strs []string) *StringTable {
-	s := &StringTable{
-		ArraySize: uint32(len(strs)),
+// NewStringArray creates a new StringArray from multiple strings.
+func NewStringArray(strs []string) *StringArray {
+	if strs == nil {
+		s := &StringArray{
+			ArraySize: -1,
+		}
+		return s
+	}
+
+	s := &StringArray{
+		ArraySize: int32(len(strs)),
 	}
 	for _, ss := range strs {
 		s.Strings = append(s.Strings, NewString(ss))
@@ -113,9 +126,9 @@ func NewStringTable(strs []string) *StringTable {
 	return s
 }
 
-// DecodeStringTable decodes given bytes into StringTable.
-func DecodeStringTable(b []byte) (*StringTable, error) {
-	s := &StringTable{}
+// DecodeStringArray decodes given bytes into StringArray.
+func DecodeStringArray(b []byte) (*StringArray, error) {
+	s := &StringArray{}
 	if err := s.DecodeFromBytes(b); err != nil {
 		return nil, err
 	}
@@ -123,11 +136,15 @@ func DecodeStringTable(b []byte) (*StringTable, error) {
 	return s, nil
 }
 
-// DecodeFromBytes decodes given bytes into StringTable.
+// DecodeFromBytes decodes given bytes into StringArray.
 // TODO: add validation to avoid crash.
-func (s *StringTable) DecodeFromBytes(b []byte) error {
+func (s *StringArray) DecodeFromBytes(b []byte) error {
+	s.ArraySize = int32(binary.LittleEndian.Uint32(b[:4]))
+	if s.ArraySize <= 0 {
+		return nil
+	}
+
 	var offset = 4
-	s.ArraySize = binary.LittleEndian.Uint32(b[:4])
 	for i := 1; i <= int(s.ArraySize); i++ {
 		str, err := DecodeString(b[offset:])
 		if err != nil {
@@ -140,8 +157,8 @@ func (s *StringTable) DecodeFromBytes(b []byte) error {
 	return nil
 }
 
-// Serialize serializes StringTable into bytes.
-func (s *StringTable) Serialize() ([]byte, error) {
+// Serialize serializes StringArray into bytes.
+func (s *StringArray) Serialize() ([]byte, error) {
 	b := make([]byte, s.Len())
 	if err := s.SerializeTo(b); err != nil {
 		return nil, err
@@ -150,10 +167,10 @@ func (s *StringTable) Serialize() ([]byte, error) {
 	return b, nil
 }
 
-// SerializeTo serializes StringTable into bytes.
-func (s *StringTable) SerializeTo(b []byte) error {
+// SerializeTo serializes StringArray into bytes.
+func (s *StringArray) SerializeTo(b []byte) error {
 	var offset = 4
-	binary.LittleEndian.PutUint32(b[:4], s.ArraySize)
+	binary.LittleEndian.PutUint32(b[:4], uint32(s.ArraySize))
 
 	for _, ss := range s.Strings {
 		if err := ss.SerializeTo(b[offset:]); err != nil {
@@ -166,7 +183,7 @@ func (s *StringTable) SerializeTo(b []byte) error {
 }
 
 // Len returns the actual length in int.
-func (s *StringTable) Len() int {
+func (s *StringArray) Len() int {
 	l := 4
 	for _, ss := range s.Strings {
 		l += ss.Len()

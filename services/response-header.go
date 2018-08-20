@@ -19,7 +19,7 @@ type ResponseHeader struct {
 	RequestHandle      uint32
 	ServiceResult      uint32
 	ServiceDiagnostics *DiagnosticInfo
-	StringTable        *datatypes.StringTable
+	StringTable        *datatypes.StringArray
 	AdditionalHeader   *AdditionalHeader
 	Payload            []byte
 }
@@ -32,7 +32,7 @@ func NewResponseHeader(timestamp time.Time, handle, code uint32, diag *Diagnosti
 		RequestHandle:      handle,
 		ServiceResult:      code,
 		ServiceDiagnostics: diag,
-		StringTable:        datatypes.NewStringTable(strs),
+		StringTable:        datatypes.NewStringArray(strs),
 		AdditionalHeader:   additionalHeader,
 		Payload:            payload,
 	}
@@ -65,7 +65,7 @@ func (r *ResponseHeader) DecodeFromBytes(b []byte) error {
 	}
 	offset += r.ServiceDiagnostics.Len()
 
-	r.StringTable = &datatypes.StringTable{}
+	r.StringTable = &datatypes.StringArray{}
 	if err := r.StringTable.DecodeFromBytes(b[offset:]); err != nil {
 		return err
 	}
