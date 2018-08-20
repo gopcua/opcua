@@ -54,7 +54,6 @@ func TestDecode(t *testing.T) {
 			t.Errorf("ChunkType doesn't match. Want: %s, Got: %s", "F", chunkType)
 		}
 	})
-	/* XXX - not implemented yet.
 	t.Run("RHE", func(t *testing.T) {
 		t.Parallel()
 		u, err := Decode(testReverseHelloBytes[0])
@@ -77,7 +76,6 @@ func TestDecode(t *testing.T) {
 			t.Errorf("ChunkType doesn't match. Want: %s, Got: %s", "F", chunkType)
 		}
 	})
-	*/
 	t.Run("XXX", func(t *testing.T) {
 		t.Parallel()
 		u, err := Decode(testGenericBytes[0])

@@ -32,41 +32,41 @@ var testAcknowledgeBytes = [][]byte{
 }
 
 func TestDecodeAcknowledge(t *testing.T) {
-	h, err := DecodeAcknowledge(testAcknowledgeBytes[0])
+	a, err := DecodeAcknowledge(testAcknowledgeBytes[0])
 	if err != nil {
 		t.Fatalf("Failed to decode Acknowledge: %s", err)
 	}
 
 	switch {
-	case h.MessageTypeValue() != MessageTypeAcknowledge:
-		t.Errorf("MessageType doesn't match. Want: %s, Got: %s", MessageTypeAcknowledge, h.MessageTypeValue())
-	case h.ChunkTypeValue() != ChunkTypeFinal:
-		t.Errorf("ChunkType doesn't match. Want: %s, Got: %s", ChunkTypeFinal, h.ChunkTypeValue())
-	case h.MessageSize != 28:
-		t.Errorf("MessageSize doesn't match. Want: %d, Got: %d", 28, h.MessageSize)
-	case h.Version != 0:
-		t.Errorf("Version doesn't match. Want: %d, Got: %d", 0, h.Version)
-	case h.SendBufSize != 65535:
-		t.Errorf("SendBufSize doesn't match. Want: %d, Got: %d", 65535, h.SendBufSize)
-	case h.ReceiveBufSize != 65535:
-		t.Errorf("ReceiveBufSize doesn't match. Want: %d, Got: %d", 65535, h.ReceiveBufSize)
-	case h.MaxMessageSize != 4000:
-		t.Errorf("MaxMessageSize doesn't match. Want: %d, Got: %d", 4000, h.MaxMessageSize)
-	case h.MaxChunkCount != 0:
-		t.Errorf("MaxChunkCount doesn't match. Want: %d, Got: %d", 0, h.MaxChunkCount)
+	case a.MessageTypeValue() != MessageTypeAcknowledge:
+		t.Errorf("MessageType doesn't match. Want: %s, Got: %s", MessageTypeAcknowledge, a.MessageTypeValue())
+	case a.ChunkTypeValue() != ChunkTypeFinal:
+		t.Errorf("ChunkType doesn't match. Want: %s, Got: %s", ChunkTypeFinal, a.ChunkTypeValue())
+	case a.MessageSize != 28:
+		t.Errorf("MessageSize doesn't match. Want: %d, Got: %d", 28, a.MessageSize)
+	case a.Version != 0:
+		t.Errorf("Version doesn't match. Want: %d, Got: %d", 0, a.Version)
+	case a.SendBufSize != 65535:
+		t.Errorf("SendBufSize doesn't match. Want: %d, Got: %d", 65535, a.SendBufSize)
+	case a.ReceiveBufSize != 65535:
+		t.Errorf("ReceiveBufSize doesn't match. Want: %d, Got: %d", 65535, a.ReceiveBufSize)
+	case a.MaxMessageSize != 4000:
+		t.Errorf("MaxMessageSize doesn't match. Want: %d, Got: %d", 4000, a.MaxMessageSize)
+	case a.MaxChunkCount != 0:
+		t.Errorf("MaxChunkCount doesn't match. Want: %d, Got: %d", 0, a.MaxChunkCount)
 	}
-	t.Log(h)
+	t.Log(a.String())
 }
 
 func TestSerializeAcknowledge(t *testing.T) {
-	h := NewAcknowledge(
+	a := NewAcknowledge(
 		0,      //Version
 		0xffff, // SendBufSize
 		0xffff, // ReceiveBufSize
 		4000,   // MaxMessageSize
 	)
 
-	serialized, err := h.Serialize()
+	serialized, err := a.Serialize()
 	if err != nil {
 		t.Fatalf("Failed to serialize Acknowledge: %s", err)
 	}
