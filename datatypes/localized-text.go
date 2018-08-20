@@ -9,6 +9,12 @@ import (
 )
 
 // LocalizedText represents a LocalizedText.
+// A LocalizedText structure contains two fields that could be missing.
+// For that reason, the encoding uses a bit mask to indicate which fields
+// are actually present in the encoded form.
+//
+// Part 6
+// 5.2.2.14
 type LocalizedText struct {
 	EncodingMask uint8
 	Locale       *String
