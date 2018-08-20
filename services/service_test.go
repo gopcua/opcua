@@ -47,7 +47,7 @@ var testServiceBytes = [][]byte{
 		// ServerNonce
 		0x01, 0x00, 0x00, 0x00, 0xff,
 	},
-	{ // GetEndpointRequest
+	{ // GetEndpointsRequest
 		// TypeID
 		0x01, 0x00, 0xac, 0x01,
 		// RequestHeader
@@ -67,7 +67,7 @@ var testServiceBytes = [][]byte{
 		// ProfileURIs
 		0xff, 0xff, 0xff, 0xff,
 	},
-	{ // GetEndpointResponse
+	{ // GetEndpointsResponse
 		// TypeID
 		0x01, 0x00, 0xaf, 0x01,
 		// ResponseHeader
@@ -254,14 +254,14 @@ func TestDecode(t *testing.T) {
 			t.Fatalf("Failed to decode Service: %s", err)
 		}
 
-		gep, ok := g.(*GetEndpointRequest)
+		gep, ok := g.(*GetEndpointsRequest)
 		if !ok {
 			t.Fatalf("Failed to assert type.")
 		}
 
 		switch {
-		case g.ServiceType() != ServiceTypeGetEndpointRequest:
-			t.Errorf("ServiceType doesn't Match. Want: %d, Got: %d", ServiceTypeGetEndpointRequest, g.ServiceType())
+		case g.ServiceType() != ServiceTypeGetEndpointsRequest:
+			t.Errorf("ServiceType doesn't Match. Want: %d, Got: %d", ServiceTypeGetEndpointsRequest, g.ServiceType())
 		case gep.EndpointURL.Get() != "opc.tcp://wow.its.easy:11111/UA/Server":
 			t.Errorf("EndpointURL doesn't Match. Want: %s, Got: %s", "opc.tcp://wow.its.easy:11111/UA/Server", gep.EndpointURL.Get())
 		case gep.LocalIDs.ArraySize != -1:
@@ -278,13 +278,13 @@ func TestDecode(t *testing.T) {
 			t.Fatalf("Failed to decode Service: %s", err)
 		}
 
-		gep, ok := g.(*GetEndpointResponse)
+		gep, ok := g.(*GetEndpointsResponse)
 		if !ok {
 			t.Fatalf("Failed to assert type.")
 		}
 
-		if g.ServiceType() != ServiceTypeGetEndpointResponse {
-			t.Errorf("ServiceType doesn't Match. Want: %d, Got: %d", ServiceTypeGetEndpointResponse, g.ServiceType())
+		if g.ServiceType() != ServiceTypeGetEndpointsResponse {
+			t.Errorf("ServiceType doesn't Match. Want: %d, Got: %d", ServiceTypeGetEndpointsResponse, g.ServiceType())
 		}
 
 		for _, ep := range gep.Endpoints.EndpointDescriptions {
@@ -362,7 +362,7 @@ func TestSerializeServices(t *testing.T) {
 	})
 	t.Run("get-endpoint-req", func(t *testing.T) {
 		t.Parallel()
-		g := NewGetEndpointRequest(
+		g := NewGetEndpointsRequest(
 			time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
 			1, 0, 0, "",
 			"opc.tcp://wow.its.easy:11111/UA/Server",
@@ -385,7 +385,7 @@ func TestSerializeServices(t *testing.T) {
 	})
 	t.Run("get-endpoint-res", func(t *testing.T) {
 		t.Parallel()
-		g := NewGetEndpointResponse(
+		g := NewGetEndpointsResponse(
 			time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
 			1, 0x00000000,
 			NewNullDiagnosticInfo(),

@@ -11,20 +11,20 @@ import (
 	"github.com/wmnsk/gopcua/errors"
 )
 
-// GetEndpointResponse represents an GetEndpointResponse.
-type GetEndpointResponse struct {
+// GetEndpointsResponse represents an GetEndpointsResponse.
+type GetEndpointsResponse struct {
 	TypeID *datatypes.ExpandedNodeID
 	*ResponseHeader
 	Endpoints *EndpointDescriptionArray
 }
 
-// NewGetEndpointResponse creates an GetEndpointResponse.
-func NewGetEndpointResponse(ts time.Time, handle, code uint32, diag *DiagnosticInfo, strs []string, endpoints ...*EndpointDescription) *GetEndpointResponse {
-	g := &GetEndpointResponse{
+// NewGetEndpointsResponse creates an GetEndpointsResponse.
+func NewGetEndpointsResponse(ts time.Time, handle, code uint32, diag *DiagnosticInfo, strs []string, endpoints ...*EndpointDescription) *GetEndpointsResponse {
+	g := &GetEndpointsResponse{
 		TypeID: datatypes.NewExpandedNodeID(
 			false, false,
 			datatypes.NewFourByteNodeID(
-				0, ServiceTypeGetEndpointResponse,
+				0, ServiceTypeGetEndpointsResponse,
 			),
 			"", 0,
 		),
@@ -50,9 +50,9 @@ func NewGetEndpointResponse(ts time.Time, handle, code uint32, diag *DiagnosticI
 	return g
 }
 
-// DecodeGetEndpointResponse decodes given bytes into GetEndpointResponse.
-func DecodeGetEndpointResponse(b []byte) (*GetEndpointResponse, error) {
-	g := &GetEndpointResponse{}
+// DecodeGetEndpointsResponse decodes given bytes into GetEndpointsResponse.
+func DecodeGetEndpointsResponse(b []byte) (*GetEndpointsResponse, error) {
+	g := &GetEndpointsResponse{}
 	if err := g.DecodeFromBytes(b); err != nil {
 		return nil, err
 	}
@@ -60,8 +60,8 @@ func DecodeGetEndpointResponse(b []byte) (*GetEndpointResponse, error) {
 	return g, nil
 }
 
-// DecodeFromBytes decodes given bytes into GetEndpointResponse.
-func (g *GetEndpointResponse) DecodeFromBytes(b []byte) error {
+// DecodeFromBytes decodes given bytes into GetEndpointsResponse.
+func (g *GetEndpointsResponse) DecodeFromBytes(b []byte) error {
 	if len(b) < 16 {
 		return &errors.ErrTooShortToDecode{g, "should be longer than 16 bytes"}
 	}
@@ -88,8 +88,8 @@ func (g *GetEndpointResponse) DecodeFromBytes(b []byte) error {
 	return nil
 }
 
-// Serialize serializes GetEndpointResponse into bytes.
-func (g *GetEndpointResponse) Serialize() ([]byte, error) {
+// Serialize serializes GetEndpointsResponse into bytes.
+func (g *GetEndpointsResponse) Serialize() ([]byte, error) {
 	b := make([]byte, g.Len())
 	if err := g.SerializeTo(b); err != nil {
 		return nil, err
@@ -98,8 +98,8 @@ func (g *GetEndpointResponse) Serialize() ([]byte, error) {
 	return b, nil
 }
 
-// SerializeTo serializes GetEndpointResponse into bytes.
-func (g *GetEndpointResponse) SerializeTo(b []byte) error {
+// SerializeTo serializes GetEndpointsResponse into bytes.
+func (g *GetEndpointsResponse) SerializeTo(b []byte) error {
 	var offset = 0
 	if g.TypeID != nil {
 		if err := g.TypeID.SerializeTo(b[offset:]); err != nil {
@@ -124,8 +124,8 @@ func (g *GetEndpointResponse) SerializeTo(b []byte) error {
 	return nil
 }
 
-// Len returns the actual length of GetEndpointResponse.
-func (g *GetEndpointResponse) Len() int {
+// Len returns the actual length of GetEndpointsResponse.
+func (g *GetEndpointsResponse) Len() int {
 	var l = 0
 	if g.TypeID != nil {
 		l += g.TypeID.Len()
@@ -141,6 +141,6 @@ func (g *GetEndpointResponse) Len() int {
 }
 
 // ServiceType returns type of Service in uint16.
-func (g *GetEndpointResponse) ServiceType() uint16 {
-	return ServiceTypeGetEndpointResponse
+func (g *GetEndpointsResponse) ServiceType() uint16 {
+	return ServiceTypeGetEndpointsResponse
 }

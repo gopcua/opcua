@@ -2,4 +2,7 @@
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
-package uasc
+/*
+Package uacp provides encoding/decoding feature for OPC UA Connection Protocol.
+*/
+package uacp

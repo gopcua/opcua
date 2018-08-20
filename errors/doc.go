@@ -2,4 +2,7 @@
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
-package uasc
+/*
+Package errors defines the errors used in multiple packages in common.
+*/
+package errors

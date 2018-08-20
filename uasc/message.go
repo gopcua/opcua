@@ -25,11 +25,25 @@ type Config struct {
 	Certificate       []byte
 	Thumbprint        []byte
 	RequestID         uint32
+	SecurityTokenID   uint32
+	CurrentSequence   uint32
 }
 
 // New creates a OPC UA Secure Conversation message, depending on the type of service given.
 func New(srv services.Service, cfg *Config) *Message {
 	switch srv.ServiceType() {
+	case services.ServiceTypeGetEndpointsRequest:
+		gep, ok := srv.(*services.GetEndpointsRequest)
+		if !ok {
+			return nil
+		}
+		return newGetEndpointsRequest(gep, cfg)
+	case services.ServiceTypeGetEndpointsResponse:
+		gep, ok := srv.(*services.GetEndpointsResponse)
+		if !ok {
+			return nil
+		}
+		return newGetEndpointsResponse(gep, cfg)
 	case services.ServiceTypeOpenSecureChannelRequest:
 		osc, ok := srv.(*services.OpenSecureChannelRequest)
 		if !ok {
@@ -47,14 +61,40 @@ func New(srv services.Service, cfg *Config) *Message {
 	}
 }
 
+func newGetEndpointsRequest(gep *services.GetEndpointsRequest, cfg *Config) *Message {
+	m := &Message{
+		Header:                  NewHeader(MessageTypeMessage, ChunkTypeFinal, cfg.SecureChannelID, nil),
+		SymmetricSecurityHeader: NewSymmetricSecurityHeader(cfg.SecurityTokenID, nil),
+		SequenceHeader: NewSequenceHeader(
+			cfg.CurrentSequence, cfg.RequestID, nil,
+		),
+		Service: gep,
+	}
+
+	return m
+}
+
+func newGetEndpointsResponse(gep *services.GetEndpointsResponse, cfg *Config) *Message {
+	m := &Message{
+		Header:                  NewHeader(MessageTypeMessage, ChunkTypeFinal, cfg.SecureChannelID, nil),
+		SymmetricSecurityHeader: NewSymmetricSecurityHeader(cfg.SecurityTokenID, nil),
+		SequenceHeader: NewSequenceHeader(
+			cfg.CurrentSequence, cfg.RequestID, nil,
+		),
+		Service: gep,
+	}
+
+	return m
+}
+
 func newOpenSecureChannelRequest(osc *services.OpenSecureChannelRequest, cfg *Config) *Message {
 	m := &Message{
-		Header: NewHeader(MessageTypeOpenSecureChannel, ChunkTypeFinal, 1, nil),
+		Header: NewHeader(MessageTypeOpenSecureChannel, ChunkTypeFinal, cfg.SecureChannelID, nil),
 		AsymmetricSecurityHeader: NewAsymmetricSecurityHeader(
 			cfg.SecurityPolicyURI, cfg.Certificate, cfg.Thumbprint, nil,
 		),
 		SequenceHeader: NewSequenceHeader(
-			1, cfg.RequestID, nil,
+			cfg.CurrentSequence, cfg.RequestID, nil,
 		),
 		Service: osc,
 	}
@@ -64,12 +104,12 @@ func newOpenSecureChannelRequest(osc *services.OpenSecureChannelRequest, cfg *Co
 
 func newOpenSecureChannelResponse(osc *services.OpenSecureChannelResponse, cfg *Config) *Message {
 	m := &Message{
-		Header: NewHeader(MessageTypeOpenSecureChannel, ChunkTypeFinal, 1, nil),
+		Header: NewHeader(MessageTypeOpenSecureChannel, ChunkTypeFinal, cfg.SecureChannelID, nil),
 		AsymmetricSecurityHeader: NewAsymmetricSecurityHeader(
 			cfg.SecurityPolicyURI, cfg.Certificate, cfg.Thumbprint, nil,
 		),
 		SequenceHeader: NewSequenceHeader(
-			1, cfg.RequestID, nil,
+			cfg.CurrentSequence, cfg.RequestID, nil,
 		),
 		Service: osc,
 	}
@@ -132,7 +172,7 @@ func (m *Message) decodeMSGFromBytes(b []byte) error {
 		return err
 	}
 	m.SequenceHeader = &SequenceHeader{}
-	if err := m.SequenceHeader.DecodeFromBytes(m.AsymmetricSecurityHeader.Payload); err != nil {
+	if err := m.SequenceHeader.DecodeFromBytes(m.SymmetricSecurityHeader.Payload); err != nil {
 		return err
 	}
 

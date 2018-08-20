@@ -34,7 +34,15 @@ func main() {
 		SecureChannelID:   1,
 		SecurityPolicyURI: *uri,
 		RequestID:         1,
+		SecurityTokenID:   0,
+		CurrentSequence:   0,
 	}
+
+	g := services.NewGetEndpointsRequest(
+		time.Now(), 1, 0, 0,
+		"", *url, nil, nil,
+	)
+	g.SetDiagAll()
 
 	o := services.NewOpenSecureChannelRequest(
 		time.Now(), 0, 1, 0, 0, "", 0,
@@ -42,11 +50,6 @@ func main() {
 		6000000, nil,
 	)
 	o.SetDiagAll()
-	opn, err := uasc.New(o, cfg).Serialize()
-	if err != nil {
-		log.Fatalf("Failed to serialize OpenSecureChannel: %s", err)
-	}
-
 	// Prepare TCP connection
 	raddr, err := net.ResolveTCPAddr("tcp", *ip+":"+*port)
 	if err != nil {
@@ -65,7 +68,7 @@ func main() {
 	}
 	log.Printf("Successfully sent Hello: %x", hello)
 
-	buf := make([]byte, 1500)
+	buf := make([]byte, 10000)
 	n, err := conn.Read(buf)
 	if err != nil {
 		log.Fatalf("Failed to read from conn: %s", err)
@@ -81,21 +84,58 @@ func main() {
 		log.Printf("Received Acknowlege: %s", cp)
 
 		// Send OpenSecureChannelRequest and wait for Resposne to come
+		opn, err := uasc.New(o, cfg).Serialize()
+		if err != nil {
+			log.Fatalf("Failed to serialize OpenSecureChannel: %s", err)
+		}
+		cfg.CurrentSequence++
+
 		if _, err := conn.Write(opn); err != nil {
 			log.Fatalf("Failed to write OpenSecureChannel: %s", err)
 		}
 		log.Printf("Successfully sent OpenSecureChannel: %x", opn)
+
+		l, err := conn.Read(buf)
+		if err != nil {
+			log.Fatalf("Failed to read from conn: %s", err)
+		}
+
+		// Decode OpenSecureChannelResponse and retrieve the values told from server.
+		sc, err := uasc.Decode(buf[:l])
+		if err != nil {
+			log.Printf("Something went wrong: %s", err)
+		}
+		log.Printf("Received: %s\nRaw: %x", sc, buf[:l])
+
+		osc, ok := sc.Service.(*services.OpenSecureChannelResponse)
+		if !ok {
+			log.Fatal("Assertion failed.")
+		}
+		cfg.SecureChannelID = sc.SecureChannelID
+		cfg.SecurityTokenID = osc.SecurityToken.TokenID
+		// Send GetEndpointsRequest and wait for Resposne to come
+		gep, err := uasc.New(g, cfg).Serialize()
+		if err != nil {
+			log.Fatalf("Failed to serialize GetEndpointsRequest: %s", err)
+		}
+		cfg.CurrentSequence++
+
+		if _, err := conn.Write(gep); err != nil {
+			log.Fatalf("Failed to write GetEndpoints: %s", err)
+		}
+		log.Printf("Successfully sent GetEndpoints: %x", gep)
 
 		m, err := conn.Read(buf)
 		if err != nil {
 			log.Fatalf("Failed to read from conn: %s", err)
 		}
 
-		sc, err := uasc.Decode(buf[:m])
+		gres, err := uasc.Decode(buf[:m])
 		if err != nil {
-			log.Fatalf("Something went wrong: %s", err)
+			log.Printf("Something went wrong: %s", err)
 		}
-		log.Printf("Received: %s", sc)
+		log.Printf("Received: %s\nRaw: %x", gres, buf[:m])
+
 	case uacp.MessageTypeError:
 		log.Fatalf("Received Error, closing: %s", cp)
 	default:
