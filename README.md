@@ -2,6 +2,9 @@
 
 [![CircleCI](https://circleci.com/gh/wmnsk/gopcua.svg?style=svg)](https://circleci.com/gh/wmnsk/gopcua)
 
+[![GoDoc](https://godoc.org/github.com/wmnsk/gopcua?status.svg)](https://godoc.org/github.com/wmnsk/gopcua)
+[![GitHub](https://img.shields.io/github/license/mashape/apistatus.svg)](https://github.com/wmnsk/gopcua/blob/master/LICENSE)
+
 gopcua provides easy and painless encoding/decoding of OPC UA protocol in pure Golang.
 
 ## Disclaimer
@@ -25,13 +28,13 @@ go run sender.go --ip <dst IP> --port <dst Port> --url "opc.tcp://endpoint.examp
 (To be written more precisely...)
 
 - [ ] Protocol definitions
-  - [ ] OPC UA Connection Protocol
+  - [x] OPC UA Connection Protocol
     - [x] Interface to handle all messages
     - [x] Header
     - [x] Hello
     - [x] Acknowledge
     - [x] Error
-    - [ ] Reverse Hello
+    - [x] Reverse Hello
   - [ ] OPC UA Secure Conversation
     - [x] Message header
     - [x] Asymmetric algorithm Security header

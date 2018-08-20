@@ -30,10 +30,8 @@ func Decode(b []byte) (UACP, error) {
 		u = &Acknowledge{}
 	case MessageTypeError:
 		u = &Error{}
-	/* XXX - not implemented yet.
 	case MessageTypeReverseHello:
 		u = &ReverseHello{}
-	*/
 	default:
 		u = &Generic{}
 	}
@@ -51,5 +49,6 @@ func Serialize(message UACP) ([]byte, error) {
 	if err := message.SerializeTo(b); err != nil {
 		return nil, err
 	}
+
 	return b, nil
 }

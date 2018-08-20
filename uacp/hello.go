@@ -8,6 +8,7 @@ import (
 	"encoding/binary"
 	"fmt"
 
+	"github.com/wmnsk/gopcua/datatypes"
 	"github.com/wmnsk/gopcua/errors"
 )
 
@@ -19,8 +20,7 @@ type Hello struct {
 	ReceiveBufSize uint32
 	MaxMessageSize uint32
 	MaxChunkCount  uint32
-	PayloadSize    uint32
-	EndPointURL    []byte
+	EndPointURL    *datatypes.String
 }
 
 // NewHello creates a new OPC UA Hello.
@@ -36,7 +36,7 @@ func NewHello(ver, sndBuf, rcvBuf, maxMsg uint32, endpoint string) *Hello {
 		ReceiveBufSize: rcvBuf,
 		MaxMessageSize: maxMsg,
 		MaxChunkCount:  0,
-		EndPointURL:    []byte(endpoint),
+		EndPointURL:    datatypes.NewString(endpoint),
 	}
 	h.SetLength()
 
@@ -71,8 +71,11 @@ func (h *Hello) DecodeFromBytes(b []byte) error {
 	h.ReceiveBufSize = binary.LittleEndian.Uint32(b[8:12])
 	h.MaxMessageSize = binary.LittleEndian.Uint32(b[12:16])
 	h.MaxChunkCount = binary.LittleEndian.Uint32(b[16:20])
-	h.PayloadSize = binary.LittleEndian.Uint32(b[20:24])
-	h.EndPointURL = b[24:]
+
+	h.EndPointURL = &datatypes.String{}
+	if err := h.EndPointURL.DecodeFromBytes(b[20:]); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -83,11 +86,11 @@ func (h *Hello) Serialize() ([]byte, error) {
 	if err := h.SerializeTo(b); err != nil {
 		return nil, err
 	}
+
 	return b, nil
 }
 
 // SerializeTo serializes OPC UA Hello into given bytes.
-// TODO: add error handling.
 func (h *Hello) SerializeTo(b []byte) error {
 	if h == nil {
 		return &errors.ErrReceiverNil{h}
@@ -99,44 +102,37 @@ func (h *Hello) SerializeTo(b []byte) error {
 	binary.LittleEndian.PutUint32(h.Header.Payload[8:12], h.ReceiveBufSize)
 	binary.LittleEndian.PutUint32(h.Header.Payload[12:16], h.MaxMessageSize)
 	binary.LittleEndian.PutUint32(h.Header.Payload[16:20], h.MaxChunkCount)
-	binary.LittleEndian.PutUint32(h.Header.Payload[20:24], h.PayloadSize)
-	copy(h.Header.Payload[24:], h.EndPointURL)
+
+	if h.EndPointURL != nil {
+		if err := h.EndPointURL.SerializeTo(h.Header.Payload[20:]); err != nil {
+			return err
+		}
+	}
 
 	h.Header.SetLength()
 	return h.Header.SerializeTo(b)
 }
 
-// EndPointURLString returns EndPointURL in string
-func (h *Hello) EndPointURLString() string {
-	if h == nil {
-		return ""
-	}
-
-	return string(h.EndPointURL)
-}
-
 // Len returns the actual length of Hello in int.
 func (h *Hello) Len() int {
-	return 32 + len(h.EndPointURL)
+	return 28 + h.EndPointURL.Len()
 }
 
 // SetLength sets the length of Hello.
 func (h *Hello) SetLength() {
-	h.MessageSize = uint32(32 + len(h.EndPointURL))
-	h.PayloadSize = uint32(len(h.EndPointURL))
+	h.MessageSize = uint32(28 + h.EndPointURL.Len())
 }
 
 // String returns Hello in string.
 func (h *Hello) String() string {
 	return fmt.Sprintf(
-		"Header: %v, Version: %d, SendBufSize: %d, ReceiveBufSize: %d, MaxMessageSize: %d, MaxChunkCount: %d, PayloadSize: %d, EndPointURL: %s",
+		"Header: %v, Version: %d, SendBufSize: %d, ReceiveBufSize: %d, MaxMessageSize: %d, MaxChunkCount: %d, EndPointURL: %s",
 		h.Header,
 		h.Version,
 		h.SendBufSize,
 		h.ReceiveBufSize,
 		h.MaxMessageSize,
 		h.MaxChunkCount,
-		h.PayloadSize,
-		h.EndPointURL,
+		h.EndPointURL.Get(),
 	)
 }
