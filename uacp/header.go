@@ -13,6 +13,9 @@ import (
 )
 
 // MessageType definitions.
+//
+// Part 6
+// 7.1.2.2
 const (
 	MessageTypeHello        = "HEL"
 	MessageTypeAcknowledge  = "ACK"
@@ -21,6 +24,9 @@ const (
 )
 
 // ChunkType definitions.
+//
+// Part 6
+// 6.7.2.2
 const (
 	ChunkTypeIntermediate = "C"
 	ChunkTypeFinal        = "F"
@@ -28,6 +34,9 @@ const (
 )
 
 // Header represents a OPC UA Connection Header.
+//
+// Part 6
+// 7.1.2.2
 type Header struct {
 	MessageType uint32
 	ChunkType   uint8

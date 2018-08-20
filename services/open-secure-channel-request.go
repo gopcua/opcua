@@ -13,12 +13,18 @@ import (
 )
 
 // SecurityTokenRequestType definitions.
+//
+// Part 4
+// 5.5.2.2
 const (
 	ReqTypeIssue uint32 = iota
 	ReqTypeRenew
 )
 
 // MessageSecurityMode definitions.
+//
+// Part 4
+// 7.15
 const (
 	SecModeInvalid uint32 = iota
 	SecModeNone

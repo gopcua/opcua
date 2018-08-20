@@ -12,6 +12,9 @@ import (
 )
 
 // ApplicationType definitions.
+//
+// Part 4
+// 7.1
 const (
 	AppTypeServer uint32 = iota
 	AppTypeClient
@@ -20,6 +23,9 @@ const (
 )
 
 // ApplicationDescription represents an ApplicationDescription.
+//
+// Part 4
+// 7.1
 type ApplicationDescription struct {
 	ApplicationURI      *datatypes.String
 	ProductURI          *datatypes.String

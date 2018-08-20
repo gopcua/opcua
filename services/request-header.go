@@ -14,6 +14,9 @@ import (
 )
 
 // RequestHeader represents a Request Header in each services.
+//
+// Part 4
+// 7.28
 type RequestHeader struct {
 	AuthenticationToken datatypes.NodeID
 	Timestamp           time.Time
