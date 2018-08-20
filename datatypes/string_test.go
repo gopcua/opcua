@@ -16,7 +16,7 @@ var testStringBytes = [][]byte{
 	{ // null String
 		0xff, 0xff, 0xff, 0xff,
 	},
-	{ // StringTable
+	{ // StringArray
 		// ArraySize
 		0x02, 0x00, 0x00, 0x00,
 		// first String: "foo"
@@ -57,11 +57,11 @@ func TestDecodeString(t *testing.T) {
 	})
 }
 
-func TestDecodeStringTable(t *testing.T) {
+func TestDecodeStringArray(t *testing.T) {
 	t.Run("normal", func(t *testing.T) {
-		strs, err := DecodeStringTable(testStringBytes[2])
+		strs, err := DecodeStringArray(testStringBytes[2])
 		if err != nil {
-			t.Fatalf("Failed to decode StringTable: %s", err)
+			t.Fatalf("Failed to decode StringArray: %s", err)
 		}
 
 		switch {
@@ -119,14 +119,14 @@ func TestSerializeString(t *testing.T) {
 	})
 }
 
-func TestSerializeStringTable(t *testing.T) {
+func TestSerializeStringArray(t *testing.T) {
 	t.Run("normal", func(t *testing.T) {
 		t.Parallel()
-		strs := NewStringTable([]string{"foo", "bar"})
+		strs := NewStringArray([]string{"foo", "bar"})
 
 		serialized, err := strs.Serialize()
 		if err != nil {
-			t.Fatalf("Failed to serialize StringTable: %s", err)
+			t.Fatalf("Failed to serialize StringArray: %s", err)
 		}
 
 		for i, s := range serialized {
