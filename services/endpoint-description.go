@@ -206,8 +206,8 @@ type EndpointDescriptionArray struct {
 	EndpointDescriptions []*EndpointDescription
 }
 
-// NewEndpointDesctiptionArray creates an NewEndpointDesctiptionArray from multiple EndpointDesctiption.
-func NewEndpointDesctiptionArray(descs []*EndpointDescription) *EndpointDescriptionArray {
+// NewEndpointDescriptionArray creates an NewEndpointDescriptionArray from multiple EndpointDesctiption.
+func NewEndpointDescriptionArray(descs []*EndpointDescription) *EndpointDescriptionArray {
 	e := &EndpointDescriptionArray{
 		ArraySize: int32(len(descs)),
 	}
