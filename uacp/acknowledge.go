@@ -6,8 +6,9 @@ package uacp
 
 import (
 	"encoding/binary"
-	"errors"
 	"fmt"
+
+	"github.com/wmnsk/gopcua/errors"
 )
 
 // Acknowledge represents a OPC UA Acknowledge.
@@ -53,7 +54,7 @@ func DecodeAcknowledge(b []byte) (*Acknowledge, error) {
 func (a *Acknowledge) DecodeFromBytes(b []byte) error {
 	var err error
 	if len(b) < 20 {
-		return errors.New("Too short to decode Acknowledge")
+		return &errors.ErrTooShortToDecode{a, "should be longer than 20 bytes"}
 	}
 
 	a.Header, err = DecodeHeader(b)
@@ -84,7 +85,7 @@ func (a *Acknowledge) Serialize() ([]byte, error) {
 // TODO: add error handling.
 func (a *Acknowledge) SerializeTo(b []byte) error {
 	if a == nil {
-		return errors.New("Acknowledge is nil")
+		return &errors.ErrReceiverNil{a}
 	}
 	a.Header.Payload = make([]byte, a.Len()-8)
 

@@ -2,10 +2,14 @@
 
 [![CircleCI](https://circleci.com/gh/wmnsk/gopcua.svg?style=svg)](https://circleci.com/gh/wmnsk/gopcua)
 
+[![GoDoc](https://godoc.org/github.com/wmnsk/gopcua?status.svg)](https://godoc.org/github.com/wmnsk/gopcua)
+[![GitHub](https://img.shields.io/github/license/mashape/apistatus.svg)](https://github.com/wmnsk/gopcua/blob/master/LICENSE)
+
 gopcua provides easy and painless encoding/decoding of OPC UA protocol in pure Golang.
 
-**THIS IS STILL EXPERIMENTAL PROJECT, ANY IMPLEMENTATION MAY CHANGE DRASTICALLY IN FUTURE**
+## Disclaimer
 
+THIS IS STILL EXPERIMENTAL PROJECT, ANY IMPLEMENTATION INCLUDING EXPORTED APIs MAY CHANGE DRASTICALLY IN THE FUTURE
 
 ## Quickstart
 
@@ -14,9 +18,9 @@ See example directory for sample codes.
 ### Run
 
 ```shell-session
-$ git clone git@github.com:wmnsk/gopcua.git
-$ cd examples/sender
-$ go run sender.go --ip <dst IP> --port <dst Port> --url "opc.tcp://endpoint.example/gopcua/server"
+git clone git@github.com:wmnsk/gopcua.git
+cd examples/sender
+go run sender.go --ip <dst IP> --port <dst Port> --url "opc.tcp://endpoint.example/gopcua/server"
 ```
 
 ## Roadmap
@@ -24,27 +28,34 @@ $ go run sender.go --ip <dst IP> --port <dst Port> --url "opc.tcp://endpoint.exa
 (To be written more precisely...)
 
 - [ ] Protocol definitions
-    - [ ] OPC UA Connection Protocol
-        - [x] Interface to handle all messages
-        - [x] Header
-        - [x] Hello
-        - [x] Acknowledge
-        - [x] Error
-        - [ ] Reverse Hello
-    - [ ] OPC UA Secure Conversation
-        - [ ] Interface to handle all messages
-        - [x] Message Header
-        - [ ] Asymmetric algorithm Security header
-        - [ ] Symmetric algorithm Security header
-        - [ ] Sequence Header
-        - [ ] Message footer
-- [ ] State Machine
-    - [ ] Implement `net.Conn`
+  - [x] OPC UA Connection Protocol
+    - [x] Interface to handle all messages
+    - [x] Header
+    - [x] Hello
+    - [x] Acknowledge
+    - [x] Error
+    - [x] Reverse Hello
+  - [ ] OPC UA Secure Conversation
+    - [x] Message header
+    - [x] Asymmetric algorithm Security header
+    - [x] Symmetric algorithm Security header
+    - [x] Sequence header
+    - [ ] Message footer
+  - [ ] Service Implementation
+    - [x] Interface to handle all services
+    - [x] Open Secure Channel Request / Response
+    - [ ] Close Secure Channel Request / Response
+    - [x] Get Endpoints Request / Response
+    - [ ] Create Session Request / Response
+    - [ ] Activate Session Request / Response
     - [ ] XXX...
+- [ ] State Machine
+  - [ ] Implement `net.Conn`
+  - [ ] XXX...
 - [ ] Others
-    - [ ] Documentation(GoDoc, README)
-    - [ ] Integrated way to handle common errors
-
+  - [ ] Documentation (improve GoDoc, README)
+  - [x] Integrated way to handle common errors
+  - [ ] XXX...
 
 ## Author
 

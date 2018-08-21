@@ -25,32 +25,32 @@ var testGenericBytes = [][]byte{
 }
 
 func TestDecodeGeneric(t *testing.T) {
-	h, err := DecodeGeneric(testGenericBytes[0])
+	g, err := DecodeGeneric(testGenericBytes[0])
 	if err != nil {
 		t.Fatalf("Failed to decode Generic: %s", err)
 	}
 
-	dummyStr := hex.EncodeToString(h.Payload)
+	dummyStr := hex.EncodeToString(g.Payload)
 	switch {
-	case h.MessageTypeValue() != "XXX":
-		t.Errorf("MessageType doesn't match. Want: %s, Got: %s", "XXX", h.MessageTypeValue())
-	case h.ChunkTypeValue() != "X":
-		t.Errorf("ChunkType doesn't match. Want: %s, Got: %s", "X", h.ChunkTypeValue())
-	case h.MessageSize != 12:
-		t.Errorf("MessageSize doesn't match. Want: %d, Got: %d", 12, h.MessageSize)
+	case g.MessageTypeValue() != "XXX":
+		t.Errorf("MessageType doesn't match. Want: %s, Got: %s", "XXX", g.MessageTypeValue())
+	case g.ChunkTypeValue() != "X":
+		t.Errorf("ChunkType doesn't match. Want: %s, Got: %s", "X", g.ChunkTypeValue())
+	case g.MessageSize != 12:
+		t.Errorf("MessageSize doesn't match. Want: %d, Got: %d", 12, g.MessageSize)
 	case dummyStr != "deadbeef":
 		t.Errorf("Paylaod doesn't match. Want: %s, Got: %s", "deadbeef", dummyStr)
 	}
 }
 
 func TestSerializeGeneric(t *testing.T) {
-	h := NewGeneric(
+	g := NewGeneric(
 		"XXX",
 		"X",
 		[]byte{0xde, 0xad, 0xbe, 0xef},
 	)
 
-	serialized, err := h.Serialize()
+	serialized, err := g.Serialize()
 	if err != nil {
 		t.Fatalf("Failed to serialize Generic: %s", err)
 	}

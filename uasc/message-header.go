@@ -6,9 +6,9 @@ package uasc
 
 import (
 	"encoding/binary"
-	"errors"
 	"fmt"
 
+	"github.com/wmnsk/gopcua/errors"
 	"github.com/wmnsk/gopcua/utils"
 )
 
@@ -26,7 +26,7 @@ const (
 	ChunkTypeError        = "A"
 )
 
-// Header represents a OPC UA Connection Header.
+// Header represents a OPC UA Secure Conversation Header.
 type Header struct {
 	MessageType     uint32
 	ChunkType       uint8
@@ -35,7 +35,7 @@ type Header struct {
 	Payload         []byte
 }
 
-// NewHeader creates a new OPC UA Connection Header.
+// NewHeader creates a new OPC UA Secure Conversation Header.
 func NewHeader(msgType, chunkType string, chanID uint32, payload []byte) *Header {
 	h := &Header{
 		MessageType:     utils.Uint24To32([]byte(msgType)),
@@ -48,7 +48,7 @@ func NewHeader(msgType, chunkType string, chanID uint32, payload []byte) *Header
 	return h
 }
 
-// DecodeHeader decodes given bytes into OPC UA Connection Header.
+// DecodeHeader decodes given bytes into OPC UA Secure Conversation Header.
 func DecodeHeader(b []byte) (*Header, error) {
 	h := &Header{}
 	if err := h.DecodeFromBytes(b); err != nil {
@@ -58,10 +58,10 @@ func DecodeHeader(b []byte) (*Header, error) {
 	return h, nil
 }
 
-// DecodeFromBytes decodes given bytes into OPC UA Header.
+// DecodeFromBytes decodes given bytes into OPC UA Secure Conversation Header.
 func (h *Header) DecodeFromBytes(b []byte) error {
 	if len(b) < 12 {
-		return errors.New("Too short to decode Header")
+		return &errors.ErrTooShortToDecode{h, "should be longer than 12 bytes"}
 	}
 
 	h.MessageType = utils.Uint24To32(b[:3])
@@ -73,7 +73,7 @@ func (h *Header) DecodeFromBytes(b []byte) error {
 	return nil
 }
 
-// Serialize serializes OPC UA Connection Header into bytes.
+// Serialize serializes OPC UA Secure Conversation Header into bytes.
 func (h *Header) Serialize() ([]byte, error) {
 	b := make([]byte, int(h.MessageSize))
 	if err := h.SerializeTo(b); err != nil {
@@ -82,7 +82,7 @@ func (h *Header) Serialize() ([]byte, error) {
 	return b, nil
 }
 
-// SerializeTo serializes OPC UA Connection Header into given bytes.
+// SerializeTo serializes OPC UA Secure Conversation Header into given bytes.
 // TODO: add error handling.
 func (h *Header) SerializeTo(b []byte) error {
 	copy(b[:3], utils.Uint32To24(h.MessageType))

@@ -6,8 +6,11 @@ package uacp
 
 import (
 	"encoding/binary"
-	"errors"
 	"fmt"
+
+	"github.com/wmnsk/gopcua/datatypes"
+
+	"github.com/wmnsk/gopcua/errors"
 )
 
 // Error definitions.
@@ -42,9 +45,8 @@ const (
 // Error represents a OPC UA Error.
 type Error struct {
 	*Header
-	Error      uint32
-	ReasonSize uint32
-	Reason     []byte
+	Error  uint32
+	Reason *datatypes.String
 }
 
 // NewError creates a new OPC UA Error.
@@ -56,7 +58,7 @@ func NewError(err uint32, reason string) *Error {
 			nil,
 		),
 		Error:  err,
-		Reason: []byte(reason),
+		Reason: datatypes.NewString(reason),
 	}
 	e.SetLength()
 
@@ -77,7 +79,7 @@ func DecodeError(b []byte) (*Error, error) {
 func (e *Error) DecodeFromBytes(b []byte) error {
 	var err error
 	if len(b) < 8 {
-		return errors.New("Too short to decode Error")
+		return &errors.ErrTooShortToDecode{e, "should be longer than 8 bytes"}
 	}
 
 	e.Header, err = DecodeHeader(b)
@@ -87,8 +89,10 @@ func (e *Error) DecodeFromBytes(b []byte) error {
 	b = e.Header.Payload
 
 	e.Error = binary.LittleEndian.Uint32(b[:4])
-	e.ReasonSize = binary.LittleEndian.Uint32(b[4:8])
-	e.Reason = b[8:]
+	e.Reason = &datatypes.String{}
+	if err = e.Reason.DecodeFromBytes(b[4:]); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -106,13 +110,16 @@ func (e *Error) Serialize() ([]byte, error) {
 // TODO: add error handling.
 func (e *Error) SerializeTo(b []byte) error {
 	if e == nil {
-		return errors.New("Error is nil")
+		return &errors.ErrReceiverNil{e}
 	}
 	e.Header.Payload = make([]byte, e.Len()-8)
 
 	binary.LittleEndian.PutUint32(e.Header.Payload[:4], e.Error)
-	binary.LittleEndian.PutUint32(e.Header.Payload[4:8], e.ReasonSize)
-	copy(e.Header.Payload[8:], e.Reason)
+	if e.Reason != nil {
+		if err := e.Reason.SerializeTo(e.Header.Payload[4:]); err != nil {
+			return err
+		}
+	}
 
 	e.Header.SetLength()
 	return e.Header.SerializeTo(b)
@@ -120,13 +127,12 @@ func (e *Error) SerializeTo(b []byte) error {
 
 // Len returns the actual length of Error in int.
 func (e *Error) Len() int {
-	return 16 + len(e.Reason)
+	return 12 + e.Reason.Len()
 }
 
 // SetLength sets the length of Error.
 func (e *Error) SetLength() {
-	e.MessageSize = uint32(16 + len(e.Reason))
-	e.ReasonSize = uint32(len(e.Reason))
+	e.MessageSize = uint32(12 + e.Reason.Len())
 }
 
 // String returns Error in string.
@@ -135,6 +141,6 @@ func (e *Error) String() string {
 		"Header: %v, Error: %d, Reason: %s",
 		e.Header,
 		e.Error,
-		e.Reason,
+		e.Reason.Get(),
 	)
 }

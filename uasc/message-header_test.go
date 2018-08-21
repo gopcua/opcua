@@ -45,6 +45,7 @@ func TestDecodeHeader(t *testing.T) {
 	case dummyStr != "deadbeef":
 		t.Errorf("Paylaod doesn't match. Want: %s, Got: %s", "deadbeef", dummyStr)
 	}
+	t.Log(h.String())
 }
 
 func TestSerializeHeader(t *testing.T) {
