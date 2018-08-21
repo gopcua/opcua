@@ -27,6 +27,9 @@ type Config struct {
 	RequestID         uint32
 	SecurityTokenID   uint32
 	CurrentSequence   uint32
+	SecurityMode      uint32
+	ServerCertificate []byte
+	ServerURI         string
 }
 
 // New creates a OPC UA Secure Conversation message, depending on the type of service given.
