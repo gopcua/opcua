@@ -38,7 +38,7 @@ func NewApplicationDescription(appURI, prodURI, appName string, appType uint32, 
 		ApplicationName:     datatypes.NewLocalizedText("", appName),
 		ApplicationType:     appType,
 		GatewayServerURI:    datatypes.NewString(gwURI),
-		DiscoveryProfileURI: datatypes.NewString(prodURI),
+		DiscoveryProfileURI: datatypes.NewString(profileURI),
 		DiscoveryURIs:       datatypes.NewStringArray(discovURIs),
 	}
 }

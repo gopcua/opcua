@@ -88,7 +88,7 @@ func main() {
 
 	switch cp.MessageTypeValue() {
 	case uacp.MessageTypeAcknowledge:
-		log.Printf("Received Acknowlege: %s", cp)
+		log.Printf("Received Acknowledge: %s", cp)
 
 		// Send OpenSecureChannelRequest and wait for Resposne to come
 		opn, err := uasc.New(o, cfg).Serialize()

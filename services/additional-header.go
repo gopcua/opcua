@@ -21,6 +21,18 @@ func NewAdditionalHeader(typeID *datatypes.ExpandedNodeID, mask uint8) *Addition
 	}
 }
 
+// NewNullAdditionalHeader creates a new AdditionalHeader without meaningful values.
+func NewNullAdditionalHeader() *AdditionalHeader {
+	return &AdditionalHeader{
+		TypeID: datatypes.NewExpandedNodeID(
+			false, false,
+			datatypes.NewTwoByteNodeID(0),
+			"", 0,
+		),
+		EncodingMask: 0x00,
+	}
+}
+
 // DecodeAdditionalHeader decodes given bytes into AdditionalHeader.
 func DecodeAdditionalHeader(b []byte) (*AdditionalHeader, error) {
 	a := &AdditionalHeader{}

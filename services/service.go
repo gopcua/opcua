@@ -15,6 +15,7 @@ const (
 	ServiceTypeGetEndpointsResponse             = 431
 	ServiceTypeOpenSecureChannelRequest         = 446
 	ServiceTypeOpenSecureChannelResponse        = 449
+	ServiceTypeCreateSessionRequest             = 461
 )
 
 // Service is an interface to handle any kind of OPC UA Services.
@@ -41,14 +42,16 @@ func Decode(b []byte) (Service, error) {
 	}
 
 	switch n.Identifier {
-	case ServiceTypeGetEndpointsRequest:
-		s = &GetEndpointsRequest{}
-	case ServiceTypeGetEndpointsResponse:
-		s = &GetEndpointsResponse{}
 	case ServiceTypeOpenSecureChannelRequest:
 		s = &OpenSecureChannelRequest{}
 	case ServiceTypeOpenSecureChannelResponse:
 		s = &OpenSecureChannelResponse{}
+	case ServiceTypeGetEndpointsRequest:
+		s = &GetEndpointsRequest{}
+	case ServiceTypeGetEndpointsResponse:
+		s = &GetEndpointsResponse{}
+	case ServiceTypeCreateSessionRequest:
+		s = &CreateSessionRequest{}
 	default:
 		return nil, &errors.ErrUnsupported{n.Identifier, "unsupported or not implemented yet."}
 	}
