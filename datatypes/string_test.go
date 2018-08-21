@@ -24,6 +24,9 @@ var testStringBytes = [][]byte{
 		// second String: "bar"
 		0x03, 0x00, 0x00, 0x00, 0x62, 0x61, 0x72,
 	},
+	{ // Empty StringArray
+		0x00, 0x00, 0x00, 0x00,
+	},
 }
 
 func TestDecodeString(t *testing.T) {
@@ -55,30 +58,36 @@ func TestDecodeString(t *testing.T) {
 		}
 		t.Log(str.Get())
 	})
-}
-
-func TestDecodeStringArray(t *testing.T) {
-	t.Run("normal", func(t *testing.T) {
-		strs, err := DecodeStringArray(testStringBytes[2])
+	t.Run("array", func(t *testing.T) {
+		str, err := DecodeStringArray(testStringBytes[2])
 		if err != nil {
 			t.Fatalf("Failed to decode StringArray: %s", err)
 		}
 
+		s1 := str.Strings[0]
+		s2 := str.Strings[1]
 		switch {
-		case strs.ArraySize != 2:
-			t.Errorf("ArraySize doesn't match. Want: %d, Got: %d", 2, strs.ArraySize)
-		case strs.Strings[0].Length != 3:
-			t.Errorf("Length doesn't match. Want: %d, Got: %d", 3, strs.Strings[0].Length)
-		case strs.Strings[0].Get() != "foo":
-			t.Errorf("Value doesn't match. Want: %s, Got: %s", "foo", strs.Strings[0].Get())
-		case strs.Strings[1].Length != 3:
-			t.Errorf("Length doesn't match. Want: %d, Got: %d", 3, strs.Strings[1].Length)
-		case strs.Strings[1].Get() != "bar":
-			t.Errorf("Value doesn't match. Want: %s, Got: %s", "bar", strs.Strings[1].Get())
+		case s1.Length != 3:
+			t.Errorf("Length doesn't match. Want: %d, Got: %d", 3, s1.Length)
+		case s1.Get() != "foo":
+			t.Errorf("Value doesn't match. Want: %s, Got: %s", "foo", s1.Get())
+		case s2.Length != 3:
+			t.Errorf("Length doesn't match. Want: %d, Got: %d", 3, s2.Length)
+		case s2.Get() != "bar":
+			t.Errorf("Value doesn't match. Want: %s, Got: %s", "bar", s2.Get())
 		}
-		for _, ss := range strs.Strings {
-			t.Log(ss.Get())
+		t.Log(s1.Get(), s2.Get())
+	})
+	t.Run("empty-array", func(t *testing.T) {
+		str, err := DecodeStringArray(testStringBytes[3])
+		if err != nil {
+			t.Fatalf("Failed to decode StringArray: %s", err)
 		}
+
+		if str.ArraySize != 0 {
+			t.Errorf("ArraySize doesn't match. Want: %d, Got: %d", 0, str.ArraySize)
+		}
+		t.Log(str)
 	})
 }
 
@@ -117,10 +126,7 @@ func TestSerializeString(t *testing.T) {
 		}
 		t.Logf("%x", serialized)
 	})
-}
-
-func TestSerializeStringArray(t *testing.T) {
-	t.Run("normal", func(t *testing.T) {
+	t.Run("array", func(t *testing.T) {
 		t.Parallel()
 		strs := NewStringArray([]string{"foo", "bar"})
 
@@ -131,6 +137,23 @@ func TestSerializeStringArray(t *testing.T) {
 
 		for i, s := range serialized {
 			x := testStringBytes[2][i]
+			if s != x {
+				t.Errorf("Bytes doesn't match. Want: %#x, Got: %#x at %dth", x, s, i)
+			}
+		}
+		t.Logf("%x", serialized)
+	})
+	t.Run("empty-array", func(t *testing.T) {
+		t.Parallel()
+		strs := NewStringArray(nil)
+
+		serialized, err := strs.Serialize()
+		if err != nil {
+			t.Fatalf("Failed to serialize StringArray: %s", err)
+		}
+
+		for i, s := range serialized {
+			x := testStringBytes[3][i]
 			if s != x {
 				t.Errorf("Bytes doesn't match. Want: %#x, Got: %#x at %dth", x, s, i)
 			}

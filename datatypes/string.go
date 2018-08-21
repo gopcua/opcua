@@ -111,7 +111,7 @@ type StringArray struct {
 func NewStringArray(strs []string) *StringArray {
 	if strs == nil {
 		s := &StringArray{
-			ArraySize: -1,
+			ArraySize: 0,
 		}
 		return s
 	}

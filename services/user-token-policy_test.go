@@ -43,7 +43,9 @@ var testUserTokenPolicyBytes = [][]byte{
 		// SecurityPolicyURI
 		0x07, 0x00, 0x00, 0x00, 0x73, 0x65, 0x63, 0x2d, 0x75, 0x72, 0x69,
 	},
-	{},
+	{ // Empty Array
+		0x00, 0x00, 0x00, 0x00,
+	},
 	{},
 	{},
 	{},
@@ -96,6 +98,19 @@ func TestDecodeUserTokenPolicy(t *testing.T) {
 			t.Log(ut)
 		}
 	})
+	t.Run("empty-array", func(t *testing.T) {
+		t.Parallel()
+
+		u, err := DecodeUserTokenPolicyArray(testUserTokenPolicyBytes[2])
+		if err != nil {
+			t.Fatalf("Failed to decode UserTokenPolicy: %s", err)
+		}
+
+		if u.ArraySize != 0 {
+			t.Errorf("ArraySize doesn't match: Want: %d, %d", 0, u.ArraySize)
+		}
+		t.Log(u)
+	})
 }
 
 func TestSerializeUserTokenPolicy(t *testing.T) {
@@ -143,6 +158,24 @@ func TestSerializeUserTokenPolicy(t *testing.T) {
 
 		for i, s := range serialized {
 			x := testUserTokenPolicyBytes[1][i]
+			if s != x {
+				t.Errorf("Bytes doesn't match. Want: %#x, Got: %#x at %dth", x, s, i)
+			}
+		}
+		t.Logf("%x", serialized)
+	})
+	t.Run("empty-array", func(t *testing.T) {
+		t.Parallel()
+
+		u := NewUserTokenPolicyArray(nil)
+
+		serialized, err := u.Serialize()
+		if err != nil {
+			t.Fatalf("Failed to serialize Service: %s", err)
+		}
+
+		for i, s := range serialized {
+			x := testUserTokenPolicyBytes[2][i]
 			if s != x {
 				t.Errorf("Bytes doesn't match. Want: %#x, Got: %#x at %dth", x, s, i)
 			}
