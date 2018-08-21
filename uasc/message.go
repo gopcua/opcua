@@ -9,6 +9,17 @@ import (
 	"github.com/wmnsk/gopcua/services"
 )
 
+// Config represents a configuration which UASC client/server has in common.
+type Config struct {
+	SecureChannelID   uint32
+	SecurityPolicyURI string
+	Certificate       []byte
+	Thumbprint        []byte
+	RequestID         uint32
+	SecurityTokenID   uint32
+	SequenceNumber    uint32
+}
+
 // Message represents a OPC UA Secure Conversation message.
 type Message struct {
 	*Header
@@ -18,100 +29,65 @@ type Message struct {
 	Service services.Service
 }
 
-// Config represents a configuration which UASC client/server has in common.
-type Config struct {
-	SecureChannelID   uint32
-	SecurityPolicyURI string
-	Certificate       []byte
-	Thumbprint        []byte
-	RequestID         uint32
-	SecurityTokenID   uint32
-	CurrentSequence   uint32
-}
-
-// New creates a OPC UA Secure Conversation message, depending on the type of service given.
+// New creates a OPC UA Secure Conversation message.New
+// MessageType of UASC is determined depending on the type of service given as below.
+//
+// Service type: OpenSecureChannel => Message type: OPN.
+//
+// Service type: CloseSecureChannel => Message type: CLO.
+//
+// Service type: Others => Message type: MSG.
 func New(srv services.Service, cfg *Config) *Message {
 	switch srv.ServiceType() {
-	case services.ServiceTypeGetEndpointsRequest:
-		gep, ok := srv.(*services.GetEndpointsRequest)
-		if !ok {
-			return nil
-		}
-		return newGetEndpointsRequest(gep, cfg)
-	case services.ServiceTypeGetEndpointsResponse:
-		gep, ok := srv.(*services.GetEndpointsResponse)
-		if !ok {
-			return nil
-		}
-		return newGetEndpointsResponse(gep, cfg)
-	case services.ServiceTypeOpenSecureChannelRequest:
-		osc, ok := srv.(*services.OpenSecureChannelRequest)
-		if !ok {
-			return nil
-		}
-		return newOpenSecureChannelRequest(osc, cfg)
-	case services.ServiceTypeOpenSecureChannelResponse:
-		osc, ok := srv.(*services.OpenSecureChannelResponse)
-		if !ok {
-			return nil
-		}
-		return newOpenSecureChannelResponse(osc, cfg)
+	case services.ServiceTypeOpenSecureChannelRequest, services.ServiceTypeOpenSecureChannelResponse:
+		return newOPN(srv, cfg)
+	/*
+		case services.ServiceTypeCloseSecureChannelRequest, services.ServiceTypeCloseSecureChannelResponse:
+			return newCLO(srv, cfg)
+	*/
 	default:
-		return nil
+		return newMSG(srv, cfg)
 	}
 }
 
-func newGetEndpointsRequest(gep *services.GetEndpointsRequest, cfg *Config) *Message {
-	m := &Message{
-		Header:                  NewHeader(MessageTypeMessage, ChunkTypeFinal, cfg.SecureChannelID, nil),
-		SymmetricSecurityHeader: NewSymmetricSecurityHeader(cfg.SecurityTokenID, nil),
-		SequenceHeader: NewSequenceHeader(
-			cfg.CurrentSequence, cfg.RequestID, nil,
-		),
-		Service: gep,
-	}
-
-	return m
-}
-
-func newGetEndpointsResponse(gep *services.GetEndpointsResponse, cfg *Config) *Message {
-	m := &Message{
-		Header:                  NewHeader(MessageTypeMessage, ChunkTypeFinal, cfg.SecureChannelID, nil),
-		SymmetricSecurityHeader: NewSymmetricSecurityHeader(cfg.SecurityTokenID, nil),
-		SequenceHeader: NewSequenceHeader(
-			cfg.CurrentSequence, cfg.RequestID, nil,
-		),
-		Service: gep,
-	}
-
-	return m
-}
-
-func newOpenSecureChannelRequest(osc *services.OpenSecureChannelRequest, cfg *Config) *Message {
+func newOPN(srv services.Service, cfg *Config) *Message {
 	m := &Message{
 		Header: NewHeader(MessageTypeOpenSecureChannel, ChunkTypeFinal, cfg.SecureChannelID, nil),
 		AsymmetricSecurityHeader: NewAsymmetricSecurityHeader(
 			cfg.SecurityPolicyURI, cfg.Certificate, cfg.Thumbprint, nil,
 		),
 		SequenceHeader: NewSequenceHeader(
-			cfg.CurrentSequence, cfg.RequestID, nil,
+			cfg.SequenceNumber, cfg.RequestID, nil,
 		),
-		Service: osc,
+		Service: srv,
 	}
 
 	return m
 }
 
-func newOpenSecureChannelResponse(osc *services.OpenSecureChannelResponse, cfg *Config) *Message {
+func newMSG(srv services.Service, cfg *Config) *Message {
 	m := &Message{
-		Header: NewHeader(MessageTypeOpenSecureChannel, ChunkTypeFinal, cfg.SecureChannelID, nil),
+		Header:                  NewHeader(MessageTypeMessage, ChunkTypeFinal, cfg.SecureChannelID, nil),
+		SymmetricSecurityHeader: NewSymmetricSecurityHeader(cfg.SecurityTokenID, nil),
+		SequenceHeader: NewSequenceHeader(
+			cfg.SequenceNumber, cfg.RequestID, nil,
+		),
+		Service: srv,
+	}
+
+	return m
+}
+
+func newCLO(srv services.Service, cfg *Config) *Message {
+	m := &Message{
+		Header: NewHeader(MessageTypeCloseSecureChannel, ChunkTypeFinal, cfg.SecureChannelID, nil),
 		AsymmetricSecurityHeader: NewAsymmetricSecurityHeader(
 			cfg.SecurityPolicyURI, cfg.Certificate, cfg.Thumbprint, nil,
 		),
 		SequenceHeader: NewSequenceHeader(
-			cfg.CurrentSequence, cfg.RequestID, nil,
+			cfg.SequenceNumber, cfg.RequestID, nil,
 		),
-		Service: osc,
+		Service: srv,
 	}
 
 	return m
@@ -129,14 +105,15 @@ func Decode(b []byte) (*Message, error) {
 
 // DecodeFromBytes decodes given bytes into OPC UA Secure Conversation message.
 func (m *Message) DecodeFromBytes(b []byte) error {
-	if len(b) < 32 {
-		return &errors.ErrTooShortToDecode{m, "should be longer than 32 bytes"}
+	if len(b) < 16 {
+		return &errors.ErrTooShortToDecode{m, "should be longer than 16 bytes"}
 	}
 
 	m.Header = &Header{}
 	if err := m.Header.DecodeFromBytes(b); err != nil {
 		return err
 	}
+
 	switch m.Header.MessageTypeValue() {
 	case MessageTypeOpenSecureChannel, MessageTypeCloseSecureChannel:
 		return m.decodeSecChanFromBytes(m.Header.Payload)
