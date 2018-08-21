@@ -63,9 +63,9 @@ var testServiceBytes = [][]byte{
 		0x2f, 0x55, 0x41, 0x2f, 0x53, 0x65, 0x72, 0x76,
 		0x65, 0x72,
 		// LocalIDs
-		0xff, 0xff, 0xff, 0xff,
+		0x00, 0x00, 0x00, 0x00,
 		// ProfileURIs
-		0xff, 0xff, 0xff, 0xff,
+		0x00, 0x00, 0x00, 0x00,
 	},
 	{ // GetEndpointsResponse
 		// TypeID
@@ -264,10 +264,10 @@ func TestDecode(t *testing.T) {
 			t.Errorf("ServiceType doesn't Match. Want: %d, Got: %d", ServiceTypeGetEndpointsRequest, g.ServiceType())
 		case gep.EndpointURL.Get() != "opc.tcp://wow.its.easy:11111/UA/Server":
 			t.Errorf("EndpointURL doesn't Match. Want: %s, Got: %s", "opc.tcp://wow.its.easy:11111/UA/Server", gep.EndpointURL.Get())
-		case gep.LocalIDs.ArraySize != -1:
-			t.Errorf("LocalIDs.ArraySize doesn't Match. Want: %d, Got: %d", -1, gep.LocalIDs.ArraySize)
-		case gep.ProfileURIs.ArraySize != -1:
-			t.Errorf("ProfileURIs.ArraySize doesn't Match. Want: %d, Got: %d", -1, gep.ProfileURIs.ArraySize)
+		case gep.LocalIDs.ArraySize != 0:
+			t.Errorf("LocalIDs.ArraySize doesn't Match. Want: %d, Got: %d", 0, gep.LocalIDs.ArraySize)
+		case gep.ProfileURIs.ArraySize != 0:
+			t.Errorf("ProfileURIs.ArraySize doesn't Match. Want: %d, Got: %d", 0, gep.ProfileURIs.ArraySize)
 		}
 		t.Log(g.String())
 	})

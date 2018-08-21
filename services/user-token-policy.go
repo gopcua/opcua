@@ -172,7 +172,7 @@ type UserTokenPolicyArray struct {
 func NewUserTokenPolicyArray(uts []*UserTokenPolicy) *UserTokenPolicyArray {
 	if uts == nil {
 		u := &UserTokenPolicyArray{
-			ArraySize: -1,
+			ArraySize: 0,
 		}
 		return u
 	}
