@@ -409,11 +409,7 @@ func (g *GUIDNodeID) DecodeFromBytes(b []byte) error {
 	g.EncodingMask = b[0]
 	g.Namespace = binary.LittleEndian.Uint16(b[1:3])
 	g.Identifier = &GUID{}
-	if err := g.Identifier.DecodeFromBytes(b[3:19]); err != nil {
-		return err
-	}
-
-	return nil
+	return g.Identifier.DecodeFromBytes(b[3:19])
 }
 
 // Serialize serializes GUIDNodeID into bytes.
@@ -430,11 +426,7 @@ func (g *GUIDNodeID) Serialize() ([]byte, error) {
 func (g *GUIDNodeID) SerializeTo(b []byte) error {
 	b[0] = g.EncodingMask
 	binary.LittleEndian.PutUint16(b[1:3], g.Namespace)
-	if err := g.Identifier.SerializeTo(b[3:]); err != nil {
-		return err
-	}
-
-	return nil
+	return g.Identifier.SerializeTo(b[3:])
 }
 
 // Len returns the actual length of GUIDNodeID in int.

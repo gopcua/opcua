@@ -73,11 +73,7 @@ func (h *Hello) DecodeFromBytes(b []byte) error {
 	h.MaxChunkCount = binary.LittleEndian.Uint32(b[16:20])
 
 	h.EndPointURL = &datatypes.String{}
-	if err := h.EndPointURL.DecodeFromBytes(b[20:]); err != nil {
-		return err
-	}
-
-	return nil
+	return h.EndPointURL.DecodeFromBytes(b[20:])
 }
 
 // Serialize serializes OPC UA Hello into bytes.
