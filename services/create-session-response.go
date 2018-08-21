@@ -31,7 +31,7 @@ type CreateSessionResponse struct {
 }
 
 // NewCreateSessionResponse creates a new NewCreateSessionResponse with the given parameters.
-func NewCreateSessionResponse(time time.Time, result uint32, diag *DiagnosticInfo, sessionID uint32, authToken uint16, timeout uint64, nonce, cert []byte, endpoints []*EndpointDescription, alg string, sign []byte, maxRespSize uint32) *CreateSessionResponse {
+func NewCreateSessionResponse(time time.Time, result uint32, diag *DiagnosticInfo, sessionID uint32, authToken uint16, timeout uint64, nonce, cert []byte, alg string, sign []byte, maxRespSize uint32, endpoints ...*EndpointDescription) *CreateSessionResponse {
 	return &CreateSessionResponse{
 		TypeID: datatypes.NewExpandedNodeID(
 			false, false,
