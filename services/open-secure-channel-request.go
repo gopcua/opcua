@@ -31,6 +31,10 @@ const (
 )
 
 // OpenSecureChannelRequest represents an OpenSecureChannelRequest.
+// This Service is used to open or renew a SecureChannel that can be used to ensure Confidentiality
+// and Integrity for Message exchange during a Session.
+//
+// Specification: Part 4, 5.5.2.2
 type OpenSecureChannelRequest struct {
 	TypeID *datatypes.ExpandedNodeID
 	*RequestHeader

@@ -12,6 +12,8 @@ import (
 )
 
 // DiagnosticInfo represents the DiagnosticInfo.
+//
+// Specification: Part 4, 7.8
 type DiagnosticInfo struct {
 	EncodingMask        uint8
 	SymboricID          int32

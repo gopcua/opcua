@@ -12,6 +12,9 @@ import (
 )
 
 // ChannelSecurityToken represents a ChannelSecurityToken.
+// It describes the new SecurityToken issued by the Server.
+//
+// Specification: Part 4, 5.5.2.2
 type ChannelSecurityToken struct {
 	ChannelID       uint32
 	TokenID         uint32

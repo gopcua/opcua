@@ -12,6 +12,10 @@ import (
 )
 
 // GetEndpointsRequest represents an GetEndpointsRequest.
+// This Service returns the Endpoints supported by a Server and all of the configuration information
+// required to establish a SecureChannel and a Session.
+//
+// Specification: Part 4, 5.4.4.2
 type GetEndpointsRequest struct {
 	TypeID *datatypes.ExpandedNodeID
 	*RequestHeader

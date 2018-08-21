@@ -10,7 +10,11 @@ import (
 	"github.com/wmnsk/gopcua/errors"
 )
 
-// ByteString represents the ByteString type in OPC UA Specifications. This consists of the four-byte length field and variable length of contents.
+// ByteString is encoded as sequence of bytes preceded by its length in bytes.
+// The length is encoded as a 32-bit signed integer.
+// If the length of the byte string is −1 then the byte string is ‘null’.
+//
+// Specification: Part 6, 5.2.2.7
 type ByteString struct {
 	Length int32
 	Value  []byte

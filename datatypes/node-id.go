@@ -12,6 +12,8 @@ import (
 )
 
 // NodeId type definitions.
+//
+// Specification: Part 6, 5.2.2.9
 const (
 	TypeTwoByte uint8 = iota
 	TypeFourByte
@@ -66,6 +68,9 @@ func DecodeNodeID(b []byte) (NodeID, error) {
 }
 
 // TwoByteNodeID represents the TwoByteNodeId.
+// It is a numeric value that fits into the two-byte representation.
+//
+// Specification: Part 6, 5.2.2.9
 type TwoByteNodeID struct {
 	EncodingMask uint8
 	Identifier   byte
@@ -136,6 +141,9 @@ func (t *TwoByteNodeID) String() string {
 }
 
 // FourByteNodeID represents the FourByteNodeId.
+// It is a numeric value that fits into the four-byte representation.
+//
+// Specification: Part 6, 5.2.2.9
 type FourByteNodeID struct {
 	EncodingMask uint8
 	Namespace    uint8
@@ -210,6 +218,9 @@ func (f *FourByteNodeID) String() string {
 }
 
 // NumericNodeID represents the NumericNodeId.
+// It is a numeric value that does not fit into the two or four byte representations.
+//
+// Specification: Part 6, 5.2.2.9
 type NumericNodeID struct {
 	EncodingMask uint8
 	Namespace    uint16
@@ -284,6 +295,8 @@ func (n *NumericNodeID) String() string {
 }
 
 // StringNodeID represents the StringNodeId.
+//
+// Specification: Part 6, 5.2.2.9
 type StringNodeID struct {
 	EncodingMask uint8
 	Namespace    uint16
@@ -367,6 +380,8 @@ func (s *StringNodeID) String() string {
 }
 
 // GUIDNodeID represents the GUIDNodeId.
+//
+// Specification: Part 6, 5.2.2.9
 type GUIDNodeID struct {
 	EncodingMask uint8
 	Namespace    uint16
@@ -453,6 +468,8 @@ func (g *GUIDNodeID) String() string {
 }
 
 // OpaqueNodeID represents the OpaqueNodeId.
+//
+// Specification: Part 6, 5.2.2.9
 type OpaqueNodeID struct {
 	EncodingMask uint8
 	Namespace    uint16
