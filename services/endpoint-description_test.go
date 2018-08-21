@@ -275,7 +275,7 @@ func TestSerializeEndpointDescription(t *testing.T) {
 	t.Run("multiple", func(t *testing.T) {
 		t.Parallel()
 
-		e := NewEndpointDesctiptionArray(
+		e := NewEndpointDescriptionArray(
 			[]*EndpointDescription{
 				NewEndpointDesctiption(
 					"ep-url",

@@ -44,7 +44,7 @@ func NewGetEndpointsResponse(ts time.Time, handle, code uint32, diag *Diagnostic
 			),
 			nil,
 		),
-		Endpoints: NewEndpointDesctiptionArray(endpoints),
+		Endpoints: NewEndpointDescriptionArray(endpoints),
 	}
 
 	return g

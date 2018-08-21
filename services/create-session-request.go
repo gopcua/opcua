@@ -14,6 +14,8 @@ import (
 )
 
 // CreateSessionRequest represents a CreateSessionRequest.
+//
+// Specification: Part4, 5.6.2
 type CreateSessionRequest struct {
 	TypeID *datatypes.ExpandedNodeID
 	*RequestHeader

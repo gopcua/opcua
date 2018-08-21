@@ -16,6 +16,7 @@ const (
 	ServiceTypeOpenSecureChannelRequest         = 446
 	ServiceTypeOpenSecureChannelResponse        = 449
 	ServiceTypeCreateSessionRequest             = 461
+	ServiceTypeCreateSessionResponse            = 464
 )
 
 // Service is an interface to handle any kind of OPC UA Services.
