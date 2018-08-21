@@ -1,3 +1,10 @@
+// Copyright 2018 gopcua authors. All rights reserved.
+// Use of this source code is governed by a MIT-style license that can be
+// found in the LICENSE file.
+
+// Command sender provides a "manual establishment" of OPC UA Secure Conversation.
+//
+// The built-in connection establishment API is to be implemented in the package itself in the future.
 package main
 
 import (
@@ -35,7 +42,7 @@ func main() {
 		SecurityPolicyURI: *uri,
 		RequestID:         1,
 		SecurityTokenID:   0,
-		CurrentSequence:   0,
+		SequenceNumber:    0,
 	}
 
 	g := services.NewGetEndpointsRequest(
@@ -88,7 +95,7 @@ func main() {
 		if err != nil {
 			log.Fatalf("Failed to serialize OpenSecureChannel: %s", err)
 		}
-		cfg.CurrentSequence++
+		cfg.SequenceNumber++
 
 		if _, err := conn.Write(opn); err != nil {
 			log.Fatalf("Failed to write OpenSecureChannel: %s", err)
@@ -111,14 +118,15 @@ func main() {
 		if !ok {
 			log.Fatal("Assertion failed.")
 		}
-		cfg.SecureChannelID = sc.SecureChannelID
+		cfg.SecureChannelID = osc.SecurityToken.ChannelID
 		cfg.SecurityTokenID = osc.SecurityToken.TokenID
+
 		// Send GetEndpointsRequest and wait for Resposne to come
 		gep, err := uasc.New(g, cfg).Serialize()
 		if err != nil {
 			log.Fatalf("Failed to serialize GetEndpointsRequest: %s", err)
 		}
-		cfg.CurrentSequence++
+		cfg.SequenceNumber++
 
 		if _, err := conn.Write(gep); err != nil {
 			log.Fatalf("Failed to write GetEndpoints: %s", err)
