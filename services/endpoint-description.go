@@ -13,6 +13,8 @@ import (
 )
 
 // EndpointDescription represents an EndpointDescription.
+//
+// Specification: Part 4, 7.10
 type EndpointDescription struct {
 	EndpointURL         *datatypes.String
 	Server              *ApplicationDescription

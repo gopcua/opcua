@@ -14,6 +14,8 @@ import (
 )
 
 // ResponseHeader represents a Response Header in each services.
+//
+// Specification: Part 4, 7.29
 type ResponseHeader struct {
 	Timestamp          time.Time
 	RequestHandle      uint32

@@ -13,7 +13,9 @@ import (
 	"github.com/wmnsk/gopcua/errors"
 )
 
-// GUID represents GUID in binary stream.
+// GUID represents GUID in binary stream. It is a 16-byte globally unique identifier.
+//
+// Specification: Part 6, 5.1.3
 type GUID struct {
 	Data1 uint32
 	Data2 uint16
