@@ -51,11 +51,7 @@ func (s *SignedSoftwareCertificate) DecodeFromBytes(b []byte) error {
 	offset += s.CertificateData.Len()
 
 	s.Signature = &datatypes.ByteString{}
-	if err := s.Signature.DecodeFromBytes(b[offset:]); err != nil {
-		return err
-	}
-
-	return nil
+	return s.Signature.DecodeFromBytes(b[offset:])
 }
 
 // Serialize serializes SignedSoftwareCertificate into bytes.

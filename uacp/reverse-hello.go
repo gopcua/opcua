@@ -65,11 +65,7 @@ func (r *ReverseHello) DecodeFromBytes(b []byte) error {
 	offset += r.ServerURI.Len()
 
 	r.EndPointURL = &datatypes.String{}
-	if err := r.EndPointURL.DecodeFromBytes(b[offset:]); err != nil {
-		return err
-	}
-
-	return nil
+	return r.EndPointURL.DecodeFromBytes(b[offset:])
 }
 
 // Serialize serializes OPC UA ReverseHello into bytes.

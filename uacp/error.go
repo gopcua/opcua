@@ -90,11 +90,7 @@ func (e *Error) DecodeFromBytes(b []byte) error {
 
 	e.Error = binary.LittleEndian.Uint32(b[:4])
 	e.Reason = &datatypes.String{}
-	if err = e.Reason.DecodeFromBytes(b[4:]); err != nil {
-		return err
-	}
-
-	return nil
+	return e.Reason.DecodeFromBytes(b[4:])
 }
 
 // Serialize serializes OPC UA Error into bytes.

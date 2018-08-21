@@ -50,11 +50,7 @@ func (s *SignatureData) DecodeFromBytes(b []byte) error {
 	offset += s.Algorithm.Len()
 
 	s.Signature = &datatypes.ByteString{}
-	if err := s.Signature.DecodeFromBytes(b[offset:]); err != nil {
-		return err
-	}
-
-	return nil
+	return s.Signature.DecodeFromBytes(b[offset:])
 }
 
 // Serialize serializes SignatureData into bytes.
