@@ -21,10 +21,14 @@ func Wireshark(offset int, message []byte) string {
 	// add content
 	for i, b := range message {
 		line = append(line, b)
+
+		// add space after first 8 bytes but not at the end of the line, i.e. after 16 bytes
 		if (i+1)%8 == 0 && (i+1)%16 != 0 {
 			fmt.Fprintf(&buf, "% x  ", line)
 			line = []byte{}
 		}
+
+		// add line break after 16 bytes and at the end of the message
 		if (i+1)%16 == 0 || i == len(message)-1 {
 			fmt.Fprintf(&buf, "% x\n", line)
 			line = []byte{}
