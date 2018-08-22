@@ -142,13 +142,13 @@ func (r *RequestHeader) Len() int {
 	return 20 + r.AuthenticationToken.Len() + r.AuditEntryID.Len() + r.AdditionalHeader.Len() + len(r.Payload)
 }
 
-// SetDiagServiceLevelSymboricID sets the ServiceLevelSymboricID bit in ReturnDiagnostics.
-func (r *RequestHeader) SetDiagServiceLevelSymboricID() {
+// SetDiagServiceLevelSymbolicID sets the ServiceLevelSymbolicID bit in ReturnDiagnostics.
+func (r *RequestHeader) SetDiagServiceLevelSymbolicID() {
 	r.ReturnDiagnostics |= 0x1
 }
 
-// RequestsServiceLevelSymboricID checks if the ServiceLevelSymboricID is requested in ReturnDiagnostics.
-func (r *RequestHeader) RequestsServiceLevelSymboricID() bool {
+// RequestsServiceLevelSymbolicID checks if the ServiceLevelSymbolicID is requested in ReturnDiagnostics.
+func (r *RequestHeader) RequestsServiceLevelSymbolicID() bool {
 	return r.ReturnDiagnostics&0x1 == 1
 }
 
@@ -192,13 +192,13 @@ func (r *RequestHeader) RequestsServiceLevelInnerDiagnostics() bool {
 	return (r.ReturnDiagnostics>>4)&0x1 == 1
 }
 
-// SetDiagOperationLevelSymboricID sets the OperationLevelSymbolicID bit in ReturnDiagnostics.
-func (r *RequestHeader) SetDiagOperationLevelSymboricID() {
+// SetDiagOperationLevelSymbolicID sets the OperationLevelSymbolicID bit in ReturnDiagnostics.
+func (r *RequestHeader) SetDiagOperationLevelSymbolicID() {
 	r.ReturnDiagnostics |= 0x20
 }
 
-// RequestsOperationLevelSymboricID checks if the OperationLevelSymboricID is requested in ReturnDiagnostics.
-func (r *RequestHeader) RequestsOperationLevelSymboricID() bool {
+// RequestsOperationLevelSymbolicID checks if the OperationLevelSymbolicID is requested in ReturnDiagnostics.
+func (r *RequestHeader) RequestsOperationLevelSymbolicID() bool {
 	return (r.ReturnDiagnostics>>5)&0x1 == 1
 }
 
@@ -244,7 +244,7 @@ func (r *RequestHeader) RequestsOperationLevelInnerDiagnostics() bool {
 
 // SetDiagServiceAll sets all the service level bit in ReturnDiagnostics.
 func (r *RequestHeader) SetDiagServiceAll() {
-	r.SetDiagServiceLevelSymboricID()
+	r.SetDiagServiceLevelSymbolicID()
 	r.SetDiagServiceLevelLocalizedText()
 	r.SetDiagServiceLevelAdditionalInfo()
 	r.SetDiagServiceLevelInnerStatusCode()
@@ -253,7 +253,7 @@ func (r *RequestHeader) SetDiagServiceAll() {
 
 // SetDiagOperationAll sets all the operation level bit in ReturnDiagnostics.
 func (r *RequestHeader) SetDiagOperationAll() {
-	r.SetDiagOperationLevelSymboricID()
+	r.SetDiagOperationLevelSymbolicID()
 	r.SetDiagOperationLevelLocalizedText()
 	r.SetDiagOperationLevelAdditionalInfo()
 	r.SetDiagOperationLevelInnerStatusCode()
@@ -262,12 +262,12 @@ func (r *RequestHeader) SetDiagOperationAll() {
 
 // SetDiagAll sets all the bit in ReturnDiagnostics.
 func (r *RequestHeader) SetDiagAll() {
-	r.SetDiagServiceLevelSymboricID()
+	r.SetDiagServiceLevelSymbolicID()
 	r.SetDiagServiceLevelLocalizedText()
 	r.SetDiagServiceLevelAdditionalInfo()
 	r.SetDiagServiceLevelInnerStatusCode()
 	r.SetDiagServiceLevelInnerDiagnostics()
-	r.SetDiagOperationLevelSymboricID()
+	r.SetDiagOperationLevelSymbolicID()
 	r.SetDiagOperationLevelLocalizedText()
 	r.SetDiagOperationLevelAdditionalInfo()
 	r.SetDiagOperationLevelInnerStatusCode()
