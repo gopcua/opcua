@@ -16,7 +16,7 @@ import (
 // Specification: Part 4, 7.8
 type DiagnosticInfo struct {
 	EncodingMask        uint8
-	SymboricID          int32
+	SymbolicID          int32
 	NamespaceURI        int32
 	Locale              int32
 	LocalizedText       int32
@@ -28,7 +28,7 @@ type DiagnosticInfo struct {
 // NewDiagnosticInfo creates a new DiagnosticInfo.
 func NewDiagnosticInfo(hasSymID, hasURI, hasText, hasLocale, hasInfo, hasInnerStatus, hasInnerDiag bool, symID, uri, locale, text int32, info *datatypes.String, code uint32, diag *DiagnosticInfo) *DiagnosticInfo {
 	d := &DiagnosticInfo{
-		SymboricID:          symID,
+		SymbolicID:          symID,
 		NamespaceURI:        uri,
 		Locale:              locale,
 		LocalizedText:       text,
@@ -38,7 +38,7 @@ func NewDiagnosticInfo(hasSymID, hasURI, hasText, hasLocale, hasInfo, hasInnerSt
 	}
 
 	if hasSymID {
-		d.SetSymboricIDFlag()
+		d.SetSymbolicIDFlag()
 	}
 	if hasURI {
 		d.SetNamespaceURIFlag()
@@ -84,8 +84,8 @@ func DecodeDiagnosticInfo(b []byte) (*DiagnosticInfo, error) {
 func (d *DiagnosticInfo) DecodeFromBytes(b []byte) error {
 	var offset = 1
 	d.EncodingMask = b[0]
-	if d.HasSymboricID() {
-		d.SymboricID = int32(binary.LittleEndian.Uint32(b[offset : offset+4]))
+	if d.HasSymbolicID() {
+		d.SymbolicID = int32(binary.LittleEndian.Uint32(b[offset : offset+4]))
 		offset += 4
 	}
 	if d.HasNamespaceURI() {
@@ -136,8 +136,8 @@ func (d *DiagnosticInfo) Serialize() ([]byte, error) {
 func (d *DiagnosticInfo) SerializeTo(b []byte) error {
 	var offset = 1
 	b[0] = d.EncodingMask
-	if d.HasSymboricID() {
-		binary.LittleEndian.PutUint32(b[offset:offset+4], uint32(d.SymboricID))
+	if d.HasSymbolicID() {
+		binary.LittleEndian.PutUint32(b[offset:offset+4], uint32(d.SymbolicID))
 		offset += 4
 	}
 	if d.HasNamespaceURI() {
@@ -175,7 +175,7 @@ func (d *DiagnosticInfo) SerializeTo(b []byte) error {
 // Len returns the actual length of DiagnosticInfo in int.
 func (d *DiagnosticInfo) Len() int {
 	l := 1
-	if d.HasSymboricID() {
+	if d.HasSymbolicID() {
 		l += 4
 	}
 	if d.HasNamespaceURI() {
@@ -204,13 +204,13 @@ func (d *DiagnosticInfo) Len() int {
 	return l
 }
 
-// HasSymboricID checks if DiagnosticInfo has SymboricID or not.
-func (d *DiagnosticInfo) HasSymboricID() bool {
+// HasSymbolicID checks if DiagnosticInfo has SymbolicID or not.
+func (d *DiagnosticInfo) HasSymbolicID() bool {
 	return d.EncodingMask&0x1 == 1
 }
 
-// SetSymboricIDFlag sets SymboricIDFlag in EncodingMask in DiagnosticInfo.
-func (d *DiagnosticInfo) SetSymboricIDFlag() {
+// SetSymbolicIDFlag sets SymbolicIDFlag in EncodingMask in DiagnosticInfo.
+func (d *DiagnosticInfo) SetSymbolicIDFlag() {
 	d.EncodingMask |= 0x1
 }
 
@@ -278,8 +278,8 @@ func (d *DiagnosticInfo) SetInnerDiagnosticInfoFlag() {
 func (d *DiagnosticInfo) String() string {
 	var str []string
 	str = append(str, fmt.Sprintf("%x", d.EncodingMask))
-	if d.HasSymboricID() {
-		str = append(str, fmt.Sprintf("%d", d.SymboricID))
+	if d.HasSymbolicID() {
+		str = append(str, fmt.Sprintf("%d", d.SymbolicID))
 	}
 	if d.HasNamespaceURI() {
 		str = append(str, fmt.Sprintf("%d", d.NamespaceURI))

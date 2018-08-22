@@ -14,7 +14,7 @@ var testDiagnosticInfoBytes = [][]byte{
 	{ // Nothing
 		0x00,
 	},
-	{ // Has SymboricID
+	{ // Has SymbolicID
 		0x01, 0x01, 0x00, 0x00, 0x00,
 	},
 	{ // Has NamespaceURI
@@ -38,7 +38,7 @@ var testDiagnosticInfoBytes = [][]byte{
 	},
 	{ // Has ALL
 		0x7f,
-		// SymboricID
+		// SymbolicID
 		0x01, 0x00, 0x00, 0x00,
 		// NamespaceURI
 		0x02, 0x00, 0x00, 0x00,
@@ -67,7 +67,7 @@ func TestDecodeDiagnosticInfo(t *testing.T) {
 		}
 		t.Log(d.String())
 	})
-	t.Run("has-symboric-id", func(t *testing.T) {
+	t.Run("has-symbolic-id", func(t *testing.T) {
 		d, err := DecodeDiagnosticInfo(testDiagnosticInfoBytes[1])
 		if err != nil {
 			t.Fatalf("Failed to decode DiagnosticInfo: %s", err)
@@ -76,8 +76,8 @@ func TestDecodeDiagnosticInfo(t *testing.T) {
 		switch {
 		case d.EncodingMask != 0x01:
 			t.Errorf("EncodingMask doesn't match. Want: %x, Got %x", 0x01, d.EncodingMask)
-		case d.SymboricID != 0x01:
-			t.Errorf("SymboricID doesn't match. Want: %x, Got %x", 0x01, d.SymboricID)
+		case d.SymbolicID != 0x01:
+			t.Errorf("SymbolicID doesn't match. Want: %x, Got %x", 0x01, d.SymbolicID)
 		}
 		t.Log(d.String())
 	})
@@ -162,8 +162,8 @@ func TestDecodeDiagnosticInfo(t *testing.T) {
 			t.Errorf("EncodingMask doesn't match. Want: %x, Got %x", 0x40, d.EncodingMask)
 		case d.InnerDiagnosticInfo.EncodingMask != 0x01:
 			t.Errorf("Locale doesn't match. Want: %x, Got %x", 0x01, d.InnerDiagnosticInfo.EncodingMask)
-		case d.InnerDiagnosticInfo.SymboricID != 0x07:
-			t.Errorf("SymboricID doesn't match. Want: %x, Got %x", 0x07, d.InnerDiagnosticInfo.SymboricID)
+		case d.InnerDiagnosticInfo.SymbolicID != 0x07:
+			t.Errorf("SymbolicID doesn't match. Want: %x, Got %x", 0x07, d.InnerDiagnosticInfo.SymbolicID)
 		}
 		t.Log(d.String())
 	})
@@ -176,8 +176,8 @@ func TestDecodeDiagnosticInfo(t *testing.T) {
 		switch {
 		case d.EncodingMask != 0x7f:
 			t.Errorf("EncodingMask doesn't match. Want: %x, Got %x", 0x7f, d.EncodingMask)
-		case d.SymboricID != 0x01:
-			t.Errorf("SymboricID doesn't match. Want: %x, Got %x", 0x01, d.SymboricID)
+		case d.SymbolicID != 0x01:
+			t.Errorf("SymbolicID doesn't match. Want: %x, Got %x", 0x01, d.SymbolicID)
 		case d.NamespaceURI != 0x02:
 			t.Errorf("NamespaceURI doesn't match. Want: %x, Got %x", 0x02, d.NamespaceURI)
 		case d.Locale != 0x04:
@@ -190,8 +190,8 @@ func TestDecodeDiagnosticInfo(t *testing.T) {
 			t.Errorf("InnerStatusCode doesn't match. Want: %x, Got %x", 0x06, d.InnerStatusCode)
 		case d.InnerDiagnosticInfo.EncodingMask != 0x01:
 			t.Errorf("InnerDiagnosticInfo.EncodingMask doesn't match. Want: %x, Got %x", 0x01, d.InnerDiagnosticInfo.EncodingMask)
-		case d.InnerDiagnosticInfo.SymboricID != 0x07:
-			t.Errorf("SymboricID doesn't match. Want: %x, Got %x", 0x07, d.InnerDiagnosticInfo.SymboricID)
+		case d.InnerDiagnosticInfo.SymbolicID != 0x07:
+			t.Errorf("SymbolicID doesn't match. Want: %x, Got %x", 0x07, d.InnerDiagnosticInfo.SymbolicID)
 		}
 		t.Log(d.String())
 	})
@@ -214,7 +214,7 @@ func TestSerializeDiagnosticInfo(t *testing.T) {
 		}
 		t.Logf("%x", serialized)
 	})
-	t.Run("has-symboric-id", func(t *testing.T) {
+	t.Run("has-symbolic-id", func(t *testing.T) {
 		d := NewDiagnosticInfo(
 			true, false, false, false, false, false, false,
 			1, 0, 0, 0, nil, 0, nil,
