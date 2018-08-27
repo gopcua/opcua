@@ -13,18 +13,22 @@ type QualifiedName struct {
 
 // NewQualifiedName creates a new QualifiedName.
 func NewQualifiedName(index uint16, name string) *QualifiedName {
-	value := []byte(name)
-	length := -1
-
-	if len(value) != 0 {
-		length = len(value)
+	if len(name) == 0 {
+		q := &QualifiedName{
+			NamespaceIndex: index,
+			Name: &String{
+				Length: -1,
+			},
+		}
+		return q
 	}
 
+	value := []byte(name)
 	q := &QualifiedName{
 		NamespaceIndex: index,
 		Name: &String{
 			Value:  value,
-			Length: int32(length),
+			Length: int32(len(value)),
 		},
 	}
 	return q
