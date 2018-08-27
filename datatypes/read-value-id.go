@@ -99,29 +99,54 @@ func (r *ReadValueID) Serialize() ([]byte, error) {
 
 // SerializeTo serializes ReadValueID into bytes.
 func (r *ReadValueID) SerializeTo(b []byte) error {
+	offset := 0
+
 	// node id
-	if err := r.NodeID.SerializeTo(b); err != nil {
-		return err
+	if r.NodeID != nil {
+		if err := r.NodeID.SerializeTo(b); err != nil {
+			return err
+		}
+		offset += r.NodeID.Len()
 	}
-	offset := r.NodeID.Len()
 
 	// attribute id
 	binary.LittleEndian.PutUint32(b[offset:offset+4], uint32(r.AttributeID))
 	offset += 4
 
 	// index range
-	if err := r.IndexRange.SerializeTo(b[offset:]); err != nil {
-		return err
+	if r.IndexRange != nil {
+		if err := r.IndexRange.SerializeTo(b[offset:]); err != nil {
+			return err
+		}
+		offset += r.IndexRange.Len()
 	}
-	offset += r.IndexRange.Len()
 
 	// data encoding
-	return r.DataEncoding.SerializeTo(b[offset:])
+	if r.DataEncoding != nil {
+		return r.DataEncoding.SerializeTo(b[offset:])
+	}
+
+	return nil
 }
 
 // Len returns the actual length of ReadValueID in int.
 func (r *ReadValueID) Len() int {
-	return r.NodeID.Len() + 4 + r.IndexRange.Len() + r.DataEncoding.Len()
+	// attribute id
+	length := 4
+
+	if r.NodeID != nil {
+		length += r.NodeID.Len()
+	}
+
+	if r.IndexRange != nil {
+		length += r.IndexRange.Len()
+	}
+
+	if r.DataEncoding != nil {
+		length += r.DataEncoding.Len()
+	}
+
+	return length
 }
 
 // ReadValueIDArray represents an array of ReadValueIDs.
