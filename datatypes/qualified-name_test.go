@@ -28,7 +28,6 @@ func TestNewQualifiedNameEmptyName(t *testing.T) {
 	expected := &QualifiedName{
 		NamespaceIndex: 1,
 		Name: &String{
-			Value:  []byte{},
 			Length: -1,
 		},
 	}

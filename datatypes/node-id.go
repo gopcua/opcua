@@ -325,7 +325,7 @@ func (s *StringNodeID) DecodeFromBytes(b []byte) error {
 	s.EncodingMask = b[0]
 	s.Namespace = binary.LittleEndian.Uint16(b[1:3])
 	s.Length = binary.LittleEndian.Uint32(b[3:7])
-	s.Identifier = b[7:]
+	s.Identifier = b[7 : 7+s.Length]
 	return nil
 }
 
@@ -344,7 +344,7 @@ func (s *StringNodeID) SerializeTo(b []byte) error {
 	b[0] = s.EncodingMask
 	binary.LittleEndian.PutUint16(b[1:3], s.Namespace)
 	binary.LittleEndian.PutUint32(b[3:7], s.Length)
-	copy(b[7:7+int(s.Length)], s.Identifier)
+	copy(b[7:7+s.Length], s.Identifier)
 
 	return nil
 }
@@ -490,7 +490,7 @@ func (o *OpaqueNodeID) DecodeFromBytes(b []byte) error {
 	o.EncodingMask = b[0]
 	o.Namespace = binary.LittleEndian.Uint16(b[1:3])
 	o.Length = binary.LittleEndian.Uint32(b[3:7])
-	o.Identifier = b[7 : 7+int(o.Length)]
+	o.Identifier = b[7 : 7+o.Length]
 
 	return nil
 }
@@ -510,7 +510,7 @@ func (o *OpaqueNodeID) SerializeTo(b []byte) error {
 	b[0] = o.EncodingMask
 	binary.LittleEndian.PutUint16(b[1:3], o.Namespace)
 	binary.LittleEndian.PutUint32(b[3:7], o.Length)
-	copy(b[7:7+int(o.Length)], o.Identifier)
+	copy(b[7:7+o.Length], o.Identifier)
 
 	return nil
 }
