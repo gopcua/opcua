@@ -7,6 +7,8 @@ package services
 import (
 	"testing"
 	"time"
+
+	"github.com/wmnsk/gopcua/datatypes"
 )
 
 var testServiceBytes = [][]byte{
@@ -518,13 +520,23 @@ func TestDecode(t *testing.T) {
 			t.Errorf("ServiceType doesn't Match. Want: %d, Got: %d", ServiceTypeCreateSessionResponse, c.ServiceType())
 		}
 
+		sessionID, ok := cs.SessionID.(*datatypes.NumericNodeID)
+		if !ok {
+			t.Fatalf("Failed to assert session id type.")
+		}
+
+		authenticationToken, ok := cs.AuthenticationToken.(*datatypes.FourByteNodeID)
+		if !ok {
+			t.Fatalf("Failed to assert session id type.")
+		}
+
 		switch {
-		case cs.SessionID.Identifier != 1:
-			t.Errorf("SessionID doesn't match. Want: %d, Got: %d", 1, cs.SessionID.Identifier)
-		case cs.AuthenticationToken.Identifier != 1:
-			t.Errorf("AuthenticationToken doesn't match. Want: %d, Got: %d", 1, cs.AuthenticationToken.Identifier)
-		case cs.ReviesedSessionTimeout != 6000000:
-			t.Errorf("ReviesedSessionTimeout doesn't match. Want: %d, Got: %d", 6000000, cs.ReviesedSessionTimeout)
+		case sessionID.Identifier != 1:
+			t.Errorf("SessionID doesn't match. Want: %d, Got: %d", 1, sessionID.Identifier)
+		case authenticationToken.Identifier != 1:
+			t.Errorf("AuthenticationToken doesn't match. Want: %d, Got: %d", 1, authenticationToken.Identifier)
+		case cs.RevisedSessionTimeout != 6000000:
+			t.Errorf("RevisedSessionTimeout doesn't match. Want: %d, Got: %d", 6000000, cs.RevisedSessionTimeout)
 		case cs.ServerNonce.Get() != nil:
 			t.Errorf("ServerNonce doesn't match. Want: %v, Got: %v", nil, cs.ServerNonce.Get())
 		case cs.ServerCertificate.Get() != nil:
