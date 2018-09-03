@@ -1,21 +1,24 @@
 # gopcua
 
 [![CircleCI](https://circleci.com/gh/wmnsk/gopcua.svg?style=svg)](https://circleci.com/gh/wmnsk/gopcua)
+[![Go Report Card](https://goreportcard.com/badge/github.com/wmnsk/gopcua)](https://goreportcard.com/report/github.com/wmnsk/gopcua)
 
 [![GoDoc](https://godoc.org/github.com/wmnsk/gopcua?status.svg)](https://godoc.org/github.com/wmnsk/gopcua)
 [![GitHub](https://img.shields.io/github/license/mashape/apistatus.svg)](https://github.com/wmnsk/gopcua/blob/master/LICENSE)
 
-gopcua provides easy and painless encoding/decoding of OPC UA protocol in pure Golang.
+gopcua provides easy and painless encoding/decoding of OPC UA Binary Protocol in pure Golang.
 
 ## Disclaimer
 
-THIS IS STILL EXPERIMENTAL PROJECT, ANY IMPLEMENTATION INCLUDING EXPORTED APIs MAY CHANGE DRASTICALLY IN THE FUTURE
+THIS IS STILL EXPERIMENTAL PROJECT, ANY IMPLEMENTATION INCLUDING EXPORTED APIs MAY CHANGE DRASTICALLY IN THE FUTURE.
 
 ## Quickstart
 
 See example directory for sample codes.
 
 ### Run
+
+The following command will send `Hello`, `OpenSecureChannel`, `CreateSession`, `CloseSecureChannel` to the destination specified in command-line arguments.
 
 ```shell-session
 git clone git@github.com:wmnsk/gopcua.git
@@ -41,16 +44,20 @@ go run sender.go --ip <dst IP> --port <dst Port> --url "opc.tcp://endpoint.examp
     - [x] Symmetric algorithm Security header
     - [x] Sequence header
     - [ ] Message footer
-  - [ ] Service Implementation
+  - [ ] Basic Service Implementation
     - [x] Interface to handle all services
     - [x] Open Secure Channel Request / Response
-    - [ ] Close Secure Channel Request / Response
+    - [x] Close Secure Channel Request / Response
     - [x] Get Endpoints Request / Response
-    - [ ] Create Session Request / Response
+    - [x] Create Session Request / Response
+    - [ ] Close Session Request / Response
     - [ ] Activate Session Request / Response
+  - [ ] Additional Service Implementation
+    - [ ] XXX...
+    - [ ] XXX...
     - [ ] XXX...
 - [ ] State Machine
-  - [ ] Implement `net.Conn`
+  - [ ] Implement `net.Conn` (`Dial()`, `Listen()`, `Accept()`)
   - [ ] XXX...
 - [ ] Others
   - [ ] Documentation (improve GoDoc, README)
@@ -60,8 +67,6 @@ go run sender.go --ip <dst IP> --port <dst Port> --url "opc.tcp://endpoint.examp
 ## Author
 
 Yoshiyuki Kurauchi ([GitHub](https://github.com/wmnsk/) / [Twitter](https://twitter.com/wmnskdmms))
-
-[![BMC](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://buymeacoff.ee/yoshk)
 
 ## License
 
