@@ -57,7 +57,7 @@ func DecodeHello(b []byte) (*Hello, error) {
 func (h *Hello) DecodeFromBytes(b []byte) error {
 	var err error
 	if len(b) < 24 {
-		return &errors.ErrTooShortToDecode{h, "should be longer than 24 bytes"}
+		return errors.NewErrTooShortToDecode(h, "should be longer than 24 bytes")
 	}
 
 	h.Header, err = DecodeHeader(b)
@@ -89,7 +89,7 @@ func (h *Hello) Serialize() ([]byte, error) {
 // SerializeTo serializes OPC UA Hello into given bytes.
 func (h *Hello) SerializeTo(b []byte) error {
 	if h == nil {
-		return &errors.ErrReceiverNil{h}
+		return errors.NewErrReceiverNil(h)
 	}
 	h.Header.Payload = make([]byte, h.Len()-8)
 

@@ -45,7 +45,7 @@ func DecodeAsymmetricSecurityHeader(b []byte) (*AsymmetricSecurityHeader, error)
 func (a *AsymmetricSecurityHeader) DecodeFromBytes(b []byte) error {
 	l := len(b)
 	if l < 12 {
-		return &errors.ErrTooShortToDecode{a, "should be longer than 12 bytes"}
+		return errors.NewErrTooShortToDecode(a, "should be longer than 12 bytes")
 	}
 
 	var offset = 0

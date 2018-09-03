@@ -53,7 +53,7 @@ func DecodeEndpointDescription(b []byte) (*EndpointDescription, error) {
 // DecodeFromBytes decodes given bytes into EndpointDescription.
 func (e *EndpointDescription) DecodeFromBytes(b []byte) error {
 	if len(b) < 6 {
-		return &errors.ErrTooShortToDecode{e, "should be longer than 6 bytes."}
+		return errors.NewErrTooShortToDecode(e, "should be longer than 6 bytes.")
 	}
 
 	var offset = 0
@@ -234,7 +234,7 @@ func DecodeEndpointDescriptionArray(b []byte) (*EndpointDescriptionArray, error)
 // DecodeFromBytes decodes given bytes into EndpointDescriptionArray.
 func (e *EndpointDescriptionArray) DecodeFromBytes(b []byte) error {
 	if len(b) < 4 {
-		return &errors.ErrTooShortToDecode{e, "should be longer than 4 bytes."}
+		return errors.NewErrTooShortToDecode(e, "should be longer than 4 bytes.")
 	}
 
 	e.ArraySize = int32(binary.LittleEndian.Uint32(b[:4]))

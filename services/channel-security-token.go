@@ -45,7 +45,7 @@ func DecodeChannelSecurityToken(b []byte) (*ChannelSecurityToken, error) {
 // DecodeFromBytes decodes given bytes into ChannelSecurityToken.
 func (c *ChannelSecurityToken) DecodeFromBytes(b []byte) error {
 	if len(b) < 20 {
-		return &errors.ErrTooShortToDecode{c, "should be longer than 20 bytes"}
+		return errors.NewErrTooShortToDecode(c, "should be longer than 20 bytes")
 	}
 
 	c.ChannelID = binary.LittleEndian.Uint32(b[0:4])

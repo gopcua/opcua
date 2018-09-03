@@ -44,7 +44,7 @@ func DecodeGeneric(b []byte) (*Generic, error) {
 func (g *Generic) DecodeFromBytes(b []byte) error {
 	var err error
 	if len(b) < 8 {
-		return &errors.ErrTooShortToDecode{g, "should be longer than 8 bytes"}
+		return errors.NewErrTooShortToDecode(g, "should be longer than 8 bytes")
 	}
 
 	g.Header, err = DecodeHeader(b)

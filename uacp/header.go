@@ -66,7 +66,7 @@ func DecodeHeader(b []byte) (*Header, error) {
 // DecodeFromBytes decodes given bytes into OPC UA Header.
 func (h *Header) DecodeFromBytes(b []byte) error {
 	if len(b) < 8 {
-		return &errors.ErrTooShortToDecode{h, "should be longer than 8 bytes"}
+		return errors.NewErrTooShortToDecode(h, "should be longer than 8 bytes")
 	}
 
 	h.MessageType = utils.Uint24To32(b[:3])
@@ -90,7 +90,7 @@ func (h *Header) Serialize() ([]byte, error) {
 // TODO: add error handling.
 func (h *Header) SerializeTo(b []byte) error {
 	if h == nil {
-		return &errors.ErrReceiverNil{h}
+		return errors.NewErrReceiverNil(h)
 	}
 	copy(b[:3], utils.Uint32To24(h.MessageType))
 	b[3] = h.ChunkType

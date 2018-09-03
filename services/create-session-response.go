@@ -68,7 +68,7 @@ func DecodeCreateSessionResponse(b []byte) (*CreateSessionResponse, error) {
 // DecodeFromBytes decodes given bytes into CreateSessionResponse.
 func (c *CreateSessionResponse) DecodeFromBytes(b []byte) error {
 	if len(b) < 120 {
-		return &errors.ErrTooShortToDecode{c, "should be longer than 120 bytes."}
+		return errors.NewErrTooShortToDecode(c, "should be longer than 120 bytes.")
 	}
 
 	var offset = 0

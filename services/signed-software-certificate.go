@@ -41,7 +41,7 @@ func DecodeSignedSoftwareCertificate(b []byte) (*SignedSoftwareCertificate, erro
 // DecodeFromBytes decodes given bytes into SignedSoftwareCertificate.
 func (s *SignedSoftwareCertificate) DecodeFromBytes(b []byte) error {
 	if len(b) < 8 {
-		return &errors.ErrTooShortToDecode{s, "should be longer than 8 bytes."}
+		return errors.NewErrTooShortToDecode(s, "should be longer than 8 bytes.")
 	}
 	var offset = 0
 	s.CertificateData = &datatypes.ByteString{}

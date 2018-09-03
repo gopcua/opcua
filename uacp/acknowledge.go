@@ -54,7 +54,7 @@ func DecodeAcknowledge(b []byte) (*Acknowledge, error) {
 func (a *Acknowledge) DecodeFromBytes(b []byte) error {
 	var err error
 	if len(b) < 20 {
-		return &errors.ErrTooShortToDecode{a, "should be longer than 20 bytes"}
+		return errors.NewErrTooShortToDecode(a, "should be longer than 20 bytes")
 	}
 
 	a.Header, err = DecodeHeader(b)
@@ -85,7 +85,7 @@ func (a *Acknowledge) Serialize() ([]byte, error) {
 // TODO: add error handling.
 func (a *Acknowledge) SerializeTo(b []byte) error {
 	if a == nil {
-		return &errors.ErrReceiverNil{a}
+		return errors.NewErrReceiverNil(a)
 	}
 	a.Header.Payload = make([]byte, a.Len()-8)
 

@@ -69,7 +69,7 @@ func DecodeCreateSessionRequest(b []byte) (*CreateSessionRequest, error) {
 // DecodeFromBytes decodes given bytes into CreateSessionRequest.
 func (c *CreateSessionRequest) DecodeFromBytes(b []byte) error {
 	if len(b) < 120 {
-		return &errors.ErrTooShortToDecode{c, "should be longer than 120 bytes."}
+		return errors.NewErrTooShortToDecode(c, "should be longer than 120 bytes.")
 	}
 
 	var offset = 0

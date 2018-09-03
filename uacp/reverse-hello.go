@@ -48,7 +48,7 @@ func DecodeReverseHello(b []byte) (*ReverseHello, error) {
 func (r *ReverseHello) DecodeFromBytes(b []byte) error {
 	var err error
 	if len(b) < 8 {
-		return &errors.ErrTooShortToDecode{r, "should be longer than 8 bytes"}
+		return errors.NewErrTooShortToDecode(r, "should be longer than 8 bytes")
 	}
 
 	r.Header, err = DecodeHeader(b)
@@ -81,7 +81,7 @@ func (r *ReverseHello) Serialize() ([]byte, error) {
 // SerializeTo serializes OPC UA ReverseHello into given bytes.
 func (r *ReverseHello) SerializeTo(b []byte) error {
 	if r == nil {
-		return &errors.ErrReceiverNil{r}
+		return errors.NewErrReceiverNil(r)
 	}
 	r.Header.Payload = make([]byte, r.Len()-8)
 

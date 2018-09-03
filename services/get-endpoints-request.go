@@ -72,7 +72,7 @@ func DecodeGetEndpointsRequest(b []byte) (*GetEndpointsRequest, error) {
 // DecodeFromBytes decodes given bytes into GetEndpointsRequest.
 func (g *GetEndpointsRequest) DecodeFromBytes(b []byte) error {
 	if len(b) < 16 {
-		return &errors.ErrTooShortToDecode{g, "should be longer than 16 bytes"}
+		return errors.NewErrTooShortToDecode(g, "should be longer than 16 bytes")
 	}
 
 	var offset = 0
