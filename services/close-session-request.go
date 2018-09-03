@@ -5,30 +5,28 @@
 package services
 
 import (
-	"encoding/binary"
 	"time"
 
 	"github.com/wmnsk/gopcua/datatypes"
-	"github.com/wmnsk/gopcua/errors"
 )
 
-// CloseSecureChannelRequest represents an CloseSecureChannelRequest.
-// This Service is used to terminate a SecureChannel.
+// CloseSessionRequest represents an CloseSessionRequest.
+// This Service is used to terminate a Session.
 //
-// Specification: Part 4, 5.5.3.2
-type CloseSecureChannelRequest struct {
+// Specification: Part 4, 5.6.4.2
+type CloseSessionRequest struct {
 	TypeID *datatypes.ExpandedNodeID
 	*RequestHeader
-	SecureChannelID uint32
+	DeleteSubscriptions *datatypes.Boolean
 }
 
-// NewCloseSecureChannelRequest creates an CloseSecureChannelRequest.
-func NewCloseSecureChannelRequest(ts time.Time, authToken uint8, handle, diag, timeout uint32, auditID string, chanID uint32) *CloseSecureChannelRequest {
-	o := &CloseSecureChannelRequest{
+// NewCloseSessionRequest creates a CloseSessionRequest.
+func NewCloseSessionRequest(ts time.Time, authToken uint8, handle, diag, timeout uint32, auditID string, deleteSubs bool) *CloseSessionRequest {
+	o := &CloseSessionRequest{
 		TypeID: datatypes.NewExpandedNodeID(
 			false, false,
 			datatypes.NewFourByteNodeID(
-				0, ServiceTypeCloseSecureChannelRequest,
+				0, ServiceTypeCloseSessionRequest,
 			),
 			"", 0,
 		),
@@ -49,15 +47,15 @@ func NewCloseSecureChannelRequest(ts time.Time, authToken uint8, handle, diag, t
 			),
 			nil,
 		),
-		SecureChannelID: chanID,
+		DeleteSubscriptions: datatypes.NewBoolean(deleteSubs),
 	}
 
 	return o
 }
 
-// DecodeCloseSecureChannelRequest decodes given bytes into CloseSecureChannelRequest.
-func DecodeCloseSecureChannelRequest(b []byte) (*CloseSecureChannelRequest, error) {
-	o := &CloseSecureChannelRequest{}
+// DecodeCloseSessionRequest decodes given bytes into CloseSessionRequest.
+func DecodeCloseSessionRequest(b []byte) (*CloseSessionRequest, error) {
+	o := &CloseSessionRequest{}
 	if err := o.DecodeFromBytes(b); err != nil {
 		return nil, err
 	}
@@ -65,12 +63,8 @@ func DecodeCloseSecureChannelRequest(b []byte) (*CloseSecureChannelRequest, erro
 	return o, nil
 }
 
-// DecodeFromBytes decodes given bytes into CloseSecureChannelRequest.
-func (o *CloseSecureChannelRequest) DecodeFromBytes(b []byte) error {
-	if len(b) < 16 {
-		return errors.NewErrTooShortToDecode(o, "should be longer than 16 bytes")
-	}
-
+// DecodeFromBytes decodes given bytes into CloseSessionRequest.
+func (o *CloseSessionRequest) DecodeFromBytes(b []byte) error {
 	var offset = 0
 	o.TypeID = &datatypes.ExpandedNodeID{}
 	if err := o.TypeID.DecodeFromBytes(b[offset:]); err != nil {
@@ -84,13 +78,12 @@ func (o *CloseSecureChannelRequest) DecodeFromBytes(b []byte) error {
 	}
 	offset += o.RequestHeader.Len() - len(o.RequestHeader.Payload)
 
-	o.SecureChannelID = binary.LittleEndian.Uint32(b[offset : offset+4])
-
-	return nil
+	o.DeleteSubscriptions = &datatypes.Boolean{}
+	return o.DeleteSubscriptions.DecodeFromBytes(b[offset:])
 }
 
-// Serialize serializes CloseSecureChannelRequest into bytes.
-func (o *CloseSecureChannelRequest) Serialize() ([]byte, error) {
+// Serialize serializes CloseSessionRequest into bytes.
+func (o *CloseSessionRequest) Serialize() ([]byte, error) {
 	b := make([]byte, o.Len())
 	if err := o.SerializeTo(b); err != nil {
 		return nil, err
@@ -99,8 +92,8 @@ func (o *CloseSecureChannelRequest) Serialize() ([]byte, error) {
 	return b, nil
 }
 
-// SerializeTo serializes CloseSecureChannelRequest into bytes.
-func (o *CloseSecureChannelRequest) SerializeTo(b []byte) error {
+// SerializeTo serializes CloseSessionRequest into bytes.
+func (o *CloseSessionRequest) SerializeTo(b []byte) error {
 	var offset = 0
 	if o.TypeID != nil {
 		if err := o.TypeID.SerializeTo(b[offset:]); err != nil {
@@ -116,25 +109,33 @@ func (o *CloseSecureChannelRequest) SerializeTo(b []byte) error {
 		offset += o.RequestHeader.Len() - len(o.Payload)
 	}
 
-	binary.LittleEndian.PutUint32(b[offset:offset+4], o.SecureChannelID)
+	if o.DeleteSubscriptions != nil {
+		if err := o.DeleteSubscriptions.SerializeTo(b[offset:]); err != nil {
+			return err
+		}
+		offset += o.DeleteSubscriptions.Len()
+	}
 
 	return nil
 }
 
-// Len returns the actual length of CloseSecureChannelRequest.
-func (o *CloseSecureChannelRequest) Len() int {
-	var l = 4
+// Len returns the actual length of CloseSessionRequest.
+func (o *CloseSessionRequest) Len() int {
+	var l = 0
 	if o.TypeID != nil {
 		l += o.TypeID.Len()
 	}
 	if o.RequestHeader != nil {
 		l += (o.RequestHeader.Len() - len(o.Payload))
 	}
+	if o.DeleteSubscriptions != nil {
+		l += o.DeleteSubscriptions.Len()
+	}
 
 	return l
 }
 
 // ServiceType returns type of Service in uint16.
-func (o *CloseSecureChannelRequest) ServiceType() uint16 {
-	return ServiceTypeCloseSecureChannelRequest
+func (o *CloseSessionRequest) ServiceType() uint16 {
+	return ServiceTypeCloseSessionRequest
 }
