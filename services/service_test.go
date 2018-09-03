@@ -369,6 +369,27 @@ var testServiceBytes = [][]byte{
 		0x00, 0x66, 0x6f, 0x6f, 0x03, 0x00, 0x00, 0x00,
 		0x62, 0x61, 0x72, 0x00, 0x00, 0x00,
 	},
+	{ // CloseSessionRequest
+		// TypeID
+		0x01, 0x00, 0xd9, 0x01,
+		// RequestHeader
+		0x00, 0x00, 0x00, 0x98, 0x67, 0xdd, 0xfd, 0x30,
+		0xd4, 0x01, 0x01, 0x00, 0x00, 0x00, 0xff, 0x03,
+		0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00,
+		// DeleteSubscription
+		0x01,
+	},
+	{ // CloseSessionResponse
+		// TypeID
+		0x01, 0x00, 0xdc, 0x01,
+		// ResponseHeader
+		0x00, 0x98, 0x67, 0xdd, 0xfd, 0x30, 0xd4, 0x01,
+		0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x02, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00,
+		0x00, 0x66, 0x6f, 0x6f, 0x03, 0x00, 0x00, 0x00,
+		0x62, 0x61, 0x72, 0x00, 0x00, 0x00,
+	},
 }
 
 func TestDecode(t *testing.T) {
@@ -601,6 +622,44 @@ func TestDecode(t *testing.T) {
 		switch {
 		case c.ServiceType() != ServiceTypeCloseSecureChannelResponse:
 			t.Errorf("ServiceType doesn't Match. Want: %d, Got: %d", ServiceTypeCloseSecureChannelResponse, c.ServiceType())
+		}
+		t.Log(c.String())
+	})
+	t.Run("close-session-req", func(t *testing.T) {
+		t.Parallel()
+		c, err := Decode(testServiceBytes[8])
+		if err != nil {
+			t.Fatalf("Failed to decode Service: %s", err)
+		}
+
+		csr, ok := c.(*CloseSessionRequest)
+		if !ok {
+			t.Fatalf("Failed to assert type.")
+		}
+
+		switch {
+		case c.ServiceType() != ServiceTypeCloseSessionRequest:
+			t.Errorf("ServiceType doesn't Match. Want: %d, Got: %d", ServiceTypeCloseSessionRequest, c.ServiceType())
+		case csr.DeleteSubscriptions.String() != "TRUE":
+			t.Errorf("DeleteSubscriptions doesn't Match. Want: %s, Got: %s", "TRUE", csr.DeleteSubscriptions.String())
+		}
+		t.Log(c.String())
+	})
+	t.Run("close-session-res", func(t *testing.T) {
+		t.Parallel()
+		c, err := Decode(testServiceBytes[9])
+		if err != nil {
+			t.Fatalf("Failed to decode Service: %s", err)
+		}
+
+		_, ok := c.(*CloseSessionResponse)
+		if !ok {
+			t.Fatalf("Failed to assert type.")
+		}
+
+		switch {
+		case c.ServiceType() != ServiceTypeCloseSessionResponse:
+			t.Errorf("ServiceType doesn't Match. Want: %d, Got: %d", ServiceTypeCloseSessionResponse, c.ServiceType())
 		}
 		t.Log(c.String())
 	})
@@ -879,6 +938,50 @@ func TestSerializeServices(t *testing.T) {
 
 		for i, s := range serialized {
 			x := testServiceBytes[7][i]
+			if s != x {
+				t.Errorf("Bytes doesn't match. Want: %#x, Got: %#x at %dth", x, s, i)
+			}
+		}
+		t.Logf("%x", serialized)
+	})
+	t.Run("close-session-req", func(t *testing.T) {
+		t.Parallel()
+		o := NewCloseSessionRequest(
+			time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
+			0, 1, 0, 0, "", true,
+		)
+		o.SetDiagAll()
+
+		serialized, err := o.Serialize()
+		if err != nil {
+			t.Fatalf("Failed to serialize Service: %s", err)
+		}
+
+		for i, s := range serialized {
+			x := testServiceBytes[8][i]
+			if s != x {
+				t.Errorf("Bytes doesn't match. Want: %#x, Got: %#x at %dth", x, s, i)
+			}
+		}
+		t.Logf("%x", serialized)
+	})
+	t.Run("close-session-res", func(t *testing.T) {
+		t.Parallel()
+		o := NewCloseSessionResponse(
+			time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
+			1,
+			0x00000000,
+			NewNullDiagnosticInfo(),
+			[]string{"foo", "bar"},
+		)
+
+		serialized, err := o.Serialize()
+		if err != nil {
+			t.Fatalf("Failed to serialize Service: %s", err)
+		}
+
+		for i, s := range serialized {
+			x := testServiceBytes[9][i]
 			if s != x {
 				t.Errorf("Bytes doesn't match. Want: %#x, Got: %#x at %dth", x, s, i)
 			}

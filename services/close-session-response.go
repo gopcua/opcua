@@ -10,22 +10,22 @@ import (
 	"github.com/wmnsk/gopcua/datatypes"
 )
 
-// CloseSecureChannelResponse represents an CloseSecureChannelResponse.
-// This Service is used to terminate a SecureChannel.
+// CloseSessionResponse represents an CloseSessionResponse.
+// This Service is used to terminate a Session.
 //
-// Specification: Part 4, 5.5.3.2
-type CloseSecureChannelResponse struct {
+// Specification: Part 4, 5.6.4.2
+type CloseSessionResponse struct {
 	TypeID *datatypes.ExpandedNodeID
 	*ResponseHeader
 }
 
-// NewCloseSecureChannelResponse creates an CloseSecureChannelResponse.
-func NewCloseSecureChannelResponse(timestamp time.Time, handle, code uint32, diag *DiagnosticInfo, strs []string) *CloseSecureChannelResponse {
-	o := &CloseSecureChannelResponse{
+// NewCloseSessionResponse creates an CloseSessionResponse.
+func NewCloseSessionResponse(timestamp time.Time, handle, code uint32, diag *DiagnosticInfo, strs []string) *CloseSessionResponse {
+	o := &CloseSessionResponse{
 		TypeID: datatypes.NewExpandedNodeID(
 			false, false,
 			datatypes.NewFourByteNodeID(
-				0, ServiceTypeCloseSecureChannelResponse,
+				0, ServiceTypeCloseSessionResponse,
 			),
 			"", 0,
 		),
@@ -45,9 +45,9 @@ func NewCloseSecureChannelResponse(timestamp time.Time, handle, code uint32, dia
 	return o
 }
 
-// DecodeCloseSecureChannelResponse decodes given bytes into CloseSecureChannelResponse.
-func DecodeCloseSecureChannelResponse(b []byte) (*CloseSecureChannelResponse, error) {
-	o := &CloseSecureChannelResponse{}
+// DecodeCloseSessionResponse decodes given bytes into CloseSessionResponse.
+func DecodeCloseSessionResponse(b []byte) (*CloseSessionResponse, error) {
+	o := &CloseSessionResponse{}
 	if err := o.DecodeFromBytes(b); err != nil {
 		return nil, err
 	}
@@ -55,8 +55,8 @@ func DecodeCloseSecureChannelResponse(b []byte) (*CloseSecureChannelResponse, er
 	return o, nil
 }
 
-// DecodeFromBytes decodes given bytes into CloseSecureChannelResponse.
-func (o *CloseSecureChannelResponse) DecodeFromBytes(b []byte) error {
+// DecodeFromBytes decodes given bytes into CloseSessionResponse.
+func (o *CloseSessionResponse) DecodeFromBytes(b []byte) error {
 	var offset = 0
 	o.TypeID = &datatypes.ExpandedNodeID{}
 	if err := o.TypeID.DecodeFromBytes(b[offset:]); err != nil {
@@ -68,8 +68,8 @@ func (o *CloseSecureChannelResponse) DecodeFromBytes(b []byte) error {
 	return o.ResponseHeader.DecodeFromBytes(b[offset:])
 }
 
-// Serialize serializes CloseSecureChannelResponse into bytes.
-func (o *CloseSecureChannelResponse) Serialize() ([]byte, error) {
+// Serialize serializes CloseSessionResponse into bytes.
+func (o *CloseSessionResponse) Serialize() ([]byte, error) {
 	b := make([]byte, o.Len())
 	if err := o.SerializeTo(b); err != nil {
 		return nil, err
@@ -78,8 +78,8 @@ func (o *CloseSecureChannelResponse) Serialize() ([]byte, error) {
 	return b, nil
 }
 
-// SerializeTo serializes CloseSecureChannelResponse into bytes.
-func (o *CloseSecureChannelResponse) SerializeTo(b []byte) error {
+// SerializeTo serializes CloseSessionResponse into bytes.
+func (o *CloseSessionResponse) SerializeTo(b []byte) error {
 	var offset = 0
 	if o.TypeID != nil {
 		if err := o.TypeID.SerializeTo(b[offset:]); err != nil {
@@ -98,8 +98,8 @@ func (o *CloseSecureChannelResponse) SerializeTo(b []byte) error {
 	return nil
 }
 
-// Len returns the actual length of CloseSecureChannelResponse.
-func (o *CloseSecureChannelResponse) Len() int {
+// Len returns the actual length of CloseSessionResponse.
+func (o *CloseSessionResponse) Len() int {
 	var l = 0
 	if o.TypeID != nil {
 		l += o.TypeID.Len()
@@ -112,6 +112,6 @@ func (o *CloseSecureChannelResponse) Len() int {
 }
 
 // ServiceType returns type of Service in uint16.
-func (o *CloseSecureChannelResponse) ServiceType() uint16 {
-	return ServiceTypeCloseSecureChannelResponse
+func (o *CloseSessionResponse) ServiceType() uint16 {
+	return ServiceTypeCloseSessionResponse
 }
