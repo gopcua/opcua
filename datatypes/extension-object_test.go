@@ -141,7 +141,7 @@ func TestExtensionObjectLen(t *testing.T) {
 			0x79, 0x6d, 0x6f, 0x75, 0x73,
 		}),
 	}
-	if e.Len() != 12 {
-		t.Errorf("Len doesn't match. Want: %d, Got: %d", 12, e.Len())
+	if e.Len() != 22 {
+		t.Errorf("Len doesn't match. Want: %d, Got: %d", 22, e.Len())
 	}
 }
