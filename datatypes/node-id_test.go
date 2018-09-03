@@ -47,11 +47,15 @@ func TestDecodeNodeID(t *testing.T) {
 			t.Errorf("Failed to assert type. Want: %s, Got: %T", "*TwoByteNodeID", n)
 		}
 
+		identStr := hex.EncodeToString(n.GetIdentifier())
+
 		switch {
 		case two.EncodingMask != TypeTwoByte:
 			t.Errorf("EncodingMask doesn't match. Want: %d, Got: %d", TypeTwoByte, two.EncodingMask)
 		case two.Identifier != 0xff:
 			t.Errorf("Identifier doesn't match. Want: %x, Got: %x", 0xff, two.Identifier)
+		case identStr != "ff":
+			t.Errorf("GetIdentifier doesn't match. Want: %s, Got: %s", "ff", identStr)
 		}
 		t.Log(two.String())
 	})
@@ -67,6 +71,8 @@ func TestDecodeNodeID(t *testing.T) {
 			t.Errorf("Failed to assert type. Want: %s, Got: %T", "*FourByteNodeID", n)
 		}
 
+		identStr := hex.EncodeToString(n.GetIdentifier())
+
 		switch {
 		case four.EncodingMask != TypeFourByte:
 			t.Errorf("EncodingMask doesn't match. Want: %d, Got: %d", TypeFourByte, four.EncodingMask)
@@ -74,6 +80,8 @@ func TestDecodeNodeID(t *testing.T) {
 			t.Errorf("Namespace doesn't match. Want: %x, Got: %x", 0, four.Namespace)
 		case four.Identifier != 0xcafe:
 			t.Errorf("Identifier doesn't match. Want: %x, Got: %x", 0xcafe, four.Identifier)
+		case identStr != "feca":
+			t.Errorf("GetIdentifier doesn't match. Want: %s, Got: %s", "feca", identStr)
 		}
 		t.Log(four.String())
 	})
@@ -89,6 +97,8 @@ func TestDecodeNodeID(t *testing.T) {
 			t.Errorf("Failed to assert type. Want: %s, Got: %T", "*NumericNodeID", n)
 		}
 
+		identStr := hex.EncodeToString(n.GetIdentifier())
+
 		switch {
 		case num.EncodingMask != TypeNumeric:
 			t.Errorf("EncodingMask doesn't match. Want: %d, Got: %d", TypeNumeric, num.EncodingMask)
@@ -96,6 +106,8 @@ func TestDecodeNodeID(t *testing.T) {
 			t.Errorf("Namespace doesn't match. Want: %x, Got: %x", 10, num.Namespace)
 		case num.Identifier != 0xdeadbeef:
 			t.Errorf("Identifier doesn't match. Want: %x, Got: %x", 0xdeadbeef, num.Identifier)
+		case identStr != "efbeadde":
+			t.Errorf("GetIdentifier doesn't match. Want: %s, Got: %s", "efbeadde", identStr)
 		}
 		t.Log(num.String())
 	})
@@ -111,6 +123,8 @@ func TestDecodeNodeID(t *testing.T) {
 			t.Errorf("Failed to assert type. Want: %s, Got: %T", "*StringNodeID", n)
 		}
 
+		identStr := hex.EncodeToString(n.GetIdentifier())
+
 		switch {
 		case str.EncodingMask != TypeString:
 			t.Errorf("EncodingMask doesn't match. Want: %d, Got: %d", TypeString, str.EncodingMask)
@@ -120,6 +134,8 @@ func TestDecodeNodeID(t *testing.T) {
 			t.Errorf("Length doesn't match. Want: %x, Got: %x", 6, str.Length)
 		case str.Value() != "foobar":
 			t.Errorf("Identifier doesn't match. Want: %s, Got: %s", "foobar", str.Value())
+		case identStr != "666f6f626172":
+			t.Errorf("GetIdentifier doesn't match. Want: %s, Got: %s", "666f6f626172", identStr)
 		}
 		t.Log(str.String())
 	})
@@ -131,6 +147,9 @@ func TestDecodeNodeID(t *testing.T) {
 		}
 
 		guid, ok := n.(*GUIDNodeID)
+
+		identStr := hex.EncodeToString(n.GetIdentifier())
+
 		if !ok {
 			t.Fatalf("Failed to assert type. Want: %s, Got: %T", "*GUIDNodeID", n)
 		}
@@ -142,6 +161,8 @@ func TestDecodeNodeID(t *testing.T) {
 			t.Errorf("Namespace doesn't match. Want: %x, Got: %x", 4660, guid.Namespace)
 		case guid.Value() != "AAAABBBB-CCDD-EEFF-0101-0123456789AB":
 			t.Errorf("Identifier doesn't match. Want: %s, Got: %s", "AAAABBBB-CCDD-EEFF-0101-0123456789AB", guid.Value())
+		case identStr != "bbbbaaaaddccffeeab89674523010101":
+			t.Errorf("GetIdentifier doesn't match. Want: %s, Got: %s", "bbbbaaaaddccffeeab89674523010101", identStr)
 		}
 		t.Log(guid.String())
 	})
@@ -157,7 +178,8 @@ func TestDecodeNodeID(t *testing.T) {
 			t.Errorf("Failed to assert type. Want: %s, Got: %T", "*OpaqueNodeID", n)
 		}
 
-		dummyStr := hex.EncodeToString(opq.Identifier)
+		identStr := hex.EncodeToString(n.GetIdentifier())
+
 		switch {
 		case opq.EncodingMask != TypeOpaque:
 			t.Errorf("EncodingMask doesn't match. Want: %d, Got: %d", TypeOpaque, opq.EncodingMask)
@@ -165,8 +187,8 @@ func TestDecodeNodeID(t *testing.T) {
 			t.Errorf("Namespace doesn't match. Want: %x, Got: %x", 32768, opq.Namespace)
 		case opq.Length != 4:
 			t.Errorf("Length doesn't match. Want: %x, Got: %x", 4, opq.Length)
-		case dummyStr != "deadbeef":
-			t.Errorf("Identifier doesn't match. Want: %s, Got: %s", "deadbeef", dummyStr)
+		case identStr != "deadbeef":
+			t.Errorf("Identifier doesn't match. Want: %s, Got: %s", "deadbeef", identStr)
 		}
 		t.Log(opq.String())
 	})

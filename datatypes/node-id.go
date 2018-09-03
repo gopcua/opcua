@@ -33,6 +33,7 @@ type NodeID interface {
 	EncodingMaskValue() uint8
 	SetURIFlag()
 	SetIndexFlag()
+	GetIdentifier() []byte
 }
 
 // DecodeNodeID decodes given bytes into NodeID, depending on the Encoding Mask.
@@ -131,6 +132,11 @@ func (t *TwoByteNodeID) SetIndexFlag() {
 	t.EncodingMask |= 0x40
 }
 
+// GetIdentifier returns value in Identifier field in bytes.
+func (t *TwoByteNodeID) GetIdentifier() []byte {
+	return []byte{t.Identifier}
+}
+
 // String returns the values in TwoByteNodeID in string.
 func (t *TwoByteNodeID) String() string {
 	return fmt.Sprintf("%x, %d", t.EncodingMask, t.Identifier)
@@ -208,6 +214,14 @@ func (f *FourByteNodeID) SetIndexFlag() {
 	f.EncodingMask |= 0x40
 }
 
+// GetIdentifier returns value in Identifier field in bytes.
+func (f *FourByteNodeID) GetIdentifier() []byte {
+	b := make([]byte, 2)
+	binary.LittleEndian.PutUint16(b, f.Identifier)
+
+	return b
+}
+
 // String returns the values in FourByteNodeID in string.
 func (f *FourByteNodeID) String() string {
 	return fmt.Sprintf("%x, %d, %d", f.EncodingMask, f.Namespace, f.Identifier)
@@ -283,6 +297,14 @@ func (n *NumericNodeID) SetURIFlag() {
 // SetIndexFlag sets NamespaceURI flag in EncodingMask.
 func (n *NumericNodeID) SetIndexFlag() {
 	n.EncodingMask |= 0x40
+}
+
+// GetIdentifier returns value in Identifier field in bytes.
+func (n *NumericNodeID) GetIdentifier() []byte {
+	b := make([]byte, 4)
+	binary.LittleEndian.PutUint32(b, n.Identifier)
+
+	return b
 }
 
 // String returns the values in NumericNodeID in string.
@@ -370,6 +392,11 @@ func (s *StringNodeID) Value() string {
 	return string(s.Identifier)
 }
 
+// GetIdentifier returns value in Identifier field in bytes.
+func (s *StringNodeID) GetIdentifier() []byte {
+	return s.Identifier
+}
+
 // String returns the values in StringNodeID in string.
 func (s *StringNodeID) String() string {
 	return fmt.Sprintf("%x, %d, %d, %d", s.EncodingMask, s.Namespace, s.Length, s.Identifier)
@@ -448,6 +475,14 @@ func (g *GUIDNodeID) SetIndexFlag() {
 // Value returns Identifier in string.
 func (g *GUIDNodeID) Value() string {
 	return g.Identifier.String()
+}
+
+// GetIdentifier returns value in Identifier field in bytes.
+// This method returns nil when the GUID in Identifier field is invalid.
+func (g *GUIDNodeID) GetIdentifier() []byte {
+	b, _ := g.Identifier.Serialize()
+
+	return b
 }
 
 // String returns the values in GUIDNodeID in string.
@@ -529,6 +564,11 @@ func (o *OpaqueNodeID) SetURIFlag() {
 // SetIndexFlag sets NamespaceURI flag in EncodingMask.
 func (o *OpaqueNodeID) SetIndexFlag() {
 	o.EncodingMask |= 0x40
+}
+
+// GetIdentifier returns value in Identifier field in bytes.
+func (o *OpaqueNodeID) GetIdentifier() []byte {
+	return o.Identifier
 }
 
 // String returns the values in OpaqueNodeID in string.
