@@ -61,7 +61,7 @@ func DecodeHeader(b []byte) (*Header, error) {
 // DecodeFromBytes decodes given bytes into OPC UA Secure Conversation Header.
 func (h *Header) DecodeFromBytes(b []byte) error {
 	if len(b) < 12 {
-		return &errors.ErrTooShortToDecode{h, "should be longer than 12 bytes"}
+		return errors.NewErrTooShortToDecode(h, "should be longer than 12 bytes")
 	}
 
 	h.MessageType = utils.Uint24To32(b[:3])

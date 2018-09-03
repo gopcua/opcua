@@ -106,7 +106,7 @@ func Decode(b []byte) (*Message, error) {
 // DecodeFromBytes decodes given bytes into OPC UA Secure Conversation message.
 func (m *Message) DecodeFromBytes(b []byte) error {
 	if len(b) < 16 {
-		return &errors.ErrTooShortToDecode{m, "should be longer than 16 bytes"}
+		return errors.NewErrTooShortToDecode(m, "should be longer than 16 bytes")
 	}
 
 	m.Header = &Header{}
@@ -120,7 +120,7 @@ func (m *Message) DecodeFromBytes(b []byte) error {
 	case MessageTypeMessage:
 		return m.decodeMSGFromBytes(m.Header.Payload)
 	default:
-		return &errors.ErrInvalidType{m, "decode", "should be one of OPN, MSG, CLO"}
+		return errors.NewErrInvalidType(m, "decode", "should be one of OPN, MSG, CLO")
 	}
 }
 
@@ -188,7 +188,7 @@ func (m *Message) SerializeTo(b []byte) error {
 	case MessageTypeMessage:
 		return m.serializeMSGTo(b[offset:])
 	default:
-		return &errors.ErrInvalidType{m, "serialize", "should be one of OPN, MSG, CLO"}
+		return errors.NewErrInvalidType(m, "serialize", "should be one of OPN, MSG, CLO")
 	}
 }
 

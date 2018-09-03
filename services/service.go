@@ -35,11 +35,11 @@ func Decode(b []byte) (Service, error) {
 
 	typeID, err := datatypes.DecodeExpandedNodeID(b)
 	if err != nil {
-		return nil, &errors.ErrUnsupported{typeID, "cannot decode TypeID."}
+		return nil, errors.NewErrUnsupported(typeID, "cannot decode TypeID.")
 	}
 	n, ok := typeID.NodeID.(*datatypes.FourByteNodeID)
 	if !ok {
-		return nil, &errors.ErrUnsupported{typeID.NodeID, "should be FourByteNodeID."}
+		return nil, errors.NewErrUnsupported(typeID.NodeID, "should be FourByteNodeID.")
 	}
 
 	switch n.Identifier {
@@ -56,7 +56,7 @@ func Decode(b []byte) (Service, error) {
 	case ServiceTypeCreateSessionResponse:
 		s = &CreateSessionResponse{}
 	default:
-		return nil, &errors.ErrUnsupported{n.Identifier, "unsupported or not implemented yet."}
+		return nil, errors.NewErrUnsupported(n.Identifier, "unsupported or not implemented yet.")
 	}
 
 	if err := s.DecodeFromBytes(b); err != nil {

@@ -95,7 +95,7 @@ func DecodeOpenSecureChannelRequest(b []byte) (*OpenSecureChannelRequest, error)
 // DecodeFromBytes decodes given bytes into OpenSecureChannelRequest.
 func (o *OpenSecureChannelRequest) DecodeFromBytes(b []byte) error {
 	if len(b) < 16 {
-		return &errors.ErrTooShortToDecode{o, "should be longer than 16 bytes"}
+		return errors.NewErrTooShortToDecode(o, "should be longer than 16 bytes")
 	}
 
 	var offset = 0

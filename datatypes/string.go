@@ -47,7 +47,7 @@ func DecodeString(b []byte) (*String, error) {
 // DecodeFromBytes decodes given bytes into OPC UA String.
 func (s *String) DecodeFromBytes(b []byte) error {
 	if len(b) < 4 {
-		return &errors.ErrTooShortToDecode{s, "should be longer than 4 bytes"}
+		return errors.NewErrTooShortToDecode(s, "should be longer than 4 bytes")
 	}
 
 	s.Length = int32(binary.LittleEndian.Uint32(b[:4]))
@@ -71,7 +71,7 @@ func (s *String) Serialize() ([]byte, error) {
 // SerializeTo serializes String into bytes.
 func (s *String) SerializeTo(b []byte) error {
 	if len(b) < s.Len() {
-		return &errors.ErrInvalidLength{s, "bytes should be longer"}
+		return errors.NewErrInvalidLength(s, "bytes should be longer")
 	}
 
 	binary.LittleEndian.PutUint32(b[:4], uint32(s.Length))

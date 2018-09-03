@@ -45,7 +45,7 @@ func DecodeSequenceHeader(b []byte) (*SequenceHeader, error) {
 func (s *SequenceHeader) DecodeFromBytes(b []byte) error {
 	l := len(b)
 	if l < 8 {
-		return &errors.ErrTooShortToDecode{s, "should be longer than 8 bytes"}
+		return errors.NewErrTooShortToDecode(s, "should be longer than 8 bytes")
 	}
 	s.SequenceNumber = binary.LittleEndian.Uint32(b[:4])
 	s.RequestID = binary.LittleEndian.Uint32(b[4:8])

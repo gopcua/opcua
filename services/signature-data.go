@@ -40,7 +40,7 @@ func DecodeSignatureData(b []byte) (*SignatureData, error) {
 // DecodeFromBytes decodes given bytes into SignatureData.
 func (s *SignatureData) DecodeFromBytes(b []byte) error {
 	if len(b) < 8 {
-		return &errors.ErrTooShortToDecode{s, "should be longer than 8 bytes."}
+		return errors.NewErrTooShortToDecode(s, "should be longer than 8 bytes.")
 	}
 	var offset = 0
 	s.Algorithm = &datatypes.String{}

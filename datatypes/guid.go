@@ -58,7 +58,7 @@ func DecodeGUID(b []byte) (*GUID, error) {
 // DecodeFromBytes decodes given bytes into GUID.
 func (g *GUID) DecodeFromBytes(b []byte) error {
 	if len(b) < 16 {
-		return &errors.ErrTooShortToDecode{g, "should be 16 bytes"}
+		return errors.NewErrTooShortToDecode(g, "should be 16 bytes")
 	}
 
 	g.Data1 = binary.LittleEndian.Uint32(b[:4])
