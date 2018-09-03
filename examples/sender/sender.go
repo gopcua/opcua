@@ -57,6 +57,7 @@ func main() {
 		6000000, nil,
 	)
 	o.SetDiagAll()
+
 	// Prepare TCP connection
 	raddr, err := net.ResolveTCPAddr("tcp", *ip+":"+*port)
 	if err != nil {
@@ -143,6 +144,20 @@ func main() {
 			log.Printf("Something went wrong: %s", err)
 		}
 		log.Printf("Received: %s\nRaw: %x", gres, buf[:m])
+
+		c := services.NewCloseSecureChannelRequest(
+			time.Now(), 0, 1, 0, 0, "", cfg.SecureChannelID,
+		)
+		c.SetDiagAll()
+		clo, err := uasc.New(c, cfg).Serialize()
+		if err != nil {
+			log.Fatalf("Failed to serialize CloseSecureChannelRequest: %s", err)
+		}
+
+		if _, err := conn.Write(clo); err != nil {
+			log.Fatalf("Failed to write CloseSecureChannel: %s", err)
+		}
+		log.Printf("Successfully sent CloseSecureChannel: %x", gep)
 
 	case uacp.MessageTypeError:
 		log.Fatalf("Received Error, closing: %s", cp)

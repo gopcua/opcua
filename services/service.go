@@ -11,12 +11,14 @@ import (
 
 // ServiceType definitions.
 const (
-	ServiceTypeGetEndpointsRequest       uint16 = 428
-	ServiceTypeGetEndpointsResponse             = 431
-	ServiceTypeOpenSecureChannelRequest         = 446
-	ServiceTypeOpenSecureChannelResponse        = 449
-	ServiceTypeCreateSessionRequest             = 461
-	ServiceTypeCreateSessionResponse            = 464
+	ServiceTypeGetEndpointsRequest        uint16 = 428
+	ServiceTypeGetEndpointsResponse              = 431
+	ServiceTypeOpenSecureChannelRequest          = 446
+	ServiceTypeOpenSecureChannelResponse         = 449
+	ServiceTypeCloseSecureChannelRequest         = 452
+	ServiceTypeCloseSecureChannelResponse        = 455
+	ServiceTypeCreateSessionRequest              = 461
+	ServiceTypeCreateSessionResponse             = 464
 )
 
 // Service is an interface to handle any kind of OPC UA Services.
@@ -47,6 +49,10 @@ func Decode(b []byte) (Service, error) {
 		s = &OpenSecureChannelRequest{}
 	case ServiceTypeOpenSecureChannelResponse:
 		s = &OpenSecureChannelResponse{}
+	case ServiceTypeCloseSecureChannelRequest:
+		s = &CloseSecureChannelRequest{}
+	case ServiceTypeCloseSecureChannelResponse:
+		s = &CloseSecureChannelResponse{}
 	case ServiceTypeGetEndpointsRequest:
 		s = &GetEndpointsRequest{}
 	case ServiceTypeGetEndpointsResponse:
