@@ -19,9 +19,9 @@ import (
 type CreateSessionResponse struct {
 	TypeID *datatypes.ExpandedNodeID
 	*ResponseHeader
-	SessionID                  *datatypes.NumericNodeID
-	AuthenticationToken        *datatypes.FourByteNodeID
-	ReviesedSessionTimeout     uint64
+	SessionID                  datatypes.NodeID
+	AuthenticationToken        datatypes.NodeID
+	RevisedSessionTimeout      uint64
 	ServerNonce                *datatypes.ByteString
 	ServerCertificate          *datatypes.ByteString
 	ServerEndpoints            *EndpointDescriptionArray
@@ -45,7 +45,7 @@ func NewCreateSessionResponse(time time.Time, result uint32, diag *DiagnosticInf
 		),
 		SessionID:                  datatypes.NewNumericNodeID(0, sessionID),
 		AuthenticationToken:        datatypes.NewFourByteNodeID(0, authToken),
-		ReviesedSessionTimeout:     timeout,
+		RevisedSessionTimeout:      timeout,
 		ServerNonce:                datatypes.NewByteString(nonce),
 		ServerCertificate:          datatypes.NewByteString(cert),
 		ServerEndpoints:            NewEndpointDescriptionArray(endpoints),
@@ -84,19 +84,21 @@ func (c *CreateSessionResponse) DecodeFromBytes(b []byte) error {
 	}
 	offset += c.ResponseHeader.Len() - len(c.ResponseHeader.Payload)
 
-	c.SessionID = &datatypes.NumericNodeID{}
-	if err := c.SessionID.DecodeFromBytes(b[offset:]); err != nil {
+	sessionID, err := datatypes.DecodeNodeID(b[offset:])
+	if err != nil {
 		return err
 	}
+	c.SessionID = sessionID
 	offset += c.SessionID.Len()
 
-	c.AuthenticationToken = &datatypes.FourByteNodeID{}
-	if err := c.AuthenticationToken.DecodeFromBytes(b[offset:]); err != nil {
+	authenticationToken, err := datatypes.DecodeNodeID(b[offset:])
+	if err != nil {
 		return err
 	}
+	c.AuthenticationToken = authenticationToken
 	offset += c.AuthenticationToken.Len()
 
-	c.ReviesedSessionTimeout = binary.LittleEndian.Uint64(b[offset : offset+8])
+	c.RevisedSessionTimeout = binary.LittleEndian.Uint64(b[offset : offset+8])
 	offset += 8
 
 	c.ServerNonce = &datatypes.ByteString{}
@@ -175,7 +177,7 @@ func (c *CreateSessionResponse) SerializeTo(b []byte) error {
 		offset += c.AuthenticationToken.Len()
 	}
 
-	binary.LittleEndian.PutUint64(b[offset:offset+8], c.ReviesedSessionTimeout)
+	binary.LittleEndian.PutUint64(b[offset:offset+8], c.RevisedSessionTimeout)
 	offset += 8
 
 	if c.ServerNonce != nil {
@@ -259,7 +261,7 @@ func (c *CreateSessionResponse) String() string {
 		c.ResponseHeader,
 		c.SessionID,
 		c.AuthenticationToken,
-		c.ReviesedSessionTimeout,
+		c.RevisedSessionTimeout,
 		c.ServerNonce,
 		c.ServerCertificate,
 		c.ServerEndpoints,
