@@ -33,7 +33,7 @@ type NodeID interface {
 	EncodingMaskValue() uint8
 	SetURIFlag()
 	SetIndexFlag()
-	GetIdentifier() ([]byte, error)
+	GetIdentifier() []byte
 }
 
 // DecodeNodeID decodes given bytes into NodeID, depending on the Encoding Mask.
@@ -133,12 +133,8 @@ func (t *TwoByteNodeID) SetIndexFlag() {
 }
 
 // GetIdentifier returns value in Identifier field in bytes.
-func (t *TwoByteNodeID) GetIdentifier() ([]byte, error) {
-	if t == nil {
-		return nil, errors.NewErrReceiverNil(t)
-	}
-
-	return []byte{t.Identifier}, nil
+func (t *TwoByteNodeID) GetIdentifier() []byte {
+	return []byte{t.Identifier}
 }
 
 // String returns the values in TwoByteNodeID in string.
@@ -219,14 +215,11 @@ func (f *FourByteNodeID) SetIndexFlag() {
 }
 
 // GetIdentifier returns value in Identifier field in bytes.
-func (f *FourByteNodeID) GetIdentifier() ([]byte, error) {
-	if f == nil {
-		return nil, errors.NewErrReceiverNil(f)
-	}
-
+func (f *FourByteNodeID) GetIdentifier() []byte {
 	b := make([]byte, 2)
 	binary.LittleEndian.PutUint16(b, f.Identifier)
-	return b, nil
+
+	return b
 }
 
 // String returns the values in FourByteNodeID in string.
@@ -307,14 +300,11 @@ func (n *NumericNodeID) SetIndexFlag() {
 }
 
 // GetIdentifier returns value in Identifier field in bytes.
-func (n *NumericNodeID) GetIdentifier() ([]byte, error) {
-	if n == nil {
-		return nil, errors.NewErrReceiverNil(n)
-	}
-
+func (n *NumericNodeID) GetIdentifier() []byte {
 	b := make([]byte, 4)
 	binary.LittleEndian.PutUint32(b, n.Identifier)
-	return b, nil
+
+	return b
 }
 
 // String returns the values in NumericNodeID in string.
@@ -403,12 +393,8 @@ func (s *StringNodeID) Value() string {
 }
 
 // GetIdentifier returns value in Identifier field in bytes.
-func (s *StringNodeID) GetIdentifier() ([]byte, error) {
-	if s == nil {
-		return nil, errors.NewErrReceiverNil(s)
-	}
-
-	return s.Identifier, nil
+func (s *StringNodeID) GetIdentifier() []byte {
+	return s.Identifier
 }
 
 // String returns the values in StringNodeID in string.
@@ -492,12 +478,11 @@ func (g *GUIDNodeID) Value() string {
 }
 
 // GetIdentifier returns value in Identifier field in bytes.
-func (g *GUIDNodeID) GetIdentifier() ([]byte, error) {
-	if g == nil {
-		return nil, errors.NewErrReceiverNil(g)
-	}
+// This method returns nil when the GUID in Identifier field is invalid.
+func (g *GUIDNodeID) GetIdentifier() []byte {
+	b, _ := g.Identifier.Serialize()
 
-	return g.Identifier.Serialize()
+	return b
 }
 
 // String returns the values in GUIDNodeID in string.
@@ -582,12 +567,8 @@ func (o *OpaqueNodeID) SetIndexFlag() {
 }
 
 // GetIdentifier returns value in Identifier field in bytes.
-func (o *OpaqueNodeID) GetIdentifier() ([]byte, error) {
-	if o == nil {
-		return nil, errors.NewErrReceiverNil(o)
-	}
-
-	return o.Identifier, nil
+func (o *OpaqueNodeID) GetIdentifier() []byte {
+	return o.Identifier
 }
 
 // String returns the values in OpaqueNodeID in string.

@@ -47,11 +47,7 @@ func TestDecodeNodeID(t *testing.T) {
 			t.Errorf("Failed to assert type. Want: %s, Got: %T", "*TwoByteNodeID", n)
 		}
 
-		identifier, err := n.GetIdentifier()
-		if err != nil {
-			t.Errorf("Failed to get identifier: %s", err)
-		}
-		identStr := hex.EncodeToString(identifier)
+		identStr := hex.EncodeToString(n.GetIdentifier())
 
 		switch {
 		case two.EncodingMask != TypeTwoByte:
@@ -75,11 +71,7 @@ func TestDecodeNodeID(t *testing.T) {
 			t.Errorf("Failed to assert type. Want: %s, Got: %T", "*FourByteNodeID", n)
 		}
 
-		identifier, err := n.GetIdentifier()
-		if err != nil {
-			t.Errorf("Failed to get identifier: %s", err)
-		}
-		identStr := hex.EncodeToString(identifier)
+		identStr := hex.EncodeToString(n.GetIdentifier())
 
 		switch {
 		case four.EncodingMask != TypeFourByte:
@@ -105,11 +97,7 @@ func TestDecodeNodeID(t *testing.T) {
 			t.Errorf("Failed to assert type. Want: %s, Got: %T", "*NumericNodeID", n)
 		}
 
-		identifier, err := n.GetIdentifier()
-		if err != nil {
-			t.Errorf("Failed to get identifier: %s", err)
-		}
-		identStr := hex.EncodeToString(identifier)
+		identStr := hex.EncodeToString(n.GetIdentifier())
 
 		switch {
 		case num.EncodingMask != TypeNumeric:
@@ -135,11 +123,7 @@ func TestDecodeNodeID(t *testing.T) {
 			t.Errorf("Failed to assert type. Want: %s, Got: %T", "*StringNodeID", n)
 		}
 
-		identifier, err := n.GetIdentifier()
-		if err != nil {
-			t.Errorf("Failed to get identifier: %s", err)
-		}
-		identStr := hex.EncodeToString(identifier)
+		identStr := hex.EncodeToString(n.GetIdentifier())
 
 		switch {
 		case str.EncodingMask != TypeString:
@@ -164,11 +148,7 @@ func TestDecodeNodeID(t *testing.T) {
 
 		guid, ok := n.(*GUIDNodeID)
 
-		identifier, err := n.GetIdentifier()
-		if err != nil {
-			t.Errorf("Failed to get identifier: %s", err)
-		}
-		identStr := hex.EncodeToString(identifier)
+		identStr := hex.EncodeToString(n.GetIdentifier())
 
 		if !ok {
 			t.Fatalf("Failed to assert type. Want: %s, Got: %T", "*GUIDNodeID", n)
@@ -198,11 +178,7 @@ func TestDecodeNodeID(t *testing.T) {
 			t.Errorf("Failed to assert type. Want: %s, Got: %T", "*OpaqueNodeID", n)
 		}
 
-		identifier, err := n.GetIdentifier()
-		if err != nil {
-			t.Errorf("Failed to get identifier: %s", err)
-		}
-		identStr := hex.EncodeToString(identifier)
+		identStr := hex.EncodeToString(n.GetIdentifier())
 
 		switch {
 		case opq.EncodingMask != TypeOpaque:
