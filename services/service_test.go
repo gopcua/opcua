@@ -348,7 +348,27 @@ var testServiceBytes = [][]byte{
 		// MaxRequestMessageSize
 		0xfe, 0xff, 0x00, 0x00,
 	},
-	{},
+	{ // CloseSecureChannelRequest
+		// TypeID
+		0x01, 0x00, 0xc4, 0x01,
+		// RequestHeader
+		0x00, 0x00, 0x00, 0x98, 0x67, 0xdd, 0xfd, 0x30,
+		0xd4, 0x01, 0x01, 0x00, 0x00, 0x00, 0xff, 0x03,
+		0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00,
+		// SecureChannelID
+		0x01, 0x00, 0x00, 0x00,
+	},
+	{ // CloseSecureChannelResponse
+		// TypeID
+		0x01, 0x00, 0xc7, 0x01,
+		// ResponseHeader
+		0x00, 0x98, 0x67, 0xdd, 0xfd, 0x30, 0xd4, 0x01,
+		0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x02, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00,
+		0x00, 0x66, 0x6f, 0x6f, 0x03, 0x00, 0x00, 0x00,
+		0x62, 0x61, 0x72, 0x00, 0x00, 0x00,
+	},
 }
 
 func TestDecode(t *testing.T) {
@@ -545,6 +565,44 @@ func TestDecode(t *testing.T) {
 			t.Errorf("MaxRequestMessageSize doesn't match. Want: %d, Got: %d", 65534, cs.MaxRequestMessageSize)
 		}
 		t.Log(cs.String())
+	})
+	t.Run("close-sec-chan-req", func(t *testing.T) {
+		t.Parallel()
+		c, err := Decode(testServiceBytes[6])
+		if err != nil {
+			t.Fatalf("Failed to decode Service: %s", err)
+		}
+
+		csc, ok := c.(*CloseSecureChannelRequest)
+		if !ok {
+			t.Fatalf("Failed to assert type.")
+		}
+
+		switch {
+		case c.ServiceType() != ServiceTypeCloseSecureChannelRequest:
+			t.Errorf("ServiceType doesn't Match. Want: %d, Got: %d", ServiceTypeCloseSecureChannelRequest, c.ServiceType())
+		case csc.SecureChannelID != 1:
+			t.Errorf("SecureChannelID doesn't Match. Want: %d, Got: %d", 1, csc.SecureChannelID)
+		}
+		t.Log(c.String())
+	})
+	t.Run("close-sec-chan-res", func(t *testing.T) {
+		t.Parallel()
+		c, err := Decode(testServiceBytes[7])
+		if err != nil {
+			t.Fatalf("Failed to decode Service: %s", err)
+		}
+
+		_, ok := c.(*CloseSecureChannelResponse)
+		if !ok {
+			t.Fatalf("Failed to assert type.")
+		}
+
+		switch {
+		case c.ServiceType() != ServiceTypeCloseSecureChannelResponse:
+			t.Errorf("ServiceType doesn't Match. Want: %d, Got: %d", ServiceTypeCloseSecureChannelResponse, c.ServiceType())
+		}
+		t.Log(c.String())
 	})
 }
 
@@ -777,6 +835,50 @@ func TestSerializeServices(t *testing.T) {
 
 		for i, s := range serialized {
 			x := testServiceBytes[5][i]
+			if s != x {
+				t.Errorf("Bytes doesn't match. Want: %#x, Got: %#x at %dth", x, s, i)
+			}
+		}
+		t.Logf("%x", serialized)
+	})
+	t.Run("close-sec-chan-req", func(t *testing.T) {
+		t.Parallel()
+		o := NewCloseSecureChannelRequest(
+			time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
+			0, 1, 0, 0, "", 1,
+		)
+		o.SetDiagAll()
+
+		serialized, err := o.Serialize()
+		if err != nil {
+			t.Fatalf("Failed to serialize Service: %s", err)
+		}
+
+		for i, s := range serialized {
+			x := testServiceBytes[6][i]
+			if s != x {
+				t.Errorf("Bytes doesn't match. Want: %#x, Got: %#x at %dth", x, s, i)
+			}
+		}
+		t.Logf("%x", serialized)
+	})
+	t.Run("close-sec-chan-res", func(t *testing.T) {
+		t.Parallel()
+		o := NewCloseSecureChannelResponse(
+			time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
+			1,
+			0x00000000,
+			NewNullDiagnosticInfo(),
+			[]string{"foo", "bar"},
+		)
+
+		serialized, err := o.Serialize()
+		if err != nil {
+			t.Fatalf("Failed to serialize Service: %s", err)
+		}
+
+		for i, s := range serialized {
+			x := testServiceBytes[7][i]
 			if s != x {
 				t.Errorf("Bytes doesn't match. Want: %#x, Got: %#x at %dth", x, s, i)
 			}
