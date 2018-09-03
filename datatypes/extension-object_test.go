@@ -1,3 +1,7 @@
+// Copyright 2018 gopcua authors. All rights reserved.
+// Use of this source code is governed by a MIT-style license that can be
+// found in the LICENSE file.
+
 package datatypes
 
 import (
@@ -138,6 +142,6 @@ func TestExtensionObjectLen(t *testing.T) {
 		}),
 	}
 	if e.Len() != 22 {
-		t.Errorf("Len doesn't match. Want: %d, Got: %d", 12, e.Len())
+		t.Errorf("Len doesn't match. Want: %d, Got: %d", 22, e.Len())
 	}
 }
