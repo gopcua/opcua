@@ -533,7 +533,6 @@ func TestDecode(t *testing.T) {
 		switch {
 		case sessionID.Identifier != 1:
 			t.Errorf("SessionID doesn't match. Want: %d, Got: %d", 1, sessionID.Identifier)
-			// four byte node id
 		case authenticationToken.Identifier != 1:
 			t.Errorf("AuthenticationToken doesn't match. Want: %d, Got: %d", 1, authenticationToken.Identifier)
 		case cs.RevisedSessionTimeout != 6000000:
