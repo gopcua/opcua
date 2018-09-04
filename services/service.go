@@ -11,8 +11,7 @@ import (
 
 // ServiceType definitions.
 const (
-	ServiceTypeAnonymousIdentityToken     uint16 = 321
-	ServiceTypeGetEndpointsRequest               = 428
+	ServiceTypeGetEndpointsRequest        uint16 = 428
 	ServiceTypeGetEndpointsResponse              = 431
 	ServiceTypeOpenSecureChannelRequest          = 446
 	ServiceTypeOpenSecureChannelResponse         = 449

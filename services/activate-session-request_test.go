@@ -54,10 +54,7 @@ func TestDecodeActivateSessionRequest(t *testing.T) {
 		LocaleIDs:                  datatypes.NewStringArray(nil),
 		UserIdentityToken: &datatypes.ExtensionObject{
 			TypeID: &datatypes.ExpandedNodeID{
-				NodeID: datatypes.NewFourByteNodeID(
-					0,
-					ServiceTypeAnonymousIdentityToken,
-				),
+				NodeID: datatypes.NewFourByteNodeID(0, 321),
 			},
 			Length:       5,
 			EncodingMask: 0x01,
@@ -116,10 +113,7 @@ func TestActivateSessionRequestDecodeFromBytes(t *testing.T) {
 		LocaleIDs:                  datatypes.NewStringArray(nil),
 		UserIdentityToken: &datatypes.ExtensionObject{
 			TypeID: &datatypes.ExpandedNodeID{
-				NodeID: datatypes.NewFourByteNodeID(
-					0,
-					ServiceTypeAnonymousIdentityToken,
-				),
+				NodeID: datatypes.NewFourByteNodeID(0, 321),
 			},
 			Length:       5,
 			EncodingMask: 0x01,
@@ -155,10 +149,7 @@ func TestActivateSessionRequestSerialize(t *testing.T) {
 		LocaleIDs:                  datatypes.NewStringArray(nil),
 		UserIdentityToken: &datatypes.ExtensionObject{
 			TypeID: &datatypes.ExpandedNodeID{
-				NodeID: datatypes.NewFourByteNodeID(
-					0,
-					ServiceTypeAnonymousIdentityToken,
-				),
+				NodeID: datatypes.NewFourByteNodeID(0, 321),
 			},
 			Length:       5,
 			EncodingMask: 0x01,
@@ -210,10 +201,7 @@ func TestActivateSessionRequestSerializeTo(t *testing.T) {
 		LocaleIDs:                  datatypes.NewStringArray(nil),
 		UserIdentityToken: &datatypes.ExtensionObject{
 			TypeID: &datatypes.ExpandedNodeID{
-				NodeID: datatypes.NewFourByteNodeID(
-					0,
-					ServiceTypeAnonymousIdentityToken,
-				),
+				NodeID: datatypes.NewFourByteNodeID(0, 321),
 			},
 			Length:       5,
 			EncodingMask: 0x01,
@@ -265,10 +253,7 @@ func TestActivateSessionRequestLen(t *testing.T) {
 		LocaleIDs:                  datatypes.NewStringArray(nil),
 		UserIdentityToken: &datatypes.ExtensionObject{
 			TypeID: &datatypes.ExpandedNodeID{
-				NodeID: datatypes.NewFourByteNodeID(
-					0,
-					ServiceTypeAnonymousIdentityToken,
-				),
+				NodeID: datatypes.NewFourByteNodeID(0, 321),
 			},
 			Length:       5,
 			EncodingMask: 0x01,
