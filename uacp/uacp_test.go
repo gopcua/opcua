@@ -5,8 +5,9 @@
 package uacp
 
 import (
-	"reflect"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 func TestDecode(t *testing.T) {
@@ -104,10 +105,10 @@ func TestSerialize(t *testing.T) {
 	t.Run("HEL", func(t *testing.T) {
 		t.Parallel()
 		h := NewHello(
-			0,      //Version
-			0xffff, // SendBufSize
-			0xffff, // ReceiveBufSize
-			4000,   // MaxMessageSize
+			0,     //Version
+			65280, // ReceiveBufSize
+			65535, // SendBufSize
+			4000,  // MaxMessageSize
 			"opc.tcp://wow.its.easy:11111/UA/Server", // EndPointURL
 		)
 
@@ -116,8 +117,8 @@ func TestSerialize(t *testing.T) {
 			t.Fatalf("Failed to serialize Hello: %s", err)
 		}
 
-		if !reflect.DeepEqual(serialized, testHelloBytes[0]) {
-			t.Errorf("Unexpectedly serialized:\nWant: %x\nGot:  %x", testHelloBytes[0], serialized)
+		if diff := cmp.Diff(serialized, testHelloBytes[0]); diff != "" {
+			t.Error(diff)
 		}
 	})
 }
