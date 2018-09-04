@@ -43,6 +43,8 @@ const (
 )
 
 // Error represents a OPC UA Error.
+//
+// Specification: Part6, 7.1.2.5
 type Error struct {
 	*Header
 	Error  uint32

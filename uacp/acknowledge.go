@@ -12,17 +12,19 @@ import (
 )
 
 // Acknowledge represents a OPC UA Acknowledge.
+//
+// Specification: Part6, 7.1.2.4
 type Acknowledge struct {
 	*Header
 	Version        uint32
-	SendBufSize    uint32
 	ReceiveBufSize uint32
+	SendBufSize    uint32
 	MaxMessageSize uint32
 	MaxChunkCount  uint32
 }
 
 // NewAcknowledge creates a new OPC UA Acknowledge.
-func NewAcknowledge(ver, sndBuf, rcvBuf, maxMsg uint32) *Acknowledge {
+func NewAcknowledge(ver, rcvBuf, sndBuf, maxMsg uint32) *Acknowledge {
 	a := &Acknowledge{
 		Header: NewHeader(
 			MessageTypeAcknowledge,
@@ -30,8 +32,8 @@ func NewAcknowledge(ver, sndBuf, rcvBuf, maxMsg uint32) *Acknowledge {
 			nil,
 		),
 		Version:        ver,
-		SendBufSize:    sndBuf,
 		ReceiveBufSize: rcvBuf,
+		SendBufSize:    sndBuf,
 		MaxMessageSize: maxMsg,
 		MaxChunkCount:  0,
 	}
@@ -64,8 +66,8 @@ func (a *Acknowledge) DecodeFromBytes(b []byte) error {
 	b = a.Header.Payload
 
 	a.Version = binary.LittleEndian.Uint32(b[:4])
-	a.SendBufSize = binary.LittleEndian.Uint32(b[4:8])
-	a.ReceiveBufSize = binary.LittleEndian.Uint32(b[8:12])
+	a.ReceiveBufSize = binary.LittleEndian.Uint32(b[4:8])
+	a.SendBufSize = binary.LittleEndian.Uint32(b[8:12])
 	a.MaxMessageSize = binary.LittleEndian.Uint32(b[12:16])
 	a.MaxChunkCount = binary.LittleEndian.Uint32(b[16:20])
 
@@ -90,8 +92,8 @@ func (a *Acknowledge) SerializeTo(b []byte) error {
 	a.Header.Payload = make([]byte, a.Len()-8)
 
 	binary.LittleEndian.PutUint32(a.Header.Payload[:4], a.Version)
-	binary.LittleEndian.PutUint32(a.Header.Payload[4:8], a.SendBufSize)
-	binary.LittleEndian.PutUint32(a.Header.Payload[8:12], a.ReceiveBufSize)
+	binary.LittleEndian.PutUint32(a.Header.Payload[4:8], a.ReceiveBufSize)
+	binary.LittleEndian.PutUint32(a.Header.Payload[8:12], a.SendBufSize)
 	binary.LittleEndian.PutUint32(a.Header.Payload[12:16], a.MaxMessageSize)
 	binary.LittleEndian.PutUint32(a.Header.Payload[16:20], a.MaxChunkCount)
 
@@ -112,11 +114,11 @@ func (a *Acknowledge) SetLength() {
 // String returns Acknowledge in string.
 func (a *Acknowledge) String() string {
 	return fmt.Sprintf(
-		"Header: %v, Version: %d, SendBufSize: %d, ReceiveBufSize: %d, MaxMessageSize: %d, MaxChunkCount: %d",
+		"Header: %v, Version: %d, ReceiveBufSize: %d, SendBufSize: %d, MaxMessageSize: %d, MaxChunkCount: %d",
 		a.Header,
 		a.Version,
-		a.SendBufSize,
 		a.ReceiveBufSize,
+		a.SendBufSize,
 		a.MaxMessageSize,
 		a.MaxChunkCount,
 	)
