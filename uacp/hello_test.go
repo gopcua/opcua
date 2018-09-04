@@ -18,8 +18,8 @@ var testHelloBytes = [][]byte{
 		0x46, 0x00, 0x00, 0x00,
 		// Version: 0
 		0x00, 0x00, 0x00, 0x00,
-		// ReceiveBufSize: 65535
-		0xff, 0xff, 0x00, 0x00,
+		// ReceiveBufSize: 65280
+		0x00, 0xff, 0x00, 0x00,
 		// SendBufSize: 65535
 		0xff, 0xff, 0x00, 0x00,
 		// MaxMessageSize: 4000
@@ -53,10 +53,10 @@ func TestDecodeHello(t *testing.T) {
 		t.Errorf("MessageSize doesn't match. Want: %d, Got: %d", 70, h.MessageSize)
 	case h.Version != 0:
 		t.Errorf("Version doesn't match. Want: %d, Got: %d", 0, h.Version)
+	case h.ReceiveBufSize != 65280:
+		t.Errorf("ReceiveBufSize doesn't match. Want: %d, Got: %d", 65280, h.ReceiveBufSize)
 	case h.SendBufSize != 65535:
 		t.Errorf("SendBufSize doesn't match. Want: %d, Got: %d", 65535, h.SendBufSize)
-	case h.ReceiveBufSize != 65535:
-		t.Errorf("ReceiveBufSize doesn't match. Want: %d, Got: %d", 65535, h.ReceiveBufSize)
 	case h.MaxMessageSize != 4000:
 		t.Errorf("MaxMessageSize doesn't match. Want: %d, Got: %d", 4000, h.MaxMessageSize)
 	case h.MaxChunkCount != 0:
@@ -69,10 +69,10 @@ func TestDecodeHello(t *testing.T) {
 
 func TestSerializeHello(t *testing.T) {
 	h := NewHello(
-		0,      //Version
-		0xffff, // SendBufSize
-		0xffff, // ReceiveBufSize
-		4000,   // MaxMessageSize
+		0,     //Version
+		65280, // ReceiveBufSize
+		65535, // SendBufSize
+		4000,  // MaxMessageSize
 		"opc.tcp://wow.its.easy:11111/UA/Server", // EndPointURL
 	)
 
