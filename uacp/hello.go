@@ -16,15 +16,15 @@ import (
 type Hello struct {
 	*Header
 	Version        uint32
-	SendBufSize    uint32
 	ReceiveBufSize uint32
+	SendBufSize    uint32
 	MaxMessageSize uint32
 	MaxChunkCount  uint32
 	EndPointURL    *datatypes.String
 }
 
 // NewHello creates a new OPC UA Hello.
-func NewHello(ver, sndBuf, rcvBuf, maxMsg uint32, endpoint string) *Hello {
+func NewHello(ver, rcvBuf, sndBuf, maxMsg uint32, endpoint string) *Hello {
 	h := &Hello{
 		Header: NewHeader(
 			MessageTypeHello,
@@ -32,8 +32,8 @@ func NewHello(ver, sndBuf, rcvBuf, maxMsg uint32, endpoint string) *Hello {
 			nil,
 		),
 		Version:        ver,
-		SendBufSize:    sndBuf,
 		ReceiveBufSize: rcvBuf,
+		SendBufSize:    sndBuf,
 		MaxMessageSize: maxMsg,
 		MaxChunkCount:  0,
 		EndPointURL:    datatypes.NewString(endpoint),
@@ -67,8 +67,8 @@ func (h *Hello) DecodeFromBytes(b []byte) error {
 	b = h.Header.Payload
 
 	h.Version = binary.LittleEndian.Uint32(b[:4])
-	h.SendBufSize = binary.LittleEndian.Uint32(b[4:8])
-	h.ReceiveBufSize = binary.LittleEndian.Uint32(b[8:12])
+	h.ReceiveBufSize = binary.LittleEndian.Uint32(b[4:8])
+	h.SendBufSize = binary.LittleEndian.Uint32(b[8:12])
 	h.MaxMessageSize = binary.LittleEndian.Uint32(b[12:16])
 	h.MaxChunkCount = binary.LittleEndian.Uint32(b[16:20])
 
@@ -94,8 +94,8 @@ func (h *Hello) SerializeTo(b []byte) error {
 	h.Header.Payload = make([]byte, h.Len()-8)
 
 	binary.LittleEndian.PutUint32(h.Header.Payload[:4], h.Version)
-	binary.LittleEndian.PutUint32(h.Header.Payload[4:8], h.SendBufSize)
-	binary.LittleEndian.PutUint32(h.Header.Payload[8:12], h.ReceiveBufSize)
+	binary.LittleEndian.PutUint32(h.Header.Payload[4:8], h.ReceiveBufSize)
+	binary.LittleEndian.PutUint32(h.Header.Payload[8:12], h.SendBufSize)
 	binary.LittleEndian.PutUint32(h.Header.Payload[12:16], h.MaxMessageSize)
 	binary.LittleEndian.PutUint32(h.Header.Payload[16:20], h.MaxChunkCount)
 
