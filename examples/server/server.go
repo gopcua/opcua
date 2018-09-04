@@ -2,6 +2,11 @@
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
+/*
+Command server provides a connection establishement of OPC UA Secure Conversation as a server.
+
+XXX - Currently this command just handles the UACP connection from any client.
+*/
 package main
 
 import (
@@ -31,7 +36,8 @@ func main() {
 			log.Print(err)
 			continue
 		}
+		defer conn.Close()
 
-		log.Printf("Successfully established and closed connection with %v", conn.RemoteAddr())
+		log.Printf("Successfully established connection with %v", conn.RemoteAddr())
 	}
 }

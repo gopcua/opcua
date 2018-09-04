@@ -7,7 +7,6 @@ package uacp
 import (
 	"fmt"
 	"net"
-	"strings"
 	"time"
 
 	"github.com/wmnsk/gopcua/errors"
@@ -92,8 +91,6 @@ func (c *Conn) SetWriteDeadline(t time.Time) error {
 }
 
 // Hello sends UACP Hello message and checks the reponse.
-//
-// Note: This is exported for those who want to debug, but might be made private in the future.
 func (c *Conn) Hello(cli *Client) error {
 	hel, err := NewHello(0, cli.ReceiveBufferSize, cli.SendBufferSize, 0, cli.Endpoint).Serialize()
 	if err != nil {
@@ -125,7 +122,7 @@ func (c *Conn) Hello(cli *Client) error {
 	}
 }
 
-// Acknowledge sends Acknowledge message to the Conn that received Hello.
+// Acknowledge sends Acknowledge message to Conn.
 func (c *Conn) Acknowledge(srv *Server) error {
 	ack, err := NewAcknowledge(0, srv.ReceiveBufferSize, srv.SendBufferSize, 0).Serialize()
 	if err != nil {
@@ -149,20 +146,4 @@ func (c *Conn) Error(code uint32, reason string) error {
 		return err
 	}
 	return nil
-}
-
-func resolveEndpoint(ep string) (network string, addr *net.TCPAddr, err error) {
-	elems := strings.Split(ep, "/")
-	if elems[0] != "opc.tcp:" {
-		return "", nil, errors.NewErrUnsupported(elems[0], "should be in \"opc.tcp://<addr:port>\" format.")
-	}
-
-	addrString := elems[2]
-	if !strings.Contains(addrString, ":") {
-		addrString += ":4840"
-	}
-
-	network = "tcp"
-	addr, err = net.ResolveTCPAddr("tcp", addrString)
-	return
 }

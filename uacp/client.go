@@ -29,8 +29,10 @@ func NewClient(endpoint string, rcvBufSize uint32) *Client {
 
 // Dial acts like net.Dial for OPC UA Connection Protocol network.
 //
-// Currently the endpoint can only be specified in "opc.tcp://<addr[:port]>" format.
+// Currently the endpoint can only be specified in "opc.tcp://<addr[:port]>/path" format.
+//
 // If port is missing, ":4840" is automatically chosen.
+//
 // If laddr is nil, a local address is automatically chosen.
 func (c *Client) Dial(laddr *net.TCPAddr) (*Conn, error) {
 	network, raddr, err := utils.ResolveEndpoint(c.Endpoint)

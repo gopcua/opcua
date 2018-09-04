@@ -35,7 +35,7 @@ type Listener struct {
 
 // Listen acts like net.Listen for OPC UA Connection Protocol networks.
 //
-// XXX
+// Currently the endpoint can only be specified in "opc.tcp://<addr[:port]>/path" format.
 //
 // If the IP field of laddr is nil or an unspecified IP address, ListenTCP listens on all available unicast and anycast IP addresses of the local system.
 // If the Port field of laddr is 0, a port number is automatically chosen.
@@ -84,7 +84,6 @@ func (l *Listener) Accept() (*Conn, error) {
 		if err := conn.Acknowledge(l.srv); err != nil {
 			return nil, err
 		}
-		return conn, nil
 	default:
 		if err := conn.Error(BadTCPMessageTypeInvalid, "Expected Hello"); err != nil {
 			return nil, err
