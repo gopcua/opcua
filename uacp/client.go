@@ -6,9 +6,9 @@ package uacp
 
 import (
 	"net"
-	"strings"
 
 	"github.com/wmnsk/gopcua/errors"
+	"github.com/wmnsk/gopcua/utils"
 )
 
 // Client is the configuration that OPC UA Connection Protocol client should have.
@@ -27,13 +27,15 @@ func NewClient(endpoint string, rcvBufSize uint32) *Client {
 	}
 }
 
-// Dial acts like net.Dial for OPC UA network.
+// Dial acts like net.Dial for OPC UA Connection Protocol network.
 //
-// Currently the endpoint can only be specified in "opc.tcp://<addr[:port]>" format.
+// Currently the endpoint can only be specified in "opc.tcp://<addr[:port]>/path" format.
+//
 // If port is missing, ":4840" is automatically chosen.
+//
 // If laddr is nil, a local address is automatically chosen.
 func (c *Client) Dial(laddr *net.TCPAddr) (*Conn, error) {
-	network, raddr, err := resolveEndpoint(c.Endpoint)
+	network, raddr, err := utils.ResolveEndpoint(c.Endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -44,6 +46,7 @@ func (c *Client) Dial(laddr *net.TCPAddr) (*Conn, error) {
 		return nil, err
 	}
 	conn.rcvBuf = make([]byte, c.ReceiveBufferSize)
+
 	if err := conn.Hello(c); err != nil {
 		return nil, err
 	}
@@ -70,20 +73,4 @@ func (c *Client) OpenConnection(conn net.Conn) (*Conn, error) {
 	default:
 		return nil, errors.NewErrUnsupported(cc, "conn should be *net.TCPConn")
 	}
-}
-
-func resolveEndpoint(ep string) (network string, raddr *net.TCPAddr, err error) {
-	elems := strings.Split(ep, "/")
-	if elems[0] != "opc.tcp:" {
-		return "", nil, errors.NewErrUnsupported(elems[0], "should be in \"opc.tcp://<addr:port>\" format.")
-	}
-
-	addr := elems[2]
-	if !strings.Contains(addr, ":") {
-		addr += ":4840"
-	}
-
-	network = "tcp"
-	raddr, err = net.ResolveTCPAddr("tcp", addr)
-	return
 }

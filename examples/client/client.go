@@ -2,10 +2,11 @@
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
-// Command client provides a connection establishment of OPC UA Secure Conversation.
-//
-// XXX - Currently this command just initiates the connection(UACP) to the specified endpoint
-// and print the address of remote endpoint.
+/*
+Command client provides a connection establishment of OPC UA Secure Conversation.
+
+XXX - Currently this command just initiates the connection(UACP) to the specified endpoint.
+*/
 package main
 
 import (
@@ -27,6 +28,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer conn.Close()
 
-	log.Printf("%T, %v", conn, conn.RemoteAddr())
+	log.Printf("Successfully established the connection with %v", conn.RemoteAddr())
 }

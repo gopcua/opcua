@@ -91,8 +91,6 @@ func (c *Conn) SetWriteDeadline(t time.Time) error {
 }
 
 // Hello sends UACP Hello message and checks the reponse.
-//
-// Note: This is exported for those who want to debug, but might be made private in the future.
 func (c *Conn) Hello(cli *Client) error {
 	hel, err := NewHello(0, cli.ReceiveBufferSize, cli.SendBufferSize, 0, cli.Endpoint).Serialize()
 	if err != nil {
@@ -118,8 +116,34 @@ func (c *Conn) Hello(cli *Client) error {
 		cli.SendBufferSize = msg.ReceiveBufSize
 		return nil
 	case *Error:
-		return fmt.Errorf("received Error. Reason: %s", msg.Reason.Get())
+		return fmt.Errorf("received Error. Code: %d, Reason: %s", msg.Error, msg.Reason.Get())
 	default:
 		return errors.NewErrInvalidType(msg, "initiating UACP", ".")
 	}
+}
+
+// Acknowledge sends Acknowledge message to Conn.
+func (c *Conn) Acknowledge(srv *Server) error {
+	ack, err := NewAcknowledge(0, srv.ReceiveBufferSize, srv.SendBufferSize, 0).Serialize()
+	if err != nil {
+		return err
+	}
+
+	if _, err := c.tcpConn.Write(ack); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Error sends Error message to Conn.
+func (c *Conn) Error(code uint32, reason string) error {
+	e, err := NewError(code, reason).Serialize()
+	if err != nil {
+		return err
+	}
+
+	if _, err := c.tcpConn.Write(e); err != nil {
+		return err
+	}
+	return nil
 }
