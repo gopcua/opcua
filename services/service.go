@@ -19,8 +19,12 @@ const (
 	ServiceTypeCloseSecureChannelResponse        = 455
 	ServiceTypeCreateSessionRequest              = 461
 	ServiceTypeCreateSessionResponse             = 464
+	ServiceTypeActivateSessionRequest            = 467
+	ServiceTypeActivateSessionResponse           = 470
 	ServiceTypeCloseSessionRequest               = 473
 	ServiceTypeCloseSessionResponse              = 476
+	ServiceTypeReadRequest                       = 631
+	ServiceTypeReadResponse                      = 634
 )
 
 // Service is an interface to handle any kind of OPC UA Services.
@@ -67,6 +71,8 @@ func Decode(b []byte) (Service, error) {
 		s = &CloseSessionRequest{}
 	case ServiceTypeCloseSessionResponse:
 		s = &CloseSessionResponse{}
+	case ServiceTypeActivateSessionRequest:
+		s = &ActivateSessionRequest{}
 	default:
 		return nil, errors.NewErrUnsupported(n.Identifier, "unsupported or not implemented yet.")
 	}
