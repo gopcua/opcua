@@ -7,6 +7,7 @@ package uacp
 import (
 	"fmt"
 	"net"
+	"strings"
 	"time"
 
 	"github.com/wmnsk/gopcua/errors"
@@ -118,8 +119,50 @@ func (c *Conn) Hello(cli *Client) error {
 		cli.SendBufferSize = msg.ReceiveBufSize
 		return nil
 	case *Error:
-		return fmt.Errorf("received Error. Reason: %s", msg.Reason.Get())
+		return fmt.Errorf("received Error. Code: %d, Reason: %s", msg.Error, msg.Reason.Get())
 	default:
 		return errors.NewErrInvalidType(msg, "initiating UACP", ".")
 	}
+}
+
+// Acknowledge sends Acknowledge message to the Conn that received Hello.
+func (c *Conn) Acknowledge(srv *Server) error {
+	ack, err := NewAcknowledge(0, srv.ReceiveBufferSize, srv.SendBufferSize, 0).Serialize()
+	if err != nil {
+		return err
+	}
+
+	if _, err := c.tcpConn.Write(ack); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Error sends Error message to Conn.
+func (c *Conn) Error(code uint32, reason string) error {
+	e, err := NewError(code, reason).Serialize()
+	if err != nil {
+		return err
+	}
+
+	if _, err := c.tcpConn.Write(e); err != nil {
+		return err
+	}
+	return nil
+}
+
+func resolveEndpoint(ep string) (network string, addr *net.TCPAddr, err error) {
+	elems := strings.Split(ep, "/")
+	if elems[0] != "opc.tcp:" {
+		return "", nil, errors.NewErrUnsupported(elems[0], "should be in \"opc.tcp://<addr:port>\" format.")
+	}
+
+	addrString := elems[2]
+	if !strings.Contains(addrString, ":") {
+		addrString += ":4840"
+	}
+
+	network = "tcp"
+	addr, err = net.ResolveTCPAddr("tcp", addrString)
+	return
 }
