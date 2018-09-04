@@ -20,7 +20,7 @@ type GetEndpointsRequest struct {
 	TypeID *datatypes.ExpandedNodeID
 	*RequestHeader
 	EndpointURL *datatypes.String
-	LocalIDs    *datatypes.StringArray
+	LocaleIDs   *datatypes.StringArray
 	ProfileURIs *datatypes.StringArray
 }
 
@@ -52,7 +52,7 @@ func NewGetEndpointsRequest(ts time.Time, handle, diag, timeout uint32, auditID 
 			nil,
 		),
 		EndpointURL: datatypes.NewString(endpoint),
-		LocalIDs:    datatypes.NewStringArray(localIDs),
+		LocaleIDs:   datatypes.NewStringArray(localIDs),
 		ProfileURIs: datatypes.NewStringArray(profileURIs),
 	}
 
@@ -94,11 +94,11 @@ func (g *GetEndpointsRequest) DecodeFromBytes(b []byte) error {
 	}
 	offset += g.EndpointURL.Len()
 
-	g.LocalIDs = &datatypes.StringArray{}
-	if err := g.LocalIDs.DecodeFromBytes(b[offset:]); err != nil {
+	g.LocaleIDs = &datatypes.StringArray{}
+	if err := g.LocaleIDs.DecodeFromBytes(b[offset:]); err != nil {
 		return err
 	}
-	offset += g.LocalIDs.Len()
+	offset += g.LocaleIDs.Len()
 
 	g.ProfileURIs = &datatypes.StringArray{}
 	if err := g.ProfileURIs.DecodeFromBytes(b[offset:]); err != nil {
@@ -143,11 +143,11 @@ func (g *GetEndpointsRequest) SerializeTo(b []byte) error {
 		offset += g.EndpointURL.Len()
 	}
 
-	if g.LocalIDs != nil {
-		if err := g.LocalIDs.SerializeTo(b[offset:]); err != nil {
+	if g.LocaleIDs != nil {
+		if err := g.LocaleIDs.SerializeTo(b[offset:]); err != nil {
 			return err
 		}
-		offset += g.LocalIDs.Len()
+		offset += g.LocaleIDs.Len()
 	}
 
 	if g.ProfileURIs != nil {
@@ -172,8 +172,8 @@ func (g *GetEndpointsRequest) Len() int {
 	if g.EndpointURL != nil {
 		l += g.EndpointURL.Len()
 	}
-	if g.LocalIDs != nil {
-		l += g.LocalIDs.Len()
+	if g.LocaleIDs != nil {
+		l += g.LocaleIDs.Len()
 	}
 	if g.ProfileURIs != nil {
 		l += g.ProfileURIs.Len()
