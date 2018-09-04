@@ -5,36 +5,35 @@
 package uacp
 
 import (
-	"fmt"
 	"net"
 	"strings"
 
 	"github.com/wmnsk/gopcua/errors"
 )
 
-// ClientConfig is the configuration that OPC UA Connection Protocol client should have.
-type ClientConfig struct {
+// Client is the configuration that OPC UA Connection Protocol client should have.
+type Client struct {
 	Endpoint          string
-	SendBufferSize    uint32
 	ReceiveBufferSize uint32
+	SendBufferSize    uint32
 }
 
-// NewClientConfig creates a new ClientConfig with minimum mandatory parameters.
-func NewClientConfig(endpoint string, rcvBufSize uint32) *ClientConfig {
-	return &ClientConfig{
+// NewClient creates a new Client with minimum mandatory parameters.
+func NewClient(endpoint string, rcvBufSize uint32) *Client {
+	return &Client{
 		Endpoint:          endpoint,
 		ReceiveBufferSize: rcvBufSize,
-		SendBufferSize:    0,
+		SendBufferSize:    0xffff,
 	}
 }
 
-// Dial acts like Dial for OPC UA network.
+// Dial acts like net.Dial for OPC UA network.
 //
 // Currently the endpoint can only be specified in "opc.tcp://<addr[:port]>" format.
 // If port is missing, ":4840" is automatically chosen.
 // If laddr is nil, a local address is automatically chosen.
-func Dial(cfg *ClientConfig, laddr *net.TCPAddr) (*Conn, error) {
-	network, raddr, err := resolveEndpoint(cfg.Endpoint)
+func (c *Client) Dial(laddr *net.TCPAddr) (*Conn, error) {
+	network, raddr, err := resolveEndpoint(c.Endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -44,45 +43,32 @@ func Dial(cfg *ClientConfig, laddr *net.TCPAddr) (*Conn, error) {
 	if err != nil {
 		return nil, err
 	}
-	conn.rcvBuf = make([]byte, int(cfg.ReceiveBufferSize))
-	if err := conn.Hello(cfg); err != nil {
+	conn.rcvBuf = make([]byte, c.ReceiveBufferSize)
+	if err := conn.Hello(c); err != nil {
 		return nil, err
 	}
 
 	return conn, nil
 }
 
-// Hello sends UACP Hello message and checks the reponse.
+// OpenConnection creates *uacp.Conn on top of the existing connection(net.Conn).
 //
-// Note: This is exported for those who wants to debug, but might be made private in the future.
-func (c *Conn) Hello(cfg *ClientConfig) error {
-	hel, err := NewHello(0, cfg.SendBufferSize, cfg.ReceiveBufferSize, 0, cfg.Endpoint).Serialize()
-	if err != nil {
-		return err
-	}
-
-	if _, err := c.tcpConn.Write(hel); err != nil {
-		return err
-	}
-
-	n, err := c.tcpConn.Read(c.rcvBuf)
-	if err != nil {
-		return err
-	}
-
-	message, err := Decode(c.rcvBuf[:n])
-	if err != nil {
-		return err
-	}
-
-	switch msg := message.(type) {
-	case *Acknowledge:
-		cfg.SendBufferSize = msg.ReceiveBufSize
-		return nil
-	case *Error:
-		return fmt.Errorf("received Error. Reason: %s", msg.Reason.Get())
+// Note: Currently conn only supports *net.TCPConn.
+func (c *Client) OpenConnection(conn net.Conn) (*Conn, error) {
+	switch cc := conn.(type) {
+	case *net.TCPConn:
+		uaConn := &Conn{
+			tcpConn:  cc,
+			endpoint: c.Endpoint,
+			rcvBuf:   make([]byte, c.ReceiveBufferSize),
+			sndBuf:   make([]byte, c.ReceiveBufferSize),
+		}
+		if err := uaConn.Hello(c); err != nil {
+			return nil, err
+		}
+		return uaConn, nil
 	default:
-		return errors.NewErrInvalidType(msg, "initiating UACP", ".")
+		return nil, errors.NewErrUnsupported(cc, "conn should be *net.TCPConn")
 	}
 }
 

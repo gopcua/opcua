@@ -3,6 +3,9 @@
 // found in the LICENSE file.
 
 // Command client provides a connection establishment of OPC UA Secure Conversation.
+//
+// XXX - Currently this command just initiates the connection(UACP) to the specified endpoint
+// and print the address of remote endpoint.
 package main
 
 import (
@@ -15,12 +18,12 @@ import (
 func main() {
 	var (
 		endpoint = flag.String("endpoint", "opc.tcp://example.com/foo/bar", "OPC UA Endpoint URL")
+		bufsize  = flag.Int("bufsize", 0xffff, "Receive Buffer Size")
 	)
 	flag.Parse()
 
-	cfg := uacp.NewClientConfig(*endpoint, 0xffff)
-
-	conn, err := uacp.Dial(cfg, nil)
+	cpClient := uacp.NewClient(*endpoint, uint32(*bufsize))
+	conn, err := cpClient.Dial(nil)
 	if err != nil {
 		log.Fatal(err)
 	}

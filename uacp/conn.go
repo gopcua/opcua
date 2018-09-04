@@ -5,16 +5,19 @@
 package uacp
 
 import (
+	"fmt"
 	"net"
 	"time"
+
+	"github.com/wmnsk/gopcua/errors"
 )
 
 // Conn is an implementation of the net.Conn interface for OPC UA Connection Protocol.
 type Conn struct {
 	tcpConn  *net.TCPConn
 	endpoint string
-	sndBuf   []byte
 	rcvBuf   []byte
+	sndBuf   []byte
 }
 
 // Read reads data from the connection.
@@ -34,7 +37,12 @@ func (c *Conn) Write(b []byte) (n int, err error) {
 // Close closes the connection.
 // Any blocked Read or Write operations will be unblocked and return errors.
 func (c *Conn) Close() error {
-	return c.tcpConn.Close()
+	if err := c.tcpConn.Close(); err != nil {
+		return err
+	}
+
+	c = nil
+	return nil
 }
 
 // LocalAddr returns the local network address.
@@ -80,4 +88,38 @@ func (c *Conn) SetReadDeadline(t time.Time) error {
 // A zero value for t means Write will not time out.
 func (c *Conn) SetWriteDeadline(t time.Time) error {
 	return c.tcpConn.SetWriteDeadline(t)
+}
+
+// Hello sends UACP Hello message and checks the reponse.
+//
+// Note: This is exported for those who want to debug, but might be made private in the future.
+func (c *Conn) Hello(cli *Client) error {
+	hel, err := NewHello(0, cli.ReceiveBufferSize, cli.SendBufferSize, 0, cli.Endpoint).Serialize()
+	if err != nil {
+		return err
+	}
+
+	if _, err := c.tcpConn.Write(hel); err != nil {
+		return err
+	}
+
+	n, err := c.tcpConn.Read(c.rcvBuf)
+	if err != nil {
+		return err
+	}
+
+	message, err := Decode(c.rcvBuf[:n])
+	if err != nil {
+		return err
+	}
+
+	switch msg := message.(type) {
+	case *Acknowledge:
+		cli.SendBufferSize = msg.ReceiveBufSize
+		return nil
+	case *Error:
+		return fmt.Errorf("received Error. Reason: %s", msg.Reason.Get())
+	default:
+		return errors.NewErrInvalidType(msg, "initiating UACP", ".")
+	}
 }
