@@ -4,6 +4,8 @@
 
 package datatypes
 
+import "encoding/binary"
+
 // ExtensionObject is encoded as sequence of bytes prefixed by the NodeId of its DataTypeEncoding
 // and the number of bytes encoded.
 //
@@ -11,6 +13,7 @@ package datatypes
 type ExtensionObject struct {
 	TypeID       *ExpandedNodeID
 	EncodingMask byte
+	Length       uint32
 	Body         *ByteString
 }
 
@@ -36,6 +39,10 @@ func (e *ExtensionObject) DecodeFromBytes(b []byte) error {
 	// encoding mask
 	e.EncodingMask = b[offset]
 	offset += 1
+
+	// length
+	e.Length = binary.LittleEndian.Uint32(b[offset : offset+4])
+	offset += 4
 
 	// body
 	e.Body = &ByteString{}
@@ -72,6 +79,10 @@ func (e *ExtensionObject) SerializeTo(b []byte) error {
 	b[offset] = e.EncodingMask
 	offset += 1
 
+	// length
+	binary.LittleEndian.PutUint32(b[offset:offset+4], e.Length)
+	offset += 4
+
 	// body
 	if e.Body != nil {
 		if err := e.Body.SerializeTo(b[offset:]); err != nil {
@@ -84,8 +95,8 @@ func (e *ExtensionObject) SerializeTo(b []byte) error {
 
 // Len returns the actual length of ExtensionObject in int.
 func (e *ExtensionObject) Len() int {
-	// encoding mask byte
-	length := 1
+	// encoding mask byte + length
+	length := 1 + 4
 
 	if e.TypeID != nil {
 		length += e.TypeID.Len()
