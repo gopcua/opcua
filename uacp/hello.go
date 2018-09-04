@@ -13,6 +13,8 @@ import (
 )
 
 // Hello represents a OPC UA Hello.
+//
+// Specification: Part6, 7.1.2.3
 type Hello struct {
 	*Header
 	Version        uint32
@@ -122,11 +124,11 @@ func (h *Hello) SetLength() {
 // String returns Hello in string.
 func (h *Hello) String() string {
 	return fmt.Sprintf(
-		"Header: %v, Version: %d, SendBufSize: %d, ReceiveBufSize: %d, MaxMessageSize: %d, MaxChunkCount: %d, EndPointURL: %s",
+		"Header: %v, Version: %d, ReceiveBufSize: %d, SendBufSize: %d, MaxMessageSize: %d, MaxChunkCount: %d, EndPointURL: %s",
 		h.Header,
 		h.Version,
-		h.SendBufSize,
 		h.ReceiveBufSize,
+		h.SendBufSize,
 		h.MaxMessageSize,
 		h.MaxChunkCount,
 		h.EndPointURL.Get(),

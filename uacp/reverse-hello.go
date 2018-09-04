@@ -12,6 +12,8 @@ import (
 )
 
 // ReverseHello represents a OPC UA ReverseHello.
+//
+// Specification: Part6, 7.1.2.6
 type ReverseHello struct {
 	*Header
 	ServerURI   *datatypes.String
