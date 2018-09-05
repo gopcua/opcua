@@ -51,6 +51,16 @@ type ReadValueID struct {
 	DataEncoding *QualifiedName
 }
 
+// NewReadValueID creates a new ReadValueID.
+func NewReadValueID(nodeID NodeID, attrID IntegerID, idxRange string, qIdx uint16, qName string) *ReadValueID {
+	return &ReadValueID{
+		NodeID:       nodeID,
+		AttributeID:  attrID,
+		IndexRange:   NewString(idxRange),
+		DataEncoding: NewQualifiedName(qIdx, qName),
+	}
+}
+
 // DecodeReadValueID decodes given bytes into ReadValueID.
 func DecodeReadValueID(b []byte) (*ReadValueID, error) {
 	r := &ReadValueID{}
