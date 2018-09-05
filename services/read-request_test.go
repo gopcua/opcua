@@ -12,6 +12,56 @@ import (
 	"github.com/wmnsk/gopcua/datatypes"
 )
 
+func TestNewReadRequest(t *testing.T) {
+	r := NewReadRequest(
+		time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC), 1033572, 0, 10000, "",
+		0, TimestampsToReturnBoth,
+		[]*datatypes.ReadValueID{
+			datatypes.NewReadValueID(
+				datatypes.NewFourByteNodeID(0, 2256),
+				datatypes.IntegerIDValue,
+				"", 0, "",
+			),
+		},
+	)
+	expected := &ReadRequest{
+		TypeID: &datatypes.ExpandedNodeID{
+			NodeID:       datatypes.NewFourByteNodeID(0, ServiceTypeReadRequest),
+			NamespaceURI: datatypes.NewString(""),
+		},
+		RequestHeader: &RequestHeader{
+			AuthenticationToken: datatypes.NewTwoByteNodeID(0x00),
+			AuditEntryID:        datatypes.NewString(""),
+			RequestHandle:       1033572,
+			TimeoutHint:         10000,
+			AdditionalHeader: &AdditionalHeader{
+				TypeID: &datatypes.ExpandedNodeID{
+					NodeID:       datatypes.NewTwoByteNodeID(0),
+					NamespaceURI: datatypes.NewString(""),
+				},
+				EncodingMask: 0x00,
+			},
+			Timestamp: time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
+		},
+		MaxAge:             0,
+		TimestampsToReturn: TimestampsToReturnBoth,
+		NodesToRead: &datatypes.ReadValueIDArray{
+			ArraySize: 1,
+			ReadValueIDs: []*datatypes.ReadValueID{
+				{
+					NodeID:       datatypes.NewFourByteNodeID(0, 2256),
+					AttributeID:  datatypes.IntegerIDValue,
+					IndexRange:   datatypes.NewString(""),
+					DataEncoding: datatypes.NewQualifiedName(0, ""),
+				},
+			},
+		},
+	}
+
+	if diff := cmp.Diff(r, expected); diff != "" {
+		t.Error(diff)
+	}
+}
 func TestDecodeReadRequest(t *testing.T) {
 	b := []byte{
 		0x01, 0x00, 0x77, 0x02, 0x05, 0x00, 0x00, 0x10,

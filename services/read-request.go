@@ -6,16 +6,18 @@ package services
 
 import (
 	"encoding/binary"
+	"time"
 
 	"github.com/wmnsk/gopcua/datatypes"
 )
-
-type TimestampsToReturn uint32
 
 // The TimestampsToReturn is an enumeration that specifies the Timestamp Attributes to be
 // transmitted for MonitoredItems or Nodes in Read and HistoryRead.
 //
 // Specification: Part 4, 7.35
+type TimestampsToReturn uint32
+
+// TimestampsToReturn definitions.
 const (
 	// Return the source timestamp.
 	TimestampsToReturnSource TimestampsToReturn = iota
@@ -79,6 +81,39 @@ type ReadRequest struct {
 	// List of Nodes and their Attributes to read. For each entry in this list,
 	// a StatusCode is returned, and if it indicates success, the Attribute Value is also returned.
 	NodesToRead *datatypes.ReadValueIDArray
+}
+
+// NewReadRequest creates a new ReadRequest.
+func NewReadRequest(ts time.Time, handle, diag, timeout uint32, auditID string, maxAge uint64, tsRet TimestampsToReturn, nodes []*datatypes.ReadValueID) *ReadRequest {
+	return &ReadRequest{
+		TypeID: datatypes.NewExpandedNodeID(
+			false, false,
+			datatypes.NewFourByteNodeID(
+				0, ServiceTypeReadRequest,
+			),
+			"", 0,
+		),
+		RequestHeader: NewRequestHeader(
+			datatypes.NewTwoByteNodeID(0x00),
+			ts,
+			handle,
+			diag,
+			timeout,
+			auditID,
+			NewAdditionalHeader(
+				datatypes.NewExpandedNodeID(
+					false, false,
+					datatypes.NewTwoByteNodeID(0),
+					"", 0,
+				),
+				0x00,
+			),
+			nil,
+		),
+		MaxAge:             maxAge,
+		TimestampsToReturn: tsRet,
+		NodesToRead:        datatypes.NewReadValueIDArray(nodes),
+	}
 }
 
 // DecodeReadRequest decodes given bytes into ReadRequest.
