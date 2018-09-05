@@ -74,7 +74,9 @@ func (l *Listener) Accept() (*Conn, error) {
 
 	switch msg := message.(type) {
 	case *Hello:
-		if utils.GetPath(msg.EndPointURL.Get()) != utils.GetPath(l.srv.Endpoint) {
+		cpath, err := utils.GetPath(msg.EndPointURL.Get())
+		spath, err := utils.GetPath(l.srv.Endpoint)
+		if err != nil || cpath != spath {
 			if err := conn.Error(BadTCPEndpointURLInvalid, fmt.Sprintf("Endpoint: %s does not exist", msg.EndPointURL.Get())); err != nil {
 				return nil, err
 			}
