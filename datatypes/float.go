@@ -9,7 +9,7 @@ import (
 	"math"
 )
 
-// All floating-point values shall be encoded with the appropriate IEEE-754 binary representation
+// Float values shall be encoded with the appropriate IEEE-754 binary representation
 // which has three basic components: the sign, the exponent, and the fraction.
 //
 // Specification: Part 6, 5.2.2.3
