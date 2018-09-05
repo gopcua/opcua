@@ -27,9 +27,8 @@ type ResponseHeader struct {
 }
 
 // NewResponseHeader creates a new ResponseHeader.
-// TODO: impl better time handling
 func NewResponseHeader(timestamp time.Time, handle, code uint32, diag *DiagnosticInfo, strs []string, additionalHeader *AdditionalHeader, payload []byte) *ResponseHeader {
-	return &ResponseHeader{
+	r := &ResponseHeader{
 		Timestamp:          timestamp,
 		RequestHandle:      handle,
 		ServiceResult:      code,
@@ -38,6 +37,11 @@ func NewResponseHeader(timestamp time.Time, handle, code uint32, diag *Diagnosti
 		AdditionalHeader:   additionalHeader,
 		Payload:            payload,
 	}
+	if diag == nil {
+		r.ServiceDiagnostics = NewNullDiagnosticInfo()
+	}
+
+	return r
 }
 
 // DecodeResponseHeader decodes given bytes into ResponseHeader.

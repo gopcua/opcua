@@ -28,7 +28,6 @@ type RequestHeader struct {
 }
 
 // NewRequestHeader creates a new RequestHeader.
-// TODO: impl better time handling
 func NewRequestHeader(authToken datatypes.NodeID, timestamp time.Time, handle, diag, timeout uint32, auditID string, additionalHeader *AdditionalHeader, payload []byte) *RequestHeader {
 	return &RequestHeader{
 		AuthenticationToken: authToken,
