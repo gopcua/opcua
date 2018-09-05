@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/wmnsk/gopcua/errors"
 )
 
 func TestResolveEndpoint(t *testing.T) {
@@ -17,7 +16,7 @@ func TestResolveEndpoint(t *testing.T) {
 		input   string
 		network string
 		addr    *net.TCPAddr
-		err     error
+		errStr  string
 	}{
 		{ // Valid, full EndpointURL
 			"opc.tcp://10.0.0.1:4840/foo/bar",
@@ -26,7 +25,7 @@ func TestResolveEndpoint(t *testing.T) {
 				IP:   net.IP([]byte{0x0a, 0x00, 0x00, 0x01}),
 				Port: 4840,
 			},
-			nil,
+			"",
 		},
 		{ // Valid, port number omitted
 			"opc.tcp://10.0.0.1/foo/bar",
@@ -35,7 +34,7 @@ func TestResolveEndpoint(t *testing.T) {
 				IP:   net.IP([]byte{0x0a, 0x00, 0x00, 0x01}),
 				Port: 4840,
 			},
-			nil,
+			"",
 		},
 		{ // Valid, hostname resolved
 			"opc.tcp://localhost:4840/foo/bar",
@@ -44,31 +43,35 @@ func TestResolveEndpoint(t *testing.T) {
 				IP:   net.IP([]byte{0x7f, 0x00, 0x00, 0x01}),
 				Port: 4840,
 			},
-			nil,
+			"",
 		},
 		{ // Invalid, schema is not "opc.tcp://"
 			"tcp://10.0.0.1:4840/foo/bar",
 			"",
 			nil,
-			errors.NewErrUnsupported("tcp:", "should be in \"opc.tcp://<addr[:port]>/path/to/somewhere\" format."),
+			"unsupported string: should be in \"opc.tcp://<addr[:port]>/path/to/somewhere\" format.",
 		},
 		{ // Invalid, bad formatted schema
 			"opc.tcp:/10.0.0.1:4840/foo/bar",
-			"tcp",
+			"",
 			nil,
-			&net.DNSError{Err: "no such host", Name: "foo"},
+			"could not resolve address",
 		},
 	}
 
 	for i, c := range cases {
+		var errStr string
 		network, addr, err := ResolveEndpoint(c.input)
+		if err != nil {
+			errStr = err.Error()
+		}
 		if diff := cmp.Diff(network, c.network); diff != "" {
 			t.Errorf("case #%d failed.\n%s", i, diff)
 		}
 		if diff := cmp.Diff(addr, c.addr); diff != "" {
 			t.Errorf("case #%d failed.\n%s", i, diff)
 		}
-		if diff := cmp.Diff(err, c.err); diff != "" {
+		if diff := cmp.Diff(errStr, c.errStr); diff != "" {
 			t.Errorf("case #%d failed.\n%s", i, diff)
 		}
 	}

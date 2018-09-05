@@ -27,7 +27,11 @@ func ResolveEndpoint(endpoint string) (network string, addr *net.TCPAddr, err er
 	}
 
 	network = "tcp"
-	addr, err = net.ResolveTCPAddr("tcp", addrString)
+	addr, err = net.ResolveTCPAddr(network, addrString)
+	switch err.(type) {
+	case *net.DNSError:
+		return "", nil, errors.New("could not resolve address")
+	}
 	return
 }
 
