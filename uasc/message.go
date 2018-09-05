@@ -41,10 +41,8 @@ func New(srv services.Service, cfg *Config) *Message {
 	switch srv.ServiceType() {
 	case services.ServiceTypeOpenSecureChannelRequest, services.ServiceTypeOpenSecureChannelResponse:
 		return newOPN(srv, cfg)
-	/*
-		case services.ServiceTypeCloseSecureChannelRequest, services.ServiceTypeCloseSecureChannelResponse:
-			return newCLO(srv, cfg)
-	*/
+	case services.ServiceTypeCloseSecureChannelRequest, services.ServiceTypeCloseSecureChannelResponse:
+		return newCLO(srv, cfg)
 	default:
 		return newMSG(srv, cfg)
 	}

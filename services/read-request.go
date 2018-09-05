@@ -10,12 +10,13 @@ import (
 	"github.com/wmnsk/gopcua/datatypes"
 )
 
-type TimestampsToReturn uint32
-
-// The TimestampsToReturn is an enumeration that specifies the Timestamp Attributes to be
+// TimestampsToReturn is an enumeration that specifies the Timestamp Attributes to be
 // transmitted for MonitoredItems or Nodes in Read and HistoryRead.
 //
 // Specification: Part 4, 7.35
+type TimestampsToReturn uint32
+
+// TimestampsToReturn definitions.
 const (
 	// Return the source timestamp.
 	TimestampsToReturnSource TimestampsToReturn = iota

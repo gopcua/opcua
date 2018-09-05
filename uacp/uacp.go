@@ -42,13 +42,3 @@ func Decode(b []byte) (UACP, error) {
 
 	return u, nil
 }
-
-// Serialize serializes UACP messages regardless of its type.
-func Serialize(message UACP) ([]byte, error) {
-	b := make([]byte, message.Len())
-	if err := message.SerializeTo(b); err != nil {
-		return nil, err
-	}
-
-	return b, nil
-}

@@ -6,8 +6,6 @@ package uacp
 
 import (
 	"testing"
-
-	"github.com/google/go-cmp/cmp"
 )
 
 func TestDecode(t *testing.T) {
@@ -97,28 +95,6 @@ func TestDecode(t *testing.T) {
 			t.Errorf("MessageType doesn't match. Want: %s, Got: %s", "XXX", msgType)
 		case chunkType != "X":
 			t.Errorf("ChunkType doesn't match. Want: %s, Got: %s", "X", chunkType)
-		}
-	})
-}
-
-func TestSerialize(t *testing.T) {
-	t.Run("HEL", func(t *testing.T) {
-		t.Parallel()
-		h := NewHello(
-			0,     //Version
-			65280, // ReceiveBufSize
-			65535, // SendBufSize
-			4000,  // MaxMessageSize
-			"opc.tcp://wow.its.easy:11111/UA/Server", // EndPointURL
-		)
-
-		serialized, err := Serialize(h)
-		if err != nil {
-			t.Fatalf("Failed to serialize Hello: %s", err)
-		}
-
-		if diff := cmp.Diff(serialized, testHelloBytes[0]); diff != "" {
-			t.Error(diff)
 		}
 	})
 }

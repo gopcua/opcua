@@ -320,9 +320,7 @@ func NewDiagnosticInfoArray(diags []*DiagnosticInfo) *DiagnosticInfoArray {
 	d := &DiagnosticInfoArray{
 		ArraySize: int32(len(diags)),
 	}
-	for _, diag := range diags {
-		d.DiagnosticInfos = append(d.DiagnosticInfos, diag)
-	}
+	d.DiagnosticInfos = append(d.DiagnosticInfos, diags...)
 
 	return d
 }

@@ -26,7 +26,7 @@ type GetEndpointsRequest struct {
 
 // NewGetEndpointsRequest creates an GetEndpointsRequest.
 func NewGetEndpointsRequest(ts time.Time, handle, diag, timeout uint32, auditID string, endpoint string, localIDs, profileURIs []string) *GetEndpointsRequest {
-	g := &GetEndpointsRequest{
+	return &GetEndpointsRequest{
 		TypeID: datatypes.NewExpandedNodeID(
 			false, false,
 			datatypes.NewFourByteNodeID(
@@ -55,8 +55,6 @@ func NewGetEndpointsRequest(ts time.Time, handle, diag, timeout uint32, auditID 
 		LocaleIDs:   datatypes.NewStringArray(localIDs),
 		ProfileURIs: datatypes.NewStringArray(profileURIs),
 	}
-
-	return g
 }
 
 // DecodeGetEndpointsRequest decodes given bytes into GetEndpointsRequest.

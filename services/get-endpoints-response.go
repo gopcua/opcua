@@ -20,7 +20,7 @@ type GetEndpointsResponse struct {
 
 // NewGetEndpointsResponse creates an GetEndpointsResponse.
 func NewGetEndpointsResponse(ts time.Time, handle, code uint32, diag *DiagnosticInfo, strs []string, endpoints ...*EndpointDescription) *GetEndpointsResponse {
-	g := &GetEndpointsResponse{
+	return &GetEndpointsResponse{
 		TypeID: datatypes.NewExpandedNodeID(
 			false, false,
 			datatypes.NewFourByteNodeID(
@@ -46,8 +46,6 @@ func NewGetEndpointsResponse(ts time.Time, handle, code uint32, diag *Diagnostic
 		),
 		Endpoints: NewEndpointDescriptionArray(endpoints),
 	}
-
-	return g
 }
 
 // DecodeGetEndpointsResponse decodes given bytes into GetEndpointsResponse.

@@ -24,9 +24,7 @@ func NewUint32Array(vals []uint32) *Uint32Array {
 	u := &Uint32Array{
 		ArraySize: int32(len(vals)),
 	}
-	for _, v := range vals {
-		u.Values = append(u.Values, v)
-	}
+	u.Values = append(u.Values, vals...)
 
 	return u
 }

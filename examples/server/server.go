@@ -24,7 +24,7 @@ func main() {
 	flag.Parse()
 
 	srv := uacp.NewServer(*endpoint, uint32(*bufsize))
-	listener, err := srv.Listen(nil)
+	listener, err := srv.Listen()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -36,7 +36,6 @@ func main() {
 			log.Print(err)
 			continue
 		}
-		defer conn.Close()
 
 		log.Printf("Successfully established connection with %v", conn.RemoteAddr())
 	}
