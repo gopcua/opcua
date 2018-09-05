@@ -22,7 +22,7 @@ type CloseSessionRequest struct {
 
 // NewCloseSessionRequest creates a CloseSessionRequest.
 func NewCloseSessionRequest(ts time.Time, authToken uint8, handle, diag, timeout uint32, auditID string, deleteSubs bool) *CloseSessionRequest {
-	o := &CloseSessionRequest{
+	return &CloseSessionRequest{
 		TypeID: datatypes.NewExpandedNodeID(
 			false, false,
 			datatypes.NewFourByteNodeID(
@@ -49,8 +49,6 @@ func NewCloseSessionRequest(ts time.Time, authToken uint8, handle, diag, timeout
 		),
 		DeleteSubscriptions: datatypes.NewBoolean(deleteSubs),
 	}
-
-	return o
 }
 
 // DecodeCloseSessionRequest decodes given bytes into CloseSessionRequest.

@@ -47,7 +47,7 @@ type OpenSecureChannelRequest struct {
 
 // NewOpenSecureChannelRequest creates an OpenSecureChannelRequest.
 func NewOpenSecureChannelRequest(ts time.Time, authToken uint8, handle, diag, timeout uint32, auditID string, ver, tokenType, securityMode, lifetime uint32, nonce []byte) *OpenSecureChannelRequest {
-	o := &OpenSecureChannelRequest{
+	return &OpenSecureChannelRequest{
 		TypeID: datatypes.NewExpandedNodeID(
 			false, false,
 			datatypes.NewFourByteNodeID(
@@ -78,8 +78,6 @@ func NewOpenSecureChannelRequest(ts time.Time, authToken uint8, handle, diag, ti
 		ClientNonce:              datatypes.NewByteString(nonce),
 		RequestedLifetime:        lifetime,
 	}
-
-	return o
 }
 
 // DecodeOpenSecureChannelRequest decodes given bytes into OpenSecureChannelRequest.

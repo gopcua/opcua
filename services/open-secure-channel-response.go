@@ -23,7 +23,7 @@ type OpenSecureChannelResponse struct {
 
 // NewOpenSecureChannelResponse creates an OpenSecureChannelResponse.
 func NewOpenSecureChannelResponse(timestamp time.Time, handle, code uint32, diag *DiagnosticInfo, strs []string, ver uint32, secToken *ChannelSecurityToken, nonce []byte) *OpenSecureChannelResponse {
-	o := &OpenSecureChannelResponse{
+	return &OpenSecureChannelResponse{
 		TypeID: datatypes.NewExpandedNodeID(
 			false, false,
 			datatypes.NewFourByteNodeID(
@@ -46,8 +46,6 @@ func NewOpenSecureChannelResponse(timestamp time.Time, handle, code uint32, diag
 		SecurityToken:         secToken,
 		ServerNonce:           datatypes.NewByteString(nonce),
 	}
-
-	return o
 }
 
 // DecodeOpenSecureChannelResponse decodes given bytes into OpenSecureChannelResponse.

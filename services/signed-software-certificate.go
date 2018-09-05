@@ -119,9 +119,7 @@ func NewSignedSoftwareCertificateArray(certs []*SignedSoftwareCertificate) *Sign
 	s := &SignedSoftwareCertificateArray{
 		ArraySize: int32(len(certs)),
 	}
-	for _, cert := range certs {
-		s.Certificates = append(s.Certificates, cert)
-	}
+	s.Certificates = append(s.Certificates, certs...)
 
 	return s
 }

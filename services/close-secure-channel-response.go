@@ -21,7 +21,7 @@ type CloseSecureChannelResponse struct {
 
 // NewCloseSecureChannelResponse creates an CloseSecureChannelResponse.
 func NewCloseSecureChannelResponse(timestamp time.Time, handle, code uint32, diag *DiagnosticInfo, strs []string) *CloseSecureChannelResponse {
-	o := &CloseSecureChannelResponse{
+	return &CloseSecureChannelResponse{
 		TypeID: datatypes.NewExpandedNodeID(
 			false, false,
 			datatypes.NewFourByteNodeID(
@@ -41,8 +41,6 @@ func NewCloseSecureChannelResponse(timestamp time.Time, handle, code uint32, dia
 			), nil,
 		),
 	}
-
-	return o
 }
 
 // DecodeCloseSecureChannelResponse decodes given bytes into CloseSecureChannelResponse.

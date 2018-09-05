@@ -19,13 +19,10 @@ type SymmetricSecurityHeader struct {
 
 // NewSymmetricSecurityHeader creates a new OPC UA Secure Conversation Symmetric Algorithm Security Header.
 func NewSymmetricSecurityHeader(token uint32, payload []byte) *SymmetricSecurityHeader {
-	s := &SymmetricSecurityHeader{
+	return &SymmetricSecurityHeader{
 		TokenID: token,
 		Payload: payload,
 	}
-	s.SetLength()
-
-	return s
 }
 
 // DecodeSymmetricSecurityHeader decodes given bytes into OPC UA Secure Conversation Symmetric Algorithm Security Header.
@@ -72,11 +69,6 @@ func (s *SymmetricSecurityHeader) SerializeTo(b []byte) error {
 // Len returns the actual length of SymmetricSecurityHeader in int.
 func (s *SymmetricSecurityHeader) Len() int {
 	return 4 + len(s.Payload)
-}
-
-// SetLength sets each length field in SymmetricSecurityHeader.
-func (s *SymmetricSecurityHeader) SetLength() {
-	return
 }
 
 // String returns Header in string.

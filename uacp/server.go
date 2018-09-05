@@ -39,8 +39,11 @@ type Listener struct {
 //
 // If the IP field of laddr is nil or an unspecified IP address, ListenTCP listens on all available unicast and anycast IP addresses of the local system.
 // If the Port field of laddr is 0, a port number is automatically chosen.
-func (s *Server) Listen(laddr *net.TCPAddr) (*Listener, error) {
+func (s *Server) Listen() (*Listener, error) {
 	network, laddr, err := utils.ResolveEndpoint(s.Endpoint)
+	if err != nil {
+		return nil, err
+	}
 
 	lis := &Listener{srv: s}
 	lis.tcpListener, err = net.ListenTCP(network, laddr)
@@ -74,8 +77,8 @@ func (l *Listener) Accept() (*Conn, error) {
 
 	switch msg := message.(type) {
 	case *Hello:
+		spath, _ := utils.GetPath(l.srv.Endpoint)
 		cpath, err := utils.GetPath(msg.EndPointURL.Get())
-		spath, err := utils.GetPath(l.srv.Endpoint)
 		if err != nil || cpath != spath {
 			if err := conn.Error(BadTCPEndpointURLInvalid, fmt.Sprintf("Endpoint: %s does not exist", msg.EndPointURL.Get())); err != nil {
 				return nil, err
