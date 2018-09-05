@@ -5,6 +5,7 @@
 package utils
 
 import (
+	"fmt"
 	"net"
 	"strings"
 
@@ -26,14 +27,22 @@ func ResolveEndpoint(endpoint string) (network string, addr *net.TCPAddr, err er
 	}
 
 	network = "tcp"
-	addr, err = net.ResolveTCPAddr("tcp", addrString)
+	addr, err = net.ResolveTCPAddr(network, addrString)
+	switch err.(type) {
+	case *net.DNSError:
+		return "", nil, errors.New("could not resolve address")
+	}
 	return
 }
 
 // GetPath returns the path that follows after address[:port] in EndpointURL.
 //
 // Expected format of input is "opc.tcp://<addr[:port]/path/to/somewhere"
-func GetPath(endpoint string) string {
+func GetPath(endpoint string) (path string, err error) {
 	elems := strings.Split(endpoint, "/")
-	return strings.Join(elems[3:], "/")
+	if len(elems) < 3 {
+		return "", fmt.Errorf("invalid input: %s", endpoint)
+	}
+
+	return "/" + strings.Join(elems[3:], "/"), nil
 }
