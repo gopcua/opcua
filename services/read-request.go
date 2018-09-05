@@ -11,7 +11,7 @@ import (
 	"github.com/wmnsk/gopcua/datatypes"
 )
 
-// The TimestampsToReturn is an enumeration that specifies the Timestamp Attributes to be
+// TimestampsToReturn is an enumeration that specifies the Timestamp Attributes to be
 // transmitted for MonitoredItems or Nodes in Read and HistoryRead.
 //
 // Specification: Part 4, 7.35

@@ -213,10 +213,7 @@ func NewEndpointDescriptionArray(descs []*EndpointDescription) *EndpointDescript
 	e := &EndpointDescriptionArray{
 		ArraySize: int32(len(descs)),
 	}
-
-	for _, desc := range descs {
-		e.EndpointDescriptions = append(e.EndpointDescriptions, desc)
-	}
+	e.EndpointDescriptions = append(e.EndpointDescriptions, descs...)
 
 	return e
 }

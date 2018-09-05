@@ -20,14 +20,11 @@ type SequenceHeader struct {
 
 // NewSequenceHeader creates a new OPC UA Secure Conversation Sequence Header.
 func NewSequenceHeader(seq, req uint32, payload []byte) *SequenceHeader {
-	s := &SequenceHeader{
+	return &SequenceHeader{
 		SequenceNumber: seq,
 		RequestID:      req,
 		Payload:        payload,
 	}
-	s.SetLength()
-
-	return s
 }
 
 // DecodeSequenceHeader decodes given bytes into OPC UA Secure Conversation Sequence Header.
@@ -76,11 +73,6 @@ func (s *SequenceHeader) SerializeTo(b []byte) error {
 // Len returns the actual length of SequenceHeader in int.
 func (s *SequenceHeader) Len() int {
 	return 8 + len(s.Payload)
-}
-
-// SetLength sets each length field in SequenceHeader.
-func (s *SequenceHeader) SetLength() {
-	return
 }
 
 // String returns Header in string.

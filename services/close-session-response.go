@@ -21,7 +21,7 @@ type CloseSessionResponse struct {
 
 // NewCloseSessionResponse creates an CloseSessionResponse.
 func NewCloseSessionResponse(timestamp time.Time, handle, code uint32, diag *DiagnosticInfo, strs []string) *CloseSessionResponse {
-	o := &CloseSessionResponse{
+	return &CloseSessionResponse{
 		TypeID: datatypes.NewExpandedNodeID(
 			false, false,
 			datatypes.NewFourByteNodeID(
@@ -41,8 +41,6 @@ func NewCloseSessionResponse(timestamp time.Time, handle, code uint32, diag *Dia
 			), nil,
 		),
 	}
-
-	return o
 }
 
 // DecodeCloseSessionResponse decodes given bytes into CloseSessionResponse.

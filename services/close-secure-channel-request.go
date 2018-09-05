@@ -24,7 +24,7 @@ type CloseSecureChannelRequest struct {
 
 // NewCloseSecureChannelRequest creates an CloseSecureChannelRequest.
 func NewCloseSecureChannelRequest(ts time.Time, authToken uint8, handle, diag, timeout uint32, auditID string, chanID uint32) *CloseSecureChannelRequest {
-	o := &CloseSecureChannelRequest{
+	return &CloseSecureChannelRequest{
 		TypeID: datatypes.NewExpandedNodeID(
 			false, false,
 			datatypes.NewFourByteNodeID(
@@ -51,8 +51,6 @@ func NewCloseSecureChannelRequest(ts time.Time, authToken uint8, handle, diag, t
 		),
 		SecureChannelID: chanID,
 	}
-
-	return o
 }
 
 // DecodeCloseSecureChannelRequest decodes given bytes into CloseSecureChannelRequest.
