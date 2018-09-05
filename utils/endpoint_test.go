@@ -60,16 +60,16 @@ func TestResolveEndpoint(t *testing.T) {
 		},
 	}
 
-	for _, c := range cases {
+	for i, c := range cases {
 		network, addr, err := ResolveEndpoint(c.input)
 		if diff := cmp.Diff(network, c.network); diff != "" {
-			t.Error(diff)
+			t.Errorf("case #%d failed.\n%s", i, diff)
 		}
 		if diff := cmp.Diff(addr, c.addr); diff != "" {
-			t.Error(diff)
+			t.Errorf("case #%d failed.\n%s", i, diff)
 		}
 		if diff := cmp.Diff(err, c.err); diff != "" {
-			t.Error(diff)
+			t.Errorf("case #%d failed.\n%s", i, diff)
 		}
 	}
 }
@@ -102,7 +102,7 @@ func TestGetPath(t *testing.T) {
 		},
 	}
 
-	for _, c := range cases {
+	for i, c := range cases {
 		var errStr string
 		path, err := GetPath(c.input)
 		if err != nil {
@@ -110,10 +110,10 @@ func TestGetPath(t *testing.T) {
 		}
 
 		if diff := cmp.Diff(path, c.path); diff != "" {
-			t.Error(diff)
+			t.Errorf("case #%d failed.\n%s", i, diff)
 		}
 		if diff := cmp.Diff(errStr, c.errStr); diff != "" {
-			t.Error(diff)
+			t.Errorf("case #%d failed.\n%s", i, diff)
 		}
 	}
 }
