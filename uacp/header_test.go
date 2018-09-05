@@ -5,61 +5,102 @@
 package uacp
 
 import (
-	"encoding/hex"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 )
 
-var testHeaderBytes = [][]byte{
-	{ // Hello message
-		// MessageType: HEL
-		0x48, 0x45, 0x4c,
-		// Chunk Type: Final
-		0x46,
-		// MessageSize: 12
-		0x0c, 0x00, 0x00, 0x00,
-		// dummy Payload
-		0xde, 0xad, 0xbe, 0xef,
-	},
-	{},
-	{},
-}
-
 func TestDecodeHeader(t *testing.T) {
-	h, err := DecodeHeader(testHeaderBytes[0])
-	if err != nil {
-		t.Fatalf("Failed to decode Header: %s", err)
+	cases := []struct {
+		input []byte
+		want  *Header
+	}{
+		{ // Normal Header
+			[]byte{ // Hello message
+				// MessageType: HEL
+				0x48, 0x45, 0x4c,
+				// Chunk Type: Final
+				0x46,
+				// MessageSize: 12
+				0x0c, 0x00, 0x00, 0x00,
+				// dummy Payload
+				0xde, 0xad, 0xbe, 0xef,
+			},
+			NewHeader(
+				MessageTypeHello,
+				ChunkTypeFinal,
+				[]byte{0xde, 0xad, 0xbe, 0xef},
+			),
+		},
 	}
 
-	dummyStr := hex.EncodeToString(h.Payload)
-	switch {
-	case h.MessageTypeValue() != MessageTypeHello:
-		t.Errorf("MessageType doesn't match. Want: %s, Got: %s", MessageTypeHello, h.MessageTypeValue())
-	case h.ChunkTypeValue() != ChunkTypeFinal:
-		t.Errorf("ChunkType doesn't match. Want: %s, Got: %s", ChunkTypeFinal, h.ChunkTypeValue())
-	case h.MessageSize != 12:
-		t.Errorf("MessageSize doesn't match. Want: %d, Got: %d", 12, h.MessageSize)
-	case dummyStr != "deadbeef":
-		t.Errorf("Paylaod doesn't match. Want: %s, Got: %s", "deadbeef", dummyStr)
+	for i, c := range cases {
+		got, err := DecodeHeader(c.input)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if diff := cmp.Diff(got, c.want); diff != "" {
+			t.Errorf("case #%d failed\n%s", i, diff)
+		}
 	}
 }
 
 func TestSerializeHeader(t *testing.T) {
-	h := NewHeader(
-		MessageTypeHello,
-		ChunkTypeFinal,
-		[]byte{0xde, 0xad, 0xbe, 0xef},
-	)
-
-	serialized, err := h.Serialize()
-	if err != nil {
-		t.Fatalf("Failed to serialize Header: %s", err)
+	cases := []struct {
+		input *Header
+		want  []byte
+	}{
+		{ // Normal Header
+			NewHeader(
+				MessageTypeHello,
+				ChunkTypeFinal,
+				[]byte{0xde, 0xad, 0xbe, 0xef},
+			),
+			[]byte{ // Hello message
+				// MessageType: HEL
+				0x48, 0x45, 0x4c,
+				// Chunk Type: Final
+				0x46,
+				// MessageSize: 12
+				0x0c, 0x00, 0x00, 0x00,
+				// dummy Payload
+				0xde, 0xad, 0xbe, 0xef,
+			},
+		},
 	}
 
-	for i, s := range serialized {
-		x := testHeaderBytes[0][i]
-		if s != x {
-			t.Errorf("Bytes doesn't match. Want: %#x, Got: %#x at %dth", x, s, i)
+	for i, c := range cases {
+		got, err := c.input.Serialize()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if diff := cmp.Diff(got, c.want); diff != "" {
+			t.Errorf("case #%d failed\n%s", i, diff)
 		}
 	}
-	t.Logf("%x", serialized)
+}
+
+func TestHeaderLen(t *testing.T) {
+	cases := []struct {
+		input *Header
+		want  int
+	}{
+		{ // Normal Header
+			NewHeader(
+				MessageTypeHello,
+				ChunkTypeFinal,
+				[]byte{0xde, 0xad, 0xbe, 0xef},
+			),
+			12,
+		},
+	}
+
+	for i, c := range cases {
+		got := c.input.Len()
+		if diff := cmp.Diff(got, c.want); diff != "" {
+			t.Errorf("case #%d failed\n%s", i, diff)
+		}
+	}
 }
