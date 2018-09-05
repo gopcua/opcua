@@ -4,7 +4,11 @@
 
 package services
 
-import "github.com/wmnsk/gopcua/datatypes"
+import (
+	"time"
+
+	"github.com/wmnsk/gopcua/datatypes"
+)
 
 // ActivateSessionRequest is used by the Client to specify the identity of the user
 // associated with the Session. This Service request shall be issued by the Client
@@ -26,6 +30,41 @@ type ActivateSessionRequest struct {
 	LocaleIDs                  *datatypes.StringArray
 	UserIdentityToken          *datatypes.ExtensionObject
 	UserTokenSignature         *SignatureData
+}
+
+// NewActivateSessionRequest creates a new ActivateSessionRequest.
+func NewActivateSessionRequest(ts time.Time, handle, diag, timeout uint32, auditID string, sig *SignatureData, certs []*SignedSoftwareCertificate, locales []string, userToken *datatypes.ExtensionObject, tokenSig *SignatureData) *ActivateSessionRequest {
+	return &ActivateSessionRequest{
+		TypeID: datatypes.NewExpandedNodeID(
+			false, false,
+			datatypes.NewFourByteNodeID(
+				0, ServiceTypeActivateSessionRequest,
+			),
+			"", 0,
+		),
+		RequestHeader: NewRequestHeader(
+			datatypes.NewTwoByteNodeID(0x00),
+			ts,
+			handle,
+			diag,
+			timeout,
+			auditID,
+			NewAdditionalHeader(
+				datatypes.NewExpandedNodeID(
+					false, false,
+					datatypes.NewTwoByteNodeID(0),
+					"", 0,
+				),
+				0x00,
+			),
+			nil,
+		),
+		ClientSignature:            sig,
+		ClientSoftwareCertificates: NewSignedSoftwareCertificateArray(certs),
+		LocaleIDs:                  datatypes.NewStringArray(locales),
+		UserIdentityToken:          userToken,
+		UserTokenSignature:         tokenSig,
+	}
 }
 
 // DecodeActivateSessionRequest decodes given bytes into ActivateSessionRequest.

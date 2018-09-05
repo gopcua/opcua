@@ -12,6 +12,60 @@ import (
 	"github.com/wmnsk/gopcua/datatypes"
 )
 
+func TestNewActivateSessionRequest(t *testing.T) {
+	a := NewActivateSessionRequest(
+		time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC), 1, 0, 0, "",
+		NewSignatureData("", nil),
+		nil,
+		[]string{""},
+		datatypes.NewExtensionObject(
+			&datatypes.ExpandedNodeID{
+				NodeID: datatypes.NewFourByteNodeID(0, 321),
+			},
+			0x01,
+			[]byte("0"),
+		),
+		NewSignatureData("", nil),
+	)
+	expected := &ActivateSessionRequest{
+		TypeID: &datatypes.ExpandedNodeID{
+			NodeID:       datatypes.NewFourByteNodeID(0, ServiceTypeActivateSessionRequest),
+			NamespaceURI: datatypes.NewString(""),
+			ServerIndex:  0,
+		},
+		RequestHeader: &RequestHeader{
+			AuthenticationToken: datatypes.NewTwoByteNodeID(0x00),
+			AuditEntryID:        datatypes.NewString(""),
+			RequestHandle:       1,
+			TimeoutHint:         0,
+			AdditionalHeader: &AdditionalHeader{
+				TypeID: &datatypes.ExpandedNodeID{
+					NodeID:       datatypes.NewTwoByteNodeID(0),
+					NamespaceURI: datatypes.NewString(""),
+				},
+				EncodingMask: 0x00,
+			},
+			Timestamp: time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
+		},
+		ClientSignature:            NewSignatureData("", nil),
+		ClientSoftwareCertificates: NewSignedSoftwareCertificateArray(nil),
+		LocaleIDs:                  datatypes.NewStringArray([]string{""}),
+		UserIdentityToken: &datatypes.ExtensionObject{
+			TypeID: &datatypes.ExpandedNodeID{
+				NodeID: datatypes.NewFourByteNodeID(0, 321),
+			},
+			Length:       5,
+			EncodingMask: 0x01,
+			Body:         datatypes.NewByteString([]byte("0")),
+		},
+		UserTokenSignature: NewSignatureData("", nil),
+	}
+
+	if diff := cmp.Diff(a, expected); diff != "" {
+		t.Error(diff)
+	}
+}
+
 func TestDecodeActivateSessionRequest(t *testing.T) {
 	b := []byte{
 		0x01, 0x00, 0xd3, 0x01, 0x02, 0x03, 0x00, 0xc7,

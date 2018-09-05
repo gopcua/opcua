@@ -10,6 +10,33 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
+func TestNewExtensionObject(t *testing.T) {
+	e := NewExtensionObject(
+		NewExpandedNodeID(
+			false, false, NewFourByteNodeID(0, 321), "", 0,
+		),
+		0x01,
+		[]byte("0"),
+	)
+	expected := &ExtensionObject{
+		TypeID: &ExpandedNodeID{
+			NodeID: &FourByteNodeID{
+				EncodingMask: 0x01,
+				Namespace:    0,
+				Identifier:   321,
+			},
+			NamespaceURI: NewString(""),
+		},
+		EncodingMask: 0x01,
+		Length:       5,
+		Body:         NewByteString([]byte("0")),
+	}
+
+	if diff := cmp.Diff(e, expected); diff != "" {
+		t.Error(diff)
+	}
+}
+
 func TestDecodeExtensionObject(t *testing.T) {
 	b := []byte{
 		0x01, 0x00, 0x41, 0x01, 0x01, 0x05, 0x00, 0x00,
