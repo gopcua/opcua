@@ -302,3 +302,93 @@ func (d *DiagnosticInfo) String() string {
 
 	return fmt.Sprintf("%v", str)
 }
+
+// DiagnosticInfoArray represents the DiagnosticInfoArray.
+type DiagnosticInfoArray struct {
+	ArraySize       int32
+	DiagnosticInfos []*DiagnosticInfo
+}
+
+// NewDiagnosticInfoArray creates a new DiagnosticInfoArray from multiple strings.
+func NewDiagnosticInfoArray(diags []*DiagnosticInfo) *DiagnosticInfoArray {
+	if diags == nil {
+		return &DiagnosticInfoArray{
+			ArraySize: 0,
+		}
+	}
+
+	d := &DiagnosticInfoArray{
+		ArraySize: int32(len(diags)),
+	}
+	for _, diag := range diags {
+		d.DiagnosticInfos = append(d.DiagnosticInfos, diag)
+	}
+
+	return d
+}
+
+// DecodeDiagnosticInfoArray decodes given bytes into DiagnosticInfoArray.
+func DecodeDiagnosticInfoArray(b []byte) (*DiagnosticInfoArray, error) {
+	d := &DiagnosticInfoArray{}
+	if err := d.DecodeFromBytes(b); err != nil {
+		return nil, err
+	}
+
+	return d, nil
+}
+
+// DecodeFromBytes decodes given bytes into DiagnosticInfoArray.
+// TODO: add validation to avoid crash.
+func (d *DiagnosticInfoArray) DecodeFromBytes(b []byte) error {
+	d.ArraySize = int32(binary.LittleEndian.Uint32(b[:4]))
+	if d.ArraySize <= 0 {
+		return nil
+	}
+
+	var offset = 4
+	for i := 1; i <= int(d.ArraySize); i++ {
+		diag, err := DecodeDiagnosticInfo(b[offset:])
+		if err != nil {
+			return err
+		}
+		d.DiagnosticInfos = append(d.DiagnosticInfos, diag)
+		offset += diag.Len()
+	}
+
+	return nil
+}
+
+// Serialize serializes DiagnosticInfoArray into bytes.
+func (d *DiagnosticInfoArray) Serialize() ([]byte, error) {
+	b := make([]byte, d.Len())
+	if err := d.SerializeTo(b); err != nil {
+		return nil, err
+	}
+
+	return b, nil
+}
+
+// SerializeTo serializes DiagnosticInfoArray into bytes.
+func (d *DiagnosticInfoArray) SerializeTo(b []byte) error {
+	var offset = 4
+	binary.LittleEndian.PutUint32(b[:4], uint32(d.ArraySize))
+
+	for _, diag := range d.DiagnosticInfos {
+		if err := diag.SerializeTo(b[offset:]); err != nil {
+			return err
+		}
+		offset += diag.Len()
+	}
+
+	return nil
+}
+
+// Len returns the actual length in int.
+func (d *DiagnosticInfoArray) Len() int {
+	l := 4
+	for _, diag := range d.DiagnosticInfos {
+		l += diag.Len()
+	}
+
+	return l
+}
