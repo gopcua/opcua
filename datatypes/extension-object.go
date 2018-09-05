@@ -13,8 +13,20 @@ import "encoding/binary"
 type ExtensionObject struct {
 	TypeID       *ExpandedNodeID
 	EncodingMask byte
-	Length       uint32
+	Length       int32
 	Body         *ByteString
+}
+
+// NewExtensionObject creates a new ExtensionObject.
+func NewExtensionObject(typeID *ExpandedNodeID, mask uint8, body []byte) *ExtensionObject {
+	e := &ExtensionObject{
+		TypeID:       typeID,
+		EncodingMask: mask,
+		Body:         NewByteString(body),
+	}
+	e.SetLength()
+
+	return e
 }
 
 // DecodeExtensionObject decodes given bytes into ExtensionObject.
@@ -38,10 +50,10 @@ func (e *ExtensionObject) DecodeFromBytes(b []byte) error {
 
 	// encoding mask
 	e.EncodingMask = b[offset]
-	offset += 1
+	offset++
 
 	// length
-	e.Length = binary.LittleEndian.Uint32(b[offset : offset+4])
+	e.Length = int32(binary.LittleEndian.Uint32(b[offset : offset+4]))
 	offset += 4
 
 	// body
@@ -77,10 +89,10 @@ func (e *ExtensionObject) SerializeTo(b []byte) error {
 
 	// encoding mask
 	b[offset] = e.EncodingMask
-	offset += 1
+	offset++
 
 	// length
-	binary.LittleEndian.PutUint32(b[offset:offset+4], e.Length)
+	binary.LittleEndian.PutUint32(b[offset:offset+4], uint32(e.Length))
 	offset += 4
 
 	// body
@@ -107,4 +119,9 @@ func (e *ExtensionObject) Len() int {
 	}
 
 	return length
+}
+
+// SetLength sets the length of Body in Length field.
+func (e *ExtensionObject) SetLength() {
+	e.Length = int32(e.Body.Len())
 }

@@ -6,6 +6,23 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
+func TestNewReadValueID(t *testing.T) {
+	r := NewReadValueID(
+		NewFourByteNodeID(0, 2256),
+		IntegerIDValue,
+		"", 0, "",
+	)
+	expected := &ReadValueID{
+		NodeID:       NewFourByteNodeID(0, 2256),
+		AttributeID:  IntegerIDValue,
+		IndexRange:   NewString(""),
+		DataEncoding: NewQualifiedName(0, ""),
+	}
+	if diff := cmp.Diff(r, expected); diff != "" {
+		t.Error(diff)
+	}
+}
+
 func TestDecodeReadValueID(t *testing.T) {
 	// sample qualified name from wireshark
 	b := []byte{
