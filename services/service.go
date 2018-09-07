@@ -27,19 +27,9 @@ const (
 	ServiceTypeReadResponse                      = 634
 )
 
-// Service is an interface to handle any kind of OPC UA Services.
-type Service interface {
-	DecodeFromBytes([]byte) error
-	Serialize() ([]byte, error)
-	SerializeTo([]byte) error
-	Len() int
-	String() string
-	ServiceType() uint16
-}
-
 // Decode decodes given bytes into Service, depending on the type of service.
-func Decode(b []byte) (Service, error) {
-	var s Service
+func Decode(b []byte) (datatypes.Service, error) {
+	var s datatypes.Service
 
 	typeID, err := datatypes.DecodeExpandedNodeID(b)
 	if err != nil {
