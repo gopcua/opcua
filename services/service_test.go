@@ -419,7 +419,7 @@ func TestDecode(t *testing.T) {
 		case osc.RequestedLifetime != 6000000:
 			t.Errorf("RequestedLifetime doesn't Match. Want: %d, Got: %d", 6000000, osc.RequestedLifetime)
 		}
-		t.Log(o.String())
+		// t.Log(o.String())
 	})
 	t.Run("open-sec-chan-res", func(t *testing.T) {
 		t.Parallel()
@@ -449,7 +449,7 @@ func TestDecode(t *testing.T) {
 		case osc.ServerNonce.Get()[0] != 255:
 			t.Errorf("ServerNonce doesn't Match. Want: %v, Got: %v", 255, osc.ServerNonce.Get()[0])
 		}
-		t.Log(o.String())
+		// t.Log(o.String())
 	})
 	t.Run("get-endpoint-req", func(t *testing.T) {
 		t.Parallel()
@@ -473,7 +473,7 @@ func TestDecode(t *testing.T) {
 		case gep.ProfileURIs.ArraySize != 0:
 			t.Errorf("ProfileURIs.ArraySize doesn't Match. Want: %d, Got: %d", 0, gep.ProfileURIs.ArraySize)
 		}
-		t.Log(g.String())
+		// t.Log(g.String())
 	})
 	t.Run("get-endpoint-res", func(t *testing.T) {
 		t.Parallel()
@@ -605,7 +605,7 @@ func TestDecode(t *testing.T) {
 		case csc.SecureChannelID != 1:
 			t.Errorf("SecureChannelID doesn't Match. Want: %d, Got: %d", 1, csc.SecureChannelID)
 		}
-		t.Log(c.String())
+		// t.Log(c.String())
 	})
 	t.Run("close-sec-chan-res", func(t *testing.T) {
 		t.Parallel()
@@ -623,7 +623,7 @@ func TestDecode(t *testing.T) {
 		case c.ServiceType() != ServiceTypeCloseSecureChannelResponse:
 			t.Errorf("ServiceType doesn't Match. Want: %d, Got: %d", ServiceTypeCloseSecureChannelResponse, c.ServiceType())
 		}
-		t.Log(c.String())
+		// t.Log(c.String())
 	})
 	t.Run("close-session-req", func(t *testing.T) {
 		t.Parallel()
@@ -643,7 +643,7 @@ func TestDecode(t *testing.T) {
 		case csr.DeleteSubscriptions.String() != "TRUE":
 			t.Errorf("DeleteSubscriptions doesn't Match. Want: %s, Got: %s", "TRUE", csr.DeleteSubscriptions.String())
 		}
-		t.Log(c.String())
+		// t.Log(c.String())
 	})
 	t.Run("close-session-res", func(t *testing.T) {
 		t.Parallel()
@@ -661,7 +661,7 @@ func TestDecode(t *testing.T) {
 		case c.ServiceType() != ServiceTypeCloseSessionResponse:
 			t.Errorf("ServiceType doesn't Match. Want: %d, Got: %d", ServiceTypeCloseSessionResponse, c.ServiceType())
 		}
-		t.Log(c.String())
+		// t.Log(c.String())
 	})
 }
 

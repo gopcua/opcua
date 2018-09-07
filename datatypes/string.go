@@ -54,7 +54,7 @@ func (s *String) DecodeFromBytes(b []byte) error {
 	if s.Length <= 0 {
 		return nil
 	}
-	s.Value = b[4 : 4+int(s.Length)]
+	s.Value = b[4 : 4+s.Length]
 	return nil
 }
 
