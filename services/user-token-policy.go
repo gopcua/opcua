@@ -16,8 +16,10 @@ import (
 // depends on the system configuration.
 //
 // Specification: Part 4, 7.36.1
+type UserIdentityToken uint32
+
 const (
-	UserTokenAnonymous uint32 = iota
+	UserTokenAnonymous UserIdentityToken = iota
 	UserTokenUsername
 	UserTokenCertificate
 	UserTokenIssuedToken
@@ -28,14 +30,14 @@ const (
 // Specification: Part 4, 7.37
 type UserTokenPolicy struct {
 	PolicyID          *datatypes.String
-	TokenType         uint32
+	TokenType         UserIdentityToken
 	IssuedTokenType   *datatypes.String
 	IssuerEndpointURI *datatypes.String
 	SecurityPolicyURI *datatypes.String
 }
 
 // NewUserTokenPolicy creates a new NewUserTokenPolicy.
-func NewUserTokenPolicy(id string, tokenType uint32, issuedToken, issuerURI, secURI string) *UserTokenPolicy {
+func NewUserTokenPolicy(id string, tokenType UserIdentityToken, issuedToken, issuerURI, secURI string) *UserTokenPolicy {
 	return &UserTokenPolicy{
 		PolicyID:          datatypes.NewString(id),
 		TokenType:         tokenType,
@@ -64,7 +66,7 @@ func (u *UserTokenPolicy) DecodeFromBytes(b []byte) error {
 	}
 	offset += u.PolicyID.Len()
 
-	u.TokenType = binary.LittleEndian.Uint32(b[offset : offset+4])
+	u.TokenType = UserIdentityToken(binary.LittleEndian.Uint32(b[offset : offset+4]))
 	offset += 4
 
 	u.IssuedTokenType = &datatypes.String{}
@@ -108,7 +110,7 @@ func (u *UserTokenPolicy) SerializeTo(b []byte) error {
 		offset += u.PolicyID.Len()
 	}
 
-	binary.LittleEndian.PutUint32(b[offset:offset+4], u.TokenType)
+	binary.LittleEndian.PutUint32(b[offset:offset+4], uint32(u.TokenType))
 	offset += 4
 
 	if u.IssuedTokenType != nil {

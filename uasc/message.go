@@ -5,6 +5,7 @@
 package uasc
 
 import (
+	"github.com/wmnsk/gopcua/datatypes"
 	"github.com/wmnsk/gopcua/errors"
 	"github.com/wmnsk/gopcua/services"
 )
@@ -26,7 +27,7 @@ type Message struct {
 	*AsymmetricSecurityHeader
 	*SymmetricSecurityHeader
 	*SequenceHeader
-	Service services.Service
+	Service datatypes.Service
 }
 
 // New creates a OPC UA Secure Conversation message.New
@@ -37,7 +38,7 @@ type Message struct {
 // Service type: CloseSecureChannel => Message type: CLO.
 //
 // Service type: Others => Message type: MSG.
-func New(srv services.Service, cfg *Config) *Message {
+func New(srv datatypes.Service, cfg *Config) *Message {
 	switch srv.ServiceType() {
 	case services.ServiceTypeOpenSecureChannelRequest, services.ServiceTypeOpenSecureChannelResponse:
 		return newOPN(srv, cfg)
@@ -48,7 +49,7 @@ func New(srv services.Service, cfg *Config) *Message {
 	}
 }
 
-func newOPN(srv services.Service, cfg *Config) *Message {
+func newOPN(srv datatypes.Service, cfg *Config) *Message {
 	m := &Message{
 		Header: NewHeader(MessageTypeOpenSecureChannel, ChunkTypeFinal, cfg.SecureChannelID, nil),
 		AsymmetricSecurityHeader: NewAsymmetricSecurityHeader(
@@ -63,7 +64,7 @@ func newOPN(srv services.Service, cfg *Config) *Message {
 	return m
 }
 
-func newMSG(srv services.Service, cfg *Config) *Message {
+func newMSG(srv datatypes.Service, cfg *Config) *Message {
 	m := &Message{
 		Header:                  NewHeader(MessageTypeMessage, ChunkTypeFinal, cfg.SecureChannelID, nil),
 		SymmetricSecurityHeader: NewSymmetricSecurityHeader(cfg.SecurityTokenID, nil),
@@ -76,7 +77,7 @@ func newMSG(srv services.Service, cfg *Config) *Message {
 	return m
 }
 
-func newCLO(srv services.Service, cfg *Config) *Message {
+func newCLO(srv datatypes.Service, cfg *Config) *Message {
 	m := &Message{
 		Header: NewHeader(MessageTypeCloseSecureChannel, ChunkTypeFinal, cfg.SecureChannelID, nil),
 		AsymmetricSecurityHeader: NewAsymmetricSecurityHeader(
