@@ -58,12 +58,19 @@ func (s *Server) Listen() (*Listener, error) {
 func (l *Listener) Accept() (*Conn, error) {
 	var err error
 
-	conn := &Conn{}
+	conn := &Conn{
+		srvCfg:    l.srv,
+		state:     srvStateClosed,
+		stateChan: make(chan state),
+		lenChan:   make(chan int),
+		errChan:   make(chan error),
+		rcvBuf:    make([]byte, l.srv.ReceiveBufferSize),
+		lep:       l.srv.Endpoint,
+	}
 	conn.tcpConn, err = l.tcpListener.AcceptTCP()
 	if err != nil {
 		return nil, err
 	}
-	conn.rcvBuf = make([]byte, l.srv.ReceiveBufferSize)
 
 	n, err := conn.tcpConn.Read(conn.rcvBuf)
 	if err != nil {
@@ -85,7 +92,8 @@ func (l *Listener) Accept() (*Conn, error) {
 			}
 			return nil, fmt.Errorf("cannot accept due to invalid EndpointURL: %s", msg.EndPointURL.Get())
 		}
-		l.srv.SendBufferSize = msg.ReceiveBufSize
+
+		conn.sndBuf = make([]byte, msg.ReceiveBufSize)
 		if err := conn.Acknowledge(l.srv); err != nil {
 			return nil, err
 		}
@@ -95,5 +103,34 @@ func (l *Listener) Accept() (*Conn, error) {
 		}
 	}
 
-	return conn, nil
+	conn.state = srvStateEstablished
+	go conn.startFSM()
+	for {
+		select {
+		case s := <-conn.stateChan:
+			switch s {
+			case srvStateEstablished:
+				return conn, nil
+			default:
+				continue
+			}
+		case err := <-conn.errChan:
+			return nil, err
+		}
+	}
+}
+
+// Close closes the Listener.
+func (l *Listener) Close() error {
+	return l.tcpListener.Close()
+}
+
+// Addr returns the listener's network address, a *TCPAddr.
+func (l *Listener) Addr() net.Addr {
+	return l.tcpListener.Addr()
+}
+
+// Endpoint returns the listener's EndpointURL.
+func (l *Listener) Endpoint() string {
+	return l.srv.Endpoint
 }

@@ -6,25 +6,47 @@ package uacp
 
 import (
 	"fmt"
+	"io"
 	"net"
 	"time"
 
 	"github.com/wmnsk/gopcua/errors"
+	"github.com/wmnsk/gopcua/utils"
 )
 
 // Conn is an implementation of the net.Conn interface for OPC UA Connection Protocol.
 type Conn struct {
-	tcpConn  *net.TCPConn
-	endpoint string
-	rcvBuf   []byte
-	sndBuf   []byte
+	tcpConn        *net.TCPConn
+	lep, rep       string
+	rcvBuf, sndBuf []byte
+	cliCfg         *Client
+	srvCfg         *Server
+	state          state
+	stateChan      chan state
+	lenChan        chan int
+	errChan        chan error
 }
 
 // Read reads data from the connection.
 // Read can be made to time out and return an Error with Timeout() == true
 // after a fixed time limit; see SetDeadline and SetReadDeadline.
+//
+// If the data is one of UACP messages, it will be handled automatically.
+// In other words, the data is passed when it is NOT one of Hello, Acknowledge, Error, ReverseHello.
 func (c *Conn) Read(b []byte) (n int, err error) {
-	return c.tcpConn.Read(b)
+	for {
+		select {
+		case l := <-c.lenChan:
+			copy(b, c.rcvBuf)
+			return l, nil
+		/*
+			case <-time.After(c.readdeadline)
+				return l, errTimeout
+		*/
+		default:
+			continue
+		}
+	}
 }
 
 // Write writes data to the connection.
@@ -41,7 +63,6 @@ func (c *Conn) Close() error {
 		return err
 	}
 
-	c = nil
 	return nil
 }
 
@@ -53,6 +74,18 @@ func (c *Conn) LocalAddr() net.Addr {
 // RemoteAddr returns the remote network address.
 func (c *Conn) RemoteAddr() net.Addr {
 	return c.tcpConn.RemoteAddr()
+}
+
+// LocalEndpoint returns the local EndpointURL.
+// This is expected to be called from server side of Conn.
+func (c *Conn) LocalEndpoint() string {
+	return c.lep
+}
+
+// RemoteEndpoint returns the remote EndpointURL.
+// This is expected to be called from client side of Conn.
+func (c *Conn) RemoteEndpoint() string {
+	return c.rep
 }
 
 // SetDeadline sets the read and write deadlines associated
@@ -90,7 +123,7 @@ func (c *Conn) SetWriteDeadline(t time.Time) error {
 	return c.tcpConn.SetWriteDeadline(t)
 }
 
-// Hello sends UACP Hello message and checks the reponse.
+// Hello sends UACP Hello message to Conn.
 func (c *Conn) Hello(cli *Client) error {
 	hel, err := NewHello(0, cli.ReceiveBufferSize, cli.SendBufferSize, 0, cli.Endpoint).Serialize()
 	if err != nil {
@@ -100,26 +133,8 @@ func (c *Conn) Hello(cli *Client) error {
 	if _, err := c.tcpConn.Write(hel); err != nil {
 		return err
 	}
-
-	n, err := c.tcpConn.Read(c.rcvBuf)
-	if err != nil {
-		return err
-	}
-
-	message, err := Decode(c.rcvBuf[:n])
-	if err != nil {
-		return err
-	}
-
-	switch msg := message.(type) {
-	case *Acknowledge:
-		cli.SendBufferSize = msg.ReceiveBufSize
-		return nil
-	case *Error:
-		return fmt.Errorf("received Error. Code: %d, Reason: %s", msg.Error, msg.Reason.Get())
-	default:
-		return errors.NewErrInvalidType(msg, "initiating UACP", ".")
-	}
+	c.state = cliStateHelloSent
+	return nil
 }
 
 // Acknowledge sends Acknowledge message to Conn.
@@ -146,4 +161,195 @@ func (c *Conn) Error(code uint32, reason string) error {
 		return err
 	}
 	return nil
+}
+
+type state uint8
+
+const (
+	cliStateClosed state = iota
+	cliStateHelloSent
+	cliStateEstablished
+	srvStateClosed
+	srvStateEstablished
+)
+
+func (s state) String() string {
+	switch s {
+	case cliStateClosed:
+		return "client closed"
+	case cliStateHelloSent:
+		return "client hello sent"
+	case cliStateEstablished:
+		return "client established"
+	case srvStateClosed:
+		return "server closed"
+	case srvStateEstablished:
+		return "client established"
+	default:
+		return "unknown"
+	}
+}
+
+// Errors
+var (
+	errInvalidState    = errors.New("invalid state")
+	errInvalidEndpoint = errors.New("invalid EndpointURL")
+	errReceivedError   = errors.New("received Error message")
+)
+
+func (c *Conn) handleErrors(e error) {
+	switch e {
+	case errInvalidState:
+		c.Close()
+	case errInvalidEndpoint:
+		c.Close()
+	default:
+		return
+	}
+}
+
+func (c *Conn) updateState(s state) {
+	c.state = s
+	c.stateChan <- c.state
+}
+
+func (c *Conn) startFSM() {
+	defer c.Close()
+	c.updateState(c.state)
+
+	for {
+		n, err := c.tcpConn.Read(c.rcvBuf)
+		if err != nil {
+			if err == io.EOF {
+				continue
+			}
+			c.Close()
+		}
+
+		msg, err := Decode(c.rcvBuf[:n])
+		if err != nil {
+			// pass to the user if msg is undecodable as UACP.
+			c.lenChan <- n
+		}
+		switch m := msg.(type) {
+		case *Hello:
+			go c.handleMsgHello(m)
+		case *Acknowledge:
+			go c.handleMsgAcknowledge(m)
+		case *Error:
+			go c.handleMsgError(m)
+		case *ReverseHello:
+			go c.handleMsgReverseHello(m)
+		// pass to the user if type of msg is unknown.
+		default:
+			c.lenChan <- n
+		}
+	}
+}
+
+func (c *Conn) handleMsgHello(h *Hello) {
+	switch c.state {
+	// server accepts Hello at anytime, as UACP does not have explicit connection closing message.
+	case srvStateClosed, srvStateEstablished:
+		spath, _ := utils.GetPath(c.lep)
+		cpath, err := utils.GetPath(h.EndPointURL.Get())
+		if err != nil || cpath != spath {
+			if err := c.Error(BadTCPEndpointURLInvalid, fmt.Sprintf("Endpoint: %s does not exist", h.EndPointURL.Get())); err != nil {
+				c.errChan <- err
+			}
+			c.errChan <- fmt.Errorf("cannot accept due to invalid EndpointURL: %s", h.EndPointURL.Get())
+		}
+
+		c.sndBuf = make([]byte, h.ReceiveBufSize)
+		if err := c.Acknowledge(c.srvCfg); err != nil {
+			c.errChan <- err
+		}
+		c.updateState(srvStateEstablished)
+	// client never accept Hello.
+	case cliStateClosed, cliStateEstablished:
+		if err := c.Error(BadTCPMessageTypeInvalid, ""); err != nil {
+			c.errChan <- err
+		}
+	// invalid state. conn should be closed in error handler.
+	default:
+		if err := c.Error(BadTCPServerTooBusy, ""); err != nil {
+			c.errChan <- err
+		}
+		c.errChan <- errInvalidState
+	}
+}
+
+func (c *Conn) handleMsgAcknowledge(a *Acknowledge) {
+	switch c.state {
+	// client accepts Acknowledge only after sending Hello.
+	case cliStateHelloSent:
+		c.cliCfg.SendBufferSize = a.ReceiveBufSize
+		c.updateState(cliStateEstablished)
+	// if client conn is closed or established, just ignore Acknowledge.
+	case cliStateClosed, cliStateEstablished:
+	// server never accept Acknowledge.
+	case srvStateClosed, srvStateEstablished:
+		if err := c.Error(BadTCPMessageTypeInvalid, ""); err != nil {
+			c.errChan <- err
+		}
+	// invalid state. conn should be closed in error handler.
+	default:
+		if err := c.Error(BadTCPServerTooBusy, ""); err != nil {
+			c.errChan <- err
+		}
+		c.errChan <- errInvalidState
+	}
+}
+
+func (c *Conn) handleMsgError(e *Error) {
+	switch c.state {
+	// if client receives Error after sending Hello, notify error handler and switch state to closed.
+	case cliStateHelloSent:
+		switch e.Error {
+		case BadTCPEndpointURLInvalid:
+			c.errChan <- errInvalidEndpoint
+			c.updateState(cliStateClosed)
+		default:
+			c.errChan <- errReceivedError
+			c.updateState(cliStateClosed)
+		}
+	// if client/server conn is established, just notify error to error handler.
+	case cliStateEstablished, srvStateEstablished:
+		c.errChan <- errReceivedError
+	// if client/server conn is closed, just ignore Error.
+	case cliStateClosed, srvStateClosed:
+	// invalid state. conn should be closed in error handler.
+	default:
+		if err := c.Error(BadTCPServerTooBusy, ""); err != nil {
+			c.errChan <- err
+		}
+		c.errChan <- errInvalidState
+	}
+}
+
+func (c *Conn) handleMsgReverseHello(r *ReverseHello) {
+	switch c.state {
+	// if client conn is closed, accept ReverseHello.
+	// XXX - not likely to hit this condition.
+	case cliStateClosed:
+		c.cliCfg.Endpoint = r.EndPointURL.Get()
+		conn, err := c.cliCfg.Dial(nil)
+		if err != nil {
+			c.errChan <- err
+		}
+		c = conn
+	// if client conn is opening/opened, client just ignore ReverseHello.
+	case cliStateHelloSent, cliStateEstablished:
+	// server never accept ReverseHello.
+	case srvStateClosed, srvStateEstablished:
+		if err := c.Error(BadTCPMessageTypeInvalid, ""); err != nil {
+			c.errChan <- err
+		}
+	// invalid state. conn should be closed in error handler.
+	default:
+		if err := c.Error(BadTCPServerTooBusy, ""); err != nil {
+			c.errChan <- err
+		}
+		c.errChan <- errInvalidState
+	}
 }
