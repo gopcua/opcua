@@ -12,6 +12,7 @@ package main
 import (
 	"flag"
 	"log"
+	"time"
 
 	"github.com/wmnsk/gopcua/uacp"
 )
@@ -23,7 +24,7 @@ func main() {
 	)
 	flag.Parse()
 
-	cpClient := uacp.NewClient(*endpoint, uint32(*bufsize))
+	cpClient := uacp.NewClient(*endpoint, uint32(*bufsize), 5*time.Second, 3)
 	conn, err := cpClient.Dial(nil)
 	if err != nil {
 		log.Fatal(err)
