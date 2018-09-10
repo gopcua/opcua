@@ -5,6 +5,7 @@
 package uacp
 
 import (
+	"context"
 	"fmt"
 	"net"
 
@@ -44,7 +45,10 @@ func Listen(endpoint string, rcvBufSize uint32) (*Listener, error) {
 }
 
 // Accept accepts the next incoming call and returns the new connection.
-func (l *Listener) Accept() (*Conn, error) {
+//
+// The first param ctx is to be passed to monitorMessages(), which monitors and handles
+// incoming messages automatically in another goroutine.
+func (l *Listener) Accept(ctx context.Context) (*Conn, error) {
 	var err error
 
 	conn := &Conn{
@@ -92,7 +96,7 @@ func (l *Listener) Accept() (*Conn, error) {
 	}
 
 	conn.state = srvStateEstablished
-	go conn.monitorMessages()
+	go conn.monitorMessages(ctx)
 	for {
 		select {
 		case s := <-conn.stateChan:

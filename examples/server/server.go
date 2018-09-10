@@ -10,10 +10,12 @@ XXX - Currently this command just handles the UACP connection from any client.
 package main
 
 import (
+	"context"
 	"flag"
 	"log"
 
 	"github.com/wmnsk/gopcua/uacp"
+	"github.com/wmnsk/gopcua/utils"
 )
 
 func main() {
@@ -29,8 +31,12 @@ func main() {
 	}
 	log.Printf("Started listening on %s.", listener.Endpoint())
 
+	ctx := context.Background()
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	for {
-		conn, err := listener.Accept()
+		conn, err := listener.Accept(ctx)
 		if err != nil {
 			log.Print(err)
 			continue
@@ -43,6 +49,6 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		log.Printf("Successfully received message: %x", buf[:n])
+		log.Printf("Successfully received message: %x\n%s", buf[:n], utils.Wireshark(0, buf[:n]))
 	}
 }

@@ -10,11 +10,13 @@ XXX - Currently this command just initiates the connection(UACP) to the specifie
 package main
 
 import (
+	"context"
 	"encoding/hex"
 	"flag"
 	"log"
 
 	"github.com/wmnsk/gopcua/uacp"
+	"github.com/wmnsk/gopcua/utils"
 )
 
 func main() {
@@ -24,7 +26,11 @@ func main() {
 	)
 	flag.Parse()
 
-	conn, err := uacp.Dial(*endpoint, nil)
+	ctx := context.Background()
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	conn, err := uacp.Dial(ctx, *endpoint, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -39,5 +45,5 @@ func main() {
 	if _, err := conn.Write(payload); err != nil {
 		log.Fatal(err)
 	}
-	log.Printf("Successfully sent message: %x", payload)
+	log.Printf("Successfully sent message: %x\n%s", payload, utils.Wireshark(0, payload))
 }

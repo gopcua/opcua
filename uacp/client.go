@@ -5,6 +5,7 @@
 package uacp
 
 import (
+	"context"
 	"net"
 	"time"
 
@@ -15,19 +16,21 @@ import (
 //
 // Currently the endpoint can only be specified in "opc.tcp://<addr[:port]>/path" format.
 //
-// If port is missing, ":4840" is automatically chosen.
+// The first param ctx is to be passed to monitorMessages(), which monitors and handles
+// incoming messages automatically in another goroutine.
 //
+// If port is missing, ":4840" is automatically chosen.
 // If laddr is nil, a local address is automatically chosen.
-func Dial(endpoint string, laddr *net.TCPAddr) (*Conn, error) {
-	return dial(endpoint, laddr, 5*time.Second, 3)
+func Dial(ctx context.Context, endpoint string, laddr *net.TCPAddr) (*Conn, error) {
+	return dial(ctx, endpoint, laddr, 5*time.Second, 3)
 }
 
 // DialTimeout is Dial with retransmission interval and max retransmission count.
-func DialTimeout(endpoint string, laddr *net.TCPAddr, interval time.Duration, maxRetry int) (*Conn, error) {
-	return dial(endpoint, laddr, interval, maxRetry)
+func DialTimeout(ctx context.Context, endpoint string, laddr *net.TCPAddr, interval time.Duration, maxRetry int) (*Conn, error) {
+	return dial(ctx, endpoint, laddr, interval, maxRetry)
 }
 
-func dial(endpoint string, laddr *net.TCPAddr, interval time.Duration, maxRetry int) (*Conn, error) {
+func dial(ctx context.Context, endpoint string, laddr *net.TCPAddr, interval time.Duration, maxRetry int) (*Conn, error) {
 	network, raddr, err := utils.ResolveEndpoint(endpoint)
 	if err != nil {
 		return nil, err
@@ -51,10 +54,10 @@ func dial(endpoint string, laddr *net.TCPAddr, interval time.Duration, maxRetry 
 	}
 	sent := 1
 
-	go conn.monitorMessages()
+	go conn.monitorMessages(ctx)
 	for {
 		if sent > maxRetry {
-			return nil, errTimeOut
+			return nil, ErrTimeout
 		}
 
 		select {
