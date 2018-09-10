@@ -11,26 +11,11 @@ import (
 	"github.com/wmnsk/gopcua/utils"
 )
 
-// Server is the configuration that OPC UA Connection Protocol server should have.
-type Server struct {
-	Endpoint          string
-	ReceiveBufferSize uint32
-	SendBufferSize    uint32
-}
-
-// NewServer creates a new Server with minimum mandatory parameters.
-func NewServer(endpoint string, rcvBufSize uint32) *Server {
-	return &Server{
-		Endpoint:          endpoint,
-		ReceiveBufferSize: rcvBufSize,
-		SendBufferSize:    0xffff,
-	}
-}
-
 // Listener is a OPC UA Connection Protocol network listener.
 type Listener struct {
-	tcpListener *net.TCPListener
-	srv         *Server
+	tcpListener            *net.TCPListener
+	endpoint               string
+	rcvBufSize, sndBufSize uint32
 }
 
 // Listen acts like net.Listen for OPC UA Connection Protocol networks.
@@ -39,13 +24,17 @@ type Listener struct {
 //
 // If the IP field of laddr is nil or an unspecified IP address, ListenTCP listens on all available unicast and anycast IP addresses of the local system.
 // If the Port field of laddr is 0, a port number is automatically chosen.
-func (s *Server) Listen() (*Listener, error) {
-	network, laddr, err := utils.ResolveEndpoint(s.Endpoint)
+func Listen(endpoint string, rcvBufSize uint32) (*Listener, error) {
+	network, laddr, err := utils.ResolveEndpoint(endpoint)
 	if err != nil {
 		return nil, err
 	}
 
-	lis := &Listener{srv: s}
+	lis := &Listener{
+		endpoint:   endpoint,
+		rcvBufSize: rcvBufSize,
+		sndBufSize: 0xffff,
+	}
 	lis.tcpListener, err = net.ListenTCP(network, laddr)
 	if err != nil {
 		return nil, err
@@ -59,13 +48,12 @@ func (l *Listener) Accept() (*Conn, error) {
 	var err error
 
 	conn := &Conn{
-		srvCfg:    l.srv,
 		state:     srvStateClosed,
 		stateChan: make(chan state),
 		lenChan:   make(chan int),
 		errChan:   make(chan error),
-		rcvBuf:    make([]byte, l.srv.ReceiveBufferSize),
-		lep:       l.srv.Endpoint,
+		rcvBuf:    make([]byte, l.rcvBufSize),
+		lep:       l.endpoint,
 	}
 	conn.tcpConn, err = l.tcpListener.AcceptTCP()
 	if err != nil {
@@ -84,7 +72,7 @@ func (l *Listener) Accept() (*Conn, error) {
 
 	switch msg := message.(type) {
 	case *Hello:
-		spath, _ := utils.GetPath(l.srv.Endpoint)
+		spath, _ := utils.GetPath(l.endpoint)
 		cpath, err := utils.GetPath(msg.EndPointURL.Get())
 		if err != nil || cpath != spath {
 			if err := conn.Error(BadTCPEndpointURLInvalid, fmt.Sprintf("Endpoint: %s does not exist", msg.EndPointURL.Get())); err != nil {
@@ -94,7 +82,7 @@ func (l *Listener) Accept() (*Conn, error) {
 		}
 
 		conn.sndBuf = make([]byte, msg.ReceiveBufSize)
-		if err := conn.Acknowledge(l.srv); err != nil {
+		if err := conn.Acknowledge(); err != nil {
 			return nil, err
 		}
 	default:
@@ -104,7 +92,7 @@ func (l *Listener) Accept() (*Conn, error) {
 	}
 
 	conn.state = srvStateEstablished
-	go conn.startFSM()
+	go conn.monitorMessages()
 	for {
 		select {
 		case s := <-conn.stateChan:
@@ -132,5 +120,5 @@ func (l *Listener) Addr() net.Addr {
 
 // Endpoint returns the listener's EndpointURL.
 func (l *Listener) Endpoint() string {
-	return l.srv.Endpoint
+	return l.endpoint
 }

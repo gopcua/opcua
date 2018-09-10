@@ -23,12 +23,11 @@ func main() {
 	)
 	flag.Parse()
 
-	srv := uacp.NewServer(*endpoint, uint32(*bufsize))
-	listener, err := srv.Listen()
+	listener, err := uacp.Listen(*endpoint, uint32(*bufsize))
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Printf("Started listening on %s.", srv.Endpoint)
+	log.Printf("Started listening on %s.", listener.Endpoint())
 
 	for {
 		conn, err := listener.Accept()
@@ -36,7 +35,14 @@ func main() {
 			log.Print(err)
 			continue
 		}
+		defer conn.Close()
+		log.Printf("Successfully established connection with %v", conn.LocalEndpoint())
 
-		log.Printf("Successfully established connection with %v", conn.RemoteAddr())
+		buf := make([]byte, 1024)
+		n, err := conn.Read(buf)
+		if err != nil {
+			log.Fatal(err)
+		}
+		log.Printf("Successfully received message: %x", buf[:n])
 	}
 }

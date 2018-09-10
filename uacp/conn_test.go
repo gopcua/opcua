@@ -6,38 +6,13 @@ package uacp
 
 import (
 	"testing"
-	"time"
 
 	"github.com/google/go-cmp/cmp"
 )
 
-func setupConn(endpoint string) (cliConn, srvConn *Conn, err error) {
-	server := NewServer(endpoint, 0xffff)
-	ln, err := server.Listen()
-	if err != nil {
-		return nil, nil, err
-	}
-
-	go func() {
-		defer ln.Close()
-		srvConn, err = ln.Accept()
-		if err != nil {
-			return
-		}
-	}()
-
-	client := NewClient(ln.Endpoint(), 0xffff, 5*time.Second, 3)
-	cliConn, err = client.Dial(nil)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return
-}
-
-func TestClientConn(t *testing.T) {
-	server := NewServer("opc.tcp://127.0.0.1:4840/foo/bar", 0xffff)
-	ln, err := server.Listen()
+func TestConn(t *testing.T) {
+	ep := "opc.tcp://127.0.0.1:4840/foo/bar"
+	ln, err := Listen(ep, 0xffff)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,50 +24,89 @@ func TestClientConn(t *testing.T) {
 		}
 	}()
 
-	client := NewClient("opc.tcp://127.0.0.1:4840/foo/bar", 0xffff, 2*time.Second, 3)
-	if _, err = client.Dial(nil); err != nil {
+	if _, err = Dial(ep, nil); err != nil {
 		t.Error(err)
 	}
 }
 
 func TestClientWrite(t *testing.T) {
-	srvConn, cliConn, err := setupConn("opc.tcp://127.0.0.1:4840/foo/bar")
+	ep := "opc.tcp://127.0.0.1:4840/foo/bar"
+	ln, err := Listen(ep, 0xffff)
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	var cliConn, srvConn *Conn
+	go func() {
+		defer ln.Close()
+		srvConn, err = ln.Accept()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	cliConn, err = Dial(ep, nil)
+	if err != nil {
+		t.Error(err)
 	}
 
 	buf := make([]byte, 1024)
-	msg := []byte{0xde, 0xad, 0xbe, 0xef}
-	if _, err := cliConn.Write(msg); err != nil {
-		t.Fatal(err)
-	}
-	n, err := srvConn.Read(buf)
-	if err != nil {
-		t.Fatal(err)
-	}
+	expected := []byte{0xde, 0xad, 0xbe, 0xef}
+	for {
+		if srvConn != nil {
+			if _, err := cliConn.Write(expected); err != nil {
+				t.Fatal(err)
+			}
+			n, err := srvConn.Read(buf)
+			if err != nil {
+				t.Fatal(err)
+			}
 
-	if diff := cmp.Diff(buf[:n], msg); diff != "" {
-		t.Error(diff)
+			if diff := cmp.Diff(buf[:n], expected); diff != "" {
+				t.Error(diff)
+			}
+			break
+		}
 	}
 }
 
 func TestServerWrite(t *testing.T) {
-	srvConn, cliConn, err := setupConn("opc.tcp://127.0.0.1:4840/foo/bar")
+	ep := "opc.tcp://127.0.0.1:4840/foo/bar"
+	ln, err := Listen(ep, 0xffff)
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	var cliConn, srvConn *Conn
+	go func() {
+		defer ln.Close()
+		srvConn, err = ln.Accept()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	cliConn, err = Dial(ep, nil)
+	if err != nil {
+		t.Error(err)
 	}
 
 	buf := make([]byte, 1024)
-	msg := []byte{0xde, 0xad, 0xbe, 0xef}
-	if _, err := srvConn.Write(msg); err != nil {
-		t.Fatal(err)
-	}
-	n, err := cliConn.Read(buf)
-	if err != nil {
-		t.Fatal(err)
-	}
+	expected := []byte{0xde, 0xad, 0xbe, 0xef}
+	for {
+		if srvConn != nil {
+			if _, err := srvConn.Write(expected); err != nil {
+				t.Fatal(err)
+			}
+			n, err := cliConn.Read(buf)
+			if err != nil {
+				t.Fatal(err)
+			}
 
-	if diff := cmp.Diff(buf[:n], msg); diff != "" {
-		t.Error(diff)
+			if diff := cmp.Diff(buf[:n], expected); diff != "" {
+				t.Error(diff)
+			}
+			break
+		}
 	}
 }

@@ -19,8 +19,6 @@ type Conn struct {
 	tcpConn        *net.TCPConn
 	lep, rep       string
 	rcvBuf, sndBuf []byte
-	cliCfg         *Client
-	srvCfg         *Server
 	state          state
 	stateChan      chan state
 	lenChan        chan int
@@ -37,7 +35,7 @@ func (c *Conn) Read(b []byte) (n int, err error) {
 	for {
 		select {
 		case l := <-c.lenChan:
-			copy(b, c.rcvBuf)
+			copy(b, c.rcvBuf[:l])
 			return l, nil
 		/*
 			case <-time.After(c.readdeadline)
@@ -63,6 +61,9 @@ func (c *Conn) Close() error {
 		return err
 	}
 
+	close(c.errChan)
+	close(c.lenChan)
+	close(c.stateChan)
 	return nil
 }
 
@@ -124,8 +125,8 @@ func (c *Conn) SetWriteDeadline(t time.Time) error {
 }
 
 // Hello sends UACP Hello message to Conn.
-func (c *Conn) Hello(cli *Client) error {
-	hel, err := NewHello(0, cli.ReceiveBufferSize, cli.SendBufferSize, 0, cli.Endpoint).Serialize()
+func (c *Conn) Hello() error {
+	hel, err := NewHello(0, uint32(len(c.rcvBuf)), uint32(len(c.sndBuf)), 0, c.rep).Serialize()
 	if err != nil {
 		return err
 	}
@@ -138,8 +139,8 @@ func (c *Conn) Hello(cli *Client) error {
 }
 
 // Acknowledge sends Acknowledge message to Conn.
-func (c *Conn) Acknowledge(srv *Server) error {
-	ack, err := NewAcknowledge(0, srv.ReceiveBufferSize, srv.SendBufferSize, 0).Serialize()
+func (c *Conn) Acknowledge() error {
+	ack, err := NewAcknowledge(0, uint32(len(c.rcvBuf)), uint32(len(c.sndBuf)), 0).Serialize()
 	if err != nil {
 		return err
 	}
@@ -190,30 +191,13 @@ func (s state) String() string {
 	}
 }
 
-// Errors
-var (
-	errInvalidState    = errors.New("invalid state")
-	errInvalidEndpoint = errors.New("invalid EndpointURL")
-	errReceivedError   = errors.New("received Error message")
-)
-
-func (c *Conn) handleErrors(e error) {
-	switch e {
-	case errInvalidState:
-		c.Close()
-	case errInvalidEndpoint:
-		c.Close()
-	default:
-		return
-	}
+func (c *Conn) notifyLen(n int) {
+	go func() {
+		c.lenChan <- n
+	}()
 }
 
-func (c *Conn) updateState(s state) {
-	c.state = s
-	c.stateChan <- c.state
-}
-
-func (c *Conn) startFSM() {
+func (c *Conn) monitorMessages() {
 	defer c.Close()
 	c.updateState(c.state)
 
@@ -225,24 +209,29 @@ func (c *Conn) startFSM() {
 			}
 			c.Close()
 		}
+		if n == 0 {
+			continue
+		}
 
 		msg, err := Decode(c.rcvBuf[:n])
 		if err != nil {
 			// pass to the user if msg is undecodable as UACP.
-			c.lenChan <- n
+			c.notifyLen(n)
+			continue
 		}
 		switch m := msg.(type) {
 		case *Hello:
-			go c.handleMsgHello(m)
+			c.handleMsgHello(m)
 		case *Acknowledge:
-			go c.handleMsgAcknowledge(m)
+			c.handleMsgAcknowledge(m)
 		case *Error:
-			go c.handleMsgError(m)
+			c.handleMsgError(m)
 		case *ReverseHello:
-			go c.handleMsgReverseHello(m)
-		// pass to the user if type of msg is unknown.
+			c.handleMsgReverseHello(m)
 		default:
-			c.lenChan <- n
+			// pass to the user if type of msg is unknown.
+			c.notifyLen(n)
+			continue
 		}
 	}
 }
@@ -261,7 +250,7 @@ func (c *Conn) handleMsgHello(h *Hello) {
 		}
 
 		c.sndBuf = make([]byte, h.ReceiveBufSize)
-		if err := c.Acknowledge(c.srvCfg); err != nil {
+		if err := c.Acknowledge(); err != nil {
 			c.errChan <- err
 		}
 		c.updateState(srvStateEstablished)
@@ -283,7 +272,7 @@ func (c *Conn) handleMsgAcknowledge(a *Acknowledge) {
 	switch c.state {
 	// client accepts Acknowledge only after sending Hello.
 	case cliStateHelloSent:
-		c.cliCfg.SendBufferSize = a.ReceiveBufSize
+		c.rcvBuf = make([]byte, a.ReceiveBufSize)
 		c.updateState(cliStateEstablished)
 	// if client conn is closed or established, just ignore Acknowledge.
 	case cliStateClosed, cliStateEstablished:
@@ -332,8 +321,8 @@ func (c *Conn) handleMsgReverseHello(r *ReverseHello) {
 	// if client conn is closed, accept ReverseHello.
 	// XXX - not likely to hit this condition.
 	case cliStateClosed:
-		c.cliCfg.Endpoint = r.EndPointURL.Get()
-		conn, err := c.cliCfg.Dial(nil)
+		c.rep = r.EndPointURL.Get()
+		conn, err := Dial(c.rep, nil)
 		if err != nil {
 			c.errChan <- err
 		}
@@ -352,4 +341,28 @@ func (c *Conn) handleMsgReverseHello(r *ReverseHello) {
 		}
 		c.errChan <- errInvalidState
 	}
+}
+
+// Errors
+var (
+	errInvalidState    = errors.New("invalid state")
+	errInvalidEndpoint = errors.New("invalid EndpointURL")
+	errTimeOut         = errors.New("timed out")
+	errReceivedError   = errors.New("received Error message")
+)
+
+func (c *Conn) handleErrors(e error) {
+	switch e {
+	case errInvalidState:
+		c.Close()
+	case errInvalidEndpoint:
+		c.Close()
+	default:
+		return
+	}
+}
+
+func (c *Conn) updateState(s state) {
+	c.state = s
+	c.stateChan <- c.state
 }

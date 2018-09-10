@@ -10,26 +10,34 @@ XXX - Currently this command just initiates the connection(UACP) to the specifie
 package main
 
 import (
+	"encoding/hex"
 	"flag"
 	"log"
-	"time"
 
 	"github.com/wmnsk/gopcua/uacp"
 )
 
 func main() {
 	var (
-		endpoint = flag.String("endpoint", "opc.tcp://example.com/foo/bar", "OPC UA Endpoint URL")
-		bufsize  = flag.Int("bufsize", 0xffff, "Receive Buffer Size")
+		endpoint   = flag.String("endpoint", "opc.tcp://example.com/foo/bar", "OPC UA Endpoint URL")
+		payloadHex = flag.String("payload", "deadbeef", "Payload to send in hex stream format")
 	)
 	flag.Parse()
 
-	cpClient := uacp.NewClient(*endpoint, uint32(*bufsize), 5*time.Second, 3)
-	conn, err := cpClient.Dial(nil)
+	conn, err := uacp.Dial(*endpoint, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer conn.Close()
+	log.Printf("Successfully established connection with %v", conn.RemoteEndpoint())
 
-	log.Printf("Successfully established the connection with %v", conn.RemoteAddr())
+	payload, err := hex.DecodeString(*payloadHex)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if _, err := conn.Write(payload); err != nil {
+		log.Fatal(err)
+	}
+	log.Printf("Successfully sent message: %x", payload)
 }
