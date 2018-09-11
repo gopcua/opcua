@@ -17,6 +17,7 @@ func TestConn(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer ln.Close()
 
 	ctx := context.Background()
 	ctx, cancel := context.WithCancel(ctx)
@@ -28,7 +29,7 @@ func TestConn(t *testing.T) {
 		}
 	}()
 
-	if _, err = Dial(ctx, ep, nil); err != nil {
+	if _, err = Dial(ctx, ep); err != nil {
 		t.Error(err)
 	}
 }
@@ -39,6 +40,7 @@ func TestClientWrite(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer ln.Close()
 
 	ctx := context.Background()
 	ctx, cancel := context.WithCancel(ctx)
@@ -53,9 +55,9 @@ func TestClientWrite(t *testing.T) {
 		}
 	}()
 
-	cliConn, err = Dial(ctx, ep, nil)
+	cliConn, err = Dial(ctx, ep)
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 
 	buf := make([]byte, 1024)
@@ -84,6 +86,7 @@ func TestServerWrite(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer ln.Close()
 
 	ctx := context.Background()
 	ctx, cancel := context.WithCancel(ctx)
@@ -98,9 +101,9 @@ func TestServerWrite(t *testing.T) {
 		}
 	}()
 
-	cliConn, err = Dial(ctx, ep, nil)
+	cliConn, err = Dial(ctx, ep)
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 
 	buf := make([]byte, 1024)
@@ -119,6 +122,47 @@ func TestServerWrite(t *testing.T) {
 				t.Error(diff)
 			}
 			break
+		}
+	}
+}
+func TestConnGetState(t *testing.T) {
+	var cases = []struct {
+		conn     *Conn
+		expected string
+	}{
+		{
+			nil,
+			"",
+		},
+		{
+			&Conn{},
+			"unknown",
+		},
+		{
+			&Conn{state: cliStateClosed},
+			"client closed",
+		},
+		{
+			&Conn{state: cliStateHelloSent},
+			"client hello sent",
+		},
+		{
+			&Conn{state: cliStateEstablished},
+			"client established",
+		},
+		{
+			&Conn{state: srvStateClosed},
+			"server closed",
+		},
+		{
+			&Conn{state: srvStateEstablished},
+			"server established",
+		},
+	}
+
+	for i, c := range cases {
+		if diff := cmp.Diff(c.conn.GetState(), c.expected); diff != "" {
+			t.Errorf("case #%d failed\n%s", i, diff)
 		}
 	}
 }

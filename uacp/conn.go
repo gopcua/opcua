@@ -17,7 +17,7 @@ import (
 
 // Conn is an implementation of the net.Conn interface for OPC UA Connection Protocol.
 type Conn struct {
-	tcpConn        *net.TCPConn
+	lowerConn      net.Conn
 	lep, rep       string
 	rcvBuf, sndBuf []byte
 	state          state
@@ -38,13 +38,11 @@ func (c *Conn) Read(b []byte) (n int, err error) {
 	}
 	for {
 		select {
-		case l := <-c.lenChan:
-			copy(b, c.rcvBuf[:l])
-			return l, nil
-		/*
-			case <-time.After(c.readdeadline)
-				return l, errTimeout
-		*/
+		case n := <-c.lenChan:
+			copy(b, c.rcvBuf[:n])
+			return n, nil
+		case e := <-c.errChan:
+			return 0, e
 		default:
 			continue
 		}
@@ -58,14 +56,18 @@ func (c *Conn) Write(b []byte) (n int, err error) {
 	if !(c.state == cliStateEstablished || c.state == srvStateEstablished) {
 		return 0, ErrConnNotEstablised
 	}
-
-	return c.tcpConn.Write(b)
+	select {
+	case e := <-c.errChan:
+		return 0, e
+	default:
+		return c.lowerConn.Write(b)
+	}
 }
 
 // Close closes the connection.
 // Any blocked Read or Write operations will be unblocked and return errors.
 func (c *Conn) Close() error {
-	if err := c.tcpConn.Close(); err != nil {
+	if err := c.lowerConn.Close(); err != nil {
 		return err
 	}
 
@@ -77,12 +79,12 @@ func (c *Conn) Close() error {
 
 // LocalAddr returns the local network address.
 func (c *Conn) LocalAddr() net.Addr {
-	return c.tcpConn.LocalAddr()
+	return c.lowerConn.LocalAddr()
 }
 
 // RemoteAddr returns the remote network address.
 func (c *Conn) RemoteAddr() net.Addr {
-	return c.tcpConn.RemoteAddr()
+	return c.lowerConn.RemoteAddr()
 }
 
 // LocalEndpoint returns the local EndpointURL.
@@ -113,14 +115,14 @@ func (c *Conn) RemoteEndpoint() string {
 //
 // A zero value for t means I/O operations will not time out.
 func (c *Conn) SetDeadline(t time.Time) error {
-	return c.tcpConn.SetDeadline(t)
+	return c.lowerConn.SetDeadline(t)
 }
 
 // SetReadDeadline sets the deadline for future Read calls
 // and any currently-blocked Read call.
 // A zero value for t means Read will not time out.
 func (c *Conn) SetReadDeadline(t time.Time) error {
-	return c.tcpConn.SetReadDeadline(t)
+	return c.lowerConn.SetReadDeadline(t)
 }
 
 // SetWriteDeadline sets the deadline for future Write calls
@@ -129,7 +131,7 @@ func (c *Conn) SetReadDeadline(t time.Time) error {
 // some of the data was successfully written.
 // A zero value for t means Write will not time out.
 func (c *Conn) SetWriteDeadline(t time.Time) error {
-	return c.tcpConn.SetWriteDeadline(t)
+	return c.lowerConn.SetWriteDeadline(t)
 }
 
 // Hello sends UACP Hello message to Conn.
@@ -139,7 +141,7 @@ func (c *Conn) Hello() error {
 		return err
 	}
 
-	if _, err := c.tcpConn.Write(hel); err != nil {
+	if _, err := c.lowerConn.Write(hel); err != nil {
 		return err
 	}
 	c.state = cliStateHelloSent
@@ -153,7 +155,7 @@ func (c *Conn) Acknowledge() error {
 		return err
 	}
 
-	if _, err := c.tcpConn.Write(ack); err != nil {
+	if _, err := c.lowerConn.Write(ack); err != nil {
 		return err
 	}
 	return nil
@@ -166,7 +168,7 @@ func (c *Conn) Error(code uint32, reason string) error {
 		return err
 	}
 
-	if _, err := c.tcpConn.Write(e); err != nil {
+	if _, err := c.lowerConn.Write(e); err != nil {
 		return err
 	}
 	return nil
@@ -175,7 +177,8 @@ func (c *Conn) Error(code uint32, reason string) error {
 type state uint8
 
 const (
-	cliStateClosed state = iota
+	undefined state = iota
+	cliStateClosed
 	cliStateHelloSent
 	cliStateEstablished
 	srvStateClosed
@@ -198,7 +201,7 @@ func (s state) String() string {
 	case srvStateClosed:
 		return "server closed"
 	case srvStateEstablished:
-		return "client established"
+		return "server established"
 	default:
 		return "unknown"
 	}
@@ -206,6 +209,9 @@ func (s state) String() string {
 
 // GetState returns the current state of Conn.
 func (c *Conn) GetState() string {
+	if c == nil {
+		return ""
+	}
 	return c.state.String()
 }
 
@@ -224,7 +230,7 @@ func (c *Conn) monitorMessages(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		default:
-			n, err := c.tcpConn.Read(c.rcvBuf)
+			n, err := c.lowerConn.Read(c.rcvBuf)
 			if err != nil {
 				if err == io.EOF {
 					continue
@@ -352,7 +358,7 @@ func (c *Conn) handleMsgReverseHello(r *ReverseHello) {
 		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
 
-		conn, err := Dial(ctx, c.rep, nil)
+		conn, err := Dial(ctx, c.rep)
 		if err != nil {
 			cancel()
 			c.errChan <- err

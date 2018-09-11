@@ -30,7 +30,7 @@ func main() {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	conn, err := uacp.Dial(ctx, *endpoint, nil)
+	conn, err := uacp.Dial(ctx, *endpoint)
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -21,16 +21,16 @@ import (
 //
 // If port is missing, ":4840" is automatically chosen.
 // If laddr is nil, a local address is automatically chosen.
-func Dial(ctx context.Context, endpoint string, laddr *net.TCPAddr) (*Conn, error) {
-	return dial(ctx, endpoint, laddr, 5*time.Second, 3)
+func Dial(ctx context.Context, endpoint string) (*Conn, error) {
+	return dial(ctx, endpoint, 5*time.Second, 3)
 }
 
 // DialTimeout is Dial with retransmission interval and max retransmission count.
-func DialTimeout(ctx context.Context, endpoint string, laddr *net.TCPAddr, interval time.Duration, maxRetry int) (*Conn, error) {
-	return dial(ctx, endpoint, laddr, interval, maxRetry)
+func DialTimeout(ctx context.Context, endpoint string, interval time.Duration, maxRetry int) (*Conn, error) {
+	return dial(ctx, endpoint, interval, maxRetry)
 }
 
-func dial(ctx context.Context, endpoint string, laddr *net.TCPAddr, interval time.Duration, maxRetry int) (*Conn, error) {
+func dial(ctx context.Context, endpoint string, interval time.Duration, maxRetry int) (*Conn, error) {
 	network, raddr, err := utils.ResolveEndpoint(endpoint)
 	if err != nil {
 		return nil, err
@@ -44,7 +44,7 @@ func dial(ctx context.Context, endpoint string, laddr *net.TCPAddr, interval tim
 		rcvBuf:    make([]byte, 0xffff),
 		rep:       endpoint,
 	}
-	conn.tcpConn, err = net.DialTCP(network, laddr, raddr)
+	conn.lowerConn, err = net.Dial(network, raddr.String())
 	if err != nil {
 		return nil, err
 	}

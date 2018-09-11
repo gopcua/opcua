@@ -14,7 +14,7 @@ import (
 
 // Listener is a OPC UA Connection Protocol network listener.
 type Listener struct {
-	tcpListener            *net.TCPListener
+	lowerListener          net.Listener
 	endpoint               string
 	rcvBufSize, sndBufSize uint32
 }
@@ -23,7 +23,7 @@ type Listener struct {
 //
 // Currently the endpoint can only be specified in "opc.tcp://<addr[:port]>/path" format.
 //
-// If the IP field of laddr is nil or an unspecified IP address, ListenTCP listens on all available unicast and anycast IP addresses of the local system.
+// If the IP field of laddr is nil or an unspecified IP address, Listen listens on all available unicast and anycast IP addresses of the local system.
 // If the Port field of laddr is 0, a port number is automatically chosen.
 func Listen(endpoint string, rcvBufSize uint32) (*Listener, error) {
 	network, laddr, err := utils.ResolveEndpoint(endpoint)
@@ -36,7 +36,7 @@ func Listen(endpoint string, rcvBufSize uint32) (*Listener, error) {
 		rcvBufSize: rcvBufSize,
 		sndBufSize: 0xffff,
 	}
-	lis.tcpListener, err = net.ListenTCP(network, laddr)
+	lis.lowerListener, err = net.Listen(network, laddr.String())
 	if err != nil {
 		return nil, err
 	}
@@ -59,12 +59,12 @@ func (l *Listener) Accept(ctx context.Context) (*Conn, error) {
 		rcvBuf:    make([]byte, l.rcvBufSize),
 		lep:       l.endpoint,
 	}
-	conn.tcpConn, err = l.tcpListener.AcceptTCP()
+	conn.lowerConn, err = l.lowerListener.Accept()
 	if err != nil {
 		return nil, err
 	}
 
-	n, err := conn.tcpConn.Read(conn.rcvBuf)
+	n, err := conn.lowerConn.Read(conn.rcvBuf)
 	if err != nil {
 		return nil, err
 	}
@@ -114,12 +114,19 @@ func (l *Listener) Accept(ctx context.Context) (*Conn, error) {
 
 // Close closes the Listener.
 func (l *Listener) Close() error {
-	return l.tcpListener.Close()
+	if err := l.lowerListener.Close(); err != nil {
+		return err
+	}
+
+	l.endpoint = ""
+	l.rcvBufSize = 0
+	l.sndBufSize = 0
+	return nil
 }
 
-// Addr returns the listener's network address, a *TCPAddr.
+// Addr returns the listener's network address.
 func (l *Listener) Addr() net.Addr {
-	return l.tcpListener.Addr()
+	return l.lowerListener.Addr()
 }
 
 // Endpoint returns the listener's EndpointURL.
