@@ -44,7 +44,7 @@ var testServiceBytes = [][]byte{
 		0x00, 0x00, 0x00, 0x00,
 		// SecurityToken
 		0x01, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00,
-		0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x98, 0x67, 0xdd, 0xfd, 0x30, 0xd4, 0x01,
 		0x80, 0x8d, 0x5b, 0x00,
 		// ServerNonce
 		0x01, 0x00, 0x00, 0x00, 0xff,
@@ -443,7 +443,7 @@ func TestDecode(t *testing.T) {
 		case osc.SecurityToken.TokenID != 2:
 			t.Errorf("SecurityToken.TokenID doesn't Match. Want: %d, Got: %d", 2, osc.SecurityToken.TokenID)
 		case osc.SecurityToken.CreatedAt != time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC):
-			t.Errorf("SecurityToken.CreatedAt doesn't Match. Want: %s, Got: %s", time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC), osc.SecurityToken.CreatedAt)
+			t.Errorf("SecurityToken.CreatedAt doesn't Match. Want: %v, Got: %v", time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC), osc.SecurityToken.CreatedAt)
 		case osc.SecurityToken.RevisedLifetime != 6000000:
 			t.Errorf("SecurityToken.RevisedLifetime doesn't Match. Want: %d, Got: %d", 6000000, osc.SecurityToken.RevisedLifetime)
 		case osc.ServerNonce.Get()[0] != 255:
