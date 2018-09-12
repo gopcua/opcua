@@ -4,60 +4,98 @@
 
 package services
 
-import "testing"
+import (
+	"testing"
+	"time"
 
-var testChannelSecurityTokenBytes = [][]byte{
-	{
-		// ChannelID
-		0x01, 0x00, 0x00, 0x00,
-		// TokenID
-		0x02, 0x00, 0x00, 0x00,
-		// CreatedAt
-		0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		// RevisedLifetime
-		0x80, 0x8d, 0x5b, 0x00,
-	},
-	{},
-	{},
-}
+	"github.com/google/go-cmp/cmp"
+)
 
 func TestDecodeChannelSecurityToken(t *testing.T) {
-	t.Run("normal", func(t *testing.T) {
-		t.Parallel()
-		c, err := DecodeChannelSecurityToken(testChannelSecurityTokenBytes[0])
+	var cases = []struct {
+		input []byte
+		want  *ChannelSecurityToken
+	}{
+		{
+			[]byte{
+				// ChannelID
+				0x01, 0x00, 0x00, 0x00,
+				// TokenID
+				0x02, 0x00, 0x00, 0x00,
+				// CreatedAt
+				0x00, 0x98, 0x67, 0xdd, 0xfd, 0x30, 0xd4, 0x01,
+				// RevisedLifetime
+				0x80, 0x8d, 0x5b, 0x00,
+			},
+			NewChannelSecurityToken(
+				1, 2, time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC), 6000000,
+			),
+		},
+	}
+
+	for i, c := range cases {
+		got, err := DecodeChannelSecurityToken(c.input)
 		if err != nil {
-			t.Fatalf("Failed to decode ChannelSecurityToken: %s", err)
+			t.Fatal(err)
 		}
 
-		switch {
-		case c.ChannelID != 1:
-			t.Errorf("ChannelID doesn't match. Want: %d, Got: %d", 1, c.ChannelID)
-		case c.TokenID != 2:
-			t.Errorf("TokenID doesn't match. Want: %d, Got: %d", 2, c.TokenID)
-		case c.CreatedAt != 1:
-			t.Errorf("CreatedAt doesn't match. Want: %d, Got: %d", 1, c.CreatedAt)
-		case c.RevisedLifetime != 6000000:
-			t.Errorf("RevisedLifetime doesn't match. Want: %d, Got: %d", 6000000, c.RevisedLifetime)
+		if diff := cmp.Diff(got, c.want); diff != "" {
+			t.Errorf("case #%d failed\n%s", i, diff)
 		}
-	})
+	}
 }
 
 func TestSerializeChannelSecurityToken(t *testing.T) {
-	t.Run("normal", func(t *testing.T) {
-		t.Parallel()
-		c := NewChannelSecurityToken(1, 2, 1, 6000000)
+	var cases = []struct {
+		input *ChannelSecurityToken
+		want  []byte
+	}{
+		{
+			NewChannelSecurityToken(
+				1, 2, time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC), 6000000,
+			),
+			[]byte{
+				// ChannelID
+				0x01, 0x00, 0x00, 0x00,
+				// TokenID
+				0x02, 0x00, 0x00, 0x00,
+				// CreatedAt
+				0x00, 0x98, 0x67, 0xdd, 0xfd, 0x30, 0xd4, 0x01,
+				// RevisedLifetime
+				0x80, 0x8d, 0x5b, 0x00,
+			},
+		},
+	}
 
-		serialized, err := c.Serialize()
+	for i, c := range cases {
+		got, err := c.input.Serialize()
 		if err != nil {
-			t.Fatalf("Failed to serialize DiagnosticInfo: %s", err)
+			t.Fatal(err)
 		}
 
-		for i, s := range serialized {
-			x := testChannelSecurityTokenBytes[0][i]
-			if s != x {
-				t.Errorf("Bytes doesn't match. Want: %#x, Got: %#x at %dth", x, s, i)
-			}
+		if diff := cmp.Diff(got, c.want); diff != "" {
+			t.Errorf("case #%d failed\n%s", i, diff)
 		}
-		t.Logf("%x", serialized)
-	})
+	}
+}
+
+func TestChannelSecurityTokenLen(t *testing.T) {
+	var cases = []struct {
+		input *ChannelSecurityToken
+		want  int
+	}{
+		{
+			NewChannelSecurityToken(
+				1, 2, time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC), 6000000,
+			),
+			20,
+		},
+	}
+
+	for i, c := range cases {
+		got := c.input.Len()
+		if diff := cmp.Diff(got, c.want); diff != "" {
+			t.Errorf("case #%d failed\n%s", i, diff)
+		}
+	}
 }
