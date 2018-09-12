@@ -14,8 +14,10 @@ import (
 	"flag"
 	"log"
 
-	"github.com/wmnsk/gopcua/uacp"
+	"github.com/wmnsk/gopcua/uasc"
 	"github.com/wmnsk/gopcua/utils"
+
+	"github.com/wmnsk/gopcua/uacp"
 )
 
 func main() {
@@ -35,6 +37,9 @@ func main() {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	uascConfig := uasc.NewConfig(
+		1, "http://opcfoundation.org/UA/SecurityPolicy#None", nil, nil, 1, 12,
+	)
 	for {
 		conn, err := listener.Accept(ctx)
 		if err != nil {
@@ -42,10 +47,17 @@ func main() {
 			continue
 		}
 		defer conn.Close()
-		log.Printf("Successfully established connection with %v", conn.LocalEndpoint())
+		log.Printf("Successfully established connection with %v", conn.RemoteAddr())
+
+		secChan, err := uasc.ListenAndAcceptSecureChannel(ctx, conn, uascConfig)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer secChan.Close()
+		log.Printf("Successfully opened secure channel with %v", conn.RemoteAddr())
 
 		buf := make([]byte, 1024)
-		n, err := conn.Read(buf)
+		n, err := secChan.Read(buf)
 		if err != nil {
 			log.Fatal(err)
 		}
