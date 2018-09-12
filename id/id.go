@@ -2,6 +2,7 @@
 
 package id
 
+// NodeId definitions, generated automatically by cmd/id.
 const (
 	Boolean                                                                                                               = 1
 	SByte                                                                                                                 = 2
