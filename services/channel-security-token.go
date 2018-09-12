@@ -7,6 +7,9 @@ package services
 import (
 	"encoding/binary"
 	"fmt"
+	"time"
+
+	"github.com/wmnsk/gopcua/utils"
 
 	"github.com/wmnsk/gopcua/errors"
 )
@@ -18,12 +21,12 @@ import (
 type ChannelSecurityToken struct {
 	ChannelID       uint32
 	TokenID         uint32
-	CreatedAt       uint64
+	CreatedAt       time.Time
 	RevisedLifetime uint32
 }
 
 // NewChannelSecurityToken creates a new ChannelSecurityToken.
-func NewChannelSecurityToken(channel, token uint32, createdAt uint64, lifetime uint32) *ChannelSecurityToken {
+func NewChannelSecurityToken(channel, token uint32, createdAt time.Time, lifetime uint32) *ChannelSecurityToken {
 	return &ChannelSecurityToken{
 		ChannelID:       channel,
 		TokenID:         token,
@@ -50,7 +53,7 @@ func (c *ChannelSecurityToken) DecodeFromBytes(b []byte) error {
 
 	c.ChannelID = binary.LittleEndian.Uint32(b[0:4])
 	c.TokenID = binary.LittleEndian.Uint32(b[4:8])
-	c.CreatedAt = binary.LittleEndian.Uint64(b[8:16])
+	c.CreatedAt = utils.DecodeTimestamp(b[8:16])
 	c.RevisedLifetime = binary.LittleEndian.Uint32(b[16:20])
 
 	return nil
@@ -70,7 +73,7 @@ func (c *ChannelSecurityToken) Serialize() ([]byte, error) {
 func (c *ChannelSecurityToken) SerializeTo(b []byte) error {
 	binary.LittleEndian.PutUint32(b[:4], c.ChannelID)
 	binary.LittleEndian.PutUint32(b[4:8], c.TokenID)
-	binary.LittleEndian.PutUint64(b[8:16], c.CreatedAt)
+	utils.EncodeTimestamp(b[8:16], c.CreatedAt)
 	binary.LittleEndian.PutUint32(b[16:20], c.RevisedLifetime)
 
 	return nil
@@ -83,7 +86,7 @@ func (c *ChannelSecurityToken) Len() int {
 
 // String returns ChannelSecurityToken in string.
 func (c *ChannelSecurityToken) String() string {
-	return fmt.Sprintf("%d, %d, %d, %d",
+	return fmt.Sprintf("%d, %d, %v, %d",
 		c.ChannelID,
 		c.TokenID,
 		c.CreatedAt,
