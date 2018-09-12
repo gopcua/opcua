@@ -20,6 +20,19 @@ type Config struct {
 	SequenceNumber    uint32
 }
 
+// NewConfig creates a new Config.
+func NewConfig(chanID uint32, policyURI string, cert, thumbprint []byte, reqID, tokenID uint32) *Config {
+	return &Config{
+		SecureChannelID:   chanID,
+		SecurityPolicyURI: policyURI,
+		Certificate:       cert,
+		Thumbprint:        thumbprint,
+		RequestID:         reqID,
+		SecurityTokenID:   tokenID,
+		SequenceNumber:    0,
+	}
+}
+
 // Message represents a OPC UA Secure Conversation message.
 type Message struct {
 	*Header
