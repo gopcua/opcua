@@ -15,8 +15,10 @@ import (
 	"flag"
 	"log"
 
-	"github.com/wmnsk/gopcua/uacp"
+	"github.com/wmnsk/gopcua/uasc"
 	"github.com/wmnsk/gopcua/utils"
+
+	"github.com/wmnsk/gopcua/uacp"
 )
 
 func main() {
@@ -37,13 +39,27 @@ func main() {
 	defer conn.Close()
 	log.Printf("Successfully established connection with %v", conn.RemoteEndpoint())
 
+	uascConfig := uasc.NewConfig(
+		1, "http://opcfoundation.org/UA/SecurityPolicy#None", nil, nil, 0, 1,
+	)
+	secChan, err := uasc.OpenSecureChannel(ctx, conn, uascConfig, 1, 1, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer secChan.Close()
+	log.Printf("Successfully opened secure channel with %v", conn.RemoteEndpoint())
+
 	payload, err := hex.DecodeString(*payloadHex)
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	if _, err := conn.Write(payload); err != nil {
+	if _, err := secChan.Write(payload); err != nil {
 		log.Fatal(err)
 	}
 	log.Printf("Successfully sent message: %x\n%s", payload, utils.Wireshark(0, payload))
+
+	if err := secChan.CloseSecureChannelRequest(); err != nil {
+		log.Fatal(err)
+	}
+	log.Println("Successfully closed secure channel")
 }

@@ -7,12 +7,13 @@ package uasc
 import (
 	"context"
 	"io"
+	"log"
 	"net"
 	"time"
 
 	"github.com/wmnsk/gopcua/errors"
 	"github.com/wmnsk/gopcua/services"
-	"github.com/wmnsk/gopcua/id"
+	"github.com/wmnsk/gopcua/status"
 )
 
 // SecureChannel is an implementation of the net.Conn interface for Secure Channel in OPC UA Secure Conversation.
@@ -22,6 +23,7 @@ type SecureChannel struct {
 	lowerConn      net.Conn
 	cfg            *Config
 	lep, rep       string
+	reqHandle      uint32
 	rcvBuf, sndBuf []byte
 	state          secChanState
 	stateChan      chan secChanState
@@ -144,8 +146,10 @@ const (
 	cliStateSecureChannelClosed
 	cliStateOpenSecureChannelSent
 	cliStateSecureChannelOpened
+	cliStateCloseSecureChannelSent
 	srvStateSecureChannelClosed
 	srvStateSecureChannelOpened
+	srvStateCloseSecureChannelSent
 )
 
 func (s *SecureChannel) updateState(c secChanState) {
@@ -163,10 +167,14 @@ func (s secChanState) String() string {
 		return "client open secure channel sent"
 	case cliStateSecureChannelOpened:
 		return "client secure channel opened"
+	case cliStateCloseSecureChannelSent:
+		return "client close secure channel sent"
 	case srvStateSecureChannelClosed:
 		return "server secure channel closed"
 	case srvStateSecureChannelOpened:
 		return "server secure channel opened"
+	case srvStateCloseSecureChannelSent:
+		return "server close secure channel sent"
 	default:
 		return "unknown"
 	}
@@ -212,96 +220,133 @@ func (s *SecureChannel) monitorMessages(ctx context.Context) {
 				if s.state == cliStateSecureChannelOpened || s.state == srvStateSecureChannelOpened {
 					s.notifyLength(n)
 				}
+				s.rcvBuf = s.rcvBuf[:]
 				continue
 			}
 			switch m := msg.Service.(type) {
 			case *services.OpenSecureChannelRequest:
-				s.handleSrvOpenSecureChannelRequest(m)
+				s.handleOpenSecureChannelRequest(m)
 			case *services.OpenSecureChannelResponse:
-				s.handleSrvOpenSecureChannelResponse(m)
+				s.handleOpenSecureChannelResponse(m)
 			case *services.CloseSecureChannelRequest:
-				s.handleSrvCloseSecureChannelRequest(m)
+				s.handleCloseSecureChannelRequest(m)
 			case *services.CloseSecureChannelResponse:
-				s.handleSrvCloseSecureChannelResponse(m)
+				s.handleCloseSecureChannelResponse(m)
 			default:
 				// pass to the user if type of msg is unknown.
 				if s.state == cliStateSecureChannelOpened || s.state == srvStateSecureChannelOpened {
 					s.notifyLength(n)
 				}
+				s.rcvBuf = s.rcvBuf[:]
 			}
 		}
 	}
 }
 
-func (s *SecureChannel) handleSrvOpenSecureChannelRequest(o *services.OpenSecureChannelRequest) {
+func (s *SecureChannel) handleOpenSecureChannelRequest(o *services.OpenSecureChannelRequest) {
 	switch s.state {
-	// if state is closed, server accepts services.OpenSecureChannelRequest.
+	// if state is closed, server accepts OpenSecureChannelRequest.
 	case srvStateSecureChannelClosed:
 		switch o.MessageSecurityMode {
-		case services.SecModeInvalid:
-			if err := s.OpenSecureChannelResponse(id.OpenSecureChannelRequest_Encoding_DefaultBinary)
-			// s.errChan <- ErrXxx
+		// accepts only if MessageSecurityMode is None.
 		case services.SecModeNone:
-			if err := s.OpenSecureChannelResponse(0, 0, 0xffff, 1, nil); err != nil {
+			s.reqHandle = o.RequestHandle
+			if err := s.OpenSecureChannelResponse(0, 0, 0xffff, nil); err != nil {
 				s.errChan <- err
 			}
-			s.updateState(cliStateOpenSecureChannelSent)
+			s.updateState(srvStateSecureChannelOpened)
+		// respond with BadSecurityModeRejected and notify server
 		default:
-			s.errChan <- errors.NewErrUnsupported(s, "currently supports security mode=None only")
+			if err := s.OpenSecureChannelResponse(status.BadSecurityModeRejected, 0, 0xffff, nil); err != nil {
+				s.errChan <- err
+			}
+			s.errChan <- errors.New("got OpenSecureChannelRequest with unsupported SecurityMode")
 		}
-	// client never accept services.OpenSecureChannelRequest, just ignore Requests.
-	case cliStateSecureChannelClosed, cliStateOpenSecureChannelSent, cliStateSecureChannelOpened:
+	// if SecureChannel is already opened, respond with BadAlreadyExists.
+	case srvStateSecureChannelOpened, srvStateCloseSecureChannelSent:
+		if err := s.OpenSecureChannelResponse(status.BadAlreadyExists, 0, 0xffff, nil); err != nil {
+			s.errChan <- err
+		}
+	// client never accept OpenSecureChannelRequest, just ignore it.
+	case cliStateSecureChannelClosed, cliStateOpenSecureChannelSent, cliStateSecureChannelOpened, cliStateCloseSecureChannelSent:
 	// invalid secChanState. conn should be closed in error handler.
 	default:
 		s.errChan <- ErrInvalidState
 	}
 }
 
-func (s *SecureChannel) handleSrvOpenSecureChannelResponse(o *services.OpenSecureChannelResponse) {
+func (s *SecureChannel) handleOpenSecureChannelResponse(o *services.OpenSecureChannelResponse) {
 	switch s.state {
-	// client accepts Acknowledge only after sending services.OpenSecureChannelRequest.
+	// client accepts OpenSecureChannelResponse only after sending OpenSecureChannelRequest.
 	case cliStateOpenSecureChannelSent:
-	// if client conn is closed or established, just ignore Acknowledge.
-	case cliStateSecureChannelClosed, cliStateSecureChannelOpened:
-	// server never accept Acknowledge.
-	case srvStateSecureChannelClosed, srvStateSecureChannelOpened:
-	// invalid secChanState. conn should be closed in error handler.
+		log.Println("WOW", o)
+		switch o.ServiceResult {
+		case 0: // Good
+			s.cfg.SecureChannelID = o.SecurityToken.ChannelID
+			s.cfg.SecurityTokenID = o.SecurityToken.TokenID
+			s.updateState(cliStateSecureChannelOpened)
+		case status.BadSecurityModeRejected:
+			s.errChan <- errors.New("SecurityMode rejected by server")
+			s.updateState(cliStateSecureChannelClosed)
+		}
+	// if client SecureChannel is closed or opened, just ignore OpenSecureChannelResponse.
+	case cliStateSecureChannelClosed, cliStateSecureChannelOpened, cliStateCloseSecureChannelSent:
+	// server never accept OpenSecureChannelResponse , just ignore it.
+	case srvStateSecureChannelClosed, srvStateSecureChannelOpened, srvStateCloseSecureChannelSent:
+	// invalid secChanState. SecureChannel should be closed in error handler.
 	default:
+		s.errChan <- ErrInvalidState
 	}
 }
 
-func (s *SecureChannel) handleSrvCloseSecureChannelResponse(c *services.CloseSecureChannelResponse) {
+func (s *SecureChannel) handleCloseSecureChannelRequest(c *services.CloseSecureChannelRequest) {
 	switch s.state {
-	// if client receives Error after sending services.OpenSecureChannelRequest, notify error handler and switch secChanState to closed.
-	case cliStateOpenSecureChannelSent:
-	// if client/server conn is established, just notify error to error handler.
-	case cliStateSecureChannelOpened, srvStateSecureChannelOpened:
-	// if client/server conn is closed, just ignore Error.
-	case cliStateSecureChannelClosed, srvStateSecureChannelClosed:
+	// if client SecureChannel is opened, accept CloseSecureChannelRequest.
+	case cliStateSecureChannelOpened:
+		s.reqHandle = c.RequestHandle
+		if err := s.CloseSecureChannelResponse(0); err != nil {
+			s.errChan <- err
+		}
+		s.updateState(cliStateSecureChannelClosed)
+	// if server SecureChannel is opened, accept CloseSecureChannelRequest.
+	case srvStateSecureChannelOpened:
+		s.reqHandle = c.RequestHandle
+		if err := s.CloseSecureChannelResponse(0); err != nil {
+			s.errChan <- err
+		}
+		s.updateState(srvStateSecureChannelClosed)
+	// if client/server SecureChannel is not opened, ignore CloseSecureChannelRequest.
+	case cliStateSecureChannelClosed, cliStateOpenSecureChannelSent, cliStateCloseSecureChannelSent, srvStateSecureChannelClosed, srvStateCloseSecureChannelSent:
 	// invalid secChanState. conn should be closed in error handler.
 	default:
+		s.errChan <- ErrInvalidState
 	}
 }
 
-func (s *SecureChannel) handleSrvCloseSecureChannelRequest(c *services.CloseSecureChannelRequest) {
+func (s *SecureChannel) handleCloseSecureChannelResponse(c *services.CloseSecureChannelResponse) {
 	switch s.state {
-	// if client conn is closed, accept services.CloseSecureChannelRequest.
-	// XXX - not likely to hit this condition.
-	case cliStateSecureChannelClosed:
-	// if client conn is opening/opened, client just ignore services.CloseSecureChannelRequest.
-	case cliStateOpenSecureChannelSent, cliStateSecureChannelOpened:
-	// server never accept services.CloseSecureChannelRequest.
-	case srvStateSecureChannelClosed, srvStateSecureChannelOpened:
+	// client accepts CloseSecureChannelResponse only after sending CloseSecureChannelResponse.
+	case cliStateCloseSecureChannelSent:
+		s.Close()
+		s.updateState(cliStateSecureChannelClosed)
+	// server accepts CloseSecureChannelResponse only after sending CloseSecureChannelResponse.
+	case srvStateCloseSecureChannelSent:
+		s.Close()
+		s.updateState(srvStateSecureChannelClosed)
+	// if client/server conn is opened, just ignore CloseSecureChannelResponse.
+	case cliStateSecureChannelClosed, cliStateOpenSecureChannelSent, cliStateSecureChannelOpened, srvStateSecureChannelClosed, srvStateSecureChannelOpened:
 	// invalid secChanState. conn should be closed in error handler.
 	default:
+		s.errChan <- ErrInvalidState
 	}
 }
 
 // OpenSecureChannelRequest sends OpenSecureChannelRequest on top of UASC to Conn.
 func (s *SecureChannel) OpenSecureChannelRequest(secMode, lifetime uint32, nonce []byte) error {
+	s.reqHandle++
 	osc, err := New(
 		services.NewOpenSecureChannelRequest(
-			time.Now(), 0, 1, 0x03, 0xffff,
+			time.Now(), 0, s.reqHandle, 0x03, 0xffff,
 			"", 0, 0, secMode, lifetime, nonce,
 		), s.cfg,
 	).Serialize()
@@ -316,12 +361,12 @@ func (s *SecureChannel) OpenSecureChannelRequest(secMode, lifetime uint32, nonce
 }
 
 // OpenSecureChannelResponse sends OpenSecureChannelResponse on top of UASC to Conn.
-func (s *SecureChannel) OpenSecureChannelResponse(code, token, lifetime uint32, createdAt uint64, nonce []byte) error {
+func (s *SecureChannel) OpenSecureChannelResponse(code, token, lifetime uint32, nonce []byte) error {
 	osc, err := New(
 		services.NewOpenSecureChannelResponse(
-			time.Now(), 1, code, services.NewNullDiagnosticInfo(),
+			time.Now(), s.reqHandle, code, services.NewNullDiagnosticInfo(),
 			[]string{""}, 0, services.NewChannelSecurityToken(
-				s.cfg.SecureChannelID, token, createdAt, lifetime,
+				s.cfg.SecureChannelID, token, time.Now(), lifetime,
 			), nonce,
 		), s.cfg,
 	).Serialize()
@@ -337,9 +382,10 @@ func (s *SecureChannel) OpenSecureChannelResponse(code, token, lifetime uint32, 
 
 // CloseSecureChannelRequest sends CloseSecureChannelRequest on top of UASC to Conn.
 func (s *SecureChannel) CloseSecureChannelRequest() error {
+	s.reqHandle++
 	csc, err := New(
 		services.NewCloseSecureChannelRequest(
-			time.Now(), 0, 1, 0x03, 0xffff,
+			time.Now(), 0, s.reqHandle, 0x03, 0xffff,
 			"", s.cfg.SecureChannelID,
 		), s.cfg,
 	).Serialize()
@@ -357,7 +403,7 @@ func (s *SecureChannel) CloseSecureChannelRequest() error {
 func (s *SecureChannel) CloseSecureChannelResponse(code uint32) error {
 	csc, err := New(
 		services.NewCloseSecureChannelResponse(
-			time.Now(), 1, code, services.NewNullDiagnosticInfo(), []string{""},
+			time.Now(), s.reqHandle, code, services.NewNullDiagnosticInfo(), []string{""},
 		), s.cfg,
 	).Serialize()
 	if err != nil {
@@ -370,7 +416,8 @@ func (s *SecureChannel) CloseSecureChannelResponse(code uint32) error {
 	return nil
 }
 
-// UASC-specific error definitions.
+// UASC SecureChannel-specific error definitions.
+// XXX - to be integrated in errors package.
 var (
 	ErrInvalidState           = errors.New("invalid secChanState")
 	ErrInvalidEndpoint        = errors.New("invalid EndpointURL")

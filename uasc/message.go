@@ -91,10 +91,8 @@ func newMSG(srv services.Service, cfg *Config) *Message {
 
 func newCLO(srv services.Service, cfg *Config) *Message {
 	m := &Message{
-		Header: NewHeader(MessageTypeCloseSecureChannel, ChunkTypeFinal, cfg.SecureChannelID, nil),
-		AsymmetricSecurityHeader: NewAsymmetricSecurityHeader(
-			cfg.SecurityPolicyURI, cfg.Certificate, cfg.Thumbprint, nil,
-		),
+		Header:                  NewHeader(MessageTypeCloseSecureChannel, ChunkTypeFinal, cfg.SecureChannelID, nil),
+		SymmetricSecurityHeader: NewSymmetricSecurityHeader(cfg.SecurityTokenID, nil),
 		SequenceHeader: NewSequenceHeader(
 			cfg.SequenceNumber, cfg.RequestID, nil,
 		),
@@ -126,16 +124,18 @@ func (m *Message) DecodeFromBytes(b []byte) error {
 	}
 
 	switch m.Header.MessageTypeValue() {
-	case MessageTypeOpenSecureChannel, MessageTypeCloseSecureChannel:
-		return m.decodeSecChanFromBytes(m.Header.Payload)
+	case MessageTypeOpenSecureChannel:
+		return m.decodeOPNFromBytes(m.Header.Payload)
 	case MessageTypeMessage:
 		return m.decodeMSGFromBytes(m.Header.Payload)
+	case MessageTypeCloseSecureChannel:
+		return m.decodeCLOFromBytes(m.Header.Payload)
 	default:
 		return errors.NewErrInvalidType(m, "decode", "should be one of OPN, MSG, CLO")
 	}
 }
 
-func (m *Message) decodeSecChanFromBytes(b []byte) error {
+func (m *Message) decodeOPNFromBytes(b []byte) error {
 	m.AsymmetricSecurityHeader = &AsymmetricSecurityHeader{}
 	if err := m.AsymmetricSecurityHeader.DecodeFromBytes(b); err != nil {
 		return err
@@ -155,6 +155,25 @@ func (m *Message) decodeSecChanFromBytes(b []byte) error {
 }
 
 func (m *Message) decodeMSGFromBytes(b []byte) error {
+	m.SymmetricSecurityHeader = &SymmetricSecurityHeader{}
+	if err := m.SymmetricSecurityHeader.DecodeFromBytes(b); err != nil {
+		return err
+	}
+	m.SequenceHeader = &SequenceHeader{}
+	if err := m.SequenceHeader.DecodeFromBytes(m.SymmetricSecurityHeader.Payload); err != nil {
+		return err
+	}
+
+	var err error
+	m.Service, err = services.Decode(m.SequenceHeader.Payload)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (m *Message) decodeCLOFromBytes(b []byte) error {
 	m.SymmetricSecurityHeader = &SymmetricSecurityHeader{}
 	if err := m.SymmetricSecurityHeader.DecodeFromBytes(b); err != nil {
 		return err
@@ -194,16 +213,18 @@ func (m *Message) SerializeTo(b []byte) error {
 		offset += m.Header.Len() - len(m.Header.Payload)
 	}
 	switch m.Header.MessageTypeValue() {
-	case MessageTypeOpenSecureChannel, MessageTypeCloseSecureChannel:
-		return m.serializeSecChanTo(b[offset:])
+	case MessageTypeOpenSecureChannel:
+		return m.serializeOPNTo(b[offset:])
 	case MessageTypeMessage:
 		return m.serializeMSGTo(b[offset:])
+	case MessageTypeCloseSecureChannel:
+		return m.serializeCLOTo(b[offset:])
 	default:
 		return errors.NewErrInvalidType(m, "serialize", "should be one of OPN, MSG, CLO")
 	}
 }
 
-func (m *Message) serializeSecChanTo(b []byte) error {
+func (m *Message) serializeOPNTo(b []byte) error {
 	var offset = 0
 	if m.AsymmetricSecurityHeader != nil {
 		if err := m.AsymmetricSecurityHeader.SerializeTo(b[offset:]); err != nil {
@@ -227,6 +248,29 @@ func (m *Message) serializeSecChanTo(b []byte) error {
 }
 
 func (m *Message) serializeMSGTo(b []byte) error {
+	var offset = 0
+	if m.SymmetricSecurityHeader != nil {
+		if err := m.SymmetricSecurityHeader.SerializeTo(b[offset:]); err != nil {
+			return err
+		}
+		offset += m.SymmetricSecurityHeader.Len() - len(m.SymmetricSecurityHeader.Payload)
+	}
+	if m.SequenceHeader != nil {
+		if err := m.SequenceHeader.SerializeTo(b[offset:]); err != nil {
+			return err
+		}
+		offset += m.SequenceHeader.Len() - len(m.SequenceHeader.Payload)
+	}
+	if m.Service != nil {
+		if err := m.Service.SerializeTo(b[offset:]); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (m *Message) serializeCLOTo(b []byte) error {
 	var offset = 0
 	if m.SymmetricSecurityHeader != nil {
 		if err := m.SymmetricSecurityHeader.SerializeTo(b[offset:]); err != nil {
