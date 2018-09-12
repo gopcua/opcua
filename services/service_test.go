@@ -442,8 +442,8 @@ func TestDecode(t *testing.T) {
 			t.Errorf("SecurityToken.ChannelID doesn't Match. Want: %d, Got: %d", 1, osc.SecurityToken.ChannelID)
 		case osc.SecurityToken.TokenID != 2:
 			t.Errorf("SecurityToken.TokenID doesn't Match. Want: %d, Got: %d", 2, osc.SecurityToken.TokenID)
-		case osc.SecurityToken.CreatedAt != 1:
-			t.Errorf("SecurityToken.CreatedAt doesn't Match. Want: %d, Got: %d", 1, osc.SecurityToken.CreatedAt)
+		case osc.SecurityToken.CreatedAt != time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC):
+			t.Errorf("SecurityToken.CreatedAt doesn't Match. Want: %s, Got: %s", time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC), osc.SecurityToken.CreatedAt)
 		case osc.SecurityToken.RevisedLifetime != 6000000:
 			t.Errorf("SecurityToken.RevisedLifetime doesn't Match. Want: %d, Got: %d", 6000000, osc.SecurityToken.RevisedLifetime)
 		case osc.ServerNonce.Get()[0] != 255:
@@ -698,7 +698,7 @@ func TestSerializeServices(t *testing.T) {
 			[]string{"foo", "bar"},
 			0,
 			NewChannelSecurityToken(
-				1, 2, 1, 6000000,
+				1, 2, time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC), 6000000,
 			),
 			[]byte{0xff},
 		)
