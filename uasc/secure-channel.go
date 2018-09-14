@@ -108,7 +108,7 @@ func (s *SecureChannel) WriteService(b []byte) (n int, err error) {
 		msg.MessageSize += uint32(len(b))
 		serialized, err := msg.Serialize()
 		if err != nil {
-			return 0, errors.New("couldn't serialize uasc")
+			return 0, ErrSerializationFailed
 		}
 		serialized = append(serialized, b...)
 
@@ -332,7 +332,7 @@ func (s *SecureChannel) handleOpenSecureChannelRequest(o *services.OpenSecureCha
 			if err := s.OpenSecureChannelResponse(status.BadSecurityModeRejected, 0, 0xffff, nil); err != nil {
 				s.errChan <- err
 			}
-			s.errChan <- errors.New("got OpenSecureChannelRequest with unsupported SecurityMode")
+			s.errChan <- ErrSecurityModeUnsupported
 		}
 	// if SecureChannel is already opened, respond with BadAlreadyExists.
 	case srvStateSecureChannelOpened, srvStateCloseSecureChannelSent:
@@ -357,7 +357,7 @@ func (s *SecureChannel) handleOpenSecureChannelResponse(o *services.OpenSecureCh
 			s.cfg.SecurityTokenID = o.SecurityToken.TokenID
 			s.updateState(cliStateSecureChannelOpened)
 		case status.BadSecurityModeRejected:
-			s.errChan <- errors.New("SecurityMode rejected by server")
+			s.errChan <- ErrRejected
 			s.updateState(cliStateSecureChannelClosed)
 		}
 	// if client SecureChannel is closed or opened, just ignore OpenSecureChannelResponse.
@@ -489,12 +489,13 @@ func (s *SecureChannel) CloseSecureChannelResponse(code uint32) error {
 	return nil
 }
 
-// UASC SecureChannel-specific error definitions.
+// UASC-specific error definitions.
 // XXX - to be integrated in errors package.
 var (
-	ErrInvalidState           = errors.New("invalid secChanState")
-	ErrInvalidEndpoint        = errors.New("invalid EndpointURL")
-	ErrTimeout                = errors.New("timed out")
-	ErrReceivedError          = errors.New("received Error message")
-	ErrSecureChannelNotOpened = errors.New("connection not established")
+	ErrInvalidState            = errors.New("invalid state")
+	ErrUnexpectedMessage       = errors.New("got unexpected message")
+	ErrTimeout                 = errors.New("timed out")
+	ErrSecureChannelNotOpened  = errors.New("connection not established")
+	ErrSecurityModeUnsupported = errors.New("got request with unsupported SecurityMode")
+	ErrRejected                = errors.New("rejected by server")
 )

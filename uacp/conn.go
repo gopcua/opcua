@@ -381,23 +381,12 @@ func (c *Conn) handleMsgReverseHello(r *ReverseHello) {
 }
 
 // UACP-specific error definitions.
+// XXX - to be integrated in errors package.
 var (
 	ErrInvalidState      = errors.New("invalid state")
 	ErrInvalidEndpoint   = errors.New("invalid EndpointURL")
+	ErrUnexpectedMessage = errors.New("got unexpected message")
 	ErrTimeout           = errors.New("timed out")
 	ErrReceivedError     = errors.New("received Error message")
 	ErrConnNotEstablised = errors.New("connection not established")
 )
-
-/*
-func (c *Conn) handleErrors(e error) {
-	switch e {
-	case ErrInvalidState:
-		c.Close()
-	case ErrInvalidEndpoint:
-		c.Close()
-	default:
-		return
-	}
-}
-*/

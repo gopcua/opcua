@@ -8,7 +8,6 @@ import (
 	"context"
 	"net"
 
-	"github.com/wmnsk/gopcua/errors"
 	"github.com/wmnsk/gopcua/services"
 )
 
@@ -32,14 +31,14 @@ func ListenAndAcceptSecureChannel(ctx context.Context, transport net.Conn, cfg *
 
 	message, err = Decode(s.rcvBuf[:n])
 	if err != nil {
-		return nil, errors.New("error decoding UASC message")
+		return nil, err
 	}
 
 	switch msg := message.Service.(type) {
 	case *services.OpenSecureChannelRequest:
 		go s.handleOpenSecureChannelRequest(msg)
 	default:
-		return nil, errors.New("got unexpected message")
+		return nil, ErrUnexpectedMessage
 	}
 
 	go s.monitorMessages(ctx)
