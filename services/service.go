@@ -73,6 +73,10 @@ func Decode(b []byte) (Service, error) {
 		s = &CloseSessionResponse{}
 	case ServiceTypeActivateSessionRequest:
 		s = &ActivateSessionRequest{}
+	case ServiceTypeActivateSessionResponse:
+		s = &ActivateSessionResponse{}
+	case ServiceTypeReadRequest:
+		s = &ReadRequest{}
 	default:
 		return nil, errors.NewErrUnsupported(n.Identifier, "unsupported or not implemented yet.")
 	}
