@@ -7,6 +7,8 @@ package datatypes
 import (
 	"encoding/binary"
 	"math"
+
+	"github.com/wmnsk/gopcua/id"
 )
 
 // Float values shall be encoded with the appropriate IEEE-754 binary representation
@@ -61,4 +63,9 @@ func (f *Float) SerializeTo(b []byte) error {
 // Len returns the actual length of Float in int.
 func (f *Float) Len() int {
 	return 4
+}
+
+// DataType returns type of Data.
+func (f *Float) DataType() uint16 {
+	return id.Float
 }

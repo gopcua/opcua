@@ -6,6 +6,8 @@ package datatypes
 
 import (
 	"fmt"
+
+	"github.com/wmnsk/gopcua/id"
 )
 
 // LocalizedText represents a LocalizedText.
@@ -136,4 +138,9 @@ func (l *LocalizedText) Len() int {
 // String retunrs LocalizedText in string.
 func (l *LocalizedText) String() string {
 	return fmt.Sprintf("%x, %s, %s", l.EncodingMask, l.Locale, l.Text)
+}
+
+// DataType returns type of Data.
+func (l *LocalizedText) DataType() uint16 {
+	return id.LocalizedText
 }

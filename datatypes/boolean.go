@@ -4,6 +4,8 @@
 
 package datatypes
 
+import "github.com/wmnsk/gopcua/id"
+
 // Boolean represents the datatype Boolean.
 //
 // Specification: Part 3, 8.8
@@ -66,4 +68,9 @@ func (bo *Boolean) String() string {
 		return "FALSE"
 	}
 	return "TRUE"
+}
+
+// DataType returns type of Data.
+func (bo *Boolean) DataType() uint16 {
+	return id.Boolean
 }
