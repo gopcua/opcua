@@ -108,7 +108,7 @@ func (s *SecureChannel) WriteService(b []byte) (n int, err error) {
 		msg.MessageSize += uint32(len(b))
 		serialized, err := msg.Serialize()
 		if err != nil {
-			return 0, ErrSerializationFailed
+			return 0, err
 		}
 		serialized = append(serialized, b...)
 
