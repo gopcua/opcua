@@ -43,8 +43,6 @@ func (c *Conn) Read(b []byte) (n int, err error) {
 			return n, nil
 		case e := <-c.errChan:
 			return 0, e
-		default:
-			continue
 		}
 	}
 }
@@ -69,6 +67,12 @@ func (c *Conn) Write(b []byte) (n int, err error) {
 func (c *Conn) Close() error {
 	if err := c.lowerConn.Close(); err != nil {
 		return err
+	}
+	switch c.state {
+	case cliStateHelloSent, cliStateEstablished:
+		c.updateState(cliStateClosed)
+	case srvStateEstablished:
+		c.updateState(srvStateClosed)
 	}
 
 	close(c.errChan)
@@ -381,23 +385,12 @@ func (c *Conn) handleMsgReverseHello(r *ReverseHello) {
 }
 
 // UACP-specific error definitions.
+// XXX - to be integrated in errors package.
 var (
 	ErrInvalidState      = errors.New("invalid state")
 	ErrInvalidEndpoint   = errors.New("invalid EndpointURL")
+	ErrUnexpectedMessage = errors.New("got unexpected message")
 	ErrTimeout           = errors.New("timed out")
 	ErrReceivedError     = errors.New("received Error message")
 	ErrConnNotEstablised = errors.New("connection not established")
 )
-
-/*
-func (c *Conn) handleErrors(e error) {
-	switch e {
-	case ErrInvalidState:
-		c.Close()
-	case ErrInvalidEndpoint:
-		c.Close()
-	default:
-		return
-	}
-}
-*/

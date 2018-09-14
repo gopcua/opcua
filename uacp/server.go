@@ -82,7 +82,7 @@ func (l *Listener) Accept(ctx context.Context) (*Conn, error) {
 			if err := conn.Error(BadTCPEndpointURLInvalid, fmt.Sprintf("Endpoint: %s does not exist", msg.EndPointURL.Get())); err != nil {
 				return nil, err
 			}
-			return nil, fmt.Errorf("cannot accept due to invalid EndpointURL: %s", msg.EndPointURL.Get())
+			return nil, ErrInvalidEndpoint
 		}
 
 		conn.sndBuf = make([]byte, msg.ReceiveBufSize)
@@ -93,6 +93,7 @@ func (l *Listener) Accept(ctx context.Context) (*Conn, error) {
 		if err := conn.Error(BadTCPMessageTypeInvalid, "Expected Hello"); err != nil {
 			return nil, err
 		}
+		return nil, ErrUnexpectedMessage
 	}
 
 	conn.state = srvStateEstablished
