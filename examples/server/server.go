@@ -13,11 +13,13 @@ import (
 	"context"
 	"flag"
 	"log"
+	"math/rand"
 
-	"github.com/wmnsk/gopcua/uasc"
-	"github.com/wmnsk/gopcua/utils"
+	"github.com/wmnsk/gopcua/services"
 
 	"github.com/wmnsk/gopcua/uacp"
+	"github.com/wmnsk/gopcua/uasc"
+	"github.com/wmnsk/gopcua/utils"
 )
 
 func main() {
@@ -33,34 +35,65 @@ func main() {
 	}
 	log.Printf("Started listening on %s.", listener.Endpoint())
 
-	ctx := context.Background()
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	uascConfig := uasc.NewConfig(
-		1, "http://opcfoundation.org/UA/SecurityPolicy#None", nil, nil, 1, 12,
+	cfg := uasc.NewConfig(
+		1, "http://opcfoundation.org/UA/SecurityPolicy#None", nil, nil, 1, rand.Uint32(),
 	)
+
 	for {
-		conn, err := listener.Accept(ctx)
-		if err != nil {
-			log.Print(err)
-			continue
-		}
-		defer conn.Close()
-		log.Printf("Successfully established connection with %v", conn.RemoteAddr())
+		func() {
+			ctx := context.Background()
+			ctx, cancel := context.WithCancel(ctx)
+			defer cancel()
 
-		secChan, err := uasc.ListenAndAcceptSecureChannel(ctx, conn, uascConfig)
-		if err != nil {
-			log.Fatal(err)
-		}
-		defer secChan.Close()
-		log.Printf("Successfully opened secure channel with %v", conn.RemoteAddr())
+			conn, err := listener.Accept(ctx)
+			if err != nil {
+				log.Print(err)
+				return
+			}
+			defer func() {
+				conn.Close()
+				log.Printf("Successfully closed connection with %v", conn.RemoteAddr())
+			}()
+			log.Printf("Successfully established connection with %v", conn.RemoteAddr())
 
-		buf := make([]byte, 1024)
-		n, err := secChan.Read(buf)
-		if err != nil {
-			log.Fatal(err)
-		}
-		log.Printf("Successfully received message: %x\n%s", buf[:n], utils.Wireshark(0, buf[:n]))
+			secChan, err := uasc.ListenAndAcceptSecureChannel(ctx, conn, cfg)
+			if err != nil {
+				log.Fatal(err)
+			}
+			defer func() {
+				secChan.Close()
+				log.Printf("Successfully closed secure channel with %v", conn.RemoteAddr())
+			}()
+			log.Printf("Successfully opened secure channel with %v", conn.RemoteAddr())
+
+			buf := make([]byte, 1024)
+			/*
+				n, err := secChan.Read(buf)
+				if err != nil {
+					log.Fatal(err)
+				}
+				log.Printf("Successfully received message: %x\n%s", buf[:n], utils.Wireshark(0, buf[:n]))
+
+				sc, err := uasc.Decode(buf[:n])
+				if err != nil {
+					log.Println("Couldn't decode received bytes as UASC")
+					return
+				}
+				log.Printf("Successfully decoded as UASC: %v", sc)
+			*/
+
+			n, err := secChan.ReadService(buf)
+			if err != nil {
+				log.Fatal(err)
+			}
+			log.Printf("Successfully received message: %x\n%s", buf[:n], utils.Wireshark(0, buf[:n]))
+
+			srv, err := services.Decode(buf[:n])
+			if err != nil {
+				log.Println("Couldn't decode received bytes as Service")
+				return
+			}
+			log.Printf("Successfully decoded as Service: %v", srv)
+		}()
 	}
 }

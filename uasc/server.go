@@ -24,12 +24,13 @@ func ListenAndAcceptSecureChannel(ctx context.Context, transport net.Conn, cfg *
 		rcvBuf:    make([]byte, 0xffff),
 	}
 
+	var message *Message
 	n, err := s.lowerConn.Read(s.rcvBuf)
 	if err != nil {
 		return nil, err
 	}
 
-	message, err := Decode(s.rcvBuf[:n])
+	message, err = Decode(s.rcvBuf[:n])
 	if err != nil {
 		return nil, errors.New("error decoding UASC message")
 	}
@@ -38,7 +39,7 @@ func ListenAndAcceptSecureChannel(ctx context.Context, transport net.Conn, cfg *
 	case *services.OpenSecureChannelRequest:
 		go s.handleOpenSecureChannelRequest(msg)
 	default:
-		return nil, errors.New("error decoding UASC message")
+		return nil, errors.New("got unexpected message")
 	}
 
 	go s.monitorMessages(ctx)

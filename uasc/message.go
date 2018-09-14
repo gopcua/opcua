@@ -51,6 +51,9 @@ type Message struct {
 //
 // Service type: Others => Message type: MSG.
 func New(srv services.Service, cfg *Config) *Message {
+	if srv == nil {
+		return newMSG(srv, cfg)
+	}
 	switch srv.ServiceType() {
 	case services.ServiceTypeOpenSecureChannelRequest, services.ServiceTypeOpenSecureChannelResponse:
 		return newOPN(srv, cfg)
@@ -72,6 +75,7 @@ func newOPN(srv services.Service, cfg *Config) *Message {
 		),
 		Service: srv,
 	}
+	m.Header.MessageSize = uint32(m.Len())
 
 	return m
 }
@@ -85,6 +89,7 @@ func newMSG(srv services.Service, cfg *Config) *Message {
 		),
 		Service: srv,
 	}
+	m.Header.MessageSize = uint32(m.Len())
 
 	return m
 }
@@ -98,6 +103,7 @@ func newCLO(srv services.Service, cfg *Config) *Message {
 		),
 		Service: srv,
 	}
+	m.Header.MessageSize = uint32(m.Len())
 
 	return m
 }
@@ -206,7 +212,6 @@ func (m *Message) Serialize() ([]byte, error) {
 func (m *Message) SerializeTo(b []byte) error {
 	var offset = 0
 	if m.Header != nil {
-		m.Header.MessageSize = uint32(m.Len())
 		if err := m.Header.SerializeTo(b[offset:]); err != nil {
 			return err
 		}
