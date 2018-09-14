@@ -43,8 +43,6 @@ func (c *Conn) Read(b []byte) (n int, err error) {
 			return n, nil
 		case e := <-c.errChan:
 			return 0, e
-		default:
-			continue
 		}
 	}
 }
@@ -69,6 +67,12 @@ func (c *Conn) Write(b []byte) (n int, err error) {
 func (c *Conn) Close() error {
 	if err := c.lowerConn.Close(); err != nil {
 		return err
+	}
+	switch c.state {
+	case cliStateHelloSent, cliStateEstablished:
+		c.updateState(cliStateClosed)
+	case srvStateEstablished:
+		c.updateState(srvStateClosed)
 	}
 
 	close(c.errChan)

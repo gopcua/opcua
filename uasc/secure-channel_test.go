@@ -7,6 +7,7 @@ package uasc
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 
@@ -71,6 +72,7 @@ func TestClientWrite(t *testing.T) {
 		cliChan, srvChan *SecureChannel
 	)
 
+	done := make(chan int)
 	cfg := NewConfig(
 		1, policyURI, nil, nil, 0, 1,
 	)
@@ -85,6 +87,7 @@ func TestClientWrite(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		done <- 0
 	}()
 
 	cliConn, err = uacp.Dial(ctx, ep)
@@ -96,6 +99,19 @@ func TestClientWrite(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	for {
+		select {
+		case _, ok := <-done:
+			if !ok {
+				t.Fatal("failed to setup secure channel")
+			}
+			goto NEXT
+		case <-time.After(10 * time.Second):
+			t.Fatalf("timed out")
+		}
+	}
+NEXT:
 
 	msg := []byte{0xde, 0xad, 0xbe, 0xef}
 	if _, err := cliChan.Write(msg); err != nil {
@@ -131,6 +147,7 @@ func TestServerWrite(t *testing.T) {
 		cliChan, srvChan *SecureChannel
 	)
 
+	done := make(chan int)
 	cfg := NewConfig(
 		1, policyURI, nil, nil, 0, 1,
 	)
@@ -145,6 +162,7 @@ func TestServerWrite(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		done <- 0
 	}()
 
 	cliConn, err = uacp.Dial(ctx, ep)
@@ -156,6 +174,19 @@ func TestServerWrite(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	for {
+		select {
+		case _, ok := <-done:
+			if !ok {
+				t.Fatal("failed to setup secure channel")
+			}
+			goto NEXT
+		case <-time.After(10 * time.Second):
+			t.Fatalf("timed out")
+		}
+	}
+NEXT:
 
 	msg := []byte{0xde, 0xad, 0xbe, 0xef}
 	if _, err := srvChan.Write(msg); err != nil {

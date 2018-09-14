@@ -79,7 +79,7 @@ func (s *SecureChannel) ReadService(b []byte) (n int, err error) {
 // Write can be made to time out and return an Error with Timeout() == true
 // after a fixed time limit; see SetDeadline and SetWriteDeadline.
 func (s *SecureChannel) Write(b []byte) (n int, err error) {
-	if !(s.state == cliStateSecureChannelOpened || s.state == srvStateSecureChannelOpened) {
+	if s == nil || !(s.state == cliStateSecureChannelOpened || s.state == srvStateSecureChannelOpened) {
 		return 0, ErrSecureChannelNotOpened
 	}
 	select {
@@ -128,19 +128,18 @@ func (s *SecureChannel) Close() error {
 	switch s.state {
 	case cliStateSecureChannelClosed, cliStateOpenSecureChannelSent, cliStateSecureChannelOpened:
 		s.CloseSecureChannelRequest()
+		s.updateState(cliStateSecureChannelClosed)
+	case srvStateCloseSecureChannelSent, srvStateSecureChannelOpened:
+		s.updateState(srvStateSecureChannelClosed)
 	}
 
-	if err := s.lowerConn.Close(); err != nil {
-		return err
-	}
 	s.cfg.SequenceNumber = 0
 	s.reqHandle = 0
-
 	close(s.errChan)
 	close(s.lenChan)
 	close(s.stateChan)
 
-	return nil
+	return s.lowerConn.Close()
 }
 
 // LocalAddr returns the local network address.
