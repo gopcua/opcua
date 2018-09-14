@@ -70,7 +70,7 @@ func (bo *Boolean) String() string {
 	return "TRUE"
 }
 
-// ServiceType returns type of Service.
-func (bo *Boolean) ServiceType() uint16 {
+// DataType returns type of Data.
+func (bo *Boolean) DataType() uint16 {
 	return id.Boolean
 }

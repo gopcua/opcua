@@ -65,7 +65,7 @@ func (f *Float) Len() int {
 	return 4
 }
 
-// ServiceType returns type of Service.
-func (f *Float) ServiceType() uint16 {
+// DataType returns type of Data.
+func (f *Float) DataType() uint16 {
 	return id.Float
 }

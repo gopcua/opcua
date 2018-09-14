@@ -5,32 +5,22 @@ import (
 	"github.com/wmnsk/gopcua/id"
 )
 
-// Service is an interface to handle any kind of OPC UA Services.
-type Service interface {
-	DecodeFromBytes([]byte) error
-	Serialize() ([]byte, error)
-	SerializeTo([]byte) error
-	Len() int
-	// String() string
-	ServiceType() uint16
-}
-
 // Variant is a union of the built-in types.
 //
 // Specification: Part 6, 5.2.2.16
 type Variant struct {
 	EncodingMask          uint8
 	ArrayLength           *int32
-	Value                 Service
+	Value                 Data
 	ArrayDimensionsLength *int32
 	ArrayDimensions       []*int32
 }
 
 // NewVariant creates a new Variant.
-func NewVariant(service Service) *Variant {
+func NewVariant(data Data) *Variant {
 	v := &Variant{
-		EncodingMask: uint8(service.ServiceType()),
-		Value:        service,
+		EncodingMask: uint8(data.DataType()),
+		Value:        data,
 	}
 	return v
 }
