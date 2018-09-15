@@ -30,6 +30,8 @@ Currently simple `client`, `server` implementation and `sender`, which lets user
 
 Simply use `go get`.
 
+The following command will send `Hello`, `OpenSecureChannel`, `CreateSession`, `CloseSecureChannel` to the destination specified in command-line arguments.
+
 ```shell-session
 go get -u github.com/pkg/errors
 go get -u github.com/google/go-cmp
