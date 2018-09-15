@@ -23,7 +23,7 @@ func Cause(err error) error {
 //
 // This function just wraps the Errorf in pkg/errors library.
 func Errorf(format string, args ...interface{}) error {
-	return errors.Errorf(format, args)
+	return errors.Errorf(format, args...)
 }
 
 // New returns an error that formats as the given text.
@@ -61,7 +61,7 @@ func Wrap(err error, message string) error {
 //
 // This function just wraps the Wrapf in pkg/errors library.
 func Wrapf(err error, format string, args ...interface{}) error {
-	return errors.Wrapf(err, format, args)
+	return errors.Wrapf(err, format, args...)
 }
 
 // Frame represents a program counter inside a stack frame.
