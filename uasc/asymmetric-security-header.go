@@ -26,7 +26,7 @@ func NewAsymmetricSecurityHeader(uri string, cert, thumbprint []byte, payload []
 		SecurityPolicyURI:             datatypes.NewString(uri),
 		SenderCertificate:             datatypes.NewByteString(cert),
 		ReceiverCertificateThumbprint: datatypes.NewByteString(thumbprint),
-		Payload: payload,
+		Payload:                       payload,
 	}
 }
 
@@ -107,7 +107,6 @@ func (a *AsymmetricSecurityHeader) SerializeTo(b []byte) error {
 	}
 
 	copy(b[offset:], a.Payload)
-
 	return nil
 }
 
@@ -123,6 +122,9 @@ func (a *AsymmetricSecurityHeader) Len() int {
 	}
 	if a.ReceiverCertificateThumbprint != nil {
 		l += a.ReceiverCertificateThumbprint.Len()
+	}
+	if a.Payload != nil {
+		l += len(a.Payload)
 	}
 
 	return l

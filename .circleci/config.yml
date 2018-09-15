@@ -12,6 +12,7 @@ jobs:
     working_directory: /go/src/github.com/wmnsk/gopcua
     steps: &ref_0
       - checkout
+      - run: go get -u github.com/pkg/errors
       - run: go install ./...
       - run: go get -v -t -d ./...
       - run: go get -u golang.org/x/lint/golint
