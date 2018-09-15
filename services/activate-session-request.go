@@ -33,7 +33,7 @@ type ActivateSessionRequest struct {
 }
 
 // NewActivateSessionRequest creates a new ActivateSessionRequest.
-func NewActivateSessionRequest(ts time.Time, handle, diag, timeout uint32, auditID string, sig *SignatureData, certs []*SignedSoftwareCertificate, locales []string, userToken *datatypes.ExtensionObject, tokenSig *SignatureData) *ActivateSessionRequest {
+func NewActivateSessionRequest(ts time.Time, authToken datatypes.NodeID, handle, diag, timeout uint32, auditID string, sig *SignatureData, certs []*SignedSoftwareCertificate, locales []string, userToken *datatypes.ExtensionObject, tokenSig *SignatureData) *ActivateSessionRequest {
 	return &ActivateSessionRequest{
 		TypeID: datatypes.NewExpandedNodeID(
 			false, false,
@@ -43,7 +43,7 @@ func NewActivateSessionRequest(ts time.Time, handle, diag, timeout uint32, audit
 			"", 0,
 		),
 		RequestHeader: NewRequestHeader(
-			datatypes.NewTwoByteNodeID(0x00),
+			authToken,
 			ts,
 			handle,
 			diag,

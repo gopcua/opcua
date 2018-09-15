@@ -21,7 +21,7 @@ type CloseSessionRequest struct {
 }
 
 // NewCloseSessionRequest creates a CloseSessionRequest.
-func NewCloseSessionRequest(ts time.Time, authToken uint8, handle, diag, timeout uint32, auditID string, deleteSubs bool) *CloseSessionRequest {
+func NewCloseSessionRequest(ts time.Time, authToken datatypes.NodeID, handle, diag, timeout uint32, auditID string, deleteSubs bool) *CloseSessionRequest {
 	return &CloseSessionRequest{
 		TypeID: datatypes.NewExpandedNodeID(
 			false, false,
@@ -31,7 +31,7 @@ func NewCloseSessionRequest(ts time.Time, authToken uint8, handle, diag, timeout
 			"", 0,
 		),
 		RequestHeader: NewRequestHeader(
-			datatypes.NewTwoByteNodeID(authToken),
+			authToken,
 			ts,
 			handle,
 			diag,

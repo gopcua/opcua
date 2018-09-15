@@ -25,7 +25,6 @@ func TestNewExtensionObject(t *testing.T) {
 				Namespace:    0,
 				Identifier:   321,
 			},
-			NamespaceURI: NewString(""),
 		},
 		EncodingMask: 0x01,
 		Length:       5,

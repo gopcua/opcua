@@ -12,325 +12,114 @@ import (
 	"github.com/wmnsk/gopcua/datatypes"
 )
 
-func TestNewActivateSessionRequest(t *testing.T) {
-	a := NewActivateSessionRequest(
-		time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC), 1, 0, 0, "",
-		NewSignatureData("", nil),
-		nil,
-		[]string{""},
-		datatypes.NewExtensionObject(
-			&datatypes.ExpandedNodeID{
-				NodeID: datatypes.NewFourByteNodeID(0, 321),
-			},
-			0x01,
-			[]byte("0"),
-		),
-		NewSignatureData("", nil),
-	)
-	expected := &ActivateSessionRequest{
-		TypeID: &datatypes.ExpandedNodeID{
-			NodeID:       datatypes.NewFourByteNodeID(0, ServiceTypeActivateSessionRequest),
-			NamespaceURI: datatypes.NewString(""),
-			ServerIndex:  0,
-		},
-		RequestHeader: &RequestHeader{
-			AuthenticationToken: datatypes.NewTwoByteNodeID(0x00),
-			AuditEntryID:        datatypes.NewString(""),
-			RequestHandle:       1,
-			TimeoutHint:         0,
-			AdditionalHeader: &AdditionalHeader{
-				TypeID: &datatypes.ExpandedNodeID{
-					NodeID:       datatypes.NewTwoByteNodeID(0),
-					NamespaceURI: datatypes.NewString(""),
+var activateSessionRequestCases = []struct {
+	description string
+	structured  *ActivateSessionRequest
+	serialized  []byte
+}{
+	{
+		"normal",
+		NewActivateSessionRequest(
+			time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
+			datatypes.NewOpaqueNodeID(0x00, []byte{
+				0x08, 0x22, 0x87, 0x62, 0xba, 0x81, 0xe1, 0x11,
+				0xa6, 0x43, 0xf8, 0x77, 0x7b, 0xc6, 0x2f, 0xc8,
+			}), 1, 0, 0, "", NewSignatureData("", nil), nil, nil,
+			datatypes.NewExtensionObject(
+				&datatypes.ExpandedNodeID{
+					NodeID: datatypes.NewFourByteNodeID(0, 321),
 				},
-				EncodingMask: 0x00,
-			},
-			Timestamp: time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
+				0x01,
+				[]byte("0"),
+			),
+			NewSignatureData("", nil),
+		),
+		[]byte{
+			// TypeID
+			0x01, 0x00, 0xd3, 0x01,
+			// RequestHeader
+			// AuthenticationToken
+			0x05, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x08,
+			0x22, 0x87, 0x62, 0xba, 0x81, 0xe1, 0x11, 0xa6,
+			0x43, 0xf8, 0x77, 0x7b, 0xc6, 0x2f, 0xc8,
+			// Timestamp
+			0x00, 0x98, 0x67, 0xdd, 0xfd, 0x30, 0xd4, 0x01,
+			// RequestHandle
+			0x01, 0x00, 0x00, 0x00,
+			// ReturnDiagnostics
+			0x00, 0x00, 0x00, 0x00,
+			// AuditEntryID
+			0xff, 0xff, 0xff, 0xff,
+			// TimeoutHint
+			0x00, 0x00, 0x00, 0x00,
+			// AdditionalHeader
+			0x00, 0x00, 0x00,
+			// ClientSignature
+			0xff, 0xff, 0xff, 0xff,
+			// ClientSoftwareCertificates
+			0xff, 0xff, 0xff, 0xff,
+			// LocaleIDs
+			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+			// UserIdentityToken
+			// TypeID
+			0x01, 0x00, 0x41, 0x01,
+			// EncodingMask
+			0x01,
+			// AnonymousIdentityToken
+			0x05, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x30,
+			// UserTokenSignature
+			0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 		},
-		ClientSignature:            NewSignatureData("", nil),
-		ClientSoftwareCertificates: NewSignedSoftwareCertificateArray(nil),
-		LocaleIDs:                  datatypes.NewStringArray([]string{""}),
-		UserIdentityToken: &datatypes.ExtensionObject{
-			TypeID: &datatypes.ExpandedNodeID{
-				NodeID: datatypes.NewFourByteNodeID(0, 321),
-			},
-			Length:       5,
-			EncodingMask: 0x01,
-			Body:         datatypes.NewByteString([]byte("0")),
-		},
-		UserTokenSignature: NewSignatureData("", nil),
-	}
-
-	if diff := cmp.Diff(a, expected); diff != "" {
-		t.Error(diff)
-	}
+	},
 }
 
 func TestDecodeActivateSessionRequest(t *testing.T) {
-	b := []byte{
-		0x01, 0x00, 0xd3, 0x01, 0x02, 0x03, 0x00, 0xc7,
-		0xd7, 0x68, 0xb5, 0x00, 0x98, 0x67, 0xdd, 0xfd,
-		0x30, 0xd4, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff,
-		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00,
-		0x41, 0x01, 0x01, 0x05, 0x00, 0x00, 0x00, 0x01,
-		0x00, 0x00, 0x00, 0x30, 0xff, 0xff, 0xff, 0xff,
-		0xff, 0xff, 0xff, 0xff,
-	}
-	a, err := DecodeActivateSessionRequest(b)
-	if err != nil {
-		t.Error(err)
-	}
-	expected := &ActivateSessionRequest{
-		TypeID: &datatypes.ExpandedNodeID{
-			NodeID: datatypes.NewFourByteNodeID(0, ServiceTypeActivateSessionRequest),
-		},
-		RequestHeader: &RequestHeader{
-			AuthenticationToken: datatypes.NewNumericNodeID(3, 3043547079),
-			AuditEntryID:        datatypes.NewString(""),
-			RequestHandle:       1,
-			TimeoutHint:         0,
-			AdditionalHeader: &AdditionalHeader{
-				TypeID: &datatypes.ExpandedNodeID{
-					NodeID: datatypes.NewTwoByteNodeID(0),
-				},
-				EncodingMask: 0x00,
-			},
-			Timestamp: time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-			Payload: []byte{
-				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-				0x01, 0x00, 0x41, 0x01, 0x01, 0x05, 0x00, 0x00,
-				0x00, 0x01, 0x00, 0x00, 0x00, 0x30, 0xff, 0xff,
-				0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-			},
-		},
-		ClientSignature:            NewSignatureData("", nil),
-		ClientSoftwareCertificates: NewSignedSoftwareCertificateArray(nil),
-		LocaleIDs:                  datatypes.NewStringArray(nil),
-		UserIdentityToken: &datatypes.ExtensionObject{
-			TypeID: &datatypes.ExpandedNodeID{
-				NodeID: datatypes.NewFourByteNodeID(0, 321),
-			},
-			Length:       5,
-			EncodingMask: 0x01,
-			Body:         datatypes.NewByteString([]byte("0")),
-		},
-		UserTokenSignature: NewSignatureData("", nil),
-	}
-	if diff := cmp.Diff(a, expected); diff != "" {
-		t.Error(diff)
+	for _, c := range activateSessionRequestCases {
+		got, err := DecodeActivateSessionRequest(c.serialized)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// need to clear Payload here.
+		got.Payload = nil
+
+		if diff := cmp.Diff(got, c.structured, decodeCmpOpt); diff != "" {
+			t.Errorf("%s failed\n%s", c.description, diff)
+		}
 	}
 }
 
-func TestActivateSessionRequestDecodeFromBytes(t *testing.T) {
-	b := []byte{
-		0x01, 0x00, 0xd3, 0x01, 0x02, 0x03, 0x00, 0xc7,
-		0xd7, 0x68, 0xb5, 0x00, 0x98, 0x67, 0xdd, 0xfd,
-		0x30, 0xd4, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff,
-		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00,
-		0x41, 0x01, 0x01, 0x05, 0x00, 0x00, 0x00, 0x01,
-		0x00, 0x00, 0x00, 0x30, 0xff, 0xff, 0xff, 0xff,
-		0xff, 0xff, 0xff, 0xff,
-	}
-	a := &ActivateSessionRequest{}
-	if err := a.DecodeFromBytes(b); err != nil {
-		t.Error(err)
-	}
-	expected := &ActivateSessionRequest{
-		TypeID: &datatypes.ExpandedNodeID{
-			NodeID: datatypes.NewFourByteNodeID(0, ServiceTypeActivateSessionRequest),
-		},
-		RequestHeader: &RequestHeader{
-			AuthenticationToken: datatypes.NewNumericNodeID(3, 3043547079),
-			AuditEntryID:        datatypes.NewString(""),
-			RequestHandle:       1,
-			TimeoutHint:         0,
-			AdditionalHeader: &AdditionalHeader{
-				TypeID: &datatypes.ExpandedNodeID{
-					NodeID: datatypes.NewTwoByteNodeID(0),
-				},
-				EncodingMask: 0x00,
-			},
-			Timestamp: time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-			Payload: []byte{
-				0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-				0x01, 0x00, 0x41, 0x01, 0x01, 0x05, 0x00, 0x00,
-				0x00, 0x01, 0x00, 0x00, 0x00, 0x30, 0xff, 0xff,
-				0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-			},
-		},
-		ClientSignature:            NewSignatureData("", nil),
-		ClientSoftwareCertificates: NewSignedSoftwareCertificateArray(nil),
-		LocaleIDs:                  datatypes.NewStringArray(nil),
-		UserIdentityToken: &datatypes.ExtensionObject{
-			TypeID: &datatypes.ExpandedNodeID{
-				NodeID: datatypes.NewFourByteNodeID(0, 321),
-			},
-			Length:       5,
-			EncodingMask: 0x01,
-			Body:         datatypes.NewByteString([]byte("0")),
-		},
-		UserTokenSignature: NewSignatureData("", nil),
-	}
-	if diff := cmp.Diff(a, expected); diff != "" {
-		t.Error(diff)
-	}
-}
+func TestSerializeActivateSessionRequest(t *testing.T) {
+	for _, c := range activateSessionRequestCases {
+		got, err := c.structured.Serialize()
+		if err != nil {
+			t.Fatal(err)
+		}
 
-func TestActivateSessionRequestSerialize(t *testing.T) {
-	a := &ActivateSessionRequest{
-		TypeID: &datatypes.ExpandedNodeID{
-			NodeID: datatypes.NewFourByteNodeID(0, ServiceTypeActivateSessionRequest),
-		},
-		RequestHeader: &RequestHeader{
-			AuthenticationToken: datatypes.NewNumericNodeID(3, 3043547079),
-			AuditEntryID:        datatypes.NewString(""),
-			RequestHandle:       1,
-			TimeoutHint:         0,
-			AdditionalHeader: &AdditionalHeader{
-				TypeID: &datatypes.ExpandedNodeID{
-					NodeID: datatypes.NewTwoByteNodeID(0),
-				},
-				EncodingMask: 0x00,
-			},
-			Timestamp: time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-		},
-		ClientSignature:            NewSignatureData("", nil),
-		ClientSoftwareCertificates: NewSignedSoftwareCertificateArray(nil),
-		LocaleIDs:                  datatypes.NewStringArray(nil),
-		UserIdentityToken: &datatypes.ExtensionObject{
-			TypeID: &datatypes.ExpandedNodeID{
-				NodeID: datatypes.NewFourByteNodeID(0, 321),
-			},
-			Length:       5,
-			EncodingMask: 0x01,
-			Body:         datatypes.NewByteString([]byte("0")),
-		},
-		UserTokenSignature: NewSignatureData("", nil),
-	}
-	b, err := a.Serialize()
-	if err != nil {
-		t.Fatal(err)
-	}
-	expected := []byte{
-		0x01, 0x00, 0xd3, 0x01, 0x02, 0x03, 0x00, 0xc7,
-		0xd7, 0x68, 0xb5, 0x00, 0x98, 0x67, 0xdd, 0xfd,
-		0x30, 0xd4, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff,
-		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00,
-		0x41, 0x01, 0x01, 0x05, 0x00, 0x00, 0x00, 0x01,
-		0x00, 0x00, 0x00, 0x30, 0xff, 0xff, 0xff, 0xff,
-		0xff, 0xff, 0xff, 0xff,
-	}
-	if diff := cmp.Diff(b, expected); diff != "" {
-		t.Error(diff)
-	}
-}
-
-func TestActivateSessionRequestSerializeTo(t *testing.T) {
-	a := &ActivateSessionRequest{
-		TypeID: &datatypes.ExpandedNodeID{
-			NodeID: datatypes.NewFourByteNodeID(0, ServiceTypeActivateSessionRequest),
-		},
-		RequestHeader: &RequestHeader{
-			AuthenticationToken: datatypes.NewNumericNodeID(3, 3043547079),
-			AuditEntryID:        datatypes.NewString(""),
-			RequestHandle:       1,
-			TimeoutHint:         0,
-			AdditionalHeader: &AdditionalHeader{
-				TypeID: &datatypes.ExpandedNodeID{
-					NodeID: datatypes.NewTwoByteNodeID(0),
-				},
-				EncodingMask: 0x00,
-			},
-			Timestamp: time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-		},
-		ClientSignature:            NewSignatureData("", nil),
-		ClientSoftwareCertificates: NewSignedSoftwareCertificateArray(nil),
-		LocaleIDs:                  datatypes.NewStringArray(nil),
-		UserIdentityToken: &datatypes.ExtensionObject{
-			TypeID: &datatypes.ExpandedNodeID{
-				NodeID: datatypes.NewFourByteNodeID(0, 321),
-			},
-			Length:       5,
-			EncodingMask: 0x01,
-			Body:         datatypes.NewByteString([]byte("0")),
-		},
-		UserTokenSignature: NewSignatureData("", nil),
-	}
-	b := make([]byte, a.Len())
-	if err := a.SerializeTo(b); err != nil {
-		t.Fatal(err)
-	}
-	expected := []byte{
-		0x01, 0x00, 0xd3, 0x01, 0x02, 0x03, 0x00, 0xc7,
-		0xd7, 0x68, 0xb5, 0x00, 0x98, 0x67, 0xdd, 0xfd,
-		0x30, 0xd4, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff,
-		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00,
-		0x41, 0x01, 0x01, 0x05, 0x00, 0x00, 0x00, 0x01,
-		0x00, 0x00, 0x00, 0x30, 0xff, 0xff, 0xff, 0xff,
-		0xff, 0xff, 0xff, 0xff,
-	}
-	if diff := cmp.Diff(b, expected); diff != "" {
-		t.Error(diff)
+		if diff := cmp.Diff(got, c.serialized); diff != "" {
+			t.Errorf("%s failed\n%s", c.description, diff)
+		}
 	}
 }
 
 func TestActivateSessionRequestLen(t *testing.T) {
-	a := &ActivateSessionRequest{
-		TypeID: &datatypes.ExpandedNodeID{
-			NodeID: datatypes.NewFourByteNodeID(0, ServiceTypeActivateSessionRequest),
-		},
-		RequestHeader: &RequestHeader{
-			AuthenticationToken: datatypes.NewNumericNodeID(3, 3043547079),
-			AuditEntryID:        datatypes.NewString(""),
-			RequestHandle:       1,
-			TimeoutHint:         0,
-			AdditionalHeader: &AdditionalHeader{
-				TypeID: &datatypes.ExpandedNodeID{
-					NodeID: datatypes.NewTwoByteNodeID(0),
-				},
-				EncodingMask: 0x00,
-			},
-			Timestamp: time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-		},
-		ClientSignature:            NewSignatureData("", nil),
-		ClientSoftwareCertificates: NewSignedSoftwareCertificateArray(nil),
-		LocaleIDs:                  datatypes.NewStringArray(nil),
-		UserIdentityToken: &datatypes.ExtensionObject{
-			TypeID: &datatypes.ExpandedNodeID{
-				NodeID: datatypes.NewFourByteNodeID(0, 321),
-			},
-			Length:       5,
-			EncodingMask: 0x01,
-			Body:         datatypes.NewByteString([]byte("0")),
-		},
-		UserTokenSignature: NewSignatureData("", nil),
-	}
-	if a.Len() != 76 {
-		t.Errorf("Len doesn't match. Want: %d, Got: %d", 76, a.Len())
+	for _, c := range activateSessionRequestCases {
+		got := c.structured.Len()
+
+		if diff := cmp.Diff(got, len(c.serialized)); diff != "" {
+			t.Errorf("%s failed\n%s", c.description, diff)
+		}
 	}
 }
 
 func TestActivateSessionRequestServiceType(t *testing.T) {
-	a := &ActivateSessionRequest{}
-	if a.ServiceType() != ServiceTypeActivateSessionRequest {
-		t.Errorf(
-			"ServiceType doesn't match. Want: %d, Got: %d",
-			ServiceTypeActivateSessionRequest,
-			a.ServiceType(),
-		)
+	for _, c := range activateSessionRequestCases {
+		if c.structured.ServiceType() != ServiceTypeActivateSessionRequest {
+			t.Errorf(
+				"ServiceType doesn't match. Want: %d, Got: %d",
+				ServiceTypeActivateSessionRequest,
+				c.structured.ServiceType(),
+			)
+		}
 	}
 }

@@ -84,7 +84,7 @@ type ReadRequest struct {
 }
 
 // NewReadRequest creates a new ReadRequest.
-func NewReadRequest(ts time.Time, handle, diag, timeout uint32, auditID string, maxAge uint64, tsRet TimestampsToReturn, nodes []*datatypes.ReadValueID) *ReadRequest {
+func NewReadRequest(ts time.Time, authToken datatypes.NodeID, handle, diag, timeout uint32, auditID string, maxAge uint64, tsRet TimestampsToReturn, nodes []*datatypes.ReadValueID) *ReadRequest {
 	return &ReadRequest{
 		TypeID: datatypes.NewExpandedNodeID(
 			false, false,
@@ -94,7 +94,7 @@ func NewReadRequest(ts time.Time, handle, diag, timeout uint32, auditID string, 
 			"", 0,
 		),
 		RequestHeader: NewRequestHeader(
-			datatypes.NewTwoByteNodeID(0x00),
+			authToken,
 			ts,
 			handle,
 			diag,
