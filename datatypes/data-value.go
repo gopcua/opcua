@@ -256,3 +256,93 @@ func (d *DataValue) HasServerPicoSeconds() bool {
 func (d *DataValue) SetServerPicoSecondsFlag() {
 	d.EncodingMask |= 0x20
 }
+
+// DataValueArray represents the DataValueArray.
+type DataValueArray struct {
+	ArraySize  int32
+	DataValues []*DataValue
+}
+
+// NewDataValueArray creates a new DataValueArray from multiple data values.
+func NewDataValueArray(values []*DataValue) *DataValueArray {
+	if values == nil {
+		d := &DataValueArray{
+			ArraySize: 0,
+		}
+		return d
+	}
+
+	d := &DataValueArray{
+		ArraySize: int32(len(values)),
+	}
+	for _, value := range values {
+		d.DataValues = append(d.DataValues, value)
+	}
+
+	return d
+}
+
+// DecodeDataValueArray decodes given bytes into DataValueArray.
+func DecodeDataValueArray(b []byte) (*DataValueArray, error) {
+	d := &DataValueArray{}
+	if err := d.DecodeFromBytes(b); err != nil {
+		return nil, err
+	}
+
+	return d, nil
+}
+
+// DecodeFromBytes decodes given bytes into DataValueArray.
+func (d *DataValueArray) DecodeFromBytes(b []byte) error {
+	d.ArraySize = int32(binary.LittleEndian.Uint32(b[:4]))
+	if d.ArraySize <= 0 {
+		return nil
+	}
+
+	var offset = 4
+	for i := 1; i <= int(d.ArraySize); i++ {
+		v, err := DecodeDataValue(b[offset:])
+		if err != nil {
+			return err
+		}
+		d.DataValues = append(d.DataValues, v)
+		offset += v.Len()
+	}
+
+	return nil
+}
+
+// Serialize serializes DataValueArray into bytes.
+func (d *DataValueArray) Serialize() ([]byte, error) {
+	b := make([]byte, d.Len())
+	if err := d.SerializeTo(b); err != nil {
+		return nil, err
+	}
+
+	return b, nil
+}
+
+// SerializeTo serializes DataValueArray into bytes.
+func (d *DataValueArray) SerializeTo(b []byte) error {
+	offset := 4
+	binary.LittleEndian.PutUint32(b[:4], uint32(d.ArraySize))
+
+	for _, value := range d.DataValues {
+		if err := value.SerializeTo(b[offset:]); err != nil {
+			return err
+		}
+		offset += value.Len()
+	}
+
+	return nil
+}
+
+// Len returns the actual length in int.
+func (d *DataValueArray) Len() int {
+	l := 4
+	for _, value := range d.DataValues {
+		l += value.Len()
+	}
+
+	return l
+}
