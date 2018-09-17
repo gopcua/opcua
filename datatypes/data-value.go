@@ -25,7 +25,7 @@ type DataValue struct {
 }
 
 // NewDataValue creates a new DataValue.
-func NewDataValue(hasValue, hasSrcTs, hasSrcPs, hasSvrTs, hasServerPc bool, v *Variant, status uint32, srcTs time.Time, srcPs uint16, svrTs time.Time, svrPs uint16) *DataValue {
+func NewDataValue(hasValue, hasStatus, hasSrcTs, hasSrcPs, hasSvrTs, hasSvrPs bool, v *Variant, status uint32, srcTs time.Time, srcPs uint16, svrTs time.Time, svrPs uint16) *DataValue {
 	d := &DataValue{
 		Value:             v,
 		Status:            status,
@@ -35,27 +35,27 @@ func NewDataValue(hasValue, hasSrcTs, hasSrcPs, hasSvrTs, hasServerPc bool, v *V
 		ServerPicoSeconds: svrPs,
 	}
 
-	if d.HasValue() {
+	if hasValue {
 		d.SetValueFlag()
 	}
 
-	if d.HasStatus() {
+	if hasStatus {
 		d.SetStatusFlag()
 	}
 
-	if d.HasSourceTimestamp() {
+	if hasSrcTs {
 		d.SetSourceTimestampFlag()
 	}
 
-	if d.HasSourcePicoSeconds() {
+	if hasSrcPs {
 		d.SetSourcePicoSecondsFlag()
 	}
 
-	if d.HasServerTimestamp() {
+	if hasSvrTs {
 		d.SetServerTimestampFlag()
 	}
 
-	if d.HasServerPicoSeconds() {
+	if hasSvrPs {
 		d.SetServerPicoSecondsFlag()
 	}
 
