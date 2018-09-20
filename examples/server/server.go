@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 /*
-Command server provides a connection establishement of OPC UA Secure Conversation as a server.
+Command server provides a connection establishment of OPC UA Secure Conversation as a server.
 
 XXX - Currently this command just handles the UACP connection from any client.
 */

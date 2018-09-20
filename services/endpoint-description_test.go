@@ -234,7 +234,7 @@ func TestSerializeEndpointDescription(t *testing.T) {
 	t.Run("single", func(t *testing.T) {
 		t.Parallel()
 
-		e := NewEndpointDesctiption(
+		e := NewEndpointDescription(
 			"ep-url",
 			NewApplicationDescription(
 				"app-uri", "prod-uri", "app-name", AppTypeServer,
@@ -277,7 +277,7 @@ func TestSerializeEndpointDescription(t *testing.T) {
 
 		e := NewEndpointDescriptionArray(
 			[]*EndpointDescription{
-				NewEndpointDesctiption(
+				NewEndpointDescription(
 					"ep-url",
 					NewApplicationDescription(
 						"app-uri", "prod-uri", "app-name", AppTypeServer,
@@ -301,7 +301,7 @@ func TestSerializeEndpointDescription(t *testing.T) {
 					"trans-uri",
 					0,
 				),
-				NewEndpointDesctiption(
+				NewEndpointDescription(
 					"ep-url",
 					NewApplicationDescription(
 						"app-uri", "prod-uri", "app-name", AppTypeServer,

@@ -34,7 +34,7 @@ type Conn struct {
 // In other words, the data is passed when it is NOT one of Hello, Acknowledge, Error, ReverseHello.
 func (c *Conn) Read(b []byte) (n int, err error) {
 	if !(c.state == cliStateEstablished || c.state == srvStateEstablished) {
-		return 0, ErrConnNotEstablised
+		return 0, ErrConnNotEstablished
 	}
 	for {
 		select {
@@ -52,7 +52,7 @@ func (c *Conn) Read(b []byte) (n int, err error) {
 // after a fixed time limit; see SetDeadline and SetWriteDeadline.
 func (c *Conn) Write(b []byte) (n int, err error) {
 	if !(c.state == cliStateEstablished || c.state == srvStateEstablished) {
-		return 0, ErrConnNotEstablised
+		return 0, ErrConnNotEstablished
 	}
 	select {
 	case e := <-c.errChan:
@@ -387,10 +387,10 @@ func (c *Conn) handleMsgReverseHello(r *ReverseHello) {
 // UACP-specific error definitions.
 // XXX - to be integrated in errors package.
 var (
-	ErrInvalidState      = errors.New("invalid state")
-	ErrInvalidEndpoint   = errors.New("invalid EndpointURL")
-	ErrUnexpectedMessage = errors.New("got unexpected message")
-	ErrTimeout           = errors.New("timed out")
-	ErrReceivedError     = errors.New("received Error message")
-	ErrConnNotEstablised = errors.New("connection not established")
+	ErrInvalidState       = errors.New("invalid state")
+	ErrInvalidEndpoint    = errors.New("invalid EndpointURL")
+	ErrUnexpectedMessage  = errors.New("got unexpected message")
+	ErrTimeout            = errors.New("timed out")
+	ErrReceivedError      = errors.New("received Error message")
+	ErrConnNotEstablished = errors.New("connection not established")
 )
