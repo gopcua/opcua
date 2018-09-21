@@ -18,7 +18,7 @@ See example directory for sample codes.
 ### Run
 
 ```shell-session
-git clone git@github.com:wmnsk/gopcua.git
+git clone https://github.com/wmnsk/gopcua.git
 cd examples/sender
 go run sender.go --ip <dst IP> --port <dst Port> --url "opc.tcp://endpoint.example/gopcua/server"
 ```

@@ -750,7 +750,7 @@ func TestSerializeServices(t *testing.T) {
 			1, 0x00000000,
 			NewNullDiagnosticInfo(),
 			[]string{},
-			NewEndpointDesctiption(
+			NewEndpointDescription(
 				"ep-url",
 				NewApplicationDescription(
 					"app-uri", "prod-uri", "app-name", AppTypeServer,
@@ -774,7 +774,7 @@ func TestSerializeServices(t *testing.T) {
 				"trans-uri",
 				0,
 			),
-			NewEndpointDesctiption(
+			NewEndpointDescription(
 				"ep-url",
 				NewApplicationDescription(
 					"app-uri", "prod-uri", "app-name", AppTypeServer,
@@ -845,7 +845,7 @@ func TestSerializeServices(t *testing.T) {
 				0xa6, 0x43, 0xf8, 0x77, 0x7b, 0xc6, 0x2f, 0xc8,
 			},
 			6000000, nil, nil, "", nil, 65534,
-			NewEndpointDesctiption(
+			NewEndpointDescription(
 				"ep-url",
 				NewApplicationDescription(
 					"app-uri", "prod-uri", "app-name", AppTypeServer,
@@ -869,7 +869,7 @@ func TestSerializeServices(t *testing.T) {
 				"trans-uri",
 				0,
 			),
-			NewEndpointDesctiption(
+			NewEndpointDescription(
 				"ep-url",
 				NewApplicationDescription(
 					"app-uri", "prod-uri", "app-name", AppTypeServer,

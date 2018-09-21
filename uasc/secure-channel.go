@@ -53,7 +53,7 @@ func (s *SecureChannel) Read(b []byte) (n int, err error) {
 }
 
 // ReadService reads the payload(=Service) from the connection.
-// Which means the UASC Headers are ommitted.
+// Which means the UASC Headers are omitted.
 func (s *SecureChannel) ReadService(b []byte) (n int, err error) {
 	if !(s.state == cliStateSecureChannelOpened || s.state == srvStateSecureChannelOpened) {
 		return 0, ErrSecureChannelNotOpened
@@ -93,7 +93,7 @@ func (s *SecureChannel) Write(b []byte) (n int, err error) {
 // WriteService writes data to the connection.
 // Unlike Write(), given b in WriteService() should only be serialized service.Service,
 // while the UASC header is automatically set by the package.
-// This enables writing arbitary Service even if the service is not implemented in the package.
+// This enables writing arbitrary Service even if the service is not implemented in the package.
 func (s *SecureChannel) WriteService(b []byte) (n int, err error) {
 	if !(s.state == cliStateSecureChannelOpened || s.state == srvStateSecureChannelOpened) {
 		return 0, ErrSecureChannelNotOpened

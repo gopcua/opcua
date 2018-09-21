@@ -36,7 +36,7 @@ func TestSerializeByteString(t *testing.T) {
 
 	serialized, err := b.Serialize()
 	if err != nil {
-		t.Fatalf("Failed to serizlize ByteString: %s", err)
+		t.Fatalf("Failed to serialize ByteString: %s", err)
 	}
 
 	for i, s := range serialized {

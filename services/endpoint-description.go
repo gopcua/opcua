@@ -26,8 +26,8 @@ type EndpointDescription struct {
 	SecurityLevel       uint8
 }
 
-// NewEndpointDesctiption creates a new NewEndpointDesctiption.
-func NewEndpointDesctiption(url string, server *ApplicationDescription, cert []byte, secMode uint32, secURI string, tokens *UserTokenPolicyArray, transportURI string, secLevel uint8) *EndpointDescription {
+// NewEndpointDescription creates a new NewEndpointDescription.
+func NewEndpointDescription(url string, server *ApplicationDescription, cert []byte, secMode uint32, secURI string, tokens *UserTokenPolicyArray, transportURI string, secLevel uint8) *EndpointDescription {
 	return &EndpointDescription{
 		EndpointURL:         datatypes.NewString(url),
 		Server:              server,
@@ -208,7 +208,7 @@ type EndpointDescriptionArray struct {
 	EndpointDescriptions []*EndpointDescription
 }
 
-// NewEndpointDescriptionArray creates an NewEndpointDescriptionArray from multiple EndpointDesctiption.
+// NewEndpointDescriptionArray creates an NewEndpointDescriptionArray from multiple EndpointDescription.
 func NewEndpointDescriptionArray(descs []*EndpointDescription) *EndpointDescriptionArray {
 	e := &EndpointDescriptionArray{
 		ArraySize: int32(len(descs)),

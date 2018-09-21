@@ -200,7 +200,7 @@ func TestSerializeNodeID(t *testing.T) {
 
 		serialized, err := n.Serialize()
 		if err != nil {
-			t.Fatalf("Failed to serizlize TwoByteNodeID: %s", err)
+			t.Fatalf("Failed to serialize TwoByteNodeID: %s", err)
 		}
 
 		for i, s := range serialized {
@@ -217,7 +217,7 @@ func TestSerializeNodeID(t *testing.T) {
 
 		serialized, err := n.Serialize()
 		if err != nil {
-			t.Fatalf("Failed to serizlize FourByteNodeID: %s", err)
+			t.Fatalf("Failed to serialize FourByteNodeID: %s", err)
 		}
 
 		for i, s := range serialized {
@@ -234,7 +234,7 @@ func TestSerializeNodeID(t *testing.T) {
 
 		serialized, err := n.Serialize()
 		if err != nil {
-			t.Fatalf("Failed to serizlize NumericNodeID: %s", err)
+			t.Fatalf("Failed to serialize NumericNodeID: %s", err)
 		}
 
 		for i, s := range serialized {
@@ -251,7 +251,7 @@ func TestSerializeNodeID(t *testing.T) {
 
 		serialized, err := n.Serialize()
 		if err != nil {
-			t.Fatalf("Failed to serizlize StringNodeID: %s", err)
+			t.Fatalf("Failed to serialize StringNodeID: %s", err)
 		}
 
 		for i, s := range serialized {
@@ -268,7 +268,7 @@ func TestSerializeNodeID(t *testing.T) {
 
 		serialized, err := n.Serialize()
 		if err != nil {
-			t.Fatalf("Failed to serizlize GUIDNodeID: %s", err)
+			t.Fatalf("Failed to serialize GUIDNodeID: %s", err)
 		}
 
 		for i, s := range serialized {
@@ -285,7 +285,7 @@ func TestSerializeNodeID(t *testing.T) {
 
 		serialized, err := n.Serialize()
 		if err != nil {
-			t.Fatalf("Failed to serizlize OpaqueNodeID: %s", err)
+			t.Fatalf("Failed to serialize OpaqueNodeID: %s", err)
 		}
 
 		for i, s := range serialized {

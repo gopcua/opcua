@@ -91,7 +91,7 @@ func main() {
 	case uacp.MessageTypeAcknowledge:
 		log.Printf("Received Acknowledge: %s", cp)
 
-		// Send OpenSecureChannelRequest and wait for Resposne to come
+		// Send OpenSecureChannelRequest and wait for Response to come
 		opn, err := uasc.New(o, cfg).Serialize()
 		if err != nil {
 			log.Fatalf("Failed to serialize OpenSecureChannel: %s", err)
@@ -122,7 +122,7 @@ func main() {
 		cfg.SecureChannelID = osc.SecurityToken.ChannelID
 		cfg.SecurityTokenID = osc.SecurityToken.TokenID
 
-		// Send GetEndpointsRequest and wait for Resposne to come
+		// Send GetEndpointsRequest and wait for Response to come
 		gep, err := uasc.New(g, cfg).Serialize()
 		if err != nil {
 			log.Fatalf("Failed to serialize GetEndpointsRequest: %s", err)
