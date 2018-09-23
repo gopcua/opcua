@@ -1,67 +1,138 @@
 # gopcua
 
-[![CircleCI](https://circleci.com/gh/wmnsk/gopcua.svg?style=svg)](https://circleci.com/gh/wmnsk/gopcua)
+gopcua provides easy and painless handling of OPC UA Binary Protocol in pure Golang.
 
+[![CircleCI](https://circleci.com/gh/wmnsk/gopcua.svg?style=svg)](https://circleci.com/gh/wmnsk/gopcua)
 [![GoDoc](https://godoc.org/github.com/wmnsk/gopcua?status.svg)](https://godoc.org/github.com/wmnsk/gopcua)
+[![Go Report Card](https://goreportcard.com/badge/github.com/wmnsk/gopcua)](https://goreportcard.com/report/github.com/wmnsk/gopcua)
 [![GitHub](https://img.shields.io/github/license/mashape/apistatus.svg)](https://github.com/wmnsk/gopcua/blob/master/LICENSE)
 
-gopcua provides easy and painless encoding/decoding of OPC UA protocol in pure Golang.
+## Table of Contents
 
-## Disclaimer
-
-THIS IS STILL EXPERIMENTAL PROJECT, ANY IMPLEMENTATION INCLUDING EXPORTED APIs MAY CHANGE DRASTICALLY IN THE FUTURE
+- [gopcua](#gopcua)
+  - [Table of Contents](#table-of-contents)
+  - [Quickstart](#quickstart)
+    - [Installing](#installing)
+    - [Running Examples](#running-examples)
+  - [Supported Features](#supported-features)
+    - [Protocol Stack](#protocol-stack)
+    - [Services](#services)
+  - [Disclaimer](#disclaimer)
+  - [Author](#author)
+  - [License](#license)
 
 ## Quickstart
 
 See example directory for sample codes.
+Currently simple `client`, `server` implementation and `sender`, which lets user to manipulate any parts including connection setup sequence, are available.
 
-### Run
+### Installing
+
+Simply use `go get`.
+
+The following command will send `Hello`, `OpenSecureChannel`, `CreateSession`, `CloseSecureChannel` to the destination specified in command-line arguments.
 
 ```shell-session
-git clone https://github.com/wmnsk/gopcua.git
-cd examples/sender
-go run sender.go --ip <dst IP> --port <dst Port> --url "opc.tcp://endpoint.example/gopcua/server"
+go get -u github.com/pkg/errors
+go get -u github.com/google/go-cmp
+go get -u github.com/wmnsk/gopcua
 ```
 
-## Roadmap
+### Running Examples
 
-(To be written more precisely...)
+`client` opens the SecureChannel with the endpoint specified in command-line arguments.
 
-- [ ] Protocol definitions
-  - [x] OPC UA Connection Protocol
-    - [x] Interface to handle all messages
-    - [x] Header
-    - [x] Hello
-    - [x] Acknowledge
-    - [x] Error
-    - [x] Reverse Hello
-  - [ ] OPC UA Secure Conversation
-    - [x] Message header
-    - [x] Asymmetric algorithm Security header
-    - [x] Symmetric algorithm Security header
-    - [x] Sequence header
-    - [ ] Message footer
-  - [ ] Service Implementation
-    - [x] Interface to handle all services
-    - [x] Open Secure Channel Request / Response
-    - [ ] Close Secure Channel Request / Response
-    - [x] Get Endpoints Request / Response
-    - [ ] Create Session Request / Response
-    - [ ] Activate Session Request / Response
-    - [ ] XXX...
-- [ ] State Machine
-  - [ ] Implement `net.Conn`
-  - [ ] XXX...
-- [ ] Others
-  - [ ] Documentation (improve GoDoc, README)
-  - [x] Integrated way to handle common errors
-  - [ ] XXX...
+If `--payload` is given, it sends any data on top of UASC headers.
+
+```shell-session
+cd examples/client
+go run client.go --endpoint "opc.tcp://endpoint.example/gopcua/server" --payload <payload in hex stream format>
+```
+
+`server` listens and accepts the SecureChannel opening request from the client on specified network.
+
+```shell-session
+cd examples/client
+go run server.go --endpoint "opc.tcp://endpoint.example/gopcua/server"
+```
+
+NOTE: Automatic session activation has not been implemented at this time.
+
+## Supported Features
+
+### Protocol Stack
+
+| Categories     | Features                         | Supported | Notes |
+| -------------- | -------------------------------- | --------- | ----- |
+| Encoding       | OPC UA Binary                    | Yes       |       |
+|                | OPC UA JSON                      |           |       |
+|                | OPC UA XML                       |           |       |
+| Transport      | UA-TCP UA-SC UA Binary           | Yes       |       |
+|                | OPC UA HTTPS                     |           |       |
+|                | SOAP-HTTP WS-SC UA Binary        |           |       |
+|                | SOAP-HTTP WS-SC UA XML           |           |       |
+|                | SOAP-HTTP WS-SC UA XML-UA Binary |           |       |
+| Encryption     | None                             | Yes       |       |
+|                | Basic128Rsa15                    |           |       |
+|                | Basic256                         |           |       |
+|                | Basic256Sha256                   |           |       |
+| Authentication | Anonymous                        |           |       |
+|                | User Name Password               |           |       |
+|                | X509 Certificate                 |           |       |
+
+### Services
+
+| Service Set                 | Service                       | Supported | Notes |
+| --------------------------- | ----------------------------- | --------- | ----- |
+| Discovery Service Set       | FindServers                   |           |       |
+|                             | FindServersOnNetwork          |           |       |
+|                             | GetEndpoints                  | Yes       |       |
+|                             | RegisterServer                |           |       |
+|                             | RegisterServer2               | Yes       |       |
+| Secure Channel Service Set  | OpenSecureChannel             | Yes       |       |
+|                             | CloseSecureChannel            | Yes       |       |
+| Session Service Set         | CreateSession                 | Yes       |       |
+|                             | CloseSession                  | Yes       |       |
+|                             | ActivateSession               | Yes       |       |
+|                             | Cancel                        |           |       |
+| Node Management Service Set | AddNodes                      |           |       |
+|                             | AddReferences                 |           |       |
+|                             | DeleteNodes                   |           |       |
+|                             | DeleteReferences              |           |       |
+| View Service Set            | Browse                        |           |       |
+|                             | BrowseNext                    |           |       |
+|                             | TranslateBrowsePathsToNodeIds |           |       |
+|                             | RegisterNodes                 |           |       |
+|                             | UnregisterNodes               |           |       |
+| Query Service Set           | QueryFirst                    |           |       |
+|                             | QueryNext                     |           |       |
+| Attribute Service Set       | Read                          | Yes       |       |
+|                             | Write                         |           |       |
+|                             | HistoryRead                   |           |       |
+|                             | HistoryUpdate                 |           |       |
+| Method Service Set          | Call                          |           |       |
+| MonitoredItems Service Set  | CreateMonitoredItems          |           |       |
+|                             | DeleteMonitoredItems          |           |       |
+|                             | ModifyMonitoredItems          |           |       |
+|                             | SetMonitoringMode             |           |       |
+|                             | SetTriggering                 |           |       |
+| Subscription Service Set    | CreateSubscription            |           |       |
+|                             | ModifySubscription            |           |       |
+|                             | SetPublishingMode             |           |       |
+|                             | Publish                       |           |       |
+|                             | Republish                     |           |       |
+|                             | DeleteSubscriptions           |           |       |
+|                             | TransferSubscriptions         |           |       |
+
+_Tables here are generated by [Markdown Tables Generator](https://www.tablesgenerator.com/markdown_tables)_
+
+## Disclaimer
+
+This is still experimental project. Any part of the exported API may be changed before first release.
 
 ## Author
 
 Yoshiyuki Kurauchi ([GitHub](https://github.com/wmnsk/) / [Twitter](https://twitter.com/wmnskdmms))
-
-[![BMC](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://buymeacoff.ee/yoshk)
 
 ## License
 
