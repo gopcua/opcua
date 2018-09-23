@@ -5,38 +5,33 @@
 package services
 
 import (
+	"reflect"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+
 	"github.com/wmnsk/gopcua/datatypes"
 )
 
-var readRequestCases = []struct {
+var closeSessionRequestCases = []struct {
 	description string
-	structured  *ReadRequest
+	structured  *CloseSessionRequest
 	serialized  []byte
 }{
 	{
 		"normal",
-		NewReadRequest(
+		NewCloseSessionRequest(
 			time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
 			datatypes.NewOpaqueNodeID(0x00, []byte{
 				0x08, 0x22, 0x87, 0x62, 0xba, 0x81, 0xe1, 0x11,
 				0xa6, 0x43, 0xf8, 0x77, 0x7b, 0xc6, 0x2f, 0xc8,
-			}), 1033572, 0, 10000, "",
-			0, TimestampsToReturnBoth,
-			[]*datatypes.ReadValueID{
-				datatypes.NewReadValueID(
-					datatypes.NewFourByteNodeID(0, 2256),
-					datatypes.IntegerIDValue,
-					"", 0, "",
-				),
-			},
+			}), 1, 0, 0, "", true,
 		),
-		[]byte{
+		[]byte{ // CloseSessionRequest
 			// TypeID
-			0x01, 0x00, 0x77, 0x02,
+			0x01, 0x00, 0xd9, 0x01,
+			// RequestHeader
 			// AuthenticationToken
 			0x05, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x08,
 			0x22, 0x87, 0x62, 0xba, 0x81, 0xe1, 0x11, 0xa6,
@@ -44,30 +39,32 @@ var readRequestCases = []struct {
 			// Timestamp
 			0x00, 0x98, 0x67, 0xdd, 0xfd, 0x30, 0xd4, 0x01,
 			// RequestHandle
-			0x64, 0xc5, 0x0f, 0x00,
+			0x01, 0x00, 0x00, 0x00,
 			// ReturnDiagnostics
 			0x00, 0x00, 0x00, 0x00,
 			// AuditEntryID
 			0xff, 0xff, 0xff, 0xff,
-			//TimeoutHint
-			0x10, 0x27, 0x00, 0x00,
+			// TimeoutHint
+			0x00, 0x00, 0x00, 0x00,
 			// AdditionalHeader
 			0x00, 0x00, 0x00,
-			// MaxAge
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-			// TimestampToReturn
-			0x02, 0x00, 0x00, 0x00,
-			// NodesToRead
-			0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0xd0, 0x08,
-			0x0d, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,
-			0x00, 0x00, 0xff, 0xff, 0xff, 0xff,
+			// DeleteSubscription
+			0x01,
 		},
 	},
 }
 
-func TestDecodeReadRequest(t *testing.T) {
-	for _, c := range readRequestCases {
-		got, err := DecodeReadRequest(c.serialized)
+// option to regard []T{} and []T{nil} as equal
+// https://godoc.org/github.com/google/go-cmp/cmp#example-Option--EqualEmpty
+var decodeCmpOpt = cmp.FilterValues(func(x, y interface{}) bool {
+	vx, vy := reflect.ValueOf(x), reflect.ValueOf(y)
+	return (vx.IsValid() && vy.IsValid() && vx.Type() == vy.Type()) &&
+		(vx.Kind() == reflect.Slice) && (vx.Len() == 0 && vy.Len() == 0)
+}, cmp.Comparer(func(_, _ interface{}) bool { return true }))
+
+func TestDecodeCloseSessionRequest(t *testing.T) {
+	for _, c := range closeSessionRequestCases {
+		got, err := DecodeCloseSessionRequest(c.serialized)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -81,8 +78,8 @@ func TestDecodeReadRequest(t *testing.T) {
 	}
 }
 
-func TestSerializeReadRequest(t *testing.T) {
-	for _, c := range readRequestCases {
+func TestSerializeCloseSessionRequest(t *testing.T) {
+	for _, c := range closeSessionRequestCases {
 		got, err := c.structured.Serialize()
 		if err != nil {
 			t.Fatal(err)
@@ -94,8 +91,8 @@ func TestSerializeReadRequest(t *testing.T) {
 	}
 }
 
-func TestReadRequestLen(t *testing.T) {
-	for _, c := range readRequestCases {
+func TestCloseSessionRequestLen(t *testing.T) {
+	for _, c := range closeSessionRequestCases {
 		got := c.structured.Len()
 
 		if diff := cmp.Diff(got, len(c.serialized)); diff != "" {
@@ -104,12 +101,12 @@ func TestReadRequestLen(t *testing.T) {
 	}
 }
 
-func TestReadRequestServiceType(t *testing.T) {
-	for _, c := range readRequestCases {
-		if c.structured.ServiceType() != ServiceTypeReadRequest {
+func TestCloseSessionRequestServiceType(t *testing.T) {
+	for _, c := range closeSessionRequestCases {
+		if c.structured.ServiceType() != ServiceTypeCloseSessionRequest {
 			t.Errorf(
 				"ServiceType doesn't match. Want: %d, Got: %d",
-				ServiceTypeReadRequest,
+				ServiceTypeCloseSessionRequest,
 				c.structured.ServiceType(),
 			)
 		}

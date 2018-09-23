@@ -22,13 +22,13 @@ type ExpandedNodeID struct {
 // NewExpandedNodeID creates a new ExpandedNodeID.
 func NewExpandedNodeID(hasURI, hasIndex bool, nodeID NodeID, uri string, idx uint32) *ExpandedNodeID {
 	e := &ExpandedNodeID{
-		NodeID:       nodeID,
-		NamespaceURI: NewString(uri),
-		ServerIndex:  idx,
+		NodeID:      nodeID,
+		ServerIndex: idx,
 	}
 
 	if hasURI {
 		e.NodeID.SetURIFlag()
+		e.NamespaceURI = NewString(uri)
 	}
 	if hasIndex {
 		e.NodeID.SetIndexFlag()

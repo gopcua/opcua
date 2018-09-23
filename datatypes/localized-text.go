@@ -135,7 +135,7 @@ func (l *LocalizedText) Len() int {
 	return ll
 }
 
-// String retunrs LocalizedText in string.
+// String returns LocalizedText in string.
 func (l *LocalizedText) String() string {
 	return fmt.Sprintf("%x, %s, %s", l.EncodingMask, l.Locale, l.Text)
 }

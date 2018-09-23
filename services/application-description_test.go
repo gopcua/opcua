@@ -57,7 +57,7 @@ func TestSerializeApplicationDescription(t *testing.T) {
 
 	serialized, err := a.Serialize()
 	if err != nil {
-		t.Fatalf("Failed to serizlize ApplicationDescription: %s", err)
+		t.Fatalf("Failed to serialize ApplicationDescription: %s", err)
 	}
 
 	for i, s := range serialized {
