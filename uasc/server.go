@@ -7,7 +7,9 @@ package uasc
 import (
 	"context"
 	"net"
+	"time"
 
+	"github.com/wmnsk/gopcua/datatypes"
 	"github.com/wmnsk/gopcua/services"
 )
 
@@ -15,6 +17,14 @@ import (
 func ListenAndAcceptSecureChannel(ctx context.Context, transport net.Conn, cfg *Config) (*SecureChannel, error) {
 	s := &SecureChannel{
 		lowerConn: transport,
+		reqHeader: services.NewRequestHeader(
+			datatypes.NewTwoByteNodeID(0), time.Now(), 0, 0,
+			0xffff, "", services.NewNullAdditionalHeader(), nil,
+		),
+		resHeader: services.NewResponseHeader(
+			time.Now(), 0, 0, services.NewNullDiagnosticInfo(),
+			[]string{}, services.NewNullAdditionalHeader(), nil,
+		),
 		cfg:       cfg,
 		state:     srvStateSecureChannelClosed,
 		stateChan: make(chan secChanState),

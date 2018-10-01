@@ -6,7 +6,6 @@ package services
 
 import (
 	"encoding/binary"
-	"time"
 
 	"github.com/wmnsk/gopcua/datatypes"
 	"github.com/wmnsk/gopcua/errors"
@@ -46,7 +45,7 @@ type OpenSecureChannelRequest struct {
 }
 
 // NewOpenSecureChannelRequest creates an OpenSecureChannelRequest.
-func NewOpenSecureChannelRequest(ts time.Time, authToken uint8, handle, diag, timeout uint32, auditID string, ver, tokenType, securityMode, lifetime uint32, nonce []byte) *OpenSecureChannelRequest {
+func NewOpenSecureChannelRequest(reqHeader *RequestHeader, ver, tokenType, securityMode, lifetime uint32, nonce []byte) *OpenSecureChannelRequest {
 	return &OpenSecureChannelRequest{
 		TypeID: datatypes.NewExpandedNodeID(
 			false, false,
@@ -55,23 +54,7 @@ func NewOpenSecureChannelRequest(ts time.Time, authToken uint8, handle, diag, ti
 			),
 			"", 0,
 		),
-		RequestHeader: NewRequestHeader(
-			datatypes.NewTwoByteNodeID(authToken),
-			ts,
-			handle,
-			diag,
-			timeout,
-			auditID,
-			NewAdditionalHeader(
-				datatypes.NewExpandedNodeID(
-					false, false,
-					datatypes.NewTwoByteNodeID(0),
-					"", 0,
-				),
-				0x00,
-			),
-			nil,
-		),
+		RequestHeader:            reqHeader,
 		ClientProtocolVersion:    ver,
 		SecurityTokenRequestType: tokenType,
 		MessageSecurityMode:      securityMode,

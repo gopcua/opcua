@@ -16,13 +16,38 @@ import (
 	"github.com/wmnsk/gopcua/uacp"
 )
 
+// Config represents a configuration which UASC client/server has in common.
+type Config struct {
+	SecureChannelID   uint32
+	SecurityPolicyURI string
+	Certificate       []byte
+	Thumbprint        []byte
+	RequestID         uint32
+	SecurityTokenID   uint32
+	SequenceNumber    uint32
+}
+
+// NewConfig creates a new Config.
+func NewConfig(chanID uint32, policyURI string, cert, thumbprint []byte, reqID, tokenID uint32) *Config {
+	return &Config{
+		SecureChannelID:   chanID,
+		SecurityPolicyURI: policyURI,
+		Certificate:       cert,
+		Thumbprint:        thumbprint,
+		RequestID:         reqID,
+		SecurityTokenID:   tokenID,
+		SequenceNumber:    0,
+	}
+}
+
 // SecureChannel is an implementation of the net.Conn interface for Secure Channel in OPC UA Secure Conversation.
 //
 // In UASC, there are two types of net.Conn: SecureChannel and Session. Each Conn is handled in different manner.
 type SecureChannel struct {
 	lowerConn      net.Conn
 	cfg            *Config
-	reqHandle      uint32
+	reqHeader      *services.RequestHeader
+	resHeader      *services.ResponseHeader
 	rcvBuf, sndBuf []byte
 	state          secChanState
 	stateChan      chan secChanState
@@ -134,7 +159,8 @@ func (s *SecureChannel) Close() error {
 	}
 
 	s.cfg.SequenceNumber = 0
-	s.reqHandle = 0
+	s.reqHeader.RequestHandle = 0
+	s.resHeader.RequestHandle = 0
 	close(s.errChan)
 	close(s.lenChan)
 	close(s.stateChan)
@@ -321,7 +347,7 @@ func (s *SecureChannel) handleOpenSecureChannelRequest(o *services.OpenSecureCha
 		switch o.MessageSecurityMode {
 		// accepts only if MessageSecurityMode is None.
 		case services.SecModeNone:
-			s.reqHandle = o.RequestHandle
+			s.resHeader.RequestHandle = o.RequestHandle
 			if err := s.OpenSecureChannelResponse(0, 0, 0xffff, nil); err != nil {
 				s.errChan <- err
 			}
@@ -373,14 +399,14 @@ func (s *SecureChannel) handleCloseSecureChannelRequest(c *services.CloseSecureC
 	switch s.state {
 	// if client SecureChannel is opened, accept CloseSecureChannelRequest.
 	case cliStateSecureChannelOpened:
-		s.reqHandle = c.RequestHandle
+		s.reqHeader.RequestHandle = c.RequestHandle
 		if err := s.CloseSecureChannelResponse(0); err != nil {
 			s.errChan <- err
 		}
 		s.updateState(cliStateCloseSecureChannelSent)
 	// if server SecureChannel is opened, accept CloseSecureChannelRequest.
 	case srvStateSecureChannelOpened:
-		s.reqHandle = c.RequestHandle
+		s.reqHeader.RequestHandle = c.RequestHandle
 		if err := s.CloseSecureChannelResponse(0); err != nil {
 			s.errChan <- err
 		}
@@ -412,11 +438,11 @@ func (s *SecureChannel) handleCloseSecureChannelResponse(c *services.CloseSecure
 // OpenSecureChannelRequest sends OpenSecureChannelRequest on top of UASC to Conn.
 func (s *SecureChannel) OpenSecureChannelRequest(secMode, lifetime uint32, nonce []byte) error {
 	s.cfg.SequenceNumber++
-	s.reqHandle++
+	s.reqHeader.RequestHandle++
+	s.reqHeader.Timestamp = time.Now()
 	osc, err := New(
 		services.NewOpenSecureChannelRequest(
-			time.Now(), 0, s.reqHandle, 0x03, 0xffff,
-			"", 0, 0, secMode, lifetime, nonce,
+			s.reqHeader, 0, services.ReqTypeIssue, secMode, lifetime, nonce,
 		), s.cfg,
 	).Serialize()
 	if err != nil {
@@ -432,10 +458,11 @@ func (s *SecureChannel) OpenSecureChannelRequest(secMode, lifetime uint32, nonce
 // OpenSecureChannelResponse sends OpenSecureChannelResponse on top of UASC to Conn.
 func (s *SecureChannel) OpenSecureChannelResponse(code, token, lifetime uint32, nonce []byte) error {
 	s.cfg.SequenceNumber++
+	s.resHeader.ServiceResult = code
+	s.resHeader.Timestamp = time.Now()
 	osc, err := New(
 		services.NewOpenSecureChannelResponse(
-			time.Now(), s.reqHandle, code, services.NewNullDiagnosticInfo(),
-			[]string{""}, 0, services.NewChannelSecurityToken(
+			s.resHeader, 0, services.NewChannelSecurityToken(
 				s.cfg.SecureChannelID, token, time.Now(), lifetime,
 			), nonce,
 		), s.cfg,
@@ -453,11 +480,11 @@ func (s *SecureChannel) OpenSecureChannelResponse(code, token, lifetime uint32, 
 // CloseSecureChannelRequest sends CloseSecureChannelRequest on top of UASC to Conn.
 func (s *SecureChannel) CloseSecureChannelRequest() error {
 	s.cfg.SequenceNumber++
-	s.reqHandle++
+	s.reqHeader.RequestHandle++
+	s.reqHeader.Timestamp = time.Now()
 	csc, err := New(
 		services.NewCloseSecureChannelRequest(
-			time.Now(), 0, s.reqHandle, 0x03, 0xffff,
-			"", s.cfg.SecureChannelID,
+			s.reqHeader, s.cfg.SecureChannelID,
 		), s.cfg,
 	).Serialize()
 	if err != nil {
@@ -473,10 +500,10 @@ func (s *SecureChannel) CloseSecureChannelRequest() error {
 // CloseSecureChannelResponse sends CloseSecureChannelResponse on top of UASC to Conn.
 func (s *SecureChannel) CloseSecureChannelResponse(code uint32) error {
 	s.cfg.SequenceNumber++
+	s.resHeader.ServiceResult = code
+	s.resHeader.Timestamp = time.Now()
 	csc, err := New(
-		services.NewCloseSecureChannelResponse(
-			time.Now(), s.reqHandle, code, services.NewNullDiagnosticInfo(), []string{""},
-		), s.cfg,
+		services.NewCloseSecureChannelResponse(s.resHeader), s.cfg,
 	).Serialize()
 	if err != nil {
 		return err

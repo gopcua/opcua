@@ -5,23 +5,21 @@
 package services
 
 import (
-	"reflect"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-
 	"github.com/wmnsk/gopcua/datatypes"
 )
 
-var closeSessionRequestCases = []struct {
+var openSecureChannelRequestCases = []struct {
 	description string
-	structured  *CloseSessionRequest
+	structured  *OpenSecureChannelRequest
 	serialized  []byte
 }{
 	{
 		"normal",
-		NewCloseSessionRequest(
+		NewOpenSecureChannelRequest(
 			NewRequestHeader(
 				datatypes.NewOpaqueNodeID(0x00, []byte{
 					0x08, 0x22, 0x87, 0x62, 0xba, 0x81, 0xe1, 0x11,
@@ -30,12 +28,15 @@ var closeSessionRequestCases = []struct {
 				time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
 				1, 0, 0, "", NewNullAdditionalHeader(), nil,
 			),
-			true,
+			0,
+			ReqTypeIssue,
+			SecModeNone,
+			6000000,
+			nil,
 		),
-		[]byte{ // CloseSessionRequest
+		[]byte{
 			// TypeID
-			0x01, 0x00, 0xd9, 0x01,
-			// RequestHeader
+			0x01, 0x00, 0xbe, 0x01,
 			// AuthenticationToken
 			0x05, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x08,
 			0x22, 0x87, 0x62, 0xba, 0x81, 0xe1, 0x11, 0xa6,
@@ -52,23 +53,23 @@ var closeSessionRequestCases = []struct {
 			0x00, 0x00, 0x00, 0x00,
 			// AdditionalHeader
 			0x00, 0x00, 0x00,
-			// DeleteSubscription
-			0x01,
+			// ClientProtocolVersion
+			0x00, 0x00, 0x00, 0x00,
+			// SecurityTokenRequestType
+			0x00, 0x00, 0x00, 0x00,
+			// MessageSecurityMode
+			0x01, 0x00, 0x00, 0x00,
+			// ClientNonce
+			0xff, 0xff, 0xff, 0xff,
+			// RequestedLifetime
+			0x80, 0x8d, 0x5b, 0x00,
 		},
 	},
 }
 
-// option to regard []T{} and []T{nil} as equal
-// https://godoc.org/github.com/google/go-cmp/cmp#example-Option--EqualEmpty
-var decodeCmpOpt = cmp.FilterValues(func(x, y interface{}) bool {
-	vx, vy := reflect.ValueOf(x), reflect.ValueOf(y)
-	return (vx.IsValid() && vy.IsValid() && vx.Type() == vy.Type()) &&
-		(vx.Kind() == reflect.Slice) && (vx.Len() == 0 && vy.Len() == 0)
-}, cmp.Comparer(func(_, _ interface{}) bool { return true }))
-
-func TestDecodeCloseSessionRequest(t *testing.T) {
-	for _, c := range closeSessionRequestCases {
-		got, err := DecodeCloseSessionRequest(c.serialized)
+func TestDecodeOpenSecureChannelRequest(t *testing.T) {
+	for _, c := range openSecureChannelRequestCases {
+		got, err := DecodeOpenSecureChannelRequest(c.serialized)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -82,8 +83,8 @@ func TestDecodeCloseSessionRequest(t *testing.T) {
 	}
 }
 
-func TestSerializeCloseSessionRequest(t *testing.T) {
-	for _, c := range closeSessionRequestCases {
+func TestSerializeOpenSecureChannelRequest(t *testing.T) {
+	for _, c := range openSecureChannelRequestCases {
 		got, err := c.structured.Serialize()
 		if err != nil {
 			t.Fatal(err)
@@ -95,8 +96,8 @@ func TestSerializeCloseSessionRequest(t *testing.T) {
 	}
 }
 
-func TestCloseSessionRequestLen(t *testing.T) {
-	for _, c := range closeSessionRequestCases {
+func TestOpenSecureChannelRequestLen(t *testing.T) {
+	for _, c := range openSecureChannelRequestCases {
 		got := c.structured.Len()
 
 		if diff := cmp.Diff(got, len(c.serialized)); diff != "" {
@@ -105,12 +106,12 @@ func TestCloseSessionRequestLen(t *testing.T) {
 	}
 }
 
-func TestCloseSessionRequestServiceType(t *testing.T) {
-	for _, c := range closeSessionRequestCases {
-		if c.structured.ServiceType() != ServiceTypeCloseSessionRequest {
+func TestOpenSecureChannelRequestServiceType(t *testing.T) {
+	for _, c := range openSecureChannelRequestCases {
+		if c.structured.ServiceType() != ServiceTypeOpenSecureChannelRequest {
 			t.Errorf(
 				"ServiceType doesn't match. Want: %d, Got: %d",
-				ServiceTypeCloseSessionRequest,
+				ServiceTypeOpenSecureChannelRequest,
 				c.structured.ServiceType(),
 			)
 		}

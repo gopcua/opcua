@@ -7,7 +7,6 @@ package services
 import (
 	"encoding/binary"
 	"fmt"
-	"time"
 
 	"github.com/wmnsk/gopcua/datatypes"
 	"github.com/wmnsk/gopcua/errors"
@@ -30,19 +29,14 @@ type CreateSessionRequest struct {
 }
 
 // NewCreateSessionRequest creates a new NewCreateSessionRequest with the given parameters.
-func NewCreateSessionRequest(time time.Time, appURI, prodURI, appName string, appType uint32, serverURI, endpoint, sessionName string, nonce, cert []byte, timeout uint64, maxRespSize uint32) *CreateSessionRequest {
+func NewCreateSessionRequest(reqHeader *RequestHeader, appURI, prodURI, appName string, appType uint32, serverURI, endpoint, sessionName string, nonce, cert []byte, timeout uint64, maxRespSize uint32) *CreateSessionRequest {
 	return &CreateSessionRequest{
 		TypeID: datatypes.NewExpandedNodeID(
 			false, false,
 			datatypes.NewFourByteNodeID(0, ServiceTypeCreateSessionRequest),
 			"", 0,
 		),
-		RequestHeader: NewRequestHeader(
-			datatypes.NewTwoByteNodeID(0),
-			time, 1, 0, 0, "",
-			NewNullAdditionalHeader(),
-			nil,
-		),
+		RequestHeader: reqHeader,
 		ClientDescription: NewApplicationDescription(
 			appURI, prodURI, appName, appType, "", "", nil,
 		),

@@ -5,8 +5,6 @@
 package services
 
 import (
-	"time"
-
 	"github.com/wmnsk/gopcua/datatypes"
 )
 
@@ -33,7 +31,7 @@ type ActivateSessionResponse struct {
 }
 
 // NewActivateSessionResponse creates a new NewActivateSessionResponse.
-func NewActivateSessionResponse(timestamp time.Time, handle, code uint32, diag *DiagnosticInfo, strs []string, nonce []byte, results []uint32, diags []*DiagnosticInfo) *ActivateSessionResponse {
+func NewActivateSessionResponse(resHeader *ResponseHeader, nonce []byte, results []uint32, diags []*DiagnosticInfo) *ActivateSessionResponse {
 	return &ActivateSessionResponse{
 		TypeID: datatypes.NewExpandedNodeID(
 			false, false,
@@ -42,9 +40,12 @@ func NewActivateSessionResponse(timestamp time.Time, handle, code uint32, diag *
 			),
 			"", 0,
 		),
-		ResponseHeader: NewResponseHeader(
-			timestamp, handle, code, diag, strs, NewNullAdditionalHeader(), nil,
-		),
+		ResponseHeader: resHeader,
+		/*
+			NewResponseHeader(
+				timestamp, handle, code, diag, strs, NewNullAdditionalHeader(), nil,
+			),
+		*/
 		ServerNonce:     datatypes.NewByteString(nonce),
 		Results:         datatypes.NewUint32Array(results),
 		DiagnosticInfos: NewDiagnosticInfoArray(diags),
