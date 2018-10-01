@@ -23,6 +23,8 @@ const (
 	ServiceTypeActivateSessionResponse           = 470
 	ServiceTypeCloseSessionRequest               = 473
 	ServiceTypeCloseSessionResponse              = 476
+	ServiceTypeCancelRequest                     = 479
+	ServiceTypeCancelResponse                    = 482
 	ServiceTypeReadRequest                       = 631
 	ServiceTypeReadResponse                      = 634
 )
