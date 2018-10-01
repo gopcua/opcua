@@ -8,6 +8,9 @@ import (
 	"context"
 	"net"
 	"time"
+
+	"github.com/wmnsk/gopcua/datatypes"
+	"github.com/wmnsk/gopcua/services"
 )
 
 // OpenSecureChannel acts like net.Dial for OPC UA Secure Conversation network.
@@ -37,6 +40,14 @@ func OpenSecureChannelSecSignAndEncrypt(ctx context.Context, transportConn net.C
 func openSecureChannel(ctx context.Context, transportConn net.Conn, cfg *Config, secMode, lifetime uint32, nonce []byte, interval time.Duration, maxRetry int) (*SecureChannel, error) {
 	secChan := &SecureChannel{
 		lowerConn: transportConn,
+		reqHeader: services.NewRequestHeader(
+			datatypes.NewTwoByteNodeID(0), time.Now(), 0, 0,
+			0xffff, "", services.NewNullAdditionalHeader(), nil,
+		),
+		resHeader: services.NewResponseHeader(
+			time.Now(), 0, 0, services.NewNullDiagnosticInfo(),
+			[]string{}, services.NewNullAdditionalHeader(), nil,
+		),
 		cfg:       cfg,
 		state:     cliStateSecureChannelClosed,
 		stateChan: make(chan secChanState),

@@ -5,8 +5,6 @@
 package services
 
 import (
-	"time"
-
 	"github.com/wmnsk/gopcua/datatypes"
 )
 
@@ -20,7 +18,7 @@ type CloseSessionResponse struct {
 }
 
 // NewCloseSessionResponse creates an CloseSessionResponse.
-func NewCloseSessionResponse(timestamp time.Time, handle, code uint32, diag *DiagnosticInfo, strs []string) *CloseSessionResponse {
+func NewCloseSessionResponse(resHeader *ResponseHeader) *CloseSessionResponse {
 	return &CloseSessionResponse{
 		TypeID: datatypes.NewExpandedNodeID(
 			false, false,
@@ -29,17 +27,7 @@ func NewCloseSessionResponse(timestamp time.Time, handle, code uint32, diag *Dia
 			),
 			"", 0,
 		),
-		ResponseHeader: NewResponseHeader(
-			timestamp, handle, code, diag, strs,
-			NewAdditionalHeader(
-				datatypes.NewExpandedNodeID(
-					false, false,
-					datatypes.NewTwoByteNodeID(0),
-					"", 0,
-				),
-				0x00,
-			), nil,
-		),
+		ResponseHeader: resHeader,
 	}
 }
 

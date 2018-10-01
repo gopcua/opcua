@@ -6,7 +6,6 @@ package services
 
 import (
 	"encoding/binary"
-	"time"
 
 	"github.com/wmnsk/gopcua/datatypes"
 	"github.com/wmnsk/gopcua/errors"
@@ -23,7 +22,7 @@ type CloseSecureChannelRequest struct {
 }
 
 // NewCloseSecureChannelRequest creates an CloseSecureChannelRequest.
-func NewCloseSecureChannelRequest(ts time.Time, authToken uint8, handle, diag, timeout uint32, auditID string, chanID uint32) *CloseSecureChannelRequest {
+func NewCloseSecureChannelRequest(reqHeader *RequestHeader, chanID uint32) *CloseSecureChannelRequest {
 	return &CloseSecureChannelRequest{
 		TypeID: datatypes.NewExpandedNodeID(
 			false, false,
@@ -32,23 +31,7 @@ func NewCloseSecureChannelRequest(ts time.Time, authToken uint8, handle, diag, t
 			),
 			"", 0,
 		),
-		RequestHeader: NewRequestHeader(
-			datatypes.NewTwoByteNodeID(authToken),
-			ts,
-			handle,
-			diag,
-			timeout,
-			auditID,
-			NewAdditionalHeader(
-				datatypes.NewExpandedNodeID(
-					false, false,
-					datatypes.NewTwoByteNodeID(0),
-					"", 0,
-				),
-				0x00,
-			),
-			nil,
-		),
+		RequestHeader:   reqHeader,
 		SecureChannelID: chanID,
 	}
 }

@@ -13,6 +13,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/wmnsk/gopcua/datatypes"
 	"github.com/wmnsk/gopcua/services"
 	"github.com/wmnsk/gopcua/uacp"
 	"github.com/wmnsk/gopcua/uasc"
@@ -46,15 +47,20 @@ func main() {
 	}
 
 	g := services.NewGetEndpointsRequest(
-		time.Now(), 1, 0, 0,
-		"", *url, nil, nil,
+		services.NewRequestHeader(
+			datatypes.NewTwoByteNodeID(0), time.Now(), 0, 0,
+			0xffff, "", services.NewNullAdditionalHeader(), nil,
+		),
+		*url, nil, nil,
 	)
 	g.SetDiagAll()
 
 	o := services.NewOpenSecureChannelRequest(
-		time.Now(), 0, 1, 0, 0, "", 0,
-		services.ReqTypeIssue, services.SecModeNone,
-		6000000, nil,
+		services.NewRequestHeader(
+			datatypes.NewTwoByteNodeID(0), time.Now(), 0, 0,
+			0xffff, "", services.NewNullAdditionalHeader(), nil,
+		),
+		0, services.ReqTypeIssue, services.SecModeNone, 6000000, nil,
 	)
 	o.SetDiagAll()
 
@@ -146,7 +152,10 @@ func main() {
 		log.Printf("Received: %s\nRaw: %x", gres, buf[:m])
 
 		c := services.NewCloseSecureChannelRequest(
-			time.Now(), 0, 1, 0, 0, "", cfg.SecureChannelID,
+			services.NewRequestHeader(
+				datatypes.NewTwoByteNodeID(0), time.Now(), 0, 0,
+				0xffff, "", services.NewNullAdditionalHeader(), nil,
+			), cfg.SecureChannelID,
 		)
 		c.SetDiagAll()
 		clo, err := uasc.New(c, cfg).Serialize()

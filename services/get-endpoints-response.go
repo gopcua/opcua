@@ -5,8 +5,6 @@
 package services
 
 import (
-	"time"
-
 	"github.com/wmnsk/gopcua/datatypes"
 	"github.com/wmnsk/gopcua/errors"
 )
@@ -19,7 +17,7 @@ type GetEndpointsResponse struct {
 }
 
 // NewGetEndpointsResponse creates an GetEndpointsResponse.
-func NewGetEndpointsResponse(ts time.Time, handle, code uint32, diag *DiagnosticInfo, strs []string, endpoints ...*EndpointDescription) *GetEndpointsResponse {
+func NewGetEndpointsResponse(resHeader *ResponseHeader, endpoints ...*EndpointDescription) *GetEndpointsResponse {
 	return &GetEndpointsResponse{
 		TypeID: datatypes.NewExpandedNodeID(
 			false, false,
@@ -28,23 +26,8 @@ func NewGetEndpointsResponse(ts time.Time, handle, code uint32, diag *Diagnostic
 			),
 			"", 0,
 		),
-		ResponseHeader: NewResponseHeader(
-			ts,
-			handle,
-			code,
-			diag,
-			strs,
-			NewAdditionalHeader(
-				datatypes.NewExpandedNodeID(
-					false, false,
-					datatypes.NewTwoByteNodeID(0),
-					"", 0,
-				),
-				0x00,
-			),
-			nil,
-		),
-		Endpoints: NewEndpointDescriptionArray(endpoints),
+		ResponseHeader: resHeader,
+		Endpoints:      NewEndpointDescriptionArray(endpoints),
 	}
 }
 

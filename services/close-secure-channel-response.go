@@ -5,8 +5,6 @@
 package services
 
 import (
-	"time"
-
 	"github.com/wmnsk/gopcua/datatypes"
 )
 
@@ -20,7 +18,7 @@ type CloseSecureChannelResponse struct {
 }
 
 // NewCloseSecureChannelResponse creates an CloseSecureChannelResponse.
-func NewCloseSecureChannelResponse(timestamp time.Time, handle, code uint32, diag *DiagnosticInfo, strs []string) *CloseSecureChannelResponse {
+func NewCloseSecureChannelResponse(resHeader *ResponseHeader) *CloseSecureChannelResponse {
 	return &CloseSecureChannelResponse{
 		TypeID: datatypes.NewExpandedNodeID(
 			false, false,
@@ -29,17 +27,7 @@ func NewCloseSecureChannelResponse(timestamp time.Time, handle, code uint32, dia
 			),
 			"", 0,
 		),
-		ResponseHeader: NewResponseHeader(
-			timestamp, handle, code, diag, strs,
-			NewAdditionalHeader(
-				datatypes.NewExpandedNodeID(
-					false, false,
-					datatypes.NewTwoByteNodeID(0),
-					"", 0,
-				),
-				0x00,
-			), nil,
-		),
+		ResponseHeader: resHeader,
 	}
 }
 
