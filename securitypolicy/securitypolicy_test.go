@@ -153,6 +153,43 @@ func TestEncryptionAlgorithms(t *testing.T) {
 
 }
 
+func TestZeroStruct(t *testing.T) {
+	defer func() {
+		if r := recover(); r != nil {
+			t.Error("panicked while checking zero value of structs", r)
+		}
+	}()
+
+	zp := &SecurityPolicy{}
+	ze := &EncryptionAlgorithm{}
+
+	const payload string = "The quick brown fox jumps over the lazy dog."
+	plaintext := []byte(payload)
+
+	// Call all the methods and make sure they don't panic due to nil pointers
+	zpSym := zp.Symmetric(nil, nil)
+	zpAsym := zp.Asymmetric(nil, nil)
+
+	_ = ze.BlockSize()
+	_ = ze.Encrypt(plaintext)
+	_ = ze.Decrypt(plaintext)
+	_ = ze.Signature(plaintext)
+	_ = ze.VerifySignature(plaintext, plaintext)
+
+	_ = zpSym.BlockSize()
+	_ = zpSym.Encrypt(plaintext)
+	_ = zpSym.Decrypt(plaintext)
+	_ = zpSym.Signature(plaintext)
+	_ = zpSym.VerifySignature(plaintext, plaintext)
+
+	_ = zpAsym.BlockSize()
+	_ = zpAsym.Encrypt(plaintext)
+	_ = zpAsym.Decrypt(plaintext)
+	_ = zpAsym.Signature(plaintext)
+	_ = zpAsym.VerifySignature(plaintext, plaintext)
+
+}
+
 func generatePrivateKey(bitSize int) (*rsa.PrivateKey, error) {
 	// Private Key generation
 	privateKey, err := rsa.GenerateKey(rand.Reader, bitSize)

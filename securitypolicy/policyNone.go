@@ -20,7 +20,7 @@ SymmetricEncryptionAlgorithm_None 		This algorithm does not apply.
 AsymmetricSignatureAlgorithm_None 		This algorithm does not apply.
 AsymmetricEncryptionAlgorithm_None 		This algorithm does not apply.
 KeyDerivationAlgorithm_None 		This algorithm does not apply.
-SecurtyPolicy_None_Limits 		DerivedSignatureKeyLength: 0
+SecurityPolicy_None_Limits 		DerivedSignatureKeyLength: 0
 
 */
 func newNoneAsymmetric(*rsa.PrivateKey, *rsa.PublicKey) *EncryptionAlgorithm {
@@ -30,7 +30,7 @@ func newNoneAsymmetric(*rsa.PrivateKey, *rsa.PublicKey) *EncryptionAlgorithm {
 	e.encrypt = encryptNone
 	e.decrypt = decryptNone
 	e.signature = signatureNone
-	e.verifySignature = func(_, _ []byte) error { return nil }
+	e.verifySignature = verifySignatureNone
 
 	return e
 }
@@ -42,7 +42,7 @@ func newNoneSymmetric([]byte, []byte) *EncryptionAlgorithm {
 	e.encrypt = encryptNone
 	e.decrypt = decryptNone
 	e.signature = signatureNone
-	e.verifySignature = func(_, _ []byte) error { return nil }
+	e.verifySignature = verifySignatureNone
 
 	return e
 }
@@ -52,14 +52,18 @@ func blockSizeNone() int {
 	return 1
 }
 
-func signatureNone([]byte) []byte {
-	return make([]byte, 0)
-}
-
 func encryptNone(src []byte) []byte {
 	return append([]byte(nil), src...)
 }
 
 func decryptNone(src []byte) []byte {
 	return append([]byte(nil), src...)
+}
+
+func signatureNone([]byte) []byte {
+	return make([]byte, 0)
+}
+
+func verifySignatureNone(_, _ []byte) error {
+	return nil
 }
