@@ -12,14 +12,14 @@ import (
 	"github.com/wmnsk/gopcua/datatypes"
 )
 
-var activateSessionRequestCases = []struct {
+var createSessionRequestCases = []struct {
 	description string
-	structured  *ActivateSessionRequest
+	structured  *CreateSessionRequest
 	serialized  []byte
 }{
 	{
 		"normal",
-		NewActivateSessionRequest(
+		NewCreateSessionRequest(
 			NewRequestHeader(
 				datatypes.NewOpaqueNodeID(0x00, []byte{
 					0x08, 0x22, 0x87, 0x62, 0xba, 0x81, 0xe1, 0x11,
@@ -28,20 +28,13 @@ var activateSessionRequestCases = []struct {
 				time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
 				1, 0, 0, "", NewNullAdditionalHeader(), nil,
 			),
-			NewSignatureData("", nil), nil, nil,
-			datatypes.NewExtensionObject(
-				&datatypes.ExpandedNodeID{
-					NodeID: datatypes.NewFourByteNodeID(0, 321),
-				},
-				0x01,
-				[]byte("0"),
-			),
-			NewSignatureData("", nil),
+			"app-uri", "prod-uri", "app-name", AppTypeClient,
+			"server-uri", "endpoint-url", "session-name", nil,
+			nil, 6000000, 65534,
 		),
 		[]byte{
 			// TypeID
-			0x01, 0x00, 0xd3, 0x01,
-			// RequestHeader
+			0x01, 0x00, 0xcd, 0x01,
 			// AuthenticationToken
 			0x05, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x08,
 			0x22, 0x87, 0x62, 0xba, 0x81, 0xe1, 0x11, 0xa6,
@@ -58,28 +51,42 @@ var activateSessionRequestCases = []struct {
 			0x00, 0x00, 0x00, 0x00,
 			// AdditionalHeader
 			0x00, 0x00, 0x00,
-			// ClientSignature
+			// ClientDescription: ApplicationDescription
+			// ApplicationURI
+			0x07, 0x00, 0x00, 0x00, 0x61, 0x70, 0x70, 0x2d, 0x75, 0x72, 0x69,
+			// ProductURI
+			0x08, 0x00, 0x00, 0x00, 0x70, 0x72, 0x6f, 0x64, 0x2d, 0x75, 0x72, 0x69,
+			// ApplicationName
+			0x02, 0x08, 0x00, 0x00, 0x00, 0x61, 0x70, 0x70, 0x2d, 0x6e, 0x61, 0x6d, 0x65,
+			// ApplicationType
+			0x01, 0x00, 0x00, 0x00,
+			// GatewayServerURI
 			0xff, 0xff, 0xff, 0xff,
-			// ClientSoftwareCertificates
+			// DiscoveryProfileURI
 			0xff, 0xff, 0xff, 0xff,
-			// LocaleIDs
-			0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-			// UserIdentityToken
-			// TypeID
-			0x01, 0x00, 0x41, 0x01,
-			// EncodingMask
-			0x01,
-			// AnonymousIdentityToken
-			0x05, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x30,
-			// UserTokenSignature
-			0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+			// DiscoveryURLs
+			0x00, 0x00, 0x00, 0x00,
+			// ServerURI
+			0x0a, 0x00, 0x00, 0x00, 0x73, 0x65, 0x72, 0x76, 0x65, 0x72, 0x2d, 0x75, 0x72, 0x69,
+			// EndpointURL
+			0x0c, 0x00, 0x00, 0x00, 0x65, 0x6e, 0x64, 0x70, 0x6f, 0x69, 0x6e, 0x74, 0x2d, 0x75, 0x72, 0x6c,
+			// SessionName
+			0x0c, 0x00, 0x00, 0x00, 0x73, 0x65, 0x73, 0x73, 0x69, 0x6f, 0x6e, 0x2d, 0x6e, 0x61, 0x6d, 0x65,
+			// ClientNonce
+			0xff, 0xff, 0xff, 0xff,
+			// ClientCertificate
+			0xff, 0xff, 0xff, 0xff,
+			// RequestedTimeout
+			0x80, 0x8d, 0x5b, 0x00, 0x00, 0x00, 0x00, 0x00,
+			// MaxResponseMessageSize
+			0xfe, 0xff, 0x00, 0x00,
 		},
 	},
 }
 
-func TestDecodeActivateSessionRequest(t *testing.T) {
-	for _, c := range activateSessionRequestCases {
-		got, err := DecodeActivateSessionRequest(c.serialized)
+func TestDecodeCreateSessionRequest(t *testing.T) {
+	for _, c := range createSessionRequestCases {
+		got, err := DecodeCreateSessionRequest(c.serialized)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -93,8 +100,8 @@ func TestDecodeActivateSessionRequest(t *testing.T) {
 	}
 }
 
-func TestSerializeActivateSessionRequest(t *testing.T) {
-	for _, c := range activateSessionRequestCases {
+func TestSerializeCreateSessionRequest(t *testing.T) {
+	for _, c := range createSessionRequestCases {
 		got, err := c.structured.Serialize()
 		if err != nil {
 			t.Fatal(err)
@@ -106,8 +113,8 @@ func TestSerializeActivateSessionRequest(t *testing.T) {
 	}
 }
 
-func TestActivateSessionRequestLen(t *testing.T) {
-	for _, c := range activateSessionRequestCases {
+func TestCreateSessionRequestLen(t *testing.T) {
+	for _, c := range createSessionRequestCases {
 		got := c.structured.Len()
 
 		if diff := cmp.Diff(got, len(c.serialized)); diff != "" {
@@ -116,12 +123,12 @@ func TestActivateSessionRequestLen(t *testing.T) {
 	}
 }
 
-func TestActivateSessionRequestServiceType(t *testing.T) {
-	for _, c := range activateSessionRequestCases {
-		if c.structured.ServiceType() != ServiceTypeActivateSessionRequest {
+func TestCreateSessionRequestServiceType(t *testing.T) {
+	for _, c := range createSessionRequestCases {
+		if c.structured.ServiceType() != ServiceTypeCreateSessionRequest {
 			t.Errorf(
 				"ServiceType doesn't match. Want: %d, Got: %d",
-				ServiceTypeActivateSessionRequest,
+				ServiceTypeCreateSessionRequest,
 				c.structured.ServiceType(),
 			)
 		}

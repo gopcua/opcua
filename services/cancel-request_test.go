@@ -5,23 +5,22 @@
 package services
 
 import (
-	"reflect"
 	"testing"
 	"time"
 
-	"github.com/google/go-cmp/cmp"
-
 	"github.com/wmnsk/gopcua/datatypes"
+
+	"github.com/google/go-cmp/cmp"
 )
 
-var closeSessionRequestCases = []struct {
+var cancelRequestCases = []struct {
 	description string
-	structured  *CloseSessionRequest
+	structured  *CancelRequest
 	serialized  []byte
 }{
 	{
 		"normal",
-		NewCloseSessionRequest(
+		NewCancelRequest(
 			NewRequestHeader(
 				datatypes.NewOpaqueNodeID(0x00, []byte{
 					0x08, 0x22, 0x87, 0x62, 0xba, 0x81, 0xe1, 0x11,
@@ -30,12 +29,11 @@ var closeSessionRequestCases = []struct {
 				time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
 				1, 0, 0, "", NewNullAdditionalHeader(), nil,
 			),
-			true,
+			1,
 		),
-		[]byte{ // CloseSessionRequest
+		[]byte{
 			// TypeID
-			0x01, 0x00, 0xd9, 0x01,
-			// RequestHeader
+			0x01, 0x00, 0xdf, 0x01,
 			// AuthenticationToken
 			0x05, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x08,
 			0x22, 0x87, 0x62, 0xba, 0x81, 0xe1, 0x11, 0xa6,
@@ -52,23 +50,15 @@ var closeSessionRequestCases = []struct {
 			0x00, 0x00, 0x00, 0x00,
 			// AdditionalHeader
 			0x00, 0x00, 0x00,
-			// DeleteSubscription
-			0x01,
+			// RequestHandle
+			0x01, 0x00, 0x00, 0x00,
 		},
 	},
 }
 
-// option to regard []T{} and []T{nil} as equal
-// https://godoc.org/github.com/google/go-cmp/cmp#example-Option--EqualEmpty
-var decodeCmpOpt = cmp.FilterValues(func(x, y interface{}) bool {
-	vx, vy := reflect.ValueOf(x), reflect.ValueOf(y)
-	return (vx.IsValid() && vy.IsValid() && vx.Type() == vy.Type()) &&
-		(vx.Kind() == reflect.Slice) && (vx.Len() == 0 && vy.Len() == 0)
-}, cmp.Comparer(func(_, _ interface{}) bool { return true }))
-
-func TestDecodeCloseSessionRequest(t *testing.T) {
-	for _, c := range closeSessionRequestCases {
-		got, err := DecodeCloseSessionRequest(c.serialized)
+func TestDecodeCancelRequest(t *testing.T) {
+	for _, c := range cancelRequestCases {
+		got, err := DecodeCancelRequest(c.serialized)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -82,8 +72,8 @@ func TestDecodeCloseSessionRequest(t *testing.T) {
 	}
 }
 
-func TestSerializeCloseSessionRequest(t *testing.T) {
-	for _, c := range closeSessionRequestCases {
+func TestSerializeCancelRequest(t *testing.T) {
+	for _, c := range cancelRequestCases {
 		got, err := c.structured.Serialize()
 		if err != nil {
 			t.Fatal(err)
@@ -95,8 +85,8 @@ func TestSerializeCloseSessionRequest(t *testing.T) {
 	}
 }
 
-func TestCloseSessionRequestLen(t *testing.T) {
-	for _, c := range closeSessionRequestCases {
+func TestCancelRequestLen(t *testing.T) {
+	for _, c := range cancelRequestCases {
 		got := c.structured.Len()
 
 		if diff := cmp.Diff(got, len(c.serialized)); diff != "" {
@@ -105,12 +95,12 @@ func TestCloseSessionRequestLen(t *testing.T) {
 	}
 }
 
-func TestCloseSessionRequestServiceType(t *testing.T) {
-	for _, c := range closeSessionRequestCases {
-		if c.structured.ServiceType() != ServiceTypeCloseSessionRequest {
+func TestCancelRequestServiceType(t *testing.T) {
+	for _, c := range cancelRequestCases {
+		if c.structured.ServiceType() != ServiceTypeCancelRequest {
 			t.Errorf(
 				"ServiceType doesn't match. Want: %d, Got: %d",
-				ServiceTypeCloseSessionRequest,
+				ServiceTypeCancelRequest,
 				c.structured.ServiceType(),
 			)
 		}

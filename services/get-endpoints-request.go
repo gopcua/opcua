@@ -5,8 +5,6 @@
 package services
 
 import (
-	"time"
-
 	"github.com/wmnsk/gopcua/datatypes"
 	"github.com/wmnsk/gopcua/errors"
 )
@@ -25,7 +23,7 @@ type GetEndpointsRequest struct {
 }
 
 // NewGetEndpointsRequest creates an GetEndpointsRequest.
-func NewGetEndpointsRequest(ts time.Time, handle, diag, timeout uint32, auditID string, endpoint string, localIDs, profileURIs []string) *GetEndpointsRequest {
+func NewGetEndpointsRequest(reqHeader *RequestHeader, endpoint string, localIDs, profileURIs []string) *GetEndpointsRequest {
 	return &GetEndpointsRequest{
 		TypeID: datatypes.NewExpandedNodeID(
 			false, false,
@@ -34,26 +32,10 @@ func NewGetEndpointsRequest(ts time.Time, handle, diag, timeout uint32, auditID 
 			),
 			"", 0,
 		),
-		RequestHeader: NewRequestHeader(
-			datatypes.NewTwoByteNodeID(0x00),
-			ts,
-			handle,
-			diag,
-			timeout,
-			auditID,
-			NewAdditionalHeader(
-				datatypes.NewExpandedNodeID(
-					false, false,
-					datatypes.NewTwoByteNodeID(0),
-					"", 0,
-				),
-				0x00,
-			),
-			nil,
-		),
-		EndpointURL: datatypes.NewString(endpoint),
-		LocaleIDs:   datatypes.NewStringArray(localIDs),
-		ProfileURIs: datatypes.NewStringArray(profileURIs),
+		RequestHeader: reqHeader,
+		EndpointURL:   datatypes.NewString(endpoint),
+		LocaleIDs:     datatypes.NewStringArray(localIDs),
+		ProfileURIs:   datatypes.NewStringArray(profileURIs),
 	}
 }
 

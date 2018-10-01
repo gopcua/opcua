@@ -23,6 +23,8 @@ const (
 	ServiceTypeActivateSessionResponse           = 470
 	ServiceTypeCloseSessionRequest               = 473
 	ServiceTypeCloseSessionResponse              = 476
+	ServiceTypeCancelRequest                     = 479
+	ServiceTypeCancelResponse                    = 482
 	ServiceTypeReadRequest                       = 631
 	ServiceTypeReadResponse                      = 634
 )
@@ -67,14 +69,18 @@ func Decode(b []byte) (Service, error) {
 		s = &CreateSessionRequest{}
 	case ServiceTypeCreateSessionResponse:
 		s = &CreateSessionResponse{}
-	case ServiceTypeCloseSessionRequest:
-		s = &CloseSessionRequest{}
-	case ServiceTypeCloseSessionResponse:
-		s = &CloseSessionResponse{}
 	case ServiceTypeActivateSessionRequest:
 		s = &ActivateSessionRequest{}
 	case ServiceTypeActivateSessionResponse:
 		s = &ActivateSessionResponse{}
+	case ServiceTypeCloseSessionRequest:
+		s = &CloseSessionRequest{}
+	case ServiceTypeCloseSessionResponse:
+		s = &CloseSessionResponse{}
+	case ServiceTypeCancelRequest:
+		s = &CancelRequest{}
+	case ServiceTypeCancelResponse:
+		s = &CancelResponse{}
 	case ServiceTypeReadRequest:
 		s = &ReadRequest{}
 	case ServiceTypeReadResponse:

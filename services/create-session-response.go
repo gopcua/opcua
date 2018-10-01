@@ -7,7 +7,6 @@ package services
 import (
 	"encoding/binary"
 	"fmt"
-	"time"
 
 	"github.com/wmnsk/gopcua/datatypes"
 	"github.com/wmnsk/gopcua/errors"
@@ -31,18 +30,14 @@ type CreateSessionResponse struct {
 }
 
 // NewCreateSessionResponse creates a new NewCreateSessionResponse with the given parameters.
-func NewCreateSessionResponse(time time.Time, result uint32, diag *DiagnosticInfo, sessionID uint32, authToken []byte, timeout uint64, nonce, cert []byte, alg string, sign []byte, maxRespSize uint32, endpoints ...*EndpointDescription) *CreateSessionResponse {
+func NewCreateSessionResponse(resHeader *ResponseHeader, sessionID uint32, authToken []byte, timeout uint64, nonce, cert []byte, alg string, sign []byte, maxRespSize uint32, endpoints ...*EndpointDescription) *CreateSessionResponse {
 	return &CreateSessionResponse{
 		TypeID: datatypes.NewExpandedNodeID(
 			false, false,
 			datatypes.NewFourByteNodeID(0, ServiceTypeCreateSessionResponse),
 			"", 0,
 		),
-		ResponseHeader: NewResponseHeader(
-			time, 1, result, diag, []string{},
-			NewNullAdditionalHeader(),
-			nil,
-		),
+		ResponseHeader:             resHeader,
 		SessionID:                  datatypes.NewNumericNodeID(0, sessionID),
 		AuthenticationToken:        datatypes.NewOpaqueNodeID(0, authToken),
 		RevisedSessionTimeout:      timeout,

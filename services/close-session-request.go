@@ -5,8 +5,6 @@
 package services
 
 import (
-	"time"
-
 	"github.com/wmnsk/gopcua/datatypes"
 )
 
@@ -21,7 +19,7 @@ type CloseSessionRequest struct {
 }
 
 // NewCloseSessionRequest creates a CloseSessionRequest.
-func NewCloseSessionRequest(ts time.Time, authToken datatypes.NodeID, handle, diag, timeout uint32, auditID string, deleteSubs bool) *CloseSessionRequest {
+func NewCloseSessionRequest(reqHeader *RequestHeader, deleteSubs bool) *CloseSessionRequest {
 	return &CloseSessionRequest{
 		TypeID: datatypes.NewExpandedNodeID(
 			false, false,
@@ -30,23 +28,7 @@ func NewCloseSessionRequest(ts time.Time, authToken datatypes.NodeID, handle, di
 			),
 			"", 0,
 		),
-		RequestHeader: NewRequestHeader(
-			authToken,
-			ts,
-			handle,
-			diag,
-			timeout,
-			auditID,
-			NewAdditionalHeader(
-				datatypes.NewExpandedNodeID(
-					false, false,
-					datatypes.NewTwoByteNodeID(0),
-					"", 0,
-				),
-				0x00,
-			),
-			nil,
-		),
+		RequestHeader:       reqHeader,
 		DeleteSubscriptions: datatypes.NewBoolean(deleteSubs),
 	}
 }

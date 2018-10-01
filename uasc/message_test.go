@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wmnsk/gopcua/datatypes"
+
 	"github.com/google/go-cmp/cmp"
 	"github.com/wmnsk/gopcua/services"
 )
@@ -22,8 +24,12 @@ var msgCases = []struct {
 		"OPN",
 		New(
 			services.NewOpenSecureChannelRequest(
-				time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-				0, 1, 0x03ff, 0, "", 0, services.ReqTypeIssue,
+				services.NewRequestHeader(
+					datatypes.NewTwoByteNodeID(0),
+					time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
+					1, 0x03ff, 0, "", services.NewNullAdditionalHeader(), nil,
+				),
+				0, services.ReqTypeIssue,
 				services.SecModeNone, 6000000, nil,
 			),
 			&Config{
@@ -85,8 +91,11 @@ var msgCases = []struct {
 		"MSG",
 		New(
 			services.NewGetEndpointsRequest(
-				time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-				1, 0x03ff, 0, "",
+				services.NewRequestHeader(
+					datatypes.NewTwoByteNodeID(0),
+					time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
+					1, 0x03ff, 0, "", services.NewNullAdditionalHeader(), nil,
+				),
 				"opc.tcp://wow.its.easy:11111/UA/Server",
 				nil, nil,
 			),
@@ -139,8 +148,12 @@ var msgCases = []struct {
 		"CLO",
 		New(
 			services.NewCloseSecureChannelRequest(
-				time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-				0, 1, 0x03ff, 0, "", 1,
+				services.NewRequestHeader(
+					datatypes.NewTwoByteNodeID(0),
+					time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
+					1, 0x03ff, 0, "", services.NewNullAdditionalHeader(), nil,
+				),
+				1,
 			),
 			&Config{
 				SecureChannelID:   0,

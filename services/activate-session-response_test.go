@@ -19,8 +19,13 @@ var activateSessionResponseCases = []struct {
 	{ // Without dummy nonce, results nor diags
 		"nothing",
 		NewActivateSessionResponse(
-			time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-			1, 0, nil, nil, nil, nil, nil,
+			NewResponseHeader(
+				time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
+				1, 0, NewNullDiagnosticInfo(), []string{}, NewNullAdditionalHeader(), nil,
+			),
+			nil,
+			nil,
+			nil,
 		),
 		[]byte{
 			// TypeID
@@ -47,8 +52,13 @@ var activateSessionResponseCases = []struct {
 	}, { // With dummy nonce, no results and diags
 		"with-nonce",
 		NewActivateSessionResponse(
-			time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-			1, 0, nil, nil, []byte{0xde, 0xad, 0xbe, 0xef}, nil, nil,
+			NewResponseHeader(
+				time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
+				1, 0, NewNullDiagnosticInfo(), []string{}, NewNullAdditionalHeader(), nil,
+			),
+			[]byte{0xde, 0xad, 0xbe, 0xef},
+			nil,
+			nil,
 		),
 		[]byte{
 			// TypeID

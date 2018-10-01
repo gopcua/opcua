@@ -5,8 +5,6 @@
 package services
 
 import (
-	"time"
-
 	"github.com/wmnsk/gopcua/datatypes"
 )
 
@@ -33,7 +31,7 @@ type ActivateSessionRequest struct {
 }
 
 // NewActivateSessionRequest creates a new ActivateSessionRequest.
-func NewActivateSessionRequest(ts time.Time, authToken datatypes.NodeID, handle, diag, timeout uint32, auditID string, sig *SignatureData, certs []*SignedSoftwareCertificate, locales []string, userToken *datatypes.ExtensionObject, tokenSig *SignatureData) *ActivateSessionRequest {
+func NewActivateSessionRequest(reqHeader *RequestHeader, sig *SignatureData, certs []*SignedSoftwareCertificate, locales []string, userToken *datatypes.ExtensionObject, tokenSig *SignatureData) *ActivateSessionRequest {
 	return &ActivateSessionRequest{
 		TypeID: datatypes.NewExpandedNodeID(
 			false, false,
@@ -42,23 +40,7 @@ func NewActivateSessionRequest(ts time.Time, authToken datatypes.NodeID, handle,
 			),
 			"", 0,
 		),
-		RequestHeader: NewRequestHeader(
-			authToken,
-			ts,
-			handle,
-			diag,
-			timeout,
-			auditID,
-			NewAdditionalHeader(
-				datatypes.NewExpandedNodeID(
-					false, false,
-					datatypes.NewTwoByteNodeID(0),
-					"", 0,
-				),
-				0x00,
-			),
-			nil,
-		),
+		RequestHeader:              reqHeader,
 		ClientSignature:            sig,
 		ClientSoftwareCertificates: NewSignedSoftwareCertificateArray(certs),
 		LocaleIDs:                  datatypes.NewStringArray(locales),
