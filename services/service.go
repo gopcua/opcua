@@ -11,7 +11,8 @@ import (
 
 // ServiceType definitions.
 const (
-	ServiceTypeGetEndpointsRequest        uint16 = 428
+	ServiceTypeFindServersRequest         uint16 = 422
+	ServiceTypeGetEndpointsRequest               = 428
 	ServiceTypeGetEndpointsResponse              = 431
 	ServiceTypeOpenSecureChannelRequest          = 446
 	ServiceTypeOpenSecureChannelResponse         = 449
