@@ -55,6 +55,12 @@ func Decode(b []byte) (Service, error) {
 	}
 
 	switch n.Identifier {
+	case ServiceTypeFindServersRequest:
+		s = &FindServersRequest{}
+	case ServiceTypeGetEndpointsRequest:
+		s = &GetEndpointsRequest{}
+	case ServiceTypeGetEndpointsResponse:
+		s = &GetEndpointsResponse{}
 	case ServiceTypeOpenSecureChannelRequest:
 		s = &OpenSecureChannelRequest{}
 	case ServiceTypeOpenSecureChannelResponse:
@@ -63,10 +69,6 @@ func Decode(b []byte) (Service, error) {
 		s = &CloseSecureChannelRequest{}
 	case ServiceTypeCloseSecureChannelResponse:
 		s = &CloseSecureChannelResponse{}
-	case ServiceTypeGetEndpointsRequest:
-		s = &GetEndpointsRequest{}
-	case ServiceTypeGetEndpointsResponse:
-		s = &GetEndpointsResponse{}
 	case ServiceTypeCreateSessionRequest:
 		s = &CreateSessionRequest{}
 	case ServiceTypeCreateSessionResponse:
