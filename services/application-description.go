@@ -9,6 +9,7 @@ import (
 	"fmt"
 
 	"github.com/wmnsk/gopcua/datatypes"
+	"github.com/wmnsk/gopcua/errors"
 )
 
 // ApplicationType definitions.
@@ -198,4 +199,92 @@ func (a *ApplicationDescription) String() string {
 		a.DiscoveryProfileURI.Get(),
 		a.DiscoveryURIs.Strings,
 	)
+}
+
+// ApplicationDescriptionArray represents an ApplicationDescriptionArray.
+type ApplicationDescriptionArray struct {
+	ArraySize               int32
+	ApplicationDescriptions []*ApplicationDescription
+}
+
+// NewApplicationDescriptionArray creates an NewApplicationDescriptionArray from multiple ApplicationDescription.
+func NewApplicationDescriptionArray(descs []*ApplicationDescription) *ApplicationDescriptionArray {
+	e := &ApplicationDescriptionArray{
+		ArraySize: int32(len(descs)),
+	}
+	e.ApplicationDescriptions = append(e.ApplicationDescriptions, descs...)
+
+	return e
+}
+
+// DecodeApplicationDescriptionArray decodes given bytes into ApplicationDescriptionArray.
+func DecodeApplicationDescriptionArray(b []byte) (*ApplicationDescriptionArray, error) {
+	e := &ApplicationDescriptionArray{}
+	if err := e.DecodeFromBytes(b); err != nil {
+		return nil, err
+	}
+
+	return e, nil
+}
+
+// DecodeFromBytes decodes given bytes into ApplicationDescriptionArray.
+func (e *ApplicationDescriptionArray) DecodeFromBytes(b []byte) error {
+	if len(b) < 4 {
+		return errors.NewErrTooShortToDecode(e, "should be longer than 4 bytes.")
+	}
+
+	e.ArraySize = int32(binary.LittleEndian.Uint32(b[:4]))
+	if e.ArraySize <= 0 {
+		return nil
+	}
+
+	var offset = 4
+	for i := 0; i < int(e.ArraySize); i++ {
+		ed, err := DecodeApplicationDescription(b[offset:])
+		if err != nil {
+			return err
+		}
+		e.ApplicationDescriptions = append(e.ApplicationDescriptions, ed)
+		offset += e.ApplicationDescriptions[i].Len()
+	}
+
+	return nil
+}
+
+// Serialize serializes ApplicationDescriptionArray into bytes.
+func (e *ApplicationDescriptionArray) Serialize() ([]byte, error) {
+	b := make([]byte, e.Len())
+	if err := e.SerializeTo(b); err != nil {
+		return nil, err
+	}
+
+	return b, nil
+}
+
+// SerializeTo serializes ApplicationDescriptionArray into bytes.
+func (e *ApplicationDescriptionArray) SerializeTo(b []byte) error {
+	binary.LittleEndian.PutUint32(b[:4], uint32(e.ArraySize))
+	if e.ArraySize <= 0 {
+		return nil
+	}
+
+	var offset = 4
+	for _, ed := range e.ApplicationDescriptions {
+		if err := ed.SerializeTo(b[offset:]); err != nil {
+			return err
+		}
+		offset += ed.Len()
+	}
+
+	return nil
+}
+
+// Len returns the actual length of ApplicationDescriptionArray in int.
+func (e *ApplicationDescriptionArray) Len() int {
+	var l = 4
+	for _, ed := range e.ApplicationDescriptions {
+		l += ed.Len()
+	}
+
+	return l
 }
