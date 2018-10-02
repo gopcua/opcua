@@ -27,6 +27,7 @@ const (
 	ServiceTypeCancelResponse                    = 482
 	ServiceTypeReadRequest                       = 631
 	ServiceTypeReadResponse                      = 634
+	ServiceTypeCreateSubscriptionRequest         = 787
 )
 
 // Service is an interface to handle any kind of OPC UA Services.
@@ -85,6 +86,8 @@ func Decode(b []byte) (Service, error) {
 		s = &ReadRequest{}
 	case ServiceTypeReadResponse:
 		s = &ReadResponse{}
+	case ServiceTypeCreateSubscriptionRequest:
+		s = &CreateSubscriptionRequest{}
 	default:
 		return nil, errors.NewErrUnsupported(n.Identifier, "unsupported or not implemented yet.")
 	}
