@@ -12,6 +12,7 @@ import (
 // ServiceType definitions.
 const (
 	ServiceTypeFindServersRequest         uint16 = 422
+	ServiceTypeFindServersResponse               = 425
 	ServiceTypeGetEndpointsRequest               = 428
 	ServiceTypeGetEndpointsResponse              = 431
 	ServiceTypeOpenSecureChannelRequest          = 446
@@ -57,6 +58,8 @@ func Decode(b []byte) (Service, error) {
 	switch n.Identifier {
 	case ServiceTypeFindServersRequest:
 		s = &FindServersRequest{}
+	case ServiceTypeFindServersResponse:
+		s = &FindServersResponse{}
 	case ServiceTypeGetEndpointsRequest:
 		s = &GetEndpointsRequest{}
 	case ServiceTypeGetEndpointsResponse:
