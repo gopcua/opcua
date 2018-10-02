@@ -12,7 +12,12 @@ import (
 	"github.com/wmnsk/gopcua/id"
 )
 
-// Specification: Part 4, 5.13.2.1
+// CreateSubscriptionRequest is used to create a Subscription. Subscriptions monitor a set of MonitoredItems for
+// Notifications and return them to the Client in response to Publish requests.
+// Illegal request values for parameters that can be revised do not generate errors. Instead the
+// Server will choose default values and indicate them in the corresponding revised parameter.
+//
+// Specification: Part 4, 5.13.2
 type CreateSubscriptionRequest struct {
 	TypeID *datatypes.ExpandedNodeID
 	*RequestHeader
