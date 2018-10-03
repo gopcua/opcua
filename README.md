@@ -107,7 +107,7 @@ NOTE: Automatic session activation has not been implemented at this time.
 | Query Service Set           | QueryFirst                    |           |              |
 |                             | QueryNext                     |           |              |
 | Attribute Service Set       | Read                          | Yes       |              |
-|                             | Write                         |           |              |
+|                             | Write                         | Yes       |              |
 |                             | HistoryRead                   |           |              |
 |                             | HistoryUpdate                 |           |              |
 | Method Service Set          | Call                          |           |              |
