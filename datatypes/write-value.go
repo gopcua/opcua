@@ -4,7 +4,9 @@
 
 package datatypes
 
-import "encoding/binary"
+import (
+	"encoding/binary"
+)
 
 // WriteValue is a set of Node and Attribute to write.
 //
@@ -120,7 +122,7 @@ func (w *WriteValue) Len() int {
 
 // WriteValueArray represents an array of WriteValues.
 // It does not correspond to a certain type from the specification
-// but makes encoding and decoding easiew.
+// but makes encoding and decoding easier.
 type WriteValueArray struct {
 	ArraySize   int32
 	WriteValues []*WriteValue
