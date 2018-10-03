@@ -67,33 +67,21 @@ func main() {
 			log.Printf("Successfully opened secure channel with %v", conn.RemoteAddr())
 
 			buf := make([]byte, 1024)
-			/*
-				n, err := secChan.Read(buf)
+			for {
+				n, err := secChan.ReadService(buf)
 				if err != nil {
-					log.Fatal(err)
+					log.Printf("Couldn't read UASC: %s", err)
+					continue
 				}
 				log.Printf("Successfully received message: %x\n%s", buf[:n], utils.Wireshark(0, buf[:n]))
 
-				sc, err := uasc.Decode(buf[:n])
+				srv, err := services.Decode(buf[:n])
 				if err != nil {
-					log.Println("Couldn't decode received bytes as UASC")
-					return
+					log.Printf("Couldn't decode received bytes as Service: %s", err)
+					continue
 				}
-				log.Printf("Successfully decoded as UASC: %v", sc)
-			*/
-
-			n, err := secChan.ReadService(buf)
-			if err != nil {
-				log.Fatal(err)
+				log.Printf("Successfully decoded as Service: %v", srv)
 			}
-			log.Printf("Successfully received message: %x\n%s", buf[:n], utils.Wireshark(0, buf[:n]))
-
-			srv, err := services.Decode(buf[:n])
-			if err != nil {
-				log.Println("Couldn't decode received bytes as Service")
-				return
-			}
-			log.Printf("Successfully decoded as Service: %v", srv)
 		}()
 	}
 }

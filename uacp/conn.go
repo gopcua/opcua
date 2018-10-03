@@ -33,16 +33,21 @@ type Conn struct {
 // If the data is one of UACP messages, it will be handled automatically.
 // In other words, the data is passed when it is NOT one of Hello, Acknowledge, Error, ReverseHello.
 func (c *Conn) Read(b []byte) (n int, err error) {
-	if !(c.state == cliStateEstablished || c.state == srvStateEstablished) {
-		return 0, ErrConnNotEstablished
-	}
 	for {
+		if !(c.state == cliStateEstablished || c.state == srvStateEstablished) {
+			return 0, ErrConnNotEstablished
+		}
 		select {
+		case err := <-c.errChan:
+			return 0, err
+		case s := <-c.stateChan:
+			if err := c.handleState(s); err != nil {
+				return 0, err
+			}
+			continue
 		case n := <-c.lenChan:
 			copy(b, c.rcvBuf[:n])
 			return n, nil
-		case e := <-c.errChan:
-			return 0, e
 		}
 	}
 }
@@ -51,28 +56,42 @@ func (c *Conn) Read(b []byte) (n int, err error) {
 // Write can be made to time out and return an Error with Timeout() == true
 // after a fixed time limit; see SetDeadline and SetWriteDeadline.
 func (c *Conn) Write(b []byte) (n int, err error) {
-	if !(c.state == cliStateEstablished || c.state == srvStateEstablished) {
-		return 0, ErrConnNotEstablished
+LOOP:
+	for {
+		if !(c.state == cliStateEstablished || c.state == srvStateEstablished) {
+			return 0, ErrConnNotEstablished
+		}
+
+		select {
+		case err := <-c.errChan:
+			return 0, err
+		case s := <-c.stateChan:
+			if err := c.handleState(s); err != nil {
+				return 0, err
+			}
+			break LOOP
+		default:
+			return c.lowerConn.Write(b)
+		}
 	}
-	select {
-	case e := <-c.errChan:
-		return 0, e
-	default:
-		return c.lowerConn.Write(b)
-	}
+
+	return 0, nil
 }
 
 // Close closes the connection.
 // Any blocked Read or Write operations will be unblocked and return errors.
 func (c *Conn) Close() error {
 	switch c.state {
-	case cliStateHelloSent, cliStateEstablished:
+	case cliStateHelloSent, cliStateEstablished, cliStateClosed:
 		c.updateState(cliStateClosed)
-	case srvStateEstablished:
+	case srvStateEstablished, srvStateClosed:
 		c.updateState(srvStateClosed)
+	default:
+		c.updateState(cliStateClosed)
+		return ErrInvalidState
 	}
 
-	return c.lowerConn.Close()
+	return nil
 }
 
 func (c *Conn) close() {
@@ -254,7 +273,8 @@ func (c *Conn) monitorMessages(ctx context.Context) {
 				if err == io.EOF {
 					continue
 				}
-				c.Close()
+				cancel()
+				return
 			}
 			if n == 0 {
 				continue

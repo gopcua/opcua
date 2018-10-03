@@ -90,11 +90,4 @@ func main() {
 	}
 	log.Printf("Successfully sent message: %x\n%s", payload, utils.Wireshark(0, payload))
 	time.Sleep(500 * time.Millisecond)
-
-	// Send CloseSecureChannelRequest to remote Endpoint.
-	if err := secChan.CloseSecureChannelRequest(); err != nil {
-		log.Fatal(err)
-	}
-	log.Println("Successfully sent CloseSecureChannelRequest")
-	time.Sleep(500 * time.Millisecond)
 }

@@ -135,29 +135,39 @@ LOOP:
 // while the UASC header is automatically set by the package.
 // This enables writing arbitrary Service even if the service is not implemented in the package.
 func (s *SecureChannel) WriteService(b []byte) (n int, err error) {
-	if !(s.state == cliStateSecureChannelOpened || s.state == srvStateSecureChannelOpened) {
-		return 0, ErrSecureChannelNotOpened
-	}
-	select {
-	case err := <-s.errChan:
-		return 0, err
-	default:
-		s.cfg.SequenceNumber++
-
-		msg := New(nil, s.cfg)
-		msg.MessageSize += uint32(len(b))
-		serialized, err := msg.Serialize()
-		if err != nil {
-			return 0, err
+LOOP:
+	for {
+		if !(s.state == cliStateSecureChannelOpened || s.state == srvStateSecureChannelOpened) {
+			return 0, ErrSecureChannelNotOpened
 		}
-		serialized = append(serialized, b...)
-
-		if _, err := s.lowerConn.Write(serialized); err != nil {
+		select {
+		case err := <-s.errChan:
 			return 0, err
-		}
+		case state := <-s.stateChan:
+			if err := s.handleState(state); err != nil {
+				return 0, err
+			}
+			break LOOP
+		default:
+			s.cfg.SequenceNumber++
 
-		return int(msg.MessageSize), nil
+			msg := New(nil, s.cfg)
+			msg.MessageSize += uint32(len(b))
+			serialized, err := msg.Serialize()
+			if err != nil {
+				return 0, err
+			}
+			serialized = append(serialized, b...)
+
+			if _, err := s.lowerConn.Write(serialized); err != nil {
+				return 0, err
+			}
+
+			return int(msg.MessageSize), nil
+		}
 	}
+
+	return 0, nil
 }
 
 // Close closes the connection.
@@ -165,13 +175,19 @@ func (s *SecureChannel) WriteService(b []byte) (n int, err error) {
 //
 // Before closing, client sends CloseSecureChannelRequest. Even if it fails, closing procedure does not stop.
 func (s *SecureChannel) Close() error {
-	if err := s.CloseSecureChannelRequest(); err != nil {
+	err := s.CloseSecureChannelRequest()
+
+	switch s.state {
+	case cliStateCloseSecureChannelSent, cliStateOpenSecureChannelSent, cliStateSecureChannelOpened, cliStateSecureChannelClosed:
 		s.updateState(cliStateSecureChannelClosed)
-		return err
+	case srvStateCloseSecureChannelSent, srvStateSecureChannelOpened, srvStateSecureChannelClosed:
+		s.updateState(srvStateSecureChannelClosed)
+	default:
+		s.updateState(srvStateSecureChannelClosed)
+		return ErrInvalidState
 	}
 
-	s.updateState(cliStateSecureChannelClosed)
-	return nil
+	return err
 }
 
 func (s *SecureChannel) close() {
@@ -270,8 +286,8 @@ const (
 	srvStateCloseSecureChannelSent
 )
 
-func (s *SecureChannel) updateState(c secChanState) {
-	s.state = c
+func (s *SecureChannel) updateState(state secChanState) {
+	s.state = state
 	s.stateChan <- s.state
 }
 
