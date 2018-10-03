@@ -1,0 +1,192 @@
+// Copyright 2018 gopcua authors. All rights reserved.
+// Use of this source code is governed by a MIT-style license that can be
+// found in the LICENSE file.
+
+package services
+
+import (
+	"testing"
+	"time"
+
+	"github.com/wmnsk/gopcua/datatypes"
+
+	"github.com/google/go-cmp/cmp"
+)
+
+var findServersOnNetworkResponseCases = []struct {
+	description string
+	structured  *FindServersOnNetworkResponse
+	serialized  []byte
+}{
+	{
+		"single-server",
+		NewFindServersOnNetworkResponse(
+			NewResponseHeader(
+				time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
+				1, 0, NewNullDiagnosticInfo(), []string{}, NewNullAdditionalHeader(), nil,
+			),
+			time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
+			datatypes.NewServersOnNetwork(
+				1,
+				"server-name",
+				"discov-uri",
+				[]string{"server-cap-1"},
+			),
+		),
+		[]byte{
+			// TypeID
+			0x01, 0x00, 0xb3, 0x2f,
+			// Timestamp
+			0x00, 0x98, 0x67, 0xdd, 0xfd, 0x30, 0xd4, 0x01,
+			// RequestHandle
+			0x01, 0x00, 0x00, 0x00,
+			// ServiceResult
+			0x00, 0x00, 0x00, 0x00,
+			// ServiceDiagnostics
+			0x00,
+			// StringTable
+			0x00, 0x00, 0x00, 0x00,
+			// AdditionalHeader
+			0x00, 0x00, 0x00,
+			// LastCounterResetTime
+			0x00, 0x98, 0x67, 0xdd, 0xfd, 0x30, 0xd4, 0x01,
+			// Servers
+			// ArraySize
+			0x01, 0x00, 0x00, 0x00,
+			// ApplicationURI
+			// RecordID
+			0x01, 0x00, 0x00, 0x00,
+			// ServerName
+			0x0b, 0x00, 0x00, 0x00,
+			0x73, 0x65, 0x72, 0x76, 0x65, 0x72, 0x2d, 0x6e, 0x61, 0x6d, 0x65,
+			// DiscoveryURI
+			0x0a, 0x00, 0x00, 0x00,
+			0x64, 0x69, 0x73, 0x63, 0x6f, 0x76, 0x2d, 0x75, 0x72, 0x69,
+			// ServerCapabilities
+			0x01, 0x00, 0x00, 0x00,
+			0x0c, 0x00, 0x00, 0x00,
+			0x73, 0x65, 0x72, 0x76, 0x65, 0x72, 0x2d, 0x63, 0x61, 0x70, 0x2d, 0x31,
+		},
+	},
+	{
+		"multiple-servers",
+		NewFindServersOnNetworkResponse(
+			NewResponseHeader(
+				time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
+				1, 0, NewNullDiagnosticInfo(), []string{}, NewNullAdditionalHeader(), nil,
+			),
+			time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
+			datatypes.NewServersOnNetwork(
+				1,
+				"server-name",
+				"discov-uri",
+				[]string{"server-cap-1"},
+			),
+			datatypes.NewServersOnNetwork(
+				1,
+				"server-name",
+				"discov-uri",
+				[]string{"server-cap-1", "server-cap-2"},
+			),
+		),
+		[]byte{
+			// TypeID
+			0x01, 0x00, 0xb3, 0x2f,
+			// Timestamp
+			0x00, 0x98, 0x67, 0xdd, 0xfd, 0x30, 0xd4, 0x01,
+			// RequestHandle
+			0x01, 0x00, 0x00, 0x00,
+			// ServiceResult
+			0x00, 0x00, 0x00, 0x00,
+			// ServiceDiagnostics
+			0x00,
+			// StringTable
+			0x00, 0x00, 0x00, 0x00,
+			// AdditionalHeader
+			0x00, 0x00, 0x00,
+			// LastCounterResetTime
+			0x00, 0x98, 0x67, 0xdd, 0xfd, 0x30, 0xd4, 0x01,
+			// Servers
+			// ArraySize
+			0x02, 0x00, 0x00, 0x00,
+			// ApplicationURI
+			// RecordID
+			0x01, 0x00, 0x00, 0x00,
+			// ServerName
+			0x0b, 0x00, 0x00, 0x00,
+			0x73, 0x65, 0x72, 0x76, 0x65, 0x72, 0x2d, 0x6e, 0x61, 0x6d, 0x65,
+			// DiscoveryURI
+			0x0a, 0x00, 0x00, 0x00,
+			0x64, 0x69, 0x73, 0x63, 0x6f, 0x76, 0x2d, 0x75, 0x72, 0x69,
+			// ServerCapabilities
+			0x01, 0x00, 0x00, 0x00,
+			0x0c, 0x00, 0x00, 0x00,
+			0x73, 0x65, 0x72, 0x76, 0x65, 0x72, 0x2d, 0x63, 0x61, 0x70, 0x2d, 0x31,
+			// RecordID
+			0x01, 0x00, 0x00, 0x00,
+			// ServerName
+			0x0b, 0x00, 0x00, 0x00,
+			0x73, 0x65, 0x72, 0x76, 0x65, 0x72, 0x2d, 0x6e, 0x61, 0x6d, 0x65,
+			// DiscoveryURI
+			0x0a, 0x00, 0x00, 0x00,
+			0x64, 0x69, 0x73, 0x63, 0x6f, 0x76, 0x2d, 0x75, 0x72, 0x69,
+			// ServerCapabilities
+			0x02, 0x00, 0x00, 0x00,
+			0x0c, 0x00, 0x00, 0x00,
+			0x73, 0x65, 0x72, 0x76, 0x65, 0x72, 0x2d, 0x63, 0x61, 0x70, 0x2d, 0x31,
+			0x0c, 0x00, 0x00, 0x00,
+			0x73, 0x65, 0x72, 0x76, 0x65, 0x72, 0x2d, 0x63, 0x61, 0x70, 0x2d, 0x32,
+		},
+	},
+}
+
+func TestDecodeFindServersOnNetworkResponse(t *testing.T) {
+	for _, c := range findServersOnNetworkResponseCases {
+		got, err := DecodeFindServersOnNetworkResponse(c.serialized)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// need to clear Payload here.
+		got.Payload = nil
+
+		if diff := cmp.Diff(got, c.structured, decodeCmpOpt); diff != "" {
+			t.Errorf("%s failed\n%s", c.description, diff)
+		}
+	}
+}
+
+func TestSerializeFindServersOnNetworkResponse(t *testing.T) {
+	for _, c := range findServersOnNetworkResponseCases {
+		got, err := c.structured.Serialize()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if diff := cmp.Diff(got, c.serialized); diff != "" {
+			t.Errorf("%s failed\n%s", c.description, diff)
+		}
+	}
+}
+
+func TestFindServersOnNetworkResponseLen(t *testing.T) {
+	for _, c := range findServersOnNetworkResponseCases {
+		got := c.structured.Len()
+
+		if diff := cmp.Diff(got, len(c.serialized)); diff != "" {
+			t.Errorf("%s failed\n%s", c.description, diff)
+		}
+	}
+}
+
+func TestFindServersOnNetworkResponseServiceType(t *testing.T) {
+	for _, c := range findServersOnNetworkResponseCases {
+		if c.structured.ServiceType() != ServiceTypeFindServersOnNetworkResponse {
+			t.Errorf(
+				"ServiceType doesn't match. Want: %d, Got: %d",
+				ServiceTypeFindServersOnNetworkResponse,
+				c.structured.ServiceType(),
+			)
+		}
+	}
+}

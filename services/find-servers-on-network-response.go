@@ -5,38 +5,43 @@
 package services
 
 import (
+	"time"
+
 	"github.com/wmnsk/gopcua/datatypes"
 	"github.com/wmnsk/gopcua/errors"
+	"github.com/wmnsk/gopcua/utils"
 )
 
-// FindServersResponse returns the Servers known to a Server or Discovery Server. The behaviour of
+// FindServersOnNetworkResponse returns the Servers known to a Server or Discovery Server. The behaviour of
 // Discovery Servers is described in detail in Part 12.
 //
 // Specification: Part4, 5.4.2
-type FindServersResponse struct {
+type FindServersOnNetworkResponse struct {
 	TypeID *datatypes.ExpandedNodeID
 	*ResponseHeader
-	Servers *ApplicationDescriptionArray
+	LastCounterResetTime time.Time
+	Servers              *datatypes.ServersOnNetworkArray
 }
 
-// NewFindServersResponse creates an FindServersResponse.
-func NewFindServersResponse(resHeader *ResponseHeader, servers ...*ApplicationDescription) *FindServersResponse {
-	return &FindServersResponse{
+// NewFindServersOnNetworkResponse creates an FindServersOnNetworkResponse.
+func NewFindServersOnNetworkResponse(resHeader *ResponseHeader, resetTime time.Time, servers ...*datatypes.ServersOnNetwork) *FindServersOnNetworkResponse {
+	return &FindServersOnNetworkResponse{
 		TypeID: datatypes.NewExpandedNodeID(
 			false, false,
 			datatypes.NewFourByteNodeID(
-				0, ServiceTypeFindServersResponse,
+				0, ServiceTypeFindServersOnNetworkResponse,
 			),
 			"", 0,
 		),
-		ResponseHeader: resHeader,
-		Servers:        NewApplicationDescriptionArray(servers),
+		ResponseHeader:       resHeader,
+		LastCounterResetTime: resetTime,
+		Servers:              datatypes.NewServersOnNetworkArray(servers),
 	}
 }
 
-// DecodeFindServersResponse decodes given bytes into FindServersResponse.
-func DecodeFindServersResponse(b []byte) (*FindServersResponse, error) {
-	f := &FindServersResponse{}
+// DecodeFindServersOnNetworkResponse decodes given bytes into FindServersOnNetworkResponse.
+func DecodeFindServersOnNetworkResponse(b []byte) (*FindServersOnNetworkResponse, error) {
+	f := &FindServersOnNetworkResponse{}
 	if err := f.DecodeFromBytes(b); err != nil {
 		return nil, err
 	}
@@ -44,8 +49,8 @@ func DecodeFindServersResponse(b []byte) (*FindServersResponse, error) {
 	return f, nil
 }
 
-// DecodeFromBytes decodes given bytes into FindServersResponse.
-func (f *FindServersResponse) DecodeFromBytes(b []byte) error {
+// DecodeFromBytes decodes given bytes into FindServersOnNetworkResponse.
+func (f *FindServersOnNetworkResponse) DecodeFromBytes(b []byte) error {
 	if len(b) < 16 {
 		return errors.NewErrTooShortToDecode(f, "should be longer than 16 bytes")
 	}
@@ -63,12 +68,15 @@ func (f *FindServersResponse) DecodeFromBytes(b []byte) error {
 	}
 	offset += f.ResponseHeader.Len() - len(f.ResponseHeader.Payload)
 
-	f.Servers = &ApplicationDescriptionArray{}
+	f.LastCounterResetTime = utils.DecodeTimestamp(b[offset:])
+	offset += 8
+
+	f.Servers = &datatypes.ServersOnNetworkArray{}
 	return f.Servers.DecodeFromBytes(b[offset:])
 }
 
-// Serialize serializes FindServersResponse into bytes.
-func (f *FindServersResponse) Serialize() ([]byte, error) {
+// Serialize serializes FindServersOnNetworkResponse into bytes.
+func (f *FindServersOnNetworkResponse) Serialize() ([]byte, error) {
 	b := make([]byte, f.Len())
 	if err := f.SerializeTo(b); err != nil {
 		return nil, err
@@ -77,8 +85,8 @@ func (f *FindServersResponse) Serialize() ([]byte, error) {
 	return b, nil
 }
 
-// SerializeTo serializes FindServersResponse into bytes.
-func (f *FindServersResponse) SerializeTo(b []byte) error {
+// SerializeTo serializes FindServersOnNetworkResponse into bytes.
+func (f *FindServersOnNetworkResponse) SerializeTo(b []byte) error {
 	var offset = 0
 	if f.TypeID != nil {
 		if err := f.TypeID.SerializeTo(b[offset:]); err != nil {
@@ -94,6 +102,9 @@ func (f *FindServersResponse) SerializeTo(b []byte) error {
 		offset += f.ResponseHeader.Len() - len(f.Payload)
 	}
 
+	utils.EncodeTimestamp(b[offset:], f.LastCounterResetTime)
+	offset += 8
+
 	if f.Servers != nil {
 		if err := f.Servers.SerializeTo(b[offset:]); err != nil {
 			return err
@@ -103,9 +114,9 @@ func (f *FindServersResponse) SerializeTo(b []byte) error {
 	return nil
 }
 
-// Len returns the actual length of FindServersResponse.
-func (f *FindServersResponse) Len() int {
-	var l = 0
+// Len returns the actual length of FindServersOnNetworkResponse.
+func (f *FindServersOnNetworkResponse) Len() int {
+	var l = 8
 	if f.TypeID != nil {
 		l += f.TypeID.Len()
 	}
@@ -120,6 +131,6 @@ func (f *FindServersResponse) Len() int {
 }
 
 // ServiceType returns type of Service in uint16.
-func (f *FindServersResponse) ServiceType() uint16 {
-	return ServiceTypeFindServersResponse
+func (f *FindServersOnNetworkResponse) ServiceType() uint16 {
+	return ServiceTypeFindServersOnNetworkResponse
 }
