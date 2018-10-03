@@ -33,16 +33,21 @@ type Conn struct {
 // If the data is one of UACP messages, it will be handled automatically.
 // In other words, the data is passed when it is NOT one of Hello, Acknowledge, Error, ReverseHello.
 func (c *Conn) Read(b []byte) (n int, err error) {
-	if !(c.state == cliStateEstablished || c.state == srvStateEstablished) {
-		return 0, ErrConnNotEstablished
-	}
 	for {
+		if !(c.state == cliStateEstablished || c.state == srvStateEstablished) {
+			return 0, ErrConnNotEstablished
+		}
 		select {
+		case err := <-c.errChan:
+			return 0, err
+		case s := <-c.stateChan:
+			if err := c.handleState(s); err != nil {
+				return 0, err
+			}
+			continue
 		case n := <-c.lenChan:
 			copy(b, c.rcvBuf[:n])
 			return n, nil
-		case e := <-c.errChan:
-			return 0, e
 		}
 	}
 }
@@ -51,34 +56,53 @@ func (c *Conn) Read(b []byte) (n int, err error) {
 // Write can be made to time out and return an Error with Timeout() == true
 // after a fixed time limit; see SetDeadline and SetWriteDeadline.
 func (c *Conn) Write(b []byte) (n int, err error) {
-	if !(c.state == cliStateEstablished || c.state == srvStateEstablished) {
-		return 0, ErrConnNotEstablished
+LOOP:
+	for {
+		if !(c.state == cliStateEstablished || c.state == srvStateEstablished) {
+			return 0, ErrConnNotEstablished
+		}
+
+		select {
+		case err := <-c.errChan:
+			return 0, err
+		case s := <-c.stateChan:
+			if err := c.handleState(s); err != nil {
+				return 0, err
+			}
+			break LOOP
+		default:
+			return c.lowerConn.Write(b)
+		}
 	}
-	select {
-	case e := <-c.errChan:
-		return 0, e
-	default:
-		return c.lowerConn.Write(b)
-	}
+
+	return 0, nil
 }
 
 // Close closes the connection.
 // Any blocked Read or Write operations will be unblocked and return errors.
 func (c *Conn) Close() error {
-	if err := c.lowerConn.Close(); err != nil {
-		return err
-	}
 	switch c.state {
-	case cliStateHelloSent, cliStateEstablished:
+	case cliStateHelloSent, cliStateEstablished, cliStateClosed:
 		c.updateState(cliStateClosed)
-	case srvStateEstablished:
+	case srvStateEstablished, srvStateClosed:
 		c.updateState(srvStateClosed)
+	default:
+		c.updateState(cliStateClosed)
+		return ErrInvalidState
 	}
+
+	return nil
+}
+
+func (c *Conn) close() {
+	c.rep = ""
+	c.lep = ""
+	c.rcvBuf = []byte{}
+	c.sndBuf = []byte{}
 
 	close(c.errChan)
 	close(c.lenChan)
 	close(c.stateChan)
-	return nil
 }
 
 // LocalAddr returns the local network address.
@@ -194,6 +218,16 @@ func (c *Conn) updateState(s state) {
 	c.stateChan <- c.state
 }
 
+func (c *Conn) handleState(s state) error {
+	switch s {
+	case cliStateClosed, srvStateClosed:
+		c.close()
+		return ErrConnNotEstablished
+	default:
+		return nil
+	}
+}
+
 func (s state) String() string {
 	switch s {
 	case cliStateClosed:
@@ -219,27 +253,28 @@ func (c *Conn) GetState() string {
 	return c.state.String()
 }
 
-func (c *Conn) notifyLength(n int) {
-	go func() {
-		c.lenChan <- n
-	}()
-}
-
 func (c *Conn) monitorMessages(ctx context.Context) {
-	defer c.Close()
 	c.updateState(c.state)
+	childCtx, cancel := context.WithCancel(ctx)
 
 	for {
 		select {
 		case <-ctx.Done():
+			cancel()
 			return
+		case s := <-c.stateChan:
+			if err := c.handleState(s); err != nil {
+				cancel()
+				return
+			}
 		default:
 			n, err := c.lowerConn.Read(c.rcvBuf)
 			if err != nil {
 				if err == io.EOF {
 					continue
 				}
-				c.Close()
+				cancel()
+				return
 			}
 			if n == 0 {
 				continue
@@ -248,9 +283,7 @@ func (c *Conn) monitorMessages(ctx context.Context) {
 			msg, err := Decode(c.rcvBuf[:n])
 			if err != nil {
 				// pass to the user if msg is undecodable as UACP.
-				if c.state == cliStateEstablished || c.state == srvStateEstablished {
-					c.notifyLength(n)
-				}
+				go c.notifyLength(childCtx, n)
 				continue
 			}
 			switch m := msg.(type) {
@@ -264,11 +297,21 @@ func (c *Conn) monitorMessages(ctx context.Context) {
 				c.handleMsgReverseHello(m)
 			default:
 				// pass to the user if type of msg is unknown.
-				if c.state == cliStateEstablished || c.state == srvStateEstablished {
-					c.notifyLength(n)
-				}
+				go c.notifyLength(childCtx, n)
 			}
 		}
+	}
+}
+
+func (c *Conn) notifyLength(ctx context.Context, n int) {
+	select {
+	case <-ctx.Done():
+		return
+	case s := <-c.stateChan:
+		c.handleState(s)
+		return
+	case c.lenChan <- n:
+		return
 	}
 }
 

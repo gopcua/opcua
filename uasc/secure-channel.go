@@ -69,9 +69,12 @@ func (s *SecureChannel) Read(b []byte) (n int, err error) {
 		case n := <-s.lenChan:
 			copy(b, s.rcvBuf[:n])
 			return n, nil
-		case e := <-s.errChan:
-			return 0, e
-		default:
+		case err := <-s.errChan:
+			return 0, err
+		case state := <-s.stateChan:
+			if err := s.handleState(state); err != nil {
+				return 0, err
+			}
 			continue
 		}
 	}
@@ -92,10 +95,12 @@ func (s *SecureChannel) ReadService(b []byte) (n int, err error) {
 			}
 			copy(b, sc.SequenceHeader.Payload)
 			return int(sc.MessageSize), nil
-		case e := <-s.errChan:
-			return 0, e
-		default:
-			continue
+		case err := <-s.errChan:
+			return 0, err
+		case state := <-s.stateChan:
+			if err := s.handleState(state); err != nil {
+				return 0, err
+			}
 		}
 	}
 }
@@ -104,15 +109,25 @@ func (s *SecureChannel) ReadService(b []byte) (n int, err error) {
 // Write can be made to time out and return an Error with Timeout() == true
 // after a fixed time limit; see SetDeadline and SetWriteDeadline.
 func (s *SecureChannel) Write(b []byte) (n int, err error) {
-	if s == nil || !(s.state == cliStateSecureChannelOpened || s.state == srvStateSecureChannelOpened) {
-		return 0, ErrSecureChannelNotOpened
+LOOP:
+	for {
+		if s == nil || !(s.state == cliStateSecureChannelOpened || s.state == srvStateSecureChannelOpened) {
+			return 0, ErrSecureChannelNotOpened
+		}
+		select {
+		case err := <-s.errChan:
+			return 0, err
+		case state := <-s.stateChan:
+			if err := s.handleState(state); err != nil {
+				return 0, err
+			}
+			break LOOP
+		default:
+			return s.lowerConn.Write(b)
+		}
 	}
-	select {
-	case e := <-s.errChan:
-		return 0, e
-	default:
-		return s.lowerConn.Write(b)
-	}
+
+	return 0, nil
 }
 
 // WriteService writes data to the connection.
@@ -120,52 +135,72 @@ func (s *SecureChannel) Write(b []byte) (n int, err error) {
 // while the UASC header is automatically set by the package.
 // This enables writing arbitrary Service even if the service is not implemented in the package.
 func (s *SecureChannel) WriteService(b []byte) (n int, err error) {
-	if !(s.state == cliStateSecureChannelOpened || s.state == srvStateSecureChannelOpened) {
-		return 0, ErrSecureChannelNotOpened
-	}
-	select {
-	case e := <-s.errChan:
-		return 0, e
-	default:
-		s.cfg.SequenceNumber++
-
-		msg := New(nil, s.cfg)
-		msg.MessageSize += uint32(len(b))
-		serialized, err := msg.Serialize()
-		if err != nil {
-			return 0, err
+LOOP:
+	for {
+		if !(s.state == cliStateSecureChannelOpened || s.state == srvStateSecureChannelOpened) {
+			return 0, ErrSecureChannelNotOpened
 		}
-		serialized = append(serialized, b...)
-
-		if _, err := s.lowerConn.Write(serialized); err != nil {
+		select {
+		case err := <-s.errChan:
 			return 0, err
-		}
+		case state := <-s.stateChan:
+			if err := s.handleState(state); err != nil {
+				return 0, err
+			}
+			break LOOP
+		default:
+			s.cfg.SequenceNumber++
 
-		return int(msg.MessageSize), nil
+			msg := New(nil, s.cfg)
+			msg.MessageSize += uint32(len(b))
+			serialized, err := msg.Serialize()
+			if err != nil {
+				return 0, err
+			}
+			serialized = append(serialized, b...)
+
+			if _, err := s.lowerConn.Write(serialized); err != nil {
+				return 0, err
+			}
+
+			return int(msg.MessageSize), nil
+		}
 	}
+
+	return 0, nil
 }
 
 // Close closes the connection.
 // Any blocked Read or Write operations will be unblocked and return errors.
 //
-// Before closing, client sends CloseSecureChannelRequest, but it does not care the result of that request.
+// Before closing, client sends CloseSecureChannelRequest. Even if it fails, closing procedure does not stop.
 func (s *SecureChannel) Close() error {
+	err := s.CloseSecureChannelRequest()
+
 	switch s.state {
-	case cliStateSecureChannelClosed, cliStateOpenSecureChannelSent, cliStateSecureChannelOpened:
-		s.CloseSecureChannelRequest()
+	case cliStateCloseSecureChannelSent, cliStateOpenSecureChannelSent, cliStateSecureChannelOpened, cliStateSecureChannelClosed:
 		s.updateState(cliStateSecureChannelClosed)
-	case srvStateCloseSecureChannelSent, srvStateSecureChannelOpened:
+	case srvStateCloseSecureChannelSent, srvStateSecureChannelOpened, srvStateSecureChannelClosed:
 		s.updateState(srvStateSecureChannelClosed)
+	default:
+		s.updateState(srvStateSecureChannelClosed)
+		return ErrInvalidState
 	}
 
-	s.cfg.SequenceNumber = 0
-	s.reqHeader.RequestHandle = 0
-	s.resHeader.RequestHandle = 0
+	return err
+}
+
+func (s *SecureChannel) close() {
+	s.cfg = nil
+	s.reqHeader = nil
+	s.resHeader = nil
+	s.rcvBuf = []byte{}
+	s.sndBuf = []byte{}
+	s.lowerConn = nil
+
 	close(s.errChan)
 	close(s.lenChan)
 	close(s.stateChan)
-
-	return s.lowerConn.Close()
 }
 
 // LocalAddr returns the local network address.
@@ -251,9 +286,19 @@ const (
 	srvStateCloseSecureChannelSent
 )
 
-func (s *SecureChannel) updateState(c secChanState) {
-	s.state = c
+func (s *SecureChannel) updateState(state secChanState) {
+	s.state = state
 	s.stateChan <- s.state
+}
+
+func (s *SecureChannel) handleState(state secChanState) error {
+	switch state {
+	case cliStateSecureChannelClosed, srvStateSecureChannelClosed:
+		s.close()
+		return ErrSecureChannelNotOpened
+	default:
+		return nil
+	}
 }
 
 func (s secChanState) String() string {
@@ -287,27 +332,29 @@ func (s *SecureChannel) GetState() string {
 	return s.state.String()
 }
 
-func (s *SecureChannel) notifyLength(n int) {
-	go func() {
-		s.lenChan <- n
-	}()
-}
-
 func (s *SecureChannel) monitorMessages(ctx context.Context) {
-	defer s.Close()
 	s.updateState(s.state)
+	childCtx, cancel := context.WithCancel(ctx)
 
 	for {
 		select {
 		case <-ctx.Done():
+			cancel()
 			return
+		case state := <-s.stateChan:
+			if err := s.handleState(state); err != nil {
+				cancel()
+				return
+			}
+			continue
 		default:
 			n, err := s.lowerConn.Read(s.rcvBuf)
 			if err != nil {
 				if err == io.EOF {
 					continue
 				}
-				s.Close()
+				cancel()
+				return
 			}
 			if n == 0 {
 				continue
@@ -316,9 +363,7 @@ func (s *SecureChannel) monitorMessages(ctx context.Context) {
 			msg, err := Decode(s.rcvBuf[:n])
 			if err != nil {
 				// pass to the user if msg is undecodable as UASC.
-				if s.state == cliStateSecureChannelOpened || s.state == srvStateSecureChannelOpened {
-					s.notifyLength(n)
-				}
+				go s.notifyLength(childCtx, n)
 				continue
 			}
 			switch m := msg.Service.(type) {
@@ -332,11 +377,26 @@ func (s *SecureChannel) monitorMessages(ctx context.Context) {
 				s.handleCloseSecureChannelResponse(m)
 			default:
 				// pass to the user if type of msg is unknown.
-				if s.state == cliStateSecureChannelOpened || s.state == srvStateSecureChannelOpened {
-					s.notifyLength(n)
-				}
+				go s.notifyLength(childCtx, n)
 			}
 		}
+	}
+}
+
+func (s *SecureChannel) notifyLength(ctx context.Context, n int) {
+	select {
+	case <-ctx.Done():
+		return
+	case err := <-s.errChan:
+		switch err {
+		case ErrInvalidState, ErrSecureChannelNotOpened:
+			return
+		}
+	case state := <-s.stateChan:
+		s.handleState(state)
+		return
+	case s.lenChan <- n:
+		return
 	}
 }
 
@@ -435,7 +495,7 @@ func (s *SecureChannel) handleCloseSecureChannelResponse(c *services.CloseSecure
 	}
 }
 
-// OpenSecureChannelRequest sends OpenSecureChannelRequest on top of UASC to Conn.
+// OpenSecureChannelRequest sends OpenSecureChannelRequest on top of UASC to SecureChannel.
 func (s *SecureChannel) OpenSecureChannelRequest(secMode, lifetime uint32, nonce []byte) error {
 	s.cfg.SequenceNumber++
 	s.reqHeader.RequestHandle++
@@ -455,7 +515,7 @@ func (s *SecureChannel) OpenSecureChannelRequest(secMode, lifetime uint32, nonce
 	return nil
 }
 
-// OpenSecureChannelResponse sends OpenSecureChannelResponse on top of UASC to Conn.
+// OpenSecureChannelResponse sends OpenSecureChannelResponse on top of UASC to SecureChannel.
 func (s *SecureChannel) OpenSecureChannelResponse(code, token, lifetime uint32, nonce []byte) error {
 	s.cfg.SequenceNumber++
 	s.resHeader.ServiceResult = code
@@ -477,7 +537,7 @@ func (s *SecureChannel) OpenSecureChannelResponse(code, token, lifetime uint32, 
 	return nil
 }
 
-// CloseSecureChannelRequest sends CloseSecureChannelRequest on top of UASC to Conn.
+// CloseSecureChannelRequest sends CloseSecureChannelRequest on top of UASC to SecureChannel.
 func (s *SecureChannel) CloseSecureChannelRequest() error {
 	s.cfg.SequenceNumber++
 	s.reqHeader.RequestHandle++
@@ -497,7 +557,7 @@ func (s *SecureChannel) CloseSecureChannelRequest() error {
 	return nil
 }
 
-// CloseSecureChannelResponse sends CloseSecureChannelResponse on top of UASC to Conn.
+// CloseSecureChannelResponse sends CloseSecureChannelResponse on top of UASC to SecureChannel.
 func (s *SecureChannel) CloseSecureChannelResponse(code uint32) error {
 	s.cfg.SequenceNumber++
 	s.resHeader.ServiceResult = code
@@ -510,6 +570,78 @@ func (s *SecureChannel) CloseSecureChannelResponse(code uint32) error {
 	}
 
 	if _, err := s.lowerConn.Write(csc); err != nil {
+		return err
+	}
+	return nil
+}
+
+// GetEndpointsRequest sends GetEndpointsRequest on top of UASC to SecureChannel.
+func (s *SecureChannel) GetEndpointsRequest(locales, uris []string) error {
+	s.reqHeader.RequestHandle++
+	s.reqHeader.Timestamp = time.Now()
+	gep, err := services.NewGetEndpointsRequest(
+		s.reqHeader, s.RemoteEndpoint(), locales, uris,
+	).Serialize()
+	if err != nil {
+		return err
+	}
+
+	if _, err := s.WriteService(gep); err != nil {
+		return err
+	}
+	return nil
+}
+
+// GetEndpointsResponse sends GetEndpointsResponse on top of UASC to SecureChannel.
+//
+// XXX - This is to be improved with some external configuration to describe endpoints infomation in the future release.
+func (s *SecureChannel) GetEndpointsResponse(code uint32, endpoints ...*services.EndpointDescription) error {
+	s.resHeader.ServiceResult = code
+	s.resHeader.Timestamp = time.Now()
+	gep, err := services.NewGetEndpointsResponse(
+		s.resHeader, endpoints...,
+	).Serialize()
+	if err != nil {
+		return err
+	}
+
+	if _, err := s.WriteService(gep); err != nil {
+		return err
+	}
+	return nil
+}
+
+// FindServersRequest sends FindServersRequest on top of UASC to SecureChannel.
+func (s *SecureChannel) FindServersRequest(locales, servers []string) error {
+	s.reqHeader.RequestHandle++
+	s.reqHeader.Timestamp = time.Now()
+	fsr, err := services.NewFindServersRequest(
+		s.reqHeader, s.RemoteEndpoint(), locales, servers,
+	).Serialize()
+	if err != nil {
+		return err
+	}
+
+	if _, err := s.WriteService(fsr); err != nil {
+		return err
+	}
+	return nil
+}
+
+// FindServersResponse sends FindServersResponse on top of UASC to SecureChannel.
+//
+// XXX - This is to be improved with some external configuration to describe application infomation in the future release.
+func (s *SecureChannel) FindServersResponse(code uint32, apps ...*services.ApplicationDescription) error {
+	s.resHeader.ServiceResult = code
+	s.resHeader.Timestamp = time.Now()
+	fsr, err := services.NewFindServersResponse(
+		s.resHeader, apps...,
+	).Serialize()
+	if err != nil {
+		return err
+	}
+
+	if _, err := s.WriteService(fsr); err != nil {
 		return err
 	}
 	return nil
