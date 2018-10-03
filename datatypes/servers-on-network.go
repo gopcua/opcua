@@ -8,9 +8,10 @@ import (
 	"encoding/binary"
 )
 
-// ServersOnNetwork is a set of Node and Attribute to write.
+// ServersOnNetwork is a DNS service record that meet criteria specified in the request.
+// This list is empty if no Servers meet the criteria.
 //
-// Specification: Part4, 5.10.4.2
+// Specification: Part4, 5.4.3.2
 type ServersOnNetwork struct {
 	RecordID           uint32
 	ServerName         *String
