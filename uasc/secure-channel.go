@@ -435,7 +435,7 @@ func (s *SecureChannel) handleCloseSecureChannelResponse(c *services.CloseSecure
 	}
 }
 
-// OpenSecureChannelRequest sends OpenSecureChannelRequest on top of UASC to Conn.
+// OpenSecureChannelRequest sends OpenSecureChannelRequest on top of UASC to SecureChannel.
 func (s *SecureChannel) OpenSecureChannelRequest(secMode, lifetime uint32, nonce []byte) error {
 	s.cfg.SequenceNumber++
 	s.reqHeader.RequestHandle++
@@ -455,7 +455,7 @@ func (s *SecureChannel) OpenSecureChannelRequest(secMode, lifetime uint32, nonce
 	return nil
 }
 
-// OpenSecureChannelResponse sends OpenSecureChannelResponse on top of UASC to Conn.
+// OpenSecureChannelResponse sends OpenSecureChannelResponse on top of UASC to SecureChannel.
 func (s *SecureChannel) OpenSecureChannelResponse(code, token, lifetime uint32, nonce []byte) error {
 	s.cfg.SequenceNumber++
 	s.resHeader.ServiceResult = code
@@ -477,7 +477,7 @@ func (s *SecureChannel) OpenSecureChannelResponse(code, token, lifetime uint32, 
 	return nil
 }
 
-// CloseSecureChannelRequest sends CloseSecureChannelRequest on top of UASC to Conn.
+// CloseSecureChannelRequest sends CloseSecureChannelRequest on top of UASC to SecureChannel.
 func (s *SecureChannel) CloseSecureChannelRequest() error {
 	s.cfg.SequenceNumber++
 	s.reqHeader.RequestHandle++
@@ -497,7 +497,7 @@ func (s *SecureChannel) CloseSecureChannelRequest() error {
 	return nil
 }
 
-// CloseSecureChannelResponse sends CloseSecureChannelResponse on top of UASC to Conn.
+// CloseSecureChannelResponse sends CloseSecureChannelResponse on top of UASC to SecureChannel.
 func (s *SecureChannel) CloseSecureChannelResponse(code uint32) error {
 	s.cfg.SequenceNumber++
 	s.resHeader.ServiceResult = code
@@ -510,6 +510,78 @@ func (s *SecureChannel) CloseSecureChannelResponse(code uint32) error {
 	}
 
 	if _, err := s.lowerConn.Write(csc); err != nil {
+		return err
+	}
+	return nil
+}
+
+// GetEndpointsRequest sends GetEndpointsRequest on top of UASC to SecureChannel.
+func (s *SecureChannel) GetEndpointsRequest(locales, uris []string) error {
+	s.reqHeader.RequestHandle++
+	s.reqHeader.Timestamp = time.Now()
+	gep, err := services.NewGetEndpointsRequest(
+		s.reqHeader, s.RemoteEndpoint(), locales, uris,
+	).Serialize()
+	if err != nil {
+		return err
+	}
+
+	if _, err := s.WriteService(gep); err != nil {
+		return err
+	}
+	return nil
+}
+
+// GetEndpointsResponse sends GetEndpointsResponse on top of UASC to SecureChannel.
+//
+// XXX - This is to be improved with some external configuration to describe endpoints infomation in the future release.
+func (s *SecureChannel) GetEndpointsResponse(code uint32, endpoints ...*services.EndpointDescription) error {
+	s.resHeader.ServiceResult = code
+	s.resHeader.Timestamp = time.Now()
+	gep, err := services.NewGetEndpointsResponse(
+		s.resHeader, endpoints...,
+	).Serialize()
+	if err != nil {
+		return err
+	}
+
+	if _, err := s.WriteService(gep); err != nil {
+		return err
+	}
+	return nil
+}
+
+// FindServersRequest sends FindServersRequest on top of UASC to SecureChannel.
+func (s *SecureChannel) FindServersRequest(locales, servers []string) error {
+	s.reqHeader.RequestHandle++
+	s.reqHeader.Timestamp = time.Now()
+	fsr, err := services.NewFindServersRequest(
+		s.reqHeader, s.RemoteEndpoint(), locales, servers,
+	).Serialize()
+	if err != nil {
+		return err
+	}
+
+	if _, err := s.WriteService(fsr); err != nil {
+		return err
+	}
+	return nil
+}
+
+// FindServersResponse sends FindServersResponse on top of UASC to SecureChannel.
+//
+// XXX - This is to be improved with some external configuration to describe application infomation in the future release.
+func (s *SecureChannel) FindServersResponse(code uint32, apps ...*services.ApplicationDescription) error {
+	s.resHeader.ServiceResult = code
+	s.resHeader.Timestamp = time.Now()
+	fsr, err := services.NewFindServersResponse(
+		s.resHeader, apps...,
+	).Serialize()
+	if err != nil {
+		return err
+	}
+
+	if _, err := s.WriteService(fsr); err != nil {
 		return err
 	}
 	return nil
