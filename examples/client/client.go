@@ -39,14 +39,18 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer func() {
+		if err := conn.Close(); err != nil {
+			log.Fatalf("Failed to shutdown connection: %s", err)
+		}
+		log.Printf("Successfully shutdown connection with %v", conn.RemoteEndpoint())
+	}()
 	log.Printf("Successfully established connection with %v", conn.RemoteEndpoint())
 
 	// Create context for UASC to be used by statemachine working background.
 	uascCtx, cancel := context.WithCancel(uacpCtx)
 	defer cancel()
-
 	// Open SecureChannel on top of UACP Connection established above.
-	// No need for secChan.Close(), as context handles the cancellation.
 	cfg := uasc.NewConfig(
 		1, "http://opcfoundation.org/UA/SecurityPolicy#None", nil, nil, 0, 0,
 	)
@@ -54,6 +58,12 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer func() {
+		if err := secChan.Close(); err != nil {
+			log.Fatalf("Failed to close secure channel: %s", err)
+		}
+		log.Printf("Successfully closed secure channel with %v", conn.RemoteEndpoint())
+	}()
 	log.Printf("Successfully opened secure channel with %v", conn.RemoteEndpoint())
 
 	// Send FindServersRequest to remote Endpoint.
@@ -61,14 +71,14 @@ func main() {
 		log.Fatal(err)
 	}
 	log.Println("Successfully sent FindServersRequest")
-	time.Sleep(1 * time.Second)
+	time.Sleep(500 * time.Millisecond)
 
 	// Send GetEndpointsRequest to remote Endpoint.
 	if err := secChan.GetEndpointsRequest([]string{"ja-JP", "de-DE", "en-US"}, []string{"gopcua-server"}); err != nil {
 		log.Fatal(err)
 	}
 	log.Println("Successfully sent GetEndpointsRequest")
-	time.Sleep(1 * time.Second)
+	time.Sleep(500 * time.Millisecond)
 
 	// Send arbitrary payload on top of UASC SecureChannel.
 	payload, err := hex.DecodeString(*payloadHex)
@@ -79,12 +89,12 @@ func main() {
 		log.Fatal(err)
 	}
 	log.Printf("Successfully sent message: %x\n%s", payload, utils.Wireshark(0, payload))
-	time.Sleep(1 * time.Second)
+	time.Sleep(500 * time.Millisecond)
 
 	// Send CloseSecureChannelRequest to remote Endpoint.
 	if err := secChan.CloseSecureChannelRequest(); err != nil {
 		log.Fatal(err)
 	}
 	log.Println("Successfully sent CloseSecureChannelRequest")
-	time.Sleep(1 * time.Second)
+	time.Sleep(500 * time.Millisecond)
 }

@@ -65,9 +65,6 @@ func (c *Conn) Write(b []byte) (n int, err error) {
 // Close closes the connection.
 // Any blocked Read or Write operations will be unblocked and return errors.
 func (c *Conn) Close() error {
-	if err := c.lowerConn.Close(); err != nil {
-		return err
-	}
 	switch c.state {
 	case cliStateHelloSent, cliStateEstablished:
 		c.updateState(cliStateClosed)
@@ -75,10 +72,18 @@ func (c *Conn) Close() error {
 		c.updateState(srvStateClosed)
 	}
 
+	return c.lowerConn.Close()
+}
+
+func (c *Conn) close() {
+	c.rep = ""
+	c.lep = ""
+	c.rcvBuf = []byte{}
+	c.sndBuf = []byte{}
+
 	close(c.errChan)
 	close(c.lenChan)
 	close(c.stateChan)
-	return nil
 }
 
 // LocalAddr returns the local network address.
@@ -194,6 +199,16 @@ func (c *Conn) updateState(s state) {
 	c.stateChan <- c.state
 }
 
+func (c *Conn) handleState(s state) error {
+	switch s {
+	case cliStateClosed, srvStateClosed:
+		c.close()
+		return ErrConnNotEstablished
+	default:
+		return nil
+	}
+}
+
 func (s state) String() string {
 	switch s {
 	case cliStateClosed:
@@ -219,20 +234,20 @@ func (c *Conn) GetState() string {
 	return c.state.String()
 }
 
-func (c *Conn) notifyLength(n int) {
-	go func() {
-		c.lenChan <- n
-	}()
-}
-
 func (c *Conn) monitorMessages(ctx context.Context) {
-	defer c.Close()
 	c.updateState(c.state)
+	childCtx, cancel := context.WithCancel(ctx)
 
 	for {
 		select {
 		case <-ctx.Done():
+			cancel()
 			return
+		case s := <-c.stateChan:
+			if err := c.handleState(s); err != nil {
+				cancel()
+				return
+			}
 		default:
 			n, err := c.lowerConn.Read(c.rcvBuf)
 			if err != nil {
@@ -248,9 +263,7 @@ func (c *Conn) monitorMessages(ctx context.Context) {
 			msg, err := Decode(c.rcvBuf[:n])
 			if err != nil {
 				// pass to the user if msg is undecodable as UACP.
-				if c.state == cliStateEstablished || c.state == srvStateEstablished {
-					c.notifyLength(n)
-				}
+				go c.notifyLength(childCtx, n)
 				continue
 			}
 			switch m := msg.(type) {
@@ -264,11 +277,21 @@ func (c *Conn) monitorMessages(ctx context.Context) {
 				c.handleMsgReverseHello(m)
 			default:
 				// pass to the user if type of msg is unknown.
-				if c.state == cliStateEstablished || c.state == srvStateEstablished {
-					c.notifyLength(n)
-				}
+				go c.notifyLength(childCtx, n)
 			}
 		}
+	}
+}
+
+func (c *Conn) notifyLength(ctx context.Context, n int) {
+	select {
+	case <-ctx.Done():
+		return
+	case s := <-c.stateChan:
+		c.handleState(s)
+		return
+	case c.lenChan <- n:
+		return
 	}
 }
 
