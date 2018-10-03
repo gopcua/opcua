@@ -85,7 +85,7 @@ NOTE: Automatic session activation has not been implemented at this time.
 | Service Set                 | Service                       | Supported | Notes        |
 | --------------------------- | ----------------------------- | --------- | ------------ |
 | Discovery Service Set       | FindServers                   | Yes       |              |
-|                             | FindServersOnNetwork          | Partial   | Request-only |
+|                             | FindServersOnNetwork          | Yes       |              |
 |                             | GetEndpoints                  | Yes       |              |
 |                             | RegisterServer                |           |              |
 |                             | RegisterServer2               |           |              |
