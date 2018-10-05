@@ -52,7 +52,7 @@ func main() {
 			}
 			defer func() {
 				conn.Close()
-				log.Printf("Successfully closed connection with %v", conn.RemoteAddr())
+				log.Println("Successfully closed connection")
 			}()
 			log.Printf("Successfully established connection with %v", conn.RemoteAddr())
 
@@ -67,6 +67,7 @@ func main() {
 			log.Printf("Successfully opened secure channel with %v", conn.RemoteAddr())
 
 			buf := make([]byte, 1024)
+
 			for {
 				n, err := secChan.ReadService(buf)
 				if err != nil {
