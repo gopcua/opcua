@@ -32,6 +32,7 @@ func TestSecureChannel(t *testing.T) {
 		1, policyURI, nil, nil, 0, 1,
 	)
 
+	done := make(chan int)
 	go func() {
 		defer ln.Close()
 		srvConn, err := ln.Accept(ctx)
@@ -42,6 +43,7 @@ func TestSecureChannel(t *testing.T) {
 		if _, err := ListenAndAcceptSecureChannel(ctx, srvConn, cfg); err != nil {
 			t.Error(err)
 		}
+		done <- 0
 	}()
 
 	cliConn, err := uacp.Dial(ctx, ep)
@@ -51,6 +53,15 @@ func TestSecureChannel(t *testing.T) {
 
 	if _, err := OpenSecureChannel(ctx, cliConn, cfg, services.SecModeNone, 0xffff, nil); err != nil {
 		t.Error(err)
+	}
+
+	select {
+	case _, ok := <-done:
+		if !ok {
+			t.Fatalf("timed out")
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatalf("timed out")
 	}
 }
 

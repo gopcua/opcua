@@ -67,8 +67,8 @@ func (l *Listener) Accept(ctx context.Context) (*Conn, error) {
 
 	go conn.monitor(ctx)
 	select {
-	case s := <-conn.established:
-		if s {
+	case ok := <-conn.established:
+		if ok {
 			return conn, nil
 		}
 	case err := <-conn.errChan:

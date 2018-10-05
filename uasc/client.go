@@ -7,6 +7,7 @@ package uasc
 import (
 	"context"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/wmnsk/gopcua/datatypes"
@@ -39,6 +40,7 @@ func OpenSecureChannelSecSignAndEncrypt(ctx context.Context, transportConn net.C
 
 func openSecureChannel(ctx context.Context, transportConn net.Conn, cfg *Config, secMode, lifetime uint32, nonce []byte, interval time.Duration, maxRetry int) (*SecureChannel, error) {
 	secChan := &SecureChannel{
+		mu:        new(sync.Mutex),
 		lowerConn: transportConn,
 		reqHeader: services.NewRequestHeader(
 			datatypes.NewTwoByteNodeID(0), time.Now(), 0, 0,
@@ -48,12 +50,12 @@ func openSecureChannel(ctx context.Context, transportConn net.Conn, cfg *Config,
 			time.Now(), 0, 0, services.NewNullDiagnosticInfo(),
 			[]string{}, services.NewNullAdditionalHeader(), nil,
 		),
-		cfg:       cfg,
-		state:     cliStateSecureChannelClosed,
-		stateChan: make(chan secChanState),
-		lenChan:   make(chan int),
-		errChan:   make(chan error),
-		rcvBuf:    make([]byte, 0xffff),
+		cfg:     cfg,
+		state:   cliStateSecureChannelClosed,
+		opened:  make(chan bool),
+		lenChan: make(chan int),
+		errChan: make(chan error),
+		rcvBuf:  make([]byte, 0xffff),
 	}
 
 	if err := secChan.OpenSecureChannelRequest(secMode, lifetime, nonce); err != nil {
@@ -69,12 +71,9 @@ func openSecureChannel(ctx context.Context, transportConn net.Conn, cfg *Config,
 		}
 
 		select {
-		case s := <-secChan.stateChan:
-			switch s {
-			case cliStateSecureChannelOpened:
+		case ok := <-secChan.opened:
+			if ok {
 				return secChan, nil
-			default:
-				continue
 			}
 		case err := <-secChan.errChan:
 			return nil, err

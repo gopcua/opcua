@@ -63,8 +63,8 @@ func dial(ctx context.Context, endpoint string, interval time.Duration, maxRetry
 		}
 
 		select {
-		case s := <-conn.established:
-			if s {
+		case ok := <-conn.established:
+			if ok {
 				return conn, nil
 			}
 		case err := <-conn.errChan:

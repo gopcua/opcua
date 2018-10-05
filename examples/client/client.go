@@ -43,7 +43,7 @@ func main() {
 		if err := conn.Close(); err != nil {
 			log.Fatalf("Failed to shutdown connection: %s", err)
 		}
-		log.Printf("Successfully shutdown connection with %v", conn.RemoteEndpoint())
+		log.Println("Successfully shutdown connection")
 	}()
 	log.Printf("Successfully established connection with %v", conn.RemoteEndpoint())
 
