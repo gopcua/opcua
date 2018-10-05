@@ -40,12 +40,7 @@ func NewActivateSessionResponse(resHeader *ResponseHeader, nonce []byte, results
 			),
 			"", 0,
 		),
-		ResponseHeader: resHeader,
-		/*
-			NewResponseHeader(
-				timestamp, handle, code, diag, strs, NewNullAdditionalHeader(), nil,
-			),
-		*/
+		ResponseHeader:  resHeader,
 		ServerNonce:     datatypes.NewByteString(nonce),
 		Results:         datatypes.NewUint32Array(results),
 		DiagnosticInfos: NewDiagnosticInfoArray(diags),
