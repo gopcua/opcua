@@ -4,8 +4,6 @@
 
 /*
 Command server provides a connection establishment of OPC UA Secure Conversation as a server.
-
-XXX - Currently this command just handles the UACP connection from any client.
 */
 package main
 
@@ -13,7 +11,7 @@ import (
 	"context"
 	"flag"
 	"log"
-	"math/rand"
+	"time"
 
 	"github.com/wmnsk/gopcua/services"
 
@@ -36,7 +34,7 @@ func main() {
 	log.Printf("Started listening on %s.", listener.Endpoint())
 
 	cfg := uasc.NewConfig(
-		1, "http://opcfoundation.org/UA/SecurityPolicy#None", nil, nil, 1, rand.Uint32(),
+		1, services.SecModeNone, "http://opcfoundation.org/UA/SecurityPolicy#None", nil, nil, 0xffff, 1, uint32(time.Now().UnixNano()),
 	)
 
 	for {
@@ -56,7 +54,10 @@ func main() {
 			}()
 			log.Printf("Successfully established connection with %v", conn.RemoteAddr())
 
-			secChan, err := uasc.ListenAndAcceptSecureChannel(ctx, conn, cfg)
+			secChanCtx, cancel := context.WithCancel(ctx)
+			defer cancel()
+
+			secChan, err := uasc.ListenAndAcceptSecureChannel(secChanCtx, conn, cfg)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -66,10 +67,23 @@ func main() {
 			}()
 			log.Printf("Successfully opened secure channel with %v", conn.RemoteAddr())
 
-			buf := make([]byte, 1024)
+			sessCtx, cancel := context.WithCancel(secChanCtx)
+			defer cancel()
 
+			sessCfg := uasc.NewSessionConfigServer(secChan)
+			session, err := uasc.ListenAndAcceptSession(sessCtx, secChan, sessCfg)
+			if err != nil {
+				log.Fatal(err)
+			}
+			defer func() {
+				session.Close()
+				log.Printf("Successfully closed session with %v", conn.RemoteAddr())
+			}()
+			log.Printf("Successfully activated session with %v", conn.RemoteAddr())
+
+			buf := make([]byte, 1024)
 			for {
-				n, err := secChan.ReadService(buf)
+				n, err := session.ReadService(buf)
 				if err != nil {
 					log.Printf("Couldn't read UASC: %s", err)
 					continue
