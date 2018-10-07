@@ -20,7 +20,7 @@ type ReadResponse struct {
 }
 
 // NewReadResponse creates a new ReadResponse.
-func NewReadResponse(resHeader *ResponseHeader, dataValues []*datatypes.DataValue, diag []*DiagnosticInfo) *ReadResponse {
+func NewReadResponse(resHeader *ResponseHeader, diag []*DiagnosticInfo, results ...*datatypes.DataValue) *ReadResponse {
 	return &ReadResponse{
 		TypeID: datatypes.NewExpandedNodeID(
 			false, false,
@@ -30,7 +30,7 @@ func NewReadResponse(resHeader *ResponseHeader, dataValues []*datatypes.DataValu
 			"", 0,
 		),
 		ResponseHeader:  resHeader,
-		Results:         datatypes.NewDataValueArray(dataValues),
+		Results:         datatypes.NewDataValueArray(results),
 		DiagnosticInfos: NewDiagnosticInfoArray(diag),
 	}
 }

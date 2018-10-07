@@ -24,7 +24,7 @@ type WriteResponse struct {
 }
 
 // NewWriteResponse creates a new WriteResponse.
-func NewWriteResponse(resHeader *ResponseHeader, results []uint32, diags []*DiagnosticInfo) *WriteResponse {
+func NewWriteResponse(resHeader *ResponseHeader, diags []*DiagnosticInfo, results ...uint32) *WriteResponse {
 	return &WriteResponse{
 		TypeID: datatypes.NewExpandedNodeID(
 			false, false,

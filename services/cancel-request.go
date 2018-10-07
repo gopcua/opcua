@@ -22,7 +22,7 @@ type CancelRequest struct {
 }
 
 // NewCancelRequest creates a new CancelRequest.
-func NewCancelRequest(reqHeader *RequestHeader, handle uint32) *CancelRequest {
+func NewCancelRequest(reqHeader *RequestHeader, reqHandle uint32) *CancelRequest {
 	return &CancelRequest{
 		TypeID: datatypes.NewExpandedNodeID(
 			false, false,
@@ -30,7 +30,7 @@ func NewCancelRequest(reqHeader *RequestHeader, handle uint32) *CancelRequest {
 			"", 0,
 		),
 		RequestHeader: reqHeader,
-		RequestHandle: handle,
+		RequestHandle: reqHandle,
 	}
 }
 

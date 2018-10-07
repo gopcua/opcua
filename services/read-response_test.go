@@ -25,17 +25,15 @@ var readResponseCases = []struct {
 				time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
 				1, 0, NewNullDiagnosticInfo(), []string{}, NewNullAdditionalHeader(), nil,
 			),
-			[]*datatypes.DataValue{
-				datatypes.NewDataValue(
-					true, false, false, false, false, false,
-					datatypes.NewVariant(
-						datatypes.NewFloat(2.5001559257507324),
-					), 0, time.Time{}, 0, time.Time{}, 0,
-				),
-			},
 			[]*DiagnosticInfo{
 				NewNullDiagnosticInfo(),
 			},
+			datatypes.NewDataValue(
+				true, false, false, false, false, false,
+				datatypes.NewVariant(
+					datatypes.NewFloat(2.5001559257507324),
+				), 0, time.Time{}, 0, time.Time{}, 0,
+			),
 		),
 		[]byte{
 			// TypeID

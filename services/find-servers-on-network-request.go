@@ -41,8 +41,8 @@ type FindServersOnNetworkRequest struct {
 }
 
 // NewFindServersOnNetworkRequest creates a new FindServersOnNetworkRequest.
-func NewFindServersOnNetworkRequest(reqHeader *RequestHeader, startRecord, maxRecords uint32, servers []string) *FindServersOnNetworkRequest {
-	return &FindServersOnNetworkRequest{
+func NewFindServersOnNetworkRequest(reqHeader *RequestHeader, startRecord, maxRecords uint32, filters ...string) *FindServersOnNetworkRequest {
+	f := &FindServersOnNetworkRequest{
 		TypeID: datatypes.NewExpandedNodeID(
 			false, false,
 			datatypes.NewFourByteNodeID(
@@ -50,11 +50,18 @@ func NewFindServersOnNetworkRequest(reqHeader *RequestHeader, startRecord, maxRe
 			),
 			"", 0,
 		),
-		RequestHeader:          reqHeader,
-		StartingRecordID:       startRecord,
-		MaxRecordsToReturn:     maxRecords,
-		ServerCapabilityFilter: datatypes.NewStringArray(servers),
+		RequestHeader:      reqHeader,
+		StartingRecordID:   startRecord,
+		MaxRecordsToReturn: maxRecords,
 	}
+	// No filters
+	if len(filters) == 1 && filters[0] == "" {
+		f.ServerCapabilityFilter = &datatypes.StringArray{ArraySize: 0}
+		return f
+	}
+
+	f.ServerCapabilityFilter = datatypes.NewStringArray(filters)
+	return f
 }
 
 // DecodeFindServersOnNetworkRequest decodes given bytes into FindServersOnNetworkRequest.
