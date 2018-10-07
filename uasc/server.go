@@ -35,7 +35,7 @@ func ListenAndAcceptSecureChannel(ctx context.Context, transport net.Conn, cfg *
 		rcvBuf:  make([]byte, 0xffff),
 	}
 
-	go secChan.monitorMessages(ctx)
+	go secChan.monitor(ctx)
 	for {
 		select {
 		case ok := <-secChan.opened:
@@ -49,10 +49,12 @@ func ListenAndAcceptSecureChannel(ctx context.Context, transport net.Conn, cfg *
 }
 
 // NewSessionConfigServer creates a new SessionConfigServer for server.
-func NewSessionConfigServer(secChan *SecureChannel) *SessionConfig {
+func NewSessionConfigServer(secChan *SecureChannel, sigData *services.SignatureData, swCerts []*services.SignedSoftwareCertificate) *SessionConfig {
 	return &SessionConfig{
-		AuthenticationToken: datatypes.NewFourByteNodeID(0, uint16(time.Now().UnixNano())),
-		SessionTimeout:      0xffff,
+		AuthenticationToken:        datatypes.NewFourByteNodeID(0, uint16(time.Now().UnixNano())),
+		SessionTimeout:             0xffff,
+		ServerSignature:            sigData,
+		ServerSoftwareCertificates: swCerts,
 		ServerEndpoints: []*services.EndpointDescription{
 			services.NewEndpointDescription(
 				secChan.LocalEndpoint(), services.NewApplicationDescription(
@@ -67,7 +69,6 @@ func NewSessionConfigServer(secChan *SecureChannel) *SessionConfig {
 				), "", 0,
 			),
 		},
-		ServerSignature: services.NewSignatureData("", nil),
 	}
 }
 

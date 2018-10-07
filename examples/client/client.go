@@ -14,6 +14,8 @@ import (
 	"log"
 	"time"
 
+	"github.com/wmnsk/gopcua/datatypes"
+
 	"github.com/wmnsk/gopcua/services"
 
 	"github.com/wmnsk/gopcua/uacp"
@@ -82,7 +84,10 @@ func main() {
 	sessCtx, cancel := context.WithCancel(uascCtx)
 	defer cancel()
 
-	sessCfg := uasc.NewSessionConfigClient([]string{"ja-JP"})
+	sessCfg := uasc.NewSessionConfigClient(
+		[]string{"ja-JP"},
+		datatypes.NewAnonymousIdentityToken("anonymous"),
+	)
 	session, err := uasc.CreateSession(sessCtx, secChan, sessCfg, 3, 5*time.Second)
 	if err != nil {
 		log.Fatal(err)

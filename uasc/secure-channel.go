@@ -249,52 +249,7 @@ func (s *SecureChannel) SetWriteDeadline(t time.Time) error {
 	return s.lowerConn.SetWriteDeadline(t)
 }
 
-type secChanState uint8
-
-const (
-	undefined secChanState = iota
-	transportUnavailable
-	cliStateSecureChannelClosed
-	cliStateOpenSecureChannelSent
-	cliStateSecureChannelOpened
-	cliStateCloseSecureChannelSent
-	srvStateSecureChannelClosed
-	srvStateSecureChannelOpened
-	srvStateCloseSecureChannelSent
-)
-
-func (s secChanState) String() string {
-	switch s {
-	case transportUnavailable:
-		return "transport connection unavailable"
-	case cliStateSecureChannelClosed:
-		return "client secure channel closed"
-	case cliStateOpenSecureChannelSent:
-		return "client open secure channel sent"
-	case cliStateSecureChannelOpened:
-		return "client secure channel opened"
-	case cliStateCloseSecureChannelSent:
-		return "client close secure channel sent"
-	case srvStateSecureChannelClosed:
-		return "server secure channel closed"
-	case srvStateSecureChannelOpened:
-		return "server secure channel opened"
-	case srvStateCloseSecureChannelSent:
-		return "server close secure channel sent"
-	default:
-		return "unknown"
-	}
-}
-
-// GetState returns the current secChanState of SecureChannel.
-func (s *SecureChannel) GetState() string {
-	if s == nil {
-		return ""
-	}
-	return s.state.String()
-}
-
-func (s *SecureChannel) monitorMessages(ctx context.Context) {
+func (s *SecureChannel) monitor(ctx context.Context) {
 	childCtx, cancel := context.WithCancel(ctx)
 
 	for {
@@ -325,13 +280,13 @@ func (s *SecureChannel) monitorMessages(ctx context.Context) {
 
 			switch m := msg.Service.(type) {
 			case *services.OpenSecureChannelRequest:
-				s.handleOpenSecureChannelRequest(m)
+				go s.handleOpenSecureChannelRequest(m)
 			case *services.OpenSecureChannelResponse:
-				s.handleOpenSecureChannelResponse(m)
+				go s.handleOpenSecureChannelResponse(m)
 			case *services.CloseSecureChannelRequest:
-				s.handleCloseSecureChannelRequest(m)
+				go s.handleCloseSecureChannelRequest(m)
 			case *services.CloseSecureChannelResponse:
-				s.handleCloseSecureChannelResponse(m)
+				go s.handleCloseSecureChannelResponse(m)
 			default:
 				// pass to the user if type of msg is unknown.
 				go s.notifyLength(childCtx, n)
@@ -614,6 +569,51 @@ func (s *SecureChannel) FindServersResponse(code uint32, apps ...*services.Appli
 		return err
 	}
 	return nil
+}
+
+type secChanState uint8
+
+const (
+	undefined secChanState = iota
+	transportUnavailable
+	cliStateSecureChannelClosed
+	cliStateOpenSecureChannelSent
+	cliStateSecureChannelOpened
+	cliStateCloseSecureChannelSent
+	srvStateSecureChannelClosed
+	srvStateSecureChannelOpened
+	srvStateCloseSecureChannelSent
+)
+
+func (s secChanState) String() string {
+	switch s {
+	case transportUnavailable:
+		return "transport connection unavailable"
+	case cliStateSecureChannelClosed:
+		return "client secure channel closed"
+	case cliStateOpenSecureChannelSent:
+		return "client open secure channel sent"
+	case cliStateSecureChannelOpened:
+		return "client secure channel opened"
+	case cliStateCloseSecureChannelSent:
+		return "client close secure channel sent"
+	case srvStateSecureChannelClosed:
+		return "server secure channel closed"
+	case srvStateSecureChannelOpened:
+		return "server secure channel opened"
+	case srvStateCloseSecureChannelSent:
+		return "server close secure channel sent"
+	default:
+		return "unknown"
+	}
+}
+
+// GetState returns the current secChanState of SecureChannel.
+func (s *SecureChannel) GetState() string {
+	if s == nil {
+		return ""
+	}
+	return s.state.String()
 }
 
 // UASC-specific error definitions.

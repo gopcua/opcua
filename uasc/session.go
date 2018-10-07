@@ -7,6 +7,7 @@ package uasc
 import (
 	"context"
 	"crypto/rand"
+	"encoding/binary"
 	"io"
 	"net"
 	"sync"
@@ -19,15 +20,15 @@ import (
 
 // SessionConfig is a set of common configurations used in Session.
 type SessionConfig struct {
-	SessionTimeout                   uint64
-	AuthenticationToken              datatypes.NodeID
-	ClientDescription                *services.ApplicationDescription
-	ServerEndpoints                  []*services.EndpointDescription
-	ClientSignature, ServerSignature *services.SignatureData
-	ClientSoftwareCertificates       []*services.SignedSoftwareCertificate
-	LocaleIDs                        []string
-	UserIdentityToken                *datatypes.ExtensionObject
-	UserTokenSignature               *services.SignatureData
+	SessionTimeout                                         uint64
+	AuthenticationToken                                    datatypes.NodeID
+	ClientDescription                                      *services.ApplicationDescription
+	ServerEndpoints                                        []*services.EndpointDescription
+	ClientSignature, ServerSignature                       *services.SignatureData
+	ClientSoftwareCertificates, ServerSoftwareCertificates []*services.SignedSoftwareCertificate
+	LocaleIDs                                              []string
+	UserIdentityToken                                      datatypes.UserIdentityToken
+	UserTokenSignature                                     *services.SignatureData
 }
 
 // Session is an implementation of the net.Conn interface for Session in OPC UA Secure Conversation.
@@ -239,17 +240,17 @@ func (s *Session) monitor(ctx context.Context) {
 
 			switch m := msg.Service.(type) {
 			case *services.CreateSessionRequest:
-				s.handleCreateSessionRequest(m)
+				go s.handleCreateSessionRequest(m)
 			case *services.CreateSessionResponse:
-				s.handleCreateSessionResponse(m)
+				go s.handleCreateSessionResponse(m)
 			case *services.ActivateSessionRequest:
-				s.handleActivateSessionRequest(m)
+				go s.handleActivateSessionRequest(m)
 			case *services.ActivateSessionResponse:
-				s.handleActivateSessionResponse(m)
+				go s.handleActivateSessionResponse(m)
 			case *services.CloseSessionRequest:
-				s.handleCloseSessionRequest(m)
+				go s.handleCloseSessionRequest(m)
 			case *services.CloseSessionResponse:
-				s.handleCloseSessionResponse(m)
+				go s.handleCloseSessionResponse(m)
 			default:
 				// pass to the user if type of msg is unknown.
 				go s.notifyLength(childCtx, n)
@@ -326,7 +327,7 @@ func (s *Session) handleActivateSessionRequest(as *services.ActivateSessionReque
 		for _, str := range as.LocaleIDs.Strings {
 			s.cfg.LocaleIDs = append(s.cfg.LocaleIDs, str.Get())
 		}
-		s.cfg.UserIdentityToken = as.UserIdentityToken
+		s.cfg.UserIdentityToken = as.UserIdentityToken.Value
 		s.cfg.UserTokenSignature = as.UserTokenSignature
 
 		if err := s.ActivateSessionResponse(0); err != nil {
@@ -420,15 +421,21 @@ func (s *Session) CreateSessionRequest() error {
 func (s *Session) CreateSessionResponse() error {
 	s.secChan.resHeader.Timestamp = time.Now()
 
+	sid := make([]byte, 4)
+	if _, err := rand.Read(sid); err != nil {
+		return err
+	}
+	sessID := binary.LittleEndian.Uint32(sid)
 	nonce := make([]byte, 32)
 	if _, err := rand.Read(nonce); err != nil {
 		return err
 	}
+
 	csr, err := services.NewCreateSessionResponse(
 		// XXX - Give AuthenticationToken as NodeID
-		s.secChan.resHeader, uint32(time.Now().UnixNano()), s.cfg.AuthenticationToken.GetIdentifier(), 0xffff,
-		nonce, s.secChan.cfg.Certificate, s.cfg.ServerSignature.Algorithm.Get(),
-		s.cfg.ServerSignature.Signature.Get(), 0xffff, s.cfg.ServerEndpoints...,
+		s.secChan.resHeader, datatypes.NewNumericNodeID(0, sessID), s.cfg.AuthenticationToken, 0xffff,
+		nonce, s.secChan.cfg.Certificate, s.cfg.ServerSoftwareCertificates, s.cfg.ServerSignature,
+		0xffff, s.cfg.ServerEndpoints...,
 	).Serialize()
 	if err != nil {
 		return err

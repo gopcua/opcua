@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/wmnsk/gopcua/datatypes"
-	"github.com/wmnsk/gopcua/id"
 	"github.com/wmnsk/gopcua/services"
 )
 
@@ -19,7 +18,7 @@ import (
 //
 // Currently security mode=None is only supported. If secMode is not set to
 //
-// The first param ctx is to be passed to monitorMessages(), which monitors and handles
+// The first param ctx is to be passed to monitor(), which monitors and handles
 // incoming messages automatically in another goroutine.
 func OpenSecureChannel(ctx context.Context, transportConn net.Conn, cfg *Config) (*SecureChannel, error) {
 	return openSecureChannel(ctx, transportConn, cfg, 5*time.Second, 3)
@@ -65,7 +64,7 @@ func openSecureChannel(ctx context.Context, transportConn net.Conn, cfg *Config,
 	sent := 1
 
 	secChan.state = cliStateOpenSecureChannelSent
-	go secChan.monitorMessages(ctx)
+	go secChan.monitor(ctx)
 	for {
 		if sent > maxRetry {
 			return nil, ErrTimeout
@@ -88,7 +87,7 @@ func openSecureChannel(ctx context.Context, transportConn net.Conn, cfg *Config,
 }
 
 // NewSessionConfigClient creates a SessionConfig for client.
-func NewSessionConfigClient(locales []string) *SessionConfig {
+func NewSessionConfigClient(locales []string, userToken datatypes.UserIdentityToken) *SessionConfig {
 	return &SessionConfig{
 		SessionTimeout: 0xffff,
 		ClientDescription: services.NewApplicationDescription(
@@ -99,15 +98,8 @@ func NewSessionConfigClient(locales []string) *SessionConfig {
 		ClientSoftwareCertificates: []*services.SignedSoftwareCertificate{
 			services.NewSignedSoftwareCertificate(nil, nil),
 		},
-		LocaleIDs: locales,
-		UserIdentityToken: datatypes.NewExtensionObject(
-			datatypes.NewExpandedNodeID(
-				false, false,
-				datatypes.NewFourByteNodeID(0, id.AnonymousIdentityToken_Encoding_DefaultBinary),
-				"", 0,
-			),
-			0x01, []byte("anonymous"),
-		),
+		LocaleIDs:          locales,
+		UserIdentityToken:  userToken,
 		UserTokenSignature: services.NewSignatureData("", nil),
 	}
 }

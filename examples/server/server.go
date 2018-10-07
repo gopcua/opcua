@@ -70,7 +70,13 @@ func main() {
 			sessCtx, cancel := context.WithCancel(secChanCtx)
 			defer cancel()
 
-			sessCfg := uasc.NewSessionConfigServer(secChan)
+			sessCfg := uasc.NewSessionConfigServer(
+				secChan,
+				services.NewSignatureData("", nil),
+				[]*services.SignedSoftwareCertificate{
+					services.NewSignedSoftwareCertificate(nil, nil),
+				},
+			)
 			session, err := uasc.ListenAndAcceptSession(sessCtx, secChan, sessCfg)
 			if err != nil {
 				log.Fatal(err)
