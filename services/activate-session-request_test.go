@@ -29,13 +29,7 @@ var activateSessionRequestCases = []struct {
 				1, 0, 0, "", NewNullAdditionalHeader(), nil,
 			),
 			NewSignatureData("", nil), nil, nil,
-			datatypes.NewExtensionObject(
-				&datatypes.ExpandedNodeID{
-					NodeID: datatypes.NewFourByteNodeID(0, 321),
-				},
-				0x01,
-				[]byte("0"),
-			),
+			datatypes.NewAnonymousIdentityToken("anonymous"),
 			NewSignatureData("", nil),
 		),
 		[]byte{
@@ -69,8 +63,10 @@ var activateSessionRequestCases = []struct {
 			0x01, 0x00, 0x41, 0x01,
 			// EncodingMask
 			0x01,
+			// Length
+			0x0d, 0x00, 0x00, 0x00,
 			// AnonymousIdentityToken
-			0x05, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x30,
+			0x09, 0x00, 0x00, 0x00, 0x61, 0x6e, 0x6f, 0x6e, 0x79, 0x6d, 0x6f, 0x75, 0x73,
 			// UserTokenSignature
 			0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 		},

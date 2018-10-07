@@ -8,6 +8,11 @@ import (
 	"github.com/wmnsk/gopcua/id"
 )
 
+// UserIdentityToken is an interface to handle all types of UserIdentityToken types as one type.
+type UserIdentityToken interface {
+	ExtensionObjectValue
+}
+
 // AnonymousIdentityToken is used to indicate that the Client has no user credentials.
 //
 // Specification: Part4, 7.36.5
@@ -68,9 +73,14 @@ func (a *AnonymousIdentityToken) Len() int {
 	return l
 }
 
-// Type returns PolicyID in int.
+// Type returns type of token defined in NodeIds.csv in int.
 func (a *AnonymousIdentityToken) Type() int {
 	return id.AnonymousIdentityToken_Encoding_DefaultBinary
+}
+
+// ID returns PolicyID in string.
+func (a *AnonymousIdentityToken) ID() string {
+	return a.PolicyID.Get()
 }
 
 // UserNameIdentityToken is used to pass simple username/password credentials to the Server.
@@ -210,9 +220,14 @@ func (u *UserNameIdentityToken) Len() int {
 	return l
 }
 
-// Type returns PolicyID in int.
+// Type returns type of token defined in NodeIds.csv in int.
 func (u *UserNameIdentityToken) Type() int {
 	return id.UserNameIdentityToken_Encoding_DefaultBinary
+}
+
+// ID returns PolicyID in string.
+func (u *UserNameIdentityToken) ID() string {
+	return u.PolicyID.Get()
 }
 
 // X509IdentityToken is used to pass an X.509 v3 Certificate which is issued by the user.
@@ -300,9 +315,14 @@ func (x *X509IdentityToken) Len() int {
 	return l
 }
 
-// Type returns PolicyID in int.
+// Type returns type of token defined in NodeIds.csv in int.
 func (x *X509IdentityToken) Type() int {
 	return id.X509IdentityToken_Encoding_DefaultBinary
+}
+
+// ID returns PolicyID in string.
+func (x *X509IdentityToken) ID() string {
+	return x.PolicyID.Get()
 }
 
 // IssuedIdentityToken is used to pass SecurityTokens issued by an external Authorization
@@ -424,7 +444,12 @@ func (i *IssuedIdentityToken) Len() int {
 	return l
 }
 
-// Type returns PolicyID in int.
+// Type returns type of token defined in NodeIds.csv in int.
 func (i *IssuedIdentityToken) Type() int {
 	return id.IssuedIdentityToken_Encoding_DefaultBinary
+}
+
+// ID returns PolicyID in string.
+func (i *IssuedIdentityToken) ID() string {
+	return i.PolicyID.Get()
 }

@@ -4,7 +4,12 @@
 
 package datatypes
 
-import "encoding/binary"
+import (
+	"encoding/binary"
+
+	"github.com/wmnsk/gopcua/errors"
+	"github.com/wmnsk/gopcua/id"
+)
 
 // ExtensionObject is encoded as sequence of bytes prefixed by the NodeId of its DataTypeEncoding
 // and the number of bytes encoded.
@@ -14,15 +19,17 @@ type ExtensionObject struct {
 	TypeID       *ExpandedNodeID
 	EncodingMask byte
 	Length       int32
-	Body         *ByteString
+	Value        ExtensionObjectValue
 }
 
-// NewExtensionObject creates a new ExtensionObject.
-func NewExtensionObject(typeID *ExpandedNodeID, mask uint8, body []byte) *ExtensionObject {
+// NewExtensionObject creates a new ExtensionObject from the ExtensionObjectValue given.
+func NewExtensionObject(mask uint8, extParam ExtensionObjectValue) *ExtensionObject {
 	e := &ExtensionObject{
-		TypeID:       typeID,
+		TypeID: NewExpandedNodeID(
+			false, false, NewFourByteNodeID(0, uint16(extParam.Type())), "", 0,
+		),
 		EncodingMask: mask,
-		Body:         NewByteString(body),
+		Value:        extParam,
 	}
 	e.SetLength()
 
@@ -52,15 +59,26 @@ func (e *ExtensionObject) DecodeFromBytes(b []byte) error {
 	e.EncodingMask = b[offset]
 	offset++
 
-	// length
 	e.Length = int32(binary.LittleEndian.Uint32(b[offset : offset+4]))
 	offset += 4
 
-	// body
-	e.Body = &ByteString{}
-	if err := e.Body.DecodeFromBytes(b[offset:]); err != nil {
+	// extension object parameter
+	var id int
+	switch e.TypeID.NodeID.(type) {
+	case *TwoByteNodeID:
+		id = int(nodeID.GetIdentifier()[0])
+	case *FourByteNodeID:
+		id = int(binary.LittleEndian.Uint16(nodeID.GetIdentifier()))
+	case *NumericNodeID:
+		id = int(binary.LittleEndian.Uint32(nodeID.GetIdentifier()))
+	default:
+		return errors.NewErrInvalidType(e.TypeID.NodeID, "decode", "NodeID should be TwoByte, FourByte or Numeric")
+	}
+	val, err := DecodeExtensionObjectValue(b[offset:], int(id))
+	if err != nil {
 		return err
 	}
+	e.Value = val
 
 	return nil
 }
@@ -91,13 +109,12 @@ func (e *ExtensionObject) SerializeTo(b []byte) error {
 	b[offset] = e.EncodingMask
 	offset++
 
-	// length
 	binary.LittleEndian.PutUint32(b[offset:offset+4], uint32(e.Length))
 	offset += 4
 
-	// body
-	if e.Body != nil {
-		if err := e.Body.SerializeTo(b[offset:]); err != nil {
+	// extension object parameter
+	if e.Value != nil {
+		if err := e.Value.SerializeTo(b[offset:]); err != nil {
 			return err
 		}
 	}
@@ -114,14 +131,87 @@ func (e *ExtensionObject) Len() int {
 		length += e.TypeID.Len()
 	}
 
-	if e.Body != nil {
-		length += e.Body.Len()
+	if e.Value != nil {
+		length += e.Value.Len()
 	}
 
 	return length
 }
 
-// SetLength sets the length of Body in Length field.
+// SetLength sets the length of Value in Length field.
 func (e *ExtensionObject) SetLength() {
-	e.Length = int32(e.Body.Len())
+	e.Length = int32(e.Value.Len())
+}
+
+// ExtensionObjectValue represents the value in ExtensionObject.
+type ExtensionObjectValue interface {
+	DecodeFromBytes([]byte) error
+	SerializeTo(b []byte) error
+	Len() int
+	Type() int
+}
+
+// DecodeExtensionObjectValue decodes given bytes as an ExtensionObjectValue depending on the specified type.
+//
+// The type should be one defined in the DiscoveryConfiguration, UserIdentityToken, NodeAttributes,
+// HistoryReadDetails, HistoryData, HistoryUpdateDetails, MonitoringFilterResult, FilterOperand.
+func DecodeExtensionObjectValue(b []byte, typ int) (ExtensionObjectValue, error) {
+	var e ExtensionObjectValue
+	switch typ {
+	case id.ElementOperand_Encoding_DefaultBinary:
+		return nil, errors.NewErrUnsupported(typ, "not implemented")
+	case id.LiteralOperand_Encoding_DefaultBinary:
+		return nil, errors.NewErrUnsupported(typ, "not implemented")
+	case id.AttributeOperand_Encoding_DefaultBinary:
+		return nil, errors.NewErrUnsupported(typ, "not implemented")
+	case id.SimpleAttributeOperand_Encoding_DefaultBinary:
+		return nil, errors.NewErrUnsupported(typ, "not implemented")
+	case id.MdnsDiscoveryConfiguration_Encoding_DefaultBinary:
+		return nil, errors.NewErrUnsupported(typ, "not implemented")
+	case id.DataChangeFilter_Encoding_DefaultBinary:
+		return nil, errors.NewErrUnsupported(typ, "not implemented")
+	case id.EventFilter_Encoding_DefaultBinary:
+		return nil, errors.NewErrUnsupported(typ, "not implemented")
+	case id.AggregateFilter_Encoding_DefaultBinary:
+		return nil, errors.NewErrUnsupported(typ, "not implemented")
+	case id.ObjectAttributes_Encoding_DefaultBinary:
+		return nil, errors.NewErrUnsupported(typ, "not implemented")
+	case id.VariableAttributes_Encoding_DefaultBinary:
+		return nil, errors.NewErrUnsupported(typ, "not implemented")
+	case id.MethodAttributes_Encoding_DefaultBinary:
+		return nil, errors.NewErrUnsupported(typ, "not implemented")
+	case id.ObjectTypeAttributes_Encoding_DefaultBinary:
+		return nil, errors.NewErrUnsupported(typ, "not implemented")
+	case id.VariableTypeAttributes_Encoding_DefaultBinary:
+		return nil, errors.NewErrUnsupported(typ, "not implemented")
+	case id.ReferenceTypeAttributes_Encoding_DefaultBinary:
+		return nil, errors.NewErrUnsupported(typ, "not implemented")
+	case id.DataTypeAttributes_Encoding_DefaultBinary:
+		return nil, errors.NewErrUnsupported(typ, "not implemented")
+	case id.ViewAttributes_Encoding_DefaultBinary:
+		return nil, errors.NewErrUnsupported(typ, "not implemented")
+	case id.GenericAttributes_Encoding_DefaultBinary:
+		return nil, errors.NewErrUnsupported(typ, "not implemented")
+	case id.DataChangeNotification_Encoding_DefaultBinary:
+		return nil, errors.NewErrUnsupported(typ, "not implemented")
+	case id.EventNotificationList_Encoding_DefaultBinary:
+		return nil, errors.NewErrUnsupported(typ, "not implemented")
+	case id.StatusChangeNotification_Encoding_DefaultBinary:
+		return nil, errors.NewErrUnsupported(typ, "not implemented")
+	case id.AnonymousIdentityToken_Encoding_DefaultBinary:
+		e = &AnonymousIdentityToken{}
+	case id.UserNameIdentityToken_Encoding_DefaultBinary:
+		e = &UserNameIdentityToken{}
+	case id.X509IdentityToken_Encoding_DefaultBinary:
+		e = &X509IdentityToken{}
+	case id.IssuedIdentityToken_Encoding_DefaultBinary:
+		e = &IssuedIdentityToken{}
+	default:
+		return nil, errors.NewErrInvalidType(typ, "decode", "should be a type of ExtensionObjectValue")
+	}
+
+	if err := e.DecodeFromBytes(b); err != nil {
+		return nil, err
+	}
+	return e, nil
 }
