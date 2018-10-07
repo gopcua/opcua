@@ -29,7 +29,7 @@ func TestSecureChannel(t *testing.T) {
 	defer cancel()
 
 	cfg := NewConfig(
-		1, policyURI, nil, nil, 0, 1,
+		1, services.SecModeNone, policyURI, nil, nil, 1000, 0, 1,
 	)
 
 	done := make(chan int)
@@ -51,7 +51,7 @@ func TestSecureChannel(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := OpenSecureChannel(ctx, cliConn, cfg, services.SecModeNone, 0xffff, nil); err != nil {
+	if _, err := OpenSecureChannel(ctx, cliConn, cfg); err != nil {
 		t.Error(err)
 	}
 
@@ -85,7 +85,7 @@ func TestClientWrite(t *testing.T) {
 
 	done := make(chan int)
 	cfg := NewConfig(
-		1, policyURI, nil, nil, 0, 1,
+		1, services.SecModeNone, policyURI, nil, nil, 1000, 0, 1,
 	)
 	go func() {
 		defer ln.Close()
@@ -106,7 +106,7 @@ func TestClientWrite(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cliChan, err = OpenSecureChannel(ctx, cliConn, cfg, services.SecModeNone, 0xffff, nil)
+	cliChan, err = OpenSecureChannel(ctx, cliConn, cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -160,7 +160,7 @@ func TestServerWrite(t *testing.T) {
 
 	done := make(chan int)
 	cfg := NewConfig(
-		1, policyURI, nil, nil, 0, 1,
+		1, services.SecModeNone, policyURI, nil, nil, 1000, 0, 1,
 	)
 	go func() {
 		defer ln.Close()
@@ -181,7 +181,7 @@ func TestServerWrite(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cliChan, err = OpenSecureChannel(ctx, cliConn, cfg, services.SecModeNone, 0xffff, nil)
+	cliChan, err = OpenSecureChannel(ctx, cliConn, cfg)
 	if err != nil {
 		t.Fatal(err)
 	}

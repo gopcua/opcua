@@ -35,7 +35,7 @@ func ListenAndAcceptSecureChannel(ctx context.Context, transport net.Conn, cfg *
 		rcvBuf:  make([]byte, 0xffff),
 	}
 
-	go secChan.monitorMessages(ctx)
+	go secChan.monitor(ctx)
 	for {
 		select {
 		case ok := <-secChan.opened:
@@ -43,6 +43,57 @@ func ListenAndAcceptSecureChannel(ctx context.Context, transport net.Conn, cfg *
 				return secChan, nil
 			}
 		case err := <-secChan.errChan:
+			return nil, err
+		}
+	}
+}
+
+// NewSessionConfigServer creates a new SessionConfigServer for server.
+func NewSessionConfigServer(secChan *SecureChannel, sigData *services.SignatureData, swCerts []*services.SignedSoftwareCertificate) *SessionConfig {
+	return &SessionConfig{
+		AuthenticationToken:        datatypes.NewFourByteNodeID(0, uint16(time.Now().UnixNano())),
+		SessionTimeout:             0xffff,
+		ServerSignature:            sigData,
+		ServerSoftwareCertificates: swCerts,
+		ServerEndpoints: []*services.EndpointDescription{
+			services.NewEndpointDescription(
+				secChan.LocalEndpoint(), services.NewApplicationDescription(
+					"urn:gopcua:client", "urn:gopcua", "gopcua - OPC UA implementation in pure Golang",
+					services.AppTypeServer, "", "", []string{""},
+				),
+				secChan.cfg.Certificate, secChan.cfg.SecurityMode, secChan.cfg.SecurityPolicyURI,
+				services.NewUserTokenPolicyArray(
+					[]*services.UserTokenPolicy{
+						services.NewUserTokenPolicy("", 0, "", "", ""),
+					},
+				), "", 0,
+			),
+		},
+	}
+}
+
+// ListenAndAcceptSession starts UASC server on top of established transport connection.
+func ListenAndAcceptSession(ctx context.Context, secChan *SecureChannel, cfg *SessionConfig) (*Session, error) {
+	session := &Session{
+		mu:        new(sync.Mutex),
+		secChan:   secChan,
+		cfg:       cfg,
+		state:     srvStateSessionClosed,
+		created:   make(chan bool),
+		activated: make(chan bool),
+		lenChan:   make(chan int),
+		errChan:   make(chan error),
+		rcvBuf:    make([]byte, 0xffff),
+	}
+
+	go session.monitor(ctx)
+	for {
+		select {
+		case ok := <-session.activated:
+			if ok {
+				return session, nil
+			}
+		case err := <-session.errChan:
 			return nil, err
 		}
 	}

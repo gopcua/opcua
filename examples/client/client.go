@@ -4,8 +4,6 @@
 
 /*
 Command client provides a connection establishment of OPC UA Secure Conversation.
-
-XXX - Currently this command just initiates the connection(UACP) to the specified endpoint.
 */
 package main
 
@@ -15,6 +13,10 @@ import (
 	"flag"
 	"log"
 	"time"
+
+	"github.com/wmnsk/gopcua/datatypes"
+
+	"github.com/wmnsk/gopcua/services"
 
 	"github.com/wmnsk/gopcua/uacp"
 	"github.com/wmnsk/gopcua/uasc"
@@ -34,7 +36,6 @@ func main() {
 	defer cancel()
 
 	// Establish UACP Connection with the Endpoint specified.
-	// No need for conn.Close(), as context handles the cancellation.
 	conn, err := uacp.Dial(uacpCtx, *endpoint)
 	if err != nil {
 		log.Fatal(err)
@@ -52,9 +53,9 @@ func main() {
 	defer cancel()
 	// Open SecureChannel on top of UACP Connection established above.
 	cfg := uasc.NewConfig(
-		1, "http://opcfoundation.org/UA/SecurityPolicy#None", nil, nil, 0, 0,
+		1, services.SecModeNone, "http://opcfoundation.org/UA/SecurityPolicy#None", nil, nil, 0xffff, 0, 0,
 	)
-	secChan, err := uasc.OpenSecureChannel(uascCtx, conn, cfg, 1, 1, nil)
+	secChan, err := uasc.OpenSecureChannel(uascCtx, conn, cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -64,7 +65,7 @@ func main() {
 		}
 		log.Printf("Successfully closed secure channel with %v", conn.RemoteEndpoint())
 	}()
-	log.Printf("Successfully opened secure channel with %v", conn.RemoteEndpoint())
+	log.Printf("Successfully opened secure channel with %v", secChan.RemoteEndpoint())
 
 	// Send FindServersRequest to remote Endpoint.
 	if err := secChan.FindServersRequest([]string{"ja-JP", "de-DE", "en-US"}, "gopcua-server"); err != nil {
@@ -79,6 +80,28 @@ func main() {
 	}
 	log.Println("Successfully sent GetEndpointsRequest")
 	time.Sleep(500 * time.Millisecond)
+
+	sessCtx, cancel := context.WithCancel(uascCtx)
+	defer cancel()
+
+	sessCfg := uasc.NewSessionConfigClient(
+		[]string{"ja-JP"},
+		datatypes.NewAnonymousIdentityToken("anonymous"),
+	)
+	session, err := uasc.CreateSession(sessCtx, secChan, sessCfg, 3, 5*time.Second)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer func() {
+		session.Close()
+		log.Printf("Successfully closed secure channel with %v", secChan.RemoteEndpoint())
+	}()
+	log.Printf("Successfully created secure channel with %v", secChan.RemoteEndpoint())
+
+	if err := session.Activate(); err != nil {
+		log.Fatal(err)
+	}
+	log.Printf("Successfully activated secure channel with %v", secChan.RemoteEndpoint())
 
 	// Send arbitrary payload on top of UASC SecureChannel.
 	payload, err := hex.DecodeString(*payloadHex)
