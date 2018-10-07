@@ -10,150 +10,61 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
-func TestNewExtensionObject(t *testing.T) {
-	e := NewExtensionObject(
-		NewExpandedNodeID(
-			false, false, NewFourByteNodeID(0, 321), "", 0,
+var extensionObjectCases = []struct {
+	description string
+	structured  *ExtensionObject
+	serialized  []byte
+}{
+	{
+		"anonymous-user-identity-token",
+		NewExtensionObject(
+			0x01, NewAnonymousIdentityToken("anonymous"),
 		),
-		0x01,
-		[]byte("0"),
-	)
-	expected := &ExtensionObject{
-		TypeID: &ExpandedNodeID{
-			NodeID: &FourByteNodeID{
-				EncodingMask: 0x01,
-				Namespace:    0,
-				Identifier:   321,
-			},
+		[]byte{
+			// TypeID
+			0x01, 0x00, 0x41, 0x01,
+			// EncodingMask
+			0x01,
+			// Length
+			0x0d, 0x00, 0x00, 0x00,
+			// AnonymousIdentityToken
+			0x09, 0x00, 0x00, 0x00, 0x61, 0x6e, 0x6f, 0x6e, 0x79, 0x6d, 0x6f, 0x75, 0x73,
 		},
-		EncodingMask: 0x01,
-		Length:       5,
-		Body:         NewByteString([]byte("0")),
-	}
-
-	if diff := cmp.Diff(e, expected); diff != "" {
-		t.Error(diff)
-	}
+	},
 }
 
 func TestDecodeExtensionObject(t *testing.T) {
-	b := []byte{
-		0x01, 0x00, 0x41, 0x01, 0x01, 0x05, 0x00, 0x00,
-		0x00, 0x01, 0x00, 0x00, 0x00, 0x30,
-	}
-	e, err := DecodeExtensionObject(b)
-	if err != nil {
-		t.Fatal(err)
-	}
-	expected := &ExtensionObject{
-		TypeID: &ExpandedNodeID{
-			NodeID: &FourByteNodeID{
-				EncodingMask: 0x01,
-				Namespace:    0,
-				Identifier:   321,
-			},
-		},
-		EncodingMask: 0x01,
-		Length:       5,
-		Body:         NewByteString([]byte("0")),
-	}
-	if diff := cmp.Diff(e, expected); diff != "" {
-		t.Error(diff)
+	for _, c := range extensionObjectCases {
+		got, err := DecodeExtensionObject(c.serialized)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if diff := cmp.Diff(got, c.structured); diff != "" {
+			t.Errorf("%s failed\n%s", c.description, diff)
+		}
 	}
 }
 
-func TestExtensionObjectDecodeFromBytes(t *testing.T) {
-	b := []byte{
-		0x01, 0x00, 0x41, 0x01, 0x01, 0x05, 0x00, 0x00,
-		0x00, 0x01, 0x00, 0x00, 0x00, 0x30,
-	}
-	e := &ExtensionObject{}
-	if err := e.DecodeFromBytes(b); err != nil {
-		t.Fatal(err)
-	}
-	expected := &ExtensionObject{
-		TypeID: &ExpandedNodeID{
-			NodeID: &FourByteNodeID{
-				EncodingMask: 0x01,
-				Namespace:    0,
-				Identifier:   321,
-			},
-		},
-		EncodingMask: 0x01,
-		Length:       5,
-		Body:         NewByteString([]byte("0")),
-	}
-	if diff := cmp.Diff(e, expected); diff != "" {
-		t.Error(diff)
-	}
-}
+func TestSerializeExtensionObject(t *testing.T) {
+	for _, c := range extensionObjectCases {
+		got, err := c.structured.Serialize()
+		if err != nil {
+			t.Fatal(err)
+		}
 
-func TestExtensionObjectSerialize(t *testing.T) {
-	e := &ExtensionObject{
-		TypeID: &ExpandedNodeID{
-			NodeID: &FourByteNodeID{
-				EncodingMask: 0x01,
-				Namespace:    0,
-				Identifier:   321,
-			},
-		},
-		EncodingMask: 0x01,
-		Length:       5,
-		Body:         NewByteString([]byte("0")),
-	}
-	b, err := e.Serialize()
-	if err != nil {
-		t.Fatal(err)
-	}
-	expected := []byte{
-		0x01, 0x00, 0x41, 0x01, 0x01, 0x05, 0x00, 0x00,
-		0x00, 0x01, 0x00, 0x00, 0x00, 0x30,
-	}
-	if diff := cmp.Diff(b, expected); diff != "" {
-		t.Error(diff)
-	}
-}
-
-func TestExtensionObjectSerializeTo(t *testing.T) {
-	e := &ExtensionObject{
-		TypeID: &ExpandedNodeID{
-			NodeID: &FourByteNodeID{
-				EncodingMask: 0x01,
-				Namespace:    0,
-				Identifier:   321,
-			},
-		},
-		EncodingMask: 0x01,
-		Length:       5,
-		Body:         NewByteString([]byte("0")),
-	}
-	b := make([]byte, e.Len())
-	if err := e.SerializeTo(b); err != nil {
-		t.Fatal(err)
-	}
-	expected := []byte{
-		0x01, 0x00, 0x41, 0x01, 0x01, 0x05, 0x00, 0x00,
-		0x00, 0x01, 0x00, 0x00, 0x00, 0x30,
-	}
-	if diff := cmp.Diff(b, expected); diff != "" {
-		t.Error(diff)
+		if diff := cmp.Diff(got, c.serialized); diff != "" {
+			t.Errorf("%s failed\n%s", c.description, diff)
+		}
 	}
 }
 
 func TestExtensionObjectLen(t *testing.T) {
-	e := &ExtensionObject{
-		TypeID: &ExpandedNodeID{
-			NodeID: &FourByteNodeID{
-				EncodingMask: 0x01,
-				Namespace:    0,
-				Identifier:   321,
-			},
-		},
-		EncodingMask: 0x01,
-		Length:       5,
-		Body:         NewByteString([]byte("0")),
-	}
-	if e.Len() != 14 {
-		t.Errorf("Len doesn't match. Want: %d, Got: %d", 14, e.Len())
+	for _, c := range extensionObjectCases {
+		got := c.structured.Len()
+
+		if diff := cmp.Diff(got, len(c.serialized)); diff != "" {
+			t.Errorf("%s failed\n%s", c.description, diff)
+		}
 	}
 }
