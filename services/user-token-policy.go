@@ -11,6 +11,18 @@ import (
 	"github.com/wmnsk/gopcua/datatypes"
 )
 
+// UserIdentityToken structure used in the Server Service Set allows Clients to specify the
+// identity of the user they are acting on behalf of. The exact mechanism used to identify users
+// depends on the system configuration.
+//
+// Specification: Part 4, 7.36.1
+const (
+	UserTokenAnonymous uint32 = iota
+	UserTokenUsername
+	UserTokenCertificate
+	UserTokenIssuedToken
+)
+
 // UserTokenPolicy represents an UserTokenPolicy.
 //
 // Specification: Part 4, 7.37

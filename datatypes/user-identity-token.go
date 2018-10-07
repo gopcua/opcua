@@ -15,6 +15,13 @@ type AnonymousIdentityToken struct {
 	PolicyID *String
 }
 
+// NewAnonymousIdentityToken creates a new AnonymousIdentityToken.
+func NewAnonymousIdentityToken(policyID string) *AnonymousIdentityToken {
+	return &AnonymousIdentityToken{
+		PolicyID: NewString(policyID),
+	}
+}
+
 // DecodeAnonymousIdentityToken decodes given bytes as AnonymousIdentityToken.
 func DecodeAnonymousIdentityToken(b []byte) (*AnonymousIdentityToken, error) {
 	a := &AnonymousIdentityToken{}
@@ -93,6 +100,16 @@ type UserNameIdentityToken struct {
 	EncryptionAlgorithm *String
 }
 
+// NewUserNameIdentityToken creates a new UserNameIdentityToken.
+func NewUserNameIdentityToken(policyID, username string, password []byte, alg string) *UserNameIdentityToken {
+	return &UserNameIdentityToken{
+		PolicyID:            NewString(policyID),
+		UserName:            NewString(username),
+		Password:            NewByteString(password),
+		EncryptionAlgorithm: NewString(alg),
+	}
+}
+
 // DecodeUserNameIdentityToken decodes given bytes as UserNameIdentityToken.
 func DecodeUserNameIdentityToken(b []byte) (*UserNameIdentityToken, error) {
 	u := &UserNameIdentityToken{}
@@ -142,28 +159,28 @@ func (u *UserNameIdentityToken) Serialize() ([]byte, error) {
 func (u *UserNameIdentityToken) SerializeTo(b []byte) error {
 	offset := 0
 	if u.PolicyID != nil {
-		if err := u.PolicyID.SerializeTo(b); err != nil {
+		if err := u.PolicyID.SerializeTo(b[offset:]); err != nil {
 			return err
 		}
 		offset += u.PolicyID.Len()
 	}
 
 	if u.UserName != nil {
-		if err := u.UserName.SerializeTo(b); err != nil {
+		if err := u.UserName.SerializeTo(b[offset:]); err != nil {
 			return err
 		}
 		offset += u.UserName.Len()
 	}
 
 	if u.Password != nil {
-		if err := u.Password.SerializeTo(b); err != nil {
+		if err := u.Password.SerializeTo(b[offset:]); err != nil {
 			return err
 		}
 		offset += u.Password.Len()
 	}
 
 	if u.EncryptionAlgorithm != nil {
-		if err := u.EncryptionAlgorithm.SerializeTo(b); err != nil {
+		if err := u.EncryptionAlgorithm.SerializeTo(b[offset:]); err != nil {
 			return err
 		}
 	}
@@ -209,6 +226,14 @@ type X509IdentityToken struct {
 	CertificateData *String
 }
 
+// NewX509IdentityToken creates a new X509IdentityToken.
+func NewX509IdentityToken(policyID, cert string) *X509IdentityToken {
+	return &X509IdentityToken{
+		PolicyID:        NewString(policyID),
+		CertificateData: NewString(cert),
+	}
+}
+
 // DecodeX509IdentityToken decodes given bytes as X509IdentityToken.
 func DecodeX509IdentityToken(b []byte) (*X509IdentityToken, error) {
 	x := &X509IdentityToken{}
@@ -246,14 +271,14 @@ func (x *X509IdentityToken) Serialize() ([]byte, error) {
 func (x *X509IdentityToken) SerializeTo(b []byte) error {
 	offset := 0
 	if x.PolicyID != nil {
-		if err := x.PolicyID.SerializeTo(b); err != nil {
+		if err := x.PolicyID.SerializeTo(b[offset:]); err != nil {
 			return err
 		}
 		offset += x.PolicyID.Len()
 	}
 
 	if x.CertificateData != nil {
-		if err := x.CertificateData.SerializeTo(b); err != nil {
+		if err := x.CertificateData.SerializeTo(b[offset:]); err != nil {
 			return err
 		}
 	}
@@ -307,6 +332,15 @@ type IssuedIdentityToken struct {
 	EncryptionAlgorithm *String
 }
 
+// NewIssuedIdentityToken creates a new IssuedIdentityToken.
+func NewIssuedIdentityToken(policyID string, tokenData []byte, alg string) *IssuedIdentityToken {
+	return &IssuedIdentityToken{
+		PolicyID:            NewString(policyID),
+		TokenData:           NewByteString(tokenData),
+		EncryptionAlgorithm: NewString(alg),
+	}
+}
+
 // DecodeIssuedIdentityToken decodes given bytes as IssuedIdentityToken.
 func DecodeIssuedIdentityToken(b []byte) (*IssuedIdentityToken, error) {
 	i := &IssuedIdentityToken{}
@@ -350,21 +384,21 @@ func (i *IssuedIdentityToken) Serialize() ([]byte, error) {
 func (i *IssuedIdentityToken) SerializeTo(b []byte) error {
 	offset := 0
 	if i.PolicyID != nil {
-		if err := i.PolicyID.SerializeTo(b); err != nil {
+		if err := i.PolicyID.SerializeTo(b[offset:]); err != nil {
 			return err
 		}
 		offset += i.PolicyID.Len()
 	}
 
 	if i.TokenData != nil {
-		if err := i.TokenData.SerializeTo(b); err != nil {
+		if err := i.TokenData.SerializeTo(b[offset:]); err != nil {
 			return err
 		}
 		offset += i.TokenData.Len()
 	}
 
 	if i.EncryptionAlgorithm != nil {
-		if err := i.EncryptionAlgorithm.SerializeTo(b); err != nil {
+		if err := i.EncryptionAlgorithm.SerializeTo(b[offset:]); err != nil {
 			return err
 		}
 	}
