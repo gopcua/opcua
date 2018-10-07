@@ -15,9 +15,7 @@ import (
 	"time"
 
 	"github.com/wmnsk/gopcua/datatypes"
-
 	"github.com/wmnsk/gopcua/services"
-
 	"github.com/wmnsk/gopcua/uacp"
 	"github.com/wmnsk/gopcua/uasc"
 	"github.com/wmnsk/gopcua/utils"
@@ -102,6 +100,15 @@ func main() {
 		log.Fatal(err)
 	}
 	log.Printf("Successfully activated secure channel with %v", secChan.RemoteEndpoint())
+
+	if err := session.ReadRequest(
+		2000, services.TimestampsToReturnBoth, datatypes.NewReadValueID(
+			datatypes.NewNumericNodeID(0, 11111), datatypes.IntegerIDValue, "", 0, "",
+		),
+	); err != nil {
+		log.Fatal(err)
+	}
+	log.Println("Successfully sent ReadRequest")
 
 	// Send arbitrary payload on top of UASC SecureChannel.
 	payload, err := hex.DecodeString(*payloadHex)

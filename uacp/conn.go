@@ -165,9 +165,6 @@ func (c *Conn) SetWriteDeadline(t time.Time) error {
 
 // Hello sends UACP Hello message to Conn.
 func (c *Conn) Hello() error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
 	hel, err := NewHello(0, uint32(len(c.rcvBuf)), uint32(len(c.sndBuf)), 0, c.rep).Serialize()
 	if err != nil {
 		return err
@@ -307,6 +304,7 @@ func (c *Conn) handleMsgHello(h *Hello) {
 		if err != nil || cpath != spath {
 			if err := c.Error(BadTCPEndpointURLInvalid, fmt.Sprintf("Endpoint: %s does not exist", h.EndPointURL.Get())); err != nil {
 				c.errChan <- err
+				return
 			}
 			c.errChan <- ErrInvalidEndpoint
 		}
@@ -326,6 +324,7 @@ func (c *Conn) handleMsgHello(h *Hello) {
 	default:
 		if err := c.Error(BadTCPServerTooBusy, ""); err != nil {
 			c.errChan <- err
+			return
 		}
 		c.errChan <- ErrInvalidState
 	}
@@ -352,6 +351,7 @@ func (c *Conn) handleMsgAcknowledge(a *Acknowledge) {
 	default:
 		if err := c.Error(BadTCPServerTooBusy, ""); err != nil {
 			c.errChan <- err
+			return
 		}
 		c.errChan <- ErrInvalidState
 	}
@@ -368,11 +368,9 @@ func (c *Conn) handleMsgError(e *Error) {
 		case BadTCPEndpointURLInvalid:
 			c.errChan <- ErrInvalidEndpoint
 			c.state = cliStateClosed
-			c.established <- false
 		default:
 			c.errChan <- ErrReceivedError
 			c.state = cliStateClosed
-			c.established <- false
 		}
 	// if client/server conn is established, just notify error to error handler.
 	case cliStateEstablished, srvStateEstablished:
@@ -383,6 +381,7 @@ func (c *Conn) handleMsgError(e *Error) {
 	default:
 		if err := c.Error(BadTCPServerTooBusy, ""); err != nil {
 			c.errChan <- err
+			return
 		}
 		c.errChan <- ErrInvalidState
 	}
@@ -405,6 +404,7 @@ func (c *Conn) handleMsgReverseHello(r *ReverseHello) {
 		if err != nil {
 			cancel()
 			c.errChan <- err
+			return
 		}
 		c = conn
 	// if client conn is opening/opened, client just ignore ReverseHello.
@@ -418,6 +418,7 @@ func (c *Conn) handleMsgReverseHello(r *ReverseHello) {
 	default:
 		if err := c.Error(BadTCPServerTooBusy, ""); err != nil {
 			c.errChan <- err
+			return
 		}
 		c.errChan <- ErrInvalidState
 	}
