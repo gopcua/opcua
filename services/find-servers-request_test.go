@@ -30,7 +30,7 @@ var findServersRequestCases = []struct {
 			),
 			"opc.tcp://wow.its.easy:11111/UA/Server",
 			[]string{},
-			[]string{},
+			"",
 		),
 		[]byte{
 			// TypeID

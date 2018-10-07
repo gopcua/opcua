@@ -29,13 +29,11 @@ var readRequestCases = []struct {
 				1, 0, 0, "", NewNullAdditionalHeader(), nil,
 			),
 			0, TimestampsToReturnBoth,
-			[]*datatypes.ReadValueID{
-				datatypes.NewReadValueID(
-					datatypes.NewFourByteNodeID(0, 2256),
-					datatypes.IntegerIDValue,
-					"", 0, "",
-				),
-			},
+			datatypes.NewReadValueID(
+				datatypes.NewFourByteNodeID(0, 2256),
+				datatypes.IntegerIDValue,
+				"", 0, "",
+			),
 		),
 		[]byte{
 			// TypeID

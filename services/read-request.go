@@ -83,7 +83,7 @@ type ReadRequest struct {
 }
 
 // NewReadRequest creates a new ReadRequest.
-func NewReadRequest(reqHeader *RequestHeader, maxAge uint64, tsRet TimestampsToReturn, nodes []*datatypes.ReadValueID) *ReadRequest {
+func NewReadRequest(reqHeader *RequestHeader, maxAge uint64, tsRet TimestampsToReturn, nodes ...*datatypes.ReadValueID) *ReadRequest {
 	return &ReadRequest{
 		TypeID: datatypes.NewExpandedNodeID(
 			false, false,

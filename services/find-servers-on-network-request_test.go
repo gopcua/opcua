@@ -30,7 +30,7 @@ var findServersOnNetworkRequestCases = []struct {
 			),
 			1000,
 			0,
-			[]string{},
+			"",
 		),
 		[]byte{
 			// TypeID

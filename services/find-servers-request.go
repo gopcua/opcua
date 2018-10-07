@@ -25,8 +25,8 @@ type FindServersRequest struct {
 }
 
 // NewFindServersRequest creates a new FindServersRequest.
-func NewFindServersRequest(reqHeader *RequestHeader, url string, locales, servers []string) *FindServersRequest {
-	return &FindServersRequest{
+func NewFindServersRequest(reqHeader *RequestHeader, url string, locales []string, serverURIs ...string) *FindServersRequest {
+	f := &FindServersRequest{
 		TypeID: datatypes.NewExpandedNodeID(
 			false, false,
 			datatypes.NewFourByteNodeID(
@@ -37,8 +37,14 @@ func NewFindServersRequest(reqHeader *RequestHeader, url string, locales, server
 		RequestHeader: reqHeader,
 		EndpointURL:   datatypes.NewString(url),
 		LocaleIDs:     datatypes.NewStringArray(locales),
-		ServerURIs:    datatypes.NewStringArray(servers),
 	}
+	// No ServerURIs
+	if len(serverURIs) == 1 && serverURIs[0] == "" {
+		f.ServerURIs = &datatypes.StringArray{ArraySize: 0}
+		return f
+	}
+	f.ServerURIs = datatypes.NewStringArray(serverURIs)
+	return f
 }
 
 // DecodeFindServersRequest decodes given bytes into FindServersRequest.

@@ -24,8 +24,8 @@ var writeResponse = []struct {
 				time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
 				1, 0, NewNullDiagnosticInfo(), []string{}, NewNullAdditionalHeader(), nil,
 			),
-			[]uint32{0},
 			nil,
+			0,
 		),
 		[]byte{
 			// TypeID
@@ -56,8 +56,8 @@ var writeResponse = []struct {
 				time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
 				1, 0, NewNullDiagnosticInfo(), []string{}, NewNullAdditionalHeader(), nil,
 			),
-			[]uint32{0, status.BadUserAccessDenied},
 			nil,
+			0, status.BadUserAccessDenied,
 		),
 		[]byte{
 			// TypeID

@@ -567,12 +567,12 @@ func (s *SecureChannel) GetEndpointsResponse(code uint32, endpoints ...*services
 }
 
 // FindServersRequest sends FindServersRequest on top of UASC to SecureChannel.
-func (s *SecureChannel) FindServersRequest(locales, servers []string) error {
+func (s *SecureChannel) FindServersRequest(locales []string, servers ...string) error {
 	s.cfg.SequenceNumber++
 	s.reqHeader.RequestHandle++
 	s.reqHeader.Timestamp = time.Now()
 	fsr, err := New(services.NewFindServersRequest(
-		s.reqHeader, s.RemoteEndpoint(), locales, servers,
+		s.reqHeader, s.RemoteEndpoint(), locales, servers...,
 	), s.cfg).Serialize()
 	if err != nil {
 		return err

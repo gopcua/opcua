@@ -67,7 +67,7 @@ func main() {
 	log.Printf("Successfully opened secure channel with %v", conn.RemoteEndpoint())
 
 	// Send FindServersRequest to remote Endpoint.
-	if err := secChan.FindServersRequest([]string{"ja-JP", "de-DE", "en-US"}, []string{"gopcua-server"}); err != nil {
+	if err := secChan.FindServersRequest([]string{"ja-JP", "de-DE", "en-US"}, "gopcua-server"); err != nil {
 		log.Fatal(err)
 	}
 	log.Println("Successfully sent FindServersRequest")
