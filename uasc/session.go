@@ -512,12 +512,47 @@ func (s *Session) CloseSessionRequest(delete bool) error {
 func (s *Session) CloseSessionResponse() error {
 	s.secChan.resHeader.Timestamp = time.Now()
 
-	asr, err := services.NewCloseSessionResponse(s.secChan.resHeader).Serialize()
+	csr, err := services.NewCloseSessionResponse(s.secChan.resHeader).Serialize()
 	if err != nil {
 		return err
 	}
 
-	if _, err := s.secChan.WriteService(asr); err != nil {
+	if _, err := s.secChan.WriteService(csr); err != nil {
+		return err
+	}
+	return nil
+}
+
+// ReadRequest sends a ReadRequest.
+func (s *Session) ReadRequest(maxAge uint64, tsRet services.TimestampsToReturn, nodes ...*datatypes.ReadValueID) error {
+	s.secChan.reqHeader.RequestHandle++
+	s.secChan.reqHeader.Timestamp = time.Now()
+
+	rdr, err := services.NewReadRequest(
+		s.secChan.reqHeader, maxAge, tsRet, nodes...,
+	).Serialize()
+	if err != nil {
+		return err
+	}
+
+	if _, err := s.secChan.WriteService(rdr); err != nil {
+		return err
+	}
+	return nil
+}
+
+// ReadResponse sends a ReadResponse.
+func (s *Session) ReadResponse(results ...*datatypes.DataValue) error {
+	s.secChan.resHeader.Timestamp = time.Now()
+
+	rdr, err := services.NewReadResponse(
+		s.secChan.resHeader, nil, results...,
+	).Serialize()
+	if err != nil {
+		return err
+	}
+
+	if _, err := s.secChan.WriteService(rdr); err != nil {
 		return err
 	}
 	return nil
