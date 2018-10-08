@@ -50,8 +50,9 @@ func main() {
 	uascCtx, cancel := context.WithCancel(uacpCtx)
 	defer cancel()
 	// Open SecureChannel on top of UACP Connection established above.
-	cfg := uasc.NewConfig(
-		1, services.SecModeNone, "http://opcfoundation.org/UA/SecurityPolicy#None", nil, nil, 0xffff, 0, 0,
+	cfg := uasc.NewClientConfig(
+		"http://opcfoundation.org/UA/SecurityPolicy#None",
+		nil, nil, 3333, services.SecModeNone, 3600000,
 	)
 	secChan, err := uasc.OpenSecureChannel(uascCtx, conn, cfg)
 	if err != nil {

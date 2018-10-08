@@ -20,30 +20,131 @@ import (
 
 // Config represents a configuration which UASC client/server has in common.
 type Config struct {
-	SequenceNumber    uint32
-	SecureChannelID   uint32
+	// SecureChannelID is a unique identifier for the SecureChannel assigned by the Server.
+	// If a Server receives a SecureChannelId which it does not recognize it shall return an
+	// appropriate transport layer error.
+	//
+	// When a Server starts the first SecureChannelId used should be a value that is likely to
+	// be unique after each restart. This ensures that a Server restart does not cause
+	// previously connected Clients to accidentally ‘reuse’ SecureChannels that did not belong
+	// to them.
+	SecureChannelID uint32
+	// SecurityPolicyURI is the URI of the Security Policy used to secure the Message.
+	// This field is encoded as a UTF-8 string without a null terminator.
 	SecurityPolicyURI string
-	SecurityMode      uint32
-	Certificate       []byte
-	Thumbprint        []byte
-	RequestID         uint32
-	SecurityTokenID   uint32
-	Lifetime          uint32
+	// Certificate is the X.509 v3 Certificate assigned to the sending application Instance.
+	// This is a DER encoded blob.
+	// The structure of an X.509 v3 Certificate is defined in X.509 v3.
+	// The DER format for a Certificate is defined in X690
+	// This indicates what Private Key was used to sign the MessageChunk.
+	// The Stack shall close the channel and report an error to the application if
+	// the SenderCertificate is too large for the buffer size supported by the
+	// transport layer.
+	// This field shall be null if the Message is not signed.
+	Certificate []byte
+	// Thumbprint is the thumbprint of the X.509 v3 Certificate assigned to the receiving
+	// application Instance.
+	// The thumbprint is the CertificateDigest of the DER encoded form of the
+	// Certificate.
+	// This indicates what public key was used to encrypt the MessageChunk.
+	// This field shall be null if the Message is not encrypted.
+	Thumbprint []byte
+	// SequenceNumber is a monotonically increasing sequence number assigned by the sender to each
+	// MessageChunk sent over the SecureChannel.
+	SequenceNumber uint32
+	// RequestID is an identifier assigned by the Client to OPC UA request Message. All MessageChunks
+	// for the request and the associated response use the same identifier
+	RequestID uint32
+	// SecurityMode is The type of security to apply to the messages. The type MessageSecurityMode
+	// is defined in 7.15.
+	// A SecureChannel may have to be created even if the securityMode is NONE. The exact behaviour
+	// depends on the mapping used and is described in the Part 6.
+	SecurityMode uint32
+	// SecurityTokenID is a unique identifier for the SecureChannel SecurityToken used to secure the Message.
+	// This identifier is returned by the Server in an OpenSecureChannel response Message.
+	// If a Server receives a TokenId which it does not recognize it shall return an appropriate
+	// transport layer error.
+	SecurityTokenID uint32
+	// Lifetime is the requested lifetime, in milliseconds, for the new SecurityToken when the
+	// SecureChannel works as client. It specifies when the Client expects to renew the SecureChannel
+	// by calling the OpenSecureChannel Service again. If a SecureChannel is not renewed, then all
+	// Messages sent using the current SecurityTokens shall be rejected by the receiver.
+	// Lifetime can also be the revised lifetime, the lifetime of the SecurityToken in milliseconds.
+	// The UTC expiration time for the token may be calculated by adding the lifetime to the createdAt time.
+	Lifetime uint32
 }
 
 // NewConfig creates a new Config.
-func NewConfig(chanID uint32, mode uint32, policyURI string, cert, thumbprint []byte, lifetime, reqID, tokenID uint32) *Config {
+//
+// This contains all the parameter Config has, but the ones should be set depends on the application type.
+// It is good idea to use NewClientConfig or NewServerConfig instead if you don't have specific purpose to
+// create Config with full parameters.
+func NewConfig(chanID uint32, policyURI string, cert, thumbprint []byte, seqNum, reqID, secMode, tokenID, lifetime uint32) *Config {
 	return &Config{
 		SecureChannelID:   chanID,
-		SecurityMode:      mode,
+		SecurityPolicyURI: policyURI,
+		Certificate:       cert,
+		Thumbprint:        thumbprint,
+		SequenceNumber:    seqNum,
+		RequestID:         reqID,
+		SecurityMode:      secMode,
+		SecurityTokenID:   tokenID,
+		Lifetime:          lifetime,
+	}
+}
+
+// NewClientConfig creates a new Config for Client.
+//
+// With all the parameter given, it is sufficient for client to open SecureChannel.
+// If the secMode is None, cert and thumbprint is not required(can be nil).
+func NewClientConfig(policyURI string, cert, thumbprint []byte, reqID, secMode, lifetime uint32) *Config {
+	return &Config{
 		SecurityPolicyURI: policyURI,
 		Certificate:       cert,
 		Thumbprint:        thumbprint,
 		RequestID:         reqID,
+		SecurityMode:      secMode,
+		Lifetime:          lifetime,
+	}
+}
+
+// NewServerConfig creates a new Config for Server.
+//
+// With all the parameter given, it is sufficient for server to accept SecureChannel.
+// If the secMode is None, cert and thumbprint is not required(can be nil).
+func NewServerConfig(policyURI string, cert, thumbprint []byte, chanID, tokenID, lifetime uint32) *Config {
+	return &Config{
+		SecurityPolicyURI: policyURI,
+		Certificate:       cert,
+		Thumbprint:        thumbprint,
+		SecureChannelID:   chanID,
 		SecurityTokenID:   tokenID,
 		Lifetime:          lifetime,
-		SequenceNumber:    0,
 	}
+}
+
+// validate validates Config. This is just to avoid crash. Strange values would be accepted for flexibility.
+func (c *Config) validate(appType string) error {
+	switch appType {
+	case "client":
+		return c.validateClientConfig()
+	case "server":
+		return c.validateClientConfig()
+	default:
+		return errors.New("invalid type. should be client or server")
+	}
+}
+
+func (c *Config) validateClientConfig() error {
+	if c.SecurityMode == services.SecModeSignAndEncrypt && (c.Certificate == nil || c.Thumbprint == nil) {
+		return errors.New("Certificate, Thumbprint is required when using SignAndEncrypt")
+	}
+
+	return nil
+}
+
+func (c *Config) validateServerConfig() error {
+	return nil
 }
 
 // SecureChannel is an implementation of the net.Conn interface for Secure Channel in OPC UA Secure Conversation.

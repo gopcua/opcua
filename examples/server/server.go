@@ -11,7 +11,6 @@ import (
 	"context"
 	"flag"
 	"log"
-	"time"
 
 	"github.com/wmnsk/gopcua/services"
 
@@ -33,10 +32,10 @@ func main() {
 	}
 	log.Printf("Started listening on %s.", listener.Endpoint())
 
-	cfg := uasc.NewConfig(
-		1, services.SecModeNone, "http://opcfoundation.org/UA/SecurityPolicy#None", nil, nil, 0xffff, 1, uint32(time.Now().UnixNano()),
+	cfg := uasc.NewServerConfig(
+		"http://opcfoundation.org/UA/SecurityPolicy#None",
+		nil, nil, 1111, 2222, 3600000,
 	)
-
 	for {
 		func() {
 			ctx := context.Background()

@@ -16,6 +16,7 @@ import (
 
 // ListenAndAcceptSecureChannel starts UASC server on top of established transport connection.
 func ListenAndAcceptSecureChannel(ctx context.Context, transport net.Conn, cfg *Config) (*SecureChannel, error) {
+
 	secChan := &SecureChannel{
 		mu:        new(sync.Mutex),
 		lowerConn: transport,
