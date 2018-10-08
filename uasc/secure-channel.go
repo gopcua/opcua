@@ -144,6 +144,7 @@ func (c *Config) validateClientConfig() error {
 }
 
 func (c *Config) validateServerConfig() error {
+
 	return nil
 }
 

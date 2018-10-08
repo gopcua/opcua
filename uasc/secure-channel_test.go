@@ -53,7 +53,7 @@ func setUpSecureChannel(ctx context.Context) (*SecureChannel, *SecureChannel, er
 		return nil, nil, err
 	}
 
-	cliChan, err := OpenSecureChannel(ctx, cliConn, cliCfg)
+	cliChan, err := OpenSecureChannel(ctx, cliConn, cliCfg, 5*time.Second, 3)
 	if err != nil {
 		return nil, nil, err
 	}

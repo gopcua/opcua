@@ -54,7 +54,7 @@ func main() {
 		"http://opcfoundation.org/UA/SecurityPolicy#None",
 		nil, nil, 3333, services.SecModeNone, 3600000,
 	)
-	secChan, err := uasc.OpenSecureChannel(uascCtx, conn, cfg)
+	secChan, err := uasc.OpenSecureChannel(uascCtx, conn, cfg, 5*time.Second, 3)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -83,7 +83,7 @@ func main() {
 	sessCtx, cancel := context.WithCancel(uascCtx)
 	defer cancel()
 
-	sessCfg := uasc.NewSessionConfigClient(
+	sessCfg := uasc.NewClientSessionConfig(
 		[]string{"ja-JP"},
 		datatypes.NewAnonymousIdentityToken("anonymous"),
 	)

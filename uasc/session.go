@@ -13,6 +13,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/wmnsk/gopcua/status"
+
 	"github.com/wmnsk/gopcua/datatypes"
 	"github.com/wmnsk/gopcua/errors"
 	"github.com/wmnsk/gopcua/services"
@@ -20,15 +22,115 @@ import (
 
 // SessionConfig is a set of common configurations used in Session.
 type SessionConfig struct {
-	SessionTimeout                                         uint64
-	AuthenticationToken                                    datatypes.NodeID
-	ClientDescription                                      *services.ApplicationDescription
-	ServerEndpoints                                        []*services.EndpointDescription
-	ClientSignature, ServerSignature                       *services.SignatureData
-	ClientSoftwareCertificates, ServerSoftwareCertificates []*services.SignedSoftwareCertificate
-	LocaleIDs                                              []string
-	UserIdentityToken                                      datatypes.UserIdentityToken
-	UserTokenSignature                                     *services.SignatureData
+	// AuthenticationToken is the secret Session identifier used to verify that the request is
+	// associated with the Session. The SessionAuthenticationToken type is defined in 7.31.
+	AuthenticationToken datatypes.NodeID
+	// ClientDescription is the information that describes the Client application.
+	// The type ApplicationDescription is defined in 7.1.
+	ClientDescription *services.ApplicationDescription
+	// ServerEndpoints is the list of Endpoints that the Server supports.
+	// The Server shall return a set of EndpointDescriptions available for the serverUri
+	// specified in the request. The EndpointDescription type is defined in 7.10. The Client
+	// shall verify this list with the list from a DiscoveryEndpoint if it used a
+	// DiscoveryEndpoint to fetch the EndpointDescriptions.
+	// It is recommended that Servers only include the server.applicationUri, endpointUrl,
+	// securityMode, securityPolicyUri, userIdentityTokens, transportProfileUri and
+	// securityLevel with all other parameters set to null. Only the recommended
+	// parameters shall be verified by the client.
+	ServerEndpoints []*services.EndpointDescription
+	// LocaleIDs is the list of locale ids in priority order for localized strings. The first
+	// LocaleId in the list has the highest priority. If the Server returns a localized string
+	// to the Client, the Server shall return the translation with the highest priority that
+	// it can. If it does not have a translation for any of the locales identified in this list,
+	// then it shall return the string value that it has and include the locale id with the
+	// string. See Part 3 for more detail on locale ids. If the Client fails to specify at least
+	// one locale id, the Server shall use any that it has.
+	// This parameter only needs to be specified during the first call to ActivateSession during
+	// a single application Session. If it is not specified the Server shall keep using the
+	// current localeIds for the Session.
+	LocaleIDs []string
+	// UserIdentityToken is the credentials of the user associated with the Client application.
+	// The Server uses these credentials to determine whether the Client should be allowed to
+	// activate a Session and what resources the Client has access to during this Session.
+	// The UserIdentityToken is an extensible parameter type defined in 7.36.
+	// The EndpointDescription specifies what UserIdentityTokens the Server shall accept.
+	// Null or empty user token shall always be interpreted as anonymous.
+	UserIdentityToken datatypes.UserIdentityToken
+	// If the Client specified a user identity token that supports digital signatures, then it
+	// shall create a signature and pass it as this parameter. Otherwise the parameter is null.
+	// The SignatureAlgorithm depends on the identity token type.
+	// The SignatureData type is defined in 7.32.
+	UserTokenSignature *services.SignatureData
+	// If Session works as a client, SessionTimeout is the requested maximum number of milliseconds
+	// that a Session should remain open without activity. If the Client fails to issue a Service
+	// request within this interval, then the Server shall automatically terminate the Client Session.
+	// If Session works as a server, SessionTimeout is an actual maximum number of milliseconds
+	// that a Session shall remain open without activity. The Server should attempt to honour the
+	// Client request for this parameter,but may negotiate this value up or down to meet its own constraints.
+	SessionTimeout uint64
+	// mySignature is is the client/serverSignature expected to receive from the other endpoint.
+	// This parameter is automatically calculated and kept temporarily until being used to verify
+	// received client/serverSignature.
+	mySignature *services.SignatureData
+	// signatureToSend is the client/serverSignature defined in Part4, Table 15 and Table 17.
+	// This parameter is automatically calculated and kept temporarily until it is sent in next message.
+	signatureToSend *services.SignatureData
+}
+
+// NewClientSessionConfig creates a SessionConfig for client.
+func NewClientSessionConfig(locales []string, userToken datatypes.UserIdentityToken) *SessionConfig {
+	return &SessionConfig{
+		SessionTimeout: 0xffff,
+		ClientDescription: services.NewApplicationDescription(
+			"urn:gopcua:client", "urn:gopcua", "gopcua - OPC UA implementation in pure Golang",
+			services.AppTypeClient, "", "", []string{""},
+		),
+		LocaleIDs:          locales,
+		UserIdentityToken:  userToken,
+		UserTokenSignature: services.NewSignatureData("", nil),
+	}
+}
+
+// NewServerSessionConfig creates a new SessionConfigServer for server.
+func NewServerSessionConfig(secChan *SecureChannel) *SessionConfig {
+	return &SessionConfig{
+		AuthenticationToken: datatypes.NewFourByteNodeID(0, uint16(time.Now().UnixNano())),
+		SessionTimeout:      0xffff,
+		ServerEndpoints: []*services.EndpointDescription{
+			services.NewEndpointDescription(
+				secChan.LocalEndpoint(), services.NewApplicationDescription(
+					"urn:gopcua:client", "urn:gopcua", "gopcua - OPC UA implementation in pure Golang",
+					services.AppTypeServer, "", "", []string{""},
+				),
+				secChan.cfg.Certificate, secChan.cfg.SecurityMode, secChan.cfg.SecurityPolicyURI,
+				services.NewUserTokenPolicyArray(
+					[]*services.UserTokenPolicy{
+						services.NewUserTokenPolicy("", 0, "", "", ""),
+					},
+				), "", 0,
+			),
+		},
+	}
+}
+
+// validate validates SessionConfig. This is just to avoid crash. Strange values would be accepted for flexibility.
+func (s *SessionConfig) validate(appType string) error {
+	switch appType {
+	case "client":
+		return s.validateClientSessionConfig()
+	case "server":
+		return s.validateClientSessionConfig()
+	default:
+		return errors.New("invalid type. should be client or server")
+	}
+}
+
+func (s *SessionConfig) validateClientSessionConfig() error {
+	return nil
+}
+
+func (s *SessionConfig) validateServerSessionConfig() error {
+	return nil
 }
 
 // Session is an implementation of the net.Conn interface for Session in OPC UA Secure Conversation.
@@ -277,6 +379,7 @@ func (s *Session) handleCreateSessionRequest(cs *services.CreateSessionRequest) 
 		s.cfg.ClientDescription = cs.ClientDescription
 		s.sndBuf = make([]byte, cs.MaxResponseMessageSize)
 
+		s.cfg.signatureToSend = services.NewSignatureDataFrom(cs.ClientCertificate.Get(), cs.ClientCertificate.Get())
 		if err := s.CreateSessionResponse(); err != nil {
 			s.errChan <- err
 		}
@@ -296,10 +399,13 @@ func (s *Session) handleCreateSessionResponse(cs *services.CreateSessionResponse
 	switch s.state {
 	case cliStateCreateSessionSent:
 		if cs.ResponseHeader.ServiceResult == 0 {
+			if err := validateSignature(cs.ServerSignature, s.cfg.mySignature); err != nil {
+				s.errChan <- err
+			}
 			s.secChan.reqHeader.AuthenticationToken = cs.AuthenticationToken
 			s.cfg.ServerEndpoints = cs.ServerEndpoints.EndpointDescriptions
 			s.cfg.SessionTimeout = cs.RevisedSessionTimeout
-			s.cfg.ServerSignature = cs.ServerSignature
+			s.cfg.signatureToSend = services.NewSignatureDataFrom(cs.ServerCertificate.Get(), cs.ServerNonce.Get())
 			s.sndBuf = make([]byte, cs.MaxRequestMessageSize)
 
 			s.state = cliStateSessionCreated
@@ -318,12 +424,15 @@ func (s *Session) handleActivateSessionRequest(as *services.ActivateSessionReque
 
 	switch s.state {
 	case srvStateSessionCreated, srvStateSessionActivated:
-		if string(as.AuthenticationToken.GetIdentifier()) != string(s.cfg.AuthenticationToken.GetIdentifier()) {
-			s.errChan <- ErrInvalidAuthenticationToken
+		if err := validateSignature(as.ClientSignature, s.cfg.mySignature); err != nil {
+			if err := s.ActivateSessionResponse(status.BadUserSignatureInvalid); err != nil {
+				s.errChan <- err
+				return
+			}
+			s.errChan <- err
+			return
 		}
 
-		s.cfg.ClientSignature = as.ClientSignature
-		s.cfg.ClientSoftwareCertificates = as.ClientSoftwareCertificates.Certificates
 		for _, str := range as.LocaleIDs.Strings {
 			s.cfg.LocaleIDs = append(s.cfg.LocaleIDs, str.Get())
 		}
@@ -332,6 +441,7 @@ func (s *Session) handleActivateSessionRequest(as *services.ActivateSessionReque
 
 		if err := s.ActivateSessionResponse(0); err != nil {
 			s.errChan <- err
+			return
 		}
 		s.state = srvStateSessionActivated
 		s.activated <- true
@@ -414,6 +524,9 @@ func (s *Session) CreateSessionRequest() error {
 	if _, err := s.secChan.WriteService(csr); err != nil {
 		return err
 	}
+
+	// keep SignatureData to verify serverSignature in CreateSessionResponse.
+	s.cfg.mySignature = services.NewSignatureDataFrom(s.secChan.cfg.Certificate, nonce)
 	return nil
 }
 
@@ -434,8 +547,7 @@ func (s *Session) CreateSessionResponse() error {
 	csr, err := services.NewCreateSessionResponse(
 		// XXX - Give AuthenticationToken as NodeID
 		s.secChan.resHeader, datatypes.NewNumericNodeID(0, sessID), s.cfg.AuthenticationToken, 0xffff,
-		nonce, s.secChan.cfg.Certificate, s.cfg.ServerSoftwareCertificates, s.cfg.ServerSignature,
-		0xffff, s.cfg.ServerEndpoints...,
+		nonce, s.secChan.cfg.Certificate, nil, s.cfg.signatureToSend, 0xffff, s.cfg.ServerEndpoints...,
 	).Serialize()
 	if err != nil {
 		return err
@@ -444,6 +556,9 @@ func (s *Session) CreateSessionResponse() error {
 	if _, err := s.secChan.WriteService(csr); err != nil {
 		return err
 	}
+
+	// keep SignatureData to verify clientSignature in ActivateSessionRequest.
+	s.cfg.mySignature = services.NewSignatureDataFrom(s.secChan.cfg.Certificate, nonce)
 	return nil
 }
 
@@ -453,8 +568,7 @@ func (s *Session) ActivateSessionRequest() error {
 	s.secChan.reqHeader.Timestamp = time.Now()
 
 	asr, err := services.NewActivateSessionRequest(
-		s.secChan.reqHeader, s.cfg.ClientSignature,
-		s.cfg.ClientSoftwareCertificates, s.cfg.LocaleIDs,
+		s.secChan.reqHeader, s.cfg.signatureToSend, nil, s.cfg.LocaleIDs,
 		s.cfg.UserIdentityToken, s.cfg.UserTokenSignature,
 	).Serialize()
 	if err != nil {
@@ -607,4 +721,17 @@ func (s sessionState) String() string {
 var (
 	ErrInvalidAuthenticationToken = errors.New("invalid AuthenticationToken")
 	ErrSessionNotActivated        = errors.New("session is not activated")
+	ErrInvalidSignatureAlgorithm  = errors.New("algorithm in signature doesn't match")
+	ErrInvalidSignatureData       = errors.New("signature is invalid")
 )
+
+func validateSignature(received, expected *services.SignatureData) error {
+	if received.Algorithm.Get() != expected.Algorithm.Get() {
+		return ErrInvalidSignatureAlgorithm
+	}
+	if string(received.Signature.Get()) != string(expected.Signature.Get()) {
+		return ErrInvalidSignatureData
+	}
+
+	return nil
+}
