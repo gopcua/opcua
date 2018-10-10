@@ -4,16 +4,7 @@
 
 package uasc
 
-import (
-	"context"
-	"testing"
-	"time"
-
-	"github.com/wmnsk/gopcua/datatypes"
-	"github.com/wmnsk/gopcua/services"
-	"github.com/wmnsk/gopcua/uacp"
-)
-
+/*
 func TestSession(t *testing.T) {
 	ep := "opc.tcp://127.0.0.1:4840/foo/bar"
 	policyURI := "http://opcfoundation.org/UA/SecurityPolicy#None"
@@ -100,3 +91,4 @@ func TestSession(t *testing.T) {
 		t.Fatalf("timed out")
 	}
 }
+*/

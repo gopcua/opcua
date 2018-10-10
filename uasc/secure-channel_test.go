@@ -11,120 +11,73 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
+	"github.com/wmnsk/gopcua/errors"
 	"github.com/wmnsk/gopcua/services"
 	"github.com/wmnsk/gopcua/uacp"
 )
 
-func TestSecureChannel(t *testing.T) {
-	ep := "opc.tcp://127.0.0.1:4840/foo/bar"
-	policyURI := "http://opcfoundation.org/UA/SecurityPolicy#None"
-	ln, err := uacp.Listen(ep, 0xffff)
+var (
+	endpoint  = "opc.tcp://127.0.0.1:4840/foo/bar"
+	policyURI = "http://opcfoundation.org/UA/SecurityPolicy#None"
+	cliCfg    = NewClientConfig(policyURI, nil, nil, 3333, services.SecModeNone, 3600000)
+	srvCfg    = NewServerConfig(policyURI, nil, nil, 1111, services.SecModeNone, 2222, 3600000)
+	msg       = []byte{0xde, 0xad, 0xbe, 0xef}
+)
+
+func setUpSecureChannel(ctx context.Context) (*SecureChannel, *SecureChannel, error) {
+
+	ln, err := uacp.Listen(endpoint, 0xffff)
 	if err != nil {
-		t.Fatal(err)
+		return nil, nil, err
 	}
 	defer ln.Close()
 
-	ctx := context.Background()
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	cfg := NewConfig(
-		1, services.SecModeNone, policyURI, nil, nil, 1000, 0, 1,
-	)
-
-	done := make(chan int)
+	srvChanChan := make(chan *SecureChannel)
+	errChan := make(chan error)
 	go func() {
 		defer ln.Close()
 		srvConn, err := ln.Accept(ctx)
 		if err != nil {
-			t.Fatal(err)
+			errChan <- err
 		}
 
-		if _, err := ListenAndAcceptSecureChannel(ctx, srvConn, cfg); err != nil {
-			t.Error(err)
+		srvChan, err := ListenAndAcceptSecureChannel(ctx, srvConn, srvCfg)
+		if err != nil {
+			errChan <- err
 		}
-		done <- 0
+		srvChanChan <- srvChan
 	}()
 
-	cliConn, err := uacp.Dial(ctx, ep)
+	cliConn, err := uacp.Dial(ctx, endpoint)
 	if err != nil {
-		t.Fatal(err)
+		return nil, nil, err
 	}
 
-	if _, err := OpenSecureChannel(ctx, cliConn, cfg); err != nil {
-		t.Error(err)
+	cliChan, err := OpenSecureChannel(ctx, cliConn, cliCfg, 5*time.Second, 3)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	select {
-	case _, ok := <-done:
-		if !ok {
-			t.Fatalf("timed out")
-		}
+	case srvChan := <-srvChanChan:
+		return cliChan, srvChan, nil
+	case err := <-errChan:
+		return nil, nil, err
 	case <-time.After(10 * time.Second):
-		t.Fatalf("timed out")
+		return nil, nil, errors.New("timed out")
 	}
 }
 
 func TestClientWrite(t *testing.T) {
-	ep := "opc.tcp://127.0.0.1:4840/foo/bar"
-	policyURI := "http://opcfoundation.org/UA/SecurityPolicy#None"
-	ln, err := uacp.Listen(ep, 0xffff)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer ln.Close()
-
 	ctx := context.Background()
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	var (
-		cliConn, srvConn *uacp.Conn
-		cliChan, srvChan *SecureChannel
-	)
-
-	done := make(chan int)
-	cfg := NewConfig(
-		1, services.SecModeNone, policyURI, nil, nil, 1000, 0, 1,
-	)
-	go func() {
-		defer ln.Close()
-		srvConn, err = ln.Accept(ctx)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		srvChan, err = ListenAndAcceptSecureChannel(ctx, srvConn, cfg)
-		if err != nil {
-			t.Fatal(err)
-		}
-		done <- 0
-	}()
-
-	cliConn, err = uacp.Dial(ctx, ep)
+	cliChan, srvChan, err := setUpSecureChannel(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	cliChan, err = OpenSecureChannel(ctx, cliConn, cfg)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	for {
-		select {
-		case _, ok := <-done:
-			if !ok {
-				t.Fatal("failed to setup secure channel")
-			}
-			goto NEXT
-		case <-time.After(10 * time.Second):
-			t.Fatalf("timed out")
-		}
-	}
-NEXT:
-
-	msg := []byte{0xde, 0xad, 0xbe, 0xef}
 	if _, err := cliChan.Write(msg); err != nil {
 		t.Fatal(err)
 	}
@@ -141,65 +94,15 @@ NEXT:
 }
 
 func TestServerWrite(t *testing.T) {
-	ep := "opc.tcp://127.0.0.1:4840/foo/bar"
-	policyURI := "http://opcfoundation.org/UA/SecurityPolicy#None"
-	ln, err := uacp.Listen(ep, 0xffff)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer ln.Close()
-
 	ctx := context.Background()
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	var (
-		cliConn, srvConn *uacp.Conn
-		cliChan, srvChan *SecureChannel
-	)
-
-	done := make(chan int)
-	cfg := NewConfig(
-		1, services.SecModeNone, policyURI, nil, nil, 1000, 0, 1,
-	)
-	go func() {
-		defer ln.Close()
-		srvConn, err = ln.Accept(ctx)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		srvChan, err = ListenAndAcceptSecureChannel(ctx, srvConn, cfg)
-		if err != nil {
-			t.Fatal(err)
-		}
-		done <- 0
-	}()
-
-	cliConn, err = uacp.Dial(ctx, ep)
+	cliChan, srvChan, err := setUpSecureChannel(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	cliChan, err = OpenSecureChannel(ctx, cliConn, cfg)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	for {
-		select {
-		case _, ok := <-done:
-			if !ok {
-				t.Fatal("failed to setup secure channel")
-			}
-			goto NEXT
-		case <-time.After(10 * time.Second):
-			t.Fatalf("timed out")
-		}
-	}
-NEXT:
-
-	msg := []byte{0xde, 0xad, 0xbe, 0xef}
 	if _, err := srvChan.Write(msg); err != nil {
 		t.Fatal(err)
 	}
@@ -211,6 +114,164 @@ NEXT:
 	}
 
 	if diff := cmp.Diff(buf[:n], msg); diff != "" {
+		t.Error(diff)
+	}
+}
+
+func TestGetEndpointRequest(t *testing.T) {
+	ctx := context.Background()
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	cliChan, srvChan, err := setUpSecureChannel(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := cliChan.GetEndpointsRequest([]string{"ja-JP"}, []string{"uri"}); err != nil {
+		t.Fatal(err)
+	}
+
+	buf := make([]byte, 1024)
+	n, err := srvChan.ReadService(buf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	msg, err := services.Decode(buf[:n])
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, ok := msg.(*services.GetEndpointsRequest); !ok {
+		t.Error("failed to assert type")
+	}
+}
+
+func TestGetEndpointResponse(t *testing.T) {
+	ctx := context.Background()
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	cliChan, srvChan, err := setUpSecureChannel(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := srvChan.GetEndpointsResponse(0, services.NewEndpointDescription(
+		srvChan.LocalEndpoint(), services.NewApplicationDescription(
+			"", "", "", services.AppTypeServer, "", "", []string{""},
+		), nil, services.SecModeNone, policyURI, services.NewUserTokenPolicyArray(
+			[]*services.UserTokenPolicy{
+				services.NewUserTokenPolicy("id", 0, "", "", ""),
+			},
+		), "", 0,
+	)); err != nil {
+		t.Fatal(err)
+	}
+
+	buf := make([]byte, 1024)
+	n, err := cliChan.ReadService(buf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	msg, err := services.Decode(buf[:n])
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, ok := msg.(*services.GetEndpointsResponse); !ok {
+		t.Error("failed to assert type")
+	}
+}
+
+func TestFindServerRequest(t *testing.T) {
+	ctx := context.Background()
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	cliChan, srvChan, err := setUpSecureChannel(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := cliChan.FindServersRequest([]string{"ja-JP"}, "server"); err != nil {
+		t.Fatal(err)
+	}
+
+	buf := make([]byte, 1024)
+	n, err := srvChan.ReadService(buf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	msg, err := services.Decode(buf[:n])
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, ok := msg.(*services.FindServersRequest); !ok {
+		t.Error("failed to assert type")
+	}
+}
+
+func TestFindServerResponse(t *testing.T) {
+	ctx := context.Background()
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	cliChan, srvChan, err := setUpSecureChannel(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := srvChan.FindServersResponse(
+		0, services.NewApplicationDescription(
+			"", "", "", services.AppTypeServer, "", "", []string{""},
+		),
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	buf := make([]byte, 1024)
+	n, err := cliChan.ReadService(buf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	msg, err := services.Decode(buf[:n])
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if _, ok := msg.(*services.FindServersResponse); !ok {
+		t.Error("failed to assert type")
+	}
+}
+
+func TestLocalEndpoint(t *testing.T) {
+	ctx := context.Background()
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	_, srvChan, err := setUpSecureChannel(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if diff := cmp.Diff(srvChan.LocalEndpoint(), endpoint); diff != "" {
+		t.Error(diff)
+	}
+}
+
+func TestRemoteEndpoint(t *testing.T) {
+	ctx := context.Background()
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	cliChan, _, err := setUpSecureChannel(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if diff := cmp.Diff(cliChan.RemoteEndpoint(), endpoint); diff != "" {
 		t.Error(diff)
 	}
 }

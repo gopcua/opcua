@@ -27,6 +27,17 @@ func NewSignatureData(algorithm string, signature []byte) *SignatureData {
 	}
 }
 
+// NewSignatureDataFrom generates SignatureData from certificate and nonce given.
+//
+// Specification: Part4, Table 15 and Table 17 (serverSignature and clientSignature).
+func NewSignatureDataFrom(cert, nonce []byte) *SignatureData {
+	// TODO: add calculation here.
+	if cert == nil && nonce == nil {
+		return NewSignatureData("", nil)
+	}
+	return NewSignatureData("", nil)
+}
+
 // DecodeSignatureData decodes given bytes into SignatureData.
 func DecodeSignatureData(b []byte) (*SignatureData, error) {
 	s := &SignatureData{}

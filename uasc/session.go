@@ -14,22 +14,8 @@ import (
 	"time"
 
 	"github.com/wmnsk/gopcua/datatypes"
-	"github.com/wmnsk/gopcua/errors"
 	"github.com/wmnsk/gopcua/services"
 )
-
-// SessionConfig is a set of common configurations used in Session.
-type SessionConfig struct {
-	SessionTimeout                                         uint64
-	AuthenticationToken                                    datatypes.NodeID
-	ClientDescription                                      *services.ApplicationDescription
-	ServerEndpoints                                        []*services.EndpointDescription
-	ClientSignature, ServerSignature                       *services.SignatureData
-	ClientSoftwareCertificates, ServerSoftwareCertificates []*services.SignedSoftwareCertificate
-	LocaleIDs                                              []string
-	UserIdentityToken                                      datatypes.UserIdentityToken
-	UserTokenSignature                                     *services.SignatureData
-}
 
 // Session is an implementation of the net.Conn interface for Session in OPC UA Secure Conversation.
 //
@@ -277,6 +263,7 @@ func (s *Session) handleCreateSessionRequest(cs *services.CreateSessionRequest) 
 		s.cfg.ClientDescription = cs.ClientDescription
 		s.sndBuf = make([]byte, cs.MaxResponseMessageSize)
 
+		s.cfg.signatureToSend = services.NewSignatureDataFrom(cs.ClientCertificate.Get(), cs.ClientCertificate.Get())
 		if err := s.CreateSessionResponse(); err != nil {
 			s.errChan <- err
 		}
@@ -296,10 +283,16 @@ func (s *Session) handleCreateSessionResponse(cs *services.CreateSessionResponse
 	switch s.state {
 	case cliStateCreateSessionSent:
 		if cs.ResponseHeader.ServiceResult == 0 {
+			/* XXX - should be handled properly when sign and encryption enabled.
+			if err := validateSignature(cs.ServerSignature, s.cfg.mySignature); err != nil {
+				s.errChan <- err
+			}
+			*/
+
 			s.secChan.reqHeader.AuthenticationToken = cs.AuthenticationToken
 			s.cfg.ServerEndpoints = cs.ServerEndpoints.EndpointDescriptions
 			s.cfg.SessionTimeout = cs.RevisedSessionTimeout
-			s.cfg.ServerSignature = cs.ServerSignature
+			s.cfg.signatureToSend = services.NewSignatureDataFrom(cs.ServerCertificate.Get(), cs.ServerNonce.Get())
 			s.sndBuf = make([]byte, cs.MaxRequestMessageSize)
 
 			s.state = cliStateSessionCreated
@@ -318,12 +311,17 @@ func (s *Session) handleActivateSessionRequest(as *services.ActivateSessionReque
 
 	switch s.state {
 	case srvStateSessionCreated, srvStateSessionActivated:
-		if string(as.AuthenticationToken.GetIdentifier()) != string(s.cfg.AuthenticationToken.GetIdentifier()) {
-			s.errChan <- ErrInvalidAuthenticationToken
+		/* XXX - should be handled properly when sign and encryption enabled.
+		if err := validateSignature(as.ClientSignature, s.cfg.mySignature); err != nil {
+			if err := s.ActivateSessionResponse(status.BadUserSignatureInvalid); err != nil {
+				s.errChan <- err
+				return
+			}
+			s.errChan <- err
+			return
 		}
+		*/
 
-		s.cfg.ClientSignature = as.ClientSignature
-		s.cfg.ClientSoftwareCertificates = as.ClientSoftwareCertificates.Certificates
 		for _, str := range as.LocaleIDs.Strings {
 			s.cfg.LocaleIDs = append(s.cfg.LocaleIDs, str.Get())
 		}
@@ -332,6 +330,7 @@ func (s *Session) handleActivateSessionRequest(as *services.ActivateSessionReque
 
 		if err := s.ActivateSessionResponse(0); err != nil {
 			s.errChan <- err
+			return
 		}
 		s.state = srvStateSessionActivated
 		s.activated <- true
@@ -396,31 +395,34 @@ func (s *Session) handleCloseSessionResponse(cs *services.CloseSessionResponse) 
 
 // CreateSessionRequest sends a CreateSessionRequest.
 func (s *Session) CreateSessionRequest() error {
-	s.secChan.reqHeader.RequestHandle++
-	s.secChan.reqHeader.Timestamp = time.Now()
-
 	nonce := make([]byte, 32)
 	if _, err := rand.Read(nonce); err != nil {
 		return err
 	}
+
+	s.secChan.reqHeader.RequestHandle++
+	s.secChan.reqHeader.Timestamp = time.Now()
 	csr, err := services.NewCreateSessionRequest(
 		s.secChan.reqHeader, s.cfg.ClientDescription, "", s.secChan.RemoteEndpoint(),
 		"gopcua-"+time.Now().String(), nonce, s.secChan.cfg.Certificate, 0, 0,
 	).Serialize()
 	if err != nil {
+		s.secChan.reqHeader.RequestHandle--
 		return err
 	}
 
 	if _, err := s.secChan.WriteService(csr); err != nil {
+		s.secChan.reqHeader.RequestHandle--
 		return err
 	}
+
+	// keep SignatureData to verify serverSignature in CreateSessionResponse.
+	s.cfg.mySignature = services.NewSignatureDataFrom(s.secChan.cfg.Certificate, nonce)
 	return nil
 }
 
 // CreateSessionResponse sends a CreateSessionResponse.
 func (s *Session) CreateSessionResponse() error {
-	s.secChan.resHeader.Timestamp = time.Now()
-
 	sid := make([]byte, 4)
 	if _, err := rand.Read(sid); err != nil {
 		return err
@@ -431,11 +433,11 @@ func (s *Session) CreateSessionResponse() error {
 		return err
 	}
 
+	s.secChan.resHeader.Timestamp = time.Now()
 	csr, err := services.NewCreateSessionResponse(
 		// XXX - Give AuthenticationToken as NodeID
 		s.secChan.resHeader, datatypes.NewNumericNodeID(0, sessID), s.cfg.AuthenticationToken, 0xffff,
-		nonce, s.secChan.cfg.Certificate, s.cfg.ServerSoftwareCertificates, s.cfg.ServerSignature,
-		0xffff, s.cfg.ServerEndpoints...,
+		nonce, s.secChan.cfg.Certificate, s.cfg.signatureToSend, 0xffff, s.cfg.ServerEndpoints...,
 	).Serialize()
 	if err != nil {
 		return err
@@ -444,6 +446,9 @@ func (s *Session) CreateSessionResponse() error {
 	if _, err := s.secChan.WriteService(csr); err != nil {
 		return err
 	}
+
+	// keep SignatureData to verify clientSignature in ActivateSessionRequest.
+	s.cfg.mySignature = services.NewSignatureDataFrom(s.secChan.cfg.Certificate, nonce)
 	return nil
 }
 
@@ -451,17 +456,17 @@ func (s *Session) CreateSessionResponse() error {
 func (s *Session) ActivateSessionRequest() error {
 	s.secChan.reqHeader.RequestHandle++
 	s.secChan.reqHeader.Timestamp = time.Now()
-
 	asr, err := services.NewActivateSessionRequest(
-		s.secChan.reqHeader, s.cfg.ClientSignature,
-		s.cfg.ClientSoftwareCertificates, s.cfg.LocaleIDs,
-		s.cfg.UserIdentityToken, s.cfg.UserTokenSignature,
+		s.secChan.reqHeader, s.cfg.signatureToSend, s.cfg.LocaleIDs, s.cfg.UserIdentityToken,
+		s.cfg.UserTokenSignature,
 	).Serialize()
 	if err != nil {
+		s.secChan.reqHeader.RequestHandle--
 		return err
 	}
 
 	if _, err := s.secChan.WriteService(asr); err != nil {
+		s.secChan.reqHeader.RequestHandle--
 		return err
 	}
 	return nil
@@ -469,12 +474,12 @@ func (s *Session) ActivateSessionRequest() error {
 
 // ActivateSessionResponse sends a ActivateSessionResponse.
 func (s *Session) ActivateSessionResponse(results ...uint32) error {
-	s.secChan.resHeader.Timestamp = time.Now()
-
 	nonce := make([]byte, 32)
 	if _, err := rand.Read(nonce); err != nil {
 		return err
 	}
+
+	s.secChan.resHeader.Timestamp = time.Now()
 	asr, err := services.NewActivateSessionResponse(
 		s.secChan.resHeader, nonce, results, []*services.DiagnosticInfo{
 			services.NewNullDiagnosticInfo(),
@@ -494,15 +499,16 @@ func (s *Session) ActivateSessionResponse(results ...uint32) error {
 func (s *Session) CloseSessionRequest(delete bool) error {
 	s.secChan.reqHeader.RequestHandle++
 	s.secChan.reqHeader.Timestamp = time.Now()
-
 	csr, err := services.NewCloseSessionRequest(
 		s.secChan.reqHeader, delete,
 	).Serialize()
 	if err != nil {
+		s.secChan.reqHeader.RequestHandle--
 		return err
 	}
 
 	if _, err := s.secChan.WriteService(csr); err != nil {
+		s.secChan.reqHeader.RequestHandle--
 		return err
 	}
 	return nil
@@ -511,7 +517,6 @@ func (s *Session) CloseSessionRequest(delete bool) error {
 // CloseSessionResponse sends a CloseSessionResponse.
 func (s *Session) CloseSessionResponse() error {
 	s.secChan.resHeader.Timestamp = time.Now()
-
 	csr, err := services.NewCloseSessionResponse(s.secChan.resHeader).Serialize()
 	if err != nil {
 		return err
@@ -527,15 +532,16 @@ func (s *Session) CloseSessionResponse() error {
 func (s *Session) ReadRequest(maxAge uint64, tsRet services.TimestampsToReturn, nodes ...*datatypes.ReadValueID) error {
 	s.secChan.reqHeader.RequestHandle++
 	s.secChan.reqHeader.Timestamp = time.Now()
-
 	rdr, err := services.NewReadRequest(
 		s.secChan.reqHeader, maxAge, tsRet, nodes...,
 	).Serialize()
 	if err != nil {
+		s.secChan.reqHeader.RequestHandle--
 		return err
 	}
 
 	if _, err := s.secChan.WriteService(rdr); err != nil {
+		s.secChan.reqHeader.RequestHandle--
 		return err
 	}
 	return nil
@@ -544,7 +550,6 @@ func (s *Session) ReadRequest(maxAge uint64, tsRet services.TimestampsToReturn, 
 // ReadResponse sends a ReadResponse.
 func (s *Session) ReadResponse(results ...*datatypes.DataValue) error {
 	s.secChan.resHeader.Timestamp = time.Now()
-
 	rdr, err := services.NewReadResponse(
 		s.secChan.resHeader, nil, results...,
 	).Serialize()
@@ -558,53 +563,17 @@ func (s *Session) ReadResponse(results ...*datatypes.DataValue) error {
 	return nil
 }
 
-type sessionState uint8
-
-const (
-	cliStateSessionClosed sessionState = iota
-	cliStateCreateSessionSent
-	cliStateSessionCreated
-	cliStateActivateSessionSent
-	cliStateSessionActivated
-	cliStateCloseSessionSent
-	srvStateSessionClosed
-	srvStateSessionCreated
-	srvStateActivateSessionSent
-	srvStateSessionActivated
-	srvStateCloseSessionSent
-)
-
-func (s sessionState) String() string {
-	switch s {
-	case cliStateSessionClosed:
-		return "cliStateSessionClosed"
-	case cliStateCreateSessionSent:
-		return "cliStateCreateSessionSent"
-	case cliStateSessionCreated:
-		return "cliStateSessionCreated"
-	case cliStateActivateSessionSent:
-		return "cliStateActivateSessionSent"
-	case cliStateSessionActivated:
-		return "cliStateSessionActivated"
-	case cliStateCloseSessionSent:
-		return "cliStateCloseSessionSent"
-	case srvStateSessionClosed:
-		return "srvStateSessionClosed"
-	case srvStateSessionCreated:
-		return "srvStateSessionCreated"
-	case srvStateActivateSessionSent:
-		return "srvStateActivateSessionSent"
-	case srvStateSessionActivated:
-		return "srvStateSessionActivated"
-	case srvStateCloseSessionSent:
-		return "srvStateCloseSessionSent"
-	default:
-		return ""
+func validateSignature(received, expected *services.SignatureData) error {
+	if received.Algorithm == nil || expected.Algorithm == nil {
+		return nil
 	}
-}
 
-// Errors
-var (
-	ErrInvalidAuthenticationToken = errors.New("invalid AuthenticationToken")
-	ErrSessionNotActivated        = errors.New("session is not activated")
-)
+	if received.Algorithm.Get() != expected.Algorithm.Get() {
+		return ErrInvalidSignatureAlgorithm
+	}
+	if string(received.Signature.Get()) != string(expected.Signature.Get()) {
+		return ErrInvalidSignatureData
+	}
+
+	return nil
+}
