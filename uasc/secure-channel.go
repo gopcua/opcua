@@ -12,141 +12,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/wmnsk/gopcua/errors"
 	"github.com/wmnsk/gopcua/services"
 	"github.com/wmnsk/gopcua/status"
 	"github.com/wmnsk/gopcua/uacp"
 )
-
-// Config represents a configuration which UASC client/server has in common.
-type Config struct {
-	// SecureChannelID is a unique identifier for the SecureChannel assigned by the Server.
-	// If a Server receives a SecureChannelId which it does not recognize it shall return an
-	// appropriate transport layer error.
-	//
-	// When a Server starts the first SecureChannelId used should be a value that is likely to
-	// be unique after each restart. This ensures that a Server restart does not cause
-	// previously connected Clients to accidentally ‘reuse’ SecureChannels that did not belong
-	// to them.
-	SecureChannelID uint32
-	// SecurityPolicyURI is the URI of the Security Policy used to secure the Message.
-	// This field is encoded as a UTF-8 string without a null terminator.
-	SecurityPolicyURI string
-	// Certificate is the X.509 v3 Certificate assigned to the sending application Instance.
-	// This is a DER encoded blob.
-	// The structure of an X.509 v3 Certificate is defined in X.509 v3.
-	// The DER format for a Certificate is defined in X690
-	// This indicates what Private Key was used to sign the MessageChunk.
-	// The Stack shall close the channel and report an error to the application if
-	// the SenderCertificate is too large for the buffer size supported by the
-	// transport layer.
-	// This field shall be null if the Message is not signed.
-	Certificate []byte
-	// Thumbprint is the thumbprint of the X.509 v3 Certificate assigned to the receiving
-	// application Instance.
-	// The thumbprint is the CertificateDigest of the DER encoded form of the
-	// Certificate.
-	// This indicates what public key was used to encrypt the MessageChunk.
-	// This field shall be null if the Message is not encrypted.
-	Thumbprint []byte
-	// SequenceNumber is a monotonically increasing sequence number assigned by the sender to each
-	// MessageChunk sent over the SecureChannel.
-	SequenceNumber uint32
-	// RequestID is an identifier assigned by the Client to OPC UA request Message. All MessageChunks
-	// for the request and the associated response use the same identifier
-	RequestID uint32
-	// SecurityMode is The type of security to apply to the messages. The type MessageSecurityMode
-	// is defined in 7.15.
-	// A SecureChannel may have to be created even if the securityMode is NONE. The exact behaviour
-	// depends on the mapping used and is described in the Part 6.
-	SecurityMode uint32
-	// SecurityTokenID is a unique identifier for the SecureChannel SecurityToken used to secure the Message.
-	// This identifier is returned by the Server in an OpenSecureChannel response Message.
-	// If a Server receives a TokenId which it does not recognize it shall return an appropriate
-	// transport layer error.
-	SecurityTokenID uint32
-	// Lifetime is the requested lifetime, in milliseconds, for the new SecurityToken when the
-	// SecureChannel works as client. It specifies when the Client expects to renew the SecureChannel
-	// by calling the OpenSecureChannel Service again. If a SecureChannel is not renewed, then all
-	// Messages sent using the current SecurityTokens shall be rejected by the receiver.
-	// Lifetime can also be the revised lifetime, the lifetime of the SecurityToken in milliseconds.
-	// The UTC expiration time for the token may be calculated by adding the lifetime to the createdAt time.
-	Lifetime uint32
-}
-
-// NewConfig creates a new Config.
-//
-// This contains all the parameter Config has, but the ones should be set depends on the application type.
-// It is good idea to use NewClientConfig or NewServerConfig instead if you don't have specific purpose to
-// create Config with full parameters.
-func NewConfig(chanID uint32, policyURI string, cert, thumbprint []byte, seqNum, reqID, secMode, tokenID, lifetime uint32) *Config {
-	return &Config{
-		SecureChannelID:   chanID,
-		SecurityPolicyURI: policyURI,
-		Certificate:       cert,
-		Thumbprint:        thumbprint,
-		SequenceNumber:    seqNum,
-		RequestID:         reqID,
-		SecurityMode:      secMode,
-		SecurityTokenID:   tokenID,
-		Lifetime:          lifetime,
-	}
-}
-
-// NewClientConfig creates a new Config for Client.
-//
-// With all the parameter given, it is sufficient for client to open SecureChannel.
-// If the secMode is None, cert and thumbprint is not required(can be nil).
-func NewClientConfig(policyURI string, cert, thumbprint []byte, reqID, secMode, lifetime uint32) *Config {
-	return &Config{
-		SecurityPolicyURI: policyURI,
-		Certificate:       cert,
-		Thumbprint:        thumbprint,
-		RequestID:         reqID,
-		SecurityMode:      secMode,
-		Lifetime:          lifetime,
-	}
-}
-
-// NewServerConfig creates a new Config for Server.
-//
-// With all the parameter given, it is sufficient for server to accept SecureChannel.
-// If the secMode is None, cert and thumbprint is not required(can be nil).
-func NewServerConfig(policyURI string, cert, thumbprint []byte, chanID, tokenID, lifetime uint32) *Config {
-	return &Config{
-		SecurityPolicyURI: policyURI,
-		Certificate:       cert,
-		Thumbprint:        thumbprint,
-		SecureChannelID:   chanID,
-		SecurityTokenID:   tokenID,
-		Lifetime:          lifetime,
-	}
-}
-
-// validate validates Config. This is just to avoid crash. Strange values would be accepted for flexibility.
-func (c *Config) validate(appType string) error {
-	switch appType {
-	case "client":
-		return c.validateClientConfig()
-	case "server":
-		return c.validateClientConfig()
-	default:
-		return errors.New("invalid type. should be client or server")
-	}
-}
-
-func (c *Config) validateClientConfig() error {
-	if c.SecurityMode == services.SecModeSignAndEncrypt && (c.Certificate == nil || c.Thumbprint == nil) {
-		return errors.New("Certificate, Thumbprint is required when using SignAndEncrypt")
-	}
-
-	return nil
-}
-
-func (c *Config) validateServerConfig() error {
-
-	return nil
-}
 
 // SecureChannel is an implementation of the net.Conn interface for Secure Channel in OPC UA Secure Conversation.
 //
@@ -353,7 +222,6 @@ func (s *SecureChannel) SetWriteDeadline(t time.Time) error {
 
 func (s *SecureChannel) monitor(ctx context.Context) {
 	childCtx, cancel := context.WithCancel(ctx)
-
 	for {
 		select {
 		case <-ctx.Done():
@@ -521,21 +389,27 @@ func (s *SecureChannel) handleCloseSecureChannelResponse(c *services.CloseSecure
 
 // OpenSecureChannelRequest sends OpenSecureChannelRequest on top of UASC to SecureChannel.
 func (s *SecureChannel) OpenSecureChannelRequest() error {
+	nonce := make([]byte, 32)
+	if _, err := rand.Read(nonce); err != nil {
+		return err
+	}
+
 	s.cfg.SequenceNumber++
 	s.reqHeader.RequestHandle++
 	s.reqHeader.Timestamp = time.Now()
-
-	nonce := make([]byte, 32)
-	rand.Read(nonce)
 	osc, err := New(
 		services.NewOpenSecureChannelRequest(
 			s.reqHeader, 0, services.ReqTypeIssue, s.cfg.SecurityMode, s.cfg.Lifetime, nonce,
 		), s.cfg).Serialize()
 	if err != nil {
+		s.cfg.SequenceNumber--
+		s.reqHeader.RequestHandle--
 		return err
 	}
 
 	if _, err := s.lowerConn.Write(osc); err != nil {
+		s.cfg.SequenceNumber--
+		s.reqHeader.RequestHandle--
 		return err
 	}
 	return nil
@@ -543,22 +417,26 @@ func (s *SecureChannel) OpenSecureChannelRequest() error {
 
 // OpenSecureChannelResponse sends OpenSecureChannelResponse on top of UASC to SecureChannel.
 func (s *SecureChannel) OpenSecureChannelResponse(code uint32) error {
+	nonce := make([]byte, 32)
+	if _, err := rand.Read(nonce); err != nil {
+		return err
+	}
+
 	s.cfg.SequenceNumber++
 	s.resHeader.ServiceResult = code
 	s.resHeader.Timestamp = time.Now()
-
-	nonce := make([]byte, 32)
-	rand.Read(nonce)
 	osc, err := New(services.NewOpenSecureChannelResponse(
 		s.resHeader, 0, services.NewChannelSecurityToken(
 			s.cfg.SecureChannelID, s.cfg.SecurityTokenID, time.Now(), s.cfg.Lifetime,
 		), nonce,
 	), s.cfg).Serialize()
 	if err != nil {
+		s.cfg.SequenceNumber--
 		return err
 	}
 
 	if _, err := s.lowerConn.Write(osc); err != nil {
+		s.cfg.SequenceNumber--
 		return err
 	}
 	return nil
@@ -567,15 +445,20 @@ func (s *SecureChannel) OpenSecureChannelResponse(code uint32) error {
 // CloseSecureChannelRequest sends CloseSecureChannelRequest on top of UASC to SecureChannel.
 func (s *SecureChannel) CloseSecureChannelRequest() error {
 	s.cfg.SequenceNumber++
+	s.reqHeader.RequestHandle++
 	s.reqHeader.Timestamp = time.Now()
 	csc, err := New(services.NewCloseSecureChannelRequest(
 		s.reqHeader, s.cfg.SecureChannelID,
 	), s.cfg).Serialize()
 	if err != nil {
+		s.cfg.SequenceNumber--
+		s.reqHeader.RequestHandle--
 		return err
 	}
 
 	if _, err := s.lowerConn.Write(csc); err != nil {
+		s.cfg.SequenceNumber--
+		s.reqHeader.RequestHandle--
 		return err
 	}
 	return nil
@@ -588,10 +471,12 @@ func (s *SecureChannel) CloseSecureChannelResponse(code uint32) error {
 	s.resHeader.Timestamp = time.Now()
 	csc, err := New(services.NewCloseSecureChannelResponse(s.resHeader), s.cfg).Serialize()
 	if err != nil {
+		s.cfg.SequenceNumber--
 		return err
 	}
 
 	if _, err := s.lowerConn.Write(csc); err != nil {
+		s.cfg.SequenceNumber--
 		return err
 	}
 	return nil
@@ -606,10 +491,14 @@ func (s *SecureChannel) GetEndpointsRequest(locales, uris []string) error {
 		s.reqHeader, s.RemoteEndpoint(), locales, uris,
 	), s.cfg).Serialize()
 	if err != nil {
+		s.cfg.SequenceNumber--
+		s.reqHeader.RequestHandle--
 		return err
 	}
 
 	if _, err := s.lowerConn.Write(gep); err != nil {
+		s.cfg.SequenceNumber--
+		s.reqHeader.RequestHandle--
 		return err
 	}
 	return nil
@@ -626,10 +515,12 @@ func (s *SecureChannel) GetEndpointsResponse(code uint32, endpoints ...*services
 		s.resHeader, endpoints...,
 	), s.cfg).Serialize()
 	if err != nil {
+		s.cfg.SequenceNumber--
 		return err
 	}
 
 	if _, err := s.lowerConn.Write(gep); err != nil {
+		s.cfg.SequenceNumber--
 		return err
 	}
 	return nil
@@ -644,10 +535,14 @@ func (s *SecureChannel) FindServersRequest(locales []string, servers ...string) 
 		s.reqHeader, s.RemoteEndpoint(), locales, servers...,
 	), s.cfg).Serialize()
 	if err != nil {
+		s.cfg.SequenceNumber--
+		s.reqHeader.RequestHandle--
 		return err
 	}
 
 	if _, err := s.lowerConn.Write(fsr); err != nil {
+		s.cfg.SequenceNumber--
+		s.reqHeader.RequestHandle--
 		return err
 	}
 	return nil
@@ -664,67 +559,13 @@ func (s *SecureChannel) FindServersResponse(code uint32, apps ...*services.Appli
 		s.resHeader, apps...,
 	), s.cfg).Serialize()
 	if err != nil {
+		s.cfg.SequenceNumber--
 		return err
 	}
 
 	if _, err := s.lowerConn.Write(fsr); err != nil {
+		s.cfg.SequenceNumber--
 		return err
 	}
 	return nil
 }
-
-type secChanState uint8
-
-const (
-	undefined secChanState = iota
-	transportUnavailable
-	cliStateSecureChannelClosed
-	cliStateOpenSecureChannelSent
-	cliStateSecureChannelOpened
-	cliStateCloseSecureChannelSent
-	srvStateSecureChannelClosed
-	srvStateSecureChannelOpened
-	srvStateCloseSecureChannelSent
-)
-
-func (s secChanState) String() string {
-	switch s {
-	case transportUnavailable:
-		return "transport connection unavailable"
-	case cliStateSecureChannelClosed:
-		return "client secure channel closed"
-	case cliStateOpenSecureChannelSent:
-		return "client open secure channel sent"
-	case cliStateSecureChannelOpened:
-		return "client secure channel opened"
-	case cliStateCloseSecureChannelSent:
-		return "client close secure channel sent"
-	case srvStateSecureChannelClosed:
-		return "server secure channel closed"
-	case srvStateSecureChannelOpened:
-		return "server secure channel opened"
-	case srvStateCloseSecureChannelSent:
-		return "server close secure channel sent"
-	default:
-		return "unknown"
-	}
-}
-
-// GetState returns the current secChanState of SecureChannel.
-func (s *SecureChannel) GetState() string {
-	if s == nil {
-		return ""
-	}
-	return s.state.String()
-}
-
-// UASC-specific error definitions.
-// XXX - to be integrated in errors package.
-var (
-	ErrInvalidState            = errors.New("invalid state")
-	ErrUnexpectedMessage       = errors.New("got unexpected message")
-	ErrTimeout                 = errors.New("timed out")
-	ErrSecureChannelNotOpened  = errors.New("secure channel not opened")
-	ErrSecurityModeUnsupported = errors.New("got request with unsupported SecurityMode")
-	ErrRejected                = errors.New("rejected by server")
-)

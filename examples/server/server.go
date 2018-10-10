@@ -34,7 +34,7 @@ func main() {
 
 	cfg := uasc.NewServerConfig(
 		"http://opcfoundation.org/UA/SecurityPolicy#None",
-		nil, nil, 1111, 2222, 3600000,
+		nil, nil, 1111, services.SecModeNone, 2222, 3600000,
 	)
 	for {
 		func() {
@@ -53,10 +53,7 @@ func main() {
 			}()
 			log.Printf("Successfully established connection with %v", conn.RemoteAddr())
 
-			secChanCtx, cancel := context.WithCancel(ctx)
-			defer cancel()
-
-			secChan, err := uasc.ListenAndAcceptSecureChannel(secChanCtx, conn, cfg)
+			secChan, err := uasc.ListenAndAcceptSecureChannel(ctx, conn, cfg)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -66,17 +63,8 @@ func main() {
 			}()
 			log.Printf("Successfully opened secure channel with %v", conn.RemoteAddr())
 
-			sessCtx, cancel := context.WithCancel(secChanCtx)
-			defer cancel()
-
-			sessCfg := uasc.NewSessionConfigServer(
-				secChan,
-				services.NewSignatureData("", nil),
-				[]*services.SignedSoftwareCertificate{
-					services.NewSignedSoftwareCertificate(nil, nil),
-				},
-			)
-			session, err := uasc.ListenAndAcceptSession(sessCtx, secChan, sessCfg)
+			sessCfg := uasc.NewServerSessionConfig(secChan)
+			session, err := uasc.ListenAndAcceptSession(ctx, secChan, sessCfg)
 			if err != nil {
 				log.Fatal(err)
 			}

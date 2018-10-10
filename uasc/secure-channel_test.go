@@ -20,7 +20,7 @@ var (
 	endpoint  = "opc.tcp://127.0.0.1:4840/foo/bar"
 	policyURI = "http://opcfoundation.org/UA/SecurityPolicy#None"
 	cliCfg    = NewClientConfig(policyURI, nil, nil, 3333, services.SecModeNone, 3600000)
-	srvCfg    = NewServerConfig(policyURI, nil, nil, 1111, 2222, 3600000)
+	srvCfg    = NewServerConfig(policyURI, nil, nil, 1111, services.SecModeNone, 2222, 3600000)
 	msg       = []byte{0xde, 0xad, 0xbe, 0xef}
 )
 
