@@ -19,6 +19,22 @@ type ReadResponse struct {
 	DiagnosticInfos *DiagnosticInfoArray
 }
 
+// NewReadResponse creates a new ReadResponse.
+func NewReadResponse(resHeader *ResponseHeader, diag []*DiagnosticInfo, results ...*datatypes.DataValue) *ReadResponse {
+	return &ReadResponse{
+		TypeID: datatypes.NewExpandedNodeID(
+			false, false,
+			datatypes.NewFourByteNodeID(
+				0, ServiceTypeReadResponse,
+			),
+			"", 0,
+		),
+		ResponseHeader:  resHeader,
+		Results:         datatypes.NewDataValueArray(results),
+		DiagnosticInfos: NewDiagnosticInfoArray(diag),
+	}
+}
+
 // DecodeReadResponse decodes given bytes into ReadResponse.
 func DecodeReadResponse(b []byte) (*ReadResponse, error) {
 	r := &ReadResponse{}

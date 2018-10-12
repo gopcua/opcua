@@ -7,6 +7,7 @@ package uasc
 import (
 	"context"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/wmnsk/gopcua/datatypes"
@@ -17,70 +18,125 @@ import (
 //
 // Currently security mode=None is only supported. If secMode is not set to
 //
-// The first param ctx is to be passed to monitorMessages(), which monitors and handles
+// The first param ctx is to be passed to monitor(), which monitors and handles
 // incoming messages automatically in another goroutine.
-func OpenSecureChannel(ctx context.Context, transportConn net.Conn, cfg *Config, secMode uint32, lifetime uint32, nonce []byte) (*SecureChannel, error) {
-	return openSecureChannel(ctx, transportConn, cfg, secMode, lifetime, nonce, 5*time.Second, 3)
-}
+func OpenSecureChannel(ctx context.Context, transportConn net.Conn, cfg *Config, interval time.Duration, maxRetry int) (*SecureChannel, error) {
+	if err := cfg.validate("client"); err != nil {
+		return nil, err
+	}
 
-/* XXX - maybe useful for users to have them?
-func OpenSecureChannelSecNone(ctx context.Context, transportConn net.Conn, lifetime uint32) (*SecureChannel, error) {
-	return openSecureChannel(ctx, transportConn, services.SecModeNone, lifetime, nil, 5*time.Second, 3)
-}
-
-func OpenSecureChannelSecSign(ctx context.Context, transportConn net.Conn, lifetime uint32) (*SecureChannel, error) {
-	return openSecureChannel(ctx, transportConn, services.SecModeSign, lifetime, nil, 5*time.Second, 3)
-}
-
-func OpenSecureChannelSecSignAndEncrypt(ctx context.Context, transportConn net.Conn, lifetime uint32, nonce []byte) (*SecureChannel, error) {
-	return openSecureChannel(ctx, transportConn, services.SecModeSignAndEncrypt, lifetime, nonce, 5*time.Second, 3)
-}
-*/
-
-func openSecureChannel(ctx context.Context, transportConn net.Conn, cfg *Config, secMode, lifetime uint32, nonce []byte, interval time.Duration, maxRetry int) (*SecureChannel, error) {
 	secChan := &SecureChannel{
+		mu:        new(sync.Mutex),
 		lowerConn: transportConn,
 		reqHeader: services.NewRequestHeader(
-			datatypes.NewTwoByteNodeID(0), time.Now(), 0, 0,
+			datatypes.NewTwoByteNodeID(0), time.Time{}, 0, 0,
 			0xffff, "", services.NewNullAdditionalHeader(), nil,
 		),
 		resHeader: services.NewResponseHeader(
-			time.Now(), 0, 0, services.NewNullDiagnosticInfo(),
+			time.Time{}, 0, 0, services.NewNullDiagnosticInfo(),
 			[]string{}, services.NewNullAdditionalHeader(), nil,
 		),
-		cfg:       cfg,
-		state:     cliStateSecureChannelClosed,
-		stateChan: make(chan secChanState),
-		lenChan:   make(chan int),
-		errChan:   make(chan error),
-		rcvBuf:    make([]byte, 0xffff),
+		cfg:     cfg,
+		state:   cliStateSecureChannelClosed,
+		opened:  make(chan bool),
+		lenChan: make(chan int),
+		errChan: make(chan error),
+		rcvBuf:  make([]byte, 0xffff),
 	}
 
-	if err := secChan.OpenSecureChannelRequest(secMode, lifetime, nonce); err != nil {
+	if err := secChan.OpenSecureChannelRequest(); err != nil {
 		return nil, err
 	}
 	sent := 1
 
 	secChan.state = cliStateOpenSecureChannelSent
-	go secChan.monitorMessages(ctx)
+	go secChan.monitor(ctx)
 	for {
 		if sent > maxRetry {
 			return nil, ErrTimeout
 		}
 
 		select {
-		case s := <-secChan.stateChan:
-			switch s {
-			case cliStateSecureChannelOpened:
+		case ok := <-secChan.opened:
+			if ok {
 				return secChan, nil
-			default:
-				continue
 			}
 		case err := <-secChan.errChan:
 			return nil, err
 		case <-time.After(interval):
-			if err := secChan.OpenSecureChannelRequest(secMode, lifetime, nonce); err != nil {
+			if err := secChan.OpenSecureChannelRequest(); err != nil {
 				return nil, err
+			}
+			sent++
+		}
+	}
+}
+
+// CreateSession creates a session on top of SecureChannel.
+func CreateSession(ctx context.Context, secChan *SecureChannel, cfg *SessionConfig, maxRetry int, interval time.Duration) (*Session, error) {
+	session := &Session{
+		mu:        new(sync.Mutex),
+		secChan:   secChan,
+		cfg:       cfg,
+		state:     cliStateSessionClosed,
+		created:   make(chan bool),
+		activated: make(chan bool),
+		lenChan:   make(chan int),
+		errChan:   make(chan error),
+		rcvBuf:    make([]byte, 0xffff),
+	}
+
+	if err := session.CreateSessionRequest(); err != nil {
+		return nil, err
+	}
+	sent := 1
+
+	session.state = cliStateCreateSessionSent
+	go session.monitor(ctx)
+	for {
+		if sent > maxRetry {
+			return nil, ErrTimeout
+		}
+
+		select {
+		case ok := <-session.created:
+			if ok {
+				return session, nil
+			}
+		case err := <-session.errChan:
+			return nil, err
+		case <-time.After(interval):
+			if err := session.CreateSessionRequest(); err != nil {
+				return nil, err
+			}
+			sent++
+		}
+	}
+}
+
+// Activate activates the session.
+func (s *Session) Activate() error {
+	if err := s.ActivateSessionRequest(); err != nil {
+		return err
+	}
+	sent := 0
+
+	s.state = cliStateActivateSessionSent
+	for {
+		if sent > 3 {
+			return ErrTimeout
+		}
+
+		select {
+		case ok := <-s.activated:
+			if ok {
+				return nil
+			}
+		case err := <-s.errChan:
+			return err
+		case <-time.After(5 * time.Second):
+			if err := s.ActivateSessionRequest(); err != nil {
+				return err
 			}
 			sent++
 		}

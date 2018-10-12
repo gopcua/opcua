@@ -26,10 +26,10 @@ type ChannelSecurityToken struct {
 }
 
 // NewChannelSecurityToken creates a new ChannelSecurityToken.
-func NewChannelSecurityToken(channel, token uint32, createdAt time.Time, lifetime uint32) *ChannelSecurityToken {
+func NewChannelSecurityToken(chanID, tokenID uint32, createdAt time.Time, lifetime uint32) *ChannelSecurityToken {
 	return &ChannelSecurityToken{
-		ChannelID:       channel,
-		TokenID:         token,
+		ChannelID:       chanID,
+		TokenID:         tokenID,
 		CreatedAt:       createdAt,
 		RevisedLifetime: lifetime,
 	}

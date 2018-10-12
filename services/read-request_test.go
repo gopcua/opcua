@@ -20,19 +20,20 @@ var readRequestCases = []struct {
 	{
 		"normal",
 		NewReadRequest(
-			time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-			datatypes.NewOpaqueNodeID(0x00, []byte{
-				0x08, 0x22, 0x87, 0x62, 0xba, 0x81, 0xe1, 0x11,
-				0xa6, 0x43, 0xf8, 0x77, 0x7b, 0xc6, 0x2f, 0xc8,
-			}), 1033572, 0, 10000, "",
+			NewRequestHeader(
+				datatypes.NewOpaqueNodeID(0x00, []byte{
+					0x08, 0x22, 0x87, 0x62, 0xba, 0x81, 0xe1, 0x11,
+					0xa6, 0x43, 0xf8, 0x77, 0x7b, 0xc6, 0x2f, 0xc8,
+				}),
+				time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
+				1, 0, 0, "", NewNullAdditionalHeader(), nil,
+			),
 			0, TimestampsToReturnBoth,
-			[]*datatypes.ReadValueID{
-				datatypes.NewReadValueID(
-					datatypes.NewFourByteNodeID(0, 2256),
-					datatypes.IntegerIDValue,
-					"", 0, "",
-				),
-			},
+			datatypes.NewReadValueID(
+				datatypes.NewFourByteNodeID(0, 2256),
+				datatypes.IntegerIDValue,
+				"", 0, "",
+			),
 		),
 		[]byte{
 			// TypeID
@@ -44,13 +45,13 @@ var readRequestCases = []struct {
 			// Timestamp
 			0x00, 0x98, 0x67, 0xdd, 0xfd, 0x30, 0xd4, 0x01,
 			// RequestHandle
-			0x64, 0xc5, 0x0f, 0x00,
+			0x01, 0x00, 0x00, 0x00,
 			// ReturnDiagnostics
 			0x00, 0x00, 0x00, 0x00,
 			// AuditEntryID
 			0xff, 0xff, 0xff, 0xff,
 			//TimeoutHint
-			0x10, 0x27, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00,
 			// AdditionalHeader
 			0x00, 0x00, 0x00,
 			// MaxAge

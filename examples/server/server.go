@@ -4,8 +4,6 @@
 
 /*
 Command server provides a connection establishment of OPC UA Secure Conversation as a server.
-
-XXX - Currently this command just handles the UACP connection from any client.
 */
 package main
 
@@ -13,7 +11,6 @@ import (
 	"context"
 	"flag"
 	"log"
-	"math/rand"
 
 	"github.com/wmnsk/gopcua/services"
 
@@ -35,10 +32,10 @@ func main() {
 	}
 	log.Printf("Started listening on %s.", listener.Endpoint())
 
-	cfg := uasc.NewConfig(
-		1, "http://opcfoundation.org/UA/SecurityPolicy#None", nil, nil, 1, rand.Uint32(),
+	cfg := uasc.NewServerConfig(
+		"http://opcfoundation.org/UA/SecurityPolicy#None",
+		nil, nil, 1111, services.SecModeNone, 2222, 3600000,
 	)
-
 	for {
 		func() {
 			ctx := context.Background()
@@ -52,7 +49,7 @@ func main() {
 			}
 			defer func() {
 				conn.Close()
-				log.Printf("Successfully closed connection with %v", conn.RemoteAddr())
+				log.Println("Successfully closed connection")
 			}()
 			log.Printf("Successfully established connection with %v", conn.RemoteAddr())
 
@@ -66,34 +63,33 @@ func main() {
 			}()
 			log.Printf("Successfully opened secure channel with %v", conn.RemoteAddr())
 
-			buf := make([]byte, 1024)
-			/*
-				n, err := secChan.Read(buf)
-				if err != nil {
-					log.Fatal(err)
-				}
-				log.Printf("Successfully received message: %x\n%s", buf[:n], utils.Wireshark(0, buf[:n]))
-
-				sc, err := uasc.Decode(buf[:n])
-				if err != nil {
-					log.Println("Couldn't decode received bytes as UASC")
-					return
-				}
-				log.Printf("Successfully decoded as UASC: %v", sc)
-			*/
-
-			n, err := secChan.ReadService(buf)
+			sessCfg := uasc.NewServerSessionConfig(secChan)
+			session, err := uasc.ListenAndAcceptSession(ctx, secChan, sessCfg)
 			if err != nil {
 				log.Fatal(err)
 			}
-			log.Printf("Successfully received message: %x\n%s", buf[:n], utils.Wireshark(0, buf[:n]))
+			defer func() {
+				session.Close()
+				log.Printf("Successfully closed session with %v", conn.RemoteAddr())
+			}()
+			log.Printf("Successfully activated session with %v", conn.RemoteAddr())
 
-			srv, err := services.Decode(buf[:n])
-			if err != nil {
-				log.Println("Couldn't decode received bytes as Service")
-				return
+			buf := make([]byte, 1024)
+			for {
+				n, err := session.ReadService(buf)
+				if err != nil {
+					log.Printf("Couldn't read UASC: %s", err)
+					continue
+				}
+				log.Printf("Successfully received message: %x\n%s", buf[:n], utils.Wireshark(0, buf[:n]))
+
+				srv, err := services.Decode(buf[:n])
+				if err != nil {
+					log.Printf("Couldn't decode received bytes as Service: %s", err)
+					continue
+				}
+				log.Printf("Successfully decoded as Service: %v", srv)
 			}
-			log.Printf("Successfully decoded as Service: %v", srv)
 		}()
 	}
 }

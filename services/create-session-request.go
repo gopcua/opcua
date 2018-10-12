@@ -29,17 +29,15 @@ type CreateSessionRequest struct {
 }
 
 // NewCreateSessionRequest creates a new NewCreateSessionRequest with the given parameters.
-func NewCreateSessionRequest(reqHeader *RequestHeader, appURI, prodURI, appName string, appType uint32, serverURI, endpoint, sessionName string, nonce, cert []byte, timeout uint64, maxRespSize uint32) *CreateSessionRequest {
+func NewCreateSessionRequest(reqHeader *RequestHeader, appDescr *ApplicationDescription, serverURI, endpoint, sessionName string, nonce, cert []byte, timeout uint64, maxRespSize uint32) *CreateSessionRequest {
 	return &CreateSessionRequest{
 		TypeID: datatypes.NewExpandedNodeID(
 			false, false,
 			datatypes.NewFourByteNodeID(0, ServiceTypeCreateSessionRequest),
 			"", 0,
 		),
-		RequestHeader: reqHeader,
-		ClientDescription: NewApplicationDescription(
-			appURI, prodURI, appName, appType, "", "", nil,
-		),
+		RequestHeader:           reqHeader,
+		ClientDescription:       appDescr,
 		ServerURI:               datatypes.NewString(serverURI),
 		EndpointURL:             datatypes.NewString(endpoint),
 		SessionName:             datatypes.NewString(sessionName),

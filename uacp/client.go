@@ -7,6 +7,7 @@ package uacp
 import (
 	"context"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/wmnsk/gopcua/utils"
@@ -16,7 +17,7 @@ import (
 //
 // Currently the endpoint can only be specified in "opc.tcp://<addr[:port]>/path" format.
 //
-// The first param ctx is to be passed to monitorMessages(), which monitors and handles
+// The first param ctx is to be passed to monitor(), which monitors and handles
 // incoming messages automatically in another goroutine.
 //
 // If port is missing, ":4840" is automatically chosen.
@@ -37,12 +38,13 @@ func dial(ctx context.Context, endpoint string, interval time.Duration, maxRetry
 	}
 
 	conn := &Conn{
-		state:     cliStateClosed,
-		stateChan: make(chan state),
-		lenChan:   make(chan int),
-		errChan:   make(chan error),
-		rcvBuf:    make([]byte, 0xffff),
-		rep:       endpoint,
+		mu:          new(sync.Mutex),
+		state:       cliStateClosed,
+		established: make(chan bool),
+		lenChan:     make(chan int),
+		errChan:     make(chan error),
+		rcvBuf:      make([]byte, 0xffff),
+		rep:         endpoint,
 	}
 	conn.lowerConn, err = net.Dial(network, raddr.String())
 	if err != nil {
@@ -54,19 +56,16 @@ func dial(ctx context.Context, endpoint string, interval time.Duration, maxRetry
 	}
 	sent := 1
 
-	go conn.monitorMessages(ctx)
+	go conn.monitor(ctx)
 	for {
 		if sent > maxRetry {
 			return nil, ErrTimeout
 		}
 
 		select {
-		case s := <-conn.stateChan:
-			switch s {
-			case cliStateEstablished:
+		case ok := <-conn.established:
+			if ok {
 				return conn, nil
-			default:
-				continue
 			}
 		case err := <-conn.errChan:
 			return nil, err

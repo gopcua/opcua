@@ -11,22 +11,29 @@ import (
 
 // ServiceType definitions.
 const (
-	ServiceTypeGetEndpointsRequest        uint16 = 428
-	ServiceTypeGetEndpointsResponse              = 431
-	ServiceTypeOpenSecureChannelRequest          = 446
-	ServiceTypeOpenSecureChannelResponse         = 449
-	ServiceTypeCloseSecureChannelRequest         = 452
-	ServiceTypeCloseSecureChannelResponse        = 455
-	ServiceTypeCreateSessionRequest              = 461
-	ServiceTypeCreateSessionResponse             = 464
-	ServiceTypeActivateSessionRequest            = 467
-	ServiceTypeActivateSessionResponse           = 470
-	ServiceTypeCloseSessionRequest               = 473
-	ServiceTypeCloseSessionResponse              = 476
-	ServiceTypeCancelRequest                     = 479
-	ServiceTypeCancelResponse                    = 482
-	ServiceTypeReadRequest                       = 631
-	ServiceTypeReadResponse                      = 634
+	ServiceTypeFindServersRequest           uint16 = 422
+	ServiceTypeFindServersResponse                 = 425
+	ServiceTypeGetEndpointsRequest                 = 428
+	ServiceTypeGetEndpointsResponse                = 431
+	ServiceTypeOpenSecureChannelRequest            = 446
+	ServiceTypeOpenSecureChannelResponse           = 449
+	ServiceTypeCloseSecureChannelRequest           = 452
+	ServiceTypeCloseSecureChannelResponse          = 455
+	ServiceTypeCreateSessionRequest                = 461
+	ServiceTypeCreateSessionResponse               = 464
+	ServiceTypeActivateSessionRequest              = 467
+	ServiceTypeActivateSessionResponse             = 470
+	ServiceTypeCloseSessionRequest                 = 473
+	ServiceTypeCloseSessionResponse                = 476
+	ServiceTypeCancelRequest                       = 479
+	ServiceTypeCancelResponse                      = 482
+	ServiceTypeReadRequest                         = 631
+	ServiceTypeReadResponse                        = 634
+	ServiceTypeWriteRequest                        = 673
+	ServiceTypeWriteResponse                       = 676
+	ServiceTypeCreateSubscriptionRequest           = 787
+	ServiceTypeFindServersOnNetworkRequest         = 12208
+	ServiceTypeFindServersOnNetworkResponse        = 12211
 )
 
 // Service is an interface to handle any kind of OPC UA Services.
@@ -53,6 +60,14 @@ func Decode(b []byte) (Service, error) {
 	}
 
 	switch n.Identifier {
+	case ServiceTypeFindServersRequest:
+		s = &FindServersRequest{}
+	case ServiceTypeFindServersResponse:
+		s = &FindServersResponse{}
+	case ServiceTypeGetEndpointsRequest:
+		s = &GetEndpointsRequest{}
+	case ServiceTypeGetEndpointsResponse:
+		s = &GetEndpointsResponse{}
 	case ServiceTypeOpenSecureChannelRequest:
 		s = &OpenSecureChannelRequest{}
 	case ServiceTypeOpenSecureChannelResponse:
@@ -61,10 +76,6 @@ func Decode(b []byte) (Service, error) {
 		s = &CloseSecureChannelRequest{}
 	case ServiceTypeCloseSecureChannelResponse:
 		s = &CloseSecureChannelResponse{}
-	case ServiceTypeGetEndpointsRequest:
-		s = &GetEndpointsRequest{}
-	case ServiceTypeGetEndpointsResponse:
-		s = &GetEndpointsResponse{}
 	case ServiceTypeCreateSessionRequest:
 		s = &CreateSessionRequest{}
 	case ServiceTypeCreateSessionResponse:
@@ -85,6 +96,16 @@ func Decode(b []byte) (Service, error) {
 		s = &ReadRequest{}
 	case ServiceTypeReadResponse:
 		s = &ReadResponse{}
+	case ServiceTypeWriteRequest:
+		s = &WriteRequest{}
+	case ServiceTypeWriteResponse:
+		s = &WriteResponse{}
+	case ServiceTypeCreateSubscriptionRequest:
+		s = &CreateSubscriptionRequest{}
+	case ServiceTypeFindServersOnNetworkRequest:
+		s = &FindServersOnNetworkRequest{}
+	case ServiceTypeFindServersOnNetworkResponse:
+		s = &FindServersOnNetworkResponse{}
 	default:
 		return nil, errors.NewErrUnsupported(n.Identifier, "unsupported or not implemented yet.")
 	}

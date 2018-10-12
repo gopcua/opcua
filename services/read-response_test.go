@@ -5,130 +5,108 @@
 package services
 
 import (
+	"log"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/wmnsk/gopcua/datatypes"
-	"github.com/wmnsk/gopcua/id"
 )
 
-var readResponseTests = []struct {
+var readResponseCases = []struct {
 	description string
-	bytes       []byte
-	r           *ReadResponse
-	length      int
+	structured  *ReadResponse
+	serialized  []byte
 }{
 	{
-		description: "read response with single float value",
-		bytes: []byte{
-			0x01, 0x00, 0x7a, 0x02, 0x90, 0x18, 0xe3, 0x05,
-			0x3f, 0x4f, 0xd4, 0x01, 0x01, 0x00, 0x00, 0x00,
-			0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff,
-			0xff, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,
-			0x01, 0x0a, 0x8e, 0x02, 0x20, 0x40, 0xff, 0xff,
-			0xff, 0xff,
+		"read response with single float value",
+		NewReadResponse(
+			NewResponseHeader(
+				time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
+				1, 0, NewNullDiagnosticInfo(), []string{}, NewNullAdditionalHeader(), nil,
+			),
+			[]*DiagnosticInfo{
+				NewNullDiagnosticInfo(),
+			},
+			datatypes.NewDataValue(
+				true, false, false, false, false, false,
+				datatypes.NewVariant(
+					datatypes.NewFloat(2.5001559257507324),
+				), 0, time.Time{}, 0, time.Time{}, 0,
+			),
+		),
+		[]byte{
+			// TypeID
+			0x01, 0x00, 0x7a, 0x02,
+			// Timestamp
+			0x00, 0x98, 0x67, 0xdd, 0xfd, 0x30, 0xd4, 0x01,
+			// RequestHandle
+			0x01, 0x00, 0x00, 0x00,
+			// ServiceResult
+			0x00, 0x00, 0x00, 0x00,
+			// ServiceDiagnostics
+			0x00,
+			// StringTable
+			0x00, 0x00, 0x00, 0x00,
+			// AdditionalHeader
+			0x00, 0x00, 0x00,
+			// Results
+			// ArraySize
+			0x01, 0x00, 0x00, 0x00,
+			// EncodingMask
+			0x01,
+			// Value
+			0x0a, 0x8e, 0x02, 0x20, 0x40, 0x01, 0x00, 0x00, 0x00, 0x00,
 		},
-		r: &ReadResponse{
-			TypeID: &datatypes.ExpandedNodeID{
-				NodeID: &datatypes.FourByteNodeID{
-					EncodingMask: 0x01,
-					Namespace:    0,
-					Identifier:   id.ReadResponse_Encoding_DefaultBinary,
-				},
-			},
-			ResponseHeader: &ResponseHeader{
-				Timestamp:     time.Date(2018, time.September, 18, 11, 02, 00, 89000000, time.UTC),
-				RequestHandle: 1,
-				ServiceResult: 0x00000000,
-				ServiceDiagnostics: &DiagnosticInfo{
-					EncodingMask: 0x00,
-				},
-				StringTable: &datatypes.StringArray{
-					ArraySize: -1,
-				},
-				AdditionalHeader: &AdditionalHeader{
-					TypeID: &datatypes.ExpandedNodeID{
-						NodeID: &datatypes.TwoByteNodeID{
-							EncodingMask: 0x00,
-							Identifier:   0,
-						},
-					},
-					EncodingMask: 0x00,
-				},
-				Payload: []byte{
-					0x01, 0x00, 0x00, 0x00, 0x01, 0x0a, 0x8e, 0x02,
-					0x20, 0x40, 0xff, 0xff, 0xff, 0xff,
-				},
-			},
-			Results: &datatypes.DataValueArray{
-				ArraySize: 1,
-				DataValues: []*datatypes.DataValue{
-					{
-						EncodingMask: 0x01,
-						Value: datatypes.NewVariant(
-							datatypes.NewFloat(2.5001559257507324),
-						),
-					},
-				},
-			},
-			DiagnosticInfos: &DiagnosticInfoArray{
-				ArraySize: -1,
-			},
-		},
-		length: 42,
 	},
 }
 
 func TestDecodeReadResponse(t *testing.T) {
-	for _, test := range readResponseTests {
-		t.Run(test.description, func(t *testing.T) {
-			v, err := DecodeReadResponse(test.bytes)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if diff := cmp.Diff(v, test.r); diff != "" {
-				t.Error(diff)
-			}
-		})
+	for _, c := range readResponseCases {
+		got, err := DecodeReadResponse(c.serialized)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// need to clear Payload here.
+		got.Payload = nil
+
+		if diff := cmp.Diff(got, c.structured, decodeCmpOpt); diff != "" {
+			t.Errorf("%s failed\n%s", c.description, diff)
+		}
 	}
 }
 
-func TestReadResponseSerialize(t *testing.T) {
-	for _, test := range readResponseTests {
-		t.Run(test.description, func(t *testing.T) {
-
-			// need to clear Payload here.
-			test.r.ResponseHeader.Payload = nil
-
-			b, err := test.r.Serialize()
-			if err != nil {
-				t.Fatal(err)
-			}
-			if diff := cmp.Diff(b, test.bytes); diff != "" {
-				t.Error(diff)
-			}
-		})
+func TestSerializeReadResponse(t *testing.T) {
+	for _, c := range readResponseCases {
+		got, err := c.structured.Serialize()
+		if err != nil {
+			t.Fatal(err)
+		}
+		log.Printf("%#x", got)
+		if diff := cmp.Diff(got, c.serialized); diff != "" {
+			t.Errorf("%s failed\n%s", c.description, diff)
+		}
 	}
 }
 
 func TestReadResponseLen(t *testing.T) {
-	for _, test := range readResponseTests {
-		t.Run(test.description, func(t *testing.T) {
-			if test.r.Len() != test.length {
-				t.Errorf("Len doesn't match. Want: %d, Got: %d", test.length, test.r.Len())
-			}
-		})
+	for _, c := range readResponseCases {
+		got := c.structured.Len()
+
+		if diff := cmp.Diff(got, len(c.serialized)); diff != "" {
+			t.Errorf("%s failed\n%s", c.description, diff)
+		}
 	}
 }
 
 func TestReadResponseServiceType(t *testing.T) {
-	for _, test := range readResponseTests {
-		if test.r.ServiceType() != id.ReadResponse_Encoding_DefaultBinary {
+	for _, c := range readResponseCases {
+		if c.structured.ServiceType() != ServiceTypeReadResponse {
 			t.Errorf(
 				"ServiceType doesn't match. Want: %d, Got: %d",
-				id.ReadResponse_Encoding_DefaultBinary,
-				test.r.ServiceType(),
+				ServiceTypeReadResponse,
+				c.structured.ServiceType(),
 			)
 		}
 	}

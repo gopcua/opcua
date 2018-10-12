@@ -6,7 +6,6 @@ package services
 
 import (
 	"encoding/binary"
-	"time"
 
 	"github.com/wmnsk/gopcua/datatypes"
 )
@@ -84,7 +83,7 @@ type ReadRequest struct {
 }
 
 // NewReadRequest creates a new ReadRequest.
-func NewReadRequest(ts time.Time, authToken datatypes.NodeID, handle, diag, timeout uint32, auditID string, maxAge uint64, tsRet TimestampsToReturn, nodes []*datatypes.ReadValueID) *ReadRequest {
+func NewReadRequest(reqHeader *RequestHeader, maxAge uint64, tsRet TimestampsToReturn, nodes ...*datatypes.ReadValueID) *ReadRequest {
 	return &ReadRequest{
 		TypeID: datatypes.NewExpandedNodeID(
 			false, false,
@@ -93,23 +92,7 @@ func NewReadRequest(ts time.Time, authToken datatypes.NodeID, handle, diag, time
 			),
 			"", 0,
 		),
-		RequestHeader: NewRequestHeader(
-			authToken,
-			ts,
-			handle,
-			diag,
-			timeout,
-			auditID,
-			NewAdditionalHeader(
-				datatypes.NewExpandedNodeID(
-					false, false,
-					datatypes.NewTwoByteNodeID(0),
-					"", 0,
-				),
-				0x00,
-			),
-			nil,
-		),
+		RequestHeader:      reqHeader,
 		MaxAge:             maxAge,
 		TimestampsToReturn: tsRet,
 		NodesToRead:        datatypes.NewReadValueIDArray(nodes),

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/wmnsk/gopcua/errors"
@@ -17,13 +18,26 @@ import (
 
 // Conn is an implementation of the net.Conn interface for OPC UA Connection Protocol.
 type Conn struct {
-	lowerConn      net.Conn
-	lep, rep       string
+	// mu is to Lock when updating state.
+	mu *sync.Mutex
+	// lowerConn is a net.Conn, typically net.TCPConn.
+	lowerConn net.Conn
+	// lep and rep are Local/Remote Endpoint.
+	lep, rep string
+	// rcvBuf and sndBuf are the buffers to read/send.
+	// XXX - sndBuf is not used in the current implementation.
 	rcvBuf, sndBuf []byte
-	state          state
-	stateChan      chan state
-	lenChan        chan int
-	errChan        chan error
+	// state represents the state of connection.
+	state state
+	// established is to notify parents(Dial() and Accept()) of
+	// the result of connection establishment.
+	established chan bool
+	// lenChan is to notify user the length of received packets.
+	lenChan chan int
+	// errChan is to pass errors to parents(Dial() and Accept()).
+	errChan chan error
+	// readDeadline time.Time
+	// writeDeadline time.Time
 }
 
 // Read reads data from the connection.
@@ -36,13 +50,16 @@ func (c *Conn) Read(b []byte) (n int, err error) {
 	if !(c.state == cliStateEstablished || c.state == srvStateEstablished) {
 		return 0, ErrConnNotEstablished
 	}
+
 	for {
 		select {
 		case n := <-c.lenChan:
 			copy(b, c.rcvBuf[:n])
 			return n, nil
-		case e := <-c.errChan:
-			return 0, e
+			/*
+				case <-time.After(c.readDeadline):
+					return 0, ErrTimeout
+			*/
 		}
 	}
 }
@@ -54,31 +71,39 @@ func (c *Conn) Write(b []byte) (n int, err error) {
 	if !(c.state == cliStateEstablished || c.state == srvStateEstablished) {
 		return 0, ErrConnNotEstablished
 	}
-	select {
-	case e := <-c.errChan:
-		return 0, e
-	default:
-		return c.lowerConn.Write(b)
-	}
+
+	return c.lowerConn.Write(b)
 }
 
 // Close closes the connection.
 // Any blocked Read or Write operations will be unblocked and return errors.
 func (c *Conn) Close() error {
-	if err := c.lowerConn.Close(); err != nil {
-		return err
-	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	switch c.state {
-	case cliStateHelloSent, cliStateEstablished:
-		c.updateState(cliStateClosed)
-	case srvStateEstablished:
-		c.updateState(srvStateClosed)
+	case cliStateHelloSent, cliStateEstablished, cliStateClosed:
+		c.state = cliStateClosed
+	case srvStateEstablished, srvStateClosed:
+		c.state = srvStateClosed
+	default:
+		c.state = cliStateClosed
+		return ErrInvalidState
 	}
+
+	c.close()
+	return nil
+}
+
+func (c *Conn) close() {
+	c.rep = ""
+	c.lep = ""
+	c.rcvBuf = []byte{}
+	c.sndBuf = []byte{}
 
 	close(c.errChan)
 	close(c.lenChan)
-	close(c.stateChan)
-	return nil
+	close(c.established)
 }
 
 // LocalAddr returns the local network address.
@@ -189,11 +214,6 @@ const (
 	srvStateEstablished
 )
 
-func (c *Conn) updateState(s state) {
-	c.state = s
-	c.stateChan <- c.state
-}
-
 func (s state) String() string {
 	switch s {
 	case cliStateClosed:
@@ -219,19 +239,13 @@ func (c *Conn) GetState() string {
 	return c.state.String()
 }
 
-func (c *Conn) notifyLength(n int) {
-	go func() {
-		c.lenChan <- n
-	}()
-}
-
-func (c *Conn) monitorMessages(ctx context.Context) {
-	defer c.Close()
-	c.updateState(c.state)
+func (c *Conn) monitor(ctx context.Context) {
+	childCtx, cancel := context.WithCancel(ctx)
 
 	for {
 		select {
 		case <-ctx.Done():
+			cancel()
 			return
 		default:
 			n, err := c.lowerConn.Read(c.rcvBuf)
@@ -239,7 +253,8 @@ func (c *Conn) monitorMessages(ctx context.Context) {
 				if err == io.EOF {
 					continue
 				}
-				c.Close()
+				cancel()
+				return
 			}
 			if n == 0 {
 				continue
@@ -248,9 +263,7 @@ func (c *Conn) monitorMessages(ctx context.Context) {
 			msg, err := Decode(c.rcvBuf[:n])
 			if err != nil {
 				// pass to the user if msg is undecodable as UACP.
-				if c.state == cliStateEstablished || c.state == srvStateEstablished {
-					c.notifyLength(n)
-				}
+				go c.notifyLength(childCtx, n)
 				continue
 			}
 			switch m := msg.(type) {
@@ -264,15 +277,25 @@ func (c *Conn) monitorMessages(ctx context.Context) {
 				c.handleMsgReverseHello(m)
 			default:
 				// pass to the user if type of msg is unknown.
-				if c.state == cliStateEstablished || c.state == srvStateEstablished {
-					c.notifyLength(n)
-				}
+				go c.notifyLength(childCtx, n)
 			}
 		}
 	}
 }
 
+func (c *Conn) notifyLength(ctx context.Context, n int) {
+	select {
+	case <-ctx.Done():
+		return
+	case c.lenChan <- n:
+		return
+	}
+}
+
 func (c *Conn) handleMsgHello(h *Hello) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	switch c.state {
 	// server accepts Hello at anytime, as UACP does not have explicit connection closing message.
 	case srvStateClosed, srvStateEstablished:
@@ -281,6 +304,7 @@ func (c *Conn) handleMsgHello(h *Hello) {
 		if err != nil || cpath != spath {
 			if err := c.Error(BadTCPEndpointURLInvalid, fmt.Sprintf("Endpoint: %s does not exist", h.EndPointURL.Get())); err != nil {
 				c.errChan <- err
+				return
 			}
 			c.errChan <- ErrInvalidEndpoint
 		}
@@ -289,7 +313,8 @@ func (c *Conn) handleMsgHello(h *Hello) {
 		if err := c.Acknowledge(); err != nil {
 			c.errChan <- err
 		}
-		c.updateState(srvStateEstablished)
+		c.state = srvStateEstablished
+		c.established <- true
 	// client never accept Hello.
 	case cliStateClosed, cliStateEstablished:
 		if err := c.Error(BadTCPMessageTypeInvalid, ""); err != nil {
@@ -299,17 +324,22 @@ func (c *Conn) handleMsgHello(h *Hello) {
 	default:
 		if err := c.Error(BadTCPServerTooBusy, ""); err != nil {
 			c.errChan <- err
+			return
 		}
 		c.errChan <- ErrInvalidState
 	}
 }
 
 func (c *Conn) handleMsgAcknowledge(a *Acknowledge) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	switch c.state {
 	// client accepts Acknowledge only after sending Hello.
 	case cliStateHelloSent:
 		c.rcvBuf = make([]byte, a.ReceiveBufSize)
-		c.updateState(cliStateEstablished)
+		c.state = cliStateEstablished
+		c.established <- true
 	// if client conn is closed or established, just ignore Acknowledge.
 	case cliStateClosed, cliStateEstablished:
 	// server never accept Acknowledge.
@@ -321,22 +351,26 @@ func (c *Conn) handleMsgAcknowledge(a *Acknowledge) {
 	default:
 		if err := c.Error(BadTCPServerTooBusy, ""); err != nil {
 			c.errChan <- err
+			return
 		}
 		c.errChan <- ErrInvalidState
 	}
 }
 
 func (c *Conn) handleMsgError(e *Error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	switch c.state {
 	// if client receives Error after sending Hello, notify error handler and switch state to closed.
 	case cliStateHelloSent:
 		switch e.Error {
 		case BadTCPEndpointURLInvalid:
 			c.errChan <- ErrInvalidEndpoint
-			c.updateState(cliStateClosed)
+			c.state = cliStateClosed
 		default:
 			c.errChan <- ErrReceivedError
-			c.updateState(cliStateClosed)
+			c.state = cliStateClosed
 		}
 	// if client/server conn is established, just notify error to error handler.
 	case cliStateEstablished, srvStateEstablished:
@@ -347,12 +381,16 @@ func (c *Conn) handleMsgError(e *Error) {
 	default:
 		if err := c.Error(BadTCPServerTooBusy, ""); err != nil {
 			c.errChan <- err
+			return
 		}
 		c.errChan <- ErrInvalidState
 	}
 }
 
 func (c *Conn) handleMsgReverseHello(r *ReverseHello) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	switch c.state {
 	// if client conn is closed, accept ReverseHello.
 	// XXX - not likely to hit this condition.
@@ -366,6 +404,7 @@ func (c *Conn) handleMsgReverseHello(r *ReverseHello) {
 		if err != nil {
 			cancel()
 			c.errChan <- err
+			return
 		}
 		c = conn
 	// if client conn is opening/opened, client just ignore ReverseHello.
@@ -379,6 +418,7 @@ func (c *Conn) handleMsgReverseHello(r *ReverseHello) {
 	default:
 		if err := c.Error(BadTCPServerTooBusy, ""); err != nil {
 			c.errChan <- err
+			return
 		}
 		c.errChan <- ErrInvalidState
 	}

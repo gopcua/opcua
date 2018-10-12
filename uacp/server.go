@@ -6,8 +6,8 @@ package uacp
 
 import (
 	"context"
-	"fmt"
 	"net"
+	"sync"
 
 	"github.com/wmnsk/gopcua/utils"
 )
@@ -46,71 +46,36 @@ func Listen(endpoint string, rcvBufSize uint32) (*Listener, error) {
 
 // Accept accepts the next incoming call and returns the new connection.
 //
-// The first param ctx is to be passed to monitorMessages(), which monitors and handles
+// The first param ctx is to be passed to monitor(), which monitors and handles
 // incoming messages automatically in another goroutine.
 func (l *Listener) Accept(ctx context.Context) (*Conn, error) {
 	var err error
 
 	conn := &Conn{
-		state:     srvStateClosed,
-		stateChan: make(chan state),
-		lenChan:   make(chan int),
-		errChan:   make(chan error),
-		rcvBuf:    make([]byte, l.rcvBufSize),
-		lep:       l.endpoint,
+		mu:          new(sync.Mutex),
+		state:       srvStateClosed,
+		established: make(chan bool),
+		lenChan:     make(chan int),
+		errChan:     make(chan error),
+		rcvBuf:      make([]byte, l.rcvBufSize),
+		lep:         l.endpoint,
 	}
 	conn.lowerConn, err = l.lowerListener.Accept()
 	if err != nil {
 		return nil, err
 	}
 
-	n, err := conn.lowerConn.Read(conn.rcvBuf)
-	if err != nil {
+	go conn.monitor(ctx)
+	select {
+	case ok := <-conn.established:
+		if ok {
+			return conn, nil
+		}
+	case err := <-conn.errChan:
 		return nil, err
 	}
 
-	message, err := Decode(conn.rcvBuf[:n])
-	if err != nil {
-		return nil, err
-	}
-
-	switch msg := message.(type) {
-	case *Hello:
-		spath, _ := utils.GetPath(l.endpoint)
-		cpath, err := utils.GetPath(msg.EndPointURL.Get())
-		if err != nil || cpath != spath {
-			if err := conn.Error(BadTCPEndpointURLInvalid, fmt.Sprintf("Endpoint: %s does not exist", msg.EndPointURL.Get())); err != nil {
-				return nil, err
-			}
-			return nil, ErrInvalidEndpoint
-		}
-
-		conn.sndBuf = make([]byte, msg.ReceiveBufSize)
-		if err := conn.Acknowledge(); err != nil {
-			return nil, err
-		}
-	default:
-		if err := conn.Error(BadTCPMessageTypeInvalid, "Expected Hello"); err != nil {
-			return nil, err
-		}
-		return nil, ErrUnexpectedMessage
-	}
-
-	conn.state = srvStateEstablished
-	go conn.monitorMessages(ctx)
-	for {
-		select {
-		case s := <-conn.stateChan:
-			switch s {
-			case srvStateEstablished:
-				return conn, nil
-			default:
-				continue
-			}
-		case err := <-conn.errChan:
-			return nil, err
-		}
-	}
+	return nil, nil
 }
 
 // Close closes the Listener.
