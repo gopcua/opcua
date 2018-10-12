@@ -77,7 +77,7 @@ func encryptPKCS1v15(pubKey *rsa.PublicKey) func([]byte) ([]byte, error) {
 	}
 }
 
-func signRsaPkc15(hash crypto.Hash, privKey *rsa.PrivateKey) func([]byte) ([]byte, error) {
+func signPKCS1v15(hash crypto.Hash, privKey *rsa.PrivateKey) func([]byte) ([]byte, error) {
 	rng := rand.Reader
 
 	return func(msg []byte) ([]byte, error) {
@@ -93,7 +93,7 @@ func signRsaPkc15(hash crypto.Hash, privKey *rsa.PrivateKey) func([]byte) ([]byt
 	}
 }
 
-func verifyRsaPkc15(hash crypto.Hash, pubKey *rsa.PublicKey) func([]byte, []byte) error {
+func verifyPKCS1v15(hash crypto.Hash, pubKey *rsa.PublicKey) func([]byte, []byte) error {
 	return func(msg, signature []byte) error {
 		h := hash.New()
 		h.Write(msg)

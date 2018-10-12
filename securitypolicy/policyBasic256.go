@@ -85,8 +85,8 @@ func newBasic256Asymmetric(localKey *rsa.PrivateKey, remoteKey *rsa.PublicKey) (
 	e.minPadding = minPaddingRsaPKCS1v15
 	e.encrypt = encryptRsaOAEP(crypto.SHA1, remoteKey)         // RSA-OAEP
 	e.decrypt = decryptRsaOAEP(crypto.SHA1, localKey)          // RSA-OAEP
-	e.signature = signRsaPkc15(crypto.SHA1, localKey)          // RSA-SHA1
-	e.verifySignature = verifyRsaPkc15(crypto.SHA1, remoteKey) // RSA-SHA1
+	e.signature = signPKCS1v15(crypto.SHA1, localKey)          // RSA-SHA1
+	e.verifySignature = verifyPKCS1v15(crypto.SHA1, remoteKey) // RSA-SHA1
 	e.encryptionURI = "http://www.w3.org/2001/04/xmlenc#rsa-oaep"
 	e.signatureURI = "http://www.w3.org/2000/09/xmldsig#rsa-sha1"
 

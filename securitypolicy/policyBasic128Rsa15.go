@@ -84,8 +84,8 @@ func newBasic128Rsa15Asymmetric(localKey *rsa.PrivateKey, remoteKey *rsa.PublicK
 	e.minPadding = minPaddingRsaPKCS1v15
 	e.encrypt = encryptPKCS1v15(remoteKey)                     // RSA-SHA15+KWRSA15
 	e.decrypt = decryptPKCS1v15(localKey)                      // RSA-SHA15+KWRSA15
-	e.signature = signRsaPkc15(crypto.SHA1, localKey)          // RSA-SHA1
-	e.verifySignature = verifyRsaPkc15(crypto.SHA1, remoteKey) // RSA-SHA1
+	e.signature = signPKCS1v15(crypto.SHA1, localKey)          // RSA-SHA1
+	e.verifySignature = verifyPKCS1v15(crypto.SHA1, remoteKey) // RSA-SHA1
 	e.encryptionURI = "http://www.w3.org/2001/04/xmlenc#rsa-1_5"
 	e.signatureURI = "http://www.w3.org/2000/09/xmldsig#rsa-sha1"
 

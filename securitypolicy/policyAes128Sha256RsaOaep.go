@@ -97,8 +97,8 @@ func newAes128Sha256RsaOaepAsymmetric(localKey *rsa.PrivateKey, remoteKey *rsa.P
 	e.minPadding = minPaddingRsaOAEP(crypto.SHA1)
 	e.encrypt = encryptRsaOAEP(crypto.SHA1, remoteKey)           // RSA-OAEP-SHA1
 	e.decrypt = decryptRsaOAEP(crypto.SHA1, localKey)            // RSA-OAEP-SHA1
-	e.signature = signRsaPkc15(crypto.SHA256, localKey)          // RSA-PKCS15-SHA2-256
-	e.verifySignature = verifyRsaPkc15(crypto.SHA256, remoteKey) // RSA-PKCS15-SHA2-256
+	e.signature = signPKCS1v15(crypto.SHA256, localKey)          // RSA-PKCS15-SHA2-256
+	e.verifySignature = verifyPKCS1v15(crypto.SHA256, remoteKey) // RSA-PKCS15-SHA2-256
 	e.encryptionURI = "http://opcfoundation.org/ua/security/rsa-oaep-sha1"
 	e.signatureURI = "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"
 
