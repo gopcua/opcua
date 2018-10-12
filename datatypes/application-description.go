@@ -2,13 +2,12 @@
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
-package services
+package datatypes
 
 import (
 	"encoding/binary"
 	"fmt"
 
-	"github.com/wmnsk/gopcua/datatypes"
 	"github.com/wmnsk/gopcua/errors"
 )
 
@@ -26,25 +25,25 @@ const (
 //
 // Specification: Part 4, 7.1
 type ApplicationDescription struct {
-	ApplicationURI      *datatypes.String
-	ProductURI          *datatypes.String
-	ApplicationName     *datatypes.LocalizedText
+	ApplicationURI      *String
+	ProductURI          *String
+	ApplicationName     *LocalizedText
 	ApplicationType     uint32
-	GatewayServerURI    *datatypes.String
-	DiscoveryProfileURI *datatypes.String
-	DiscoveryURIs       *datatypes.StringArray
+	GatewayServerURI    *String
+	DiscoveryProfileURI *String
+	DiscoveryURIs       *StringArray
 }
 
 // NewApplicationDescription creates a new NewApplicationDescription.
 func NewApplicationDescription(appURI, prodURI, appName string, appType uint32, gwURI, profileURI string, discovURIs []string) *ApplicationDescription {
 	return &ApplicationDescription{
-		ApplicationURI:      datatypes.NewString(appURI),
-		ProductURI:          datatypes.NewString(prodURI),
-		ApplicationName:     datatypes.NewLocalizedText("", appName),
+		ApplicationURI:      NewString(appURI),
+		ProductURI:          NewString(prodURI),
+		ApplicationName:     NewLocalizedText("", appName),
 		ApplicationType:     appType,
-		GatewayServerURI:    datatypes.NewString(gwURI),
-		DiscoveryProfileURI: datatypes.NewString(profileURI),
-		DiscoveryURIs:       datatypes.NewStringArray(discovURIs),
+		GatewayServerURI:    NewString(gwURI),
+		DiscoveryProfileURI: NewString(profileURI),
+		DiscoveryURIs:       NewStringArray(discovURIs),
 	}
 }
 
@@ -61,19 +60,19 @@ func DecodeApplicationDescription(b []byte) (*ApplicationDescription, error) {
 // DecodeFromBytes decodes given bytes into ApplicationDescription.
 func (a *ApplicationDescription) DecodeFromBytes(b []byte) error {
 	var offset = 0
-	a.ApplicationURI = &datatypes.String{}
+	a.ApplicationURI = &String{}
 	if err := a.ApplicationURI.DecodeFromBytes(b[offset:]); err != nil {
 		return err
 	}
 	offset += a.ApplicationURI.Len()
 
-	a.ProductURI = &datatypes.String{}
+	a.ProductURI = &String{}
 	if err := a.ProductURI.DecodeFromBytes(b[offset:]); err != nil {
 		return err
 	}
 	offset += a.ProductURI.Len()
 
-	a.ApplicationName = &datatypes.LocalizedText{}
+	a.ApplicationName = &LocalizedText{}
 	if err := a.ApplicationName.DecodeFromBytes(b[offset:]); err != nil {
 		return err
 	}
@@ -82,19 +81,19 @@ func (a *ApplicationDescription) DecodeFromBytes(b []byte) error {
 	a.ApplicationType = binary.LittleEndian.Uint32(b[offset : offset+4])
 	offset += 4
 
-	a.GatewayServerURI = &datatypes.String{}
+	a.GatewayServerURI = &String{}
 	if err := a.GatewayServerURI.DecodeFromBytes(b[offset:]); err != nil {
 		return err
 	}
 	offset += a.GatewayServerURI.Len()
 
-	a.DiscoveryProfileURI = &datatypes.String{}
+	a.DiscoveryProfileURI = &String{}
 	if err := a.DiscoveryProfileURI.DecodeFromBytes(b[offset:]); err != nil {
 		return err
 	}
 	offset += a.DiscoveryProfileURI.Len()
 
-	a.DiscoveryURIs = &datatypes.StringArray{}
+	a.DiscoveryURIs = &StringArray{}
 	if err := a.DiscoveryURIs.DecodeFromBytes(b[offset:]); err != nil {
 		return err
 	}

@@ -23,7 +23,7 @@ var createSessionResponseCases = []struct {
 		NewCreateSessionResponse(
 			NewResponseHeader(
 				time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-				1, 0, NewNullDiagnosticInfo(), []string{}, NewNullAdditionalHeader(), nil,
+				1, 0, datatypes.NewNullDiagnosticInfo(), []string{}, NewNullAdditionalHeader(), nil,
 			),
 			datatypes.NewNumericNodeID(0, 1),
 			datatypes.NewOpaqueNodeID(0, []byte{
@@ -31,28 +31,28 @@ var createSessionResponseCases = []struct {
 				0xa6, 0x43, 0xf8, 0x77, 0x7b, 0xc6, 0x2f, 0xc8,
 			}),
 			6000000, nil, nil, nil,
-			NewSignatureData(
+			datatypes.NewSignatureData(
 				"http://www.w3.org/2000/09/xmldsig#rsa-sha1",
 				nil,
 			),
 			65534,
-			NewEndpointDescription(
+			datatypes.NewEndpointDescription(
 				"ep-url",
-				NewApplicationDescription(
-					"app-uri", "prod-uri", "app-name", AppTypeServer,
+				datatypes.NewApplicationDescription(
+					"app-uri", "prod-uri", "app-name", datatypes.AppTypeServer,
 					"gw-uri", "prof-uri", []string{"discov-uri-1", "discov-uri-2"},
 				),
 				[]byte{},
 				SecModeNone,
 				"sec-uri",
-				NewUserTokenPolicyArray(
-					[]*UserTokenPolicy{
-						NewUserTokenPolicy(
-							"1", UserTokenAnonymous,
+				datatypes.NewUserTokenPolicyArray(
+					[]*datatypes.UserTokenPolicy{
+						datatypes.NewUserTokenPolicy(
+							"1", datatypes.UserTokenAnonymous,
 							"issued-token", "issuer-uri", "sec-uri",
 						),
-						NewUserTokenPolicy(
-							"1", UserTokenAnonymous,
+						datatypes.NewUserTokenPolicy(
+							"1", datatypes.UserTokenAnonymous,
 							"issued-token", "issuer-uri", "sec-uri",
 						),
 					},
@@ -60,23 +60,23 @@ var createSessionResponseCases = []struct {
 				"trans-uri",
 				0,
 			),
-			NewEndpointDescription(
+			datatypes.NewEndpointDescription(
 				"ep-url",
-				NewApplicationDescription(
-					"app-uri", "prod-uri", "app-name", AppTypeServer,
+				datatypes.NewApplicationDescription(
+					"app-uri", "prod-uri", "app-name", datatypes.AppTypeServer,
 					"gw-uri", "prof-uri", []string{"discov-uri-1", "discov-uri-2"},
 				),
 				[]byte{},
 				SecModeNone,
 				"sec-uri",
-				NewUserTokenPolicyArray(
-					[]*UserTokenPolicy{
-						NewUserTokenPolicy(
-							"1", UserTokenAnonymous,
+				datatypes.NewUserTokenPolicyArray(
+					[]*datatypes.UserTokenPolicy{
+						datatypes.NewUserTokenPolicy(
+							"1", datatypes.UserTokenAnonymous,
 							"issued-token", "issuer-uri", "sec-uri",
 						),
-						NewUserTokenPolicy(
-							"1", UserTokenAnonymous,
+						datatypes.NewUserTokenPolicy(
+							"1", datatypes.UserTokenAnonymous,
 							"issued-token", "issuer-uri", "sec-uri",
 						),
 					},

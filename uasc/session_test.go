@@ -48,9 +48,9 @@ func TestSession(t *testing.T) {
 
 		svrCfg := NewSessionConfigServer(
 			secChan,
-			services.NewSignatureData("", nil),
-			[]*services.SignedSoftwareCertificate{
-				services.NewSignedSoftwareCertificate(nil, nil),
+			datatypes.NewSignatureData("", nil),
+			[]*datatypes.SignedSoftwareCertificate{
+				datatypes.NewSignedSoftwareCertificate(nil, nil),
 			},
 		)
 		if _, err := ListenAndAcceptSession(ctx, secChan, svrCfg); err != nil {

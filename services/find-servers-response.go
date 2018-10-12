@@ -16,11 +16,11 @@ import (
 type FindServersResponse struct {
 	TypeID *datatypes.ExpandedNodeID
 	*ResponseHeader
-	Servers *ApplicationDescriptionArray
+	Servers *datatypes.ApplicationDescriptionArray
 }
 
 // NewFindServersResponse creates an FindServersResponse.
-func NewFindServersResponse(resHeader *ResponseHeader, servers ...*ApplicationDescription) *FindServersResponse {
+func NewFindServersResponse(resHeader *ResponseHeader, servers ...*datatypes.ApplicationDescription) *FindServersResponse {
 	return &FindServersResponse{
 		TypeID: datatypes.NewExpandedNodeID(
 			false, false,
@@ -30,7 +30,7 @@ func NewFindServersResponse(resHeader *ResponseHeader, servers ...*ApplicationDe
 			"", 0,
 		),
 		ResponseHeader: resHeader,
-		Servers:        NewApplicationDescriptionArray(servers),
+		Servers:        datatypes.NewApplicationDescriptionArray(servers),
 	}
 }
 
@@ -63,7 +63,7 @@ func (f *FindServersResponse) DecodeFromBytes(b []byte) error {
 	}
 	offset += f.ResponseHeader.Len() - len(f.ResponseHeader.Payload)
 
-	f.Servers = &ApplicationDescriptionArray{}
+	f.Servers = &datatypes.ApplicationDescriptionArray{}
 	return f.Servers.DecodeFromBytes(b[offset:])
 }
 

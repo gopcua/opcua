@@ -5,45 +5,58 @@
 package datatypes
 
 import (
-	"encoding/hex"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 )
 
-var testByteStringBytes = [][]byte{
+var byteStringCases = []struct {
+	description string
+	structured  *ByteString
+	serialized  []byte
+}{
 	{
-		0x04, 0x00, 0x00, 0x00,
-		0xde, 0xad, 0xbe, 0xef,
+		"normal",
+		NewByteString([]byte{0xde, 0xad, 0xbe, 0xef}),
+		[]byte{
+			0x04, 0x00, 0x00, 0x00,
+			0xde, 0xad, 0xbe, 0xef,
+		},
 	},
 }
 
 func TestDecodeByteString(t *testing.T) {
-	b, err := DecodeByteString(testByteStringBytes[0])
-	if err != nil {
-		t.Fatalf("Failed to decode ByteString: %s", err)
-	}
+	for _, c := range byteStringCases {
+		got, err := DecodeByteString(c.serialized)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	str := hex.EncodeToString(b.Get())
-	switch {
-	case b.Length != 4:
-		t.Errorf("Length doesn't match. Want: %d, Got: %d", 4, b.Length)
-	case str != "deadbeef":
-		t.Errorf("Value doesn't match. Want: %s, Got: %s", "deadbeef", str)
+		if diff := cmp.Diff(got, c.structured); diff != "" {
+			t.Errorf("%s failed\n%s", c.description, diff)
+		}
 	}
 }
 
 func TestSerializeByteString(t *testing.T) {
-	b := NewByteString([]byte{0xde, 0xad, 0xbe, 0xef})
+	for _, c := range byteStringCases {
+		got, err := c.structured.Serialize()
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	serialized, err := b.Serialize()
-	if err != nil {
-		t.Fatalf("Failed to serialize ByteString: %s", err)
-	}
-
-	for i, s := range serialized {
-		x := testByteStringBytes[0][i]
-		if s != x {
-			t.Errorf("Bytes doesn't match. Want: %#x, Got: %#x at %dth", x, s, i)
+		if diff := cmp.Diff(got, c.serialized); diff != "" {
+			t.Errorf("%s failed\n%s", c.description, diff)
 		}
 	}
-	t.Logf("%x", serialized)
+}
+
+func TestByteStringLen(t *testing.T) {
+	for _, c := range byteStringCases {
+		got := c.structured.Len()
+
+		if diff := cmp.Diff(got, len(c.serialized)); diff != "" {
+			t.Errorf("%s failed\n%s", c.description, diff)
+		}
+	}
 }

@@ -13,11 +13,11 @@ import (
 type GetEndpointsResponse struct {
 	TypeID *datatypes.ExpandedNodeID
 	*ResponseHeader
-	Endpoints *EndpointDescriptionArray
+	Endpoints *datatypes.EndpointDescriptionArray
 }
 
 // NewGetEndpointsResponse creates an GetEndpointsResponse.
-func NewGetEndpointsResponse(resHeader *ResponseHeader, endpoints ...*EndpointDescription) *GetEndpointsResponse {
+func NewGetEndpointsResponse(resHeader *ResponseHeader, endpoints ...*datatypes.EndpointDescription) *GetEndpointsResponse {
 	return &GetEndpointsResponse{
 		TypeID: datatypes.NewExpandedNodeID(
 			false, false,
@@ -27,7 +27,7 @@ func NewGetEndpointsResponse(resHeader *ResponseHeader, endpoints ...*EndpointDe
 			"", 0,
 		),
 		ResponseHeader: resHeader,
-		Endpoints:      NewEndpointDescriptionArray(endpoints),
+		Endpoints:      datatypes.NewEndpointDescriptionArray(endpoints),
 	}
 }
 
@@ -60,7 +60,7 @@ func (g *GetEndpointsResponse) DecodeFromBytes(b []byte) error {
 	}
 	offset += g.ResponseHeader.Len() - len(g.ResponseHeader.Payload)
 
-	g.Endpoints = &EndpointDescriptionArray{}
+	g.Endpoints = &datatypes.EndpointDescriptionArray{}
 	if err := g.Endpoints.DecodeFromBytes(b[offset:]); err != nil {
 		return err
 	}

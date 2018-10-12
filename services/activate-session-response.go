@@ -27,11 +27,11 @@ type ActivateSessionResponse struct {
 	*ResponseHeader
 	ServerNonce     *datatypes.ByteString
 	Results         *datatypes.Uint32Array
-	DiagnosticInfos *DiagnosticInfoArray
+	DiagnosticInfos *datatypes.DiagnosticInfoArray
 }
 
 // NewActivateSessionResponse creates a new NewActivateSessionResponse.
-func NewActivateSessionResponse(resHeader *ResponseHeader, nonce []byte, results []uint32, diags []*DiagnosticInfo) *ActivateSessionResponse {
+func NewActivateSessionResponse(resHeader *ResponseHeader, nonce []byte, results []uint32, diags []*datatypes.DiagnosticInfo) *ActivateSessionResponse {
 	return &ActivateSessionResponse{
 		TypeID: datatypes.NewExpandedNodeID(
 			false, false,
@@ -43,7 +43,7 @@ func NewActivateSessionResponse(resHeader *ResponseHeader, nonce []byte, results
 		ResponseHeader:  resHeader,
 		ServerNonce:     datatypes.NewByteString(nonce),
 		Results:         datatypes.NewUint32Array(results),
-		DiagnosticInfos: NewDiagnosticInfoArray(diags),
+		DiagnosticInfos: datatypes.NewDiagnosticInfoArray(diags),
 	}
 }
 
@@ -85,7 +85,7 @@ func (a *ActivateSessionResponse) DecodeFromBytes(b []byte) error {
 	}
 	offset += a.Results.Len()
 
-	a.DiagnosticInfos = &DiagnosticInfoArray{}
+	a.DiagnosticInfos = &datatypes.DiagnosticInfoArray{}
 	return a.DiagnosticInfos.DecodeFromBytes(b[offset:])
 }
 

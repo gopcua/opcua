@@ -20,11 +20,11 @@ type WriteResponse struct {
 	TypeID *datatypes.ExpandedNodeID
 	*ResponseHeader
 	Results         *datatypes.Uint32Array
-	DiagnosticInfos *DiagnosticInfoArray
+	DiagnosticInfos *datatypes.DiagnosticInfoArray
 }
 
 // NewWriteResponse creates a new WriteResponse.
-func NewWriteResponse(resHeader *ResponseHeader, diags []*DiagnosticInfo, results ...uint32) *WriteResponse {
+func NewWriteResponse(resHeader *ResponseHeader, diags []*datatypes.DiagnosticInfo, results ...uint32) *WriteResponse {
 	return &WriteResponse{
 		TypeID: datatypes.NewExpandedNodeID(
 			false, false,
@@ -33,7 +33,7 @@ func NewWriteResponse(resHeader *ResponseHeader, diags []*DiagnosticInfo, result
 		),
 		ResponseHeader:  resHeader,
 		Results:         datatypes.NewUint32Array(results),
-		DiagnosticInfos: NewDiagnosticInfoArray(diags),
+		DiagnosticInfos: datatypes.NewDiagnosticInfoArray(diags),
 	}
 }
 
@@ -68,7 +68,7 @@ func (w *WriteResponse) DecodeFromBytes(b []byte) error {
 	}
 	offset += w.Results.Len()
 
-	w.DiagnosticInfos = &DiagnosticInfoArray{}
+	w.DiagnosticInfos = &datatypes.DiagnosticInfoArray{}
 	return w.DiagnosticInfos.DecodeFromBytes(b[offset:])
 }
 

@@ -66,7 +66,7 @@ func TestSerializeResponseHeader(t *testing.T) {
 		time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
 		1,
 		0x00000000,
-		NewDiagnosticInfo(
+		datatypes.NewDiagnosticInfo(
 			false, false, false, false, false, false, false,
 			0, 0, 0, 0, nil, 0, nil,
 		),

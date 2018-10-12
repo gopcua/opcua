@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/wmnsk/gopcua/datatypes"
 	"github.com/wmnsk/gopcua/errors"
 	"github.com/wmnsk/gopcua/services"
 	"github.com/wmnsk/gopcua/status"
@@ -448,7 +449,7 @@ func (s *SecureChannel) OpenSecureChannelResponse(code uint32) error {
 	nonce := make([]byte, 32)
 	rand.Read(nonce)
 	osc, err := New(services.NewOpenSecureChannelResponse(
-		s.resHeader, 0, services.NewChannelSecurityToken(
+		s.resHeader, 0, datatypes.NewChannelSecurityToken(
 			s.cfg.SecureChannelID, s.cfg.SecurityTokenID, time.Now(), s.cfg.Lifetime,
 		), nonce,
 	), s.cfg).Serialize()
@@ -516,7 +517,7 @@ func (s *SecureChannel) GetEndpointsRequest(locales, uris []string) error {
 // GetEndpointsResponse sends GetEndpointsResponse on top of UASC to SecureChannel.
 //
 // XXX - This is to be improved with some external configuration to describe endpoints infomation in the future release.
-func (s *SecureChannel) GetEndpointsResponse(code uint32, endpoints ...*services.EndpointDescription) error {
+func (s *SecureChannel) GetEndpointsResponse(code uint32, endpoints ...*datatypes.EndpointDescription) error {
 	s.cfg.SequenceNumber++
 	s.resHeader.ServiceResult = code
 	s.resHeader.Timestamp = time.Now()
@@ -554,7 +555,7 @@ func (s *SecureChannel) FindServersRequest(locales []string, servers ...string) 
 // FindServersResponse sends FindServersResponse on top of UASC to SecureChannel.
 //
 // XXX - This is to be improved with some external configuration to describe application infomation in the future release.
-func (s *SecureChannel) FindServersResponse(code uint32, apps ...*services.ApplicationDescription) error {
+func (s *SecureChannel) FindServersResponse(code uint32, apps ...*datatypes.ApplicationDescription) error {
 	s.cfg.SequenceNumber++
 	s.resHeader.ServiceResult = code
 	s.resHeader.Timestamp = time.Now()

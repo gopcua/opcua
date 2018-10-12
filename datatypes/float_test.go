@@ -25,75 +25,52 @@ var opt = cmp.Comparer(func(x, y float32) bool {
 	return delta/mean < 0.00001
 })
 
-func TestNewFloat(t *testing.T) {
-	f := NewFloat(5.00078)
-	expected := &Float{
-		Value: 5.00078,
-	}
-	if diff := cmp.Diff(f, expected); diff != "" {
-		t.Error(diff)
-	}
+var floatCases = []struct {
+	description string
+	structured  *Float
+	serialized  []byte
+}{
+	{
+		"normal",
+		NewFloat(5.00078),
+		[]byte{
+			0x64, 0x06, 0xa0, 0x40,
+		},
+	},
 }
 
 func TestDecodeFloat(t *testing.T) {
-	b := []byte{0x64, 0x06, 0xa0, 0x40}
-	f, err := DecodeFloat(b)
-	if err != nil {
-		t.Fatal(err)
-	}
-	expected := &Float{
-		Value: 5.00078,
-	}
-	if diff := cmp.Diff(f, expected, opt); diff != "" {
-		t.Error(diff)
+	for _, c := range floatCases {
+		got, err := DecodeFloat(c.serialized)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if diff := cmp.Diff(got, c.structured, opt); diff != "" {
+			t.Errorf("%s failed\n%s", c.description, diff)
+		}
 	}
 }
 
-func TestFloatDecodeFromBytes(t *testing.T) {
-	f := &Float{}
-	b := []byte{0x64, 0x06, 0xa0, 0x40}
-	if err := f.DecodeFromBytes(b); err != nil {
-		t.Fatal(err)
-	}
-	expected := &Float{
-		Value: 5.00078,
-	}
-	if diff := cmp.Diff(f, expected, opt); diff != "" {
-		t.Error(diff)
-	}
-}
+func TestSerializeFloat(t *testing.T) {
+	for _, c := range floatCases {
+		got, err := c.structured.Serialize()
+		if err != nil {
+			t.Fatal(err)
+		}
 
-func TestFloatSerialize(t *testing.T) {
-	f := &Float{
-		Value: 5.00078,
-	}
-	b, err := f.Serialize()
-	if err != nil {
-		t.Fatal(err)
-	}
-	expected := []byte{0x64, 0x06, 0xa0, 0x40}
-	if diff := cmp.Diff(b, expected); diff != "" {
-		t.Error(diff)
-	}
-}
-
-func TestFloatSerializeTo(t *testing.T) {
-	f := &Float{
-		Value: 5.00078,
-	}
-	b := make([]byte, f.Len())
-	if err := f.SerializeTo(b); err != nil {
-		t.Fatal(err)
-	}
-	expected := []byte{0x64, 0x06, 0xa0, 0x40}
-	if diff := cmp.Diff(b, expected); diff != "" {
-		t.Error(diff)
+		if diff := cmp.Diff(got, c.serialized); diff != "" {
+			t.Errorf("%s failed\n%s", c.description, diff)
+		}
 	}
 }
 
 func TestFloatLen(t *testing.T) {
-	f := &Float{}
-	if f.Len() != 4 {
-		t.Errorf("Len doesn't match. Want: %d, Got: %d", 4, f.Len())
+	for _, c := range floatCases {
+		got := c.structured.Len()
+
+		if diff := cmp.Diff(got, len(c.serialized)); diff != "" {
+			t.Errorf("%s failed\n%s", c.description, diff)
+		}
 	}
 }

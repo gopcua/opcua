@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/wmnsk/gopcua/datatypes"
 )
 
 var openSecureChannelResponseCases = []struct {
@@ -21,10 +22,10 @@ var openSecureChannelResponseCases = []struct {
 		NewOpenSecureChannelResponse(
 			NewResponseHeader(
 				time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-				1, 0, NewNullDiagnosticInfo(), []string{}, NewNullAdditionalHeader(), nil,
+				1, 0, datatypes.NewNullDiagnosticInfo(), []string{}, NewNullAdditionalHeader(), nil,
 			),
 			0,
-			NewChannelSecurityToken(
+			datatypes.NewChannelSecurityToken(
 				1, 2, time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC), 6000000,
 			),
 			[]byte{0xff},

@@ -10,113 +10,71 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
-func TestDecodeUint32Array(t *testing.T) {
-	cases := []struct {
-		input []byte
-		want  *Uint32Array
-	}{
-		{ // No contents
-			[]byte{
-				0x00, 0x00, 0x00, 0x00,
-			},
-			NewUint32Array(nil),
+var uint32ArrayCases = []struct {
+	description string
+	structured  *Uint32Array
+	serialized  []byte
+}{
+	{
+		"No contents",
+		NewUint32Array(nil),
+		[]byte{
+			0x00, 0x00, 0x00, 0x00,
 		},
-		{ // 1 value
-			[]byte{
-				0x01, 0x00, 0x00, 0x00,
-				0x01, 0x00, 0x00, 0x00,
-			},
-			NewUint32Array([]uint32{1}),
+	},
+	{
+		"1 value",
+		NewUint32Array([]uint32{1}),
+		[]byte{
+			0x01, 0x00, 0x00, 0x00,
+			0x01, 0x00, 0x00, 0x00,
 		},
-		{ // 4 values
-			[]byte{
-				0x04, 0x00, 0x00, 0x00,
-				0x01, 0x00, 0x00, 0x00,
-				0x02, 0x00, 0x00, 0x00,
-				0x03, 0x00, 0x00, 0x00,
-				0x04, 0x00, 0x00, 0x00,
-			},
-			NewUint32Array([]uint32{1, 2, 3, 4}),
+	},
+	{
+		"4 values",
+		NewUint32Array([]uint32{1, 2, 3, 4}),
+		[]byte{
+			0x04, 0x00, 0x00, 0x00,
+			0x01, 0x00, 0x00, 0x00,
+			0x02, 0x00, 0x00, 0x00,
+			0x03, 0x00, 0x00, 0x00,
+			0x04, 0x00, 0x00, 0x00,
 		},
-	}
+	},
+}
 
-	for i, c := range cases {
-		got, err := DecodeUint32Array(c.input)
+func TestDecodeUint32Array(t *testing.T) {
+	for _, c := range uint32ArrayCases {
+		got, err := DecodeUint32Array(c.serialized)
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		if diff := cmp.Diff(got, c.want); diff != "" {
-			t.Errorf("case #%d failed\n%s", i, diff)
+		if diff := cmp.Diff(got, c.structured); diff != "" {
+			t.Errorf("%s failed\n%s", c.description, diff)
 		}
 	}
 }
 
 func TestSerializeUint32Array(t *testing.T) {
-	cases := []struct {
-		input *Uint32Array
-		want  []byte
-	}{
-		{ // No contents
-			NewUint32Array(nil),
-			[]byte{
-				0x00, 0x00, 0x00, 0x00,
-			},
-		},
-		{ // 1 value
-			NewUint32Array([]uint32{1}),
-			[]byte{
-				0x01, 0x00, 0x00, 0x00,
-				0x01, 0x00, 0x00, 0x00,
-			},
-		},
-		{ // 4 values
-			NewUint32Array([]uint32{1, 2, 3, 4}),
-			[]byte{
-				0x04, 0x00, 0x00, 0x00,
-				0x01, 0x00, 0x00, 0x00,
-				0x02, 0x00, 0x00, 0x00,
-				0x03, 0x00, 0x00, 0x00,
-				0x04, 0x00, 0x00, 0x00,
-			},
-		},
-	}
-
-	for i, c := range cases {
-		got, err := c.input.Serialize()
+	for _, c := range uint32ArrayCases {
+		got, err := c.structured.Serialize()
 		if err != nil {
 			t.Fatal(err)
 		}
 
-		if diff := cmp.Diff(got, c.want); diff != "" {
-			t.Errorf("case #%d failed\n%s", i, diff)
+		if diff := cmp.Diff(got, c.serialized); diff != "" {
+			t.Errorf("%s failed\n%s", c.description, diff)
 		}
 	}
 }
 
 func TestUint32ArrayLen(t *testing.T) {
-	cases := []struct {
-		input *Uint32Array
-		want  int
-	}{
-		{ // No contents
-			NewUint32Array(nil),
-			4,
-		},
-		{ // 1 value
-			NewUint32Array([]uint32{1}),
-			8,
-		},
-		{ // 4 values
-			NewUint32Array([]uint32{1, 2, 3, 4}),
-			20,
-		},
-	}
+	for _, c := range uint32ArrayCases {
+		got := c.structured.Len()
 
-	for i, c := range cases {
-		got := c.input.Len()
-		if diff := cmp.Diff(got, c.want); diff != "" {
-			t.Errorf("case #%d failed\n%s", i, diff)
+		if diff := cmp.Diff(got, len(c.serialized)); diff != "" {
+			t.Errorf("%s failed\n%s", c.description, diff)
 		}
 	}
 }

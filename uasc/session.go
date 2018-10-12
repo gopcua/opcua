@@ -22,13 +22,13 @@ import (
 type SessionConfig struct {
 	SessionTimeout                                         uint64
 	AuthenticationToken                                    datatypes.NodeID
-	ClientDescription                                      *services.ApplicationDescription
-	ServerEndpoints                                        []*services.EndpointDescription
-	ClientSignature, ServerSignature                       *services.SignatureData
-	ClientSoftwareCertificates, ServerSoftwareCertificates []*services.SignedSoftwareCertificate
+	ClientDescription                                      *datatypes.ApplicationDescription
+	ServerEndpoints                                        []*datatypes.EndpointDescription
+	ClientSignature, ServerSignature                       *datatypes.SignatureData
+	ClientSoftwareCertificates, ServerSoftwareCertificates []*datatypes.SignedSoftwareCertificate
 	LocaleIDs                                              []string
 	UserIdentityToken                                      datatypes.UserIdentityToken
-	UserTokenSignature                                     *services.SignatureData
+	UserTokenSignature                                     *datatypes.SignatureData
 }
 
 // Session is an implementation of the net.Conn interface for Session in OPC UA Secure Conversation.
@@ -476,8 +476,8 @@ func (s *Session) ActivateSessionResponse(results ...uint32) error {
 		return err
 	}
 	asr, err := services.NewActivateSessionResponse(
-		s.secChan.resHeader, nonce, results, []*services.DiagnosticInfo{
-			services.NewNullDiagnosticInfo(),
+		s.secChan.resHeader, nonce, results, []*datatypes.DiagnosticInfo{
+			datatypes.NewNullDiagnosticInfo(),
 		},
 	).Serialize()
 	if err != nil {

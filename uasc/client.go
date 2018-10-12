@@ -47,7 +47,7 @@ func openSecureChannel(ctx context.Context, transportConn net.Conn, cfg *Config,
 			0xffff, "", services.NewNullAdditionalHeader(), nil,
 		),
 		resHeader: services.NewResponseHeader(
-			time.Time{}, 0, 0, services.NewNullDiagnosticInfo(),
+			time.Time{}, 0, 0, datatypes.NewNullDiagnosticInfo(),
 			[]string{}, services.NewNullAdditionalHeader(), nil,
 		),
 		cfg:     cfg,
@@ -90,17 +90,17 @@ func openSecureChannel(ctx context.Context, transportConn net.Conn, cfg *Config,
 func NewSessionConfigClient(locales []string, userToken datatypes.UserIdentityToken) *SessionConfig {
 	return &SessionConfig{
 		SessionTimeout: 0xffff,
-		ClientDescription: services.NewApplicationDescription(
+		ClientDescription: datatypes.NewApplicationDescription(
 			"urn:gopcua:client", "urn:gopcua", "gopcua - OPC UA implementation in pure Golang",
-			services.AppTypeClient, "", "", []string{""},
+			datatypes.AppTypeClient, "", "", []string{""},
 		),
-		ClientSignature: services.NewSignatureData("", nil),
-		ClientSoftwareCertificates: []*services.SignedSoftwareCertificate{
-			services.NewSignedSoftwareCertificate(nil, nil),
+		ClientSignature: datatypes.NewSignatureData("", nil),
+		ClientSoftwareCertificates: []*datatypes.SignedSoftwareCertificate{
+			datatypes.NewSignedSoftwareCertificate(nil, nil),
 		},
 		LocaleIDs:          locales,
 		UserIdentityToken:  userToken,
-		UserTokenSignature: services.NewSignatureData("", nil),
+		UserTokenSignature: datatypes.NewSignatureData("", nil),
 	}
 }
 

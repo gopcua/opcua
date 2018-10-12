@@ -23,15 +23,15 @@ import (
 type ActivateSessionRequest struct {
 	TypeID *datatypes.ExpandedNodeID
 	*RequestHeader
-	ClientSignature            *SignatureData
-	ClientSoftwareCertificates *SignedSoftwareCertificateArray
+	ClientSignature            *datatypes.SignatureData
+	ClientSoftwareCertificates *datatypes.SignedSoftwareCertificateArray
 	LocaleIDs                  *datatypes.StringArray
 	UserIdentityToken          *datatypes.ExtensionObject
-	UserTokenSignature         *SignatureData
+	UserTokenSignature         *datatypes.SignatureData
 }
 
 // NewActivateSessionRequest creates a new ActivateSessionRequest.
-func NewActivateSessionRequest(reqHeader *RequestHeader, sig *SignatureData, certs []*SignedSoftwareCertificate, locales []string, userToken datatypes.UserIdentityToken, tokenSig *SignatureData) *ActivateSessionRequest {
+func NewActivateSessionRequest(reqHeader *RequestHeader, sig *datatypes.SignatureData, certs []*datatypes.SignedSoftwareCertificate, locales []string, userToken datatypes.UserIdentityToken, tokenSig *datatypes.SignatureData) *ActivateSessionRequest {
 	return &ActivateSessionRequest{
 		TypeID: datatypes.NewExpandedNodeID(
 			false, false,
@@ -42,7 +42,7 @@ func NewActivateSessionRequest(reqHeader *RequestHeader, sig *SignatureData, cer
 		),
 		RequestHeader:              reqHeader,
 		ClientSignature:            sig,
-		ClientSoftwareCertificates: NewSignedSoftwareCertificateArray(certs),
+		ClientSoftwareCertificates: datatypes.NewSignedSoftwareCertificateArray(certs),
 		LocaleIDs:                  datatypes.NewStringArray(locales),
 		UserIdentityToken:          datatypes.NewExtensionObject(0x01, userToken),
 		UserTokenSignature:         tokenSig,
@@ -78,14 +78,14 @@ func (a *ActivateSessionRequest) DecodeFromBytes(b []byte) error {
 	offset += a.RequestHeader.Len() - len(a.RequestHeader.Payload)
 
 	// client signature
-	a.ClientSignature = &SignatureData{}
+	a.ClientSignature = &datatypes.SignatureData{}
 	if err := a.ClientSignature.DecodeFromBytes(b[offset:]); err != nil {
 		return err
 	}
 	offset += a.ClientSignature.Len()
 
 	// client software certificates
-	a.ClientSoftwareCertificates = &SignedSoftwareCertificateArray{}
+	a.ClientSoftwareCertificates = &datatypes.SignedSoftwareCertificateArray{}
 	if err := a.ClientSoftwareCertificates.DecodeFromBytes(b[offset:]); err != nil {
 		return err
 	}
@@ -106,7 +106,7 @@ func (a *ActivateSessionRequest) DecodeFromBytes(b []byte) error {
 	offset += a.UserIdentityToken.Len()
 
 	// user token signature
-	a.UserTokenSignature = &SignatureData{}
+	a.UserTokenSignature = &datatypes.SignatureData{}
 	return a.UserTokenSignature.DecodeFromBytes(b[offset:])
 }
 

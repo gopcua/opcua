@@ -2,13 +2,12 @@
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
-package services
+package datatypes
 
 import (
 	"encoding/binary"
 	"fmt"
 
-	"github.com/wmnsk/gopcua/datatypes"
 	"github.com/wmnsk/gopcua/errors"
 )
 
@@ -16,15 +15,15 @@ import (
 //
 // Specification: Part 4, 7.33
 type SignedSoftwareCertificate struct {
-	CertificateData *datatypes.ByteString
-	Signature       *datatypes.ByteString
+	CertificateData *ByteString
+	Signature       *ByteString
 }
 
 // NewSignedSoftwareCertificate creates a new SignedSoftwareCertificate.
 func NewSignedSoftwareCertificate(cert, signature []byte) *SignedSoftwareCertificate {
 	return &SignedSoftwareCertificate{
-		CertificateData: datatypes.NewByteString(cert),
-		Signature:       datatypes.NewByteString(signature),
+		CertificateData: NewByteString(cert),
+		Signature:       NewByteString(signature),
 	}
 }
 
@@ -44,13 +43,13 @@ func (s *SignedSoftwareCertificate) DecodeFromBytes(b []byte) error {
 		return errors.NewErrTooShortToDecode(s, "should be longer than 8 bytes.")
 	}
 	var offset = 0
-	s.CertificateData = &datatypes.ByteString{}
+	s.CertificateData = &ByteString{}
 	if err := s.CertificateData.DecodeFromBytes(b[offset:]); err != nil {
 		return err
 	}
 	offset += s.CertificateData.Len()
 
-	s.Signature = &datatypes.ByteString{}
+	s.Signature = &ByteString{}
 	return s.Signature.DecodeFromBytes(b[offset:])
 }
 
@@ -96,7 +95,7 @@ func (s *SignedSoftwareCertificate) Len() int {
 	return l
 }
 
-// datatypes.ByteString returns SignedSoftwareCertificate in string.
+// ByteString returns SignedSoftwareCertificate in string.
 func (s *SignedSoftwareCertificate) String() string {
 	return fmt.Sprintf("%x, %x", s.CertificateData, s.Signature)
 }

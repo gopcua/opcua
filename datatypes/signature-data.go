@@ -2,12 +2,11 @@
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
-package services
+package datatypes
 
 import (
 	"fmt"
 
-	"github.com/wmnsk/gopcua/datatypes"
 	"github.com/wmnsk/gopcua/errors"
 )
 
@@ -15,15 +14,15 @@ import (
 //
 // Specification: Part 4, 7.32
 type SignatureData struct {
-	Algorithm *datatypes.String
-	Signature *datatypes.ByteString
+	Algorithm *String
+	Signature *ByteString
 }
 
 // NewSignatureData creates a new SignatureData.
 func NewSignatureData(algorithm string, signature []byte) *SignatureData {
 	return &SignatureData{
-		Algorithm: datatypes.NewString(algorithm),
-		Signature: datatypes.NewByteString(signature),
+		Algorithm: NewString(algorithm),
+		Signature: NewByteString(signature),
 	}
 }
 
@@ -43,13 +42,13 @@ func (s *SignatureData) DecodeFromBytes(b []byte) error {
 		return errors.NewErrTooShortToDecode(s, "should be longer than 8 bytes.")
 	}
 	var offset = 0
-	s.Algorithm = &datatypes.String{}
+	s.Algorithm = &String{}
 	if err := s.Algorithm.DecodeFromBytes(b[offset:]); err != nil {
 		return err
 	}
 	offset += s.Algorithm.Len()
 
-	s.Signature = &datatypes.ByteString{}
+	s.Signature = &ByteString{}
 	return s.Signature.DecodeFromBytes(b[offset:])
 }
 
@@ -95,7 +94,7 @@ func (s *SignatureData) Len() int {
 	return l
 }
 
-// datatypes.String returns SignatureData in string.
+// String returns SignatureData in string.
 func (s *SignatureData) String() string {
 	return fmt.Sprintf("%s, %x", s.Algorithm, s.Signature)
 }

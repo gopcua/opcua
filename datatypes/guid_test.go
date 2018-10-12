@@ -6,42 +6,57 @@ package datatypes
 
 import (
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 )
 
-var testGIUDBytes = [][]byte{
-	{ // OK
-		0xbb, 0xbb, 0xaa, 0xaa, 0xdd, 0xcc, 0xff, 0xee,
-		0xab, 0x89, 0x67, 0x45, 0x23, 0x01, 0x01, 0x01,
-	},
-	{ // Too short
-		0xaa, 0xaa, 0xbb, 0xbb, 0xcc, 0xdd, 0xee, 0xff,
+var guidCases = []struct {
+	description string
+	structured  *GUID
+	serialized  []byte
+}{
+	{
+		"ok",
+		NewGUID("AAAABBBB-CCDD-EEFF-0101-0123456789AB"),
+		[]byte{
+			0xbb, 0xbb, 0xaa, 0xaa, 0xdd, 0xcc, 0xff, 0xee,
+			0xab, 0x89, 0x67, 0x45, 0x23, 0x01, 0x01, 0x01,
+		},
 	},
 }
 
 func TestDecodeGUID(t *testing.T) {
-	g, err := DecodeGUID(testGIUDBytes[0])
-	if err != nil {
-		t.Fatalf("Failed to decode GUID: %s", err)
-	}
+	for _, c := range guidCases {
+		got, err := DecodeGUID(c.serialized)
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	if g.String() != "AAAABBBB-CCDD-EEFF-0101-0123456789AB" {
-		t.Errorf("Error decoding GUID: Want: %s, Got: %s", "AAAABBBB-CCDD-EEFF-0101-0123456789AB", g.String())
+		if diff := cmp.Diff(got, c.structured); diff != "" {
+			t.Errorf("%s failed\n%s", c.description, diff)
+		}
 	}
 }
 
 func TestSerializeGUID(t *testing.T) {
-	g := NewGUID("AAAABBBB-CCDD-EEFF-0101-0123456789AB")
+	for _, c := range guidCases {
+		got, err := c.structured.Serialize()
+		if err != nil {
+			t.Fatal(err)
+		}
 
-	serialized, err := g.Serialize()
-	if err != nil {
-		t.Fatalf("Failed to serialize GUID: %s", err)
-	}
-
-	for i, s := range serialized {
-		x := testGIUDBytes[0][i]
-		if s != x {
-			t.Errorf("Bytes doesn't match. Want: %#x, Got: %#x at %dth", x, s, i)
+		if diff := cmp.Diff(got, c.serialized); diff != "" {
+			t.Errorf("%s failed\n%s", c.description, diff)
 		}
 	}
-	t.Logf("%x", serialized)
+}
+
+func TestGUIDLen(t *testing.T) {
+	for _, c := range guidCases {
+		got := c.structured.Len()
+
+		if diff := cmp.Diff(got, len(c.serialized)); diff != "" {
+			t.Errorf("%s failed\n%s", c.description, diff)
+		}
+	}
 }

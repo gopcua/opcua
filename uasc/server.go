@@ -24,7 +24,7 @@ func ListenAndAcceptSecureChannel(ctx context.Context, transport net.Conn, cfg *
 			0xffff, "", services.NewNullAdditionalHeader(), nil,
 		),
 		resHeader: services.NewResponseHeader(
-			time.Now(), 0, 0, services.NewNullDiagnosticInfo(),
+			time.Now(), 0, 0, datatypes.NewNullDiagnosticInfo(),
 			[]string{}, services.NewNullAdditionalHeader(), nil,
 		),
 		cfg:     cfg,
@@ -49,22 +49,22 @@ func ListenAndAcceptSecureChannel(ctx context.Context, transport net.Conn, cfg *
 }
 
 // NewSessionConfigServer creates a new SessionConfigServer for server.
-func NewSessionConfigServer(secChan *SecureChannel, sigData *services.SignatureData, swCerts []*services.SignedSoftwareCertificate) *SessionConfig {
+func NewSessionConfigServer(secChan *SecureChannel, sigData *datatypes.SignatureData, swCerts []*datatypes.SignedSoftwareCertificate) *SessionConfig {
 	return &SessionConfig{
 		AuthenticationToken:        datatypes.NewFourByteNodeID(0, uint16(time.Now().UnixNano())),
 		SessionTimeout:             0xffff,
 		ServerSignature:            sigData,
 		ServerSoftwareCertificates: swCerts,
-		ServerEndpoints: []*services.EndpointDescription{
-			services.NewEndpointDescription(
-				secChan.LocalEndpoint(), services.NewApplicationDescription(
+		ServerEndpoints: []*datatypes.EndpointDescription{
+			datatypes.NewEndpointDescription(
+				secChan.LocalEndpoint(), datatypes.NewApplicationDescription(
 					"urn:gopcua:client", "urn:gopcua", "gopcua - OPC UA implementation in pure Golang",
-					services.AppTypeServer, "", "", []string{""},
+					datatypes.AppTypeServer, "", "", []string{""},
 				),
 				secChan.cfg.Certificate, secChan.cfg.SecurityMode, secChan.cfg.SecurityPolicyURI,
-				services.NewUserTokenPolicyArray(
-					[]*services.UserTokenPolicy{
-						services.NewUserTokenPolicy("", 0, "", "", ""),
+				datatypes.NewUserTokenPolicyArray(
+					[]*datatypes.UserTokenPolicy{
+						datatypes.NewUserTokenPolicy("", 0, "", "", ""),
 					},
 				), "", 0,
 			),

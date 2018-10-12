@@ -16,11 +16,11 @@ type ReadResponse struct {
 	TypeID *datatypes.ExpandedNodeID
 	*ResponseHeader
 	Results         *datatypes.DataValueArray
-	DiagnosticInfos *DiagnosticInfoArray
+	DiagnosticInfos *datatypes.DiagnosticInfoArray
 }
 
 // NewReadResponse creates a new ReadResponse.
-func NewReadResponse(resHeader *ResponseHeader, diag []*DiagnosticInfo, results ...*datatypes.DataValue) *ReadResponse {
+func NewReadResponse(resHeader *ResponseHeader, diag []*datatypes.DiagnosticInfo, results ...*datatypes.DataValue) *ReadResponse {
 	return &ReadResponse{
 		TypeID: datatypes.NewExpandedNodeID(
 			false, false,
@@ -31,7 +31,7 @@ func NewReadResponse(resHeader *ResponseHeader, diag []*DiagnosticInfo, results 
 		),
 		ResponseHeader:  resHeader,
 		Results:         datatypes.NewDataValueArray(results),
-		DiagnosticInfos: NewDiagnosticInfoArray(diag),
+		DiagnosticInfos: datatypes.NewDiagnosticInfoArray(diag),
 	}
 }
 
@@ -67,7 +67,7 @@ func (r *ReadResponse) DecodeFromBytes(b []byte) error {
 	}
 	offset += r.Results.Len()
 
-	r.DiagnosticInfos = &DiagnosticInfoArray{}
+	r.DiagnosticInfos = &datatypes.DiagnosticInfoArray{}
 	return r.DiagnosticInfos.DecodeFromBytes(b[offset:])
 }
 

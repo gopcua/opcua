@@ -6,30 +6,37 @@ package datatypes
 
 import (
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 )
 
-var booleanCases = []struct {
+var channelSecurityTokenCases = []struct {
 	description string
-	structured  *Boolean
+	structured  *ChannelSecurityToken
 	serialized  []byte
 }{
 	{
-		"true",
-		NewBoolean(true),
-		[]byte{0x01},
-	},
-	{
-		"false",
-		NewBoolean(false),
-		[]byte{0x00},
+		"normal",
+		NewChannelSecurityToken(
+			1, 2, time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC), 6000000,
+		),
+		[]byte{
+			// ChannelID
+			0x01, 0x00, 0x00, 0x00,
+			// TokenID
+			0x02, 0x00, 0x00, 0x00,
+			// CreatedAt
+			0x00, 0x98, 0x67, 0xdd, 0xfd, 0x30, 0xd4, 0x01,
+			// RevisedLifetime
+			0x80, 0x8d, 0x5b, 0x00,
+		},
 	},
 }
 
-func TestDecodeBoolean(t *testing.T) {
-	for _, c := range booleanCases {
-		got, err := DecodeBoolean(c.serialized)
+func TestDecodeChannelSecurityToken(t *testing.T) {
+	for _, c := range channelSecurityTokenCases {
+		got, err := DecodeChannelSecurityToken(c.serialized)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -40,8 +47,8 @@ func TestDecodeBoolean(t *testing.T) {
 	}
 }
 
-func TestSerializeBoolean(t *testing.T) {
-	for _, c := range booleanCases {
+func TestSerializeChannelSecurityToken(t *testing.T) {
+	for _, c := range channelSecurityTokenCases {
 		got, err := c.structured.Serialize()
 		if err != nil {
 			t.Fatal(err)
@@ -53,8 +60,8 @@ func TestSerializeBoolean(t *testing.T) {
 	}
 }
 
-func TestBooleanLen(t *testing.T) {
-	for _, c := range booleanCases {
+func TestChannelSecurityTokenLen(t *testing.T) {
+	for _, c := range channelSecurityTokenCases {
 		got := c.structured.Len()
 
 		if diff := cmp.Diff(got, len(c.serialized)); diff != "" {

@@ -28,8 +28,8 @@ var createSessionRequestCases = []struct {
 				time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
 				1, 0, 0, "", NewNullAdditionalHeader(), nil,
 			),
-			NewApplicationDescription(
-				"app-uri", "prod-uri", "app-name", AppTypeClient,
+			datatypes.NewApplicationDescription(
+				"app-uri", "prod-uri", "app-name", datatypes.AppTypeClient,
 				"gw-uri", "profile-uri", []string{"1", "2"},
 			),
 			"server-uri", "endpoint-url", "session-name", nil,

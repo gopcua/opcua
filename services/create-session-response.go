@@ -23,14 +23,14 @@ type CreateSessionResponse struct {
 	RevisedSessionTimeout      uint64
 	ServerNonce                *datatypes.ByteString
 	ServerCertificate          *datatypes.ByteString
-	ServerEndpoints            *EndpointDescriptionArray
-	ServerSoftwareCertificates *SignedSoftwareCertificateArray
-	ServerSignature            *SignatureData
+	ServerEndpoints            *datatypes.EndpointDescriptionArray
+	ServerSoftwareCertificates *datatypes.SignedSoftwareCertificateArray
+	ServerSignature            *datatypes.SignatureData
 	MaxRequestMessageSize      uint32
 }
 
 // NewCreateSessionResponse creates a new NewCreateSessionResponse with the given parameters.
-func NewCreateSessionResponse(resHeader *ResponseHeader, sessionID, authToken datatypes.NodeID, timeout uint64, nonce, cert []byte, singedCert []*SignedSoftwareCertificate, svrSignature *SignatureData, maxRespSize uint32, endpoints ...*EndpointDescription) *CreateSessionResponse {
+func NewCreateSessionResponse(resHeader *ResponseHeader, sessionID, authToken datatypes.NodeID, timeout uint64, nonce, cert []byte, singedCert []*datatypes.SignedSoftwareCertificate, svrSignature *datatypes.SignatureData, maxRespSize uint32, endpoints ...*datatypes.EndpointDescription) *CreateSessionResponse {
 	return &CreateSessionResponse{
 		TypeID: datatypes.NewExpandedNodeID(
 			false, false,
@@ -43,8 +43,8 @@ func NewCreateSessionResponse(resHeader *ResponseHeader, sessionID, authToken da
 		RevisedSessionTimeout:      timeout,
 		ServerNonce:                datatypes.NewByteString(nonce),
 		ServerCertificate:          datatypes.NewByteString(cert),
-		ServerEndpoints:            NewEndpointDescriptionArray(endpoints),
-		ServerSoftwareCertificates: NewSignedSoftwareCertificateArray(singedCert),
+		ServerEndpoints:            datatypes.NewEndpointDescriptionArray(endpoints),
+		ServerSoftwareCertificates: datatypes.NewSignedSoftwareCertificateArray(singedCert),
 		ServerSignature:            svrSignature,
 		MaxRequestMessageSize:      maxRespSize,
 	}
@@ -108,19 +108,19 @@ func (c *CreateSessionResponse) DecodeFromBytes(b []byte) error {
 	}
 	offset += c.ServerCertificate.Len()
 
-	c.ServerEndpoints = &EndpointDescriptionArray{}
+	c.ServerEndpoints = &datatypes.EndpointDescriptionArray{}
 	if err := c.ServerEndpoints.DecodeFromBytes(b[offset:]); err != nil {
 		return err
 	}
 	offset += c.ServerEndpoints.Len()
 
-	c.ServerSoftwareCertificates = &SignedSoftwareCertificateArray{}
+	c.ServerSoftwareCertificates = &datatypes.SignedSoftwareCertificateArray{}
 	if err := c.ServerSoftwareCertificates.DecodeFromBytes(b[offset:]); err != nil {
 		return err
 	}
 	offset += c.ServerSoftwareCertificates.Len()
 
-	c.ServerSignature = &SignatureData{}
+	c.ServerSignature = &datatypes.SignatureData{}
 	if err := c.ServerSignature.DecodeFromBytes(b[offset:]); err != nil {
 		return err
 	}

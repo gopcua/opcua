@@ -2,13 +2,11 @@
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
-package services
+package datatypes
 
 import (
 	"encoding/binary"
 	"fmt"
-
-	"github.com/wmnsk/gopcua/datatypes"
 )
 
 // DiagnosticInfo represents the DiagnosticInfo.
@@ -20,13 +18,13 @@ type DiagnosticInfo struct {
 	NamespaceURI        int32
 	Locale              int32
 	LocalizedText       int32
-	AdditionalInfo      *datatypes.String
+	AdditionalInfo      *String
 	InnerStatusCode     uint32
 	InnerDiagnosticInfo *DiagnosticInfo
 }
 
 // NewDiagnosticInfo creates a new DiagnosticInfo.
-func NewDiagnosticInfo(hasSymID, hasURI, hasText, hasLocale, hasInfo, hasInnerStatus, hasInnerDiag bool, symID, uri, locale, text int32, info *datatypes.String, code uint32, diag *DiagnosticInfo) *DiagnosticInfo {
+func NewDiagnosticInfo(hasSymID, hasURI, hasText, hasLocale, hasInfo, hasInnerStatus, hasInnerDiag bool, symID, uri, locale, text int32, info *String, code uint32, diag *DiagnosticInfo) *DiagnosticInfo {
 	d := &DiagnosticInfo{
 		SymbolicID:          symID,
 		NamespaceURI:        uri,
@@ -101,7 +99,7 @@ func (d *DiagnosticInfo) DecodeFromBytes(b []byte) error {
 		offset += 4
 	}
 	if d.HasAdditionalInfo() {
-		d.AdditionalInfo = &datatypes.String{}
+		d.AdditionalInfo = &String{}
 		if err := d.AdditionalInfo.DecodeFromBytes(b[offset:]); err != nil {
 			return err
 		}
@@ -274,7 +272,7 @@ func (d *DiagnosticInfo) SetInnerDiagnosticInfoFlag() {
 	d.EncodingMask |= 0x40
 }
 
-// datatypes.String returns DiagnosticInfo in string.
+// String returns DiagnosticInfo in string.
 func (d *DiagnosticInfo) String() string {
 	var str []string
 	str = append(str, fmt.Sprintf("%x", d.EncodingMask))

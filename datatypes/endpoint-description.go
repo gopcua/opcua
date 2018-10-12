@@ -2,13 +2,12 @@
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
-package services
+package datatypes
 
 import (
 	"encoding/binary"
 	"fmt"
 
-	"github.com/wmnsk/gopcua/datatypes"
 	"github.com/wmnsk/gopcua/errors"
 )
 
@@ -16,26 +15,26 @@ import (
 //
 // Specification: Part 4, 7.10
 type EndpointDescription struct {
-	EndpointURL         *datatypes.String
+	EndpointURL         *String
 	Server              *ApplicationDescription
-	ServerCertificate   *datatypes.ByteString
+	ServerCertificate   *ByteString
 	MessageSecurityMode uint32
-	SecurityPolicyURI   *datatypes.String
+	SecurityPolicyURI   *String
 	UserIdentityTokens  *UserTokenPolicyArray
-	TransportProfileURI *datatypes.String
+	TransportProfileURI *String
 	SecurityLevel       uint8
 }
 
 // NewEndpointDescription creates a new NewEndpointDescription.
 func NewEndpointDescription(url string, server *ApplicationDescription, cert []byte, secMode uint32, secURI string, tokens *UserTokenPolicyArray, transportURI string, secLevel uint8) *EndpointDescription {
 	return &EndpointDescription{
-		EndpointURL:         datatypes.NewString(url),
+		EndpointURL:         NewString(url),
 		Server:              server,
-		ServerCertificate:   datatypes.NewByteString(cert),
+		ServerCertificate:   NewByteString(cert),
 		MessageSecurityMode: secMode,
-		SecurityPolicyURI:   datatypes.NewString(secURI),
+		SecurityPolicyURI:   NewString(secURI),
 		UserIdentityTokens:  tokens,
-		TransportProfileURI: datatypes.NewString(transportURI),
+		TransportProfileURI: NewString(transportURI),
 		SecurityLevel:       secLevel,
 	}
 }
@@ -57,7 +56,7 @@ func (e *EndpointDescription) DecodeFromBytes(b []byte) error {
 	}
 
 	var offset = 0
-	e.EndpointURL = &datatypes.String{}
+	e.EndpointURL = &String{}
 	if err := e.EndpointURL.DecodeFromBytes(b[offset:]); err != nil {
 		return err
 	}
@@ -69,7 +68,7 @@ func (e *EndpointDescription) DecodeFromBytes(b []byte) error {
 	}
 	offset += e.Server.Len()
 
-	e.ServerCertificate = &datatypes.ByteString{}
+	e.ServerCertificate = &ByteString{}
 	if err := e.ServerCertificate.DecodeFromBytes(b[offset:]); err != nil {
 		return err
 	}
@@ -78,7 +77,7 @@ func (e *EndpointDescription) DecodeFromBytes(b []byte) error {
 	e.MessageSecurityMode = binary.LittleEndian.Uint32(b[offset : offset+4])
 	offset += 4
 
-	e.SecurityPolicyURI = &datatypes.String{}
+	e.SecurityPolicyURI = &String{}
 	if err := e.SecurityPolicyURI.DecodeFromBytes(b[offset:]); err != nil {
 		return err
 	}
@@ -90,7 +89,7 @@ func (e *EndpointDescription) DecodeFromBytes(b []byte) error {
 	}
 	offset += e.UserIdentityTokens.Len()
 
-	e.TransportProfileURI = &datatypes.String{}
+	e.TransportProfileURI = &String{}
 	if err := e.TransportProfileURI.DecodeFromBytes(b[offset:]); err != nil {
 		return err
 	}

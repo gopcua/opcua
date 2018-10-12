@@ -23,10 +23,10 @@ var readResponseCases = []struct {
 		NewReadResponse(
 			NewResponseHeader(
 				time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-				1, 0, NewNullDiagnosticInfo(), []string{}, NewNullAdditionalHeader(), nil,
+				1, 0, datatypes.NewNullDiagnosticInfo(), []string{}, NewNullAdditionalHeader(), nil,
 			),
-			[]*DiagnosticInfo{
-				NewNullDiagnosticInfo(),
+			[]*datatypes.DiagnosticInfo{
+				datatypes.NewNullDiagnosticInfo(),
 			},
 			datatypes.NewDataValue(
 				true, false, false, false, false, false,

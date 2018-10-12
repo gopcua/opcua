@@ -10,26 +10,36 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
-var booleanCases = []struct {
+var signatureDataCases = []struct {
 	description string
-	structured  *Boolean
+	structured  *SignatureData
 	serialized  []byte
 }{
 	{
-		"true",
-		NewBoolean(true),
-		[]byte{0x01},
+		"empty",
+		NewSignatureData("", nil),
+		[]byte{
+			// Algorithm
+			0xff, 0xff, 0xff, 0xff,
+			// Signature
+			0xff, 0xff, 0xff, 0xff,
+		},
 	},
 	{
-		"false",
-		NewBoolean(false),
-		[]byte{0x00},
+		"dummy-data",
+		NewSignatureData("alg", []byte{0xde, 0xad, 0xbe, 0xef}),
+		[]byte{
+			// Algorithm
+			0x03, 0x00, 0x00, 0x00, 0x61, 0x6c, 0x67,
+			// Signature
+			0x04, 0x00, 0x00, 0x00, 0xde, 0xad, 0xbe, 0xef,
+		},
 	},
 }
 
-func TestDecodeBoolean(t *testing.T) {
-	for _, c := range booleanCases {
-		got, err := DecodeBoolean(c.serialized)
+func TestDecodeSignatureData(t *testing.T) {
+	for _, c := range signatureDataCases {
+		got, err := DecodeSignatureData(c.serialized)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -40,8 +50,8 @@ func TestDecodeBoolean(t *testing.T) {
 	}
 }
 
-func TestSerializeBoolean(t *testing.T) {
-	for _, c := range booleanCases {
+func TestSerializeSignatureData(t *testing.T) {
+	for _, c := range signatureDataCases {
 		got, err := c.structured.Serialize()
 		if err != nil {
 			t.Fatal(err)
@@ -53,8 +63,8 @@ func TestSerializeBoolean(t *testing.T) {
 	}
 }
 
-func TestBooleanLen(t *testing.T) {
-	for _, c := range booleanCases {
+func TestSignatureDataLen(t *testing.T) {
+	for _, c := range signatureDataCases {
 		got := c.structured.Len()
 
 		if diff := cmp.Diff(got, len(c.serialized)); diff != "" {

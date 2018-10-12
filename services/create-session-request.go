@@ -18,7 +18,7 @@ import (
 type CreateSessionRequest struct {
 	TypeID *datatypes.ExpandedNodeID
 	*RequestHeader
-	ClientDescription       *ApplicationDescription
+	ClientDescription       *datatypes.ApplicationDescription
 	ServerURI               *datatypes.String
 	EndpointURL             *datatypes.String
 	SessionName             *datatypes.String
@@ -29,7 +29,7 @@ type CreateSessionRequest struct {
 }
 
 // NewCreateSessionRequest creates a new NewCreateSessionRequest with the given parameters.
-func NewCreateSessionRequest(reqHeader *RequestHeader, appDescr *ApplicationDescription, serverURI, endpoint, sessionName string, nonce, cert []byte, timeout uint64, maxRespSize uint32) *CreateSessionRequest {
+func NewCreateSessionRequest(reqHeader *RequestHeader, appDescr *datatypes.ApplicationDescription, serverURI, endpoint, sessionName string, nonce, cert []byte, timeout uint64, maxRespSize uint32) *CreateSessionRequest {
 	return &CreateSessionRequest{
 		TypeID: datatypes.NewExpandedNodeID(
 			false, false,
@@ -77,7 +77,7 @@ func (c *CreateSessionRequest) DecodeFromBytes(b []byte) error {
 	}
 	offset += c.RequestHeader.Len() - len(c.RequestHeader.Payload)
 
-	c.ClientDescription = &ApplicationDescription{}
+	c.ClientDescription = &datatypes.ApplicationDescription{}
 	if err := c.ClientDescription.DecodeFromBytes(b[offset:]); err != nil {
 		return err
 	}

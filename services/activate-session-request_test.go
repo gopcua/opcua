@@ -28,9 +28,9 @@ var activateSessionRequestCases = []struct {
 				time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
 				1, 0, 0, "", NewNullAdditionalHeader(), nil,
 			),
-			NewSignatureData("", nil), nil, nil,
+			datatypes.NewSignatureData("", nil), nil, nil,
 			datatypes.NewAnonymousIdentityToken("anonymous"),
-			NewSignatureData("", nil),
+			datatypes.NewSignatureData("", nil),
 		),
 		[]byte{
 			// TypeID

@@ -11,119 +11,90 @@ import (
 	"github.com/google/go-cmp/cmp"
 )
 
-var dataValueTests = []struct {
+var dataValueCases = []struct {
 	description string
-	bytes       []byte
-	dv          *DataValue
-	length      int
+	structured  *DataValue
+	serialized  []byte
 }{
 	{
-		description: "value only",
-		bytes:       []byte{0x01, 0x0a, 0x19, 0x04, 0x20, 0x40},
-		dv: &DataValue{
-			EncodingMask: 0x01,
-			Value:        NewVariant(NewFloat(2.50025)),
-		},
-		length: 6,
+		"value only",
+		NewDataValue(
+			true, false, false, false, false, false,
+			NewVariant(NewFloat(2.50025)),
+			0, time.Time{}, 0, time.Time{}, 0,
+		),
+		[]byte{
+			// EncodingMask
+			0x01,
+			// Value(Float)
+			0x0a, 0x19, 0x04, 0x20, 0x40},
 	},
 	{
-		description: "value, source timestamp, server timestamp",
-		bytes: []byte{
-			0x0d, 0x0a, 0xc9, 0x02, 0x20, 0x40, 0x80, 0x3b,
-			0xe8, 0xb3, 0x92, 0x4e, 0xd4, 0x01, 0x80, 0x3b,
-			0xe8, 0xb3, 0x92, 0x4e, 0xd4, 0x01,
+		"value, source timestamp, server timestamp",
+		NewDataValue(
+			true, false, true, false, true, false,
+			NewVariant(NewFloat(2.50017)),
+			0, time.Date(2018, time.September, 17, 14, 28, 29, 112000000, time.UTC),
+			0, time.Date(2018, time.September, 17, 14, 28, 29, 112000000, time.UTC),
+			0,
+		),
+		[]byte{
+			// EncodingMask
+			0x0d,
+			// Value(Float)
+			0x0a, 0xc9, 0x02, 0x20, 0x40,
+			// SourceTimestamp
+			0x80, 0x3b, 0xe8, 0xb3, 0x92, 0x4e, 0xd4, 0x01,
+			// ServerTimestamp
+			0x80, 0x3b, 0xe8, 0xb3, 0x92, 0x4e, 0xd4, 0x01,
 		},
-		dv: &DataValue{
-			EncodingMask:    0x0d,
-			Value:           NewVariant(NewFloat(2.50017)),
-			SourceTimestamp: time.Date(2018, time.September, 17, 14, 28, 29, 112000000, time.UTC),
-			ServerTimestamp: time.Date(2018, time.September, 17, 14, 28, 29, 112000000, time.UTC),
-		},
-		length: 22,
 	},
 }
 
 func TestDecodeDataValue(t *testing.T) {
-	for _, test := range dataValueTests {
-		t.Run(test.description, func(t *testing.T) {
-			v, err := DecodeDataValue(test.bytes)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if diff := cmp.Diff(v, test.dv, opt); diff != "" {
-				t.Error(diff)
-			}
-		})
+	for _, c := range dataValueCases {
+		got, err := DecodeDataValue(c.serialized)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if diff := cmp.Diff(got, c.structured); diff != "" {
+			t.Errorf("%s failed\n%s", c.description, diff)
+		}
 	}
 }
 
-func TestDataValueDecodeFromBytes(t *testing.T) {
-	for _, test := range dataValueTests {
-		t.Run(test.description, func(t *testing.T) {
-			d := &DataValue{}
-			if err := d.DecodeFromBytes(test.bytes); err != nil {
-				t.Fatal(err)
-			}
-			if diff := cmp.Diff(d, test.dv, opt); diff != "" {
-				t.Error(diff)
-			}
-		})
-	}
-}
+func TestSerializeDataValue(t *testing.T) {
+	for _, c := range dataValueCases {
+		got, err := c.structured.Serialize()
+		if err != nil {
+			t.Fatal(err)
+		}
 
-func TestDataValueSerialize(t *testing.T) {
-	for _, test := range dataValueTests {
-		t.Run(test.description, func(t *testing.T) {
-			b, err := test.dv.Serialize()
-			if err != nil {
-				t.Fatal(err)
-			}
-			if diff := cmp.Diff(b, test.bytes); diff != "" {
-				t.Error(diff)
-			}
-		})
-	}
-}
-
-func TestDataValueSerializeTo(t *testing.T) {
-	for _, test := range dataValueTests {
-		t.Run(test.description, func(t *testing.T) {
-			b := make([]byte, test.dv.Len())
-			if err := test.dv.SerializeTo(b); err != nil {
-				t.Fatal(err)
-			}
-			if diff := cmp.Diff(b, test.bytes); diff != "" {
-				t.Error(diff)
-			}
-		})
+		if diff := cmp.Diff(got, c.serialized); diff != "" {
+			t.Errorf("%s failed\n%s", c.description, diff)
+		}
 	}
 }
 
 func TestDataValueLen(t *testing.T) {
-	for _, test := range dataValueTests {
-		t.Run(test.description, func(t *testing.T) {
-			if test.dv.Len() != test.length {
-				t.Errorf("Len doesn't match. Want: %d, Got: %d", test.length, test.dv.Len())
-			}
-		})
+	for _, c := range dataValueCases {
+		got := c.structured.Len()
+
+		if diff := cmp.Diff(got, len(c.serialized)); diff != "" {
+			t.Errorf("%s failed\n%s", c.description, diff)
+		}
 	}
 }
 
-var dataValueArrayTests = []struct {
+var dataValueArrayCases = []struct {
 	description string
-	bytes       []byte
-	dva         *DataValueArray
-	length      int
+	structured  *DataValueArray
+	serialized  []byte
 }{
 	{
-		description: "value only and value, source timestamp, server timestamp",
-		bytes: []byte{
-			0x02, 0x00, 0x00, 0x00, 0x01, 0x0a, 0x19, 0x04,
-			0x20, 0x40, 0x0d, 0x0a, 0xc9, 0x02, 0x20, 0x40, 0x80, 0x3b,
-			0xe8, 0xb3, 0x92, 0x4e, 0xd4, 0x01, 0x80, 0x3b,
-			0xe8, 0xb3, 0x92, 0x4e, 0xd4, 0x01,
-		},
-		dva: NewDataValueArray([]*DataValue{
+		"value only and value, source timestamp, server timestamp",
+		NewDataValueArray([]*DataValue{
 			&DataValue{
 				EncodingMask: 0x01,
 				Value:        NewVariant(NewFloat(2.50025)),
@@ -135,72 +106,57 @@ var dataValueArrayTests = []struct {
 				ServerTimestamp: time.Date(2018, time.September, 17, 14, 28, 29, 112000000, time.UTC),
 			},
 		}),
-		length: 32,
+		[]byte{
+			// ArraySize
+			0x02, 0x00, 0x00, 0x00,
+			// EncodingMask
+			0x01,
+			// Variant(Float)
+			0x0a, 0x19, 0x04, 0x20, 0x40,
+			// EncodingMask
+			0x0d,
+			// Variant(Float)
+			0x0a, 0xc9, 0x02, 0x20, 0x40,
+			// SourceTimestamp
+			0x80, 0x3b, 0xe8, 0xb3, 0x92, 0x4e, 0xd4, 0x01,
+			// ServerTimestamp
+			0x80, 0x3b, 0xe8, 0xb3, 0x92, 0x4e, 0xd4, 0x01,
+		},
 	},
 }
 
 func TestDecodeDataValueArray(t *testing.T) {
-	for _, test := range dataValueArrayTests {
-		t.Run(test.description, func(t *testing.T) {
-			v, err := DecodeDataValueArray(test.bytes)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if diff := cmp.Diff(v, test.dva, opt); diff != "" {
-				t.Error(diff)
-			}
-		})
+	for _, c := range dataValueArrayCases {
+		got, err := DecodeDataValueArray(c.serialized)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if diff := cmp.Diff(got, c.structured); diff != "" {
+			t.Errorf("%s failed\n%s", c.description, diff)
+		}
 	}
 }
 
-func TestDataValueArrayDecodeFromBytes(t *testing.T) {
-	for _, test := range dataValueArrayTests {
-		t.Run(test.description, func(t *testing.T) {
-			d := &DataValueArray{}
-			if err := d.DecodeFromBytes(test.bytes); err != nil {
-				t.Fatal(err)
-			}
-			if diff := cmp.Diff(d, test.dva, opt); diff != "" {
-				t.Error(diff)
-			}
-		})
-	}
-}
+func TestSerializeDataValueArray(t *testing.T) {
+	for _, c := range dataValueArrayCases {
+		got, err := c.structured.Serialize()
+		if err != nil {
+			t.Fatal(err)
+		}
 
-func TestDataValueArraySerialize(t *testing.T) {
-	for _, test := range dataValueArrayTests {
-		t.Run(test.description, func(t *testing.T) {
-			b, err := test.dva.Serialize()
-			if err != nil {
-				t.Fatal(err)
-			}
-			if diff := cmp.Diff(b, test.bytes); diff != "" {
-				t.Error(diff)
-			}
-		})
-	}
-}
-
-func TestDataValueArraySerializeTo(t *testing.T) {
-	for _, test := range dataValueArrayTests {
-		t.Run(test.description, func(t *testing.T) {
-			b := make([]byte, test.dva.Len())
-			if err := test.dva.SerializeTo(b); err != nil {
-				t.Fatal(err)
-			}
-			if diff := cmp.Diff(b, test.bytes); diff != "" {
-				t.Error(diff)
-			}
-		})
+		if diff := cmp.Diff(got, c.serialized); diff != "" {
+			t.Errorf("%s failed\n%s", c.description, diff)
+		}
 	}
 }
 
 func TestDataValueArrayLen(t *testing.T) {
-	for _, test := range dataValueArrayTests {
-		t.Run(test.description, func(t *testing.T) {
-			if test.dva.Len() != test.length {
-				t.Errorf("Len doesn't match. Want: %d, Got: %d", test.length, test.dva.Len())
-			}
-		})
+	for _, c := range dataValueArrayCases {
+		got := c.structured.Len()
+
+		if diff := cmp.Diff(got, len(c.serialized)); diff != "" {
+			t.Errorf("%s failed\n%s", c.description, diff)
+		}
 	}
 }

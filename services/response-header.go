@@ -20,14 +20,14 @@ type ResponseHeader struct {
 	Timestamp          time.Time
 	RequestHandle      uint32
 	ServiceResult      uint32
-	ServiceDiagnostics *DiagnosticInfo
+	ServiceDiagnostics *datatypes.DiagnosticInfo
 	StringTable        *datatypes.StringArray
 	AdditionalHeader   *AdditionalHeader
 	Payload            []byte
 }
 
 // NewResponseHeader creates a new ResponseHeader.
-func NewResponseHeader(timestamp time.Time, handle, code uint32, diag *DiagnosticInfo, strs []string, additionalHeader *AdditionalHeader, payload []byte) *ResponseHeader {
+func NewResponseHeader(timestamp time.Time, handle, code uint32, diag *datatypes.DiagnosticInfo, strs []string, additionalHeader *AdditionalHeader, payload []byte) *ResponseHeader {
 	r := &ResponseHeader{
 		Timestamp:          timestamp,
 		RequestHandle:      handle,
@@ -38,7 +38,7 @@ func NewResponseHeader(timestamp time.Time, handle, code uint32, diag *Diagnosti
 		Payload:            payload,
 	}
 	if diag == nil {
-		r.ServiceDiagnostics = NewNullDiagnosticInfo()
+		r.ServiceDiagnostics = datatypes.NewNullDiagnosticInfo()
 	}
 
 	return r
@@ -65,7 +65,7 @@ func (r *ResponseHeader) DecodeFromBytes(b []byte) error {
 	r.ServiceResult = binary.LittleEndian.Uint32(b[offset : offset+4])
 	offset += 4
 
-	r.ServiceDiagnostics = &DiagnosticInfo{}
+	r.ServiceDiagnostics = &datatypes.DiagnosticInfo{}
 	if err := r.ServiceDiagnostics.DecodeFromBytes(b[offset:]); err != nil {
 		return err
 	}

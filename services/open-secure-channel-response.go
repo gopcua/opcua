@@ -16,12 +16,12 @@ type OpenSecureChannelResponse struct {
 	TypeID *datatypes.ExpandedNodeID
 	*ResponseHeader
 	ServerProtocolVersion uint32
-	SecurityToken         *ChannelSecurityToken
+	SecurityToken         *datatypes.ChannelSecurityToken
 	ServerNonce           *datatypes.ByteString
 }
 
 // NewOpenSecureChannelResponse creates an OpenSecureChannelResponse.
-func NewOpenSecureChannelResponse(resHeader *ResponseHeader, ver uint32, secToken *ChannelSecurityToken, nonce []byte) *OpenSecureChannelResponse {
+func NewOpenSecureChannelResponse(resHeader *ResponseHeader, ver uint32, secToken *datatypes.ChannelSecurityToken, nonce []byte) *OpenSecureChannelResponse {
 	return &OpenSecureChannelResponse{
 		TypeID: datatypes.NewExpandedNodeID(
 			false, false,
@@ -69,7 +69,7 @@ func (o *OpenSecureChannelResponse) DecodeFromBytes(b []byte) error {
 	o.ServerProtocolVersion = binary.LittleEndian.Uint32(b[offset : offset+4])
 	offset += 4
 
-	o.SecurityToken = &ChannelSecurityToken{}
+	o.SecurityToken = &datatypes.ChannelSecurityToken{}
 	if err := o.SecurityToken.DecodeFromBytes(b[offset:]); err != nil {
 		return err
 	}

@@ -13,6 +13,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/wmnsk/gopcua/datatypes"
 	"github.com/wmnsk/gopcua/services"
 
 	"github.com/wmnsk/gopcua/uacp"
@@ -72,9 +73,9 @@ func main() {
 
 			sessCfg := uasc.NewSessionConfigServer(
 				secChan,
-				services.NewSignatureData("", nil),
-				[]*services.SignedSoftwareCertificate{
-					services.NewSignedSoftwareCertificate(nil, nil),
+				datatypes.NewSignatureData("", nil),
+				[]*datatypes.SignedSoftwareCertificate{
+					datatypes.NewSignedSoftwareCertificate(nil, nil),
 				},
 			)
 			session, err := uasc.ListenAndAcceptSession(sessCtx, secChan, sessCfg)

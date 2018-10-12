@@ -2,13 +2,11 @@
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
-package services
+package datatypes
 
 import (
 	"encoding/binary"
 	"fmt"
-
-	"github.com/wmnsk/gopcua/datatypes"
 )
 
 // UserIdentityToken structure used in the Server Service Set allows Clients to specify the
@@ -27,21 +25,21 @@ const (
 //
 // Specification: Part 4, 7.37
 type UserTokenPolicy struct {
-	PolicyID          *datatypes.String
+	PolicyID          *String
 	TokenType         uint32
-	IssuedTokenType   *datatypes.String
-	IssuerEndpointURI *datatypes.String
-	SecurityPolicyURI *datatypes.String
+	IssuedTokenType   *String
+	IssuerEndpointURI *String
+	SecurityPolicyURI *String
 }
 
 // NewUserTokenPolicy creates a new NewUserTokenPolicy.
 func NewUserTokenPolicy(id string, tokenType uint32, issuedToken, issuerURI, secURI string) *UserTokenPolicy {
 	return &UserTokenPolicy{
-		PolicyID:          datatypes.NewString(id),
+		PolicyID:          NewString(id),
 		TokenType:         tokenType,
-		IssuedTokenType:   datatypes.NewString(issuedToken),
-		IssuerEndpointURI: datatypes.NewString(issuerURI),
-		SecurityPolicyURI: datatypes.NewString(secURI),
+		IssuedTokenType:   NewString(issuedToken),
+		IssuerEndpointURI: NewString(issuerURI),
+		SecurityPolicyURI: NewString(secURI),
 	}
 }
 
@@ -58,7 +56,7 @@ func DecodeUserTokenPolicy(b []byte) (*UserTokenPolicy, error) {
 // DecodeFromBytes decodes given bytes into UserTokenPolicy.
 func (u *UserTokenPolicy) DecodeFromBytes(b []byte) error {
 	var offset = 0
-	u.PolicyID = &datatypes.String{}
+	u.PolicyID = &String{}
 	if err := u.PolicyID.DecodeFromBytes(b[offset:]); err != nil {
 		return err
 	}
@@ -67,19 +65,19 @@ func (u *UserTokenPolicy) DecodeFromBytes(b []byte) error {
 	u.TokenType = binary.LittleEndian.Uint32(b[offset : offset+4])
 	offset += 4
 
-	u.IssuedTokenType = &datatypes.String{}
+	u.IssuedTokenType = &String{}
 	if err := u.IssuedTokenType.DecodeFromBytes(b[offset:]); err != nil {
 		return err
 	}
 	offset += u.IssuedTokenType.Len()
 
-	u.IssuerEndpointURI = &datatypes.String{}
+	u.IssuerEndpointURI = &String{}
 	if err := u.IssuerEndpointURI.DecodeFromBytes(b[offset:]); err != nil {
 		return err
 	}
 	offset += u.IssuerEndpointURI.Len()
 
-	u.SecurityPolicyURI = &datatypes.String{}
+	u.SecurityPolicyURI = &String{}
 	if err := u.SecurityPolicyURI.DecodeFromBytes(b[offset:]); err != nil {
 		return err
 	}
