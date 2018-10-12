@@ -24,7 +24,7 @@ func decryptPKCS1v15(privKey *rsa.PrivateKey) func([]byte) ([]byte, error) {
 	return func(src []byte) ([]byte, error) {
 		var plaintext []byte
 
-		blockSize := privKey.PublicKey.Size()
+		blockSize := keySize(&privKey.PublicKey)
 		srcRemaining := len(src)
 		start := 0
 
@@ -54,7 +54,7 @@ func encryptPKCS1v15(pubKey *rsa.PublicKey) func([]byte) ([]byte, error) {
 	return func(src []byte) ([]byte, error) {
 		var ciphertext []byte
 
-		maxBlock := pubKey.Size() - minPaddingRsaPKCS1v15()
+		maxBlock := keySize(pubKey) - minPaddingRsaPKCS1v15()
 		srcRemaining := len(src)
 		start := 0
 		for srcRemaining > 0 {
