@@ -2,28 +2,15 @@
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
+// Package securitypolicy implements the encryption, decryption, signing,
+// and signature verifying algorithms for Security Policy profiles as
+// defined in Part 7 of the OPC-UA specifications (version 1.04)
 package securitypolicy
 
 import (
 	"crypto/rsa"
 	"errors"
 )
-
-/* Security Policy
-Name							Description
-PolicyUri						The URI assigned to the SecurityPolicy.
-SymmetricSignatureAlgorithm		The symmetric signature algorithm to use.
-SymmetricEncryptionAlgorithm	The symmetric encryption algorithm to use.
-AsymmetricSignatureAlgorithm	The asymmetric signature algorithm to use.
-AsymmetricEncryptionAlgorithm	The asymmetric encryption algorithm to use.
-MinAsymmetricKeyLength			The minimum length, in bits, for an asymmetric key.
-MaxAsymmetricKeyLength			The maximum length, in bits, for an asymmetric key.
-KeyDerivationAlgorithm			The key derivation algorithm to use.
-DerivedSignatureKeyLength		The length in bits of the derived key used for Message authentication.
-CertificateSignatureAlgorithm	The asymmetric signature algorithm used to sign certificates.
-SecureChannelNonceLength		The length, in bytes, of the Nonces exchanged when creating a SecureChannel.
-
-*/
 
 // EncryptionAlgorithm wraps the functions used to return the various
 // methods required to implement the symmetric and asymmetric algorithms
@@ -33,13 +20,51 @@ SecureChannelNonceLength		The length, in bytes, of the Nonces exchanged when cre
 // EncryptionAlgorithm should always be instantiated through calls to
 // SecurityPolicy.Symmetric() and SecurityPolicy.Asymmetric() to ensure
 // correct behavior.
-// The zero value of this struct will use SecurityPolicy#None
+// The zero value of this struct will use SecurityPolicy#None although
+// using in this manner is discouraged for readability
 type EncryptionAlgorithm struct {
 	blockSize       func() int
-	encrypt         func(cleartext []byte) (ciphertext []byte)
-	decrypt         func(ciphertext []byte) (cleartext []byte)
-	signature       func(message []byte) (signature []byte)
+	minPadding      func() int
+	encrypt         func(cleartext []byte) (ciphertext []byte, err error)
+	decrypt         func(ciphertext []byte) (cleartext []byte, err error)
+	signature       func(message []byte) (signature []byte, err error)
 	verifySignature func(message, signature []byte) error
+	encryptionURI   string
+	signatureURI    string
+}
+
+// Asymmetric returns the EncryptionAlgorithm struct seeded with the required public
+// and private RSA keys to fully implement.
+// For Security Policy "None", both keys are ignored and may be nil
+func Asymmetric(policyURI string, localKey *rsa.PrivateKey, remoteKey *rsa.PublicKey) (*EncryptionAlgorithm, error) {
+	policy, ok := supportedPolicies[policyURI]
+
+	if !ok {
+		return nil, errors.New("unknown security policy")
+	}
+
+	if policy.asymmetricInitFunc == nil {
+		return newNoneAsymmetric(localKey, remoteKey)
+	}
+
+	return policy.asymmetricInitFunc(localKey, remoteKey)
+}
+
+// Symmetric returns the EncryptionAlgorithm struct seeded with the client and server nonces
+// negotiated from the OpenSecureChannel service (encrypted by the Asymmetric algorithms)
+// For Security Policy "None", both nonces are ignored and may be nil
+func Symmetric(policyURI string, localNonce []byte, remoteNonce []byte) (*EncryptionAlgorithm, error) {
+	policy, ok := supportedPolicies[policyURI]
+
+	if !ok {
+		return nil, errors.New("unknown security policy")
+	}
+
+	if policy.symmetricInitFunc == nil {
+		return newNoneSymmetric(localNonce, remoteNonce)
+	}
+
+	return policy.symmetricInitFunc(localNonce, remoteNonce)
 }
 
 // BlockSize returns the underlying encryption algorithm's blocksize.
@@ -53,8 +78,19 @@ func (e *EncryptionAlgorithm) BlockSize() int {
 	return e.blockSize()
 }
 
+// MinPadding returns the underlying encryption algorithm's minimum padding.
+// Used to calculate the maximum plaintext blocksize that can be fed into
+// the encryption algorithm.
+func (e *EncryptionAlgorithm) MinPadding() int {
+	if e.minPadding == nil {
+		e.minPadding = minPaddingNone
+	}
+
+	return e.minPadding()
+}
+
 // Encrypt encrypts the input cleartext based on the algorithms and keys passed in
-func (e *EncryptionAlgorithm) Encrypt(cleartext []byte) (ciphertext []byte) {
+func (e *EncryptionAlgorithm) Encrypt(cleartext []byte) (ciphertext []byte, err error) {
 	if e.encrypt == nil {
 		e.encrypt = encryptNone
 	}
@@ -63,7 +99,7 @@ func (e *EncryptionAlgorithm) Encrypt(cleartext []byte) (ciphertext []byte) {
 }
 
 // Decrypt decrypts the input ciphertext based on the algorithms and keys passed in
-func (e *EncryptionAlgorithm) Decrypt(ciphertext []byte) (cleartext []byte) {
+func (e *EncryptionAlgorithm) Decrypt(ciphertext []byte) (cleartext []byte, err error) {
 	if e.decrypt == nil {
 		e.decrypt = decryptNone
 	}
@@ -72,7 +108,7 @@ func (e *EncryptionAlgorithm) Decrypt(ciphertext []byte) (cleartext []byte) {
 }
 
 // Signature returns the cryptographic signature of message
-func (e *EncryptionAlgorithm) Signature(message []byte) (signature []byte) {
+func (e *EncryptionAlgorithm) Signature(message []byte) (signature []byte, err error) {
 	if e.signature == nil {
 		e.signature = signatureNone
 	}
@@ -91,53 +127,14 @@ func (e *EncryptionAlgorithm) VerifySignature(message, signature []byte) error {
 	return e.verifySignature(message, signature)
 }
 
-// SecurityPolicy wraps both the Asymmetric and Symmetric algorithms for a specific
-// security policy as defined by the OPC-UA specifications
-// These functions need to be instantiated with appropriate security keys which are
-// received from various parts of the Secure Channel negotiation.
-//
-// SecurityPolicy should always be instantiated through a call to New(policyURI)
-// to ensure correct behavior.
-// The zero value of this struct will use SecurityPolicy#None
-type SecurityPolicy struct {
-	asymmetric func(localKey *rsa.PrivateKey, remoteKey *rsa.PublicKey) *EncryptionAlgorithm
-	symmetric  func(localNonce []byte, remoteNonce []byte) *EncryptionAlgorithm
+// EncryptionURI returns the URI for the encryption algorithm as defined
+// by the OPC-UA profiles in Part 7
+func (e *EncryptionAlgorithm) EncryptionURI() string {
+	return e.encryptionURI
 }
 
-// Asymmetric returns the EncryptionAlgorithm struct seeded with the required public
-// and private RSA keys to fully implement.
-// For Security Policy "None", both keys are ignored and may be nil
-func (s *SecurityPolicy) Asymmetric(localKey *rsa.PrivateKey, remoteKey *rsa.PublicKey) *EncryptionAlgorithm {
-	if s.asymmetric == nil {
-		s.asymmetric = newNoneAsymmetric
-	}
-
-	return s.asymmetric(localKey, remoteKey)
-}
-
-// Symmetric returns the EncryptionAlgorithm struct seeded with the client and server nonces
-// negotiated from the OpenSecureChannel service (encrypted by the Asymmetric algorithms)
-// For Security Policy "None", both nonces are ignored and may be nil
-func (s *SecurityPolicy) Symmetric(localNonce []byte, remoteNonce []byte) *EncryptionAlgorithm {
-	if s.symmetric == nil {
-		s.symmetric = newNoneSymmetric
-	}
-
-	return s.symmetric(localNonce, remoteNonce)
-}
-
-// New creates a new security policy for encoding/decoding UASC messages
-func New(policyURI string) (*SecurityPolicy, error) {
-	var p = new(SecurityPolicy)
-
-	policy, ok := supportedPolicies[policyURI]
-
-	if !ok {
-		return nil, errors.New("unknown security policy")
-	}
-
-	p.asymmetric = policy.asymmetricInitFunc
-	p.symmetric = policy.symmetricInitFunc
-
-	return p, nil
+// SignatureURI returns the URI for the signature algorithm as defined
+// by the OPC-UA profiles in Part 7
+func (e *EncryptionAlgorithm) SignatureURI() string {
+	return e.signatureURI
 }

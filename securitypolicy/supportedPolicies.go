@@ -36,7 +36,7 @@ var supportedPolicies = map[string]policyInitFuncs{
 }
 
 // SupportedPolicies returns all supported Security Policies
-// (and therefore, valid inputs to New())
+// (and therefore, valid inputs to Asymmetric(...) and Symmetric(...))
 func SupportedPolicies() []string {
 	p := make([]string, len(supportedPolicies))
 
@@ -50,6 +50,6 @@ func SupportedPolicies() []string {
 }
 
 type policyInitFuncs struct {
-	asymmetricInitFunc func(localKey *rsa.PrivateKey, remoteKey *rsa.PublicKey) *EncryptionAlgorithm
-	symmetricInitFunc  func(localNonce []byte, remoteNonce []byte) *EncryptionAlgorithm
+	asymmetricInitFunc func(localKey *rsa.PrivateKey, remoteKey *rsa.PublicKey) (*EncryptionAlgorithm, error)
+	symmetricInitFunc  func(localNonce []byte, remoteNonce []byte) (*EncryptionAlgorithm, error)
 }

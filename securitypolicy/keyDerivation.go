@@ -28,7 +28,6 @@ ClientSeed		The value of the ClientNonce provided in the OpenSecureChannel reque
 ServerSecret	The value of the ServerNonce provided in the OpenSecureChannel response.
 ServerSeed		The value of the ServerNonce provided in the OpenSecureChannel response.
 
-
  Key						Secret			Seed		Length				Offset
  ClientSigningKey			ServerSecret	ClientSeed	SigningKeyLength	0
  ClientEncryptingKey		ServerSecret	ClientSeed	EncryptingKeyLength	SigningKeyLength
@@ -43,11 +42,12 @@ type derivedKeys struct {
 	signing, encryption, iv []byte
 }
 
-func generateKeys(hmacFunc func(input []byte) []byte, seed []byte, signingLength, encryptingLength, encryptingBlockSize int) *derivedKeys {
+func generateKeys(hmacFunc func(input []byte) ([]byte, error), seed []byte, signingLength, encryptingLength, encryptingBlockSize int) *derivedKeys {
 	var p []byte
 	for len(p) < signingLength+encryptingLength+encryptingBlockSize {
 		input := append(p, seed...)
-		p = append(p, hmacFunc(input)...)
+		h, _ := hmacFunc(input)
+		p = append(p, h...)
 	}
 
 	return &derivedKeys{

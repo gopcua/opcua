@@ -5,10 +5,14 @@
 package securitypolicy
 
 import (
-	"crypto/rand"
+	"crypto"
 	"crypto/rsa"
+	"errors"
 	"fmt"
-	"os"
+
+	// Force compilation of required hashing algorithms, although we don't directly use the packages
+	_ "crypto/sha1"
+	_ "crypto/sha256"
 )
 
 /*
@@ -31,12 +35,12 @@ Name 	Opt. 	 Description 	 From Profile
 
 If a certificate or any certificate in the chain is not signed with a hash that is Sha1 or stronger then the certificate shall be rejected.
 	Security Encryption Required 		Encryption is required using the algorithms provided in the security algorithm suite.
-	Security Signing Required 		Signing is required using the algorithms provided in the security algorithm suite.
+	Security Signing Required 			Signing is required using the algorithms provided in the security algorithm suite.
 
 
 */
 
-func newBasic128Rsa15Symmetric(localNonce []byte, remoteNonce []byte) *EncryptionAlgorithm {
+func newBasic128Rsa15Symmetric(localNonce []byte, remoteNonce []byte) (*EncryptionAlgorithm, error) {
 	e := new(EncryptionAlgorithm)
 
 	var (
@@ -44,63 +48,46 @@ func newBasic128Rsa15Symmetric(localNonce []byte, remoteNonce []byte) *Encryptio
 		encryptionKeyLength = 16
 		encryptionBlockSize = blockSizeAES()
 	)
-
-	localKeys := generateKeys(hmacSha1(remoteNonce), localNonce, signatureKeyLength, encryptionKeyLength, encryptionBlockSize)
-	remoteKeys := generateKeys(hmacSha1(localNonce), remoteNonce, signatureKeyLength, encryptionKeyLength, encryptionBlockSize)
+	localKeys := generateKeys(computeHmac(crypto.SHA1, remoteNonce), localNonce, signatureKeyLength, encryptionKeyLength, encryptionBlockSize)
+	remoteKeys := generateKeys(computeHmac(crypto.SHA1, localNonce), remoteNonce, signatureKeyLength, encryptionKeyLength, encryptionBlockSize)
 
 	e.blockSize = blockSizeAES
 	e.encrypt = encryptAES(128, remoteKeys.iv, remoteKeys.encryption) // AES128
 	e.decrypt = decryptAES(128, localKeys.iv, localKeys.encryption)   // AES128
-	e.signature = hmacSha1(remoteKeys.signing)                        // HMAC-SHA1
-	e.verifySignature = verifyHmacSha1(localKeys.signing)             // HMAC-SHA1
+	e.signature = computeHmac(crypto.SHA1, remoteKeys.signing)        // HMAC-SHA1
+	e.verifySignature = verifyHmac(crypto.SHA1, localKeys.signing)    // HMAC-SHA1
+	e.encryptionURI = "http://www.w3.org/2001/04/xmlenc#aes128-cbc"
+	e.signatureURI = "http://www.w3.org/2000/09/xmldsig#hmac-sha1"
 
-	return e
+	return e, nil
 }
 
-func newBasic128Rsa15Asymmetric(localKey *rsa.PrivateKey, remoteKey *rsa.PublicKey) *EncryptionAlgorithm {
+func newBasic128Rsa15Asymmetric(localKey *rsa.PrivateKey, remoteKey *rsa.PublicKey) (*EncryptionAlgorithm, error) {
+	const (
+		minAsymmetricKeyLength = 128 // 1024 bits
+		maxAsymmetricKeyLength = 256 // 2048 bits
+	)
+
+	if localKey != nil && (localKey.PublicKey.Size() < minAsymmetricKeyLength || localKey.PublicKey.Size() > maxAsymmetricKeyLength) {
+		msg := fmt.Sprintf("local key size should be %d-%d bytes, got %d bytes", minAsymmetricKeyLength, maxAsymmetricKeyLength, localKey.PublicKey.Size())
+		return nil, errors.New(msg)
+	}
+
+	if remoteKey != nil && (remoteKey.Size() < minAsymmetricKeyLength || remoteKey.Size() > maxAsymmetricKeyLength) {
+		msg := fmt.Sprintf("remote key size should be %d-%d bytes, got %d bytes", minAsymmetricKeyLength, maxAsymmetricKeyLength, remoteKey.Size())
+		return nil, errors.New(msg)
+	}
+
 	e := new(EncryptionAlgorithm)
 
-	e.blockSize = blockSizeNone
-	e.encrypt = encryptPKCS1v15(remoteKey)            // RSA-SHA15+KWRSA15
-	e.decrypt = decryptPKCS1v15(localKey)             // RSA-SHA15+KWRSA15
-	e.signature = signRsaPkc15Sha1(localKey)          // RSA-SHA1
-	e.verifySignature = verifyRsaPkc15Sha1(remoteKey) // RSA-SHA1
+	e.blockSize = remoteKey.Size
+	e.minPadding = minPaddingRsaPKCS1v15
+	e.encrypt = encryptPKCS1v15(remoteKey)                     // RSA-SHA15+KWRSA15
+	e.decrypt = decryptPKCS1v15(localKey)                      // RSA-SHA15+KWRSA15
+	e.signature = signRsaPkc15(crypto.SHA1, localKey)          // RSA-SHA1
+	e.verifySignature = verifyRsaPkc15(crypto.SHA1, remoteKey) // RSA-SHA1
+	e.encryptionURI = "http://www.w3.org/2001/04/xmlenc#rsa-1_5"
+	e.signatureURI = "http://www.w3.org/2000/09/xmldsig#rsa-sha1"
 
-	return e
-}
-
-func decryptPKCS1v15(privKey *rsa.PrivateKey) func([]byte) []byte {
-	return func(src []byte) []byte {
-
-		// crypto/rand.Reader is a good source of entropy for blinding the RSA
-		// operation.
-		rng := rand.Reader
-
-		plaintext, err := rsa.DecryptPKCS1v15(rng, privKey, src)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error from decryption: %s\n", err)
-		}
-
-		return plaintext
-		// Remember that encryption only provides confidentiality. The
-		// ciphertext should be signed before authenticity is assumed and, even
-		// then, consider that messages might be reordered.
-	}
-}
-
-func encryptPKCS1v15(pubKey *rsa.PublicKey) func([]byte) []byte {
-	return func(src []byte) []byte {
-		// crypto/rand.Reader is a good source of entropy for randomizing the
-		// encryption function.
-		rng := rand.Reader
-
-		ciphertext, err := rsa.EncryptPKCS1v15(rng, pubKey, src)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error from encryption: %s\n", err)
-		}
-
-		return ciphertext
-		// Since encryption is a randomized function, ciphertext will be
-		// different each time.
-	}
+	return e, nil
 }

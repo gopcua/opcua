@@ -5,6 +5,7 @@
 package securitypolicy
 
 import (
+	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
 	"testing"
@@ -40,7 +41,7 @@ func TestGenerateKeys(t *testing.T) {
 		t.Fatalf("Could not generate remote nonce")
 	}
 
-	keys := generateKeys(hmacSha256(remoteNonce), localNonce, 32, 32, 16)
+	keys := generateKeys(computeHmac(crypto.SHA256, remoteNonce), localNonce, 32, 32, 16)
 	if len(keys.signing) != 32 {
 		t.Errorf("Signing Key Invalid Length\n")
 	}
@@ -59,11 +60,18 @@ func TestGenerateKeys(t *testing.T) {
 // Therefore, the test simply encrypts the message, decrypts it, then compares the
 // results.
 func TestEncryptionAlgorithms(t *testing.T) {
-	const payload string = "The quick brown fox jumps over the lazy dog."
+	payload := make([]byte, 5000)
+	_, err := rand.Read(payload)
+	if err != nil {
+		t.Fatalf("could not generate random payload")
+	}
+
+	payloadRef := make([]byte, len(payload))
+	copy(payloadRef, payload)
 
 	localNonce := make([]byte, 32)
 	remoteNonce := make([]byte, 32)
-	_, err := rand.Read(localNonce)
+	_, err = rand.Read(localNonce)
 	if err != nil {
 		t.Fatalf("could not generate local nonce")
 	}
@@ -86,24 +94,28 @@ func TestEncryptionAlgorithms(t *testing.T) {
 
 	for _, c := range cases {
 
-		localPolicy, err := New(c)
+		localSymmetric, err := Symmetric(c, localNonce, remoteNonce)
 		if err != nil {
-			t.Fatalf("failed local New(%s) : %s", c, err)
+			t.Fatalf("failed local Symmetric New(%s) : %s", c, err)
+		}
+		localAsymmetric, err := Asymmetric(c, localKey, &remoteKey.PublicKey)
+		if err != nil {
+			t.Fatalf("failed local Asymmetric New(%s) : %s", c, err)
 		}
 
-		remotePolicy, err := New(c)
+		remoteSymmetric, err := Symmetric(c, remoteNonce, localNonce)
 		if err != nil {
-			t.Fatalf("failed remote New(%s) : %s", c, err)
+			t.Fatalf("failed remote Symmetric New(%s) : %s", c, err)
 		}
 
-		localSymmetric := localPolicy.Symmetric(localNonce, remoteNonce)
-		localAsymmetric := localPolicy.Asymmetric(localKey, &remoteKey.PublicKey)
-
-		remoteSymmetric := remotePolicy.Symmetric(remoteNonce, localNonce)
-		remoteAsymmetric := remotePolicy.Asymmetric(remoteKey, &localKey.PublicKey)
+		remoteAsymmetric, err := Asymmetric(c, remoteKey, &localKey.PublicKey)
+		if err != nil {
+			t.Fatalf("failed remote Asymmetric New(%s) : %s", c, err)
+		}
 
 		// Symmetric Algorithm
-		plaintext := []byte(payload)
+		plaintext := make([]byte, len(payload))
+		copy(plaintext, payload)
 
 		padSize := len(plaintext) % localSymmetric.BlockSize()
 		if padSize > 0 {
@@ -112,38 +124,61 @@ func TestEncryptionAlgorithms(t *testing.T) {
 		paddedPlaintext := make([]byte, len(plaintext)+padSize)
 		copy(paddedPlaintext, plaintext)
 
-		symCiphertext := localSymmetric.Encrypt(paddedPlaintext)
+		symCiphertext, err := localSymmetric.Encrypt(paddedPlaintext)
+		if err != nil {
+			t.Fatalf("failed to encrypt Symmetric (%s) : %s", c, err)
+		}
 
-		symDeciphered := remoteSymmetric.Decrypt(symCiphertext)
+		symDeciphered, err := remoteSymmetric.Decrypt(symCiphertext)
+		if err != nil {
+			t.Fatalf("failed to decrypt Symmetric (%s) : %s", c, err)
+		}
 		symDeciphered = symDeciphered[:len(symDeciphered)-padSize] // Trim off padding
 		if diff := cmp.Diff(symDeciphered, plaintext, nil); diff != "" {
 			t.Errorf("Policy: %s\nsymmetric encryption failed:\n%s\n", c, diff)
 		}
 
-		paddedPlaintext[4] = 'X'
-		if diff := cmp.Diff(symDeciphered, []byte(payload), nil); diff != "" {
+		// Modify the plaintext and detect if the decrypted message changes; if it does,
+		// our byte slices are referencing the same data and the previous test may have
+		// been a false positive
+		paddedPlaintext[4] = 0xff ^ paddedPlaintext[4]
+		if diff := cmp.Diff(symDeciphered, payloadRef, nil); diff != "" {
 			t.Errorf("Policy: %s\nsymmetric input corruption detected:\n%s\n", c, diff)
 		}
 
-		symSignature := localSymmetric.Signature(paddedPlaintext)
+		symSignature, err := localSymmetric.Signature(paddedPlaintext)
+		if err != nil {
+			t.Errorf("Policy: %s\nsymmetric signature generation failed\n", c)
+		}
+
 		err = remoteSymmetric.VerifySignature(paddedPlaintext, symSignature)
 		if err != nil {
 			t.Errorf("Policy: %s\nsymmetric signature validation failed\n", c)
 		}
 
 		// Asymmetric Algorithm
-		asymCiphertext := localAsymmetric.Encrypt(plaintext)
-		asymDeciphered := remoteAsymmetric.Decrypt(asymCiphertext)
+		asymCiphertext, err := localAsymmetric.Encrypt(plaintext)
+		if err != nil {
+			t.Fatalf("failed to encrypt Asymmetric (%s) : %s", c, err)
+		}
+		asymDeciphered, err := remoteAsymmetric.Decrypt(asymCiphertext)
+		if err != nil {
+			t.Fatalf("failed to decrypt Asymmetric (%s) : %s", c, err)
+		}
 		if diff := cmp.Diff(asymDeciphered, plaintext, nil); diff != "" {
 			t.Errorf("Policy: %s\nasymmetric encryption failed:\n%s\n", c, diff)
 		}
 
-		plaintext[4] = 'X'
-		if diff := cmp.Diff(asymDeciphered, []byte(payload), nil); diff != "" {
+		paddedPlaintext[4] = 0xff ^ paddedPlaintext[4]
+		if diff := cmp.Diff(asymDeciphered, payloadRef, nil); diff != "" {
 			t.Errorf("Policy: %s\nasymmetric input corruption detected:\n%s\n", c, diff)
 		}
 
-		asymSignature := localAsymmetric.Signature(plaintext)
+		asymSignature, err := localAsymmetric.Signature(plaintext)
+		if err != nil {
+			t.Errorf("Policy: %s\nasymmetric signature generation failed\n", c)
+		}
+
 		err = remoteAsymmetric.VerifySignature(plaintext, asymSignature)
 		if err != nil {
 			t.Errorf("Policy: %s\nasymmetric signature validation failed\n", c)
@@ -160,33 +195,20 @@ func TestZeroStruct(t *testing.T) {
 		}
 	}()
 
-	zp := &SecurityPolicy{}
 	ze := &EncryptionAlgorithm{}
 
 	const payload string = "The quick brown fox jumps over the lazy dog."
 	plaintext := []byte(payload)
 
 	// Call all the methods and make sure they don't panic due to nil pointers
-	zpSym := zp.Symmetric(nil, nil)
-	zpAsym := zp.Asymmetric(nil, nil)
-
 	_ = ze.BlockSize()
-	_ = ze.Encrypt(plaintext)
-	_ = ze.Decrypt(plaintext)
-	_ = ze.Signature(plaintext)
+	_ = ze.MinPadding()
+	_, _ = ze.Encrypt(plaintext)
+	_, _ = ze.Decrypt(plaintext)
+	_, _ = ze.Signature(plaintext)
 	_ = ze.VerifySignature(plaintext, plaintext)
-
-	_ = zpSym.BlockSize()
-	_ = zpSym.Encrypt(plaintext)
-	_ = zpSym.Decrypt(plaintext)
-	_ = zpSym.Signature(plaintext)
-	_ = zpSym.VerifySignature(plaintext, plaintext)
-
-	_ = zpAsym.BlockSize()
-	_ = zpAsym.Encrypt(plaintext)
-	_ = zpAsym.Decrypt(plaintext)
-	_ = zpAsym.Signature(plaintext)
-	_ = zpAsym.VerifySignature(plaintext, plaintext)
+	_ = ze.EncryptionURI()
+	_ = ze.SignatureURI()
 
 }
 

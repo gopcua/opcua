@@ -4,7 +4,16 @@
 
 package securitypolicy
 
-import "crypto/rsa"
+import (
+	"crypto"
+	"crypto/rsa"
+	"errors"
+	"fmt"
+
+	// Force compilation of required hashing algorithms, although we don't directly use the packages
+	_ "crypto/sha1"
+	_ "crypto/sha256"
+)
 
 /*
 "OLD SecurityPolicy – Basic256" Profile
@@ -30,7 +39,7 @@ Both Sha1 and Sha256 shall be supported. However, it is recommended to use Sha25
 	Security Signing Required 		Signing is required using the algorithms provided in the security algorithm suite.
 */
 
-func newBasic256Symmetric(localNonce []byte, remoteNonce []byte) *EncryptionAlgorithm {
+func newBasic256Symmetric(localNonce []byte, remoteNonce []byte) (*EncryptionAlgorithm, error) {
 	e := new(EncryptionAlgorithm)
 
 	var (
@@ -39,26 +48,47 @@ func newBasic256Symmetric(localNonce []byte, remoteNonce []byte) *EncryptionAlgo
 		encryptionBlockSize = blockSizeAES()
 	)
 
-	localKeys := generateKeys(hmacSha1(remoteNonce), localNonce, signatureKeyLength, encryptionKeyLength, encryptionBlockSize)
-	remoteKeys := generateKeys(hmacSha1(localNonce), remoteNonce, signatureKeyLength, encryptionKeyLength, encryptionBlockSize)
+	localKeys := generateKeys(computeHmac(crypto.SHA1, remoteNonce), localNonce, signatureKeyLength, encryptionKeyLength, encryptionBlockSize)
+	remoteKeys := generateKeys(computeHmac(crypto.SHA1, localNonce), remoteNonce, signatureKeyLength, encryptionKeyLength, encryptionBlockSize)
 
 	e.blockSize = blockSizeAES
+	e.minPadding = minPaddingAES
 	e.encrypt = encryptAES(256, remoteKeys.iv, remoteKeys.encryption) // AES256-CBC
 	e.decrypt = decryptAES(256, localKeys.iv, localKeys.encryption)   // AES256-CBC
-	e.signature = hmacSha1(remoteKeys.signing)                        // HMAC-SHA1
-	e.verifySignature = verifyHmacSha1(localKeys.signing)             // HMAC-SHA1
+	e.signature = computeHmac(crypto.SHA1, remoteKeys.signing)        // HMAC-SHA1
+	e.verifySignature = verifyHmac(crypto.SHA1, localKeys.signing)    // HMAC-SHA1
+	e.encryptionURI = "http://www.w3.org/2001/04/xmlenc#aes256-cbc"
+	e.signatureURI = "http://www.w3.org/2000/09/xmldsig#hmac-sha1"
 
-	return e
+	return e, nil
 }
 
-func newBasic256Asymmetric(localKey *rsa.PrivateKey, remoteKey *rsa.PublicKey) *EncryptionAlgorithm {
+func newBasic256Asymmetric(localKey *rsa.PrivateKey, remoteKey *rsa.PublicKey) (*EncryptionAlgorithm, error) {
+	const (
+		minAsymmetricKeyLength = 128 // 1024 bits
+		maxAsymmetricKeyLength = 256 // 2048 bits
+	)
+
+	if localKey != nil && (localKey.PublicKey.Size() < minAsymmetricKeyLength || localKey.PublicKey.Size() > maxAsymmetricKeyLength) {
+		msg := fmt.Sprintf("local key size should be %d-%d bytes, got %d bytes", minAsymmetricKeyLength, maxAsymmetricKeyLength, localKey.PublicKey.Size())
+		return nil, errors.New(msg)
+	}
+
+	if remoteKey != nil && (remoteKey.Size() < minAsymmetricKeyLength || remoteKey.Size() > maxAsymmetricKeyLength) {
+		msg := fmt.Sprintf("remote key size should be %d-%d bytes, got %d bytes", minAsymmetricKeyLength, maxAsymmetricKeyLength, remoteKey.Size())
+		return nil, errors.New(msg)
+	}
+
 	e := new(EncryptionAlgorithm)
 
 	e.blockSize = blockSizeNone
-	e.encrypt = encryptRsaOAEPSha1(remoteKey)         // RSA-OAEP
-	e.decrypt = decryptRsaOAEPSha1(localKey)          // RSA-OAEP
-	e.signature = signRsaPkc15Sha1(localKey)          // RSA-SHA1
-	e.verifySignature = verifyRsaPkc15Sha1(remoteKey) // RSA-SHA1
+	e.minPadding = minPaddingRsaPKCS1v15
+	e.encrypt = encryptRsaOAEP(crypto.SHA1, remoteKey)         // RSA-OAEP
+	e.decrypt = decryptRsaOAEP(crypto.SHA1, localKey)          // RSA-OAEP
+	e.signature = signRsaPkc15(crypto.SHA1, localKey)          // RSA-SHA1
+	e.verifySignature = verifyRsaPkc15(crypto.SHA1, remoteKey) // RSA-SHA1
+	e.encryptionURI = "http://www.w3.org/2001/04/xmlenc#rsa-oaep"
+	e.signatureURI = "http://www.w3.org/2000/09/xmldsig#rsa-sha1"
 
-	return e
+	return e, nil
 }

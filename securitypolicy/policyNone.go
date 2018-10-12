@@ -23,47 +23,28 @@ KeyDerivationAlgorithm_None 		This algorithm does not apply.
 SecurityPolicy_None_Limits 		DerivedSignatureKeyLength: 0
 
 */
-func newNoneAsymmetric(*rsa.PrivateKey, *rsa.PublicKey) *EncryptionAlgorithm {
+func newNoneAsymmetric(*rsa.PrivateKey, *rsa.PublicKey) (*EncryptionAlgorithm, error) {
 	e := new(EncryptionAlgorithm)
 
 	e.blockSize = blockSizeNone
+	e.minPadding = minPaddingNone
 	e.encrypt = encryptNone
 	e.decrypt = decryptNone
 	e.signature = signatureNone
 	e.verifySignature = verifySignatureNone
 
-	return e
+	return e, nil
 }
 
-func newNoneSymmetric([]byte, []byte) *EncryptionAlgorithm {
+func newNoneSymmetric([]byte, []byte) (*EncryptionAlgorithm, error) {
 	e := new(EncryptionAlgorithm)
 
 	e.blockSize = blockSizeNone
+	e.minPadding = minPaddingNone
 	e.encrypt = encryptNone
 	e.decrypt = decryptNone
 	e.signature = signatureNone
 	e.verifySignature = verifySignatureNone
 
-	return e
-}
-
-// None functions: return zero values
-func blockSizeNone() int {
-	return 1
-}
-
-func encryptNone(src []byte) []byte {
-	return append([]byte(nil), src...)
-}
-
-func decryptNone(src []byte) []byte {
-	return append([]byte(nil), src...)
-}
-
-func signatureNone([]byte) []byte {
-	return make([]byte, 0)
-}
-
-func verifySignatureNone(_, _ []byte) error {
-	return nil
+	return e, nil
 }
