@@ -30,7 +30,7 @@ type CreateSessionResponse struct {
 }
 
 // NewCreateSessionResponse creates a new NewCreateSessionResponse with the given parameters.
-func NewCreateSessionResponse(resHeader *ResponseHeader, sessionID, authToken datatypes.NodeID, timeout uint64, nonce, cert []byte, singedCert []*datatypes.SignedSoftwareCertificate, svrSignature *datatypes.SignatureData, maxRespSize uint32, endpoints ...*datatypes.EndpointDescription) *CreateSessionResponse {
+func NewCreateSessionResponse(resHeader *ResponseHeader, sessionID, authToken datatypes.NodeID, timeout uint64, nonce, cert []byte, svrSignature *datatypes.SignatureData, maxRespSize uint32, endpoints ...*datatypes.EndpointDescription) *CreateSessionResponse {
 	return &CreateSessionResponse{
 		TypeID: datatypes.NewExpandedNodeID(
 			false, false,
@@ -44,7 +44,7 @@ func NewCreateSessionResponse(resHeader *ResponseHeader, sessionID, authToken da
 		ServerNonce:                datatypes.NewByteString(nonce),
 		ServerCertificate:          datatypes.NewByteString(cert),
 		ServerEndpoints:            datatypes.NewEndpointDescriptionArray(endpoints),
-		ServerSoftwareCertificates: datatypes.NewSignedSoftwareCertificateArray(singedCert),
+		ServerSoftwareCertificates: &datatypes.SignedSoftwareCertificateArray{ArraySize: 0},
 		ServerSignature:            svrSignature,
 		MaxRequestMessageSize:      maxRespSize,
 	}

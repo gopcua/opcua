@@ -29,12 +29,12 @@ func main() {
 	flag.Parse()
 
 	// Create context for UACP to be used by statemachine working background.
-	uacpCtx := context.Background()
-	uacpCtx, cancel := context.WithCancel(uacpCtx)
+	ctx := context.Background()
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	// Establish UACP Connection with the Endpoint specified.
-	conn, err := uacp.Dial(uacpCtx, *endpoint)
+	conn, err := uacp.Dial(ctx, *endpoint)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -46,14 +46,9 @@ func main() {
 	}()
 	log.Printf("Successfully established connection with %v", conn.RemoteEndpoint())
 
-	// Create context for UASC to be used by statemachine working background.
-	uascCtx, cancel := context.WithCancel(uacpCtx)
-	defer cancel()
 	// Open SecureChannel on top of UACP Connection established above.
-	cfg := uasc.NewConfig(
-		1, services.SecModeNone, "http://opcfoundation.org/UA/SecurityPolicy#None", nil, nil, 0xffff, 0, 0,
-	)
-	secChan, err := uasc.OpenSecureChannel(uascCtx, conn, cfg)
+	cfg := uasc.NewClientConfigSecurityNone(3333, 3600000)
+	secChan, err := uasc.OpenSecureChannel(ctx, conn, cfg, 5*time.Second, 3)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -79,14 +74,11 @@ func main() {
 	log.Println("Successfully sent GetEndpointsRequest")
 	time.Sleep(500 * time.Millisecond)
 
-	sessCtx, cancel := context.WithCancel(uascCtx)
-	defer cancel()
-
-	sessCfg := uasc.NewSessionConfigClient(
+	sessCfg := uasc.NewClientSessionConfig(
 		[]string{"ja-JP"},
 		datatypes.NewAnonymousIdentityToken("anonymous"),
 	)
-	session, err := uasc.CreateSession(sessCtx, secChan, sessCfg, 3, 5*time.Second)
+	session, err := uasc.CreateSession(ctx, secChan, sessCfg, 3, 5*time.Second)
 	if err != nil {
 		log.Fatal(err)
 	}

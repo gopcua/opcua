@@ -16,6 +16,10 @@ import (
 
 // ListenAndAcceptSecureChannel starts UASC server on top of established transport connection.
 func ListenAndAcceptSecureChannel(ctx context.Context, transport net.Conn, cfg *Config) (*SecureChannel, error) {
+	if err := cfg.validate("server"); err != nil {
+		return nil, err
+	}
+
 	secChan := &SecureChannel{
 		mu:        new(sync.Mutex),
 		lowerConn: transport,
@@ -45,30 +49,6 @@ func ListenAndAcceptSecureChannel(ctx context.Context, transport net.Conn, cfg *
 		case err := <-secChan.errChan:
 			return nil, err
 		}
-	}
-}
-
-// NewSessionConfigServer creates a new SessionConfigServer for server.
-func NewSessionConfigServer(secChan *SecureChannel, sigData *datatypes.SignatureData, swCerts []*datatypes.SignedSoftwareCertificate) *SessionConfig {
-	return &SessionConfig{
-		AuthenticationToken:        datatypes.NewFourByteNodeID(0, uint16(time.Now().UnixNano())),
-		SessionTimeout:             0xffff,
-		ServerSignature:            sigData,
-		ServerSoftwareCertificates: swCerts,
-		ServerEndpoints: []*datatypes.EndpointDescription{
-			datatypes.NewEndpointDescription(
-				secChan.LocalEndpoint(), datatypes.NewApplicationDescription(
-					"urn:gopcua:client", "urn:gopcua", "gopcua - OPC UA implementation in pure Golang",
-					datatypes.AppTypeServer, "", "", []string{""},
-				),
-				secChan.cfg.Certificate, secChan.cfg.SecurityMode, secChan.cfg.SecurityPolicyURI,
-				datatypes.NewUserTokenPolicyArray(
-					[]*datatypes.UserTokenPolicy{
-						datatypes.NewUserTokenPolicy("", 0, "", "", ""),
-					},
-				), "", 0,
-			),
-		},
 	}
 }
 

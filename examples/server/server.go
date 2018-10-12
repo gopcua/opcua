@@ -11,9 +11,7 @@ import (
 	"context"
 	"flag"
 	"log"
-	"time"
 
-	"github.com/wmnsk/gopcua/datatypes"
 	"github.com/wmnsk/gopcua/services"
 
 	"github.com/wmnsk/gopcua/uacp"
@@ -34,10 +32,10 @@ func main() {
 	}
 	log.Printf("Started listening on %s.", listener.Endpoint())
 
-	cfg := uasc.NewConfig(
-		1, services.SecModeNone, "http://opcfoundation.org/UA/SecurityPolicy#None", nil, nil, 0xffff, 1, uint32(time.Now().UnixNano()),
+	cfg := uasc.NewServerConfig(
+		"http://opcfoundation.org/UA/SecurityPolicy#None",
+		nil, nil, 1111, services.SecModeNone, 2222, 3600000,
 	)
-
 	for {
 		func() {
 			ctx := context.Background()
@@ -55,10 +53,7 @@ func main() {
 			}()
 			log.Printf("Successfully established connection with %v", conn.RemoteAddr())
 
-			secChanCtx, cancel := context.WithCancel(ctx)
-			defer cancel()
-
-			secChan, err := uasc.ListenAndAcceptSecureChannel(secChanCtx, conn, cfg)
+			secChan, err := uasc.ListenAndAcceptSecureChannel(ctx, conn, cfg)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -68,17 +63,8 @@ func main() {
 			}()
 			log.Printf("Successfully opened secure channel with %v", conn.RemoteAddr())
 
-			sessCtx, cancel := context.WithCancel(secChanCtx)
-			defer cancel()
-
-			sessCfg := uasc.NewSessionConfigServer(
-				secChan,
-				datatypes.NewSignatureData("", nil),
-				[]*datatypes.SignedSoftwareCertificate{
-					datatypes.NewSignedSoftwareCertificate(nil, nil),
-				},
-			)
-			session, err := uasc.ListenAndAcceptSession(sessCtx, secChan, sessCfg)
+			sessCfg := uasc.NewServerSessionConfig(secChan)
+			session, err := uasc.ListenAndAcceptSession(ctx, secChan, sessCfg)
 			if err != nil {
 				log.Fatal(err)
 			}

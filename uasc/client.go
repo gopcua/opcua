@@ -20,25 +20,11 @@ import (
 //
 // The first param ctx is to be passed to monitor(), which monitors and handles
 // incoming messages automatically in another goroutine.
-func OpenSecureChannel(ctx context.Context, transportConn net.Conn, cfg *Config) (*SecureChannel, error) {
-	return openSecureChannel(ctx, transportConn, cfg, 5*time.Second, 3)
-}
+func OpenSecureChannel(ctx context.Context, transportConn net.Conn, cfg *Config, interval time.Duration, maxRetry int) (*SecureChannel, error) {
+	if err := cfg.validate("client"); err != nil {
+		return nil, err
+	}
 
-/* XXX - maybe useful for users to have them?
-func OpenSecureChannelSecNone(ctx context.Context, transportConn net.Conn, lifetime uint32) (*SecureChannel, error) {
-	return openSecureChannel(ctx, transportConn, services.SecModeNone, lifetime, nil, 5*time.Second, 3)
-}
-
-func OpenSecureChannelSecSign(ctx context.Context, transportConn net.Conn, lifetime uint32) (*SecureChannel, error) {
-	return openSecureChannel(ctx, transportConn, services.SecModeSign, lifetime, nil, 5*time.Second, 3)
-}
-
-func OpenSecureChannelSecSignAndEncrypt(ctx context.Context, transportConn net.Conn) (*SecureChannel, error) {
-	return openSecureChannel(ctx, transportConn, services.SecModeSignAndEncrypt, lifetime, nonce, 5*time.Second, 3)
-}
-*/
-
-func openSecureChannel(ctx context.Context, transportConn net.Conn, cfg *Config, interval time.Duration, maxRetry int) (*SecureChannel, error) {
 	secChan := &SecureChannel{
 		mu:        new(sync.Mutex),
 		lowerConn: transportConn,
@@ -83,24 +69,6 @@ func openSecureChannel(ctx context.Context, transportConn net.Conn, cfg *Config,
 			}
 			sent++
 		}
-	}
-}
-
-// NewSessionConfigClient creates a SessionConfig for client.
-func NewSessionConfigClient(locales []string, userToken datatypes.UserIdentityToken) *SessionConfig {
-	return &SessionConfig{
-		SessionTimeout: 0xffff,
-		ClientDescription: datatypes.NewApplicationDescription(
-			"urn:gopcua:client", "urn:gopcua", "gopcua - OPC UA implementation in pure Golang",
-			datatypes.AppTypeClient, "", "", []string{""},
-		),
-		ClientSignature: datatypes.NewSignatureData("", nil),
-		ClientSoftwareCertificates: []*datatypes.SignedSoftwareCertificate{
-			datatypes.NewSignedSoftwareCertificate(nil, nil),
-		},
-		LocaleIDs:          locales,
-		UserIdentityToken:  userToken,
-		UserTokenSignature: datatypes.NewSignatureData("", nil),
 	}
 }
 
