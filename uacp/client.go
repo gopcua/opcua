@@ -44,6 +44,7 @@ func dial(ctx context.Context, endpoint string, interval time.Duration, maxRetry
 		lenChan:     make(chan int),
 		errChan:     make(chan error),
 		rcvBuf:      make([]byte, 0xffff),
+		sndBuf:      make([]byte, 0xffff),
 		rep:         endpoint,
 	}
 	conn.lowerConn, err = net.Dial(network, raddr.String())
