@@ -322,7 +322,7 @@ func TestParseNodeID(t *testing.T) {
 
 		// error flows
 		{s: "i=1", err: errors.New("invalid node id: i=1")},
-		{s: "nsu=abc;i=1", err: errors.New("namespace urls are not yet supported: nsu=abc;i=1")},
+		{s: "nsu=abc;i=1", err: errors.New("namespace urls are not supported: nsu=abc;i=1")},
 		{s: "ns=65536;i=1", err: errors.New("namespace id out of range (0..65535): ns=65536;i=1")},
 		{s: "ns=abc;i=1", err: errors.New("invalid namespace id: ns=abc;i=1")},
 		{s: "ns=1;i=abc", err: errors.New("invalid numeric id: ns=1;i=abc")},
