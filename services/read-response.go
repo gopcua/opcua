@@ -22,13 +22,7 @@ type ReadResponse struct {
 // NewReadResponse creates a new ReadResponse.
 func NewReadResponse(resHeader *ResponseHeader, diag []*DiagnosticInfo, results ...*datatypes.DataValue) *ReadResponse {
 	return &ReadResponse{
-		TypeID: datatypes.NewExpandedNodeID(
-			false, false,
-			datatypes.NewFourByteNodeID(
-				0, ServiceTypeReadResponse,
-			),
-			"", 0,
-		),
+		TypeID:          datatypes.NewFourByteExpandedNodeID(0, ServiceTypeReadResponse),
 		ResponseHeader:  resHeader,
 		Results:         datatypes.NewDataValueArray(results),
 		DiagnosticInfos: NewDiagnosticInfoArray(diag),

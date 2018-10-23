@@ -43,13 +43,7 @@ type FindServersOnNetworkRequest struct {
 // NewFindServersOnNetworkRequest creates a new FindServersOnNetworkRequest.
 func NewFindServersOnNetworkRequest(reqHeader *RequestHeader, startRecord, maxRecords uint32, filters ...string) *FindServersOnNetworkRequest {
 	f := &FindServersOnNetworkRequest{
-		TypeID: datatypes.NewExpandedNodeID(
-			false, false,
-			datatypes.NewFourByteNodeID(
-				0, ServiceTypeFindServersOnNetworkRequest,
-			),
-			"", 0,
-		),
+		TypeID:             datatypes.NewFourByteExpandedNodeID(0, ServiceTypeFindServersOnNetworkRequest),
 		RequestHeader:      reqHeader,
 		StartingRecordID:   startRecord,
 		MaxRecordsToReturn: maxRecords,

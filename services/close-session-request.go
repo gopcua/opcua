@@ -21,13 +21,7 @@ type CloseSessionRequest struct {
 // NewCloseSessionRequest creates a CloseSessionRequest.
 func NewCloseSessionRequest(reqHeader *RequestHeader, deleteSubs bool) *CloseSessionRequest {
 	return &CloseSessionRequest{
-		TypeID: datatypes.NewExpandedNodeID(
-			false, false,
-			datatypes.NewFourByteNodeID(
-				0, ServiceTypeCloseSessionRequest,
-			),
-			"", 0,
-		),
+		TypeID:              datatypes.NewFourByteExpandedNodeID(0, ServiceTypeCloseSessionRequest),
 		RequestHeader:       reqHeader,
 		DeleteSubscriptions: datatypes.NewBoolean(deleteSubs),
 	}

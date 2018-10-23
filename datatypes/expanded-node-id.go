@@ -37,6 +37,20 @@ func NewExpandedNodeID(hasURI, hasIndex bool, nodeID NodeID, uri string, idx uin
 	return e
 }
 
+// NewTwoByteExpandedNodeID creates a two byte numeric expanded node id.
+func NewTwoByteExpandedNodeID(id uint8) *ExpandedNodeID {
+	return &ExpandedNodeID{
+		NodeID: NewTwoByteNodeID(id),
+	}
+}
+
+// NewFourByteExpandedNodeID creates a four byte numeric expanded node id.
+func NewFourByteExpandedNodeID(ns uint8, id uint16) *ExpandedNodeID {
+	return &ExpandedNodeID{
+		NodeID: NewFourByteNodeID(ns, id),
+	}
+}
+
 // DecodeExpandedNodeID decodes given bytes into ExpandedNodeID.
 func DecodeExpandedNodeID(b []byte) (*ExpandedNodeID, error) {
 	e := &ExpandedNodeID{}

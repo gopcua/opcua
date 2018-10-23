@@ -20,13 +20,7 @@ type CloseSessionResponse struct {
 // NewCloseSessionResponse creates an CloseSessionResponse.
 func NewCloseSessionResponse(resHeader *ResponseHeader) *CloseSessionResponse {
 	return &CloseSessionResponse{
-		TypeID: datatypes.NewExpandedNodeID(
-			false, false,
-			datatypes.NewFourByteNodeID(
-				0, ServiceTypeCloseSessionResponse,
-			),
-			"", 0,
-		),
+		TypeID:         datatypes.NewFourByteExpandedNodeID(0, ServiceTypeCloseSessionResponse),
 		ResponseHeader: resHeader,
 	}
 }

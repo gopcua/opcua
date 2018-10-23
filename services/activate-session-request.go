@@ -33,13 +33,7 @@ type ActivateSessionRequest struct {
 // NewActivateSessionRequest creates a new ActivateSessionRequest.
 func NewActivateSessionRequest(reqHeader *RequestHeader, sig *SignatureData, locales []string, userToken datatypes.UserIdentityToken, tokenSig *SignatureData) *ActivateSessionRequest {
 	return &ActivateSessionRequest{
-		TypeID: datatypes.NewExpandedNodeID(
-			false, false,
-			datatypes.NewFourByteNodeID(
-				0, ServiceTypeActivateSessionRequest,
-			),
-			"", 0,
-		),
+		TypeID:                     datatypes.NewFourByteExpandedNodeID(0, ServiceTypeActivateSessionRequest),
 		RequestHeader:              reqHeader,
 		ClientSignature:            sig,
 		ClientSoftwareCertificates: &SignedSoftwareCertificateArray{ArraySize: 0},

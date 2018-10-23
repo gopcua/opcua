@@ -27,13 +27,7 @@ type FindServersRequest struct {
 // NewFindServersRequest creates a new FindServersRequest.
 func NewFindServersRequest(reqHeader *RequestHeader, url string, locales []string, serverURIs ...string) *FindServersRequest {
 	f := &FindServersRequest{
-		TypeID: datatypes.NewExpandedNodeID(
-			false, false,
-			datatypes.NewFourByteNodeID(
-				0, ServiceTypeFindServersRequest,
-			),
-			"", 0,
-		),
+		TypeID:        datatypes.NewFourByteExpandedNodeID(0, ServiceTypeFindServersRequest),
 		RequestHeader: reqHeader,
 		EndpointURL:   datatypes.NewString(url),
 		LocaleIDs:     datatypes.NewStringArray(locales),

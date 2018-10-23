@@ -22,13 +22,7 @@ type FindServersResponse struct {
 // NewFindServersResponse creates an FindServersResponse.
 func NewFindServersResponse(resHeader *ResponseHeader, servers ...*ApplicationDescription) *FindServersResponse {
 	return &FindServersResponse{
-		TypeID: datatypes.NewExpandedNodeID(
-			false, false,
-			datatypes.NewFourByteNodeID(
-				0, ServiceTypeFindServersResponse,
-			),
-			"", 0,
-		),
+		TypeID:         datatypes.NewFourByteExpandedNodeID(0, ServiceTypeFindServersResponse),
 		ResponseHeader: resHeader,
 		Servers:        NewApplicationDescriptionArray(servers),
 	}

@@ -32,11 +32,7 @@ type CreateSessionResponse struct {
 // NewCreateSessionResponse creates a new NewCreateSessionResponse with the given parameters.
 func NewCreateSessionResponse(resHeader *ResponseHeader, sessionID, authToken datatypes.NodeID, timeout uint64, nonce, cert []byte, svrSignature *SignatureData, maxRespSize uint32, endpoints ...*EndpointDescription) *CreateSessionResponse {
 	return &CreateSessionResponse{
-		TypeID: datatypes.NewExpandedNodeID(
-			false, false,
-			datatypes.NewFourByteNodeID(0, ServiceTypeCreateSessionResponse),
-			"", 0,
-		),
+		TypeID:                     datatypes.NewFourByteExpandedNodeID(0, ServiceTypeCreateSessionResponse),
 		ResponseHeader:             resHeader,
 		SessionID:                  sessionID,
 		AuthenticationToken:        authToken,
