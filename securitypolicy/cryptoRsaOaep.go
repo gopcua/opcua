@@ -14,7 +14,7 @@ import (
 	_ "crypto/sha256"
 )
 
-func minPaddingRsaOAEP(hash crypto.Hash) func() int {
+func minPaddingRsaOAEP(hash crypto.Hash) int {
 	// messageLen = (keyLenBits / 8) - 2*(hashLenBits / 8) - 2
 	// paddingLen = keyLen - messageLen
 	//            = 2*hashLenBytes + 2
@@ -26,9 +26,7 @@ func minPaddingRsaOAEP(hash crypto.Hash) func() int {
 		hLen = 64
 	}
 
-	return func() int {
-		return (2 * hLen) + 2
-	}
+	return (2 * hLen) + 2
 }
 
 func decryptRsaOAEP(hash crypto.Hash, privKey *rsa.PrivateKey) func([]byte) ([]byte, error) {
@@ -67,7 +65,7 @@ func encryptRsaOAEP(hash crypto.Hash, pubKey *rsa.PublicKey) func([]byte) ([]byt
 	return func(src []byte) ([]byte, error) {
 		var ciphertext []byte
 
-		maxBlock := keySize(pubKey) - minPaddingRsaOAEP(hash)()
+		maxBlock := keySize(pubKey) - minPaddingRsaOAEP(hash)
 		srcRemaining := len(src)
 		start := 0
 		for srcRemaining > 0 {

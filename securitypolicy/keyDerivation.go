@@ -44,10 +44,12 @@ type derivedKeys struct {
 
 func generateKeys(hmacFunc func(input []byte) ([]byte, error), seed []byte, signingLength, encryptingLength, encryptingBlockSize int) *derivedKeys {
 	var p []byte
+	a, _ := hmacFunc(seed)
 	for len(p) < signingLength+encryptingLength+encryptingBlockSize {
-		input := append(p, seed...)
+		input := append(a, seed...)
 		h, _ := hmacFunc(input)
 		p = append(p, h...)
+		a, _ = hmacFunc(a)
 	}
 
 	return &derivedKeys{

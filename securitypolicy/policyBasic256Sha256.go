@@ -6,6 +6,7 @@ package securitypolicy
 
 import (
 	"crypto"
+	"crypto/aes"
 	"crypto/rsa"
 	"errors"
 	"fmt"
@@ -62,11 +63,11 @@ func newBasic256Rsa256Symmetric(localNonce []byte, remoteNonce []byte) (*Encrypt
 		encryptionBlockSize = blockSizeAES()
 	)
 
-	localKeys := generateKeys(computeHmac(crypto.SHA256, remoteNonce), localNonce, signatureKeyLength, encryptionKeyLength, encryptionBlockSize)
-	remoteKeys := generateKeys(computeHmac(crypto.SHA256, localNonce), remoteNonce, signatureKeyLength, encryptionKeyLength, encryptionBlockSize)
+	localKeys := generateKeys(computeHmac(crypto.SHA256, localNonce), remoteNonce, signatureKeyLength, encryptionKeyLength, encryptionBlockSize)
+	remoteKeys := generateKeys(computeHmac(crypto.SHA256, remoteNonce), localNonce, signatureKeyLength, encryptionKeyLength, encryptionBlockSize)
 
-	e.blockSize = blockSizeAES
-	e.minPadding = minPaddingAES
+	e.blockSize = aes.BlockSize
+	e.minPadding = minPaddingAES()
 	e.encrypt = encryptAES(256, remoteKeys.iv, remoteKeys.encryption) // AES256-CBC
 	e.decrypt = decryptAES(256, localKeys.iv, localKeys.encryption)   // AES256-CBC
 	e.signature = computeHmac(crypto.SHA256, remoteKeys.signing)      // HMAC-SHA2-256
@@ -95,12 +96,13 @@ func newBasic256Rsa256Asymmetric(localKey *rsa.PrivateKey, remoteKey *rsa.Public
 
 	e := new(EncryptionAlgorithm)
 
-	e.blockSize = blockSizeNone
+	e.blockSize = keySize(remoteKey)
 	e.minPadding = minPaddingRsaOAEP(crypto.SHA1)
 	e.encrypt = encryptRsaOAEP(crypto.SHA1, remoteKey)           // RSA-OAEP-SHA1
 	e.decrypt = decryptRsaOAEP(crypto.SHA1, localKey)            // RSA-OAEP-SHA1
 	e.signature = signPKCS1v15(crypto.SHA256, localKey)          // RSA-PKCS15-SHA2-256
 	e.verifySignature = verifyPKCS1v15(crypto.SHA256, remoteKey) // RSA-PKCS15-SHA2-256
+	e.signatureLength = keySize(&localKey.PublicKey)
 	e.encryptionURI = "http://www.w3.org/2001/04/xmlenc#rsa-oaep"
 	e.signatureURI = "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"
 

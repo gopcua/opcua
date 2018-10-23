@@ -6,6 +6,7 @@ package securitypolicy
 
 import (
 	"crypto"
+	"crypto/aes"
 	"crypto/rsa"
 	"errors"
 	"fmt"
@@ -48,15 +49,16 @@ func newBasic256Symmetric(localNonce []byte, remoteNonce []byte) (*EncryptionAlg
 		encryptionBlockSize = blockSizeAES()
 	)
 
-	localKeys := generateKeys(computeHmac(crypto.SHA1, remoteNonce), localNonce, signatureKeyLength, encryptionKeyLength, encryptionBlockSize)
-	remoteKeys := generateKeys(computeHmac(crypto.SHA1, localNonce), remoteNonce, signatureKeyLength, encryptionKeyLength, encryptionBlockSize)
+	localKeys := generateKeys(computeHmac(crypto.SHA1, localNonce), remoteNonce, signatureKeyLength, encryptionKeyLength, encryptionBlockSize)
+	remoteKeys := generateKeys(computeHmac(crypto.SHA1, remoteNonce), localNonce, signatureKeyLength, encryptionKeyLength, encryptionBlockSize)
 
-	e.blockSize = blockSizeAES
-	e.minPadding = minPaddingAES
+	e.blockSize = aes.BlockSize
+	e.minPadding = minPaddingAES()
 	e.encrypt = encryptAES(256, remoteKeys.iv, remoteKeys.encryption) // AES256-CBC
 	e.decrypt = decryptAES(256, localKeys.iv, localKeys.encryption)   // AES256-CBC
 	e.signature = computeHmac(crypto.SHA1, remoteKeys.signing)        // HMAC-SHA1
 	e.verifySignature = verifyHmac(crypto.SHA1, localKeys.signing)    // HMAC-SHA1
+	e.signatureLength = 160 / 8
 	e.encryptionURI = "http://www.w3.org/2001/04/xmlenc#aes256-cbc"
 	e.signatureURI = "http://www.w3.org/2000/09/xmldsig#hmac-sha1"
 
@@ -81,12 +83,13 @@ func newBasic256Asymmetric(localKey *rsa.PrivateKey, remoteKey *rsa.PublicKey) (
 
 	e := new(EncryptionAlgorithm)
 
-	e.blockSize = blockSizeNone
-	e.minPadding = minPaddingRsaPKCS1v15
+	e.blockSize = keySize(remoteKey)
+	e.minPadding = minPaddingRsaPKCS1v15()
 	e.encrypt = encryptRsaOAEP(crypto.SHA1, remoteKey)         // RSA-OAEP
 	e.decrypt = decryptRsaOAEP(crypto.SHA1, localKey)          // RSA-OAEP
 	e.signature = signPKCS1v15(crypto.SHA1, localKey)          // RSA-SHA1
 	e.verifySignature = verifyPKCS1v15(crypto.SHA1, remoteKey) // RSA-SHA1
+	e.signatureLength = keySize(&localKey.PublicKey)
 	e.encryptionURI = "http://www.w3.org/2001/04/xmlenc#rsa-oaep"
 	e.signatureURI = "http://www.w3.org/2000/09/xmldsig#rsa-sha1"
 

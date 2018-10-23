@@ -23,12 +23,13 @@ import (
 // The zero value of this struct will use SecurityPolicy#None although
 // using in this manner is discouraged for readability
 type EncryptionAlgorithm struct {
-	blockSize       func() int
-	minPadding      func() int
+	blockSize       int
+	minPadding      int
 	encrypt         func(cleartext []byte) (ciphertext []byte, err error)
 	decrypt         func(ciphertext []byte) (cleartext []byte, err error)
 	signature       func(message []byte) (signature []byte, err error)
 	verifySignature func(message, signature []byte) error
+	signatureLength int
 	encryptionURI   string
 	signatureURI    string
 }
@@ -71,22 +72,14 @@ func Symmetric(policyURI string, localNonce []byte, remoteNonce []byte) (*Encryp
 // Used to calculate the padding required to make the cleartext an
 // even multiple of the blocksize
 func (e *EncryptionAlgorithm) BlockSize() int {
-	if e.blockSize == nil {
-		e.blockSize = blockSizeNone
-	}
-
-	return e.blockSize()
+	return e.blockSize
 }
 
 // MinPadding returns the underlying encryption algorithm's minimum padding.
 // Used to calculate the maximum plaintext blocksize that can be fed into
 // the encryption algorithm.
 func (e *EncryptionAlgorithm) MinPadding() int {
-	if e.minPadding == nil {
-		e.minPadding = minPaddingNone
-	}
-
-	return e.minPadding()
+	return e.minPadding
 }
 
 // Encrypt encrypts the input cleartext based on the algorithms and keys passed in
@@ -125,6 +118,11 @@ func (e *EncryptionAlgorithm) VerifySignature(message, signature []byte) error {
 	}
 
 	return e.verifySignature(message, signature)
+}
+
+// SignatureLength returns the length in bytes for the signature algorithm
+func (e *EncryptionAlgorithm) SignatureLength() int {
+	return e.signatureLength
 }
 
 // EncryptionURI returns the URI for the encryption algorithm as defined
