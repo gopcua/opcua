@@ -134,7 +134,7 @@ func TestEncryptionAlgorithms(t *testing.T) {
 			t.Fatalf("failed to decrypt Symmetric (%s) : %s", c, err)
 		}
 		symDeciphered = symDeciphered[:len(symDeciphered)-padSize] // Trim off padding
-		if diff := cmp.Diff(symDeciphered, plaintext, nil); diff != "" {
+		if diff := cmp.Diff(symDeciphered, plaintext); diff != "" {
 			t.Errorf("Policy: %s\nsymmetric encryption failed:\n%s\n", c, diff)
 		}
 
@@ -142,7 +142,7 @@ func TestEncryptionAlgorithms(t *testing.T) {
 		// our byte slices are referencing the same data and the previous test may have
 		// been a false positive
 		paddedPlaintext[4] = 0xff ^ paddedPlaintext[4]
-		if diff := cmp.Diff(symDeciphered, payloadRef, nil); diff != "" {
+		if diff := cmp.Diff(symDeciphered, payloadRef); diff != "" {
 			t.Errorf("Policy: %s\nsymmetric input corruption detected:\n%s\n", c, diff)
 		}
 
@@ -165,12 +165,12 @@ func TestEncryptionAlgorithms(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to decrypt Asymmetric (%s) : %s", c, err)
 		}
-		if diff := cmp.Diff(asymDeciphered, plaintext, nil); diff != "" {
+		if diff := cmp.Diff(asymDeciphered, plaintext); diff != "" {
 			t.Errorf("Policy: %s\nasymmetric encryption failed:\n%s\n", c, diff)
 		}
 
 		paddedPlaintext[4] = 0xff ^ paddedPlaintext[4]
-		if diff := cmp.Diff(asymDeciphered, payloadRef, nil); diff != "" {
+		if diff := cmp.Diff(asymDeciphered, payloadRef); diff != "" {
 			t.Errorf("Policy: %s\nasymmetric input corruption detected:\n%s\n", c, diff)
 		}
 
