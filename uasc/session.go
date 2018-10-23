@@ -563,6 +563,41 @@ func (s *Session) ReadResponse(results ...*datatypes.DataValue) error {
 	return nil
 }
 
+// WriteRequest sends a WriteRequest.
+func (s *Session) WriteRequest(nodes ...*datatypes.WriteValue) error {
+	s.secChan.reqHeader.RequestHandle++
+	s.secChan.reqHeader.Timestamp = time.Now()
+	wrr, err := services.NewWriteRequest(
+		s.secChan.reqHeader, nodes...,
+	).Serialize()
+	if err != nil {
+		s.secChan.reqHeader.RequestHandle--
+		return err
+	}
+
+	if _, err := s.secChan.WriteService(wrr); err != nil {
+		s.secChan.reqHeader.RequestHandle--
+		return err
+	}
+	return nil
+}
+
+// WriteResponse sends a WriteResponse.
+func (s *Session) WriteResponse(results ...uint32) error {
+	s.secChan.resHeader.Timestamp = time.Now()
+	wrr, err := services.NewWriteResponse(
+		s.secChan.resHeader, nil, results...,
+	).Serialize()
+	if err != nil {
+		return err
+	}
+
+	if _, err := s.secChan.WriteService(wrr); err != nil {
+		return err
+	}
+	return nil
+}
+
 func validateSignature(received, expected *services.SignatureData) error {
 	if received.Algorithm == nil || expected.Algorithm == nil {
 		return nil
