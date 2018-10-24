@@ -5,6 +5,7 @@
 package datatypes
 
 import (
+	"math"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
