@@ -23,7 +23,7 @@ func TestCreateSubscriptionRequest(t *testing.T) {
 						0xfe, 0x8d, 0x87, 0x79, 0xf7, 0x03, 0x27, 0x77,
 						0xc5, 0x03, 0xa1, 0x09, 0x50, 0x29, 0x27, 0x60,
 					}),
-					AuditEntryID:  datatypes.NewString(""),
+					AuditEntryID:  "",
 					RequestHandle: 1003429,
 					TimeoutHint:   10000,
 					AdditionalHeader: &AdditionalHeader{
@@ -36,7 +36,7 @@ func TestCreateSubscriptionRequest(t *testing.T) {
 				RequestedLifetimeCount:      2400,
 				RequestedMaxKeepAliveCount:  10,
 				MaxNotificationsPerPublish:  65536,
-				PublishingEnabled:           datatypes.NewBoolean(true),
+				PublishingEnabled:           true,
 				Priority:                    0,
 			},
 			Bytes: []byte{
@@ -53,14 +53,7 @@ func TestCreateSubscriptionRequest(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases, func(b []byte) (codectest.S, error) {
-		v, err := DecodeCreateSubscriptionRequest(b)
-		if err != nil {
-			return nil, err
-		}
-		v.Payload = nil
-		return v, nil
-	})
+	codectest.Run(t, cases)
 
 	t.Run("service-id", func(t *testing.T) {
 		id := new(CreateSubscriptionRequest).ServiceType()

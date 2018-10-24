@@ -5,12 +5,7 @@
 package uacp
 
 import (
-	"encoding/binary"
 	"fmt"
-
-	"github.com/wmnsk/gopcua/datatypes"
-
-	"github.com/wmnsk/gopcua/errors"
 )
 
 // Error definitions.
@@ -46,99 +41,23 @@ const (
 //
 // Specification: Part6, 7.1.2.5
 type Error struct {
-	*Header
 	Error  uint32
-	Reason *datatypes.String
+	Reason string
 }
 
 // NewError creates a new OPC UA Error.
 func NewError(err uint32, reason string) *Error {
-	e := &Error{
-		Header: NewHeader(
-			MessageTypeError,
-			ChunkTypeFinal,
-			nil,
-		),
+	return &Error{
 		Error:  err,
-		Reason: datatypes.NewString(reason),
+		Reason: reason,
 	}
-	e.SetLength()
-
-	return e
-}
-
-// DecodeError decodes given bytes into OPC UA Error.
-func DecodeError(b []byte) (*Error, error) {
-	e := &Error{}
-	if err := e.DecodeFromBytes(b); err != nil {
-		return nil, err
-	}
-
-	return e, nil
-}
-
-// DecodeFromBytes decodes given bytes into OPC UA Error.
-func (e *Error) DecodeFromBytes(b []byte) error {
-	var err error
-	if len(b) < 8 {
-		return errors.NewErrTooShortToDecode(e, "should be longer than 8 bytes")
-	}
-
-	e.Header, err = DecodeHeader(b)
-	if err != nil {
-		return err
-	}
-	b = e.Header.Payload
-
-	e.Error = binary.LittleEndian.Uint32(b[:4])
-	e.Reason = &datatypes.String{}
-	return e.Reason.DecodeFromBytes(b[4:])
-}
-
-// Serialize serializes OPC UA Error into bytes.
-func (e *Error) Serialize() ([]byte, error) {
-	b := make([]byte, int(e.MessageSize))
-	if err := e.SerializeTo(b); err != nil {
-		return nil, err
-	}
-	return b, nil
-}
-
-// SerializeTo serializes OPC UA Error into given bytes.
-// TODO: add error handling.
-func (e *Error) SerializeTo(b []byte) error {
-	if e == nil {
-		return errors.NewErrReceiverNil(e)
-	}
-	e.Header.Payload = make([]byte, e.Len()-8)
-
-	binary.LittleEndian.PutUint32(e.Header.Payload[:4], e.Error)
-	if e.Reason != nil {
-		if err := e.Reason.SerializeTo(e.Header.Payload[4:]); err != nil {
-			return err
-		}
-	}
-
-	e.Header.SetLength()
-	return e.Header.SerializeTo(b)
-}
-
-// Len returns the actual length of Error in int.
-func (e *Error) Len() int {
-	return 12 + e.Reason.Len()
-}
-
-// SetLength sets the length of Error.
-func (e *Error) SetLength() {
-	e.MessageSize = uint32(12 + e.Reason.Len())
 }
 
 // String returns Error in string.
 func (e *Error) String() string {
 	return fmt.Sprintf(
-		"Header: %v, Error: %d, Reason: %s",
-		e.Header,
+		"Error: %d, Reason: %s",
 		e.Error,
-		e.Reason.Get(),
+		e.Reason,
 	)
 }

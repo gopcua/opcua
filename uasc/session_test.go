@@ -63,17 +63,16 @@ func TestClientSessionWrite(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := cliSession.Write(msg); err != nil {
+	if err := cliSession.WriteService(msg); err != nil {
 		t.Fatal(err)
 	}
 
-	buf := make([]byte, 1024)
-	n, err := srvSession.Read(buf)
+	got, err := srvSession.ReadService()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if diff := cmp.Diff(buf[:n], msg); diff != "" {
+	if diff := cmp.Diff(got, msg); diff != "" {
 		t.Error(diff)
 	}
 }
@@ -88,17 +87,16 @@ func TestServerSessionWrite(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := srvSession.Write(msg); err != nil {
+	if err := srvSession.WriteService(msg); err != nil {
 		t.Fatal(err)
 	}
 
-	buf := make([]byte, 1024)
-	n, err := cliSession.Read(buf)
+	got, err := cliSession.ReadService()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if diff := cmp.Diff(buf[:n], msg); diff != "" {
+	if diff := cmp.Diff(got, msg); diff != "" {
 		t.Error(diff)
 	}
 }

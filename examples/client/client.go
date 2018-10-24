@@ -9,7 +9,6 @@ package main
 
 import (
 	"context"
-	"encoding/hex"
 	"flag"
 	"log"
 	"time"
@@ -18,13 +17,12 @@ import (
 	"github.com/wmnsk/gopcua/services"
 	"github.com/wmnsk/gopcua/uacp"
 	"github.com/wmnsk/gopcua/uasc"
-	"github.com/wmnsk/gopcua/utils"
 )
 
 func main() {
 	var (
-		endpoint   = flag.String("endpoint", "opc.tcp://example.com/foo/bar", "OPC UA Endpoint URL")
-		payloadHex = flag.String("payload", "deadbeef", "Payload to send in hex stream format")
+		endpoint = flag.String("endpoint", "opc.tcp://example.com/foo/bar", "OPC UA Endpoint URL")
+		// payloadHex = flag.String("payload", "deadbeef", "Payload to send in hex stream format")
 	)
 	flag.Parse()
 
@@ -103,13 +101,13 @@ func main() {
 	log.Println("Successfully sent ReadRequest")
 
 	// Send arbitrary payload on top of UASC SecureChannel.
-	payload, err := hex.DecodeString(*payloadHex)
-	if err != nil {
-		log.Fatal(err)
-	}
-	if _, err := secChan.WriteService(payload); err != nil {
-		log.Fatal(err)
-	}
-	log.Printf("Successfully sent message: %x\n%s", payload, utils.Wireshark(0, payload))
+	// payload, err := hex.DecodeString(*payloadHex)
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// if err := secChan.WriteService(payload); err != nil {
+	// 	log.Fatal(err)
+	// }
+	// log.Printf("Successfully sent message: %x\n%s", payload, utils.Wireshark(0, payload))
 	time.Sleep(500 * time.Millisecond)
 }

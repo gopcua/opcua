@@ -44,7 +44,5 @@ func TestLocalizedText(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases, func(b []byte) (codectest.S, error) {
-		return DecodeLocalizedText(b)
-	})
+	codectest.Run(t, cases)
 }

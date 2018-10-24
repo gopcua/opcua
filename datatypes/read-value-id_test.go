@@ -34,36 +34,38 @@ func TestReadValueID(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases, func(b []byte) (codectest.S, error) {
-		return DecodeReadValueID(b)
-	})
+	codectest.Run(t, cases)
 }
 
 func TestReadValueIDArray(t *testing.T) {
 	cases := []codectest.Case{
 		{
+			Name:   "empty",
+			Struct: []*ReadValueID{},
+			Bytes: []byte{
+				// length
+				0x00, 0x00, 0x00, 0x00,
+			},
+		},
+		{
 			Name: "Normal",
-			Struct: NewReadValueIDArray(
-				[]*ReadValueID{
-					{
-						NodeID:       NewStringNodeID(1, "Temperature"),
-						AttributeID:  IntegerIDNodeClass,
-						IndexRange:   NewString(""),
-						DataEncoding: NewQualifiedName(0, ""),
-					},
-					{
-						NodeID:       NewStringNodeID(1, "Temperature"),
-						AttributeID:  IntegerIDBrowseName,
-						IndexRange:   NewString(""),
-						DataEncoding: NewQualifiedName(0, ""),
-					},
-					{
-						NodeID:       NewStringNodeID(1, "Temperature"),
-						AttributeID:  IntegerIDDisplayName,
-						IndexRange:   NewString(""),
-						DataEncoding: NewQualifiedName(0, ""),
-					},
-				}),
+			Struct: []*ReadValueID{
+				{
+					NodeID:       NewStringNodeID(1, "Temperature"),
+					AttributeID:  IntegerIDNodeClass,
+					DataEncoding: NewQualifiedName(0, ""),
+				},
+				{
+					NodeID:       NewStringNodeID(1, "Temperature"),
+					AttributeID:  IntegerIDBrowseName,
+					DataEncoding: NewQualifiedName(0, ""),
+				},
+				{
+					NodeID:       NewStringNodeID(1, "Temperature"),
+					AttributeID:  IntegerIDDisplayName,
+					DataEncoding: NewQualifiedName(0, ""),
+				},
+			},
 			Bytes: []byte{
 				// Length
 				0x03, 0x00, 0x00, 0x00,
@@ -109,7 +111,5 @@ func TestReadValueIDArray(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases, func(b []byte) (codectest.S, error) {
-		return DecodeReadValueIDArray(b)
-	})
+	codectest.Run(t, cases)
 }

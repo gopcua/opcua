@@ -23,9 +23,10 @@ func TestActivateSessionRequest(t *testing.T) {
 						0xa6, 0x43, 0xf8, 0x77, 0x7b, 0xc6, 0x2f, 0xc8,
 					}),
 					time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-					1, 0, 0, "", NewNullAdditionalHeader(), nil,
+					1, 0, 0, "", NewNullAdditionalHeader(),
 				),
-				NewSignatureData("", nil), nil,
+				NewSignatureData("", nil),
+				nil,
 				datatypes.NewAnonymousIdentityToken("anonymous"),
 				NewSignatureData("", nil),
 			),
@@ -53,8 +54,10 @@ func TestActivateSessionRequest(t *testing.T) {
 				0xff, 0xff, 0xff, 0xff,
 				// ClientSoftwareCertificates
 				0xff, 0xff, 0xff, 0xff,
-				// LocaleIDs
-				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+				// Algorithm
+				0xff, 0xff, 0xff, 0xff,
+				// Signature
+				0xff, 0xff, 0xff, 0xff,
 				// UserIdentityToken
 				// TypeID
 				0x01, 0x00, 0x41, 0x01,
@@ -69,14 +72,7 @@ func TestActivateSessionRequest(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases, func(b []byte) (codectest.S, error) {
-		v, err := DecodeActivateSessionRequest(b)
-		if err != nil {
-			return nil, err
-		}
-		v.Payload = nil
-		return v, nil
-	})
+	codectest.Run(t, cases)
 
 	t.Run("service-id", func(t *testing.T) {
 		id := new(ActivateSessionRequest).ServiceType()

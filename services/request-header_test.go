@@ -31,7 +31,6 @@ func TestRequestHeader(t *testing.T) {
 						),
 						0x00,
 					),
-					[]byte{0xde, 0xad, 0xbe, 0xef},
 				)
 				r.SetDiagAll()
 				return r
@@ -52,12 +51,8 @@ func TestRequestHeader(t *testing.T) {
 				0x00, 0x00, 0x00, 0x00,
 				// AdditionalHeader
 				0x00, 0xff, 0x00,
-				// dummy Payload
-				0xde, 0xad, 0xbe, 0xef,
 			},
 		},
 	}
-	codectest.Run(t, cases, func(b []byte) (codectest.S, error) {
-		return DecodeRequestHeader(b)
-	})
+	codectest.Run(t, cases)
 }

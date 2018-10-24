@@ -26,7 +26,5 @@ func TestAdditionalHeader(t *testing.T) {
 			Bytes: []byte{0x00, 0xff, 0x00},
 		},
 	}
-	codectest.Run(t, cases, func(b []byte) (codectest.S, error) {
-		return DecodeAdditionalHeader(b)
-	})
+	codectest.Run(t, cases)
 }

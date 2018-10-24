@@ -19,7 +19,7 @@ func TestCreateSessionResponse(t *testing.T) {
 			Struct: NewCreateSessionResponse(
 				NewResponseHeader(
 					time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-					1, 0, NewNullDiagnosticInfo(), []string{}, NewNullAdditionalHeader(), nil,
+					1, 0, datatypes.NewNullDiagnosticInfo(), []string{}, NewNullAdditionalHeader(),
 				),
 				datatypes.NewNumericNodeID(0, 1),
 				datatypes.NewOpaqueNodeID(0, []byte{
@@ -38,21 +38,19 @@ func TestCreateSessionResponse(t *testing.T) {
 						"app-uri", "prod-uri", "app-name", AppTypeServer,
 						"gw-uri", "prof-uri", []string{"discov-uri-1", "discov-uri-2"},
 					),
-					[]byte{},
+					nil,
 					SecModeNone,
 					"sec-uri",
-					NewUserTokenPolicyArray(
-						[]*UserTokenPolicy{
-							NewUserTokenPolicy(
-								"1", UserTokenAnonymous,
-								"issued-token", "issuer-uri", "sec-uri",
-							),
-							NewUserTokenPolicy(
-								"1", UserTokenAnonymous,
-								"issued-token", "issuer-uri", "sec-uri",
-							),
-						},
-					),
+					[]*UserTokenPolicy{
+						NewUserTokenPolicy(
+							"1", UserTokenAnonymous,
+							"issued-token", "issuer-uri", "sec-uri",
+						),
+						NewUserTokenPolicy(
+							"1", UserTokenAnonymous,
+							"issued-token", "issuer-uri", "sec-uri",
+						),
+					},
 					"trans-uri",
 					0,
 				),
@@ -62,21 +60,19 @@ func TestCreateSessionResponse(t *testing.T) {
 						"app-uri", "prod-uri", "app-name", AppTypeServer,
 						"gw-uri", "prof-uri", []string{"discov-uri-1", "discov-uri-2"},
 					),
-					[]byte{},
+					nil,
 					SecModeNone,
 					"sec-uri",
-					NewUserTokenPolicyArray(
-						[]*UserTokenPolicy{
-							NewUserTokenPolicy(
-								"1", UserTokenAnonymous,
-								"issued-token", "issuer-uri", "sec-uri",
-							),
-							NewUserTokenPolicy(
-								"1", UserTokenAnonymous,
-								"issued-token", "issuer-uri", "sec-uri",
-							),
-						},
-					),
+					[]*UserTokenPolicy{
+						NewUserTokenPolicy(
+							"1", UserTokenAnonymous,
+							"issued-token", "issuer-uri", "sec-uri",
+						),
+						NewUserTokenPolicy(
+							"1", UserTokenAnonymous,
+							"issued-token", "issuer-uri", "sec-uri",
+						),
+					},
 					"trans-uri",
 					0,
 				),
@@ -190,7 +186,7 @@ func TestCreateSessionResponse(t *testing.T) {
 				// SecurityLevel
 				0x00,
 				// ServerSoftwareCertificates
-				0x00, 0x00, 0x00, 0x00,
+				0xff, 0xff, 0xff, 0xff,
 				// ServerSignature
 				0x2a, 0x00, 0x00, 0x00, 0x68, 0x74, 0x74, 0x70, 0x3a, 0x2f, 0x2f, 0x77, 0x77, 0x77, 0x2e, 0x77,
 				0x33, 0x2e, 0x6f, 0x72, 0x67, 0x2f, 0x32, 0x30, 0x30, 0x30, 0x2f, 0x30, 0x39, 0x2f, 0x78, 0x6d,
@@ -201,14 +197,7 @@ func TestCreateSessionResponse(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases, func(b []byte) (codectest.S, error) {
-		v, err := DecodeCreateSessionResponse(b)
-		if err != nil {
-			return nil, err
-		}
-		v.Payload = nil
-		return v, nil
-	})
+	codectest.Run(t, cases)
 
 	t.Run("service-id", func(t *testing.T) {
 		id := new(CreateSessionResponse).ServiceType()

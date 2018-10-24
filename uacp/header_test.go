@@ -4,33 +4,25 @@
 
 package uacp
 
-import (
-	"testing"
-
-	"github.com/wmnsk/gopcua/utils/codectest"
-)
-
-func TestHeader(t *testing.T) {
-	cases := []codectest.Case{
-		{
-			Struct: NewHeader(
-				MessageTypeHello,
-				ChunkTypeFinal,
-				[]byte{0xde, 0xad, 0xbe, 0xef},
-			),
-			Bytes: []byte{ // Hello message
-				// MessageType: HEL
-				0x48, 0x45, 0x4c,
-				// Chunk Type: Final
-				0x46,
-				// MessageSize: 12
-				0x0c, 0x00, 0x00, 0x00,
-				// dummy Payload
-				0xde, 0xad, 0xbe, 0xef,
-			},
-		},
-	}
-	codectest.Run(t, cases, func(b []byte) (codectest.S, error) {
-		return DecodeHeader(b)
-	})
-}
+// todo(fs): this test should be removed since the header is now sent in conn.go
+// todo(fs): and is no longer part of the message itself.
+// func TestHeader(t *testing.T) {
+// 	cases := []codectest.Case{
+// 		{
+// 			Struct: &Header{
+// 				MessageType: MessageTypeHello,
+// 				ChunkType:   ChunkTypeFinal,
+// 				MessageSize: 0xab,
+// 			},
+// 			Bytes: []byte{ // Hello message
+// 				// MessageType: HEL
+// 				0x48, 0x45, 0x4c,
+// 				// Chunk Type: Final
+// 				0x46,
+// 				// MessageSize:
+// 				0xab, 0x00,
+// 			},
+// 		},
+// 	}
+// 	codectest.Run(t, cases)
+// }

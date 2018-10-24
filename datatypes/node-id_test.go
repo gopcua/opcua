@@ -10,6 +10,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/wmnsk/gopcua"
 	"github.com/wmnsk/gopcua/utils/codectest"
 )
 
@@ -91,9 +92,27 @@ func TestNodeID(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases, func(b []byte) (codectest.S, error) {
-		return DecodeNodeID(b)
-	})
+	codectest.Run(t, cases)
+}
+
+func BenchmarkReflectDecode(b *testing.B) {
+	data := []byte{
+		// mask
+		0x05,
+		// namespace
+		0x00, 0x80,
+		// length
+		0x04, 0x00, 0x00, 0x00,
+		// value
+		0xde, 0xad, 0xbe, 0xef,
+	}
+
+	for i := 0; i < b.N; i++ {
+		v := new(NodeID)
+		if err := gopcua.Decode(data, v); err != nil {
+			b.Fatal(err)
+		}
+	}
 }
 
 func TestNewNodeID(t *testing.T) {

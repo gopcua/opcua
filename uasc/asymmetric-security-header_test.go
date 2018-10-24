@@ -18,7 +18,7 @@ func TestAsymmetricSecurityHeader(t *testing.T) {
 				"http://gopcua.example/OPCUA/SecurityPolicy#Foo",
 				[]byte{0xde, 0xad},
 				[]byte{0xbe, 0xef},
-				[]byte{0xde, 0xad, 0xbe, 0xef},
+				//[]byte{0xde, 0xad, 0xbe, 0xef},
 			),
 			Bytes: []byte{
 				// SecurityPolicyURILength
@@ -35,7 +35,7 @@ func TestAsymmetricSecurityHeader(t *testing.T) {
 				// ReceiverCertificateThumbprint
 				0x02, 0x00, 0x00, 0x00, 0xbe, 0xef,
 				// dummy Payload
-				0xde, 0xad, 0xbe, 0xef,
+				//0xde, 0xad, 0xbe, 0xef,
 			},
 		},
 		{
@@ -44,7 +44,7 @@ func TestAsymmetricSecurityHeader(t *testing.T) {
 				"",
 				[]byte{0xde, 0xad},
 				[]byte{0xbe, 0xef},
-				[]byte{0xde, 0xad, 0xbe, 0xef},
+				//[]byte{0xde, 0xad, 0xbe, 0xef},
 			),
 			Bytes: []byte{
 				// SecurityPolicyURILength
@@ -54,7 +54,7 @@ func TestAsymmetricSecurityHeader(t *testing.T) {
 				// ReceiverCertificateThumbprint
 				0x02, 0x00, 0x00, 0x00, 0xbe, 0xef,
 				// dummy Payload
-				0xde, 0xad, 0xbe, 0xef,
+				//0xde, 0xad, 0xbe, 0xef,
 			},
 		},
 		{
@@ -63,7 +63,7 @@ func TestAsymmetricSecurityHeader(t *testing.T) {
 				"http://gopcua.example/OPCUA/SecurityPolicy#Foo",
 				nil,
 				[]byte{0xbe, 0xef},
-				[]byte{0xde, 0xad, 0xbe, 0xef},
+				//[]byte{0xde, 0xad, 0xbe, 0xef},
 			),
 			Bytes: []byte{
 				// SecurityPolicyURILength
@@ -80,7 +80,7 @@ func TestAsymmetricSecurityHeader(t *testing.T) {
 				// ReceiverCertificateThumbprint
 				0x02, 0x00, 0x00, 0x00, 0xbe, 0xef,
 				// dummy Payload
-				0xde, 0xad, 0xbe, 0xef,
+				//0xde, 0xad, 0xbe, 0xef,
 			},
 		},
 		{
@@ -89,7 +89,7 @@ func TestAsymmetricSecurityHeader(t *testing.T) {
 				"http://gopcua.example/OPCUA/SecurityPolicy#Foo",
 				[]byte{0xde, 0xad},
 				nil,
-				[]byte{0xde, 0xad, 0xbe, 0xef},
+				//[]byte{0xde, 0xad, 0xbe, 0xef},
 			),
 			Bytes: []byte{
 				// SecurityPolicyURILength
@@ -106,7 +106,7 @@ func TestAsymmetricSecurityHeader(t *testing.T) {
 				// ReceiverCertificateThumbprint
 				0xff, 0xff, 0xff, 0xff,
 				// dummy Payload
-				0xde, 0xad, 0xbe, 0xef,
+				//0xde, 0xad, 0xbe, 0xef,
 			},
 		},
 		{
@@ -115,7 +115,7 @@ func TestAsymmetricSecurityHeader(t *testing.T) {
 				"http://gopcua.example/OPCUA/SecurityPolicy#Foo",
 				[]byte{0xde, 0xad},
 				[]byte{0xbe, 0xef},
-				nil,
+				//nil,
 			),
 			Bytes: []byte{
 				// SecurityPolicyURILength
@@ -139,7 +139,7 @@ func TestAsymmetricSecurityHeader(t *testing.T) {
 				"",
 				nil,
 				nil,
-				nil,
+				//nil,
 			),
 			Bytes: []byte{
 				// SecurityPolicyURILength
@@ -151,7 +151,5 @@ func TestAsymmetricSecurityHeader(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases, func(b []byte) (codectest.S, error) {
-		return DecodeAsymmetricSecurityHeader(b)
-	})
+	codectest.Run(t, cases)
 }

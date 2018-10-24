@@ -1,60 +1,59 @@
 package codectest
 
 import (
+	"reflect"
 	"testing"
+
+	"github.com/wmnsk/gopcua"
 
 	"github.com/pascaldekloe/goe/verify"
 )
-
-type S interface {
-	Serialize() ([]byte, error)
-	Len() int
-}
 
 // Case describes a test case for a encoding and decoding an
 // object from bytes.
 type Case struct {
 	Name   string
-	Struct S
+	Struct interface{}
 	Bytes  []byte
 }
 
-// DecoderFunc creates an object from bytes.
-type DecoderFunc func([]byte) (S, error)
-
 // Run tests encoding, decoding and length calclulation for the given
 // object.
-func Run(t *testing.T, cases []Case, decode DecoderFunc) {
+func Run(t *testing.T, cases []Case) {
 	t.Helper()
 
 	for _, c := range cases {
 		t.Run(c.Name, func(t *testing.T) {
 			t.Run("decode", func(t *testing.T) {
-				v, err := decode(c.Bytes)
-				if err != nil {
+				// create a new instance of the same type as c.Struct
+				typ := reflect.ValueOf(c.Struct).Type()
+				var v reflect.Value
+				switch typ.Kind() {
+				case reflect.Ptr:
+					v = reflect.New(typ.Elem()) // typ: *struct, v: *struct
+				case reflect.Slice:
+					v = reflect.New(typ) // typ: []x, v: *[]x
+				default:
+					t.Fatalf("%T is not a pointer or a slice", c.Struct)
+				}
+
+				if err := gopcua.Decode(c.Bytes, v.Interface()); err != nil {
 					t.Fatal(err)
 				}
 
-				if got, want := v, c.Struct; !verify.Values(t, "", got, want) {
-					t.Fail()
+				// if v is a *[]x we need to dereference it before comparing it.
+				if typ.Kind() == reflect.Slice {
+					v = v.Elem()
 				}
+				verify.Values(t, "", v.Interface(), c.Struct)
 			})
 
 			t.Run("encode", func(t *testing.T) {
-				b, err := c.Struct.Serialize()
+				b, err := gopcua.Encode(c.Struct)
 				if err != nil {
 					t.Fatal(err)
 				}
-
-				if got, want := b, c.Bytes; !verify.Values(t, "", got, want) {
-					t.Fail()
-				}
-			})
-
-			t.Run("len", func(t *testing.T) {
-				if got, want := c.Struct.Len(), len(c.Bytes); got != want {
-					t.Fatalf("got %v want %v", got, want)
-				}
+				verify.Values(t, "", b, c.Bytes)
 			})
 		})
 	}

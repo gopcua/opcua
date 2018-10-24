@@ -21,9 +21,7 @@ func TestAnonymousIdentityToken(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases, func(b []byte) (codectest.S, error) {
-		return DecodeAnonymousIdentityToken(b)
-	})
+	codectest.Run(t, cases)
 }
 
 func TestUserNameIdentityToken(t *testing.T) {
@@ -43,9 +41,7 @@ func TestUserNameIdentityToken(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases, func(b []byte) (codectest.S, error) {
-		return DecodeUserNameIdentityToken(b)
-	})
+	codectest.Run(t, cases)
 }
 
 func TestX509IdentityToken(t *testing.T) {
@@ -61,9 +57,7 @@ func TestX509IdentityToken(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases, func(b []byte) (codectest.S, error) {
-		return DecodeX509IdentityToken(b)
-	})
+	codectest.Run(t, cases)
 }
 
 func TestIssuedIdentityToken(t *testing.T) {
@@ -81,7 +75,5 @@ func TestIssuedIdentityToken(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases, func(b []byte) (codectest.S, error) {
-		return DecodeIssuedIdentityToken(b)
-	})
+	codectest.Run(t, cases)
 }

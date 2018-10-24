@@ -21,12 +21,6 @@ func TestHello(t *testing.T) {
 				"opc.tcp://wow.its.easy:11111/UA/Server", // EndPointURL
 			),
 			Bytes: []byte{ // Hello message
-				// MessageType: HEL
-				0x48, 0x45, 0x4c,
-				// Chunk Type: F
-				0x46,
-				// MessageSize: 70
-				0x46, 0x00, 0x00, 0x00,
 				// Version: 0
 				0x00, 0x00, 0x00, 0x00,
 				// ReceiveBufSize: 65280
@@ -47,12 +41,5 @@ func TestHello(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases, func(b []byte) (codectest.S, error) {
-		v, err := DecodeHello(b)
-		if err != nil {
-			return nil, err
-		}
-		v.Payload = nil
-		return v, nil
-	})
+	codectest.Run(t, cases)
 }

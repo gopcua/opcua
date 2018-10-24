@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/wmnsk/gopcua/errors"
+	"github.com/wmnsk/gopcua"
 )
 
 // GUID represents GUID in binary stream. It is a 16-byte globally unique identifier.
@@ -36,61 +36,30 @@ func NewGUID(guid string) *GUID {
 		return nil
 	}
 
-	g := &GUID{}
-	g.Data1 = binary.BigEndian.Uint32(b[:4])
-	g.Data2 = binary.BigEndian.Uint16(b[4:6])
-	g.Data3 = binary.BigEndian.Uint16(b[6:8])
-	g.Data4 = binary.BigEndian.Uint64(b[8:16])
-
-	return g
-}
-
-// DecodeGUID decodes given bytes into GUID.
-func DecodeGUID(b []byte) (*GUID, error) {
-	g := &GUID{}
-	if err := g.DecodeFromBytes(b); err != nil {
-		return nil, err
+	return &GUID{
+		Data1: binary.BigEndian.Uint32(b[:4]),
+		Data2: binary.BigEndian.Uint16(b[4:6]),
+		Data3: binary.BigEndian.Uint16(b[6:8]),
+		Data4: binary.BigEndian.Uint64(b[8:16]),
 	}
-
-	return g, nil
 }
 
-// DecodeFromBytes decodes given bytes into GUID.
-func (g *GUID) DecodeFromBytes(b []byte) error {
-	if len(b) < 16 {
-		return errors.NewErrTooShortToDecode(g, "should be 16 bytes")
-	}
-
-	g.Data1 = binary.LittleEndian.Uint32(b[:4])
-	g.Data2 = binary.LittleEndian.Uint16(b[4:6])
-	g.Data3 = binary.LittleEndian.Uint16(b[6:8])
-	g.Data4 = binary.LittleEndian.Uint64(b[8:16])
-	return nil
+func (g *GUID) Decode(b []byte) (int, error) {
+	buf := gopcua.NewBuffer(b)
+	g.Data1 = buf.ReadUint32()
+	g.Data2 = buf.ReadUint16()
+	g.Data3 = buf.ReadUint16()
+	g.Data4 = buf.ReadUint64()
+	return buf.Pos(), buf.Error()
 }
 
-// Serialize serializes GUID into bytes.
-func (g *GUID) Serialize() ([]byte, error) {
-	b := make([]byte, g.Len())
-	if err := g.SerializeTo(b); err != nil {
-		return nil, err
-	}
-
-	return b, nil
-}
-
-// SerializeTo serializes GUID into given bytes.
-func (g *GUID) SerializeTo(b []byte) error {
-	binary.LittleEndian.PutUint32(b[:4], g.Data1)
-	binary.LittleEndian.PutUint16(b[4:6], g.Data2)
-	binary.LittleEndian.PutUint16(b[6:8], g.Data3)
-	binary.LittleEndian.PutUint64(b[8:16], g.Data4)
-
-	return nil
-}
-
-// Len returns the actual size of GUID in int.
-func (g *GUID) Len() int {
-	return 16
+func (g *GUID) Encode() ([]byte, error) {
+	buf := gopcua.NewBuffer(nil)
+	buf.WriteUint32(g.Data1)
+	buf.WriteUint16(g.Data2)
+	buf.WriteUint16(g.Data3)
+	buf.WriteUint64(g.Data4)
+	return buf.Bytes(), buf.Error()
 }
 
 // String returns GUID in human-readable string.

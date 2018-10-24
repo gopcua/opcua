@@ -5,7 +5,6 @@
 package services
 
 import (
-	"encoding/binary"
 	"fmt"
 
 	"github.com/wmnsk/gopcua/datatypes"
@@ -28,79 +27,6 @@ func NewCancelRequest(reqHeader *RequestHeader, reqHandle uint32) *CancelRequest
 		RequestHeader: reqHeader,
 		RequestHandle: reqHandle,
 	}
-}
-
-// DecodeCancelRequest decodes given bytes into CancelRequest.
-func DecodeCancelRequest(b []byte) (*CancelRequest, error) {
-	c := &CancelRequest{}
-	if err := c.DecodeFromBytes(b); err != nil {
-		return nil, err
-	}
-
-	return c, nil
-}
-
-// DecodeFromBytes decodes given bytes into CancelRequest.
-func (c *CancelRequest) DecodeFromBytes(b []byte) error {
-	var offset = 0
-	c.TypeID = &datatypes.ExpandedNodeID{}
-	if err := c.TypeID.DecodeFromBytes(b[offset:]); err != nil {
-		return err
-	}
-	offset += c.TypeID.Len()
-
-	c.RequestHeader = &RequestHeader{}
-	if err := c.RequestHeader.DecodeFromBytes(b[offset:]); err != nil {
-		return err
-	}
-	offset += c.RequestHeader.Len() - len(c.RequestHeader.Payload)
-
-	c.RequestHandle = binary.LittleEndian.Uint32(b[offset : offset+4])
-	return nil
-}
-
-// Serialize serializes CancelRequest into bytes.
-func (c *CancelRequest) Serialize() ([]byte, error) {
-	b := make([]byte, c.Len())
-	if err := c.SerializeTo(b); err != nil {
-		return nil, err
-	}
-
-	return b, nil
-}
-
-// SerializeTo serializes CancelRequest into bytes.
-func (c *CancelRequest) SerializeTo(b []byte) error {
-	var offset = 0
-	if c.TypeID != nil {
-		if err := c.TypeID.SerializeTo(b[offset:]); err != nil {
-			return err
-		}
-		offset += c.TypeID.Len()
-	}
-
-	if c.RequestHeader != nil {
-		if err := c.RequestHeader.SerializeTo(b[offset:]); err != nil {
-			return err
-		}
-		offset += c.RequestHeader.Len()
-	}
-
-	binary.LittleEndian.PutUint32(b[offset:offset+4], c.RequestHandle)
-	return nil
-}
-
-// Len returns the actual length of CancelRequest in int.
-func (c *CancelRequest) Len() int {
-	var l = 4
-	if c.TypeID != nil {
-		l += c.TypeID.Len()
-	}
-	if c.RequestHeader != nil {
-		l += c.RequestHeader.Len()
-	}
-
-	return l
 }
 
 // String returns CancelRequest in string.

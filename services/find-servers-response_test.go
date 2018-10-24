@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wmnsk/gopcua/datatypes"
 	"github.com/wmnsk/gopcua/utils/codectest"
 )
 
@@ -18,7 +19,7 @@ func TestFindServersResponse(t *testing.T) {
 			Struct: NewFindServersResponse(
 				NewResponseHeader(
 					time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-					1, 0, NewNullDiagnosticInfo(), []string{}, NewNullAdditionalHeader(), nil,
+					1, 0, datatypes.NewNullDiagnosticInfo(), []string{}, NewNullAdditionalHeader(),
 				),
 				NewApplicationDescription(
 					"app-uri",
@@ -94,14 +95,7 @@ func TestFindServersResponse(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases, func(b []byte) (codectest.S, error) {
-		v, err := DecodeFindServersResponse(b)
-		if err != nil {
-			return nil, err
-		}
-		v.Payload = nil
-		return v, nil
-	})
+	codectest.Run(t, cases)
 
 	t.Run("service-id", func(t *testing.T) {
 		id := new(FindServersResponse).ServiceType()

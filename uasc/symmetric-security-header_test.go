@@ -16,19 +16,15 @@ func TestSymmetricSecurityHeader(t *testing.T) {
 			Name: "normal",
 			Struct: NewSymmetricSecurityHeader(
 				0x11223344,
-				[]byte{0xde, 0xad, 0xbe, 0xef},
 			),
 			Bytes: []byte{
 				// TokenID
 				0x44, 0x33, 0x22, 0x11,
-				// dummy Payload
-				0xde, 0xad, 0xbe, 0xef,
 			},
 		}, {
 			Name: "no-payload",
 			Struct: NewSymmetricSecurityHeader(
 				0x11223344,
-				nil,
 			),
 			Bytes: []byte{
 				// TokenID
@@ -36,7 +32,5 @@ func TestSymmetricSecurityHeader(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases, func(b []byte) (codectest.S, error) {
-		return DecodeSymmetricSecurityHeader(b)
-	})
+	codectest.Run(t, cases)
 }

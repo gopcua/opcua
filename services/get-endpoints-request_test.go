@@ -23,7 +23,7 @@ func TestGetEndpointsRequest(t *testing.T) {
 						0xa6, 0x43, 0xf8, 0x77, 0x7b, 0xc6, 0x2f, 0xc8,
 					}),
 					time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-					1, 0, 0, "", NewNullAdditionalHeader(), nil,
+					1, 0, 0, "", NewNullAdditionalHeader(),
 				),
 				"opc.tcp://wow.its.easy:11111/UA/Server",
 				nil,
@@ -56,20 +56,13 @@ func TestGetEndpointsRequest(t *testing.T) {
 				0x2f, 0x55, 0x41, 0x2f, 0x53, 0x65, 0x72, 0x76,
 				0x65, 0x72,
 				// LocaleIDs
-				0x00, 0x00, 0x00, 0x00,
+				0xff, 0xff, 0xff, 0xff,
 				// ProfileURIs
-				0x00, 0x00, 0x00, 0x00,
+				0xff, 0xff, 0xff, 0xff,
 			},
 		},
 	}
-	codectest.Run(t, cases, func(b []byte) (codectest.S, error) {
-		v, err := DecodeGetEndpointsRequest(b)
-		if err != nil {
-			return nil, err
-		}
-		v.Payload = nil
-		return v, nil
-	})
+	codectest.Run(t, cases)
 
 	t.Run("service-id", func(t *testing.T) {
 		id := new(GetEndpointsRequest).ServiceType()

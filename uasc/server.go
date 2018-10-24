@@ -25,11 +25,11 @@ func ListenAndAcceptSecureChannel(ctx context.Context, transport net.Conn, cfg *
 		lowerConn: transport,
 		reqHeader: services.NewRequestHeader(
 			datatypes.NewTwoByteNodeID(0), time.Now(), 0, 0,
-			0xffff, "", services.NewNullAdditionalHeader(), nil,
+			0xffff, "", services.NewNullAdditionalHeader(),
 		),
 		resHeader: services.NewResponseHeader(
-			time.Now(), 0, 0, services.NewNullDiagnosticInfo(),
-			[]string{}, services.NewNullAdditionalHeader(), nil,
+			time.Now(), 0, 0, &datatypes.DiagnosticInfo{},
+			[]string{}, services.NewNullAdditionalHeader(),
 		),
 		cfg:     cfg,
 		state:   srvStateSecureChannelClosed,

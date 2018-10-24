@@ -18,7 +18,7 @@ func TestActivateSessionResponse(t *testing.T) {
 			Struct: NewActivateSessionResponse(
 				NewResponseHeader(
 					time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-					1, 0, NewNullDiagnosticInfo(), []string{}, NewNullAdditionalHeader(), nil,
+					1, 0, nil, []string{}, NewNullAdditionalHeader(),
 				),
 				nil,
 				nil,
@@ -42,16 +42,16 @@ func TestActivateSessionResponse(t *testing.T) {
 				// ServerNonce
 				0xff, 0xff, 0xff, 0xff,
 				// Results
-				0x00, 0x00, 0x00, 0x00,
+				0xff, 0xff, 0xff, 0xff,
 				// DiagnosticInfos
-				0x00, 0x00, 0x00, 0x00,
+				0xff, 0xff, 0xff, 0xff,
 			},
 		}, { // With dummy nonce, no results and diags
 			Name: "with-nonce",
 			Struct: NewActivateSessionResponse(
 				NewResponseHeader(
 					time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-					1, 0, NewNullDiagnosticInfo(), []string{}, NewNullAdditionalHeader(), nil,
+					1, 0, nil, []string{}, NewNullAdditionalHeader(),
 				),
 				[]byte{0xde, 0xad, 0xbe, 0xef},
 				nil,
@@ -76,20 +76,13 @@ func TestActivateSessionResponse(t *testing.T) {
 				0x04, 0x00, 0x00, 0x00,
 				0xde, 0xad, 0xbe, 0xef,
 				// Results
-				0x00, 0x00, 0x00, 0x00,
+				0xff, 0xff, 0xff, 0xff,
 				// DiagnosticInfos
-				0x00, 0x00, 0x00, 0x00,
+				0xff, 0xff, 0xff, 0xff,
 			},
 		},
 	}
-	codectest.Run(t, cases, func(b []byte) (codectest.S, error) {
-		v, err := DecodeActivateSessionResponse(b)
-		if err != nil {
-			return nil, err
-		}
-		v.Payload = nil
-		return v, nil
-	})
+	codectest.Run(t, cases)
 
 	t.Run("service-id", func(t *testing.T) {
 		id := new(ActivateSessionResponse).ServiceType()

@@ -8,10 +8,12 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"sync"
 	"time"
 
+	"github.com/wmnsk/gopcua"
 	"github.com/wmnsk/gopcua/errors"
 	"github.com/wmnsk/gopcua/utils"
 )
@@ -169,12 +171,15 @@ func (c *Conn) SetWriteDeadline(t time.Time) error {
 
 // Hello sends UACP Hello message to Conn.
 func (c *Conn) Hello() error {
-	hel, err := NewHello(0, uint32(len(c.rcvBuf)), uint32(len(c.sndBuf)), 0, c.rep).Serialize()
-	if err != nil {
-		return err
+	m := &Hello{
+		Version:        0,
+		ReceiveBufSize: uint32(len(c.rcvBuf)),
+		SendBufSize:    uint32(len(c.sndBuf)),
+		MaxMessageSize: 0,
+		MaxChunkCount:  0,
+		EndPointURL:    c.rep,
 	}
-
-	if _, err := c.lowerConn.Write(hel); err != nil {
+	if err := c.send(MessageTypeHello, ChunkTypeFinal, m); err != nil {
 		return err
 	}
 	c.state = cliStateHelloSent
@@ -183,28 +188,36 @@ func (c *Conn) Hello() error {
 
 // Acknowledge sends Acknowledge message to Conn.
 func (c *Conn) Acknowledge() error {
-	ack, err := NewAcknowledge(0, uint32(len(c.rcvBuf)), uint32(len(c.sndBuf)), 0).Serialize()
-	if err != nil {
-		return err
-	}
-
-	if _, err := c.lowerConn.Write(ack); err != nil {
-		return err
-	}
-	return nil
+	m := NewAcknowledge(0, uint32(len(c.rcvBuf)), uint32(len(c.sndBuf)), 0)
+	return c.send(MessageTypeAcknowledge, ChunkTypeFinal, m)
 }
 
 // Error sends Error message to Conn.
 func (c *Conn) Error(code uint32, reason string) error {
-	e, err := NewError(code, reason).Serialize()
+	m := NewError(code, reason)
+	return c.send(MessageTypeError, ChunkTypeFinal, m)
+}
+
+func (c *Conn) send(msgType string, chunkType byte, v interface{}) error {
+	body, err := gopcua.Encode(v)
 	if err != nil {
 		return err
 	}
-
-	if _, err := c.lowerConn.Write(e); err != nil {
+	hdr := &Header{
+		MessageType: msgType,
+		ChunkType:   chunkType,
+		MessageSize: uint32(len(body) + 8),
+	}
+	b, err := hdr.Encode()
+	if err != nil {
 		return err
 	}
-	return nil
+	b = append(b, body...)
+	log.Printf("uacp: send %T, %d bytes", v, len(b))
+	if _, err = c.lowerConn.Write(b); err != nil {
+		log.Printf("uacp: send %T %s", v, err)
+	}
+	return err
 }
 
 type state uint8
@@ -263,6 +276,7 @@ func (c *Conn) monitor(ctx context.Context) {
 			if n == 0 {
 				continue
 			}
+			// log.Printf("uacp: recv %d bytes", n)
 
 			msg, err := Decode(c.rcvBuf[:n])
 			if err != nil {
@@ -270,17 +284,23 @@ func (c *Conn) monitor(ctx context.Context) {
 				go c.notifyLength(childCtx, n)
 				continue
 			}
+			log.Printf("uacp: recv %T, %d bytes", msg, n)
 			switch m := msg.(type) {
 			case *Hello:
+				// log.Printf("uacp: recv hello")
 				c.handleMsgHello(m)
 			case *Acknowledge:
+				// log.Printf("uacp: recv ack")
 				c.handleMsgAcknowledge(m)
 			case *Error:
+				// log.Printf("uacp: recv err")
 				c.handleMsgError(m)
 			case *ReverseHello:
+				// log.Printf("uacp: recv rhello")
 				c.handleMsgReverseHello(m)
 			default:
 				// pass to the user if type of msg is unknown.
+				// log.Printf("uacp: recv unknown")
 				go c.notifyLength(childCtx, n)
 			}
 		}
@@ -304,9 +324,9 @@ func (c *Conn) handleMsgHello(h *Hello) {
 	// server accepts Hello at anytime, as UACP does not have explicit connection closing message.
 	case srvStateClosed, srvStateEstablished:
 		spath, _ := utils.GetPath(c.lep)
-		cpath, err := utils.GetPath(h.EndPointURL.Get())
+		cpath, err := utils.GetPath(h.EndPointURL)
 		if err != nil || cpath != spath {
-			if err := c.Error(BadTCPEndpointURLInvalid, fmt.Sprintf("Endpoint: %s does not exist", h.EndPointURL.Get())); err != nil {
+			if err := c.Error(BadTCPEndpointURLInvalid, fmt.Sprintf("Endpoint: %s does not exist", h.EndPointURL)); err != nil {
 				c.errChan <- err
 				return
 			}
@@ -399,7 +419,7 @@ func (c *Conn) handleMsgReverseHello(r *ReverseHello) {
 	// if client conn is closed, accept ReverseHello.
 	// XXX - not likely to hit this condition.
 	case cliStateClosed:
-		c.rep = r.EndPointURL.Get()
+		c.rep = r.EndPointURL
 		ctx := context.Background()
 		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()

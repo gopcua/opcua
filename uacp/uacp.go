@@ -4,26 +4,19 @@
 
 package uacp
 
-// UACP is an interface for handling all type of UACP messages.
-type UACP interface {
-	Serialize() ([]byte, error)
-	SerializeTo([]byte) error
-	DecodeFromBytes([]byte) error
-	Len() int
-	String() string
-	MessageTypeValue() string
-	ChunkTypeValue() string
-}
+import "github.com/wmnsk/gopcua"
 
 // Decode decodes given bytes as UACP.
-func Decode(b []byte) (UACP, error) {
-	var u UACP
-	h, err := DecodeHeader(b)
+func Decode(b []byte) (interface{}, error) {
+	hdr := new(Header)
+	n, err := hdr.Decode(b)
 	if err != nil {
 		return nil, err
 	}
+	b = b[n:]
 
-	switch h.MessageTypeValue() {
+	var u interface{}
+	switch hdr.MessageType {
 	case MessageTypeHello:
 		u = &Hello{}
 	case MessageTypeAcknowledge:
@@ -36,9 +29,26 @@ func Decode(b []byte) (UACP, error) {
 		u = &Generic{}
 	}
 
-	if err := u.DecodeFromBytes(b); err != nil {
+	if err := gopcua.Decode(b, u); err != nil {
 		return nil, err
 	}
-
 	return u, nil
+}
+
+func Encode(msgType string, chunkType byte, v interface{}) ([]byte, error) {
+	body, err := gopcua.Encode(v)
+	if err != nil {
+		return nil, err
+	}
+	hdr := &Header{
+		MessageType: msgType,
+		ChunkType:   chunkType,
+		MessageSize: uint32(len(body) + 12),
+	}
+	b, err := hdr.Encode()
+	if err != nil {
+		return nil, err
+	}
+	b = append(b, body...)
+	return b, nil
 }

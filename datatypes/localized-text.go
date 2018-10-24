@@ -7,6 +7,8 @@ package datatypes
 import (
 	"fmt"
 
+	"github.com/wmnsk/gopcua"
+
 	"github.com/wmnsk/gopcua/id"
 )
 
@@ -18,88 +20,47 @@ import (
 // Specification: Part 6, 5.2.2.14
 type LocalizedText struct {
 	EncodingMask uint8
-	Locale       *String
-	Text         *String
+	Locale       string
+	Text         string
 }
 
 // NewLocalizedText creates a new NewLocalizedText.
 func NewLocalizedText(locale, text string) *LocalizedText {
-	var l = &LocalizedText{}
+	l := &LocalizedText{
+		Locale: locale,
+		Text:   text,
+	}
 	if locale != "" {
-		l.Locale = NewString(locale)
 		l.SetLocaleMask()
 	}
 	if text != "" {
-		l.Text = NewString(text)
 		l.SetTextMask()
 	}
-
 	return l
 }
 
-// DecodeLocalizedText decodes given bytes into LocalizedText.
-func DecodeLocalizedText(b []byte) (*LocalizedText, error) {
-	l := &LocalizedText{}
-	if err := l.DecodeFromBytes(b); err != nil {
-		return nil, err
+func (m *LocalizedText) Decode(b []byte) (int, error) {
+	buf := gopcua.NewBuffer(b)
+	m.EncodingMask = buf.ReadByte()
+	if m.HasLocale() {
+		m.Locale = buf.ReadString()
 	}
-	return l, nil
+	if m.HasText() {
+		m.Text = buf.ReadString()
+	}
+	return buf.Pos(), buf.Error()
 }
 
-// DecodeFromBytes decodes given bytes into LocalizedText.
-func (l *LocalizedText) DecodeFromBytes(b []byte) error {
-	l.EncodingMask = b[0]
-
-	var offset = 1
-	if l.HasLocale() {
-		l.Locale = &String{}
-		if err := l.Locale.DecodeFromBytes(b[offset:]); err != nil {
-			return err
-		}
-		offset += l.Locale.Len()
+func (m *LocalizedText) Encode() ([]byte, error) {
+	buf := gopcua.NewBuffer(nil)
+	buf.WriteUint8(m.EncodingMask)
+	if m.HasLocale() {
+		buf.WriteString(m.Locale)
 	}
-
-	if l.HasText() {
-		l.Text = &String{}
-		if err := l.Text.DecodeFromBytes(b[offset:]); err != nil {
-			return err
-		}
-		offset += l.Text.Len()
+	if m.HasText() {
+		buf.WriteString(m.Text)
 	}
-
-	return nil
-}
-
-// Serialize serializes LocalizedText into bytes.
-func (l *LocalizedText) Serialize() ([]byte, error) {
-	b := make([]byte, l.Len())
-	if err := l.SerializeTo(b); err != nil {
-		return nil, err
-	}
-
-	return b, nil
-}
-
-// SerializeTo serializes LocalizedText into bytes.
-func (l *LocalizedText) SerializeTo(b []byte) error {
-	b[0] = l.EncodingMask
-
-	var offset = 1
-	if l.Locale != nil {
-		if err := l.Locale.SerializeTo(b[offset:]); err != nil {
-			return err
-		}
-		offset += l.Locale.Len()
-	}
-
-	if l.Text != nil {
-		if err := l.Text.SerializeTo(b[offset:]); err != nil {
-			return err
-		}
-		offset += l.Text.Len()
-	}
-
-	return nil
+	return buf.Bytes(), buf.Error()
 }
 
 // HasLocale checks if the LocalizedText has HasLocale mask in EncodingMask.
@@ -120,19 +81,6 @@ func (l *LocalizedText) HasText() bool {
 // SetTextMask sets the HasText mask in EncodingMask.
 func (l *LocalizedText) SetTextMask() {
 	l.EncodingMask |= 0x2
-}
-
-// Len returns the actual length of LocalizedText in int.
-func (l *LocalizedText) Len() int {
-	var ll = 1
-	if l.Locale != nil {
-		ll += l.Locale.Len()
-	}
-	if l.Text != nil {
-		ll += l.Text.Len()
-	}
-
-	return ll
 }
 
 // String returns LocalizedText in string.

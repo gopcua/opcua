@@ -19,9 +19,9 @@ func TestResponseHeader(t *testing.T) {
 				time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
 				1,
 				0x00000000,
-				NewDiagnosticInfo(
+				datatypes.NewDiagnosticInfo(
 					false, false, false, false, false, false, false,
-					0, 0, 0, 0, nil, 0, nil,
+					0, 0, 0, 0, "", 0, nil,
 				),
 				[]string{"foo", "bar"},
 				NewAdditionalHeader(
@@ -32,7 +32,6 @@ func TestResponseHeader(t *testing.T) {
 					),
 					0x00,
 				),
-				[]byte{0xde, 0xad, 0xbe, 0xef},
 			),
 			Bytes: []byte{
 				// Timestamp
@@ -49,12 +48,8 @@ func TestResponseHeader(t *testing.T) {
 				0x61, 0x72,
 				// AdditionalHeader
 				0x00, 0xff, 0x00,
-				// dummy Payload
-				0xde, 0xad, 0xbe, 0xef,
 			},
 		},
 	}
-	codectest.Run(t, cases, func(b []byte) (codectest.S, error) {
-		return DecodeResponseHeader(b)
-	})
+	codectest.Run(t, cases)
 }

@@ -6,6 +6,7 @@ package uacp
 
 import (
 	"context"
+	"log"
 	"net"
 	"sync"
 	"time"
@@ -47,11 +48,14 @@ func dial(ctx context.Context, endpoint string, interval time.Duration, maxRetry
 		sndBuf:      make([]byte, 0xffff),
 		rep:         endpoint,
 	}
+
 	conn.lowerConn, err = net.Dial(network, raddr.String())
 	if err != nil {
 		return nil, err
 	}
+	log.Printf("uacp: connected")
 
+	log.Printf("uacp: send hello #1")
 	if err := conn.Hello(); err != nil {
 		return nil, err
 	}
@@ -66,15 +70,18 @@ func dial(ctx context.Context, endpoint string, interval time.Duration, maxRetry
 		select {
 		case ok := <-conn.established:
 			if ok {
+				log.Printf("uacp: established")
 				return conn, nil
 			}
 		case err := <-conn.errChan:
+			log.Printf("uacp: dial error %s", err)
 			return nil, err
 		case <-time.After(interval):
 			if err := conn.Hello(); err != nil {
 				return nil, err
 			}
 			sent++
+			log.Printf("uacp: send hello #%d", sent)
 		}
 	}
 }

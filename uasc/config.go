@@ -321,11 +321,10 @@ func NewServerSessionConfig(secChan *SecureChannel) *SessionConfig {
 					services.AppTypeServer, "", "", []string{""},
 				),
 				secChan.cfg.Certificate, secChan.cfg.SecurityMode, secChan.cfg.SecurityPolicyURI,
-				services.NewUserTokenPolicyArray(
-					[]*services.UserTokenPolicy{
-						services.NewUserTokenPolicy("", 0, "", "", ""),
-					},
-				), "", 0,
+				[]*services.UserTokenPolicy{
+					services.NewUserTokenPolicy("", 0, "", "", ""),
+				},
+				"", 0,
 			),
 		},
 	}

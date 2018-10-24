@@ -8,118 +8,78 @@ package errors
 import (
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
+	"github.com/pascaldekloe/goe/verify"
 )
 
 var dummy string
 
 func TestNewErrors(t *testing.T) {
 	t.Run("ErrTooShortToDecode", func(t *testing.T) {
-		t.Parallel()
-		e := NewErrTooShortToDecode(dummy, "should be XXX.")
-		expected := &ErrTooShortToDecode{
+		got := NewErrTooShortToDecode(dummy, "should be XXX.")
+		want := &ErrTooShortToDecode{
 			Type:    dummy,
 			Message: "should be XXX.",
 		}
-
-		if diff := cmp.Diff(e, expected); diff != "" {
-			t.Error(diff)
-		}
+		verify.Values(t, "", got, want)
 	})
 	t.Run("ErrInvalidLength", func(t *testing.T) {
-		t.Parallel()
-		e := NewErrInvalidLength(dummy, "should be XXX.")
-		expected := &ErrInvalidLength{
+		got := NewErrInvalidLength(dummy, "should be XXX.")
+		want := &ErrInvalidLength{
 			Type:    dummy,
 			Message: "should be XXX.",
 		}
-
-		if diff := cmp.Diff(e, expected); diff != "" {
-			t.Error(diff)
-		}
+		verify.Values(t, "", got, want)
 	})
 	t.Run("ErrUnsupported", func(t *testing.T) {
-		t.Parallel()
-		e := NewErrUnsupported(dummy, "XXX is not supported yet.")
-		expected := &ErrUnsupported{
+		got := NewErrUnsupported(dummy, "XXX is not supported yet.")
+		want := &ErrUnsupported{
 			Type:    dummy,
 			Message: "XXX is not supported yet.",
 		}
-
-		if diff := cmp.Diff(e, expected); diff != "" {
-			t.Error(diff)
-		}
+		verify.Values(t, "", got, want)
 	})
 	t.Run("ErrInvalidType", func(t *testing.T) {
-		t.Parallel()
-		e := NewErrInvalidType(dummy, "decode", "something's wrong.")
-		expected := &ErrInvalidType{
+		got := NewErrInvalidType(dummy, "decode", "something's wrong.")
+		want := &ErrInvalidType{
 			Type:    dummy,
 			Action:  "decode",
 			Message: "something's wrong.",
 		}
-
-		if diff := cmp.Diff(e, expected); diff != "" {
-			t.Error(diff)
-		}
+		verify.Values(t, "", got, want)
 	})
 	t.Run("ErrReceiverNil", func(t *testing.T) {
-		t.Parallel()
-		e := NewErrReceiverNil(dummy)
-		expected := &ErrReceiverNil{
+		got := NewErrReceiverNil(dummy)
+		want := &ErrReceiverNil{
 			Type: dummy,
 		}
-
-		if diff := cmp.Diff(e, expected); diff != "" {
-			t.Error(diff)
-		}
+		verify.Values(t, "", got, want)
 	})
 }
 
 func TestError(t *testing.T) {
 	t.Run("ErrTooShortToDecode", func(t *testing.T) {
-		t.Parallel()
-		e := NewErrTooShortToDecode(dummy, "should be XXX.").Error()
-		expected := "too short to decode as string: should be XXX."
-
-		if diff := cmp.Diff(e, expected); diff != "" {
-			t.Error(diff)
-		}
+		got := NewErrTooShortToDecode(dummy, "should be XXX.").Error()
+		want := "too short to decode as string: should be XXX."
+		verify.Values(t, "", got, want)
 	})
 	t.Run("ErrInvalidLength", func(t *testing.T) {
-		t.Parallel()
-		e := NewErrInvalidLength(dummy, "should be XXX.").Error()
-		expected := "got invalid Length in string: should be XXX."
-
-		if diff := cmp.Diff(e, expected); diff != "" {
-			t.Error(diff)
-		}
+		got := NewErrInvalidLength(dummy, "should be XXX.").Error()
+		want := "got invalid Length in string: should be XXX."
+		verify.Values(t, "", got, want)
 	})
 	t.Run("ErrUnsupported", func(t *testing.T) {
-		t.Parallel()
-		e := NewErrUnsupported(dummy, "XXX is not supported yet.").Error()
-		expected := "unsupported string: XXX is not supported yet."
-
-		if diff := cmp.Diff(e, expected); diff != "" {
-			t.Error(diff)
-		}
+		got := NewErrUnsupported(dummy, "XXX is not supported yet.").Error()
+		want := "unsupported string: XXX is not supported yet."
+		verify.Values(t, "", got, want)
 	})
 	t.Run("ErrInvalidType", func(t *testing.T) {
-		t.Parallel()
-		e := NewErrInvalidType(dummy, "decode", "something's wrong.").Error()
-		expected := "cannot decode as string: something's wrong."
-
-		if diff := cmp.Diff(e, expected); diff != "" {
-			t.Error(diff)
-		}
+		got := NewErrInvalidType(dummy, "decode", "something's wrong.").Error()
+		want := "cannot decode as string: something's wrong."
+		verify.Values(t, "", got, want)
 	})
 	t.Run("ErrReceiverNil", func(t *testing.T) {
-		t.Parallel()
-		e := NewErrReceiverNil(dummy).Error()
-		expected := "Receiver string is nil."
-
-		if diff := cmp.Diff(e, expected); diff != "" {
-			t.Error(diff)
-		}
+		got := NewErrReceiverNil(dummy).Error()
+		want := "Receiver string is nil."
+		verify.Values(t, "", got, want)
 	})
 }

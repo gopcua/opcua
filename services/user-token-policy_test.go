@@ -31,26 +31,22 @@ func TestUserTokenPolicy(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases, func(b []byte) (codectest.S, error) {
-		return DecodeUserTokenPolicy(b)
-	})
+	codectest.Run(t, cases)
 }
 
 func TestUserTokenPolicyArray(t *testing.T) {
 	cases := []codectest.Case{
 		{
-			Struct: NewUserTokenPolicyArray(
-				[]*UserTokenPolicy{
-					NewUserTokenPolicy(
-						"1", UserTokenAnonymous,
-						"issued-token", "issuer-uri", "sec-uri",
-					),
-					NewUserTokenPolicy(
-						"1", UserTokenAnonymous,
-						"issued-token", "issuer-uri", "sec-uri",
-					),
-				},
-			),
+			Struct: []*UserTokenPolicy{
+				NewUserTokenPolicy(
+					"1", UserTokenAnonymous,
+					"issued-token", "issuer-uri", "sec-uri",
+				),
+				NewUserTokenPolicy(
+					"1", UserTokenAnonymous,
+					"issued-token", "issuer-uri", "sec-uri",
+				),
+			},
 			Bytes: []byte{
 				// ArraySize
 				0x02, 0x00, 0x00, 0x00,
@@ -77,7 +73,5 @@ func TestUserTokenPolicyArray(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases, func(b []byte) (codectest.S, error) {
-		return DecodeUserTokenPolicyArray(b)
-	})
+	codectest.Run(t, cases)
 }

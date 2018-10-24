@@ -5,6 +5,7 @@
 package services
 
 import (
+	"github.com/wmnsk/gopcua"
 	"github.com/wmnsk/gopcua/datatypes"
 	"github.com/wmnsk/gopcua/errors"
 )
@@ -36,29 +37,27 @@ const (
 	ServiceTypeFindServersOnNetworkResponse uint16 = 12211
 )
 
-// Service is an interface to handle any kind of OPC UA Services.
 type Service interface {
-	DecodeFromBytes([]byte) error
-	Serialize() ([]byte, error)
-	SerializeTo([]byte) error
-	Len() int
-	String() string
 	ServiceType() uint16
 }
 
 // Decode decodes given bytes into Service, depending on the type of service.
 func Decode(b []byte) (Service, error) {
-	var s Service
-
-	typeID, err := datatypes.DecodeExpandedNodeID(b)
+	// peek at the type id without stripping it from the buffer to determine
+	// the type of service. The type id will be decoded again with the reflective
+	// decoder.
+	typeID := new(datatypes.ExpandedNodeID)
+	_, err := typeID.Decode(b)
 	if err != nil {
 		return nil, errors.NewErrUnsupported(typeID, "cannot decode TypeID.")
 	}
-	if typeID.NodeID.Type() != datatypes.TypeFourByte {
+	if typeID.NodeID.Type() != datatypes.NodeIDTypeFourByte {
 		return nil, errors.NewErrUnsupported(typeID.NodeID, "should be FourByteNodeID.")
 	}
 
+	var s Service
 	id := uint16(typeID.NodeID.IntID())
+	// log.Printf("Decode: id:%d %d bytes %x", id, len(b), b)
 	switch id {
 	case ServiceTypeFindServersRequest:
 		s = &FindServersRequest{}
@@ -110,9 +109,8 @@ func Decode(b []byte) (Service, error) {
 		return nil, errors.NewErrUnsupported(id, "unsupported or not implemented yet.")
 	}
 
-	if err := s.DecodeFromBytes(b); err != nil {
+	if err := gopcua.Decode(b, s); err != nil {
 		return nil, err
 	}
-
 	return s, nil
 }

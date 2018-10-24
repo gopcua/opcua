@@ -20,21 +20,19 @@ func TestEndpointDescription(t *testing.T) {
 					"app-uri", "prod-uri", "app-name", AppTypeServer,
 					"gw-uri", "prof-uri", []string{"discov-uri-1", "discov-uri-2"},
 				),
-				[]byte{},
+				nil,
 				SecModeNone,
 				"sec-uri",
-				NewUserTokenPolicyArray(
-					[]*UserTokenPolicy{
-						NewUserTokenPolicy(
-							"1", UserTokenAnonymous,
-							"issued-token", "issuer-uri", "sec-uri",
-						),
-						NewUserTokenPolicy(
-							"1", UserTokenAnonymous,
-							"issued-token", "issuer-uri", "sec-uri",
-						),
-					},
-				),
+				[]*UserTokenPolicy{
+					NewUserTokenPolicy(
+						"1", UserTokenAnonymous,
+						"issued-token", "issuer-uri", "sec-uri",
+					),
+					NewUserTokenPolicy(
+						"1", UserTokenAnonymous,
+						"issued-token", "issuer-uri", "sec-uri",
+					),
+				},
 				"trans-uri",
 				0,
 			),
@@ -95,67 +93,59 @@ func TestEndpointDescription(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases, func(b []byte) (codectest.S, error) {
-		return DecodeEndpointDescription(b)
-	})
+	codectest.Run(t, cases)
 }
 
 func TestEndpointDescriptionArray(t *testing.T) {
 	cases := []codectest.Case{
 		{
 			Name: "Normal",
-			Struct: NewEndpointDescriptionArray(
-				[]*EndpointDescription{
-					NewEndpointDescription(
-						"ep-url",
-						NewApplicationDescription(
-							"app-uri", "prod-uri", "app-name", AppTypeServer,
-							"gw-uri", "prof-uri", []string{"discov-uri-1", "discov-uri-2"},
-						),
-						[]byte{},
-						SecModeNone,
-						"sec-uri",
-						NewUserTokenPolicyArray(
-							[]*UserTokenPolicy{
-								NewUserTokenPolicy(
-									"1", UserTokenAnonymous,
-									"issued-token", "issuer-uri", "sec-uri",
-								),
-								NewUserTokenPolicy(
-									"1", UserTokenAnonymous,
-									"issued-token", "issuer-uri", "sec-uri",
-								),
-							},
-						),
-						"trans-uri",
-						0,
+			Struct: []*EndpointDescription{
+				NewEndpointDescription(
+					"ep-url",
+					NewApplicationDescription(
+						"app-uri", "prod-uri", "app-name", AppTypeServer,
+						"gw-uri", "prof-uri", []string{"discov-uri-1", "discov-uri-2"},
 					),
-					NewEndpointDescription(
-						"ep-url",
-						NewApplicationDescription(
-							"app-uri", "prod-uri", "app-name", AppTypeServer,
-							"gw-uri", "prof-uri", []string{"discov-uri-1", "discov-uri-2"},
+					nil,
+					SecModeNone,
+					"sec-uri",
+					[]*UserTokenPolicy{
+						NewUserTokenPolicy(
+							"1", UserTokenAnonymous,
+							"issued-token", "issuer-uri", "sec-uri",
 						),
-						[]byte{},
-						SecModeNone,
-						"sec-uri",
-						NewUserTokenPolicyArray(
-							[]*UserTokenPolicy{
-								NewUserTokenPolicy(
-									"1", UserTokenAnonymous,
-									"issued-token", "issuer-uri", "sec-uri",
-								),
-								NewUserTokenPolicy(
-									"1", UserTokenAnonymous,
-									"issued-token", "issuer-uri", "sec-uri",
-								),
-							},
+						NewUserTokenPolicy(
+							"1", UserTokenAnonymous,
+							"issued-token", "issuer-uri", "sec-uri",
 						),
-						"trans-uri",
-						0,
+					},
+					"trans-uri",
+					0,
+				),
+				NewEndpointDescription(
+					"ep-url",
+					NewApplicationDescription(
+						"app-uri", "prod-uri", "app-name", AppTypeServer,
+						"gw-uri", "prof-uri", []string{"discov-uri-1", "discov-uri-2"},
 					),
-				},
-			),
+					nil,
+					SecModeNone,
+					"sec-uri",
+					[]*UserTokenPolicy{
+						NewUserTokenPolicy(
+							"1", UserTokenAnonymous,
+							"issued-token", "issuer-uri", "sec-uri",
+						),
+						NewUserTokenPolicy(
+							"1", UserTokenAnonymous,
+							"issued-token", "issuer-uri", "sec-uri",
+						),
+					},
+					"trans-uri",
+					0,
+				),
+			},
 			Bytes: []byte{
 				// ArraySize
 				0x02, 0x00, 0x00, 0x00,
@@ -268,7 +258,5 @@ func TestEndpointDescriptionArray(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases, func(b []byte) (codectest.S, error) {
-		return DecodeEndpointDescriptionArray(b)
-	})
+	codectest.Run(t, cases)
 }

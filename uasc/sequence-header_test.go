@@ -17,15 +17,12 @@ func TestSequenceHeader(t *testing.T) {
 			Struct: NewSequenceHeader(
 				0x11223344,
 				0x44332211,
-				[]byte{0xde, 0xad, 0xbe, 0xef},
 			),
 			Bytes: []byte{
 				// SequenceNumber
 				0x44, 0x33, 0x22, 0x11,
 				// RequestID
 				0x11, 0x22, 0x33, 0x44,
-				// dummy Payload
-				0xde, 0xad, 0xbe, 0xef,
 			},
 		},
 		{
@@ -33,7 +30,6 @@ func TestSequenceHeader(t *testing.T) {
 			Struct: NewSequenceHeader(
 				0x11223344,
 				0x44332211,
-				nil,
 			),
 			Bytes: []byte{
 				// SequenceNumber
@@ -43,7 +39,5 @@ func TestSequenceHeader(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases, func(b []byte) (codectest.S, error) {
-		return DecodeSequenceHeader(b)
-	})
+	codectest.Run(t, cases)
 }

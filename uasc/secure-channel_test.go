@@ -9,11 +9,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/go-cmp/cmp"
-
+	"github.com/wmnsk/gopcua/datatypes"
 	"github.com/wmnsk/gopcua/errors"
 	"github.com/wmnsk/gopcua/services"
 	"github.com/wmnsk/gopcua/uacp"
+
+	"github.com/pascaldekloe/goe/verify"
 )
 
 var (
@@ -21,7 +22,20 @@ var (
 	policyURI = "http://opcfoundation.org/UA/SecurityPolicy#None"
 	cliCfg    = NewClientConfig(policyURI, nil, nil, 3333, services.SecModeNone, 3600000)
 	srvCfg    = NewServerConfig(policyURI, nil, nil, 1111, services.SecModeNone, 2222, 3600000)
-	msg       = []byte{0xde, 0xad, 0xbe, 0xef}
+	msg       = services.NewReadRequest(
+		services.NewRequestHeader(
+			datatypes.NewTwoByteNodeID(0),
+			time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
+			1, 0, 0, "", services.NewNullAdditionalHeader(),
+		),
+		0, services.TimestampsToReturnBoth,
+		datatypes.NewReadValueID(
+			datatypes.NewFourByteNodeID(0, 2256),
+			datatypes.IntegerIDValue,
+			"", 0, "",
+		),
+	)
+	// msg       = []byte{0xde, 0xad, 0xbe, 0xef}
 )
 
 func setUpSecureChannel(ctx context.Context) (*SecureChannel, *SecureChannel, error) {
@@ -76,19 +90,15 @@ func TestClientWrite(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := cliChan.Write(msg); err != nil {
+	if err := cliChan.WriteService(msg); err != nil {
 		t.Fatal(err)
 	}
 
-	buf := make([]byte, 1024)
-	n, err := srvChan.Read(buf)
+	got, err := srvChan.ReadService()
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	if diff := cmp.Diff(buf[:n], msg); diff != "" {
-		t.Error(diff)
-	}
+	verify.Values(t, "", got, msg)
 }
 
 func TestServerWrite(t *testing.T) {
@@ -101,19 +111,15 @@ func TestServerWrite(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := srvChan.Write(msg); err != nil {
+	if err := srvChan.WriteService(msg); err != nil {
 		t.Fatal(err)
 	}
 
-	buf := make([]byte, 1024)
-	n, err := cliChan.Read(buf)
+	got, err := cliChan.ReadService()
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	if diff := cmp.Diff(buf[:n], msg); diff != "" {
-		t.Error(diff)
-	}
+	verify.Values(t, "", got, msg)
 }
 
 func TestClientClose(t *testing.T) {
@@ -160,12 +166,7 @@ func TestGetEndpointRequest(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	buf := make([]byte, 1024)
-	n, err := srvChan.ReadService(buf)
-	if err != nil {
-		t.Fatal(err)
-	}
-	msg, err := services.Decode(buf[:n])
+	msg, err := srvChan.ReadService()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -188,21 +189,15 @@ func TestGetEndpointResponse(t *testing.T) {
 	if err := srvChan.GetEndpointsResponse(0, services.NewEndpointDescription(
 		srvChan.LocalEndpoint(), services.NewApplicationDescription(
 			"", "", "", services.AppTypeServer, "", "", []string{""},
-		), nil, services.SecModeNone, policyURI, services.NewUserTokenPolicyArray(
-			[]*services.UserTokenPolicy{
-				services.NewUserTokenPolicy("id", 0, "", "", ""),
-			},
-		), "", 0,
+		), nil, services.SecModeNone, policyURI,
+		[]*services.UserTokenPolicy{
+			services.NewUserTokenPolicy("id", 0, "", "", ""),
+		}, "", 0,
 	)); err != nil {
 		t.Fatal(err)
 	}
 
-	buf := make([]byte, 1024)
-	n, err := cliChan.ReadService(buf)
-	if err != nil {
-		t.Fatal(err)
-	}
-	msg, err := services.Decode(buf[:n])
+	msg, err := cliChan.ReadService()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -226,12 +221,7 @@ func TestFindServerRequest(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	buf := make([]byte, 1024)
-	n, err := srvChan.ReadService(buf)
-	if err != nil {
-		t.Fatal(err)
-	}
-	msg, err := services.Decode(buf[:n])
+	msg, err := srvChan.ReadService()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -259,12 +249,7 @@ func TestFindServerResponse(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	buf := make([]byte, 1024)
-	n, err := cliChan.ReadService(buf)
-	if err != nil {
-		t.Fatal(err)
-	}
-	msg, err := services.Decode(buf[:n])
+	msg, err := cliChan.ReadService()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -284,9 +269,7 @@ func TestLocalEndpoint(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if diff := cmp.Diff(srvChan.LocalEndpoint(), endpoint); diff != "" {
-		t.Error(diff)
-	}
+	verify.Values(t, "", srvChan.LocalEndpoint(), endpoint)
 }
 
 func TestRemoteEndpoint(t *testing.T) {
@@ -299,7 +282,5 @@ func TestRemoteEndpoint(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if diff := cmp.Diff(cliChan.RemoteEndpoint(), endpoint); diff != "" {
-		t.Error(diff)
-	}
+	verify.Values(t, "", cliChan.RemoteEndpoint(), endpoint)
 }

@@ -5,6 +5,7 @@
 package datatypes
 
 import (
+	"github.com/wmnsk/gopcua"
 	"github.com/wmnsk/gopcua/id"
 )
 
@@ -17,60 +18,26 @@ type UserIdentityToken interface {
 //
 // Specification: Part4, 7.36.5
 type AnonymousIdentityToken struct {
-	PolicyID *String
+	PolicyID string
 }
 
 // NewAnonymousIdentityToken creates a new AnonymousIdentityToken.
 func NewAnonymousIdentityToken(policyID string) *AnonymousIdentityToken {
 	return &AnonymousIdentityToken{
-		PolicyID: NewString(policyID),
+		PolicyID: policyID,
 	}
 }
 
-// DecodeAnonymousIdentityToken decodes given bytes as AnonymousIdentityToken.
-func DecodeAnonymousIdentityToken(b []byte) (*AnonymousIdentityToken, error) {
-	a := &AnonymousIdentityToken{}
-	if err := a.DecodeFromBytes(b); err != nil {
-		return nil, err
-	}
-
-	return a, nil
+func (t *AnonymousIdentityToken) Decode(b []byte) (int, error) {
+	buf := gopcua.NewBuffer(b)
+	t.PolicyID = buf.ReadString()
+	return buf.Pos(), buf.Error()
 }
 
-// DecodeFromBytes decodes given bytes as AnonymousIdentityToken.
-func (a *AnonymousIdentityToken) DecodeFromBytes(b []byte) error {
-	a.PolicyID = &String{}
-	return a.PolicyID.DecodeFromBytes(b)
-}
-
-// Serialize serializes AnonymousIdentityToken into bytes.
-func (a *AnonymousIdentityToken) Serialize() ([]byte, error) {
-	b := make([]byte, a.Len())
-	if err := a.SerializeTo(b); err != nil {
-		return nil, err
-	}
-
-	return b, nil
-}
-
-// SerializeTo serializes AnonymousIdentityToken into bytes.
-func (a *AnonymousIdentityToken) SerializeTo(b []byte) error {
-	if a.PolicyID != nil {
-		if err := a.PolicyID.SerializeTo(b); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// Len returns the actual Length of AnonymousIdentityToken in int.
-func (a *AnonymousIdentityToken) Len() int {
-	l := 0
-	if a.PolicyID != nil {
-		l += a.PolicyID.Len()
-	}
-
-	return l
+func (t *AnonymousIdentityToken) Encode() ([]byte, error) {
+	buf := gopcua.NewBuffer(nil)
+	buf.WriteString(t.PolicyID)
+	return buf.Bytes(), buf.Error()
 }
 
 // Type returns type of token defined in NodeIds.csv in int.
@@ -80,7 +47,7 @@ func (a *AnonymousIdentityToken) Type() int {
 
 // ID returns PolicyID in string.
 func (a *AnonymousIdentityToken) ID() string {
-	return a.PolicyID.Get()
+	return a.PolicyID
 }
 
 // UserNameIdentityToken is used to pass simple username/password credentials to the Server.
@@ -104,120 +71,38 @@ func (a *AnonymousIdentityToken) ID() string {
 //
 // Specification: Part4, 7.36.4
 type UserNameIdentityToken struct {
-	PolicyID            *String
-	UserName            *String
-	Password            *ByteString
-	EncryptionAlgorithm *String
+	PolicyID            string
+	UserName            string
+	Password            []byte
+	EncryptionAlgorithm string
 }
 
 // NewUserNameIdentityToken creates a new UserNameIdentityToken.
 func NewUserNameIdentityToken(policyID, username string, password []byte, alg string) *UserNameIdentityToken {
 	return &UserNameIdentityToken{
-		PolicyID:            NewString(policyID),
-		UserName:            NewString(username),
-		Password:            NewByteString(password),
-		EncryptionAlgorithm: NewString(alg),
+		PolicyID:            policyID,
+		UserName:            username,
+		Password:            password,
+		EncryptionAlgorithm: alg,
 	}
 }
 
-// DecodeUserNameIdentityToken decodes given bytes as UserNameIdentityToken.
-func DecodeUserNameIdentityToken(b []byte) (*UserNameIdentityToken, error) {
-	u := &UserNameIdentityToken{}
-	if err := u.DecodeFromBytes(b); err != nil {
-		return nil, err
-	}
-
-	return u, nil
+func (t *UserNameIdentityToken) Decode(b []byte) (int, error) {
+	buf := gopcua.NewBuffer(b)
+	t.PolicyID = buf.ReadString()
+	t.UserName = buf.ReadString()
+	t.Password = buf.ReadBytes()
+	t.EncryptionAlgorithm = buf.ReadString()
+	return buf.Pos(), buf.Error()
 }
 
-// DecodeFromBytes decodes given bytes as UserNameIdentityToken.
-func (u *UserNameIdentityToken) DecodeFromBytes(b []byte) error {
-	offset := 0
-	u.PolicyID = &String{}
-	if err := u.PolicyID.DecodeFromBytes(b[offset:]); err != nil {
-		return err
-	}
-	offset += u.PolicyID.Len()
-
-	u.UserName = &String{}
-	if err := u.UserName.DecodeFromBytes(b[offset:]); err != nil {
-		return err
-	}
-	offset += u.UserName.Len()
-
-	u.Password = &ByteString{}
-	if err := u.Password.DecodeFromBytes(b[offset:]); err != nil {
-		return err
-	}
-	offset += u.Password.Len()
-
-	u.EncryptionAlgorithm = &String{}
-	return u.EncryptionAlgorithm.DecodeFromBytes(b[offset:])
-}
-
-// Serialize serializes UserNameIdentityToken into bytes.
-func (u *UserNameIdentityToken) Serialize() ([]byte, error) {
-	b := make([]byte, u.Len())
-	if err := u.SerializeTo(b); err != nil {
-		return nil, err
-	}
-
-	return b, nil
-}
-
-// SerializeTo serializes UserNameIdentityToken into bytes.
-func (u *UserNameIdentityToken) SerializeTo(b []byte) error {
-	offset := 0
-	if u.PolicyID != nil {
-		if err := u.PolicyID.SerializeTo(b[offset:]); err != nil {
-			return err
-		}
-		offset += u.PolicyID.Len()
-	}
-
-	if u.UserName != nil {
-		if err := u.UserName.SerializeTo(b[offset:]); err != nil {
-			return err
-		}
-		offset += u.UserName.Len()
-	}
-
-	if u.Password != nil {
-		if err := u.Password.SerializeTo(b[offset:]); err != nil {
-			return err
-		}
-		offset += u.Password.Len()
-	}
-
-	if u.EncryptionAlgorithm != nil {
-		if err := u.EncryptionAlgorithm.SerializeTo(b[offset:]); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// Len returns the actual Length of UserNameIdentityToken in int.
-func (u *UserNameIdentityToken) Len() int {
-	l := 0
-	if u.PolicyID != nil {
-		l += u.PolicyID.Len()
-	}
-
-	if u.UserName != nil {
-		l += u.UserName.Len()
-	}
-
-	if u.Password != nil {
-		l += u.Password.Len()
-	}
-
-	if u.EncryptionAlgorithm != nil {
-		l += u.EncryptionAlgorithm.Len()
-	}
-
-	return l
+func (t *UserNameIdentityToken) Encode() ([]byte, error) {
+	buf := gopcua.NewBuffer(nil)
+	buf.WriteString(t.PolicyID)
+	buf.WriteString(t.UserName)
+	buf.WriteByteString(t.Password)
+	buf.WriteString(t.EncryptionAlgorithm)
+	return buf.Bytes(), buf.Error()
 }
 
 // Type returns type of token defined in NodeIds.csv in int.
@@ -227,7 +112,7 @@ func (u *UserNameIdentityToken) Type() int {
 
 // ID returns PolicyID in string.
 func (u *UserNameIdentityToken) ID() string {
-	return u.PolicyID.Get()
+	return u.PolicyID
 }
 
 // X509IdentityToken is used to pass an X.509 v3 Certificate which is issued by the user.
@@ -237,82 +122,30 @@ func (u *UserNameIdentityToken) ID() string {
 //
 // Specification: Part4, 7.36.5
 type X509IdentityToken struct {
-	PolicyID        *String
-	CertificateData *String
+	PolicyID        string
+	CertificateData string
 }
 
 // NewX509IdentityToken creates a new X509IdentityToken.
 func NewX509IdentityToken(policyID, cert string) *X509IdentityToken {
 	return &X509IdentityToken{
-		PolicyID:        NewString(policyID),
-		CertificateData: NewString(cert),
+		PolicyID:        policyID,
+		CertificateData: cert,
 	}
 }
 
-// DecodeX509IdentityToken decodes given bytes as X509IdentityToken.
-func DecodeX509IdentityToken(b []byte) (*X509IdentityToken, error) {
-	x := &X509IdentityToken{}
-	if err := x.DecodeFromBytes(b); err != nil {
-		return nil, err
-	}
-
-	return x, nil
+func (t *X509IdentityToken) Decode(b []byte) (int, error) {
+	buf := gopcua.NewBuffer(b)
+	t.PolicyID = buf.ReadString()
+	t.CertificateData = buf.ReadString()
+	return buf.Pos(), buf.Error()
 }
 
-// DecodeFromBytes decodes given bytes as X509IdentityToken.
-func (x *X509IdentityToken) DecodeFromBytes(b []byte) error {
-	offset := 0
-	x.PolicyID = &String{}
-	if err := x.PolicyID.DecodeFromBytes(b[offset:]); err != nil {
-		return err
-	}
-	offset += x.PolicyID.Len()
-
-	x.CertificateData = &String{}
-	return x.CertificateData.DecodeFromBytes(b[offset:])
-}
-
-// Serialize serializes X509IdentityToken into bytes.
-func (x *X509IdentityToken) Serialize() ([]byte, error) {
-	b := make([]byte, x.Len())
-	if err := x.SerializeTo(b); err != nil {
-		return nil, err
-	}
-
-	return b, nil
-}
-
-// SerializeTo serializes X509IdentityToken into bytes.
-func (x *X509IdentityToken) SerializeTo(b []byte) error {
-	offset := 0
-	if x.PolicyID != nil {
-		if err := x.PolicyID.SerializeTo(b[offset:]); err != nil {
-			return err
-		}
-		offset += x.PolicyID.Len()
-	}
-
-	if x.CertificateData != nil {
-		if err := x.CertificateData.SerializeTo(b[offset:]); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// Len returns the actual Length of X509IdentityToken in int.
-func (x *X509IdentityToken) Len() int {
-	l := 0
-	if x.PolicyID != nil {
-		l += x.PolicyID.Len()
-	}
-
-	if x.CertificateData != nil {
-		l += x.CertificateData.Len()
-	}
-
-	return l
+func (t *X509IdentityToken) Encode() ([]byte, error) {
+	buf := gopcua.NewBuffer(nil)
+	buf.WriteString(t.PolicyID)
+	buf.WriteString(t.CertificateData)
+	return buf.Bytes(), buf.Error()
 }
 
 // Type returns type of token defined in NodeIds.csv in int.
@@ -322,7 +155,7 @@ func (x *X509IdentityToken) Type() int {
 
 // ID returns PolicyID in string.
 func (x *X509IdentityToken) ID() string {
-	return x.PolicyID.Get()
+	return x.PolicyID
 }
 
 // IssuedIdentityToken is used to pass SecurityTokens issued by an external Authorization
@@ -347,101 +180,34 @@ func (x *X509IdentityToken) ID() string {
 //
 // Specification: Part4, 7.36.6
 type IssuedIdentityToken struct {
-	PolicyID            *String
-	TokenData           *ByteString
-	EncryptionAlgorithm *String
+	PolicyID            string
+	TokenData           []byte
+	EncryptionAlgorithm string
 }
 
 // NewIssuedIdentityToken creates a new IssuedIdentityToken.
 func NewIssuedIdentityToken(policyID string, tokenData []byte, alg string) *IssuedIdentityToken {
 	return &IssuedIdentityToken{
-		PolicyID:            NewString(policyID),
-		TokenData:           NewByteString(tokenData),
-		EncryptionAlgorithm: NewString(alg),
+		PolicyID:            policyID,
+		TokenData:           tokenData,
+		EncryptionAlgorithm: alg,
 	}
 }
 
-// DecodeIssuedIdentityToken decodes given bytes as IssuedIdentityToken.
-func DecodeIssuedIdentityToken(b []byte) (*IssuedIdentityToken, error) {
-	i := &IssuedIdentityToken{}
-	if err := i.DecodeFromBytes(b); err != nil {
-		return nil, err
-	}
-
-	return i, nil
+func (t *IssuedIdentityToken) Decode(b []byte) (int, error) {
+	buf := gopcua.NewBuffer(b)
+	t.PolicyID = buf.ReadString()
+	t.TokenData = buf.ReadBytes()
+	t.EncryptionAlgorithm = buf.ReadString()
+	return buf.Pos(), buf.Error()
 }
 
-// DecodeFromBytes decodes given bytes as IssuedIdentityToken.
-func (i *IssuedIdentityToken) DecodeFromBytes(b []byte) error {
-	offset := 0
-	i.PolicyID = &String{}
-	if err := i.PolicyID.DecodeFromBytes(b[offset:]); err != nil {
-		return err
-	}
-	offset += i.PolicyID.Len()
-
-	i.TokenData = &ByteString{}
-	if err := i.TokenData.DecodeFromBytes(b[offset:]); err != nil {
-		return err
-	}
-	offset += i.TokenData.Len()
-
-	i.EncryptionAlgorithm = &String{}
-	return i.EncryptionAlgorithm.DecodeFromBytes(b[offset:])
-}
-
-// Serialize serializes IssuedIdentityToken into bytes.
-func (i *IssuedIdentityToken) Serialize() ([]byte, error) {
-	b := make([]byte, i.Len())
-	if err := i.SerializeTo(b); err != nil {
-		return nil, err
-	}
-
-	return b, nil
-}
-
-// SerializeTo serializes IssuedIdentityToken into bytes.
-func (i *IssuedIdentityToken) SerializeTo(b []byte) error {
-	offset := 0
-	if i.PolicyID != nil {
-		if err := i.PolicyID.SerializeTo(b[offset:]); err != nil {
-			return err
-		}
-		offset += i.PolicyID.Len()
-	}
-
-	if i.TokenData != nil {
-		if err := i.TokenData.SerializeTo(b[offset:]); err != nil {
-			return err
-		}
-		offset += i.TokenData.Len()
-	}
-
-	if i.EncryptionAlgorithm != nil {
-		if err := i.EncryptionAlgorithm.SerializeTo(b[offset:]); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// Len returns the actual Length of IssuedIdentityToken in int.
-func (i *IssuedIdentityToken) Len() int {
-	l := 0
-	if i.PolicyID != nil {
-		l += i.PolicyID.Len()
-	}
-
-	if i.TokenData != nil {
-		l += i.TokenData.Len()
-	}
-
-	if i.EncryptionAlgorithm != nil {
-		l += i.EncryptionAlgorithm.Len()
-	}
-
-	return l
+func (t *IssuedIdentityToken) Encode() ([]byte, error) {
+	buf := gopcua.NewBuffer(nil)
+	buf.WriteString(t.PolicyID)
+	buf.WriteByteString(t.TokenData)
+	buf.WriteString(t.EncryptionAlgorithm)
+	return buf.Bytes(), buf.Error()
 }
 
 // Type returns type of token defined in NodeIds.csv in int.
@@ -451,5 +217,5 @@ func (i *IssuedIdentityToken) Type() int {
 
 // ID returns PolicyID in string.
 func (i *IssuedIdentityToken) ID() string {
-	return i.PolicyID.Get()
+	return i.PolicyID
 }

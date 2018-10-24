@@ -5,8 +5,6 @@
 package services
 
 import (
-	"encoding/binary"
-
 	"github.com/wmnsk/gopcua/datatypes"
 )
 
@@ -79,7 +77,7 @@ type ReadRequest struct {
 
 	// List of Nodes and their Attributes to read. For each entry in this list,
 	// a StatusCode is returned, and if it indicates success, the Attribute Value is also returned.
-	NodesToRead *datatypes.ReadValueIDArray
+	NodesToRead []*datatypes.ReadValueID
 }
 
 // NewReadRequest creates a new ReadRequest.
@@ -89,112 +87,8 @@ func NewReadRequest(reqHeader *RequestHeader, maxAge uint64, tsRet TimestampsToR
 		RequestHeader:      reqHeader,
 		MaxAge:             maxAge,
 		TimestampsToReturn: tsRet,
-		NodesToRead:        datatypes.NewReadValueIDArray(nodes),
+		NodesToRead:        nodes,
 	}
-}
-
-// DecodeReadRequest decodes given bytes into ReadRequest.
-func DecodeReadRequest(b []byte) (*ReadRequest, error) {
-	r := &ReadRequest{}
-	if err := r.DecodeFromBytes(b); err != nil {
-		return nil, err
-	}
-	return r, nil
-}
-
-// DecodeFromBytes decodes given bytes into ReadRequest.
-func (r *ReadRequest) DecodeFromBytes(b []byte) error {
-	offset := 0
-
-	r.TypeID = &datatypes.ExpandedNodeID{}
-	if err := r.TypeID.DecodeFromBytes(b[offset:]); err != nil {
-		return err
-	}
-	offset += r.TypeID.Len()
-
-	// request header
-	r.RequestHeader = &RequestHeader{}
-	if err := r.RequestHeader.DecodeFromBytes(b[offset:]); err != nil {
-		return err
-	}
-	offset += r.RequestHeader.Len() - len(r.RequestHeader.Payload)
-
-	// max age
-	r.MaxAge = binary.LittleEndian.Uint64(b[offset : offset+8])
-	offset += 8
-
-	// timestamps to return
-	r.TimestampsToReturn = TimestampsToReturn(binary.LittleEndian.Uint32(b[offset : offset+4]))
-	offset += 4
-
-	// nodes to read
-	r.NodesToRead = &datatypes.ReadValueIDArray{}
-	if err := r.NodesToRead.DecodeFromBytes(b[offset:]); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// Serialize serializes ReadRequest into bytes.
-func (r *ReadRequest) Serialize() ([]byte, error) {
-	b := make([]byte, r.Len())
-	if err := r.SerializeTo(b); err != nil {
-		return nil, err
-	}
-
-	return b, nil
-}
-
-// SerializeTo serializes ReadRequest into bytes.
-func (r *ReadRequest) SerializeTo(b []byte) error {
-	offset := 0
-
-	// type id
-	if err := r.TypeID.SerializeTo(b[offset:]); err != nil {
-		return err
-	}
-	offset += r.TypeID.Len()
-
-	// request header
-	if err := r.RequestHeader.SerializeTo(b[offset:]); err != nil {
-		return err
-	}
-	offset += r.RequestHeader.Len()
-
-	// max age
-	binary.LittleEndian.PutUint64(b[offset:offset+8], r.MaxAge)
-	offset += 8
-
-	// timestamps to return
-	binary.LittleEndian.PutUint32(b[offset:offset+4], uint32(r.TimestampsToReturn))
-	offset += 4
-
-	// nodes to read
-	return r.NodesToRead.SerializeTo(b[offset:])
-}
-
-// Len returns the actual length of ReadRequest.
-func (r *ReadRequest) Len() int {
-	// max age + timestamps to return
-	length := 12
-
-	// type id
-	if r.TypeID != nil {
-		length += r.TypeID.Len()
-	}
-
-	// request header
-	if r.RequestHeader != nil {
-		length += r.RequestHeader.Len()
-	}
-
-	// nodes to read
-	if r.NodesToRead != nil {
-		length += r.NodesToRead.Len()
-	}
-
-	return length
 }
 
 // ServiceType returns type of Service in uint16.

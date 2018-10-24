@@ -5,10 +5,9 @@
 package datatypes
 
 import (
-	"encoding/binary"
 	"time"
 
-	"github.com/wmnsk/gopcua/utils"
+	"github.com/wmnsk/gopcua"
 )
 
 // DataValue is always preceded by a mask that indicates which fields are present in the stream.
@@ -38,163 +37,71 @@ func NewDataValue(hasValue, hasStatus, hasSrcTs, hasSrcPs, hasSvrTs, hasSvrPs bo
 	if hasValue {
 		d.SetValueFlag()
 	}
-
 	if hasStatus {
 		d.SetStatusFlag()
 	}
-
 	if hasSrcTs {
 		d.SetSourceTimestampFlag()
 	}
-
 	if hasSrcPs {
 		d.SetSourcePicoSecondsFlag()
 	}
-
 	if hasSvrTs {
 		d.SetServerTimestampFlag()
 	}
-
 	if hasSvrPs {
 		d.SetServerPicoSecondsFlag()
 	}
-
 	return d
 }
 
-// DecodeDataValue decodes given bytes into DataValue.
-func DecodeDataValue(b []byte) (*DataValue, error) {
-	d := &DataValue{}
-	if err := d.DecodeFromBytes(b); err != nil {
-		return nil, err
-	}
-
-	return d, nil
-}
-
-// DecodeFromBytes decodes given bytes into DataValue.
-func (d *DataValue) DecodeFromBytes(b []byte) error {
-	d.EncodingMask = b[0]
-
-	offset := 1
-
+func (d *DataValue) Decode(b []byte) (int, error) {
+	buf := gopcua.NewBuffer(b)
+	d.EncodingMask = buf.ReadByte()
 	if d.HasValue() {
-		d.Value = &Variant{}
-		if err := d.Value.DecodeFromBytes(b[offset:]); err != nil {
-			return err
-		}
-		offset += d.Value.Len()
+		d.Value = new(Variant)
+		buf.ReadStruct(d.Value)
 	}
-
 	if d.HasStatus() {
-		d.Status = binary.LittleEndian.Uint32(b[offset : offset+4])
-		offset += 4
+		d.Status = buf.ReadUint32()
 	}
-
 	if d.HasSourceTimestamp() {
-		d.SourceTimestamp = utils.DecodeTimestamp(b[offset : offset+8])
-		offset += 8
+		d.SourceTimestamp = buf.ReadTime()
 	}
-
 	if d.HasSourcePicoSeconds() {
-		d.SourcePicoSeconds = binary.LittleEndian.Uint16(b[offset : offset+2])
-		offset += 2
+		d.SourcePicoSeconds = buf.ReadUint16()
 	}
-
 	if d.HasServerTimestamp() {
-		d.ServerTimestamp = utils.DecodeTimestamp(b[offset : offset+8])
-		offset += 8
+		d.ServerTimestamp = buf.ReadTime()
 	}
-
 	if d.HasServerPicoSeconds() {
-		d.ServerPicoSeconds = binary.LittleEndian.Uint16(b[offset : offset+2])
-		offset += 2
+		d.ServerPicoSeconds = buf.ReadUint16()
 	}
-
-	return nil
+	return buf.Pos(), buf.Error()
 }
 
-// Serialize serializes DataValue into bytes.
-func (d *DataValue) Serialize() ([]byte, error) {
-	b := make([]byte, d.Len())
-	if err := d.SerializeTo(b); err != nil {
-		return nil, err
-	}
-
-	return b, nil
-}
-
-// SerializeTo serializes DataValue into bytes.
-func (d *DataValue) SerializeTo(b []byte) error {
-	b[0] = d.EncodingMask
-
-	offset := 1
+func (d *DataValue) Encode() ([]byte, error) {
+	buf := gopcua.NewBuffer(nil)
+	buf.WriteUint8(d.EncodingMask)
 	if d.HasValue() {
-		if err := d.Value.SerializeTo(b[offset:]); err != nil {
-			return err
-		}
-		offset += d.Value.Len()
+		buf.WriteStruct(d.Value)
 	}
-
 	if d.HasStatus() {
-		binary.LittleEndian.PutUint32(b[offset:offset+4], d.Status)
-		offset += 4
+		buf.WriteUint32(d.Status)
 	}
-
 	if d.HasSourceTimestamp() {
-		utils.EncodeTimestamp(b[offset:offset+8], d.SourceTimestamp)
-		offset += 8
+		buf.WriteTime(d.SourceTimestamp)
 	}
-
 	if d.HasSourcePicoSeconds() {
-		binary.LittleEndian.PutUint16(b[offset:offset+2], d.SourcePicoSeconds)
-		offset += 2
+		buf.WriteUint16(d.SourcePicoSeconds)
 	}
-
 	if d.HasServerTimestamp() {
-		utils.EncodeTimestamp(b[offset:offset+8], d.ServerTimestamp)
-		offset += 8
+		buf.WriteTime(d.ServerTimestamp)
 	}
-
 	if d.HasServerPicoSeconds() {
-		binary.LittleEndian.PutUint16(b[offset:offset+2], d.ServerPicoSeconds)
-		offset += 2
+		buf.WriteUint16(d.ServerPicoSeconds)
 	}
-
-	return nil
-}
-
-// Len returns the actual length of DataValue in int.
-func (d *DataValue) Len() int {
-	length := 1
-
-	if d.HasValue() {
-		if d.Value != nil {
-			length += d.Value.Len()
-		}
-	}
-
-	if d.HasStatus() {
-		length += 4
-	}
-
-	if d.HasSourceTimestamp() {
-		length += 8
-	}
-
-	if d.HasSourcePicoSeconds() {
-		length += 2
-	}
-
-	if d.HasServerTimestamp() {
-		length += 8
-	}
-
-	if d.HasServerPicoSeconds() {
-		length += 2
-	}
-
-	return length
+	return buf.Bytes(), buf.Error()
 }
 
 // HasValue checks if DataValue has Value or not.
@@ -255,94 +162,4 @@ func (d *DataValue) HasServerPicoSeconds() bool {
 // SetServerPicoSecondsFlag sets server picoseconds flag in EncodingMask in DataValue.
 func (d *DataValue) SetServerPicoSecondsFlag() {
 	d.EncodingMask |= 0x20
-}
-
-// DataValueArray represents the DataValueArray.
-type DataValueArray struct {
-	ArraySize  int32
-	DataValues []*DataValue
-}
-
-// NewDataValueArray creates a new DataValueArray from multiple data values.
-func NewDataValueArray(values []*DataValue) *DataValueArray {
-	if values == nil {
-		d := &DataValueArray{
-			ArraySize: 0,
-		}
-		return d
-	}
-
-	d := &DataValueArray{
-		ArraySize: int32(len(values)),
-	}
-	for _, value := range values {
-		d.DataValues = append(d.DataValues, value)
-	}
-
-	return d
-}
-
-// DecodeDataValueArray decodes given bytes into DataValueArray.
-func DecodeDataValueArray(b []byte) (*DataValueArray, error) {
-	d := &DataValueArray{}
-	if err := d.DecodeFromBytes(b); err != nil {
-		return nil, err
-	}
-
-	return d, nil
-}
-
-// DecodeFromBytes decodes given bytes into DataValueArray.
-func (d *DataValueArray) DecodeFromBytes(b []byte) error {
-	d.ArraySize = int32(binary.LittleEndian.Uint32(b[:4]))
-	if d.ArraySize <= 0 {
-		return nil
-	}
-
-	var offset = 4
-	for i := 1; i <= int(d.ArraySize); i++ {
-		v, err := DecodeDataValue(b[offset:])
-		if err != nil {
-			return err
-		}
-		d.DataValues = append(d.DataValues, v)
-		offset += v.Len()
-	}
-
-	return nil
-}
-
-// Serialize serializes DataValueArray into bytes.
-func (d *DataValueArray) Serialize() ([]byte, error) {
-	b := make([]byte, d.Len())
-	if err := d.SerializeTo(b); err != nil {
-		return nil, err
-	}
-
-	return b, nil
-}
-
-// SerializeTo serializes DataValueArray into bytes.
-func (d *DataValueArray) SerializeTo(b []byte) error {
-	offset := 4
-	binary.LittleEndian.PutUint32(b[:4], uint32(d.ArraySize))
-
-	for _, value := range d.DataValues {
-		if err := value.SerializeTo(b[offset:]); err != nil {
-			return err
-		}
-		offset += value.Len()
-	}
-
-	return nil
-}
-
-// Len returns the actual length in int.
-func (d *DataValueArray) Len() int {
-	l := 4
-	for _, value := range d.DataValues {
-		l += value.Len()
-	}
-
-	return l
 }

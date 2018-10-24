@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wmnsk/gopcua/datatypes"
 	"github.com/wmnsk/gopcua/utils/codectest"
 )
 
@@ -18,7 +19,7 @@ func TestGetEndpointsResponse(t *testing.T) {
 			Struct: NewGetEndpointsResponse(
 				NewResponseHeader(
 					time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-					1, 0, NewNullDiagnosticInfo(), []string{}, NewNullAdditionalHeader(), nil,
+					1, 0, datatypes.NewNullDiagnosticInfo(), []string{}, NewNullAdditionalHeader(),
 				),
 				NewEndpointDescription(
 					"ep-url",
@@ -26,21 +27,19 @@ func TestGetEndpointsResponse(t *testing.T) {
 						"app-uri", "prod-uri", "app-name", AppTypeServer,
 						"gw-uri", "prof-uri", []string{"discov-uri-1", "discov-uri-2"},
 					),
-					[]byte{},
+					nil,
 					SecModeNone,
 					"sec-uri",
-					NewUserTokenPolicyArray(
-						[]*UserTokenPolicy{
-							NewUserTokenPolicy(
-								"1", UserTokenAnonymous,
-								"issued-token", "issuer-uri", "sec-uri",
-							),
-							NewUserTokenPolicy(
-								"1", UserTokenAnonymous,
-								"issued-token", "issuer-uri", "sec-uri",
-							),
-						},
-					),
+					[]*UserTokenPolicy{
+						NewUserTokenPolicy(
+							"1", UserTokenAnonymous,
+							"issued-token", "issuer-uri", "sec-uri",
+						),
+						NewUserTokenPolicy(
+							"1", UserTokenAnonymous,
+							"issued-token", "issuer-uri", "sec-uri",
+						),
+					},
 					"trans-uri",
 					0,
 				),
@@ -50,21 +49,19 @@ func TestGetEndpointsResponse(t *testing.T) {
 						"app-uri", "prod-uri", "app-name", AppTypeServer,
 						"gw-uri", "prof-uri", []string{"discov-uri-1", "discov-uri-2"},
 					),
-					[]byte{},
+					nil,
 					SecModeNone,
 					"sec-uri",
-					NewUserTokenPolicyArray(
-						[]*UserTokenPolicy{
-							NewUserTokenPolicy(
-								"1", UserTokenAnonymous,
-								"issued-token", "issuer-uri", "sec-uri",
-							),
-							NewUserTokenPolicy(
-								"1", UserTokenAnonymous,
-								"issued-token", "issuer-uri", "sec-uri",
-							),
-						},
-					),
+					[]*UserTokenPolicy{
+						NewUserTokenPolicy(
+							"1", UserTokenAnonymous,
+							"issued-token", "issuer-uri", "sec-uri",
+						),
+						NewUserTokenPolicy(
+							"1", UserTokenAnonymous,
+							"issued-token", "issuer-uri", "sec-uri",
+						),
+					},
 					"trans-uri",
 					0,
 				),
@@ -196,14 +193,7 @@ func TestGetEndpointsResponse(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases, func(b []byte) (codectest.S, error) {
-		v, err := DecodeGetEndpointsResponse(b)
-		if err != nil {
-			return nil, err
-		}
-		v.Payload = nil
-		return v, nil
-	})
+	codectest.Run(t, cases)
 
 	t.Run("service-id", func(t *testing.T) {
 		id := new(GetEndpointsResponse).ServiceType()

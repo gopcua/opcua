@@ -8,10 +8,12 @@ import (
 	"context"
 	"crypto/rand"
 	"io"
+	"log"
 	"net"
 	"sync"
 	"time"
 
+	"github.com/wmnsk/gopcua"
 	"github.com/wmnsk/gopcua/services"
 	"github.com/wmnsk/gopcua/status"
 	"github.com/wmnsk/gopcua/uacp"
@@ -39,27 +41,34 @@ type SecureChannel struct {
 //
 // If the data is one of OpenSecureChannel or CloseSecureChannel, it will be handled automatically.
 func (s *SecureChannel) Read(b []byte) (n int, err error) {
-	n, err = s.read(b)
+	n, err = s.read()
+	if err != nil {
+		return 0, err
+	}
 	copy(b, s.rcvBuf[:n])
-
 	return n, nil
+}
+
+func (s *SecureChannel) ReadMessage() (*Message, error) {
+	n, err := s.read()
+	if err != nil {
+		return nil, err
+	}
+	return Decode(s.rcvBuf[:n])
 }
 
 // ReadService reads the payload(=Service) from the connection.
 // Which means the UASC Headers are omitted.
-func (s *SecureChannel) ReadService(b []byte) (n int, err error) {
-	n, err = s.read(b)
-
-	sc, err := Decode(s.rcvBuf[:n])
+func (s *SecureChannel) ReadService() (services.Service, error) {
+	m, err := s.ReadMessage()
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
-
-	copy(b, sc.SequenceHeader.Payload)
-	return int(sc.MessageSize), nil
+	log.Printf("uasc: recv %s%c", m.MessageType, m.ChunkType)
+	return m.Service, nil
 }
 
-func (s *SecureChannel) read(b []byte) (n int, err error) {
+func (s *SecureChannel) read() (n int, err error) {
 	if !(s.state == cliStateSecureChannelOpened || s.state == srvStateSecureChannelOpened) {
 		return 0, ErrSecureChannelNotOpened
 	}
@@ -74,40 +83,28 @@ func (s *SecureChannel) read(b []byte) (n int, err error) {
 	}
 }
 
-// Write writes data to the connection.
-// Write can be made to time out and return an Error with Timeout() == true
-// after a fixed time limit; see SetDeadline and SetWriteDeadline.
-func (s *SecureChannel) Write(b []byte) (n int, err error) {
-	if s == nil || !(s.state == cliStateSecureChannelOpened || s.state == srvStateSecureChannelOpened) {
-		return 0, ErrSecureChannelNotOpened
-	}
-
-	return s.lowerConn.Write(b)
-}
-
 // WriteService writes data to the connection.
 // Unlike Write(), given b in WriteService() should only be serialized service.Service,
 // while the UASC header is automatically set by the package.
 // This enables writing arbitrary Service even if the service is not implemented in the package.
-func (s *SecureChannel) WriteService(b []byte) (n int, err error) {
+func (s *SecureChannel) WriteService(svc services.Service) error {
 	if !(s.state == cliStateSecureChannelOpened || s.state == srvStateSecureChannelOpened) {
-		return 0, ErrSecureChannelNotOpened
+		return ErrSecureChannelNotOpened
 	}
 	s.cfg.SequenceNumber++
+	return s.write(New(svc, s.cfg))
+}
 
-	msg := New(nil, s.cfg)
-	msg.MessageSize += uint32(len(b))
-	serialized, err := msg.Serialize()
+func (s *SecureChannel) write(msg *Message) error {
+	b, err := gopcua.Encode(msg)
 	if err != nil {
-		return 0, err
+		return err
 	}
-	serialized = append(serialized, b...)
-
-	if _, err := s.lowerConn.Write(serialized); err != nil {
-		return 0, err
+	log.Printf("uasc: send %s%c %d bytes %x", msg.MessageType, msg.ChunkType, msg.MessageSize, b)
+	if _, err := s.lowerConn.Write(b); err != nil {
+		log.Printf("usac: send err:%s", err)
 	}
-
-	return int(msg.MessageSize), nil
+	return err
 }
 
 // Close closes the connection.
@@ -237,13 +234,16 @@ func (s *SecureChannel) monitor(ctx context.Context) {
 			if len(s.rcvBuf) < n {
 				continue
 			}
+			log.Printf("uasc: recv %d bytes %x", n, s.rcvBuf[:n])
 
 			msg, err := Decode(s.rcvBuf[:n])
 			if err != nil {
+				log.Printf("uasc: decode failed: %s", err)
 				// pass to the user if msg is undecodable as UASC.
 				go s.notifyLength(childCtx, n)
 				continue
 			}
+			log.Printf("uasc: recv %s%c %x", msg.MessageType, msg.ChunkType, s.rcvBuf[:n])
 
 			s.cfg.RequestID = msg.RequestID
 			switch m := msg.Service.(type) {
@@ -287,7 +287,7 @@ func (s *SecureChannel) handleOpenSecureChannelRequest(o *services.OpenSecureCha
 		switch o.MessageSecurityMode {
 		// accepts only if MessageSecurityMode is None.
 		case services.SecModeNone:
-			s.resHeader.RequestHandle = o.RequestHandle
+			s.resHeader.RequestHandle = o.RequestHeader.RequestHandle
 			if err := s.OpenSecureChannelResponse(0); err != nil {
 				s.errChan <- err
 			}
@@ -320,7 +320,7 @@ func (s *SecureChannel) handleOpenSecureChannelResponse(o *services.OpenSecureCh
 	switch s.state {
 	// client accepts OpenSecureChannelResponse only after sending OpenSecureChannelRequest.
 	case cliStateOpenSecureChannelSent:
-		switch o.ServiceResult {
+		switch o.ResponseHeader.ServiceResult {
 		case 0: // Good
 			s.cfg.SecureChannelID = o.SecurityToken.ChannelID
 			s.cfg.SecurityTokenID = o.SecurityToken.TokenID
@@ -347,14 +347,14 @@ func (s *SecureChannel) handleCloseSecureChannelRequest(c *services.CloseSecureC
 	switch s.state {
 	// if client SecureChannel is opened, accept CloseSecureChannelRequest.
 	case cliStateSecureChannelOpened:
-		s.reqHeader.RequestHandle = c.RequestHandle
+		s.reqHeader.RequestHandle = c.RequestHeader.RequestHandle
 		if err := s.CloseSecureChannelResponse(0); err != nil {
 			s.errChan <- err
 		}
 		s.state = cliStateCloseSecureChannelSent
 	// if server SecureChannel is opened, accept CloseSecureChannelRequest.
 	case srvStateSecureChannelOpened:
-		s.reqHeader.RequestHandle = c.RequestHandle
+		s.reqHeader.RequestHandle = c.RequestHeader.RequestHandle
 		if err := s.CloseSecureChannelResponse(0); err != nil {
 			s.errChan <- err
 		}
@@ -396,17 +396,9 @@ func (s *SecureChannel) OpenSecureChannelRequest() error {
 	s.cfg.SequenceNumber++
 	s.reqHeader.RequestHandle++
 	s.reqHeader.Timestamp = time.Now()
-	osc, err := New(
-		services.NewOpenSecureChannelRequest(
-			s.reqHeader, 0, services.ReqTypeIssue, s.cfg.SecurityMode, s.cfg.Lifetime, nonce,
-		), s.cfg).Serialize()
-	if err != nil {
-		s.cfg.SequenceNumber--
-		s.reqHeader.RequestHandle--
-		return err
-	}
 
-	if _, err := s.lowerConn.Write(osc); err != nil {
+	svc := services.NewOpenSecureChannelRequest(s.reqHeader, 0, services.ReqTypeIssue, s.cfg.SecurityMode, s.cfg.Lifetime, nonce)
+	if err := s.write(New(svc, s.cfg)); err != nil {
 		s.cfg.SequenceNumber--
 		s.reqHeader.RequestHandle--
 		return err
@@ -424,17 +416,14 @@ func (s *SecureChannel) OpenSecureChannelResponse(code uint32) error {
 	s.cfg.SequenceNumber++
 	s.resHeader.ServiceResult = code
 	s.resHeader.Timestamp = time.Now()
-	osc, err := New(services.NewOpenSecureChannelResponse(
+
+	svc := services.NewOpenSecureChannelResponse(
 		s.resHeader, 0, services.NewChannelSecurityToken(
 			s.cfg.SecureChannelID, s.cfg.SecurityTokenID, time.Now(), s.cfg.Lifetime,
 		), nonce,
-	), s.cfg).Serialize()
-	if err != nil {
-		s.cfg.SequenceNumber--
-		return err
-	}
+	)
 
-	if _, err := s.lowerConn.Write(osc); err != nil {
+	if err := s.write(New(svc, s.cfg)); err != nil {
 		s.cfg.SequenceNumber--
 		return err
 	}
@@ -446,16 +435,9 @@ func (s *SecureChannel) CloseSecureChannelRequest() error {
 	s.cfg.SequenceNumber++
 	s.reqHeader.RequestHandle++
 	s.reqHeader.Timestamp = time.Now()
-	csc, err := New(services.NewCloseSecureChannelRequest(
-		s.reqHeader, s.cfg.SecureChannelID,
-	), s.cfg).Serialize()
-	if err != nil {
-		s.cfg.SequenceNumber--
-		s.reqHeader.RequestHandle--
-		return err
-	}
 
-	if _, err := s.lowerConn.Write(csc); err != nil {
+	svc := services.NewCloseSecureChannelRequest(s.reqHeader, s.cfg.SecureChannelID)
+	if err := s.write(New(svc, s.cfg)); err != nil {
 		s.cfg.SequenceNumber--
 		s.reqHeader.RequestHandle--
 		return err
@@ -468,13 +450,9 @@ func (s *SecureChannel) CloseSecureChannelResponse(code uint32) error {
 	s.cfg.SequenceNumber++
 	s.resHeader.ServiceResult = code
 	s.resHeader.Timestamp = time.Now()
-	csc, err := New(services.NewCloseSecureChannelResponse(s.resHeader), s.cfg).Serialize()
-	if err != nil {
-		s.cfg.SequenceNumber--
-		return err
-	}
 
-	if _, err := s.lowerConn.Write(csc); err != nil {
+	svc := services.NewCloseSecureChannelResponse(s.resHeader)
+	if err := s.write(New(svc, s.cfg)); err != nil {
 		s.cfg.SequenceNumber--
 		return err
 	}
@@ -486,16 +464,9 @@ func (s *SecureChannel) GetEndpointsRequest(locales, uris []string) error {
 	s.cfg.SequenceNumber++
 	s.reqHeader.RequestHandle++
 	s.reqHeader.Timestamp = time.Now()
-	gep, err := New(services.NewGetEndpointsRequest(
-		s.reqHeader, s.RemoteEndpoint(), locales, uris,
-	), s.cfg).Serialize()
-	if err != nil {
-		s.cfg.SequenceNumber--
-		s.reqHeader.RequestHandle--
-		return err
-	}
 
-	if _, err := s.lowerConn.Write(gep); err != nil {
+	svc := services.NewGetEndpointsRequest(s.reqHeader, s.RemoteEndpoint(), locales, uris)
+	if err := s.write(New(svc, s.cfg)); err != nil {
 		s.cfg.SequenceNumber--
 		s.reqHeader.RequestHandle--
 		return err
@@ -510,15 +481,9 @@ func (s *SecureChannel) GetEndpointsResponse(code uint32, endpoints ...*services
 	s.cfg.SequenceNumber++
 	s.resHeader.ServiceResult = code
 	s.resHeader.Timestamp = time.Now()
-	gep, err := New(services.NewGetEndpointsResponse(
-		s.resHeader, endpoints...,
-	), s.cfg).Serialize()
-	if err != nil {
-		s.cfg.SequenceNumber--
-		return err
-	}
 
-	if _, err := s.lowerConn.Write(gep); err != nil {
+	svc := services.NewGetEndpointsResponse(s.resHeader, endpoints...)
+	if err := s.write(New(svc, s.cfg)); err != nil {
 		s.cfg.SequenceNumber--
 		return err
 	}
@@ -530,16 +495,9 @@ func (s *SecureChannel) FindServersRequest(locales []string, servers ...string) 
 	s.cfg.SequenceNumber++
 	s.reqHeader.RequestHandle++
 	s.reqHeader.Timestamp = time.Now()
-	fsr, err := New(services.NewFindServersRequest(
-		s.reqHeader, s.RemoteEndpoint(), locales, servers...,
-	), s.cfg).Serialize()
-	if err != nil {
-		s.cfg.SequenceNumber--
-		s.reqHeader.RequestHandle--
-		return err
-	}
 
-	if _, err := s.lowerConn.Write(fsr); err != nil {
+	svc := services.NewFindServersRequest(s.reqHeader, s.RemoteEndpoint(), locales, servers)
+	if err := s.write(New(svc, s.cfg)); err != nil {
 		s.cfg.SequenceNumber--
 		s.reqHeader.RequestHandle--
 		return err
@@ -554,15 +512,9 @@ func (s *SecureChannel) FindServersResponse(code uint32, apps ...*services.Appli
 	s.cfg.SequenceNumber++
 	s.resHeader.ServiceResult = code
 	s.resHeader.Timestamp = time.Now()
-	fsr, err := New(services.NewFindServersResponse(
-		s.resHeader, apps...,
-	), s.cfg).Serialize()
-	if err != nil {
-		s.cfg.SequenceNumber--
-		return err
-	}
 
-	if _, err := s.lowerConn.Write(fsr); err != nil {
+	svc := services.NewFindServersResponse(s.resHeader, apps...)
+	if err := s.write(New(svc, s.cfg)); err != nil {
 		s.cfg.SequenceNumber--
 		return err
 	}

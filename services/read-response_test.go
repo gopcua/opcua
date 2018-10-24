@@ -19,16 +19,15 @@ func TestReadResponse(t *testing.T) {
 			Struct: NewReadResponse(
 				NewResponseHeader(
 					time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-					1, 0, NewNullDiagnosticInfo(), []string{}, NewNullAdditionalHeader(), nil,
+					1, 0, datatypes.NewNullDiagnosticInfo(), []string{}, NewNullAdditionalHeader(),
 				),
-				[]*DiagnosticInfo{
-					NewNullDiagnosticInfo(),
+				[]*datatypes.DiagnosticInfo{
+					datatypes.NewNullDiagnosticInfo(),
 				},
 				datatypes.NewDataValue(
 					true, false, false, false, false, false,
-					datatypes.NewVariant(
-						datatypes.NewFloat(2.5001559257507324),
-					), 0, time.Time{}, 0, time.Time{}, 0,
+					datatypes.MustVariant(float32(2.5001559257507324)),
+					0, time.Time{}, 0, time.Time{}, 0,
 				),
 			),
 			Bytes: []byte{
@@ -56,14 +55,7 @@ func TestReadResponse(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases, func(b []byte) (codectest.S, error) {
-		v, err := DecodeReadResponse(b)
-		if err != nil {
-			return nil, err
-		}
-		v.Payload = nil
-		return v, nil
-	})
+	codectest.Run(t, cases)
 
 	t.Run("service-id", func(t *testing.T) {
 		id := new(ReadResponse).ServiceType()
