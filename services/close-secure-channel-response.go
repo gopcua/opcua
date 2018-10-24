@@ -20,13 +20,7 @@ type CloseSecureChannelResponse struct {
 // NewCloseSecureChannelResponse creates an CloseSecureChannelResponse.
 func NewCloseSecureChannelResponse(resHeader *ResponseHeader) *CloseSecureChannelResponse {
 	return &CloseSecureChannelResponse{
-		TypeID: datatypes.NewExpandedNodeID(
-			false, false,
-			datatypes.NewFourByteNodeID(
-				0, ServiceTypeCloseSecureChannelResponse,
-			),
-			"", 0,
-		),
+		TypeID:         datatypes.NewFourByteExpandedNodeID(0, ServiceTypeCloseSecureChannelResponse),
 		ResponseHeader: resHeader,
 	}
 }

@@ -9,7 +9,6 @@ import (
 	"math"
 
 	"github.com/wmnsk/gopcua/datatypes"
-	"github.com/wmnsk/gopcua/id"
 )
 
 // CreateSubscriptionRequest is used to create a Subscription. Subscriptions monitor a set of MonitoredItems for
@@ -40,11 +39,7 @@ func NewCreateSubscriptionRequest(
 	priority byte,
 ) *CreateSubscriptionRequest {
 	return &CreateSubscriptionRequest{
-		TypeID: datatypes.NewExpandedNodeID(
-			false, false,
-			datatypes.NewFourByteNodeID(0, id.CreateSubscriptionRequest_Encoding_DefaultBinary),
-			"", 0,
-		),
+		TypeID:                      datatypes.NewFourByteExpandedNodeID(0, ServiceTypeCreateSubscriptionRequest),
 		RequestHeader:               reqHeader,
 		RequestedPublishingInterval: pubInterval,
 		RequestedLifetimeCount:      lifetime,
@@ -192,5 +187,5 @@ func (c *CreateSubscriptionRequest) Len() int {
 
 // ServiceType returns type of Service in uint16.
 func (c *CreateSubscriptionRequest) ServiceType() uint16 {
-	return id.CreateSubscriptionRequest_Encoding_DefaultBinary
+	return ServiceTypeCreateSubscriptionRequest
 }

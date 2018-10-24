@@ -33,13 +33,7 @@ type ActivateSessionResponse struct {
 // NewActivateSessionResponse creates a new NewActivateSessionResponse.
 func NewActivateSessionResponse(resHeader *ResponseHeader, nonce []byte, results []uint32, diags []*DiagnosticInfo) *ActivateSessionResponse {
 	return &ActivateSessionResponse{
-		TypeID: datatypes.NewExpandedNodeID(
-			false, false,
-			datatypes.NewFourByteNodeID(
-				0, ServiceTypeActivateSessionResponse,
-			),
-			"", 0,
-		),
+		TypeID:          datatypes.NewFourByteExpandedNodeID(0, ServiceTypeActivateSessionResponse),
 		ResponseHeader:  resHeader,
 		ServerNonce:     datatypes.NewByteString(nonce),
 		Results:         datatypes.NewUint32Array(results),

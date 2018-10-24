@@ -24,11 +24,7 @@ type CancelResponse struct {
 // NewCancelResponse creates a new CancelResponse.
 func NewCancelResponse(resHeader *ResponseHeader, cancelCount uint32) *CancelResponse {
 	return &CancelResponse{
-		TypeID: datatypes.NewExpandedNodeID(
-			false, false,
-			datatypes.NewFourByteNodeID(0, ServiceTypeCancelResponse),
-			"", 0,
-		),
+		TypeID:         datatypes.NewFourByteExpandedNodeID(0, ServiceTypeCancelResponse),
 		ResponseHeader: resHeader,
 		CancelCount:    cancelCount,
 	}

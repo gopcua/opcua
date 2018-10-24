@@ -26,13 +26,7 @@ type FindServersOnNetworkResponse struct {
 // NewFindServersOnNetworkResponse creates an FindServersOnNetworkResponse.
 func NewFindServersOnNetworkResponse(resHeader *ResponseHeader, resetTime time.Time, servers ...*datatypes.ServersOnNetwork) *FindServersOnNetworkResponse {
 	return &FindServersOnNetworkResponse{
-		TypeID: datatypes.NewExpandedNodeID(
-			false, false,
-			datatypes.NewFourByteNodeID(
-				0, ServiceTypeFindServersOnNetworkResponse,
-			),
-			"", 0,
-		),
+		TypeID:               datatypes.NewFourByteExpandedNodeID(0, ServiceTypeFindServersOnNetworkResponse),
 		ResponseHeader:       resHeader,
 		LastCounterResetTime: resetTime,
 		Servers:              datatypes.NewServersOnNetworkArray(servers),

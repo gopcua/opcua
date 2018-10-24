@@ -19,13 +19,7 @@ type GetEndpointsResponse struct {
 // NewGetEndpointsResponse creates an GetEndpointsResponse.
 func NewGetEndpointsResponse(resHeader *ResponseHeader, endpoints ...*EndpointDescription) *GetEndpointsResponse {
 	return &GetEndpointsResponse{
-		TypeID: datatypes.NewExpandedNodeID(
-			false, false,
-			datatypes.NewFourByteNodeID(
-				0, ServiceTypeGetEndpointsResponse,
-			),
-			"", 0,
-		),
+		TypeID:         datatypes.NewFourByteExpandedNodeID(0, ServiceTypeGetEndpointsResponse),
 		ResponseHeader: resHeader,
 		Endpoints:      NewEndpointDescriptionArray(endpoints),
 	}

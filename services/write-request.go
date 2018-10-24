@@ -23,13 +23,7 @@ type WriteRequest struct {
 // NewWriteRequest creates a new WriteRequest.
 func NewWriteRequest(reqHeader *RequestHeader, nodes ...*datatypes.WriteValue) *WriteRequest {
 	return &WriteRequest{
-		TypeID: datatypes.NewExpandedNodeID(
-			false, false,
-			datatypes.NewFourByteNodeID(
-				0, ServiceTypeWriteRequest,
-			),
-			"", 0,
-		),
+		TypeID:        datatypes.NewFourByteExpandedNodeID(0, ServiceTypeWriteRequest),
 		RequestHeader: reqHeader,
 		NodesToWrite:  datatypes.NewWriteValueArray(nodes),
 	}

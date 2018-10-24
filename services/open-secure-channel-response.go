@@ -23,13 +23,7 @@ type OpenSecureChannelResponse struct {
 // NewOpenSecureChannelResponse creates an OpenSecureChannelResponse.
 func NewOpenSecureChannelResponse(resHeader *ResponseHeader, ver uint32, secToken *ChannelSecurityToken, nonce []byte) *OpenSecureChannelResponse {
 	return &OpenSecureChannelResponse{
-		TypeID: datatypes.NewExpandedNodeID(
-			false, false,
-			datatypes.NewFourByteNodeID(
-				0, ServiceTypeOpenSecureChannelResponse,
-			),
-			"", 0,
-		),
+		TypeID:                datatypes.NewFourByteExpandedNodeID(0, ServiceTypeOpenSecureChannelResponse),
 		ResponseHeader:        resHeader,
 		ServerProtocolVersion: ver,
 		SecurityToken:         secToken,

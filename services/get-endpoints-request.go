@@ -25,13 +25,7 @@ type GetEndpointsRequest struct {
 // NewGetEndpointsRequest creates an GetEndpointsRequest.
 func NewGetEndpointsRequest(reqHeader *RequestHeader, endpoint string, localIDs, profileURIs []string) *GetEndpointsRequest {
 	return &GetEndpointsRequest{
-		TypeID: datatypes.NewExpandedNodeID(
-			false, false,
-			datatypes.NewFourByteNodeID(
-				0, ServiceTypeGetEndpointsRequest,
-			),
-			"", 0,
-		),
+		TypeID:        datatypes.NewFourByteExpandedNodeID(0, ServiceTypeGetEndpointsRequest),
 		RequestHeader: reqHeader,
 		EndpointURL:   datatypes.NewString(endpoint),
 		LocaleIDs:     datatypes.NewStringArray(localIDs),

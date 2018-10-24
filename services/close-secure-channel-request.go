@@ -24,13 +24,7 @@ type CloseSecureChannelRequest struct {
 // NewCloseSecureChannelRequest creates an CloseSecureChannelRequest.
 func NewCloseSecureChannelRequest(reqHeader *RequestHeader, chanID uint32) *CloseSecureChannelRequest {
 	return &CloseSecureChannelRequest{
-		TypeID: datatypes.NewExpandedNodeID(
-			false, false,
-			datatypes.NewFourByteNodeID(
-				0, ServiceTypeCloseSecureChannelRequest,
-			),
-			"", 0,
-		),
+		TypeID:          datatypes.NewFourByteExpandedNodeID(0, ServiceTypeCloseSecureChannelRequest),
 		RequestHeader:   reqHeader,
 		SecureChannelID: chanID,
 	}
