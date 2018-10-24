@@ -20,6 +20,29 @@ func TestNewFloat(t *testing.T) {
 	}
 }
 
+func TestFloatNaN(t *testing.T) {
+	qnan32 := []byte{0x00, 0x00, 0xc0, 0xff}
+	t.Run("decode silent nan", func(t *testing.T) {
+		f, err := DecodeFloat(qnan32)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !math.IsNaN(float64(f.Value)) {
+			t.Fatal("should be NaN")
+		}
+	})
+	t.Run("encode nan", func(t *testing.T) {
+		f := &Float{float32(math.NaN())}
+		b, err := f.Serialize()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if diff := cmp.Diff(b, qnan32); diff != "" {
+			t.Fatal(diff)
+		}
+	})
+}
+
 func TestDecodeFloat(t *testing.T) {
 	b := []byte{0x64, 0x06, 0xa0, 0x40}
 	f, err := DecodeFloat(b)

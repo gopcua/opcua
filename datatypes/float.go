@@ -55,6 +55,12 @@ func (f *Float) Serialize() ([]byte, error) {
 
 // SerializeTo serializes Float into bytes.
 func (f *Float) SerializeTo(b []byte) error {
+	// Part 6, 5.2.2.3 encode NaN as IEEE 754 silent NaN
+	if math.IsNaN(float64(f.Value)) {
+		binary.LittleEndian.PutUint32(b, 0xFFC00000)
+		return nil
+	}
+
 	bits := math.Float32bits(f.Value)
 	binary.LittleEndian.PutUint32(b, bits)
 	return nil
