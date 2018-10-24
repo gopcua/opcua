@@ -9,7 +9,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
 	"github.com/wmnsk/gopcua/utils/codectest"
 )
 
@@ -64,7 +63,7 @@ func TestNodeID(t *testing.T) {
 func TestParseNodeID(t *testing.T) {
 	cases := []struct {
 		s   string
-		n   NodeID
+		n   *NodeID
 		err error
 	}{
 		// happy flows
@@ -96,8 +95,8 @@ func TestParseNodeID(t *testing.T) {
 			if got, want := err, c.err; !reflect.DeepEqual(got, want) {
 				t.Fatalf("got error %v want %v", got, want)
 			}
-			if got, want := n, c.n; !cmp.Equal(got, want) {
-				t.Fatal(cmp.Diff(got, want))
+			if got, want := n, c.n; !reflect.DeepEqual(got, want) {
+				t.Fatalf("\ngot  %#v\nwant %#v", got, want)
 			}
 		})
 	}

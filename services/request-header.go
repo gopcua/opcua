@@ -17,7 +17,7 @@ import (
 //
 // Specification: Part 4, 7.28
 type RequestHeader struct {
-	AuthenticationToken datatypes.NodeID
+	AuthenticationToken *datatypes.NodeID
 	Timestamp           time.Time
 	RequestHandle       uint32
 	ReturnDiagnostics   uint32
@@ -28,7 +28,7 @@ type RequestHeader struct {
 }
 
 // NewRequestHeader creates a new RequestHeader.
-func NewRequestHeader(authToken datatypes.NodeID, timestamp time.Time, handle, diag, timeout uint32, auditID string, additionalHeader *AdditionalHeader, payload []byte) *RequestHeader {
+func NewRequestHeader(authToken *datatypes.NodeID, timestamp time.Time, handle, diag, timeout uint32, auditID string, additionalHeader *AdditionalHeader, payload []byte) *RequestHeader {
 	return &RequestHeader{
 		AuthenticationToken: authToken,
 		Timestamp:           timestamp,

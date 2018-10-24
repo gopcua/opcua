@@ -238,7 +238,7 @@ func (c *Config) validateServerConfig() error {
 type SessionConfig struct {
 	// AuthenticationToken is the secret Session identifier used to verify that the request is
 	// associated with the Session. The SessionAuthenticationToken type is defined in 7.31.
-	AuthenticationToken datatypes.NodeID
+	AuthenticationToken *datatypes.NodeID
 	// ClientDescription is the information that describes the Client application.
 	// The type ApplicationDescription is defined in 7.1.
 	ClientDescription *services.ApplicationDescription

@@ -8,11 +8,10 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"fmt"
+	"io"
 	"math"
 	"strconv"
 	"strings"
-
-	"github.com/wmnsk/gopcua/errors"
 )
 
 // NodeId type definitions.
@@ -27,24 +26,312 @@ const (
 	TypeOpaque
 )
 
-// NodeID is an interface to handle all types of NodeId.
-type NodeID interface {
-	Serialize() ([]byte, error)
-	SerializeTo([]byte) error
-	DecodeFromBytes([]byte) error
-	Len() int
-	String() string
-	EncodingMaskValue() uint8
-	SetURIFlag()
-	SetIndexFlag()
-	GetIdentifier() []byte
+type NodeID struct {
+	mask uint8
+	ns   uint16
+	nid  uint32
+	bid  []byte
+	gid  *GUID
+}
+
+func NewTwoByteNodeID(id uint8) *NodeID {
+	return &NodeID{
+		mask: TypeTwoByte,
+		nid:  uint32(id),
+	}
+}
+
+func NewFourByteNodeID(ns uint8, id uint16) *NodeID {
+	return &NodeID{
+		mask: TypeFourByte,
+		ns:   uint16(ns),
+		nid:  uint32(id),
+	}
+}
+
+func NewNumericNodeID(ns uint16, id uint32) *NodeID {
+	return &NodeID{
+		mask: TypeNumeric,
+		ns:   ns,
+		nid:  id,
+	}
+}
+
+func NewStringNodeID(ns uint16, id string) *NodeID {
+	return &NodeID{
+		mask: TypeString,
+		ns:   ns,
+		bid:  []byte(id),
+	}
+}
+
+func NewGUIDNodeID(ns uint16, id string) *NodeID {
+	return &NodeID{
+		mask: TypeGUID,
+		ns:   ns,
+		gid:  NewGUID(id),
+	}
+}
+
+func NewOpaqueNodeID(ns uint16, id []byte) *NodeID {
+	return &NodeID{
+		mask: TypeOpaque,
+		ns:   ns,
+		bid:  id,
+	}
+}
+
+func (n *NodeID) EncodingMask() uint8 {
+	return n.mask
+}
+
+func (n *NodeID) Type() uint8 {
+	return n.mask & 0xf
+}
+
+// URIFlag returns whether the URI flag is set in EncodingMask.
+func (n *NodeID) URIFlag() bool {
+	return n.mask&0x80 == 0x80
+}
+
+// SetURIFlag sets NamespaceURI flag in EncodingMask.
+func (n *NodeID) SetURIFlag() {
+	n.mask |= 0x80
+}
+
+// IndexFlag returns whether the Index flag is set in EncodingMask.
+func (n *NodeID) IndexFlag() bool {
+	return n.mask&0x40 == 0x40
+}
+
+// SetIndexFlag sets NamespaceURI flag in EncodingMask.
+func (n *NodeID) SetIndexFlag() {
+	n.mask |= 0x40
+}
+
+// GetIdentifier returns value in Identifier field in bytes.
+func (n *NodeID) GetIdentifier() []byte {
+	switch n.Type() {
+	case TypeTwoByte:
+		return []byte{uint8(n.nid)}
+
+	case TypeFourByte:
+		b := make([]byte, 2)
+		binary.LittleEndian.PutUint16(b, uint16(n.nid))
+		return b
+
+	case TypeNumeric:
+		b := make([]byte, 4)
+		binary.LittleEndian.PutUint32(b, n.nid)
+		return b
+
+	case TypeGUID:
+		b, _ := n.gid.Serialize()
+		return b
+
+	case TypeString, TypeOpaque:
+		return n.bid
+
+	default:
+		panic(fmt.Sprintf("invalid node id type: %d", n.Type()))
+	}
+}
+
+// Serialize serializes NodeID into bytes.
+func (n *NodeID) Serialize() ([]byte, error) {
+	b := make([]byte, n.Len())
+	if err := n.SerializeTo(b); err != nil {
+		return nil, err
+	}
+	return b, nil
+}
+
+// SerializeTo serializes NodeID into bytes.
+func (n *NodeID) SerializeTo(b []byte) error {
+	switch n.Type() {
+	case TypeTwoByte:
+		b[0] = n.mask
+		b[1] = uint8(n.nid)
+		return nil
+
+	case TypeFourByte:
+		b[0] = n.mask
+		b[1] = uint8(n.ns)
+		binary.LittleEndian.PutUint16(b[2:], uint16(n.nid))
+		return nil
+
+	case TypeNumeric:
+		b[0] = n.mask
+		binary.LittleEndian.PutUint16(b[1:3], n.ns)
+		binary.LittleEndian.PutUint32(b[3:7], n.nid)
+		return nil
+
+	case TypeGUID:
+		b[0] = n.mask
+		binary.LittleEndian.PutUint16(b[1:3], n.ns)
+		return n.gid.SerializeTo(b[3:])
+
+	case TypeString, TypeOpaque:
+		b[0] = n.mask
+		binary.LittleEndian.PutUint16(b[1:3], n.ns)
+		binary.LittleEndian.PutUint32(b[3:7], uint32(len(n.bid)))
+		copy(b[7:7+len(n.bid)], n.bid)
+		return nil
+
+	default:
+		return fmt.Errorf("invalid node id type: %d", n.Type())
+	}
+
+	return nil
+}
+
+func (n *NodeID) DecodeFromBytes(b []byte) error {
+	if len(b) == 0 {
+		return io.ErrUnexpectedEOF
+	}
+	n.mask = b[0]
+
+	switch n.Type() {
+	case TypeTwoByte:
+		if len(b) < 2 {
+			return io.ErrUnexpectedEOF
+		}
+		n.nid = uint32(b[1])
+		return nil
+
+	case TypeFourByte:
+		if len(b) < 4 {
+			return io.ErrUnexpectedEOF
+		}
+		n.ns = uint16(b[1])
+		n.nid = uint32(binary.LittleEndian.Uint16(b[2:4]))
+		return nil
+
+	case TypeNumeric:
+		if len(b) < 7 {
+			return io.ErrUnexpectedEOF
+		}
+		n.ns = binary.LittleEndian.Uint16(b[1:3])
+		n.nid = binary.LittleEndian.Uint32(b[3:7])
+		return nil
+
+	case TypeGUID:
+		if len(b) < 19 {
+			return io.ErrUnexpectedEOF
+		}
+		n.ns = binary.LittleEndian.Uint16(b[1:3])
+		n.gid = &GUID{}
+		return n.gid.DecodeFromBytes(b[3:19])
+
+	case TypeString, TypeOpaque:
+		if len(b) < 7 {
+			return io.ErrUnexpectedEOF
+		}
+		n.ns = binary.LittleEndian.Uint16(b[1:3])
+		l := binary.LittleEndian.Uint32(b[3:7])
+		if len(b) < int(l) {
+			return io.ErrUnexpectedEOF
+		}
+		n.bid = make([]byte, l)
+		copy(n.bid, b[7:7+l])
+		return nil
+
+	default:
+		panic(fmt.Sprintf("invalid node id type: %d", n.Type()))
+	}
+}
+
+// GetIdentifier returns value in Identifier field in bytes.
+func (n *NodeID) Len() int {
+	switch n.Type() {
+	case TypeTwoByte:
+		return 2
+
+	case TypeFourByte:
+		return 4
+
+	case TypeNumeric:
+		return 7
+
+	case TypeString:
+		return 7 + len(n.bid)
+
+	case TypeGUID:
+		return 19
+
+	case TypeOpaque:
+		return 7 + len(n.bid)
+
+	default:
+		panic(fmt.Sprintf("invalid node id type: %d", n.Type()))
+	}
+}
+
+func (n *NodeID) IntID() int {
+	return int(n.nid)
+}
+
+func (n *NodeID) StringID() string {
+	switch n.Type() {
+	case TypeGUID:
+		if n.gid == nil {
+			return ""
+		}
+		return n.gid.String()
+	case TypeString:
+		return string(n.bid)
+	case TypeOpaque:
+		return base64.StdEncoding.EncodeToString(n.bid)
+	default:
+		return ""
+	}
+}
+
+func (n *NodeID) String() string {
+	switch n.Type() {
+	case TypeTwoByte:
+		return fmt.Sprintf("i=%d", n.nid)
+
+	case TypeFourByte:
+		if n.ns == 0 {
+			return fmt.Sprintf("i=%d", n.nid)
+		}
+		return fmt.Sprintf("ns=%d;i=%d", n.ns, n.nid)
+
+	case TypeNumeric:
+		if n.ns == 0 {
+			return fmt.Sprintf("i=%d", n.nid)
+		}
+		return fmt.Sprintf("ns=%d;i=%d", n.ns, n.nid)
+
+	case TypeString:
+		if n.ns == 0 {
+			return fmt.Sprintf("s=%s", n.StringID())
+		}
+		return fmt.Sprintf("ns=%d;s=%s", n.ns, n.StringID())
+
+	case TypeGUID:
+		if n.ns == 0 {
+			return fmt.Sprintf("g=%s", n.StringID())
+		}
+		return fmt.Sprintf("ns=%d;g=%s", n.ns, n.StringID())
+
+	case TypeOpaque:
+		if n.ns == 0 {
+			return fmt.Sprintf("o=%s", n.StringID())
+		}
+		return fmt.Sprintf("ns=%d;o=%s", n.ns, n.StringID())
+
+	default:
+		panic(fmt.Sprintf("invalid node id type: %d", n.Type()))
+	}
 }
 
 // ParseNodeID returns a node id from a string definition of the format
 // 'ns=<namespace>;{s,i,b,g}=<identifier>'. Namespace URLs 'nsu=' are not
 // supported since they require a lookup. The 's=' prefix can be omitted
 // for string node ids.
-func ParseNodeID(s string) (NodeID, error) {
+func ParseNodeID(s string) (*NodeID, error) {
 	if s == "" {
 		return NewTwoByteNodeID(0), nil
 	}
@@ -98,7 +385,7 @@ func ParseNodeID(s string) (NodeID, error) {
 
 	case strings.HasPrefix(idval, "g="):
 		n := NewGUIDNodeID(ns, idval[2:])
-		if n == nil || n.Identifier == nil {
+		if n == nil || n.StringID() == "" {
 			return nil, fmt.Errorf("invalid guid node id: %s", s)
 		}
 		return n, nil
@@ -115,542 +402,10 @@ func ParseNodeID(s string) (NodeID, error) {
 	}
 }
 
-// DecodeNodeID decodes given bytes into NodeID, depending on the Encoding Mask.
-func DecodeNodeID(b []byte) (NodeID, error) {
-	var n NodeID
-
-	encodingMask := b[0] & 0xf
-	switch encodingMask {
-	case TypeTwoByte:
-		n = &TwoByteNodeID{}
-	case TypeFourByte:
-		n = &FourByteNodeID{}
-	case TypeNumeric:
-		n = &NumericNodeID{}
-	case TypeString:
-		n = &StringNodeID{}
-	case TypeGUID:
-		n = &GUIDNodeID{}
-	case TypeOpaque:
-		n = &OpaqueNodeID{}
-	default:
-		return nil, errors.NewErrInvalidType(encodingMask, "decode", "got undefined type")
-	}
-
+func DecodeNodeID(b []byte) (*NodeID, error) {
+	n := &NodeID{}
 	if err := n.DecodeFromBytes(b); err != nil {
 		return nil, err
 	}
 	return n, nil
-}
-
-// TwoByteNodeID represents the TwoByteNodeId.
-// It is a numeric value that fits into the two-byte representation.
-//
-// Specification: Part 6, 5.2.2.9
-type TwoByteNodeID struct {
-	EncodingMask uint8
-	Identifier   byte
-}
-
-// NewTwoByteNodeID creates a new TwoByteNodeID.
-func NewTwoByteNodeID(val byte) *TwoByteNodeID {
-	t := &TwoByteNodeID{
-		EncodingMask: TypeTwoByte,
-		Identifier:   val,
-	}
-
-	return t
-}
-
-// DecodeFromBytes decodes given bytes into TwoByteNodeID.
-func (t *TwoByteNodeID) DecodeFromBytes(b []byte) error {
-	if len(b) < 2 {
-		return errors.NewErrTooShortToDecode(t, "should be 2 bytes")
-	}
-
-	t.EncodingMask = b[0]
-	t.Identifier = b[1]
-	return nil
-}
-
-// Serialize serializes TwoByteNodeID into bytes.
-func (t *TwoByteNodeID) Serialize() ([]byte, error) {
-	b := make([]byte, t.Len())
-	if err := t.SerializeTo(b); err != nil {
-		return nil, err
-	}
-
-	return b, nil
-}
-
-// SerializeTo serializes TwoByteNodeID into bytes.
-func (t *TwoByteNodeID) SerializeTo(b []byte) error {
-	b[0] = t.EncodingMask
-	b[1] = t.Identifier
-
-	return nil
-}
-
-// Len returns the actual length of TwoByteNodeID in int.
-func (t *TwoByteNodeID) Len() int {
-	return 2
-}
-
-// EncodingMaskValue returns EncodingMask in uint8.
-func (t *TwoByteNodeID) EncodingMaskValue() uint8 {
-	return t.EncodingMask
-}
-
-// SetURIFlag sets NamespaceURI flag in EncodingMask.
-func (t *TwoByteNodeID) SetURIFlag() {
-	t.EncodingMask |= 0x80
-}
-
-// SetIndexFlag sets NamespaceURI flag in EncodingMask.
-func (t *TwoByteNodeID) SetIndexFlag() {
-	t.EncodingMask |= 0x40
-}
-
-// GetIdentifier returns value in Identifier field in bytes.
-func (t *TwoByteNodeID) GetIdentifier() []byte {
-	return []byte{t.Identifier}
-}
-
-// String returns the values in TwoByteNodeID in string.
-func (t *TwoByteNodeID) String() string {
-	return fmt.Sprintf("%x, %d", t.EncodingMask, t.Identifier)
-}
-
-// FourByteNodeID represents the FourByteNodeId.
-// It is a numeric value that fits into the four-byte representation.
-//
-// Specification: Part 6, 5.2.2.9
-type FourByteNodeID struct {
-	EncodingMask uint8
-	Namespace    uint8
-	Identifier   uint16
-}
-
-// NewFourByteNodeID creates a new FourByteNodeID.
-func NewFourByteNodeID(idx uint8, val uint16) *FourByteNodeID {
-	f := &FourByteNodeID{
-		EncodingMask: TypeFourByte,
-		Namespace:    idx,
-		Identifier:   val,
-	}
-
-	return f
-}
-
-// DecodeFromBytes decodes given bytes into FourByteNodeID.
-func (f *FourByteNodeID) DecodeFromBytes(b []byte) error {
-	if len(b) < 4 {
-		return errors.NewErrTooShortToDecode(f, "should be 4 bytes")
-	}
-
-	f.EncodingMask = b[0]
-	f.Namespace = b[1]
-	f.Identifier = binary.LittleEndian.Uint16(b[2:4])
-	return nil
-}
-
-// Serialize serializes FourByteNodeID into bytes.
-func (f *FourByteNodeID) Serialize() ([]byte, error) {
-	b := make([]byte, f.Len())
-	if err := f.SerializeTo(b); err != nil {
-		return nil, err
-	}
-
-	return b, nil
-}
-
-// SerializeTo serializes FourByteNodeID into bytes.
-func (f *FourByteNodeID) SerializeTo(b []byte) error {
-	b[0] = f.EncodingMask
-	b[1] = f.Namespace
-	binary.LittleEndian.PutUint16(b[2:], f.Identifier)
-
-	return nil
-}
-
-// Len returns the actual length of FourByteNodeID in int.
-func (f *FourByteNodeID) Len() int {
-	return 4
-}
-
-// EncodingMaskValue returns EncodingMask in uint8.
-func (f *FourByteNodeID) EncodingMaskValue() uint8 {
-	return f.EncodingMask
-}
-
-// SetURIFlag sets NamespaceURI flag in EncodingMask.
-func (f *FourByteNodeID) SetURIFlag() {
-	f.EncodingMask |= 0x80
-}
-
-// SetIndexFlag sets NamespaceURI flag in EncodingMask.
-func (f *FourByteNodeID) SetIndexFlag() {
-	f.EncodingMask |= 0x40
-}
-
-// GetIdentifier returns value in Identifier field in bytes.
-func (f *FourByteNodeID) GetIdentifier() []byte {
-	b := make([]byte, 2)
-	binary.LittleEndian.PutUint16(b, f.Identifier)
-
-	return b
-}
-
-// String returns the values in FourByteNodeID in string.
-func (f *FourByteNodeID) String() string {
-	return fmt.Sprintf("%x, %d, %d", f.EncodingMask, f.Namespace, f.Identifier)
-}
-
-// NumericNodeID represents the NumericNodeId.
-// It is a numeric value that does not fit into the two or four byte representations.
-//
-// Specification: Part 6, 5.2.2.9
-type NumericNodeID struct {
-	EncodingMask uint8
-	Namespace    uint16
-	Identifier   uint32
-}
-
-// NewNumericNodeID creates a new NumericNodeID.
-func NewNumericNodeID(idx uint16, val uint32) *NumericNodeID {
-	n := &NumericNodeID{
-		EncodingMask: TypeNumeric,
-		Namespace:    idx,
-		Identifier:   val,
-	}
-
-	return n
-}
-
-// DecodeFromBytes decodes given bytes into NumericNodeID.
-func (n *NumericNodeID) DecodeFromBytes(b []byte) error {
-	if len(b) < 7 {
-		return errors.NewErrTooShortToDecode(n, "should be 7 bytes")
-	}
-
-	n.EncodingMask = b[0]
-	n.Namespace = binary.LittleEndian.Uint16(b[1:3])
-	n.Identifier = binary.LittleEndian.Uint32(b[3:7])
-	return nil
-}
-
-// Serialize serializes NumericNodeID into bytes.
-func (n *NumericNodeID) Serialize() ([]byte, error) {
-	b := make([]byte, n.Len())
-	if err := n.SerializeTo(b); err != nil {
-		return nil, err
-	}
-
-	return b, nil
-}
-
-// SerializeTo serializes NumericNodeID into bytes.
-func (n *NumericNodeID) SerializeTo(b []byte) error {
-	b[0] = n.EncodingMask
-	binary.LittleEndian.PutUint16(b[1:3], n.Namespace)
-	binary.LittleEndian.PutUint32(b[3:7], n.Identifier)
-
-	return nil
-}
-
-// Len returns the actual length of NumericNodeID in int.
-func (n *NumericNodeID) Len() int {
-	return 7
-}
-
-// EncodingMaskValue returns EncodingMask in uint8.
-func (n *NumericNodeID) EncodingMaskValue() uint8 {
-	return n.EncodingMask
-}
-
-// SetURIFlag sets NamespaceURI flag in EncodingMask.
-func (n *NumericNodeID) SetURIFlag() {
-	n.EncodingMask |= 0x80
-}
-
-// SetIndexFlag sets NamespaceURI flag in EncodingMask.
-func (n *NumericNodeID) SetIndexFlag() {
-	n.EncodingMask |= 0x40
-}
-
-// GetIdentifier returns value in Identifier field in bytes.
-func (n *NumericNodeID) GetIdentifier() []byte {
-	b := make([]byte, 4)
-	binary.LittleEndian.PutUint32(b, n.Identifier)
-
-	return b
-}
-
-// String returns the values in NumericNodeID in string.
-func (n *NumericNodeID) String() string {
-	return fmt.Sprintf("%x, %d, %d", n.EncodingMask, n.Namespace, n.Identifier)
-}
-
-// StringNodeID represents the StringNodeId.
-//
-// Specification: Part 6, 5.2.2.9
-type StringNodeID struct {
-	EncodingMask uint8
-	Namespace    uint16
-	Length       uint32
-	Identifier   []byte
-}
-
-// NewStringNodeID creates a new StringNodeID.
-func NewStringNodeID(idx uint16, val string) *StringNodeID {
-	n := &StringNodeID{
-		EncodingMask: TypeString,
-		Namespace:    idx,
-		Identifier:   []byte(val),
-	}
-	n.Length = uint32(len(val))
-
-	return n
-}
-
-// DecodeFromBytes decodes given bytes into StringNodeID.
-func (s *StringNodeID) DecodeFromBytes(b []byte) error {
-	if len(b) < 7 {
-		return errors.NewErrTooShortToDecode(s, "should be longer than 7 bytes")
-	}
-
-	s.EncodingMask = b[0]
-	s.Namespace = binary.LittleEndian.Uint16(b[1:3])
-	s.Length = binary.LittleEndian.Uint32(b[3:7])
-	s.Identifier = b[7 : 7+s.Length]
-	return nil
-}
-
-// Serialize serializes StringNodeID into bytes.
-func (s *StringNodeID) Serialize() ([]byte, error) {
-	b := make([]byte, s.Len())
-	if err := s.SerializeTo(b); err != nil {
-		return nil, err
-	}
-
-	return b, nil
-}
-
-// SerializeTo serializes StringNodeID into bytes.
-func (s *StringNodeID) SerializeTo(b []byte) error {
-	b[0] = s.EncodingMask
-	binary.LittleEndian.PutUint16(b[1:3], s.Namespace)
-	binary.LittleEndian.PutUint32(b[3:7], s.Length)
-	copy(b[7:7+s.Length], s.Identifier)
-
-	return nil
-}
-
-// Len returns the actual length of StringNodeID in int.
-func (s *StringNodeID) Len() int {
-	return 7 + len(s.Identifier)
-}
-
-// EncodingMaskValue returns EncodingMask in uint8.
-func (s *StringNodeID) EncodingMaskValue() uint8 {
-	return s.EncodingMask
-}
-
-// SetURIFlag sets NamespaceURI flag in EncodingMask.
-func (s *StringNodeID) SetURIFlag() {
-	s.EncodingMask |= 0x80
-}
-
-// SetIndexFlag sets NamespaceURI flag in EncodingMask.
-func (s *StringNodeID) SetIndexFlag() {
-	s.EncodingMask |= 0x40
-}
-
-// Value returns Identifier in string.
-func (s *StringNodeID) Value() string {
-	return string(s.Identifier)
-}
-
-// GetIdentifier returns value in Identifier field in bytes.
-func (s *StringNodeID) GetIdentifier() []byte {
-	return s.Identifier
-}
-
-// String returns the values in StringNodeID in string.
-func (s *StringNodeID) String() string {
-	return fmt.Sprintf("%x, %d, %d, %d", s.EncodingMask, s.Namespace, s.Length, s.Identifier)
-}
-
-// GUIDNodeID represents the GUIDNodeId.
-//
-// Specification: Part 6, 5.2.2.9
-type GUIDNodeID struct {
-	EncodingMask uint8
-	Namespace    uint16
-	Identifier   *GUID
-}
-
-// NewGUIDNodeID creates a new GUIDNodeID.
-func NewGUIDNodeID(idx uint16, val string) *GUIDNodeID {
-	guid := NewGUID(val)
-	n := &GUIDNodeID{
-		EncodingMask: TypeGUID,
-		Namespace:    idx,
-		Identifier:   guid,
-	}
-
-	return n
-}
-
-// DecodeFromBytes decodes given bytes into GUIDNodeID.
-func (g *GUIDNodeID) DecodeFromBytes(b []byte) error {
-	if len(b) < 19 {
-		return errors.NewErrTooShortToDecode(g, "should be 19 bytes")
-	}
-
-	g.EncodingMask = b[0]
-	g.Namespace = binary.LittleEndian.Uint16(b[1:3])
-	g.Identifier = &GUID{}
-	return g.Identifier.DecodeFromBytes(b[3:19])
-}
-
-// Serialize serializes GUIDNodeID into bytes.
-func (g *GUIDNodeID) Serialize() ([]byte, error) {
-	b := make([]byte, g.Len())
-	if err := g.SerializeTo(b); err != nil {
-		return nil, err
-	}
-
-	return b, nil
-}
-
-// SerializeTo serializes GUIDNodeID into bytes.
-func (g *GUIDNodeID) SerializeTo(b []byte) error {
-	b[0] = g.EncodingMask
-	binary.LittleEndian.PutUint16(b[1:3], g.Namespace)
-	return g.Identifier.SerializeTo(b[3:])
-}
-
-// Len returns the actual length of GUIDNodeID in int.
-func (g *GUIDNodeID) Len() int {
-	return 19
-}
-
-// EncodingMaskValue returns EncodingMask in uint8.
-func (g *GUIDNodeID) EncodingMaskValue() uint8 {
-	return g.EncodingMask
-}
-
-// SetURIFlag sets NamespaceURI flag in EncodingMask.
-func (g *GUIDNodeID) SetURIFlag() {
-	g.EncodingMask |= 0x80
-}
-
-// SetIndexFlag sets NamespaceURI flag in EncodingMask.
-func (g *GUIDNodeID) SetIndexFlag() {
-	g.EncodingMask |= 0x40
-}
-
-// Value returns Identifier in string.
-func (g *GUIDNodeID) Value() string {
-	return g.Identifier.String()
-}
-
-// GetIdentifier returns value in Identifier field in bytes.
-// This method returns nil when the GUID in Identifier field is invalid.
-func (g *GUIDNodeID) GetIdentifier() []byte {
-	b, _ := g.Identifier.Serialize()
-
-	return b
-}
-
-// String returns the values in GUIDNodeID in string.
-func (g *GUIDNodeID) String() string {
-	return fmt.Sprintf("%x, %d, %v", g.EncodingMask, g.Namespace, g.Identifier)
-}
-
-// OpaqueNodeID represents the OpaqueNodeId.
-//
-// Specification: Part 6, 5.2.2.9
-type OpaqueNodeID struct {
-	EncodingMask uint8
-	Namespace    uint16
-	Length       uint32
-	Identifier   []byte
-}
-
-// NewOpaqueNodeID creates a new OpaqueNodeID.
-func NewOpaqueNodeID(idx uint16, val []byte) *OpaqueNodeID {
-	n := &OpaqueNodeID{
-		EncodingMask: TypeOpaque,
-		Namespace:    idx,
-		Identifier:   val,
-	}
-	n.Length = uint32(len(val))
-
-	return n
-}
-
-// DecodeFromBytes decodes given bytes into OpaqueNodeID.
-func (o *OpaqueNodeID) DecodeFromBytes(b []byte) error {
-	if len(b) < 7 {
-		return errors.NewErrTooShortToDecode(o, "should be longer than 7 bytes")
-	}
-
-	o.EncodingMask = b[0]
-	o.Namespace = binary.LittleEndian.Uint16(b[1:3])
-	o.Length = binary.LittleEndian.Uint32(b[3:7])
-	o.Identifier = b[7 : 7+o.Length]
-
-	return nil
-}
-
-// Serialize serializes OpaqueNodeID into bytes.
-func (o *OpaqueNodeID) Serialize() ([]byte, error) {
-	b := make([]byte, o.Len())
-	if err := o.SerializeTo(b); err != nil {
-		return nil, err
-	}
-
-	return b, nil
-}
-
-// SerializeTo serializes OpaqueNodeID into bytes.
-func (o *OpaqueNodeID) SerializeTo(b []byte) error {
-	b[0] = o.EncodingMask
-	binary.LittleEndian.PutUint16(b[1:3], o.Namespace)
-	binary.LittleEndian.PutUint32(b[3:7], o.Length)
-	copy(b[7:7+o.Length], o.Identifier)
-
-	return nil
-}
-
-// Len returns the actual length of OpaqueNodeID in int.
-func (o *OpaqueNodeID) Len() int {
-	return 7 + len(o.Identifier)
-}
-
-// EncodingMaskValue returns EncodingMask in uint8.
-func (o *OpaqueNodeID) EncodingMaskValue() uint8 {
-	return o.EncodingMask
-}
-
-// SetURIFlag sets NamespaceURI flag in EncodingMask.
-func (o *OpaqueNodeID) SetURIFlag() {
-	o.EncodingMask |= 0x80
-}
-
-// SetIndexFlag sets NamespaceURI flag in EncodingMask.
-func (o *OpaqueNodeID) SetIndexFlag() {
-	o.EncodingMask |= 0x40
-}
-
-// GetIdentifier returns value in Identifier field in bytes.
-func (o *OpaqueNodeID) GetIdentifier() []byte {
-	return o.Identifier
-}
-
-// String returns the values in OpaqueNodeID in string.
-func (o *OpaqueNodeID) String() string {
-	return fmt.Sprintf("%x, %d, %d, %d", o.EncodingMask, o.Namespace, o.Length, o.Identifier)
 }
