@@ -60,7 +60,7 @@ func TestDecodeVariant(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if diff := cmp.Diff(v, test.expected, opt); diff != "" {
+			if diff := cmp.Diff(v, test.expected); diff != "" {
 				t.Error(diff)
 			}
 		})
@@ -74,7 +74,7 @@ func TestVariantDecodeFromBytes(t *testing.T) {
 			if err := v.DecodeFromBytes(test.in); err != nil {
 				t.Fatal(err)
 			}
-			if diff := cmp.Diff(v, test.expected, opt); diff != "" {
+			if diff := cmp.Diff(v, test.expected); diff != "" {
 				t.Error(diff)
 			}
 		})

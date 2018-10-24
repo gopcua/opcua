@@ -50,7 +50,7 @@ func TestDecodeDataValue(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if diff := cmp.Diff(v, test.dv, opt); diff != "" {
+			if diff := cmp.Diff(v, test.dv); diff != "" {
 				t.Error(diff)
 			}
 		})
@@ -64,7 +64,7 @@ func TestDataValueDecodeFromBytes(t *testing.T) {
 			if err := d.DecodeFromBytes(test.bytes); err != nil {
 				t.Fatal(err)
 			}
-			if diff := cmp.Diff(d, test.dv, opt); diff != "" {
+			if diff := cmp.Diff(d, test.dv); diff != "" {
 				t.Error(diff)
 			}
 		})
@@ -146,7 +146,7 @@ func TestDecodeDataValueArray(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if diff := cmp.Diff(v, test.dva, opt); diff != "" {
+			if diff := cmp.Diff(v, test.dva); diff != "" {
 				t.Error(diff)
 			}
 		})
@@ -160,7 +160,7 @@ func TestDataValueArrayDecodeFromBytes(t *testing.T) {
 			if err := d.DecodeFromBytes(test.bytes); err != nil {
 				t.Fatal(err)
 			}
-			if diff := cmp.Diff(d, test.dva, opt); diff != "" {
+			if diff := cmp.Diff(d, test.dva); diff != "" {
 				t.Error(diff)
 			}
 		})
