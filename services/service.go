@@ -12,28 +12,28 @@ import (
 // ServiceType definitions.
 const (
 	ServiceTypeFindServersRequest           uint16 = 422
-	ServiceTypeFindServersResponse                 = 425
-	ServiceTypeGetEndpointsRequest                 = 428
-	ServiceTypeGetEndpointsResponse                = 431
-	ServiceTypeOpenSecureChannelRequest            = 446
-	ServiceTypeOpenSecureChannelResponse           = 449
-	ServiceTypeCloseSecureChannelRequest           = 452
-	ServiceTypeCloseSecureChannelResponse          = 455
-	ServiceTypeCreateSessionRequest                = 461
-	ServiceTypeCreateSessionResponse               = 464
-	ServiceTypeActivateSessionRequest              = 467
-	ServiceTypeActivateSessionResponse             = 470
-	ServiceTypeCloseSessionRequest                 = 473
-	ServiceTypeCloseSessionResponse                = 476
-	ServiceTypeCancelRequest                       = 479
-	ServiceTypeCancelResponse                      = 482
-	ServiceTypeReadRequest                         = 631
-	ServiceTypeReadResponse                        = 634
-	ServiceTypeWriteRequest                        = 673
-	ServiceTypeWriteResponse                       = 676
-	ServiceTypeCreateSubscriptionRequest           = 787
-	ServiceTypeFindServersOnNetworkRequest         = 12208
-	ServiceTypeFindServersOnNetworkResponse        = 12211
+	ServiceTypeFindServersResponse          uint16 = 425
+	ServiceTypeGetEndpointsRequest          uint16 = 428
+	ServiceTypeGetEndpointsResponse         uint16 = 431
+	ServiceTypeOpenSecureChannelRequest     uint16 = 446
+	ServiceTypeOpenSecureChannelResponse    uint16 = 449
+	ServiceTypeCloseSecureChannelRequest    uint16 = 452
+	ServiceTypeCloseSecureChannelResponse   uint16 = 455
+	ServiceTypeCreateSessionRequest         uint16 = 461
+	ServiceTypeCreateSessionResponse        uint16 = 464
+	ServiceTypeActivateSessionRequest       uint16 = 467
+	ServiceTypeActivateSessionResponse      uint16 = 470
+	ServiceTypeCloseSessionRequest          uint16 = 473
+	ServiceTypeCloseSessionResponse         uint16 = 476
+	ServiceTypeCancelRequest                uint16 = 479
+	ServiceTypeCancelResponse               uint16 = 482
+	ServiceTypeReadRequest                  uint16 = 631
+	ServiceTypeReadResponse                 uint16 = 634
+	ServiceTypeWriteRequest                 uint16 = 673
+	ServiceTypeWriteResponse                uint16 = 676
+	ServiceTypeCreateSubscriptionRequest    uint16 = 787
+	ServiceTypeFindServersOnNetworkRequest  uint16 = 12208
+	ServiceTypeFindServersOnNetworkResponse uint16 = 12211
 )
 
 // Service is an interface to handle any kind of OPC UA Services.
