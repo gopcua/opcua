@@ -43,5 +43,4 @@ func TestSerializeGUID(t *testing.T) {
 			t.Errorf("Bytes doesn't match. Want: %#x, Got: %#x at %dth", x, s, i)
 		}
 	}
-	t.Logf("%x", serialized)
 }

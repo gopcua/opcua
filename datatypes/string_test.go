@@ -42,7 +42,6 @@ func TestDecodeString(t *testing.T) {
 		case str.Get() != "foobar":
 			t.Errorf("Value doesn't match. Want: %s, Got: %s", "foobar", str.Get())
 		}
-		t.Log(str.Get())
 	})
 	t.Run("null", func(t *testing.T) {
 		str, err := DecodeString(testStringBytes[1])
@@ -56,7 +55,6 @@ func TestDecodeString(t *testing.T) {
 		case str.Get() != "":
 			t.Errorf("Value doesn't match. Want: %s, Got: %s", "", str.Get())
 		}
-		t.Log(str.Get())
 	})
 	t.Run("array", func(t *testing.T) {
 		str, err := DecodeStringArray(testStringBytes[2])
@@ -76,7 +74,6 @@ func TestDecodeString(t *testing.T) {
 		case s2.Get() != "bar":
 			t.Errorf("Value doesn't match. Want: %s, Got: %s", "bar", s2.Get())
 		}
-		t.Log(s1.Get(), s2.Get())
 	})
 	t.Run("empty-array", func(t *testing.T) {
 		str, err := DecodeStringArray(testStringBytes[3])
@@ -87,7 +84,6 @@ func TestDecodeString(t *testing.T) {
 		if str.ArraySize != 0 {
 			t.Errorf("ArraySize doesn't match. Want: %d, Got: %d", 0, str.ArraySize)
 		}
-		t.Log(str)
 	})
 }
 
@@ -107,7 +103,6 @@ func TestSerializeString(t *testing.T) {
 				t.Errorf("Bytes doesn't match. Want: %#x, Got: %#x at %dth", x, s, i)
 			}
 		}
-		t.Logf("%x", serialized)
 	})
 	t.Run("null", func(t *testing.T) {
 		t.Parallel()
@@ -124,7 +119,6 @@ func TestSerializeString(t *testing.T) {
 				t.Errorf("Bytes doesn't match. Want: %#x, Got: %#x at %dth", x, s, i)
 			}
 		}
-		t.Logf("%x", serialized)
 	})
 	t.Run("array", func(t *testing.T) {
 		t.Parallel()
@@ -141,7 +135,6 @@ func TestSerializeString(t *testing.T) {
 				t.Errorf("Bytes doesn't match. Want: %#x, Got: %#x at %dth", x, s, i)
 			}
 		}
-		t.Logf("%x", serialized)
 	})
 	t.Run("empty-array", func(t *testing.T) {
 		t.Parallel()
@@ -158,6 +151,5 @@ func TestSerializeString(t *testing.T) {
 				t.Errorf("Bytes doesn't match. Want: %#x, Got: %#x at %dth", x, s, i)
 			}
 		}
-		t.Logf("%x", serialized)
 	})
 }

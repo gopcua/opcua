@@ -39,7 +39,6 @@ func TestDecodeExpandedNodeID(t *testing.T) {
 		case e.HasServerIndex():
 			t.Errorf("Index Flag doesn't match. Want: %v, Got: %v", false, e.HasServerIndex())
 		}
-		t.Log(e.String())
 	})
 	t.Run("has-uri", func(t *testing.T) {
 		t.Parallel()
@@ -56,7 +55,6 @@ func TestDecodeExpandedNodeID(t *testing.T) {
 		case e.NamespaceURI.Get() != "foobar":
 			t.Errorf("NamespaceURI doesn't match. Want: %s, Got: %s", "foobar", e.NamespaceURI.Get())
 		}
-		t.Log(e.String())
 	})
 	t.Run("has-index", func(t *testing.T) {
 		t.Parallel()
@@ -73,7 +71,6 @@ func TestDecodeExpandedNodeID(t *testing.T) {
 		case e.ServerIndex != 32768:
 			t.Errorf("ServerIndex doesn't match. Want: %d, Got: %d", 32768, e.ServerIndex)
 		}
-		t.Log(e.String())
 	})
 	t.Run("has-both", func(t *testing.T) {
 		t.Parallel()
@@ -92,7 +89,6 @@ func TestDecodeExpandedNodeID(t *testing.T) {
 		case e.ServerIndex != 32768:
 			t.Errorf("ServerIndex doesn't match. Want: %d, Got: %d", 32768, e.ServerIndex)
 		}
-		t.Log(e.String())
 	})
 }
 
@@ -116,7 +112,6 @@ func TestSerializeExpandedNodeID(t *testing.T) {
 				t.Errorf("Bytes doesn't match. Want: %#x, Got: %#x at %dth", x, s, i)
 			}
 		}
-		t.Logf("%x", serialized)
 	})
 	t.Run("has-uri", func(t *testing.T) {
 		t.Parallel()
@@ -137,7 +132,6 @@ func TestSerializeExpandedNodeID(t *testing.T) {
 				t.Errorf("Bytes doesn't match. Want: %#x, Got: %#x at %dth", x, s, i)
 			}
 		}
-		t.Logf("%x", serialized)
 	})
 	t.Run("has-index", func(t *testing.T) {
 		t.Parallel()
@@ -158,7 +152,6 @@ func TestSerializeExpandedNodeID(t *testing.T) {
 				t.Errorf("Bytes doesn't match. Want: %#x, Got: %#x at %dth", x, s, i)
 			}
 		}
-		t.Logf("%x", serialized)
 	})
 	t.Run("has-both", func(t *testing.T) {
 		t.Parallel()
@@ -179,6 +172,5 @@ func TestSerializeExpandedNodeID(t *testing.T) {
 				t.Errorf("Bytes doesn't match. Want: %#x, Got: %#x at %dth", x, s, i)
 			}
 		}
-		t.Logf("%x", serialized)
 	})
 }

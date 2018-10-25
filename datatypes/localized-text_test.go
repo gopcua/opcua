@@ -44,7 +44,6 @@ func TestDecodeLocalizedText(t *testing.T) {
 		case l.Text != nil:
 			t.Errorf("Text doesn't match. Want: %v, Got: %v", nil, l.Text)
 		}
-		t.Log(l.String())
 	})
 	t.Run("has-locale", func(t *testing.T) {
 		t.Parallel()
@@ -61,7 +60,6 @@ func TestDecodeLocalizedText(t *testing.T) {
 		case l.Text != nil:
 			t.Errorf("Text doesn't match. Want: %v, Got: %v", nil, l.Text)
 		}
-		t.Log(l.String())
 	})
 	t.Run("has-text", func(t *testing.T) {
 		t.Parallel()
@@ -78,7 +76,6 @@ func TestDecodeLocalizedText(t *testing.T) {
 		case l.Text.Get() != "bar":
 			t.Errorf("Text doesn't match. Want: %x, Got: %x", "bar", l.Text.Get())
 		}
-		t.Log(l.String())
 	})
 	t.Run("has-both", func(t *testing.T) {
 		t.Parallel()
@@ -95,7 +92,6 @@ func TestDecodeLocalizedText(t *testing.T) {
 		case l.Text.Get() != "bar":
 			t.Errorf("Text doesn't match. Want: %x, Got: %x", "bar", l.Text.Get())
 		}
-		t.Log(l.String())
 	})
 }
 
@@ -115,7 +111,6 @@ func TestSerializeLocalizedText(t *testing.T) {
 				t.Errorf("Bytes doesn't match. Want: %#x, Got: %#x at %dth", x, s, i)
 			}
 		}
-		t.Logf("%x", serialized)
 	})
 	t.Run("has-locale", func(t *testing.T) {
 		t.Parallel()
@@ -132,7 +127,6 @@ func TestSerializeLocalizedText(t *testing.T) {
 				t.Errorf("Bytes doesn't match. Want: %#x, Got: %#x at %dth", x, s, i)
 			}
 		}
-		t.Logf("%x", serialized)
 	})
 	t.Run("has-text", func(t *testing.T) {
 		t.Parallel()
@@ -149,7 +143,6 @@ func TestSerializeLocalizedText(t *testing.T) {
 				t.Errorf("Bytes doesn't match. Want: %#x, Got: %#x at %dth", x, s, i)
 			}
 		}
-		t.Logf("%x", serialized)
 	})
 	t.Run("has-both", func(t *testing.T) {
 		t.Parallel()
@@ -166,6 +159,5 @@ func TestSerializeLocalizedText(t *testing.T) {
 				t.Errorf("Bytes doesn't match. Want: %#x, Got: %#x at %dth", x, s, i)
 			}
 		}
-		t.Logf("%x", serialized)
 	})
 }
