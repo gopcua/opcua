@@ -13,6 +13,7 @@ jobs:
     steps: &ref_0
       - checkout
       - run: go get -u github.com/pkg/errors
+      - run: go get -u github.com/google/go-cmp/cmp
       - run: go install ./...
       - run: go get -v -t -d ./...
       - run: go get -u golang.org/x/lint/golint
