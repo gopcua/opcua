@@ -28,7 +28,6 @@ var testSignatureDataBytes = [][]byte{
 
 func TestDecodeSignatureData(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
-		t.Parallel()
 		s, err := DecodeSignatureData(testSignatureDataBytes[0])
 		if err != nil {
 			t.Fatalf("Failed to decode SignatureData: %s", err)
@@ -43,7 +42,6 @@ func TestDecodeSignatureData(t *testing.T) {
 		t.Log(s.String())
 	})
 	t.Run("with-dummy", func(t *testing.T) {
-		t.Parallel()
 		s, err := DecodeSignatureData(testSignatureDataBytes[1])
 		if err != nil {
 			t.Fatalf("Failed to decode SignatureData: %s", err)
@@ -62,7 +60,6 @@ func TestDecodeSignatureData(t *testing.T) {
 
 func TestSerializeSignatureData(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
-		t.Parallel()
 		s := NewSignatureData("", nil)
 
 		serialized, err := s.Serialize()
@@ -79,7 +76,6 @@ func TestSerializeSignatureData(t *testing.T) {
 		t.Logf("%x", serialized)
 	})
 	t.Run("with-dummy", func(t *testing.T) {
-		t.Parallel()
 		s := NewSignatureData("alg", []byte{0xde, 0xad, 0xbe, 0xef})
 
 		serialized, err := s.Serialize()

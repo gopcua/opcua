@@ -93,7 +93,6 @@ func TestDecodeString(t *testing.T) {
 
 func TestSerializeString(t *testing.T) {
 	t.Run("normal", func(t *testing.T) {
-		t.Parallel()
 		str := NewString("foobar")
 
 		serialized, err := str.Serialize()
@@ -110,7 +109,6 @@ func TestSerializeString(t *testing.T) {
 		t.Logf("%x", serialized)
 	})
 	t.Run("null", func(t *testing.T) {
-		t.Parallel()
 		str := NewString("")
 
 		serialized, err := str.Serialize()
@@ -127,7 +125,6 @@ func TestSerializeString(t *testing.T) {
 		t.Logf("%x", serialized)
 	})
 	t.Run("array", func(t *testing.T) {
-		t.Parallel()
 		strs := NewStringArray([]string{"foo", "bar"})
 
 		serialized, err := strs.Serialize()
@@ -144,7 +141,6 @@ func TestSerializeString(t *testing.T) {
 		t.Logf("%x", serialized)
 	})
 	t.Run("empty-array", func(t *testing.T) {
-		t.Parallel()
 		strs := NewStringArray(nil)
 
 		serialized, err := strs.Serialize()

@@ -15,7 +15,6 @@ var dummy string
 
 func TestNewErrors(t *testing.T) {
 	t.Run("ErrTooShortToDecode", func(t *testing.T) {
-		t.Parallel()
 		e := NewErrTooShortToDecode(dummy, "should be XXX.")
 		expected := &ErrTooShortToDecode{
 			Type:    dummy,
@@ -27,7 +26,6 @@ func TestNewErrors(t *testing.T) {
 		}
 	})
 	t.Run("ErrInvalidLength", func(t *testing.T) {
-		t.Parallel()
 		e := NewErrInvalidLength(dummy, "should be XXX.")
 		expected := &ErrInvalidLength{
 			Type:    dummy,
@@ -39,7 +37,6 @@ func TestNewErrors(t *testing.T) {
 		}
 	})
 	t.Run("ErrUnsupported", func(t *testing.T) {
-		t.Parallel()
 		e := NewErrUnsupported(dummy, "XXX is not supported yet.")
 		expected := &ErrUnsupported{
 			Type:    dummy,
@@ -51,7 +48,6 @@ func TestNewErrors(t *testing.T) {
 		}
 	})
 	t.Run("ErrInvalidType", func(t *testing.T) {
-		t.Parallel()
 		e := NewErrInvalidType(dummy, "decode", "something's wrong.")
 		expected := &ErrInvalidType{
 			Type:    dummy,
@@ -64,7 +60,6 @@ func TestNewErrors(t *testing.T) {
 		}
 	})
 	t.Run("ErrReceiverNil", func(t *testing.T) {
-		t.Parallel()
 		e := NewErrReceiverNil(dummy)
 		expected := &ErrReceiverNil{
 			Type: dummy,
@@ -78,7 +73,6 @@ func TestNewErrors(t *testing.T) {
 
 func TestError(t *testing.T) {
 	t.Run("ErrTooShortToDecode", func(t *testing.T) {
-		t.Parallel()
 		e := NewErrTooShortToDecode(dummy, "should be XXX.").Error()
 		expected := "too short to decode as string: should be XXX."
 
@@ -87,7 +81,6 @@ func TestError(t *testing.T) {
 		}
 	})
 	t.Run("ErrInvalidLength", func(t *testing.T) {
-		t.Parallel()
 		e := NewErrInvalidLength(dummy, "should be XXX.").Error()
 		expected := "got invalid Length in string: should be XXX."
 
@@ -96,7 +89,6 @@ func TestError(t *testing.T) {
 		}
 	})
 	t.Run("ErrUnsupported", func(t *testing.T) {
-		t.Parallel()
 		e := NewErrUnsupported(dummy, "XXX is not supported yet.").Error()
 		expected := "unsupported string: XXX is not supported yet."
 
@@ -105,7 +97,6 @@ func TestError(t *testing.T) {
 		}
 	})
 	t.Run("ErrInvalidType", func(t *testing.T) {
-		t.Parallel()
 		e := NewErrInvalidType(dummy, "decode", "something's wrong.").Error()
 		expected := "cannot decode as string: something's wrong."
 
@@ -114,7 +105,6 @@ func TestError(t *testing.T) {
 		}
 	})
 	t.Run("ErrReceiverNil", func(t *testing.T) {
-		t.Parallel()
 		e := NewErrReceiverNil(dummy).Error()
 		expected := "Receiver string is nil."
 

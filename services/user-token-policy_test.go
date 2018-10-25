@@ -53,8 +53,6 @@ var testUserTokenPolicyBytes = [][]byte{
 
 func TestDecodeUserTokenPolicy(t *testing.T) {
 	t.Run("single", func(t *testing.T) {
-		t.Parallel()
-
 		u, err := DecodeUserTokenPolicy(testUserTokenPolicyBytes[0])
 		if err != nil {
 			t.Fatalf("Failed to decode UserTokenPolicy: %s", err)
@@ -75,8 +73,6 @@ func TestDecodeUserTokenPolicy(t *testing.T) {
 		t.Log(u.String())
 	})
 	t.Run("multiple", func(t *testing.T) {
-		t.Parallel()
-
 		u, err := DecodeUserTokenPolicyArray(testUserTokenPolicyBytes[1])
 		if err != nil {
 			t.Fatalf("Failed to decode UserTokenPolicy: %s", err)
@@ -99,8 +95,6 @@ func TestDecodeUserTokenPolicy(t *testing.T) {
 		}
 	})
 	t.Run("empty-array", func(t *testing.T) {
-		t.Parallel()
-
 		u, err := DecodeUserTokenPolicyArray(testUserTokenPolicyBytes[2])
 		if err != nil {
 			t.Fatalf("Failed to decode UserTokenPolicy: %s", err)
@@ -115,8 +109,6 @@ func TestDecodeUserTokenPolicy(t *testing.T) {
 
 func TestSerializeUserTokenPolicy(t *testing.T) {
 	t.Run("single", func(t *testing.T) {
-		t.Parallel()
-
 		u := NewUserTokenPolicy(
 			"1", UserTokenAnonymous,
 			"issued-token", "issuer-uri", "sec-uri",
@@ -136,8 +128,6 @@ func TestSerializeUserTokenPolicy(t *testing.T) {
 		t.Logf("%x", serialized)
 	})
 	t.Run("multiple", func(t *testing.T) {
-		t.Parallel()
-
 		u := NewUserTokenPolicyArray(
 			[]*UserTokenPolicy{
 				NewUserTokenPolicy(
@@ -165,8 +155,6 @@ func TestSerializeUserTokenPolicy(t *testing.T) {
 		t.Logf("%x", serialized)
 	})
 	t.Run("empty-array", func(t *testing.T) {
-		t.Parallel()
-
 		u := NewUserTokenPolicyArray(nil)
 
 		serialized, err := u.Serialize()

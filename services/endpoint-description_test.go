@@ -181,7 +181,6 @@ var testEndpointDescriptionBytes = [][]byte{
 
 func TestDecodeEndpointDescription(t *testing.T) {
 	t.Run("single", func(t *testing.T) {
-		t.Parallel()
 		e, err := DecodeEndpointDescription(testEndpointDescriptionBytes[0])
 		if err != nil {
 			t.Fatalf("Failed to decode EndpointDescription: %s", err)
@@ -204,7 +203,6 @@ func TestDecodeEndpointDescription(t *testing.T) {
 		t.Log(e)
 	})
 	t.Run("multiple", func(t *testing.T) {
-		t.Parallel()
 		e, err := DecodeEndpointDescriptionArray(testEndpointDescriptionBytes[1])
 		if err != nil {
 			t.Fatalf("Failed to decode EndpointDescription: %s", err)
@@ -232,8 +230,6 @@ func TestDecodeEndpointDescription(t *testing.T) {
 
 func TestSerializeEndpointDescription(t *testing.T) {
 	t.Run("single", func(t *testing.T) {
-		t.Parallel()
-
 		e := NewEndpointDescription(
 			"ep-url",
 			NewApplicationDescription(
@@ -273,8 +269,6 @@ func TestSerializeEndpointDescription(t *testing.T) {
 		t.Logf("%x", serialized)
 	})
 	t.Run("multiple", func(t *testing.T) {
-		t.Parallel()
-
 		e := NewEndpointDescriptionArray(
 			[]*EndpointDescription{
 				NewEndpointDescription(

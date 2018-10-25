@@ -43,7 +43,6 @@ var testSignedSoftwareCertificateBytes = [][]byte{
 
 func TestDecodeSignedSoftwareCertificate(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
-		t.Parallel()
 		s, err := DecodeSignedSoftwareCertificate(testSignedSoftwareCertificateBytes[0])
 		if err != nil {
 			t.Fatalf("Failed to decode SignedSoftwareCertificate: %s", err)
@@ -58,7 +57,6 @@ func TestDecodeSignedSoftwareCertificate(t *testing.T) {
 		t.Log(s.String())
 	})
 	t.Run("with-dummy", func(t *testing.T) {
-		t.Parallel()
 		s, err := DecodeSignedSoftwareCertificate(testSignedSoftwareCertificateBytes[1])
 		if err != nil {
 			t.Fatalf("Failed to decode SignedSoftwareCertificate: %s", err)
@@ -75,7 +73,6 @@ func TestDecodeSignedSoftwareCertificate(t *testing.T) {
 		t.Log(s.String())
 	})
 	t.Run("array-empty", func(t *testing.T) {
-		t.Parallel()
 		s, err := DecodeSignedSoftwareCertificateArray(testSignedSoftwareCertificateBytes[2])
 		if err != nil {
 			t.Fatalf("Failed to decode SignedSoftwareCertificateArray: %s", err)
@@ -87,7 +84,6 @@ func TestDecodeSignedSoftwareCertificate(t *testing.T) {
 		t.Log(s)
 	})
 	t.Run("array-with-dummy", func(t *testing.T) {
-		t.Parallel()
 		s, err := DecodeSignedSoftwareCertificateArray(testSignedSoftwareCertificateBytes[3])
 		if err != nil {
 			t.Fatalf("Failed to decode SignedSoftwareCertificateArray: %s", err)
@@ -109,7 +105,6 @@ func TestDecodeSignedSoftwareCertificate(t *testing.T) {
 
 func TestSerializeSignedSoftwareCertificate(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
-		t.Parallel()
 		s := NewSignedSoftwareCertificate(nil, nil)
 
 		serialized, err := s.Serialize()
@@ -126,7 +121,6 @@ func TestSerializeSignedSoftwareCertificate(t *testing.T) {
 		t.Logf("%x", serialized)
 	})
 	t.Run("with-dummy", func(t *testing.T) {
-		t.Parallel()
 		s := NewSignedSoftwareCertificate([]byte{0xca, 0xfe}, []byte{0xde, 0xad, 0xbe, 0xef})
 
 		serialized, err := s.Serialize()
@@ -143,7 +137,6 @@ func TestSerializeSignedSoftwareCertificate(t *testing.T) {
 		t.Logf("%x", serialized)
 	})
 	t.Run("array-with-dummy", func(t *testing.T) {
-		t.Parallel()
 		s := NewSignedSoftwareCertificateArray(nil)
 
 		serialized, err := s.Serialize()
@@ -160,7 +153,6 @@ func TestSerializeSignedSoftwareCertificate(t *testing.T) {
 		t.Logf("%x", serialized)
 	})
 	t.Run("array-with-dummy", func(t *testing.T) {
-		t.Parallel()
 		s := NewSignedSoftwareCertificateArray(
 			[]*SignedSoftwareCertificate{
 				NewSignedSoftwareCertificate([]byte{0xca, 0xfe}, []byte{0xde, 0xad, 0xbe, 0xef}),

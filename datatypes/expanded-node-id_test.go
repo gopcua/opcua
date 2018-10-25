@@ -27,7 +27,6 @@ var testExpandedNodeIDBytes = [][]byte{
 
 func TestDecodeExpandedNodeID(t *testing.T) {
 	t.Run("no-options", func(t *testing.T) {
-		t.Parallel()
 		e, err := DecodeExpandedNodeID(testExpandedNodeIDBytes[0])
 		if err != nil {
 			t.Fatalf("Failed to decode ExpandedNodeID: %s", err)
@@ -42,7 +41,6 @@ func TestDecodeExpandedNodeID(t *testing.T) {
 		t.Log(e.String())
 	})
 	t.Run("has-uri", func(t *testing.T) {
-		t.Parallel()
 		e, err := DecodeExpandedNodeID(testExpandedNodeIDBytes[1])
 		if err != nil {
 			t.Fatalf("Failed to decode ExpandedNodeID: %s", err)
@@ -59,7 +57,6 @@ func TestDecodeExpandedNodeID(t *testing.T) {
 		t.Log(e.String())
 	})
 	t.Run("has-index", func(t *testing.T) {
-		t.Parallel()
 		e, err := DecodeExpandedNodeID(testExpandedNodeIDBytes[2])
 		if err != nil {
 			t.Fatalf("Failed to decode ExpandedNodeID: %s", err)
@@ -76,7 +73,6 @@ func TestDecodeExpandedNodeID(t *testing.T) {
 		t.Log(e.String())
 	})
 	t.Run("has-both", func(t *testing.T) {
-		t.Parallel()
 		e, err := DecodeExpandedNodeID(testExpandedNodeIDBytes[3])
 		if err != nil {
 			t.Fatalf("Failed to decode ExpandedNodeID: %s", err)
@@ -98,7 +94,6 @@ func TestDecodeExpandedNodeID(t *testing.T) {
 
 func TestSerializeExpandedNodeID(t *testing.T) {
 	t.Run("no-options", func(t *testing.T) {
-		t.Parallel()
 		e := NewExpandedNodeID(
 			false, false,
 			NewTwoByteNodeID(0xff),
@@ -119,7 +114,6 @@ func TestSerializeExpandedNodeID(t *testing.T) {
 		t.Logf("%x", serialized)
 	})
 	t.Run("has-uri", func(t *testing.T) {
-		t.Parallel()
 		e := NewExpandedNodeID(
 			true, false,
 			NewTwoByteNodeID(0xff),
@@ -140,7 +134,6 @@ func TestSerializeExpandedNodeID(t *testing.T) {
 		t.Logf("%x", serialized)
 	})
 	t.Run("has-index", func(t *testing.T) {
-		t.Parallel()
 		e := NewExpandedNodeID(
 			false, true,
 			NewTwoByteNodeID(0xff),
@@ -161,7 +154,6 @@ func TestSerializeExpandedNodeID(t *testing.T) {
 		t.Logf("%x", serialized)
 	})
 	t.Run("has-both", func(t *testing.T) {
-		t.Parallel()
 		e := NewExpandedNodeID(
 			true, true,
 			NewTwoByteNodeID(0xff),

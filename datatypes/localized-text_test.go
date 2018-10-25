@@ -30,7 +30,6 @@ var testLocalizedTextBytes = [][]byte{
 
 func TestDecodeLocalizedText(t *testing.T) {
 	t.Run("nothing", func(t *testing.T) {
-		t.Parallel()
 		l, err := DecodeLocalizedText(testLocalizedTextBytes[0])
 		if err != nil {
 			t.Fatalf("Failed to decode LocalizedText: %s", err)
@@ -47,7 +46,6 @@ func TestDecodeLocalizedText(t *testing.T) {
 		t.Log(l.String())
 	})
 	t.Run("has-locale", func(t *testing.T) {
-		t.Parallel()
 		l, err := DecodeLocalizedText(testLocalizedTextBytes[1])
 		if err != nil {
 			t.Fatalf("Failed to decode LocalizedText: %s", err)
@@ -64,7 +62,6 @@ func TestDecodeLocalizedText(t *testing.T) {
 		t.Log(l.String())
 	})
 	t.Run("has-text", func(t *testing.T) {
-		t.Parallel()
 		l, err := DecodeLocalizedText(testLocalizedTextBytes[2])
 		if err != nil {
 			t.Fatalf("Failed to decode LocalizedText: %s", err)
@@ -81,7 +78,6 @@ func TestDecodeLocalizedText(t *testing.T) {
 		t.Log(l.String())
 	})
 	t.Run("has-both", func(t *testing.T) {
-		t.Parallel()
 		l, err := DecodeLocalizedText(testLocalizedTextBytes[3])
 		if err != nil {
 			t.Fatalf("Failed to decode LocalizedText: %s", err)
@@ -101,7 +97,6 @@ func TestDecodeLocalizedText(t *testing.T) {
 
 func TestSerializeLocalizedText(t *testing.T) {
 	t.Run("nothing", func(t *testing.T) {
-		t.Parallel()
 		l := NewLocalizedText("", "")
 
 		serialized, err := l.Serialize()
@@ -118,7 +113,6 @@ func TestSerializeLocalizedText(t *testing.T) {
 		t.Logf("%x", serialized)
 	})
 	t.Run("has-locale", func(t *testing.T) {
-		t.Parallel()
 		l := NewLocalizedText("foo", "")
 
 		serialized, err := l.Serialize()
@@ -135,7 +129,6 @@ func TestSerializeLocalizedText(t *testing.T) {
 		t.Logf("%x", serialized)
 	})
 	t.Run("has-text", func(t *testing.T) {
-		t.Parallel()
 		l := NewLocalizedText("", "bar")
 
 		serialized, err := l.Serialize()
@@ -152,7 +145,6 @@ func TestSerializeLocalizedText(t *testing.T) {
 		t.Logf("%x", serialized)
 	})
 	t.Run("has-both", func(t *testing.T) {
-		t.Parallel()
 		l := NewLocalizedText("foo", "bar")
 
 		serialized, err := l.Serialize()
