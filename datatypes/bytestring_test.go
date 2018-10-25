@@ -5,45 +5,24 @@
 package datatypes
 
 import (
-	"encoding/hex"
 	"testing"
+
+	"github.com/wmnsk/gopcua/utils/codectest"
 )
 
-var testByteStringBytes = [][]byte{
-	{
-		0x04, 0x00, 0x00, 0x00,
-		0xde, 0xad, 0xbe, 0xef,
-	},
-}
-
-func TestDecodeByteString(t *testing.T) {
-	b, err := DecodeByteString(testByteStringBytes[0])
-	if err != nil {
-		t.Fatalf("Failed to decode ByteString: %s", err)
+func TestByteString(t *testing.T) {
+	cases := []codectest.Case{
+		{
+			Struct: NewByteString([]byte{0xde, 0xad, 0xbe, 0xef}),
+			Bytes: []byte{
+				// length
+				0x04, 0x00, 0x00, 0x00,
+				// value
+				0xde, 0xad, 0xbe, 0xef,
+			},
+		},
 	}
-
-	str := hex.EncodeToString(b.Get())
-	switch {
-	case b.Length != 4:
-		t.Errorf("Length doesn't match. Want: %d, Got: %d", 4, b.Length)
-	case str != "deadbeef":
-		t.Errorf("Value doesn't match. Want: %s, Got: %s", "deadbeef", str)
-	}
-}
-
-func TestSerializeByteString(t *testing.T) {
-	b := NewByteString([]byte{0xde, 0xad, 0xbe, 0xef})
-
-	serialized, err := b.Serialize()
-	if err != nil {
-		t.Fatalf("Failed to serialize ByteString: %s", err)
-	}
-
-	for i, s := range serialized {
-		x := testByteStringBytes[0][i]
-		if s != x {
-			t.Errorf("Bytes doesn't match. Want: %#x, Got: %#x at %dth", x, s, i)
-		}
-	}
-	t.Logf("%x", serialized)
+	codectest.Run(t, cases, func(b []byte) (codectest.S, error) {
+		return DecodeByteString(b)
+	})
 }

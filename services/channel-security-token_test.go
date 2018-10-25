@@ -8,53 +8,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/go-cmp/cmp"
+	"github.com/wmnsk/gopcua/utils/codectest"
 )
 
-func TestDecodeChannelSecurityToken(t *testing.T) {
-	var cases = []struct {
-		input []byte
-		want  *ChannelSecurityToken
-	}{
+func TestChannelSecurityToken(t *testing.T) {
+	cases := []codectest.Case{
 		{
-			[]byte{
-				// ChannelID
-				0x01, 0x00, 0x00, 0x00,
-				// TokenID
-				0x02, 0x00, 0x00, 0x00,
-				// CreatedAt
-				0x00, 0x98, 0x67, 0xdd, 0xfd, 0x30, 0xd4, 0x01,
-				// RevisedLifetime
-				0x80, 0x8d, 0x5b, 0x00,
-			},
-			NewChannelSecurityToken(
+			Name: "Normal",
+			Struct: NewChannelSecurityToken(
 				1, 2, time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC), 6000000,
 			),
-		},
-	}
-
-	for i, c := range cases {
-		got, err := DecodeChannelSecurityToken(c.input)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if diff := cmp.Diff(got, c.want); diff != "" {
-			t.Errorf("case #%d failed\n%s", i, diff)
-		}
-	}
-}
-
-func TestSerializeChannelSecurityToken(t *testing.T) {
-	var cases = []struct {
-		input *ChannelSecurityToken
-		want  []byte
-	}{
-		{
-			NewChannelSecurityToken(
-				1, 2, time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC), 6000000,
-			),
-			[]byte{
+			Bytes: []byte{
 				// ChannelID
 				0x01, 0x00, 0x00, 0x00,
 				// TokenID
@@ -66,36 +30,7 @@ func TestSerializeChannelSecurityToken(t *testing.T) {
 			},
 		},
 	}
-
-	for i, c := range cases {
-		got, err := c.input.Serialize()
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if diff := cmp.Diff(got, c.want); diff != "" {
-			t.Errorf("case #%d failed\n%s", i, diff)
-		}
-	}
-}
-
-func TestChannelSecurityTokenLen(t *testing.T) {
-	var cases = []struct {
-		input *ChannelSecurityToken
-		want  int
-	}{
-		{
-			NewChannelSecurityToken(
-				1, 2, time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC), 6000000,
-			),
-			20,
-		},
-	}
-
-	for i, c := range cases {
-		got := c.input.Len()
-		if diff := cmp.Diff(got, c.want); diff != "" {
-			t.Errorf("case #%d failed\n%s", i, diff)
-		}
-	}
+	codectest.Run(t, cases, func(b []byte) (codectest.S, error) {
+		return DecodeChannelSecurityToken(b)
+	})
 }
