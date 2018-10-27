@@ -43,7 +43,9 @@ func (s *SymmetricSecurityHeader) DecodeFromBytes(b []byte) error {
 		return errors.NewErrTooShortToDecode(s, "should be longer than 4 bytes")
 	}
 	s.TokenID = binary.LittleEndian.Uint32(b[:4])
-	s.Payload = b[4:]
+	if len(b[4:]) > 0 {
+		s.Payload = b[4:]
+	}
 
 	return nil
 }
