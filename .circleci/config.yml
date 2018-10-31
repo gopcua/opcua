@@ -14,6 +14,7 @@ jobs:
       - checkout
       - run: go get -u github.com/pkg/errors
       - run: go get -u github.com/google/go-cmp/cmp
+      - run: go get -u github.com/pascaldekloe/goe/verify
       - run: go install ./...
       - run: go get -v -t -d ./...
       - run: go get -u golang.org/x/lint/golint
