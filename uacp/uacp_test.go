@@ -7,16 +7,21 @@ package uacp
 import (
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
+	"github.com/wmnsk/gopcua/utils/codectest"
 )
 
-func TestDecode(t *testing.T) {
-	cases := []struct {
-		input []byte
-		want  UACP
-	}{
-		{ // Normal Hello
-			[]byte{ // Hello message
+func TestUACPMessage(t *testing.T) {
+	cases := []codectest.Case{
+		{
+			Name: "Hello",
+			Struct: NewHello(
+				0,                                        //Version
+				65280,                                    // ReceiveBufSize
+				65535,                                    // SendBufSize
+				4000,                                     // MaxMessageSize
+				"opc.tcp://wow.its.easy:11111/UA/Server", // EndPointURL
+			),
+			Bytes: []byte{ // Hello message
 				// MessageType: HEL
 				0x48, 0x45, 0x4c,
 				// Chunk Type: F
@@ -41,16 +46,16 @@ func TestDecode(t *testing.T) {
 				0x2f, 0x55, 0x41, 0x2f, 0x53, 0x65, 0x72, 0x76,
 				0x65, 0x72,
 			},
-			NewHello(
-				0,                                        //Version
-				65280,                                    // ReceiveBufSize
-				65535,                                    // SendBufSize
-				4000,                                     // MaxMessageSize
-				"opc.tcp://wow.its.easy:11111/UA/Server", // EndPointURL
-			),
 		},
-		{ // Normal Acknowledge
-			[]byte{
+		{
+			Name: "Acknowledge",
+			Struct: NewAcknowledge(
+				0,     //Version
+				65280, // ReceiveBufSize
+				65535, // SendBufSize
+				4000,  // MaxMessageSize
+			),
+			Bytes: []byte{
 				// MessageType: ACK
 				0x41, 0x43, 0x4b,
 				// Chunk Type: F
@@ -68,15 +73,14 @@ func TestDecode(t *testing.T) {
 				// MaxChunkCount: 0
 				0x00, 0x00, 0x00, 0x00,
 			},
-			NewAcknowledge(
-				0,     //Version
-				65280, // ReceiveBufSize
-				65535, // SendBufSize
-				4000,  // MaxMessageSize
-			),
 		},
-		{ // Normal Error
-			[]byte{
+		{
+			Name: "Error",
+			Struct: NewError(
+				BadSecureChannelClosed, // Error
+				"foobar",
+			),
+			Bytes: []byte{
 				// MessageType: ERR
 				0x45, 0x52, 0x52,
 				// Chunk Type: F
@@ -88,13 +92,14 @@ func TestDecode(t *testing.T) {
 				// Reason: dummy
 				0x06, 0x00, 0x00, 0x00, 0x66, 0x6f, 0x6f, 0x62, 0x61, 0x72,
 			},
-			NewError(
-				BadSecureChannelClosed, // Error
-				"foobar",
-			),
 		},
-		{ // Normal ReverseHello
-			[]byte{
+		{
+			Name: "ReverseHello",
+			Struct: NewReverseHello(
+				"opc.tcp://wow.its.easy:11111/UA/Server", // ServerURI
+				"opc.tcp://wow.its.easy:11111/UA/Server", // EndPointURL
+			),
+			Bytes: []byte{
 				// MessageType: RHE
 				0x52, 0x48, 0x45,
 				// Chunk Type: F
@@ -116,13 +121,15 @@ func TestDecode(t *testing.T) {
 				0x2f, 0x55, 0x41, 0x2f, 0x53, 0x65, 0x72, 0x76,
 				0x65, 0x72,
 			},
-			NewReverseHello(
-				"opc.tcp://wow.its.easy:11111/UA/Server", // ServerURI
-				"opc.tcp://wow.its.easy:11111/UA/Server", // EndPointURL
-			),
 		},
-		{ // Normal Generic (undefined type)
-			[]byte{
+		{
+			Name: "Generic",
+			Struct: NewGeneric(
+				"XXX",
+				"X",
+				[]byte{0xde, 0xad, 0xbe, 0xef},
+			),
+			Bytes: []byte{
 				// MessageType: XXX
 				0x58, 0x58, 0x58,
 				// Chunk Type: X
@@ -132,21 +139,14 @@ func TestDecode(t *testing.T) {
 				// dummy Payload
 				0xde, 0xad, 0xbe, 0xef,
 			},
-			NewGeneric(
-				"XXX",
-				"X",
-				[]byte{0xde, 0xad, 0xbe, 0xef},
-			),
 		},
 	}
-
-	for i, c := range cases {
-		uacp, err := Decode(c.input)
+	codectest.Run(t, cases, func(b []byte) (codectest.S, error) {
+		v, err := Decode(b)
 		if err != nil {
-			t.Fatal(err)
+			return nil, err
 		}
-
-		switch got := uacp.(type) {
+		switch got := v.(type) {
 		case *Hello:
 			got.Payload = nil
 		case *Acknowledge:
@@ -158,11 +158,8 @@ func TestDecode(t *testing.T) {
 		case *Generic:
 			// do nothing
 		default: // should not be called
-			t.Fatalf("unexpected type: %T", uacp)
+			t.Fatalf("unexpected type: %T", v)
 		}
-
-		if diff := cmp.Diff(uacp, c.want); diff != "" {
-			t.Errorf("case #%d failed\n%s", i, diff)
-		}
-	}
+		return v, nil
+	})
 }

@@ -67,7 +67,9 @@ func (a *AsymmetricSecurityHeader) DecodeFromBytes(b []byte) error {
 	}
 	offset += a.ReceiverCertificateThumbprint.Len()
 
-	a.Payload = b[offset:]
+	if len(b[offset:]) > 0 {
+		a.Payload = b[offset:]
+	}
 
 	return nil
 }

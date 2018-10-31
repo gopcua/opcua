@@ -46,7 +46,9 @@ func (s *SequenceHeader) DecodeFromBytes(b []byte) error {
 	}
 	s.SequenceNumber = binary.LittleEndian.Uint32(b[:4])
 	s.RequestID = binary.LittleEndian.Uint32(b[4:8])
-	s.Payload = b[8:]
+	if len(b[8:]) > 0 {
+		s.Payload = b[8:]
+	}
 
 	return nil
 }

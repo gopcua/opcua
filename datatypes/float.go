@@ -11,6 +11,8 @@ import (
 	"github.com/wmnsk/gopcua/id"
 )
 
+const f32qnan = 0xffc00000
+
 // Float values shall be encoded with the appropriate IEEE-754 binary representation
 // which has three basic components: the sign, the exponent, and the fraction.
 //
@@ -57,7 +59,7 @@ func (f *Float) Serialize() ([]byte, error) {
 func (f *Float) SerializeTo(b []byte) error {
 	// Part 6, 5.2.2.3 encode NaN as IEEE 754 silent NaN
 	if math.IsNaN(float64(f.Value)) {
-		binary.LittleEndian.PutUint32(b, 0xFFC00000)
+		binary.LittleEndian.PutUint32(b, f32qnan)
 		return nil
 	}
 

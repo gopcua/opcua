@@ -68,7 +68,9 @@ func (h *Header) DecodeFromBytes(b []byte) error {
 	h.ChunkType = b[3]
 	h.MessageSize = binary.LittleEndian.Uint32(b[4:8])
 	h.SecureChannelID = binary.LittleEndian.Uint32(b[8:12])
-	h.Payload = b[12:]
+	if len(b[12:]) > 0 {
+		h.Payload = b[12:]
+	}
 
 	return nil
 }

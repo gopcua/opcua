@@ -5,22 +5,29 @@
 package datatypes
 
 import (
+	"bytes"
 	"math"
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
+	"github.com/wmnsk/gopcua/utils/codectest"
 )
 
-func TestNewFloat(t *testing.T) {
-	f := NewFloat(5.00078)
-	expected := &Float{
-		Value: 5.00078,
+func TestFloat(t *testing.T) {
+	cases := []codectest.Case{
+		{
+			Name:   "Normal",
+			Struct: NewFloat(5.00078),
+			Bytes:  []byte{0x64, 0x06, 0xa0, 0x40},
+		},
 	}
-	if diff := cmp.Diff(f, expected); diff != "" {
-		t.Error(diff)
-	}
+	codectest.Run(t, cases, func(b []byte) (codectest.S, error) {
+		return DecodeFloat(b)
+	})
 }
 
+// compare NaN in a separate test since the
+// decode test will always fail with a NaN value
+// since f != f for a NaN float.
 func TestFloatNaN(t *testing.T) {
 	qnan32 := []byte{0x00, 0x00, 0xc0, 0xff}
 	t.Run("decode silent nan", func(t *testing.T) {
@@ -38,71 +45,8 @@ func TestFloatNaN(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if diff := cmp.Diff(b, qnan32); diff != "" {
-			t.Fatal(diff)
+		if got, want := b, qnan32; !bytes.Equal(got, want) {
+			t.Fatalf("got %#v, want %#v", got, want)
 		}
 	})
-}
-
-func TestDecodeFloat(t *testing.T) {
-	b := []byte{0x64, 0x06, 0xa0, 0x40}
-	f, err := DecodeFloat(b)
-	if err != nil {
-		t.Fatal(err)
-	}
-	expected := &Float{
-		Value: 5.00078,
-	}
-	if diff := cmp.Diff(f, expected); diff != "" {
-		t.Error(diff)
-	}
-}
-
-func TestFloatDecodeFromBytes(t *testing.T) {
-	f := &Float{}
-	b := []byte{0x64, 0x06, 0xa0, 0x40}
-	if err := f.DecodeFromBytes(b); err != nil {
-		t.Fatal(err)
-	}
-	expected := &Float{
-		Value: 5.00078,
-	}
-	if diff := cmp.Diff(f, expected); diff != "" {
-		t.Error(diff)
-	}
-}
-
-func TestFloatSerialize(t *testing.T) {
-	f := &Float{
-		Value: 5.00078,
-	}
-	b, err := f.Serialize()
-	if err != nil {
-		t.Fatal(err)
-	}
-	expected := []byte{0x64, 0x06, 0xa0, 0x40}
-	if diff := cmp.Diff(b, expected); diff != "" {
-		t.Error(diff)
-	}
-}
-
-func TestFloatSerializeTo(t *testing.T) {
-	f := &Float{
-		Value: 5.00078,
-	}
-	b := make([]byte, f.Len())
-	if err := f.SerializeTo(b); err != nil {
-		t.Fatal(err)
-	}
-	expected := []byte{0x64, 0x06, 0xa0, 0x40}
-	if diff := cmp.Diff(b, expected); diff != "" {
-		t.Error(diff)
-	}
-}
-
-func TestFloatLen(t *testing.T) {
-	f := &Float{}
-	if f.Len() != 4 {
-		t.Errorf("Len doesn't match. Want: %d, Got: %d", 4, f.Len())
-	}
 }
