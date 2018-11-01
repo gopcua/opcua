@@ -90,9 +90,15 @@ func NewOpaqueNodeID(ns uint16, id []byte) *NodeID {
 }
 
 // NewNodeID returns a node id from a string definition of the format
-// 'ns=<namespace>;{s,i,b,g}=<identifier>'. Namespace URLs 'nsu=' are not
-// supported since they require a lookup. For string node ids the 's='
-// prefix can be omitted.
+// 'ns=<namespace>;{s,i,b,g}=<identifier>'.
+//
+// For string node ids the 's=' prefix can be omitted.
+//
+// For numeric ids the smallest possible type which can store the namespace
+// and id value is returned.
+//
+// Namespace URLs 'nsu=' are not supported since they require a lookup.
+//
 func NewNodeID(s string) (*NodeID, error) {
 	if s == "" {
 		return NewTwoByteNodeID(0), nil
