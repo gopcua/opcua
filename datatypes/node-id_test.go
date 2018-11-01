@@ -319,3 +319,114 @@ func TestSetStringID(t *testing.T) {
 		})
 	}
 }
+
+func TestSetNamespace(t *testing.T) {
+	tests := []struct {
+		name string
+		n    *NodeID
+		v    int
+		err  error
+	}{
+		// happy flows
+		{
+			name: "TwoByte",
+			n:    NewTwoByteNodeID(1),
+			v:    0,
+		},
+		{
+			name: "FourByte",
+			n:    NewFourByteNodeID(0, 1),
+			v:    1,
+		},
+		{
+			name: "Numeric",
+			n:    NewNumericNodeID(0, 1),
+			v:    1,
+		},
+
+		// error flows
+		{
+			name: "TwoByte.invalid",
+			n:    NewTwoByteNodeID(1),
+			v:    1,
+			err:  errors.New("out of range [0..0]: 1"),
+		},
+		{
+			name: "FourByte.tooSmall",
+			n:    NewFourByteNodeID(0, 1),
+			v:    -1,
+			err:  errors.New("out of range [0..255]: -1"),
+		},
+		{
+			name: "FourByte.tooBig",
+			n:    NewFourByteNodeID(0, 1),
+			v:    256,
+			err:  errors.New("out of range [0..255]: 256"),
+		},
+		{
+			name: "Numeric.tooSmall",
+			n:    NewNumericNodeID(0, 1),
+			v:    -1,
+			err:  errors.New("out of range [0..65535]: -1"),
+		},
+		{
+			name: "Numeric.toobBig",
+			n:    NewNumericNodeID(0, 1),
+			v:    65536,
+			err:  errors.New("out of range [0..65535]: 65536"),
+		},
+		{
+			name: "String.tooSmall",
+			n:    NewStringNodeID(0, "a"),
+			v:    -1,
+			err:  errors.New("out of range [0..65535]: -1"),
+		},
+		{
+			name: "String.tooBig",
+			n:    NewStringNodeID(0, "a"),
+			v:    65536,
+			err:  errors.New("out of range [0..65535]: 65536"),
+		},
+		{
+			name: "GUID.tooSmall",
+			n:    NewGUIDNodeID(0, "a"),
+			v:    -1,
+			err:  errors.New("out of range [0..65535]: -1"),
+		},
+		{
+			name: "GUID.tooBig",
+			n:    NewGUIDNodeID(0, "a"),
+			v:    65536,
+			err:  errors.New("out of range [0..65535]: 65536"),
+		},
+		{
+			name: "Opaque.tooSmall",
+			n:    NewOpaqueNodeID(0, []byte{'a'}),
+			v:    -1,
+			err:  errors.New("out of range [0..65535]: -1"),
+		},
+		{
+			name: "Opaque.tooBig",
+			n:    NewOpaqueNodeID(0, []byte{'a'}),
+			v:    65536,
+			err:  errors.New("out of range [0..65535]: 65536"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.n.SetNamespace(tt.v)
+			if got, want := err, tt.err; !reflect.DeepEqual(got, want) {
+				t.Fatalf("got error %v want %v", got, want)
+			}
+			// if the test should fail and the error was correct
+			// we need to stop here.
+			if tt.err != nil {
+				return
+			}
+			if got, want := tt.n.Namespace(), tt.v; got != want {
+				t.Fatalf("got value %d want %d", got, want)
+			}
+		})
+	}
+}

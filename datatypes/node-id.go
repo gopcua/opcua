@@ -323,6 +323,38 @@ func (n *NodeID) Len() int {
 	}
 }
 
+// Namespace returns the namespace id. For two byte node ids
+// this will always be zero.
+func (n *NodeID) Namespace() int {
+	return int(n.ns)
+}
+
+// SetNamespace sets the namespace id. It returns an error
+// if the id is not within the range of the node id type.
+func (n *NodeID) SetNamespace(v int) error {
+	switch n.Type() {
+	case TypeTwoByte:
+		if v != 0 {
+			return fmt.Errorf("out of range [0..0]: %d", v)
+		}
+		return nil
+
+	case TypeFourByte:
+		if max := math.MaxUint8; v < 0 || v > max {
+			return fmt.Errorf("out of range [0..%d]: %d", max, v)
+		}
+		n.ns = uint16(v)
+		return nil
+
+	default:
+		if max := math.MaxUint16; v < 0 || v > max {
+			return fmt.Errorf("out of range [0..%d]: %d", max, v)
+		}
+		n.ns = uint16(v)
+		return nil
+	}
+}
+
 // IntID returns the identifier value if the type is
 // TwoByte, FourByte or Numeric. For all other types IntID
 // returns 0.
