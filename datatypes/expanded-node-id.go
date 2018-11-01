@@ -14,13 +14,13 @@ import (
 //
 // Specification: Part 6, 5.2.2.10
 type ExpandedNodeID struct {
-	NodeID
+	NodeID       *NodeID
 	NamespaceURI *String
 	ServerIndex  uint32
 }
 
 // NewExpandedNodeID creates a new ExpandedNodeID.
-func NewExpandedNodeID(hasURI, hasIndex bool, nodeID NodeID, uri string, idx uint32) *ExpandedNodeID {
+func NewExpandedNodeID(hasURI, hasIndex bool, nodeID *NodeID, uri string, idx uint32) *ExpandedNodeID {
 	e := &ExpandedNodeID{
 		NodeID:      nodeID,
 		ServerIndex: idx,
@@ -63,8 +63,8 @@ func DecodeExpandedNodeID(b []byte) (*ExpandedNodeID, error) {
 
 // DecodeFromBytes decodes given bytes into ExpandedNodeID.
 func (e *ExpandedNodeID) DecodeFromBytes(b []byte) error {
-	node, err := DecodeNodeID(b)
-	if err != nil {
+	node := &NodeID{}
+	if err := node.DecodeFromBytes(b); err != nil {
 		return err
 	}
 	e.NodeID = node
@@ -140,10 +140,10 @@ func (e *ExpandedNodeID) Len() int {
 
 // HasNamespaceURI checks if an ExpandedNodeID has NamespaceURI Flag.
 func (e *ExpandedNodeID) HasNamespaceURI() bool {
-	return e.NodeID.EncodingMaskValue()>>7&0x1 == 1
+	return e.NodeID.EncodingMask()>>7&0x1 == 1
 }
 
 // HasServerIndex checks if an ExpandedNodeID has ServerIndex Flag.
 func (e *ExpandedNodeID) HasServerIndex() bool {
-	return e.NodeID.EncodingMaskValue()>>6&0x1 == 1
+	return e.NodeID.EncodingMask()>>6&0x1 == 1
 }

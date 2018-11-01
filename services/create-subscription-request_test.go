@@ -17,13 +17,7 @@ func TestCreateSubscriptionRequest(t *testing.T) {
 		{
 			Name: "normal",
 			Struct: &CreateSubscriptionRequest{
-				TypeID: &datatypes.ExpandedNodeID{
-					NodeID: &datatypes.FourByteNodeID{
-						EncodingMask: 0x01,
-						Namespace:    0,
-						Identifier:   ServiceTypeCreateSubscriptionRequest,
-					},
-				},
+				TypeID: datatypes.NewFourByteExpandedNodeID(0, ServiceTypeCreateSubscriptionRequest),
 				RequestHeader: &RequestHeader{
 					AuthenticationToken: datatypes.NewOpaqueNodeID(0, []byte{
 						0xfe, 0x8d, 0x87, 0x79, 0xf7, 0x03, 0x27, 0x77,
@@ -33,9 +27,7 @@ func TestCreateSubscriptionRequest(t *testing.T) {
 					RequestHandle: 1003429,
 					TimeoutHint:   10000,
 					AdditionalHeader: &AdditionalHeader{
-						TypeID: &datatypes.ExpandedNodeID{
-							NodeID: datatypes.NewTwoByteNodeID(0),
-						},
+						TypeID:       datatypes.NewTwoByteExpandedNodeID(0),
 						EncodingMask: 0x00,
 					},
 					Timestamp: time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),

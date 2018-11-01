@@ -54,12 +54,12 @@ func Decode(b []byte) (Service, error) {
 	if err != nil {
 		return nil, errors.NewErrUnsupported(typeID, "cannot decode TypeID.")
 	}
-	n, ok := typeID.NodeID.(*datatypes.FourByteNodeID)
-	if !ok {
+	if typeID.NodeID.Type() != datatypes.TypeFourByte {
 		return nil, errors.NewErrUnsupported(typeID.NodeID, "should be FourByteNodeID.")
 	}
 
-	switch n.Identifier {
+	id := uint16(typeID.NodeID.IntID())
+	switch id {
 	case ServiceTypeFindServersRequest:
 		s = &FindServersRequest{}
 	case ServiceTypeFindServersResponse:
@@ -107,7 +107,7 @@ func Decode(b []byte) (Service, error) {
 	case ServiceTypeFindServersOnNetworkResponse:
 		s = &FindServersOnNetworkResponse{}
 	default:
-		return nil, errors.NewErrUnsupported(n.Identifier, "unsupported or not implemented yet.")
+		return nil, errors.NewErrUnsupported(id, "unsupported or not implemented yet.")
 	}
 
 	if err := s.DecodeFromBytes(b); err != nil {

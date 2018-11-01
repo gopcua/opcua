@@ -3,7 +3,7 @@ package codectest
 import (
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
+	"github.com/pascaldekloe/goe/verify"
 )
 
 type S interface {
@@ -35,8 +35,8 @@ func Run(t *testing.T, cases []Case, decode DecoderFunc) {
 					t.Fatal(err)
 				}
 
-				if got, want := v, c.Struct; !cmp.Equal(got, want) {
-					t.Fatal(cmp.Diff(got, want))
+				if got, want := v, c.Struct; !verify.Values(t, "", got, want) {
+					t.Fail()
 				}
 			})
 
@@ -46,8 +46,8 @@ func Run(t *testing.T, cases []Case, decode DecoderFunc) {
 					t.Fatal(err)
 				}
 
-				if got, want := b, c.Bytes; !cmp.Equal(got, want) {
-					t.Fatal(cmp.Diff(got, want))
+				if got, want := b, c.Bytes; !verify.Values(t, "", got, want) {
+					t.Fail()
 				}
 			})
 

@@ -12,14 +12,14 @@ import (
 //
 // Specification: Part4, 5.10.4.2
 type WriteValue struct {
-	NodeID
+	NodeID      *NodeID
 	AttributeID IntegerID
 	IndexRange  *String
 	Value       *DataValue
 }
 
 // NewWriteValue creates a new NewWriteValue.
-func NewWriteValue(node NodeID, attr IntegerID, idxRange string, value *DataValue) *WriteValue {
+func NewWriteValue(node *NodeID, attr IntegerID, idxRange string, value *DataValue) *WriteValue {
 	return &WriteValue{
 		NodeID:      node,
 		AttributeID: attr,
@@ -40,8 +40,8 @@ func DecodeWriteValue(b []byte) (*WriteValue, error) {
 
 // DecodeFromBytes decodes given bytes into OPC UA WriteValue.
 func (w *WriteValue) DecodeFromBytes(b []byte) error {
-	nodeID, err := DecodeNodeID(b)
-	if err != nil {
+	nodeID := &NodeID{}
+	if err := nodeID.DecodeFromBytes(b); err != nil {
 		return err
 	}
 	w.NodeID = nodeID

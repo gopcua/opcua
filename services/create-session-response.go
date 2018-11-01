@@ -18,8 +18,8 @@ import (
 type CreateSessionResponse struct {
 	TypeID *datatypes.ExpandedNodeID
 	*ResponseHeader
-	SessionID                  datatypes.NodeID
-	AuthenticationToken        datatypes.NodeID
+	SessionID                  *datatypes.NodeID
+	AuthenticationToken        *datatypes.NodeID
 	RevisedSessionTimeout      uint64
 	ServerNonce                *datatypes.ByteString
 	ServerCertificate          *datatypes.ByteString
@@ -30,7 +30,7 @@ type CreateSessionResponse struct {
 }
 
 // NewCreateSessionResponse creates a new NewCreateSessionResponse with the given parameters.
-func NewCreateSessionResponse(resHeader *ResponseHeader, sessionID, authToken datatypes.NodeID, timeout uint64, nonce, cert []byte, svrSignature *SignatureData, maxRespSize uint32, endpoints ...*EndpointDescription) *CreateSessionResponse {
+func NewCreateSessionResponse(resHeader *ResponseHeader, sessionID, authToken *datatypes.NodeID, timeout uint64, nonce, cert []byte, svrSignature *SignatureData, maxRespSize uint32, endpoints ...*EndpointDescription) *CreateSessionResponse {
 	return &CreateSessionResponse{
 		TypeID:                     datatypes.NewFourByteExpandedNodeID(0, ServiceTypeCreateSessionResponse),
 		ResponseHeader:             resHeader,

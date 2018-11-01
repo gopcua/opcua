@@ -64,13 +64,10 @@ func (e *ExtensionObject) DecodeFromBytes(b []byte) error {
 
 	// extension object parameter
 	var id int
-	switch e.TypeID.NodeID.(type) {
-	case *TwoByteNodeID:
-		id = int(nodeID.GetIdentifier()[0])
-	case *FourByteNodeID:
-		id = int(binary.LittleEndian.Uint16(nodeID.GetIdentifier()))
-	case *NumericNodeID:
-		id = int(binary.LittleEndian.Uint32(nodeID.GetIdentifier()))
+	node := e.TypeID.NodeID
+	switch node.Type() {
+	case TypeTwoByte, TypeFourByte, TypeNumeric:
+		id = node.IntID()
 	default:
 		return errors.NewErrInvalidType(e.TypeID.NodeID, "decode", "NodeID should be TwoByte, FourByte or Numeric")
 	}

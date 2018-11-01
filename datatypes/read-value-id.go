@@ -49,14 +49,14 @@ const (
 //
 // Specification: Part 4, 7.24
 type ReadValueID struct {
-	NodeID
+	NodeID       *NodeID
 	AttributeID  IntegerID
 	IndexRange   *String
 	DataEncoding *QualifiedName
 }
 
 // NewReadValueID creates a new ReadValueID.
-func NewReadValueID(nodeID NodeID, attrID IntegerID, idxRange string, qIdx uint16, qName string) *ReadValueID {
+func NewReadValueID(nodeID *NodeID, attrID IntegerID, idxRange string, qIdx uint16, qName string) *ReadValueID {
 	return &ReadValueID{
 		NodeID:       nodeID,
 		AttributeID:  attrID,
@@ -76,8 +76,8 @@ func DecodeReadValueID(b []byte) (*ReadValueID, error) {
 
 // DecodeFromBytes decodes given bytes into OPC UA ReadValueID.
 func (r *ReadValueID) DecodeFromBytes(b []byte) error {
-	nodeID, err := DecodeNodeID(b)
-	if err != nil {
+	nodeID := &NodeID{}
+	if err := nodeID.DecodeFromBytes(b); err != nil {
 		return err
 	}
 	r.NodeID = nodeID
