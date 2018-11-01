@@ -17,31 +17,60 @@ func TestNodeID(t *testing.T) {
 		{
 			Name:   "TwoByte",
 			Struct: NewTwoByteNodeID(0xff),
-			Bytes:  []byte{0x00, 0xff},
+			Bytes: []byte{
+				// mask
+				0x00,
+				// id
+				0xff,
+			},
 		},
 		{
 			Name:   "FourByte",
 			Struct: NewFourByteNodeID(0, 0xcafe),
-			Bytes:  []byte{0x01, 0x00, 0xfe, 0xca},
+			Bytes: []byte{
+				// mask
+				0x01,
+				// namespace
+				0x00,
+				// id
+				0xfe, 0xca,
+			},
 		},
 		{
 			Name:   "Numeric",
 			Struct: NewNumericNodeID(10, 0xdeadbeef),
-			Bytes:  []byte{0x02, 0x0a, 0x00, 0xef, 0xbe, 0xad, 0xde},
+			Bytes: []byte{
+				// mask
+				0x02,
+				// namespace
+				0x0a, 0x00,
+				// id
+				0xef, 0xbe, 0xad, 0xde,
+			},
 		},
 		{
 			Name:   "String",
 			Struct: NewStringNodeID(255, "foobar"),
 			Bytes: []byte{
-				0x03, 0xff, 0x00, 0x06, 0x00, 0x00, 0x00, 0x66,
-				0x6f, 0x6f, 0x62, 0x61, 0x72,
+				// mask
+				0x03,
+				// namespace
+				0xff, 0x00,
+				// length
+				0x06, 0x00, 0x00, 0x00,
+				// value
+				0x66, 0x6f, 0x6f, 0x62, 0x61, 0x72,
 			},
 		},
 		{
 			Name:   "GUID",
 			Struct: NewGUIDNodeID(4660, "AAAABBBB-CCDD-EEFF-0101-0123456789AB"),
 			Bytes: []byte{
-				0x04, 0x34, 0x12,
+				// mask
+				0x04,
+				// namespace
+				0x34, 0x12,
+				// id
 				0xbb, 0xbb, 0xaa, 0xaa, 0xdd, 0xcc, 0xff, 0xee,
 				0xab, 0x89, 0x67, 0x45, 0x23, 0x01, 0x01, 0x01,
 			},
@@ -50,8 +79,14 @@ func TestNodeID(t *testing.T) {
 			Name:   "Opaque",
 			Struct: NewOpaqueNodeID(32768, []byte{0xde, 0xad, 0xbe, 0xef}),
 			Bytes: []byte{
-				0x05, 0x00, 0x80, 0x04, 0x00, 0x00, 0x00, 0xde,
-				0xad, 0xbe, 0xef,
+				// mask
+				0x05,
+				// namespace
+				0x00, 0x80,
+				// length
+				0x04, 0x00, 0x00, 0x00,
+				// value
+				0xde, 0xad, 0xbe, 0xef,
 			},
 		},
 	}
@@ -60,7 +95,7 @@ func TestNodeID(t *testing.T) {
 	})
 }
 
-func TestParseNodeID(t *testing.T) {
+func TestNewNodeID(t *testing.T) {
 	cases := []struct {
 		s   string
 		n   *NodeID
@@ -91,7 +126,7 @@ func TestParseNodeID(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.s, func(t *testing.T) {
-			n, err := ParseNodeID(c.s)
+			n, err := NewNodeID(c.s)
 			if got, want := err, c.err; !reflect.DeepEqual(got, want) {
 				t.Fatalf("got error %v want %v", got, want)
 			}
