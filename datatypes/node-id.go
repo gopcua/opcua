@@ -330,6 +330,36 @@ func (n *NodeID) IntID() int {
 	return int(n.nid)
 }
 
+// SetIntID sets the identifier value for two byte, four byte and
+// numeric node ids. It returns an error for other types.
+func (n *NodeID) SetIntID(v int) error {
+	switch n.Type() {
+	case TypeTwoByte:
+		if max := math.MaxUint8; v < 0 || v > max {
+			return fmt.Errorf("out of range [0..%d]: %d", max, v)
+		}
+		n.nid = uint32(v)
+		return nil
+
+	case TypeFourByte:
+		if max := math.MaxUint16; v < 0 || v > max {
+			return fmt.Errorf("out of range [0..%d]: %d", max, v)
+		}
+		n.nid = uint32(v)
+		return nil
+
+	case TypeNumeric:
+		if max := math.MaxUint32; v < 0 || v > max {
+			return fmt.Errorf("out of range [0..%d]: %d", max, v)
+		}
+		n.nid = uint32(v)
+		return nil
+
+	default:
+		return fmt.Errorf("incompatible node id type")
+	}
+}
+
 // StringID returns the string value of the identifier
 // for String and GUID NodeIDs, and the base64 encoded
 // value for Opaque types. For all other types StringID
@@ -347,6 +377,31 @@ func (n *NodeID) StringID() string {
 		return base64.StdEncoding.EncodeToString(n.bid)
 	default:
 		return ""
+	}
+}
+
+// SetStringID sets the identifier value for string, guid and opaque
+// node ids. It returns an error for other types.
+func (n *NodeID) SetStringID(v string) error {
+	switch n.Type() {
+	case TypeGUID:
+		n.gid = NewGUID(v)
+		return nil
+
+	case TypeString:
+		n.bid = []byte(v)
+		return nil
+
+	case TypeOpaque:
+		b, err := base64.StdEncoding.DecodeString(v)
+		if err != nil {
+			return err
+		}
+		n.bid = b
+		return nil
+
+	default:
+		return fmt.Errorf("incompatible node id type")
 	}
 }
 

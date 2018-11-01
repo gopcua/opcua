@@ -5,6 +5,7 @@
 package datatypes
 
 import (
+	"encoding/base64"
 	"errors"
 	"reflect"
 	"testing"
@@ -132,6 +133,188 @@ func TestNewNodeID(t *testing.T) {
 			}
 			if got, want := n, c.n; !reflect.DeepEqual(got, want) {
 				t.Fatalf("\ngot  %#v\nwant %#v", got, want)
+			}
+		})
+	}
+}
+
+func TestSetIntID(t *testing.T) {
+	tests := []struct {
+		name string
+		n    *NodeID
+		v    int
+		err  error
+	}{
+		// happy flows
+		{
+			name: "TwoByte",
+			n:    NewTwoByteNodeID(1),
+			v:    2,
+		},
+		{
+			name: "FourByte",
+			n:    NewFourByteNodeID(0, 1),
+			v:    2,
+		},
+		{
+			name: "Numeric",
+			n:    NewNumericNodeID(0, 1),
+			v:    2,
+		},
+
+		// error flows
+		{
+			name: "TwoByte.tooSmall",
+			n:    NewTwoByteNodeID(1),
+			v:    -1,
+			err:  errors.New("out of range [0..255]: -1"),
+		},
+		{
+			name: "TwoByte.tooBig",
+			n:    NewTwoByteNodeID(1),
+			v:    256,
+			err:  errors.New("out of range [0..255]: 256"),
+		},
+		{
+			name: "FourByte.tooSmall",
+			n:    NewFourByteNodeID(0, 1),
+			v:    -1,
+			err:  errors.New("out of range [0..65535]: -1"),
+		},
+		{
+			name: "FourByte.tooBig",
+			n:    NewFourByteNodeID(0, 1),
+			v:    65536,
+			err:  errors.New("out of range [0..65535]: 65536"),
+		},
+		{
+			name: "Numeric.tooSmall",
+			n:    NewNumericNodeID(0, 1),
+			v:    -1,
+			err:  errors.New("out of range [0..4294967295]: -1"),
+		},
+		{
+			name: "Numeric.toobBig",
+			n:    NewNumericNodeID(0, 1),
+			v:    4294967296,
+			err:  errors.New("out of range [0..4294967295]: 4294967296"),
+		},
+		{
+			name: "String.incompatible",
+			n:    NewStringNodeID(0, "a"),
+			v:    1,
+			err:  errors.New("incompatible node id type"),
+		},
+		{
+			name: "GUID.incompatible",
+			n:    NewGUIDNodeID(0, "a"),
+			v:    1,
+			err:  errors.New("incompatible node id type"),
+		},
+		{
+			name: "Opaque.incompatible",
+			n:    NewOpaqueNodeID(0, []byte{0x01}),
+			v:    1,
+			err:  errors.New("incompatible node id type"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			v := tt.n.IntID()
+
+			// sanity check
+			if before, after := v, tt.v; before == after {
+				t.Fatalf("before == after: %d == %d", before, after)
+			}
+
+			err := tt.n.SetIntID(tt.v)
+			if got, want := err, tt.err; !reflect.DeepEqual(got, want) {
+				t.Fatalf("got error %v want %v", got, want)
+			}
+			// if the test should fail and the error was correct
+			// we need to stop here.
+			if tt.err != nil {
+				return
+			}
+			if got, want := tt.n.IntID(), tt.v; got != want {
+				t.Fatalf("got value %d want %d", got, want)
+			}
+		})
+	}
+}
+
+func TestSetStringID(t *testing.T) {
+	tests := []struct {
+		name string
+		n    *NodeID
+		v    string
+		err  error
+	}{
+		// happy flows
+		{
+			name: "String",
+			n:    NewStringNodeID(0, "a"),
+			v:    "b",
+		},
+		{
+			name: "GUID",
+			n:    NewGUIDNodeID(0, "AAAABBBB-CCDD-EEFF-0101-0123456789AB"),
+			v:    "AAAABBBB-CCDD-EEFF-0101-012345678900",
+		},
+		{
+			name: "Opaque",
+			n:    NewOpaqueNodeID(0, []byte{'a'}),
+			v:    "Yg==",
+		},
+
+		// error flows
+		{
+			name: "TwoByte.incompatible",
+			n:    NewTwoByteNodeID(1),
+			v:    "a",
+			err:  errors.New("incompatible node id type"),
+		},
+		{
+			name: "FourByte.incompatible",
+			n:    NewFourByteNodeID(0, 1),
+			v:    "a",
+			err:  errors.New("incompatible node id type"),
+		},
+		{
+			name: "Numeric.incompatible",
+			n:    NewNumericNodeID(0, 1),
+			v:    "a",
+			err:  errors.New("incompatible node id type"),
+		},
+		{
+			name: "Opaque.badBase64",
+			n:    NewOpaqueNodeID(0, []byte{'a'}),
+			v:    "%",
+			err:  base64.CorruptInputError(0),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			v := tt.n.StringID()
+
+			// sanity check
+			if before, after := v, tt.v; before == after {
+				t.Fatalf("before == after: %s == %s", before, after)
+			}
+
+			err := tt.n.SetStringID(tt.v)
+			if got, want := err, tt.err; !reflect.DeepEqual(got, want) {
+				t.Fatalf("got error %q (%T) want %q (%T)", got, got, want, want)
+			}
+			// if the test should fail and the error was correct
+			// we need to stop here.
+			if tt.err != nil {
+				return
+			}
+			if got, want := tt.n.StringID(), tt.v; got != want {
+				t.Fatalf("got value %s want %s", got, want)
 			}
 		})
 	}
