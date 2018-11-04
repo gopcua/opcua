@@ -53,7 +53,11 @@ func (c *Conn) Read(b []byte) (n int, err error) {
 
 	for {
 		select {
-		case n := <-c.lenChan:
+		case n, ok := <-c.lenChan:
+			if !ok {
+				return 0, ErrConnNotEstablished
+			}
+
 			copy(b, c.rcvBuf[:n])
 			return n, nil
 			/*
