@@ -25,7 +25,6 @@ var (
 )
 
 func setUpSecureChannel(ctx context.Context) (*SecureChannel, *SecureChannel, error) {
-
 	ln, err := uacp.Listen(endpoint, 0xffff)
 	if err != nil {
 		return nil, nil, err
@@ -35,7 +34,6 @@ func setUpSecureChannel(ctx context.Context) (*SecureChannel, *SecureChannel, er
 	srvChanChan := make(chan *SecureChannel)
 	errChan := make(chan error)
 	go func() {
-		defer ln.Close()
 		srvConn, err := ln.Accept(ctx)
 		if err != nil {
 			errChan <- err
@@ -115,6 +113,36 @@ func TestServerWrite(t *testing.T) {
 
 	if diff := cmp.Diff(buf[:n], msg); diff != "" {
 		t.Error(diff)
+	}
+}
+
+func TestClientClose(t *testing.T) {
+	ctx := context.Background()
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	cliChan, _, err := setUpSecureChannel(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := cliChan.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestServerClose(t *testing.T) {
+	ctx := context.Background()
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	_, srvChan, err := setUpSecureChannel(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := srvChan.Close(); err != nil {
+		t.Fatal(err)
 	}
 }
 

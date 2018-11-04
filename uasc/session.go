@@ -43,7 +43,11 @@ func (s *Session) Read(b []byte) (n int, err error) {
 	}
 	for {
 		select {
-		case n := <-s.lenChan:
+		case n, ok := <-s.lenChan:
+			if !ok {
+				return 0, ErrSessionNotActivated
+			}
+
 			copy(b, s.rcvBuf[:n])
 			return n, nil
 			/*
@@ -62,7 +66,11 @@ func (s *Session) ReadService(b []byte) (n int, err error) {
 	}
 	for {
 		select {
-		case n := <-s.lenChan:
+		case n, ok := <-s.lenChan:
+			if !ok {
+				return 0, ErrSessionNotActivated
+			}
+
 			sc, err := Decode(s.rcvBuf[:n])
 			if err != nil {
 				return 0, err
@@ -214,6 +222,9 @@ func (s *Session) monitor(ctx context.Context) {
 				return
 			}
 			if n == 0 {
+				continue
+			}
+			if len(s.rcvBuf) < n {
 				continue
 			}
 

@@ -39,41 +39,37 @@ type SecureChannel struct {
 //
 // If the data is one of OpenSecureChannel or CloseSecureChannel, it will be handled automatically.
 func (s *SecureChannel) Read(b []byte) (n int, err error) {
-	if !(s.state == cliStateSecureChannelOpened || s.state == srvStateSecureChannelOpened) {
-		return 0, ErrSecureChannelNotOpened
-	}
-	for {
-		select {
-		case n := <-s.lenChan:
-			copy(b, s.rcvBuf[:n])
-			return n, nil
-			/*
-				case time.After(s.readDeadline):
-					return 0, ErrTimeout
-			*/
-		}
-	}
+	n, err = s.read(b)
+	copy(b, s.rcvBuf[:n])
+
+	return n, nil
 }
 
 // ReadService reads the payload(=Service) from the connection.
 // Which means the UASC Headers are omitted.
 func (s *SecureChannel) ReadService(b []byte) (n int, err error) {
+	n, err = s.read(b)
+
+	sc, err := Decode(s.rcvBuf[:n])
+	if err != nil {
+		return 0, err
+	}
+
+	copy(b, sc.SequenceHeader.Payload)
+	return int(sc.MessageSize), nil
+}
+
+func (s *SecureChannel) read(b []byte) (n int, err error) {
 	if !(s.state == cliStateSecureChannelOpened || s.state == srvStateSecureChannelOpened) {
 		return 0, ErrSecureChannelNotOpened
 	}
 	for {
 		select {
-		case n := <-s.lenChan:
-			sc, err := Decode(s.rcvBuf[:n])
-			if err != nil {
-				return 0, err
+		case n, ok := <-s.lenChan:
+			if !ok {
+				return 0, ErrSecureChannelNotOpened
 			}
-			copy(b, sc.SequenceHeader.Payload)
-			return int(sc.MessageSize), nil
-			/*
-				case time.After(s.readDeadline):
-					return 0, ErrTimeout
-			*/
+			return n, nil
 		}
 	}
 }
@@ -144,7 +140,6 @@ func (s *SecureChannel) close() {
 	s.resHeader = nil
 	s.rcvBuf = []byte{}
 	s.sndBuf = []byte{}
-	s.lowerConn = nil
 
 	close(s.errChan)
 	close(s.lenChan)
@@ -239,6 +234,9 @@ func (s *SecureChannel) monitor(ctx context.Context) {
 			if n == 0 {
 				continue
 			}
+			if len(s.rcvBuf) < n {
+				continue
+			}
 
 			msg, err := Decode(s.rcvBuf[:n])
 			if err != nil {
@@ -246,8 +244,8 @@ func (s *SecureChannel) monitor(ctx context.Context) {
 				go s.notifyLength(childCtx, n)
 				continue
 			}
-			s.cfg.RequestID = msg.RequestID
 
+			s.cfg.RequestID = msg.RequestID
 			switch m := msg.Service.(type) {
 			case *services.OpenSecureChannelRequest:
 				go s.handleOpenSecureChannelRequest(m)
@@ -258,7 +256,8 @@ func (s *SecureChannel) monitor(ctx context.Context) {
 			case *services.CloseSecureChannelResponse:
 				go s.handleCloseSecureChannelResponse(m)
 			default:
-				// pass to the user if type of msg is unknown.
+				// pass to the user if type of msg is not
+				// related to SecureChannel establishment.
 				go s.notifyLength(childCtx, n)
 			}
 		}
