@@ -28,7 +28,7 @@ func TestSupportedPolicies(t *testing.T) {
 
 }
 
-func TestGenerateKeys(t *testing.T) {
+func TestGenerateKeysLength(t *testing.T) {
 	localNonce := make([]byte, 32)
 	remoteNonce := make([]byte, 32)
 	_, err := rand.Read(localNonce)
@@ -52,6 +52,46 @@ func TestGenerateKeys(t *testing.T) {
 		t.Errorf("Encryption IV Invalid Length\n")
 	}
 
+}
+
+func TestGenerateKeys(t *testing.T) {
+
+	localNonce := []byte("\xEE\x51\x68\x84\x0E\x07\xF3\x94\x5B\x6D\xB7\x3A\x41\x3E\xC2\x5C")
+	remoteNonce := []byte("\x9B\x0F\x5B\xF8\x5E\x32\xFB\x37\x01\x43\x69\xB3\x14\xDE\x7A\xE7")
+
+	localKeys := &derivedKeys{
+		signing:    []byte("\xCB\xFB\x77\x42\x44\xB1\x03\xB3\xB5\x2C\x10\x7C\xA3\xAE\x80\xD4"),
+		encryption: []byte("\x00\x52\xB6\x82\xB2\x2C\x75\x54\x71\xDB\xF7\xC9\x8F\x88\x39\xFA"),
+		iv:         []byte("\xF8\x97\xF4\x13\xCC\xC7\xB8\x19\xE5\x45\xC7\xAE\xC3\x5D\x9D\x77"),
+	}
+
+	remoteKeys := &derivedKeys{
+		signing:    []byte("\x9E\x0A\xA9\x20\xED\x7E\xC2\x18\x6D\xB8\x19\x95\x8C\xD9\x0F\xA5"),
+		encryption: []byte("\x9C\x11\xEA\x7D\xAA\xD8\x7B\xBC\x94\x47\xCB\x1C\x06\xB5\xC6\x4B"),
+		iv:         []byte("\x09\xAA\x4F\x50\x15\x4D\x69\xC5\x0B\x3B\x78\x7F\xD8\x54\x36\x45"),
+	}
+
+	keys := generateKeys(computeHmac(crypto.SHA1, localNonce), remoteNonce, 16, 16, 16)
+	if diff := cmp.Diff(keys.signing, localKeys.signing, nil); diff != "" {
+		t.Errorf("local signing key generation failed:\n%s\n", diff)
+	}
+	if diff := cmp.Diff(keys.encryption, localKeys.encryption, nil); diff != "" {
+		t.Errorf("local encryption key generation failed:\n%s\n", diff)
+	}
+	if diff := cmp.Diff(keys.iv, localKeys.iv, nil); diff != "" {
+		t.Errorf("local iv key generation failed:\n%s\n", diff)
+	}
+
+	keys = generateKeys(computeHmac(crypto.SHA1, remoteNonce), localNonce, 16, 16, 16)
+	if diff := cmp.Diff(keys.signing, remoteKeys.signing, nil); diff != "" {
+		t.Errorf("remote signing key generation failed:\n%s\n", diff)
+	}
+	if diff := cmp.Diff(keys.encryption, remoteKeys.encryption, nil); diff != "" {
+		t.Errorf("remote encryption key generation failed:\n%s\n", diff)
+	}
+	if diff := cmp.Diff(keys.iv, remoteKeys.iv, nil); diff != "" {
+		t.Errorf("remote iv key generation failed:\n%s\n", diff)
+	}
 }
 
 // Test all supported encryption algorithms.  Because the majority of the algorithms
@@ -191,7 +231,7 @@ func TestEncryptionAlgorithms(t *testing.T) {
 func TestZeroStruct(t *testing.T) {
 	defer func() {
 		if r := recover(); r != nil {
-			t.Error("panicked while checking zero value of structs", r)
+			t.Error("panicked while checking zero value of struct", r)
 		}
 	}()
 
@@ -207,6 +247,7 @@ func TestZeroStruct(t *testing.T) {
 	_, _ = ze.Decrypt(plaintext)
 	_, _ = ze.Signature(plaintext)
 	_ = ze.VerifySignature(plaintext, plaintext)
+	_ = ze.SignatureLength()
 	_ = ze.EncryptionURI()
 	_ = ze.SignatureURI()
 
