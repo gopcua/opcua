@@ -7,40 +7,25 @@ gopcua provides easy and painless handling of OPC UA Binary Protocol in pure Gol
 [![Go Report Card](https://goreportcard.com/badge/github.com/wmnsk/gopcua)](https://goreportcard.com/report/github.com/wmnsk/gopcua)
 [![GitHub](https://img.shields.io/github/license/mashape/apistatus.svg)](https://github.com/wmnsk/gopcua/blob/master/LICENSE)
 
-## Table of Contents
-
-- [gopcua](#gopcua)
-  - [Table of Contents](#table-of-contents)
-  - [Quickstart](#quickstart)
-    - [Installing](#installing)
-    - [Running Examples](#running-examples)
-  - [Supported Features](#supported-features)
-    - [Protocol Stack](#protocol-stack)
-    - [Services](#services)
-  - [Disclaimer](#disclaimer)
-  - [Author](#author)
-  - [License](#license)
 
 ## Quickstart
 
 See example directory for sample codes.
 Currently simple `client`, `server` implementation and `sender`, which lets user to manipulate any parts including connection setup sequence, are available.
 
-### Installing
+### Requirements
 
-Simply use `go get`.
+gopcua is implemented in pure Golang. So just `go get` the following packages.
 
-The following command will send `Hello`, `OpenSecureChannel`, `CreateSession`, `CloseSecureChannel` to the destination specified in command-line arguments.
+_Vendoring is planned to be implemented after Go 1.12 release._
 
-```shell-session
-go get -u github.com/pkg/errors
-go get -u github.com/google/go-cmp
-go get -u github.com/wmnsk/gopcua
-```
+[github.com/pkg/errors](https://github.com/pkg/errors)  
+[github.com/google/go-cmp](https://github.com/google/go-cmp)  
+[github.com/wmnsk/gopcua](https://github.com/wmnsk/gopcua)  
 
 ### Running Examples
 
-`client` opens the SecureChannel with the endpoint specified in command-line arguments.
+[`client`](./examples/client) opens the SecureChannel with the endpoint specified in command-line arguments.
 
 If `--payload` is given, it sends any data on top of UASC headers.
 
@@ -49,14 +34,34 @@ cd examples/client
 go run client.go --endpoint "opc.tcp://endpoint.example/gopcua/server" --payload <payload in hex stream format>
 ```
 
-`server` listens and accepts the SecureChannel opening request from the client on specified network.
+[`server`](./examples/server) listens and accepts the SecureChannel opening request from the client on specified network.
 
 ```shell-session
 cd examples/client
 go run server.go --endpoint "opc.tcp://endpoint.example/gopcua/server"
 ```
 
-NOTE: Automatic session activation has not been implemented at this time.
+## Help Wanted!
+
+We believe our idea to implement the OPC-UA protocol in Golang can contribute to fostering the industry, and we are trying to make this project production-ready.
+However, due to the lack of resources the progress is not quite good actually. So, we want your help.
+
+### by writing codes
+
+As listed in GitHub [issues](https://github.com/wmnsk/gopcua/issues) and [projects](https://github.com/wmnsk/gopcua/projects/2), we still have a lot of things to be considered/implemented.
+Resolving the issues listed by writing your code would help really much.
+
+### by reporting issues
+
+Please feel free to open an issue to report anything you face when using the package.
+
+### by reviewing
+
+Please don't hesitate to post your thoughts on some issues and/or pull requests. It also helps us a lot.
+
+### by sharing
+
+The number of stars or shares on Twitter(or anything else) is a great motivation for us to work on the project continuously.
 
 ## Supported Features
 
@@ -132,7 +137,7 @@ This is still experimental project. Any part of the exported API may be changed 
 
 ## Author
 
-Yoshiyuki Kurauchi ([GitHub](https://github.com/wmnsk/) / [Twitter](https://twitter.com/wmnskdmms))
+Yoshiyuki Kurauchi ([Twitter](https://twitter.com/wmnskdmms) / [LinkedIn](https://www.linkedin.com/in/yoshiyuki-kurauchi/))
 
 ## License
 
