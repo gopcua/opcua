@@ -26,10 +26,12 @@ type CreateSessionRequest struct {
 	MaxResponseMessageSize  uint32
 }
 
+var CreateSessionRequestID = datatypes.NewFourByteExpandedNodeID(0, ServiceTypeCreateSessionRequest)
+
 // NewCreateSessionRequest creates a new NewCreateSessionRequest with the given parameters.
 func NewCreateSessionRequest(reqHeader *RequestHeader, appDescr *ApplicationDescription, serverURI, endpoint, sessionName string, nonce, cert []byte, timeout uint64, maxRespSize uint32) *CreateSessionRequest {
 	return &CreateSessionRequest{
-		TypeID:                  datatypes.NewFourByteExpandedNodeID(0, ServiceTypeCreateSessionRequest),
+		TypeID:                  CreateSessionRequestID,
 		RequestHeader:           reqHeader,
 		ClientDescription:       appDescr,
 		ServerURI:               serverURI,

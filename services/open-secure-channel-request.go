@@ -41,10 +41,12 @@ type OpenSecureChannelRequest struct {
 	RequestedLifetime        uint32
 }
 
+var OpenSecureChannelRequestID = datatypes.NewFourByteExpandedNodeID(0, ServiceTypeOpenSecureChannelRequest)
+
 // NewOpenSecureChannelRequest creates an OpenSecureChannelRequest.
 func NewOpenSecureChannelRequest(reqHeader *RequestHeader, ver, tokenType, securityMode, lifetime uint32, nonce []byte) *OpenSecureChannelRequest {
 	return &OpenSecureChannelRequest{
-		TypeID:                   datatypes.NewFourByteExpandedNodeID(0, ServiceTypeOpenSecureChannelRequest),
+		TypeID:                   OpenSecureChannelRequestID,
 		RequestHeader:            reqHeader,
 		ClientProtocolVersion:    ver,
 		SecurityTokenRequestType: tokenType,

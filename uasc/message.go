@@ -29,54 +29,34 @@ type Message struct {
 // Service type: Others => Message type: MSG.
 //
 // todo(fs): this feels wrong and we should move this switching into the secure channel.
-func New(srv services.Service, cfg *Config) *Message {
-	if srv == nil {
-		return newMSG(srv, cfg)
-	}
+func NewMessage(srv services.Service, cfg *Config) *Message {
 	switch srv.ServiceType() {
-	case services.ServiceTypeOpenSecureChannelRequest, services.ServiceTypeOpenSecureChannelResponse:
-		return newOPN(srv, cfg)
-	case services.ServiceTypeCloseSecureChannelRequest, services.ServiceTypeCloseSecureChannelResponse:
-		return newCLO(srv, cfg)
+	case services.ServiceTypeOpenSecureChannelRequest,
+		services.ServiceTypeOpenSecureChannelResponse:
+		return &Message{
+			Header:                   NewHeader(MessageTypeOpenSecureChannel, ChunkTypeFinal, cfg.SecureChannelID),
+			AsymmetricSecurityHeader: NewAsymmetricSecurityHeader(cfg.SecurityPolicyURI, cfg.Certificate, cfg.Thumbprint),
+			SequenceHeader:           NewSequenceHeader(cfg.SequenceNumber, cfg.RequestID),
+			Service:                  srv,
+		}
+
+	case services.ServiceTypeCloseSecureChannelRequest,
+		services.ServiceTypeCloseSecureChannelResponse:
+		return &Message{
+			Header:                  NewHeader(MessageTypeCloseSecureChannel, ChunkTypeFinal, cfg.SecureChannelID),
+			SymmetricSecurityHeader: NewSymmetricSecurityHeader(cfg.SecurityTokenID),
+			SequenceHeader:          NewSequenceHeader(cfg.SequenceNumber, cfg.RequestID),
+			Service:                 srv,
+		}
+
 	default:
-		return newMSG(srv, cfg)
+		return &Message{
+			Header:                  NewHeader(MessageTypeMessage, ChunkTypeFinal, cfg.SecureChannelID),
+			SymmetricSecurityHeader: NewSymmetricSecurityHeader(cfg.SecurityTokenID),
+			SequenceHeader:          NewSequenceHeader(cfg.SequenceNumber, cfg.RequestID),
+			Service:                 srv,
+		}
 	}
-}
-
-func newOPN(srv services.Service, cfg *Config) *Message {
-	return &Message{
-		Header:                   NewHeader(MessageTypeOpenSecureChannel, ChunkTypeFinal, cfg.SecureChannelID),
-		AsymmetricSecurityHeader: NewAsymmetricSecurityHeader(cfg.SecurityPolicyURI, cfg.Certificate, cfg.Thumbprint),
-		SequenceHeader:           NewSequenceHeader(cfg.SequenceNumber, cfg.RequestID),
-		Service:                  srv,
-	}
-}
-
-func newMSG(srv services.Service, cfg *Config) *Message {
-	return &Message{
-		Header:                  NewHeader(MessageTypeMessage, ChunkTypeFinal, cfg.SecureChannelID),
-		SymmetricSecurityHeader: NewSymmetricSecurityHeader(cfg.SecurityTokenID),
-		SequenceHeader:          NewSequenceHeader(cfg.SequenceNumber, cfg.RequestID),
-		Service:                 srv,
-	}
-}
-
-func newCLO(srv services.Service, cfg *Config) *Message {
-	return &Message{
-		Header:                  NewHeader(MessageTypeCloseSecureChannel, ChunkTypeFinal, cfg.SecureChannelID),
-		SymmetricSecurityHeader: NewSymmetricSecurityHeader(cfg.SecurityTokenID),
-		SequenceHeader:          NewSequenceHeader(cfg.SequenceNumber, cfg.RequestID),
-		Service:                 srv,
-	}
-}
-
-func Decode(b []byte) (*Message, error) {
-	m := new(Message)
-	_, err := m.Decode(b)
-	if err != nil {
-		return nil, err
-	}
-	return m, nil
 }
 
 func (m *Message) Decode(b []byte) (int, error) {
@@ -142,6 +122,99 @@ func (m *Message) Encode() ([]byte, error) {
 	buf.WriteStruct(m.Header)
 	buf.Write(sechdr)
 	buf.Write(seqhdr)
+	buf.Write(svc)
+	return buf.Bytes(), buf.Error()
+}
+
+type OPNMessage struct {
+	*AsymmetricSecurityHeader
+	*SequenceHeader
+	Service services.Service
+}
+
+func (m *OPNMessage) Decode(b []byte) error {
+	m.AsymmetricSecurityHeader = new(AsymmetricSecurityHeader)
+	m.SequenceHeader = new(SequenceHeader)
+
+	var err error
+	buf := gopcua.NewBuffer(b)
+	buf.ReadStruct(m.AsymmetricSecurityHeader)
+	buf.ReadStruct(m.SequenceHeader)
+	m.Service, err = services.Decode(buf.Bytes())
+	return err
+}
+
+func (m *OPNMessage) Encode() ([]byte, error) {
+	svc, err := gopcua.Encode(m.Service)
+	if err != nil {
+		return nil, err
+	}
+
+	buf := gopcua.NewBuffer(nil)
+	buf.WriteStruct(m.AsymmetricSecurityHeader)
+	buf.WriteStruct(m.SequenceHeader)
+	buf.Write(svc)
+	return buf.Bytes(), buf.Error()
+}
+
+type CLOMessage struct {
+	*SymmetricSecurityHeader
+	*SequenceHeader
+	Service services.Service
+}
+
+func (m *CLOMessage) Decode(b []byte) error {
+	m.SymmetricSecurityHeader = new(SymmetricSecurityHeader)
+	m.SequenceHeader = new(SequenceHeader)
+
+	var err error
+	buf := gopcua.NewBuffer(b)
+	buf.ReadStruct(m.SymmetricSecurityHeader)
+	buf.ReadStruct(m.SequenceHeader)
+	m.Service, err = services.Decode(buf.Bytes())
+	return err
+}
+
+func (m *CLOMessage) Encode() ([]byte, error) {
+	svc, err := gopcua.Encode(m.Service)
+	if err != nil {
+		return nil, err
+	}
+
+	buf := gopcua.NewBuffer(nil)
+	buf.WriteStruct(m.SymmetricSecurityHeader)
+	buf.WriteStruct(m.SequenceHeader)
+	buf.Write(svc)
+	return buf.Bytes(), buf.Error()
+}
+
+type MSGMessage struct {
+	*SymmetricSecurityHeader
+	*SequenceHeader
+	Service services.Service
+}
+
+func (m *MSGMessage) Decode(b []byte) error {
+	m.SymmetricSecurityHeader = new(SymmetricSecurityHeader)
+	m.SequenceHeader = new(SequenceHeader)
+
+	var err error
+	buf := gopcua.NewBuffer(b)
+	buf.ReadStruct(m.SymmetricSecurityHeader)
+	buf.ReadStruct(m.SequenceHeader)
+	m.Service, err = services.Decode(buf.Bytes())
+	return err
+}
+
+func (m *MSGMessage) Encode() ([]byte, error) {
+	svc, err := gopcua.Encode(m.Service)
+	if err != nil {
+		return nil, err
+	}
+
+	buf := gopcua.NewBuffer(nil)
+	buf.WriteStruct(m.SymmetricSecurityHeader)
+	buf.WriteStruct(m.SequenceHeader)
 	buf.Write(svc)
 	return buf.Bytes(), buf.Error()
 }

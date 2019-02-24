@@ -215,7 +215,8 @@ func (s *Session) monitor(ctx context.Context) {
 				continue
 			}
 
-			msg, err := Decode(s.rcvBuf[:n])
+			msg := new(Message)
+			_, err = msg.Decode(s.rcvBuf[:n])
 			if err != nil {
 				// pass to the user if msg is undecodable as UASC.
 				go s.notifyLength(childCtx, n)

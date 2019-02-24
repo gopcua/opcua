@@ -7,6 +7,7 @@ package uasc
 import (
 	"context"
 	"crypto/rand"
+	"fmt"
 	"io"
 	"log"
 	"net"
@@ -54,7 +55,12 @@ func (s *SecureChannel) ReadMessage() (*Message, error) {
 	if err != nil {
 		return nil, err
 	}
-	return Decode(s.rcvBuf[:n])
+	fmt.Println("SecureChannel.ReadMessage.Decode")
+	m := new(Message)
+	if _, err := m.Decode(s.rcvBuf[:n]); err != nil {
+		return nil, err
+	}
+	return m, nil
 }
 
 // ReadService reads the payload(=Service) from the connection.
@@ -92,7 +98,7 @@ func (s *SecureChannel) WriteService(svc services.Service) error {
 		return ErrSecureChannelNotOpened
 	}
 	s.cfg.SequenceNumber++
-	return s.write(New(svc, s.cfg))
+	return s.write(NewMessage(svc, s.cfg))
 }
 
 func (s *SecureChannel) write(msg *Message) error {
@@ -236,7 +242,8 @@ func (s *SecureChannel) monitor(ctx context.Context) {
 			}
 			log.Printf("uasc: recv %d bytes %x", n, s.rcvBuf[:n])
 
-			msg, err := Decode(s.rcvBuf[:n])
+			msg := new(Message)
+			_, err = msg.Decode(s.rcvBuf[:n])
 			if err != nil {
 				log.Printf("uasc: decode failed: %s", err)
 				// pass to the user if msg is undecodable as UASC.
@@ -398,7 +405,7 @@ func (s *SecureChannel) OpenSecureChannelRequest() error {
 	s.reqHeader.Timestamp = time.Now()
 
 	svc := services.NewOpenSecureChannelRequest(s.reqHeader, 0, services.ReqTypeIssue, s.cfg.SecurityMode, s.cfg.Lifetime, nonce)
-	if err := s.write(New(svc, s.cfg)); err != nil {
+	if err := s.write(NewMessage(svc, s.cfg)); err != nil {
 		s.cfg.SequenceNumber--
 		s.reqHeader.RequestHandle--
 		return err
@@ -423,7 +430,7 @@ func (s *SecureChannel) OpenSecureChannelResponse(code uint32) error {
 		), nonce,
 	)
 
-	if err := s.write(New(svc, s.cfg)); err != nil {
+	if err := s.write(NewMessage(svc, s.cfg)); err != nil {
 		s.cfg.SequenceNumber--
 		return err
 	}
@@ -437,7 +444,7 @@ func (s *SecureChannel) CloseSecureChannelRequest() error {
 	s.reqHeader.Timestamp = time.Now()
 
 	svc := services.NewCloseSecureChannelRequest(s.reqHeader, s.cfg.SecureChannelID)
-	if err := s.write(New(svc, s.cfg)); err != nil {
+	if err := s.write(NewMessage(svc, s.cfg)); err != nil {
 		s.cfg.SequenceNumber--
 		s.reqHeader.RequestHandle--
 		return err
@@ -452,7 +459,7 @@ func (s *SecureChannel) CloseSecureChannelResponse(code uint32) error {
 	s.resHeader.Timestamp = time.Now()
 
 	svc := services.NewCloseSecureChannelResponse(s.resHeader)
-	if err := s.write(New(svc, s.cfg)); err != nil {
+	if err := s.write(NewMessage(svc, s.cfg)); err != nil {
 		s.cfg.SequenceNumber--
 		return err
 	}
@@ -466,7 +473,7 @@ func (s *SecureChannel) GetEndpointsRequest(locales, uris []string) error {
 	s.reqHeader.Timestamp = time.Now()
 
 	svc := services.NewGetEndpointsRequest(s.reqHeader, s.RemoteEndpoint(), locales, uris)
-	if err := s.write(New(svc, s.cfg)); err != nil {
+	if err := s.write(NewMessage(svc, s.cfg)); err != nil {
 		s.cfg.SequenceNumber--
 		s.reqHeader.RequestHandle--
 		return err
@@ -483,7 +490,7 @@ func (s *SecureChannel) GetEndpointsResponse(code uint32, endpoints ...*services
 	s.resHeader.Timestamp = time.Now()
 
 	svc := services.NewGetEndpointsResponse(s.resHeader, endpoints...)
-	if err := s.write(New(svc, s.cfg)); err != nil {
+	if err := s.write(NewMessage(svc, s.cfg)); err != nil {
 		s.cfg.SequenceNumber--
 		return err
 	}
@@ -497,7 +504,7 @@ func (s *SecureChannel) FindServersRequest(locales []string, servers ...string) 
 	s.reqHeader.Timestamp = time.Now()
 
 	svc := services.NewFindServersRequest(s.reqHeader, s.RemoteEndpoint(), locales, servers)
-	if err := s.write(New(svc, s.cfg)); err != nil {
+	if err := s.write(NewMessage(svc, s.cfg)); err != nil {
 		s.cfg.SequenceNumber--
 		s.reqHeader.RequestHandle--
 		return err
@@ -514,7 +521,7 @@ func (s *SecureChannel) FindServersResponse(code uint32, apps ...*services.Appli
 	s.resHeader.Timestamp = time.Now()
 
 	svc := services.NewFindServersResponse(s.resHeader, apps...)
-	if err := s.write(New(svc, s.cfg)); err != nil {
+	if err := s.write(NewMessage(svc, s.cfg)); err != nil {
 		s.cfg.SequenceNumber--
 		return err
 	}

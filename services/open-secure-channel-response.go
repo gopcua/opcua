@@ -17,10 +17,12 @@ type OpenSecureChannelResponse struct {
 	ServerNonce           []byte
 }
 
+var OpenSecureChannelResponseID = datatypes.NewFourByteExpandedNodeID(0, ServiceTypeOpenSecureChannelResponse)
+
 // NewOpenSecureChannelResponse creates an OpenSecureChannelResponse.
 func NewOpenSecureChannelResponse(resHeader *ResponseHeader, ver uint32, secToken *ChannelSecurityToken, nonce []byte) *OpenSecureChannelResponse {
 	return &OpenSecureChannelResponse{
-		TypeID:                datatypes.NewFourByteExpandedNodeID(0, ServiceTypeOpenSecureChannelResponse),
+		TypeID:                OpenSecureChannelResponseID,
 		ResponseHeader:        resHeader,
 		ServerProtocolVersion: ver,
 		SecurityToken:         secToken,
