@@ -33,7 +33,3 @@ func NewReadResponse(resHeader *ResponseHeader, diag []*datatypes.DiagnosticInfo
 func (r *ReadResponse) ServiceType() uint16 {
 	return id.ReadResponse_Encoding_DefaultBinary
 }
-
-func (f *ReadResponse) RespHeader() *ResponseHeader {
-	return f.ResponseHeader
-}

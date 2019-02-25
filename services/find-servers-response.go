@@ -31,7 +31,3 @@ func NewFindServersResponse(resHeader *ResponseHeader, servers ...*ApplicationDe
 func (f *FindServersResponse) ServiceType() uint16 {
 	return ServiceTypeFindServersResponse
 }
-
-func (f *FindServersResponse) RespHeader() *ResponseHeader {
-	return f.ResponseHeader
-}
