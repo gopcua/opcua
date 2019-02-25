@@ -1,4 +1,4 @@
-package conn
+package uascnew
 
 import (
 	"testing"
@@ -38,5 +38,5 @@ func TestClientRead(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Logf("time: %v", v)
+	t.Logf("timex: %v", v)
 }
