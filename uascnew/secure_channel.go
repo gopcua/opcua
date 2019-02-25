@@ -1,11 +1,13 @@
 package uascnew
 
 import (
+	"context"
 	"crypto/rand"
 	"fmt"
 	"io"
 	"log"
 	"reflect"
+	"sync"
 	"time"
 
 	"github.com/wmnsk/gopcua/datatypes"
@@ -13,12 +15,23 @@ import (
 	"github.com/wmnsk/gopcua/uasc"
 )
 
+type response struct {
+	v   interface{}
+	err error
+}
+
 type SecureChannel struct {
 	c           *Conn
 	cfg         *uasc.Config
 	reqHeader   *services.RequestHeader
 	resHeader   *services.ResponseHeader
 	endpointURL string
+
+	mu      sync.Mutex
+	handler map[uint32]chan response // key: RequestHandle
+
+	ctx    context.Context
+	cancel func()
 }
 
 func NewSecureChannel(c *Conn, cfg *uasc.Config) *SecureChannel {
@@ -36,10 +49,14 @@ func NewSecureChannel(c *Conn, cfg *uasc.Config) *SecureChannel {
 		AdditionalHeader:    services.NewNullAdditionalHeader(),
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
 	return &SecureChannel{
 		c:         c,
 		cfg:       cfg,
+		ctx:       ctx,
+		cancel:    cancel,
 		reqHeader: reqHeader,
+		handler:   make(map[uint32]chan response),
 	}
 }
 
@@ -51,6 +68,7 @@ func (s *SecureChannel) Open() error {
 }
 
 func (s *SecureChannel) Close() error {
+	s.cancel()
 	if err := s.sendCloseSecureChannelRequest(); err != nil {
 		log.Print("failed to send close secure channel request")
 	}
@@ -70,7 +88,7 @@ func (s *SecureChannel) sendOpenSecureChannelRequest() error {
 		ClientNonce:              nonce,
 		RequestedLifetime:        s.cfg.Lifetime,
 	}
-	return s.send(svc)
+	return s.send(svc, nil)
 }
 
 func (s *SecureChannel) handleOpenSecureChannelResponse() error {
@@ -91,10 +109,10 @@ func (s *SecureChannel) sendCloseSecureChannelRequest() error {
 	svc := &services.CloseSecureChannelRequest{
 		SecureChannelID: s.cfg.SecureChannelID,
 	}
-	return s.send(svc)
+	return s.send(svc, nil)
 }
 
-func (s *SecureChannel) send(svc services.Service) (err error) {
+func (s *SecureChannel) send(svc services.Service, r chan response) (err error) {
 	// use reflection to set typeid and request header
 	// the send method will update the request header fields
 	// and reset them if the call failed.
@@ -127,8 +145,16 @@ func (s *SecureChannel) send(svc services.Service) (err error) {
 	}
 
 	// send the message
-	_, err = s.c.Write(b)
-	return err
+	if _, err := s.c.Write(b); err != nil {
+		return err
+	}
+
+	// register the handler
+	s.mu.Lock()
+	s.handler[s.reqHeader.RequestHandle] = r
+	s.mu.Unlock()
+
+	return nil
 }
 
 func (s *SecureChannel) recv() (services.Service, error) {
@@ -166,4 +192,52 @@ func (s *SecureChannel) recv() (services.Service, error) {
 	}
 
 	return m.Service, nil
+}
+
+func (s *SecureChannel) monitor() {
+	go s.run(s.ctx)
+}
+
+func (s *SecureChannel) run(ctx context.Context) error {
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+			svc, err := s.recv()
+
+			// since we are not decoding the ResponseHeader separately
+			// we need to drop every message that has an error since we
+			// cannot get to the RequestHandle in the ResponseHeader.
+			// To fix this we must a) decode the ResponseHeader separately
+			// and subsequently remove it and the TypeID from all service
+			// structs and tests. We also need to add a deadline to all
+			// handlers and check them periodically to time them out.
+			if err != nil {
+				log.Print(err)
+				continue
+			}
+
+			// the response header is always the second field
+			val := reflect.ValueOf(svc)
+			resp := val.Elem().Field(1).Interface().(*services.ResponseHeader)
+
+			// check if we have a pending request handler for this response.
+			s.mu.Lock()
+			h := s.handler[resp.RequestHandle]
+			delete(s.handler, resp.RequestHandle)
+			s.mu.Unlock()
+
+			if h == nil {
+				log.Printf("%T: %s", svc, err)
+				continue
+			}
+
+			select {
+			case <-ctx.Done():
+				return nil
+			case h <- response{svc, err}:
+			}
+		}
+	}
 }

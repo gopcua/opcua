@@ -28,3 +28,7 @@ func NewGetEndpointsResponse(resHeader *ResponseHeader, endpoints ...*EndpointDe
 func (g *GetEndpointsResponse) ServiceType() uint16 {
 	return ServiceTypeGetEndpointsResponse
 }
+
+func (f *GetEndpointsResponse) RespHeader() *ResponseHeader {
+	return f.ResponseHeader
+}

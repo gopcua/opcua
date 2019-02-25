@@ -59,20 +59,26 @@ func (c *Client) Read(id string) (*ua.Variant, error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := c.sendReadRequest(nid); err != nil {
+
+	h := NewReadAsync(c.sechan)
+	if err := h.Send(nid); err != nil {
 		return nil, err
 	}
-	resp, err := c.handleReadResponse()
-	if err != nil {
-		return nil, err
-	}
-	if len(resp.Results) > 0 {
-		return resp.Results[0].Value, nil
-	}
-	return nil, nil
+	return h.Recv()
 }
 
-func (c *Client) sendReadRequest(id *ua.NodeID) error {
+// ReadAsync implements an async ReadRequest/Response for a single
+// node value.
+type ReadAsync struct {
+	sechan *SecureChannel
+	ch     chan response
+}
+
+func NewReadAsync(sechan *SecureChannel) *ReadAsync {
+	return &ReadAsync{sechan, make(chan response)}
+}
+
+func (r *ReadAsync) Send(id *ua.NodeID) error {
 	req := &uas.ReadRequest{
 		MaxAge:             0,
 		TimestampsToReturn: 0,
@@ -84,18 +90,20 @@ func (c *Client) sendReadRequest(id *ua.NodeID) error {
 			},
 		},
 	}
-	// todo(fs): shouldn't we send this via the session?
-	return c.sechan.send(req)
+	return r.sechan.send(req, r.ch)
 }
 
-func (c *Client) handleReadResponse() (*uas.ReadResponse, error) {
-	svc, err := c.sechan.recv()
-	if err != nil {
-		return nil, err
+func (r *ReadAsync) Recv() (*ua.Variant, error) {
+	resp := <-r.ch
+	if resp.err != nil {
+		return nil, resp.err
 	}
-	resp, ok := svc.(*uas.ReadResponse)
+	res, ok := resp.v.(*uas.ReadResponse)
 	if !ok {
-		return nil, fmt.Errorf("invalid response. Got %T, want CreateSessionResponse", svc)
+		return nil, fmt.Errorf("invalid response: %T", resp.v)
 	}
-	return resp, nil
+	if len(res.Results) > 0 {
+		return res.Results[0].Value, nil
+	}
+	return nil, nil
 }

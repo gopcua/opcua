@@ -40,7 +40,11 @@ func (s *Session) Open() error {
 	if err := s.sendActivateSessionRequest(); err != nil {
 		return err
 	}
-	return s.handleActivateSessionResponse()
+	if err := s.handleActivateSessionResponse(); err != nil {
+		return err
+	}
+	go s.sechan.monitor()
+	return nil
 }
 
 func (s *Session) Close() error {
@@ -61,7 +65,7 @@ func (s *Session) sendCreateSessionRequest() error {
 		ClientCertificate: s.sechan.cfg.Certificate,
 	}
 
-	if err := s.sechan.send(req); err != nil {
+	if err := s.sechan.send(req, nil); err != nil {
 		return err
 	}
 
@@ -96,7 +100,7 @@ func (s *Session) sendActivateSessionRequest() error {
 		UserIdentityToken:          datatypes.NewExtensionObject(1, s.cfg.UserIdentityToken),
 		UserTokenSignature:         s.cfg.UserTokenSignature,
 	}
-	return s.sechan.send(req)
+	return s.sechan.send(req, nil)
 }
 
 func (s *Session) handleActivateSessionResponse() error {
