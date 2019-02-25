@@ -24,7 +24,6 @@ type SecureChannel struct {
 	c           *Conn
 	cfg         *uasc.Config
 	reqHeader   *services.RequestHeader
-	resHeader   *services.ResponseHeader
 	endpointURL string
 
 	mu      sync.Mutex
@@ -198,11 +197,11 @@ func (s *SecureChannel) monitor() {
 	go s.run(s.ctx)
 }
 
-func (s *SecureChannel) run(ctx context.Context) error {
+func (s *SecureChannel) run(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			return nil
+			return
 		default:
 			svc, err := s.recv()
 
@@ -235,7 +234,7 @@ func (s *SecureChannel) run(ctx context.Context) error {
 
 			select {
 			case <-ctx.Done():
-				return nil
+				return
 			case h <- response{svc, err}:
 			}
 		}
