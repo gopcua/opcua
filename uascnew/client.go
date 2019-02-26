@@ -71,11 +71,11 @@ func (c *Client) Read(id string) (*ua.Variant, error) {
 // node value.
 type ReadAsync struct {
 	sechan *SecureChannel
-	ch     chan response
+	ch     chan asyncResponse
 }
 
 func NewReadAsync(sechan *SecureChannel) *ReadAsync {
-	return &ReadAsync{sechan, make(chan response)}
+	return &ReadAsync{sechan, make(chan asyncResponse)}
 }
 
 func (r *ReadAsync) Send(id *ua.NodeID) error {

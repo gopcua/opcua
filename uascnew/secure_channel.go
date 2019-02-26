@@ -15,7 +15,7 @@ import (
 	"github.com/wmnsk/gopcua/uasc"
 )
 
-type response struct {
+type asyncResponse struct {
 	v   interface{}
 	err error
 }
@@ -26,9 +26,14 @@ type SecureChannel struct {
 	reqHeader   *services.RequestHeader
 	endpointURL string
 
+	// mu guards handler which contains the response channels
+	// for the outstanding requests. The key is the request
+	// handle which is part of the Request and Response headers.
 	mu      sync.Mutex
-	handler map[uint32]chan response // key: RequestHandle
+	handler map[uint32]chan asyncResponse
 
+	// ctx controls the request loop and terminates it when
+	// cancelled.
 	ctx    context.Context
 	cancel func()
 }
@@ -55,7 +60,7 @@ func NewSecureChannel(c *Conn, cfg *uasc.Config) *SecureChannel {
 		ctx:       ctx,
 		cancel:    cancel,
 		reqHeader: reqHeader,
-		handler:   make(map[uint32]chan response),
+		handler:   make(map[uint32]chan asyncResponse),
 	}
 }
 
@@ -112,7 +117,7 @@ func (s *SecureChannel) sendCloseSecureChannelRequest() error {
 	return s.send(svc, nil)
 }
 
-func (s *SecureChannel) send(svc services.Service, r chan response) (err error) {
+func (s *SecureChannel) send(svc services.Service, r chan asyncResponse) (err error) {
 	// use reflection to set typeid and request header
 	// the send method will update the request header fields
 	// and reset them if the call failed.
@@ -195,15 +200,21 @@ func (s *SecureChannel) recv() (services.Service, error) {
 	return m.Service, nil
 }
 
+// monitor starts the request loop.
 func (s *SecureChannel) monitor() {
 	go s.run(s.ctx)
 }
 
+// run executes the request loop. It receives messages from the
+// secure channel, decodes them and then forwards them to the
+// registered response channel, if there is one. Otherwise, the
+// message is dropped.
 func (s *SecureChannel) run(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
 			return
+
 		default:
 			svc, err := s.recv()
 
@@ -229,16 +240,17 @@ func (s *SecureChannel) run(ctx context.Context) {
 			delete(s.handler, resp.RequestHandle)
 			s.mu.Unlock()
 
+			// no handler -> next response
 			if h == nil {
 				log.Printf("%T: %s", svc, err)
 				continue
 			}
 
-			select {
-			case <-ctx.Done():
-				return
-			case h <- response{svc, err}:
-			}
+			// send response to caller
+			go func() {
+				h <- asyncResponse{svc, err}
+				close(h)
+			}()
 		}
 	}
 }
