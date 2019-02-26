@@ -35,7 +35,7 @@ func decryptRsaOAEP(hash crypto.Hash, privKey *rsa.PrivateKey) func([]byte) ([]b
 	return func(src []byte) ([]byte, error) {
 		var plaintext []byte
 
-		blockSize := keySize(&privKey.PublicKey)
+		blockSize := privKey.PublicKey.Size()
 		srcRemaining := len(src)
 		start := 0
 
@@ -65,7 +65,7 @@ func encryptRsaOAEP(hash crypto.Hash, pubKey *rsa.PublicKey) func([]byte) ([]byt
 	return func(src []byte) ([]byte, error) {
 		var ciphertext []byte
 
-		maxBlock := keySize(pubKey) - minPaddingRsaOAEP(hash)
+		maxBlock := pubKey.Size() - minPaddingRsaOAEP(hash)
 		srcRemaining := len(src)
 		start := 0
 		for srcRemaining > 0 {

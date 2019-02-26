@@ -87,25 +87,25 @@ func newAes256Sha256RsaPssAsymmetric(localKey *rsa.PrivateKey, remoteKey *rsa.Pu
 		maxAsymmetricKeyLength = 512 // 4096 bits
 	)
 
-	if localKey != nil && (keySize(&localKey.PublicKey) < minAsymmetricKeyLength || keySize(&localKey.PublicKey) > maxAsymmetricKeyLength) {
-		msg := fmt.Sprintf("local key size should be %d-%d bytes, got %d bytes", minAsymmetricKeyLength, maxAsymmetricKeyLength, keySize(&localKey.PublicKey))
+	if localKey != nil && (localKey.PublicKey.Size() < minAsymmetricKeyLength || localKey.PublicKey.Size() > maxAsymmetricKeyLength) {
+		msg := fmt.Sprintf("local key size should be %d-%d bytes, got %d bytes", minAsymmetricKeyLength, maxAsymmetricKeyLength, localKey.PublicKey.Size())
 		return nil, errors.New(msg)
 	}
 
-	if remoteKey != nil && (keySize(remoteKey) < minAsymmetricKeyLength || keySize(remoteKey) > maxAsymmetricKeyLength) {
-		msg := fmt.Sprintf("remote key size should be %d-%d bytes, got %d bytes", minAsymmetricKeyLength, maxAsymmetricKeyLength, keySize(remoteKey))
+	if remoteKey != nil && (remoteKey.Size() < minAsymmetricKeyLength || remoteKey.Size() > maxAsymmetricKeyLength) {
+		msg := fmt.Sprintf("remote key size should be %d-%d bytes, got %d bytes", minAsymmetricKeyLength, maxAsymmetricKeyLength, remoteKey.Size())
 		return nil, errors.New(msg)
 	}
 
 	e := new(EncryptionAlgorithm)
 
-	e.blockSize = keySize(remoteKey)
+	e.blockSize = remoteKey.Size()
 	e.minPadding = minPaddingRsaOAEP(crypto.SHA1)
 	e.encrypt = encryptRsaOAEP(crypto.SHA1, remoteKey)         // RSA-OAEP-SHA1
 	e.decrypt = decryptRsaOAEP(crypto.SHA1, localKey)          // RSA-OAEP-SHA1
 	e.signature = signRsaPss(crypto.SHA256, localKey)          // RSA-PSS-SHA2-256
 	e.verifySignature = verifyRsaPss(crypto.SHA256, remoteKey) // RSA-PSS-SHA2-256
-	e.signatureLength = keySize(&localKey.PublicKey)
+	e.signatureLength = localKey.PublicKey.Size()
 	e.encryptionURI = "http://opcfoundation.org/UA/security/rsa-oaep-sha2-256"
 	e.signatureURI = "http://opcfoundation.org/UA/security/rsa-pss-sha2-256"
 
