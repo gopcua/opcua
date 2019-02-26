@@ -117,6 +117,9 @@ func (b *Buffer) ReadFloat32() float32 {
 	if b.err != nil {
 		return 0
 	}
+	if bits == f32qnan {
+		return float32(math.NaN())
+	}
 	return math.Float32frombits(bits)
 }
 
@@ -127,6 +130,9 @@ func (b *Buffer) ReadFloat64() float64 {
 	bits := b.ReadUint64()
 	if b.err != nil {
 		return 0
+	}
+	if bits == f64qnan {
+		return math.NaN()
 	}
 	return math.Float64frombits(bits)
 }
@@ -234,13 +240,19 @@ func (b *Buffer) WriteUint64(n uint64) {
 }
 
 func (b *Buffer) WriteFloat32(n float32) {
-	bits := math.Float32bits(n)
-	b.WriteUint32(bits)
+	if math.IsNaN(float64(n)) {
+		b.WriteUint32(f32qnan)
+	} else {
+		b.WriteUint32(math.Float32bits(n))
+	}
 }
 
 func (b *Buffer) WriteFloat64(n float64) {
-	bits := math.Float64bits(n)
-	b.WriteUint64(bits)
+	if math.IsNaN(n) {
+		b.WriteUint64(f64qnan)
+	} else {
+		b.WriteUint64(math.Float64bits(n))
+	}
 }
 
 func (b *Buffer) WriteString(s string) {
