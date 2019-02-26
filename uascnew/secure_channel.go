@@ -75,6 +75,7 @@ func (s *SecureChannel) Close() error {
 }
 
 func (s *SecureChannel) sendOpenSecureChannelRequest() error {
+	// todo(fs): do we need to set the nonce if the security policy is None?
 	nonce := make([]byte, 32)
 	if _, err := rand.Read(nonce); err != nil {
 		return err
@@ -179,6 +180,7 @@ func (s *SecureChannel) recv() (services.Service, error) {
 		return nil, fmt.Errorf("sechan: read message failed")
 	}
 
+	// todo(fs): handle ERR messages
 	m := new(uasc.Message)
 	if _, err := m.Decode(append(hdr, b...)); err != nil {
 		return nil, fmt.Errorf("sechan: decode message failed: %s", err)
