@@ -18,7 +18,7 @@ func TestMessage(t *testing.T) {
 		{
 			Name: "OPN",
 			Struct: func() interface{} {
-				m := New(
+				m := NewMessage(
 					services.NewOpenSecureChannelRequest(
 						services.NewRequestHeader(
 							datatypes.NewTwoByteNodeID(0),
@@ -108,7 +108,7 @@ func TestMessage(t *testing.T) {
 		}, {
 			Name: "MSG",
 			Struct: func() interface{} {
-				m := New(
+				m := NewMessage(
 					services.NewGetEndpointsRequest(
 						services.NewRequestHeader(
 							datatypes.NewTwoByteNodeID(0),
@@ -173,7 +173,7 @@ func TestMessage(t *testing.T) {
 		}, {
 			Name: "CLO",
 			Struct: func() interface{} {
-				m := New(
+				m := NewMessage(
 					services.NewCloseSecureChannelRequest(
 						services.NewRequestHeader(
 							datatypes.NewTwoByteNodeID(0),
