@@ -83,25 +83,25 @@ func newAes128Sha256RsaOaepAsymmetric(localKey *rsa.PrivateKey, remoteKey *rsa.P
 		maxAsymmetricKeyLength = 512 // 4096 bits
 	)
 
-	if localKey != nil && (keySize(&localKey.PublicKey) < minAsymmetricKeyLength || keySize(&localKey.PublicKey) > maxAsymmetricKeyLength) {
-		msg := fmt.Sprintf("local key size should be %d-%d bytes, got %d bytes", minAsymmetricKeyLength, maxAsymmetricKeyLength, keySize(&localKey.PublicKey))
+	if localKey != nil && (localKey.PublicKey.Size() < minAsymmetricKeyLength || localKey.PublicKey.Size() > maxAsymmetricKeyLength) {
+		msg := fmt.Sprintf("local key size should be %d-%d bytes, got %d bytes", minAsymmetricKeyLength, maxAsymmetricKeyLength, localKey.PublicKey.Size())
 		return nil, errors.New(msg)
 	}
 
-	if remoteKey != nil && (keySize(remoteKey) < minAsymmetricKeyLength || keySize(remoteKey) > maxAsymmetricKeyLength) {
-		msg := fmt.Sprintf("remote key size should be %d-%d bytes, got %d bytes", minAsymmetricKeyLength, maxAsymmetricKeyLength, keySize(remoteKey))
+	if remoteKey != nil && (remoteKey.Size() < minAsymmetricKeyLength || remoteKey.Size() > maxAsymmetricKeyLength) {
+		msg := fmt.Sprintf("remote key size should be %d-%d bytes, got %d bytes", minAsymmetricKeyLength, maxAsymmetricKeyLength, remoteKey.Size())
 		return nil, errors.New(msg)
 	}
 
 	e := new(EncryptionAlgorithm)
 
-	e.blockSize = keySize(remoteKey)
+	e.blockSize = remoteKey.Size()
 	e.minPadding = minPaddingRsaOAEP(crypto.SHA1)
 	e.encrypt = encryptRsaOAEP(crypto.SHA1, remoteKey)           // RSA-OAEP-SHA1
 	e.decrypt = decryptRsaOAEP(crypto.SHA1, localKey)            // RSA-OAEP-SHA1
 	e.signature = signPKCS1v15(crypto.SHA256, localKey)          // RSA-PKCS15-SHA2-256
 	e.verifySignature = verifyPKCS1v15(crypto.SHA256, remoteKey) // RSA-PKCS15-SHA2-256
-	e.signatureLength = keySize(&localKey.PublicKey)
+	e.signatureLength = localKey.PublicKey.Size()
 	e.encryptionURI = "http://opcfoundation.org/ua/security/rsa-oaep-sha1"
 	e.signatureURI = "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"
 
