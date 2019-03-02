@@ -7,8 +7,8 @@ package datatypes
 import (
 	"fmt"
 
-	"github.com/wmnsk/gopcua"
 	"github.com/wmnsk/gopcua/id"
+	"github.com/wmnsk/gopcua/ua"
 )
 
 // ExtensionObject is encoded as sequence of bytes prefixed by the NodeId of its DataTypeEncoding
@@ -33,7 +33,7 @@ func NewExtensionObject(mask uint8, extParam ExtensionObjectValue) *ExtensionObj
 }
 
 func (e *ExtensionObject) Decode(b []byte) (int, error) {
-	buf := gopcua.NewBuffer(b)
+	buf := ua.NewBuffer(b)
 	e.TypeID = new(ExpandedNodeID)
 	buf.ReadStruct(e.TypeID)
 	e.EncodingMask = buf.ReadByte()
@@ -51,7 +51,7 @@ func (e *ExtensionObject) Decode(b []byte) (int, error) {
 }
 
 func (e *ExtensionObject) Encode() ([]byte, error) {
-	buf := gopcua.NewBuffer(nil)
+	buf := ua.NewBuffer(nil)
 	buf.WriteStruct(e.TypeID)
 	buf.WriteByte(e.EncodingMask)
 	if e.Value == nil {
@@ -68,8 +68,8 @@ func (e *ExtensionObject) Encode() ([]byte, error) {
 
 // ExtensionObjectValue represents the value in ExtensionObject.
 type ExtensionObjectValue interface {
-	gopcua.BinaryDecoder
-	gopcua.BinaryEncoder
+	ua.BinaryDecoder
+	ua.BinaryEncoder
 	Type() int
 }
 

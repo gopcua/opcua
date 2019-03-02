@@ -4,7 +4,7 @@
 
 package uacp
 
-import "github.com/wmnsk/gopcua"
+import "github.com/wmnsk/gopcua/ua"
 
 // Decode decodes given bytes as UACP.
 func Decode(b []byte) (interface{}, error) {
@@ -29,14 +29,14 @@ func Decode(b []byte) (interface{}, error) {
 		u = &Generic{}
 	}
 
-	if err := gopcua.Decode(b, u); err != nil {
+	if err := ua.Decode(b, u); err != nil {
 		return nil, err
 	}
 	return u, nil
 }
 
 func Encode(msgType string, chunkType byte, v interface{}) ([]byte, error) {
-	body, err := gopcua.Encode(v)
+	body, err := ua.Encode(v)
 	if err != nil {
 		return nil, err
 	}

@@ -7,7 +7,7 @@ package datatypes
 import (
 	"fmt"
 
-	"github.com/wmnsk/gopcua"
+	"github.com/wmnsk/gopcua/ua"
 )
 
 // DiagnosticInfo represents the DiagnosticInfo.
@@ -67,7 +67,7 @@ func NewNullDiagnosticInfo() *DiagnosticInfo {
 }
 
 func (d *DiagnosticInfo) Decode(b []byte) (int, error) {
-	buf := gopcua.NewBuffer(b)
+	buf := ua.NewBuffer(b)
 	d.EncodingMask = buf.ReadByte()
 	if d.HasSymbolicID() {
 		d.SymbolicID = buf.ReadInt32()
@@ -95,7 +95,7 @@ func (d *DiagnosticInfo) Decode(b []byte) (int, error) {
 }
 
 func (d *DiagnosticInfo) Encode() ([]byte, error) {
-	buf := gopcua.NewBuffer(nil)
+	buf := ua.NewBuffer(nil)
 	buf.WriteByte(d.EncodingMask)
 	if d.HasSymbolicID() {
 		buf.WriteInt32(d.SymbolicID)

@@ -13,8 +13,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/wmnsk/gopcua"
 	"github.com/wmnsk/gopcua/errors"
+	"github.com/wmnsk/gopcua/ua"
 	"github.com/wmnsk/gopcua/utils"
 )
 
@@ -199,7 +199,7 @@ func (c *Conn) Error(code uint32, reason string) error {
 }
 
 func (c *Conn) send(msgType string, chunkType byte, v interface{}) error {
-	body, err := gopcua.Encode(v)
+	body, err := ua.Encode(v)
 	if err != nil {
 		return err
 	}

@@ -5,9 +5,9 @@
 package uasc
 
 import (
-	"github.com/wmnsk/gopcua"
 	"github.com/wmnsk/gopcua/errors"
 	"github.com/wmnsk/gopcua/services"
+	"github.com/wmnsk/gopcua/ua"
 )
 
 // Message represents a OPC UA Secure Conversation message.
@@ -60,7 +60,7 @@ func NewMessage(srv services.Service, cfg *Config) *Message {
 }
 
 func (m *Message) Decode(b []byte) (int, error) {
-	buf := gopcua.NewBuffer(b)
+	buf := ua.NewBuffer(b)
 
 	m.Header = new(Header)
 	buf.ReadStruct(m.Header)
@@ -112,13 +112,13 @@ func (m *Message) Encode() ([]byte, error) {
 		return nil, err
 	}
 
-	svc, err := gopcua.Encode(m.Service)
+	svc, err := ua.Encode(m.Service)
 	if err != nil {
 		return nil, err
 	}
 
 	m.Header.MessageSize = uint32(12 + len(sechdr) + len(seqhdr) + len(svc))
-	buf := gopcua.NewBuffer(nil)
+	buf := ua.NewBuffer(nil)
 	buf.WriteStruct(m.Header)
 	buf.Write(sechdr)
 	buf.Write(seqhdr)
@@ -137,7 +137,7 @@ func (m *OPNMessage) Decode(b []byte) error {
 	m.SequenceHeader = new(SequenceHeader)
 
 	var err error
-	buf := gopcua.NewBuffer(b)
+	buf := ua.NewBuffer(b)
 	buf.ReadStruct(m.AsymmetricSecurityHeader)
 	buf.ReadStruct(m.SequenceHeader)
 	m.Service, err = services.Decode(buf.Bytes())
@@ -145,12 +145,12 @@ func (m *OPNMessage) Decode(b []byte) error {
 }
 
 func (m *OPNMessage) Encode() ([]byte, error) {
-	svc, err := gopcua.Encode(m.Service)
+	svc, err := ua.Encode(m.Service)
 	if err != nil {
 		return nil, err
 	}
 
-	buf := gopcua.NewBuffer(nil)
+	buf := ua.NewBuffer(nil)
 	buf.WriteStruct(m.AsymmetricSecurityHeader)
 	buf.WriteStruct(m.SequenceHeader)
 	buf.Write(svc)
@@ -168,7 +168,7 @@ func (m *CLOMessage) Decode(b []byte) error {
 	m.SequenceHeader = new(SequenceHeader)
 
 	var err error
-	buf := gopcua.NewBuffer(b)
+	buf := ua.NewBuffer(b)
 	buf.ReadStruct(m.SymmetricSecurityHeader)
 	buf.ReadStruct(m.SequenceHeader)
 	m.Service, err = services.Decode(buf.Bytes())
@@ -176,12 +176,12 @@ func (m *CLOMessage) Decode(b []byte) error {
 }
 
 func (m *CLOMessage) Encode() ([]byte, error) {
-	svc, err := gopcua.Encode(m.Service)
+	svc, err := ua.Encode(m.Service)
 	if err != nil {
 		return nil, err
 	}
 
-	buf := gopcua.NewBuffer(nil)
+	buf := ua.NewBuffer(nil)
 	buf.WriteStruct(m.SymmetricSecurityHeader)
 	buf.WriteStruct(m.SequenceHeader)
 	buf.Write(svc)
@@ -199,7 +199,7 @@ func (m *MSGMessage) Decode(b []byte) error {
 	m.SequenceHeader = new(SequenceHeader)
 
 	var err error
-	buf := gopcua.NewBuffer(b)
+	buf := ua.NewBuffer(b)
 	buf.ReadStruct(m.SymmetricSecurityHeader)
 	buf.ReadStruct(m.SequenceHeader)
 	m.Service, err = services.Decode(buf.Bytes())
@@ -207,12 +207,12 @@ func (m *MSGMessage) Decode(b []byte) error {
 }
 
 func (m *MSGMessage) Encode() ([]byte, error) {
-	svc, err := gopcua.Encode(m.Service)
+	svc, err := ua.Encode(m.Service)
 	if err != nil {
 		return nil, err
 	}
 
-	buf := gopcua.NewBuffer(nil)
+	buf := ua.NewBuffer(nil)
 	buf.WriteStruct(m.SymmetricSecurityHeader)
 	buf.WriteStruct(m.SequenceHeader)
 	buf.Write(svc)

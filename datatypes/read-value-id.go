@@ -4,9 +4,7 @@
 
 package datatypes
 
-import (
-	"github.com/wmnsk/gopcua"
-)
+import "github.com/wmnsk/gopcua/ua"
 
 // IntegerID is a UInt32 that is used as an identifier, such as a handle.
 // All values, except for 0, are valid.
@@ -69,7 +67,7 @@ func NewReadValueID(nodeID *NodeID, attrID uint32, idxRange string, qIdx uint16,
 }
 
 func (v *ReadValueID) Decode(b []byte) (int, error) {
-	buf := gopcua.NewBuffer(b)
+	buf := ua.NewBuffer(b)
 	v.NodeID = new(NodeID)
 	buf.ReadStruct(v.NodeID)
 	v.AttributeID = buf.ReadUint32()
@@ -80,7 +78,7 @@ func (v *ReadValueID) Decode(b []byte) (int, error) {
 }
 
 func (v *ReadValueID) Encode() ([]byte, error) {
-	buf := gopcua.NewBuffer(nil)
+	buf := ua.NewBuffer(nil)
 	buf.WriteStruct(v.NodeID)
 	buf.WriteUint32(v.AttributeID)
 	buf.WriteString(v.IndexRange)

@@ -7,7 +7,7 @@ package uacp
 import (
 	"fmt"
 
-	"github.com/wmnsk/gopcua"
+	"github.com/wmnsk/gopcua/ua"
 )
 
 // MessageType definitions.
@@ -39,7 +39,7 @@ type Header struct {
 }
 
 func (h *Header) Decode(b []byte) (int, error) {
-	buf := gopcua.NewBuffer(b)
+	buf := ua.NewBuffer(b)
 	h.MessageType = string(buf.ReadN(3))
 	h.ChunkType = buf.ReadByte()
 	h.MessageSize = buf.ReadUint32()
@@ -47,7 +47,7 @@ func (h *Header) Decode(b []byte) (int, error) {
 }
 
 func (h *Header) Encode() ([]byte, error) {
-	buf := gopcua.NewBuffer(nil)
+	buf := ua.NewBuffer(nil)
 	if len(h.MessageType) != 3 {
 		return nil, fmt.Errorf("invalid message type: %q", h.MessageType)
 	}

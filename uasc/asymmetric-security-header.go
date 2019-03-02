@@ -7,7 +7,7 @@ package uasc
 import (
 	"fmt"
 
-	"github.com/wmnsk/gopcua"
+	"github.com/wmnsk/gopcua/ua"
 )
 
 // AsymmetricSecurityHeader represents a Asymmetric Algorithm Security Header in OPC UA Secure Conversation.
@@ -27,7 +27,7 @@ func NewAsymmetricSecurityHeader(uri string, cert, thumbprint []byte) *Asymmetri
 }
 
 func (h *AsymmetricSecurityHeader) Decode(b []byte) (int, error) {
-	buf := gopcua.NewBuffer(b)
+	buf := ua.NewBuffer(b)
 	h.SecurityPolicyURI = buf.ReadString()
 	h.SenderCertificate = buf.ReadBytes()
 	h.ReceiverCertificateThumbprint = buf.ReadBytes()
@@ -35,7 +35,7 @@ func (h *AsymmetricSecurityHeader) Decode(b []byte) (int, error) {
 }
 
 func (h *AsymmetricSecurityHeader) Encode() ([]byte, error) {
-	buf := gopcua.NewBuffer(nil)
+	buf := ua.NewBuffer(nil)
 	buf.WriteString(h.SecurityPolicyURI)
 	buf.WriteByteString(h.SenderCertificate)
 	buf.WriteByteString(h.ReceiverCertificateThumbprint)

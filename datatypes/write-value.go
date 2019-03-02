@@ -4,9 +4,7 @@
 
 package datatypes
 
-import (
-	"github.com/wmnsk/gopcua"
-)
+import "github.com/wmnsk/gopcua/ua"
 
 // WriteValue is a set of Node and Attribute to write.
 //
@@ -29,7 +27,7 @@ func NewWriteValue(node *NodeID, attr uint32, idxRange string, value *DataValue)
 }
 
 func (v *WriteValue) Decode(b []byte) (int, error) {
-	buf := gopcua.NewBuffer(b)
+	buf := ua.NewBuffer(b)
 	v.NodeID = new(NodeID)
 	buf.ReadStruct(v.NodeID)
 	v.AttributeID = buf.ReadUint32()
@@ -40,7 +38,7 @@ func (v *WriteValue) Decode(b []byte) (int, error) {
 }
 
 func (v *WriteValue) Encode() ([]byte, error) {
-	buf := gopcua.NewBuffer(nil)
+	buf := ua.NewBuffer(nil)
 	buf.WriteStruct(v.NodeID)
 	buf.WriteUint32(v.AttributeID)
 	buf.WriteString(v.IndexRange)

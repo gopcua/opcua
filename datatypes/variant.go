@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/wmnsk/gopcua"
+	"github.com/wmnsk/gopcua/ua"
 )
 
 // Variant is a union of the built-in types.
@@ -73,7 +73,7 @@ func (m *Variant) HasArrayValues() bool {
 }
 
 func (m *Variant) Decode(b []byte) (int, error) {
-	buf := gopcua.NewBuffer(b)
+	buf := ua.NewBuffer(b)
 
 	m.EncodingMask = buf.ReadByte()
 
@@ -177,7 +177,7 @@ func (m *Variant) Decode(b []byte) (int, error) {
 }
 
 func (m *Variant) Encode() ([]byte, error) {
-	buf := gopcua.NewBuffer(nil)
+	buf := ua.NewBuffer(nil)
 
 	buf.WriteByte(m.EncodingMask)
 

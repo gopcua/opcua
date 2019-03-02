@@ -10,7 +10,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/wmnsk/gopcua"
+	"github.com/wmnsk/gopcua/ua"
 	"github.com/wmnsk/gopcua/utils/codectest"
 )
 
@@ -109,7 +109,7 @@ func BenchmarkReflectDecode(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		v := new(NodeID)
-		if err := gopcua.Decode(data, v); err != nil {
+		if err := ua.Decode(data, v); err != nil {
 			b.Fatal(err)
 		}
 	}

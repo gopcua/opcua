@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/wmnsk/gopcua"
+	"github.com/wmnsk/gopcua/ua"
 )
 
 // GUID represents GUID in binary stream. It is a 16-byte globally unique identifier.
@@ -45,7 +45,7 @@ func NewGUID(guid string) *GUID {
 }
 
 func (g *GUID) Decode(b []byte) (int, error) {
-	buf := gopcua.NewBuffer(b)
+	buf := ua.NewBuffer(b)
 	g.Data1 = buf.ReadUint32()
 	g.Data2 = buf.ReadUint16()
 	g.Data3 = buf.ReadUint16()
@@ -54,7 +54,7 @@ func (g *GUID) Decode(b []byte) (int, error) {
 }
 
 func (g *GUID) Encode() ([]byte, error) {
-	buf := gopcua.NewBuffer(nil)
+	buf := ua.NewBuffer(nil)
 	buf.WriteUint32(g.Data1)
 	buf.WriteUint16(g.Data2)
 	buf.WriteUint16(g.Data3)

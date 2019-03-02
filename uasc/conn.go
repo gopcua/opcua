@@ -1,4 +1,4 @@
-package uascnew
+package uasc
 
 import (
 	"fmt"
@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/wmnsk/gopcua"
+	"github.com/wmnsk/gopcua/ua"
 	"github.com/wmnsk/gopcua/uacp"
 )
 
@@ -94,7 +94,7 @@ func (a *Conn) handshake(endpoint string) error {
 	}
 
 	ack := new(uacp.Acknowledge)
-	if err := gopcua.Decode(b, ack); err != nil {
+	if err := ua.Decode(b, ack); err != nil {
 		return fmt.Errorf("decode ACK failed: %s", err)
 	}
 
@@ -117,7 +117,7 @@ func (a *Conn) recv() ([]byte, error) {
 	}
 
 	var h uacp.Header
-	if err := gopcua.Decode(hdr, &h); err != nil {
+	if err := ua.Decode(hdr, &h); err != nil {
 		return nil, fmt.Errorf("hdr decode failed: %s", err)
 	}
 
@@ -139,7 +139,7 @@ func (a *Conn) send(typ string, msg interface{}) error {
 		return fmt.Errorf("invalid msg type: %s", typ)
 	}
 
-	body, err := gopcua.Encode(msg)
+	body, err := ua.Encode(msg)
 	if err != nil {
 		return fmt.Errorf("encode msg failed: %s", err)
 	}

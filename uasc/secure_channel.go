@@ -1,4 +1,4 @@
-package uascnew
+package uasc
 
 import (
 	"context"
@@ -12,25 +12,25 @@ import (
 
 	"github.com/wmnsk/gopcua/datatypes"
 	"github.com/wmnsk/gopcua/services"
-	"github.com/wmnsk/gopcua/uasc"
 )
 
-type asyncResponse struct {
-	v   interface{}
-	err error
+type Response struct {
+	V   interface{}
+	Err error
 }
 
 type SecureChannel struct {
-	c           *Conn
-	cfg         *uasc.Config
-	reqHeader   *services.RequestHeader
-	endpointURL string
+	EndpointURL string
+
+	c         *Conn
+	cfg       *Config
+	reqHeader *services.RequestHeader
 
 	// mu guards handler which contains the response channels
 	// for the outstanding requests. The key is the request
 	// handle which is part of the Request and Response headers.
 	mu      sync.Mutex
-	handler map[uint32]chan asyncResponse
+	handler map[uint32]chan Response
 
 	// ctx controls the request loop and terminates it when
 	// cancelled.
@@ -38,9 +38,9 @@ type SecureChannel struct {
 	cancel func()
 }
 
-func NewSecureChannel(c *Conn, cfg *uasc.Config) *SecureChannel {
+func NewSecureChannel(c *Conn, cfg *Config) *SecureChannel {
 	if cfg == nil {
-		cfg = uasc.NewClientConfigSecurityNone(3333, 3600000)
+		cfg = NewClientConfigSecurityNone(3333, 3600000)
 	}
 
 	// always reset the secure channel id
@@ -60,26 +60,27 @@ func NewSecureChannel(c *Conn, cfg *uasc.Config) *SecureChannel {
 		ctx:       ctx,
 		cancel:    cancel,
 		reqHeader: reqHeader,
-		handler:   make(map[uint32]chan asyncResponse),
+		handler:   make(map[uint32]chan Response),
 	}
 }
 
 func (s *SecureChannel) Open() error {
-	if err := s.sendOpenSecureChannelRequest(); err != nil {
-		return err
-	}
-	return s.handleOpenSecureChannelResponse()
+	return s.openSecureChannel()
 }
 
 func (s *SecureChannel) Close() error {
 	s.cancel()
-	if err := s.sendCloseSecureChannelRequest(); err != nil {
+	if err := s.closeSecureChannel(); err != nil {
 		log.Print("failed to send close secure channel request")
 	}
 	return s.c.Close()
 }
 
-func (s *SecureChannel) sendOpenSecureChannelRequest() error {
+func (s *SecureChannel) LocalEndpoint() string {
+	return s.EndpointURL
+}
+
+func (s *SecureChannel) openSecureChannel() error {
 	// todo(fs): do we need to set the nonce if the security policy is None?
 	nonce := make([]byte, 32)
 	if _, err := rand.Read(nonce); err != nil {
@@ -93,31 +94,41 @@ func (s *SecureChannel) sendOpenSecureChannelRequest() error {
 		ClientNonce:              nonce,
 		RequestedLifetime:        s.cfg.Lifetime,
 	}
-	return s.send(svc, nil)
+	return s.Send(svc, func(v interface{}) error {
+		resp, ok := v.(*services.OpenSecureChannelResponse)
+		if !ok {
+			return fmt.Errorf("got %T, want OpenSecureChannelResponse", svc)
+		}
+		s.cfg.SecurityTokenID = resp.SecurityToken.TokenID
+		return nil
+	})
 }
 
-func (s *SecureChannel) handleOpenSecureChannelResponse() error {
-	svc, err := s.recv()
-	if err != nil {
-		return err
-	}
-	resp, ok := svc.(*services.OpenSecureChannelResponse)
-	if !ok {
-		return fmt.Errorf("got %T, want OpenSecureChannelResponse", svc)
-	}
-	s.cfg.SecurityTokenID = resp.SecurityToken.TokenID
-	return nil
-}
-
-// CloseSecureChannelRequest sends CloseSecureChannelRequest on top of UASC to SecureChannel.
-func (s *SecureChannel) sendCloseSecureChannelRequest() error {
+// closeSecureChannel sends CloseSecureChannelRequest on top of UASC to SecureChannel.
+func (s *SecureChannel) closeSecureChannel() error {
 	svc := &services.CloseSecureChannelRequest{
 		SecureChannelID: s.cfg.SecureChannelID,
 	}
-	return s.send(svc, nil)
+	return s.Send(svc, nil)
 }
 
-func (s *SecureChannel) send(svc services.Service, r chan asyncResponse) (err error) {
+// Send sends the service request and calls h with the response object.
+func (s *SecureChannel) Send(svc services.Service, h func(interface{}) error) error {
+	ch, err := s.SendAsync(svc)
+	if err != nil {
+		return err
+	}
+	// todo(fs): handle timeout
+	resp := <-ch
+	if resp.Err != nil {
+		return resp.Err
+	}
+	return h(resp.V)
+}
+
+// SendAsync sends the service request and returns a channel which will receive the
+// response when it arrives.
+func (s *SecureChannel) SendAsync(svc services.Service) (resp chan Response, err error) {
 	// use reflection to set typeid and request header
 	// the send method will update the request header fields
 	// and reset them if the call failed.
@@ -143,23 +154,23 @@ func (s *SecureChannel) send(svc services.Service, r chan asyncResponse) (err er
 
 	// todo(fs): should we drop the headers from Message and generate them here?
 	// encode the message
-	m := uasc.NewMessage(svc, s.cfg)
+	m := NewMessage(svc, s.cfg)
 	b, err := m.Encode()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// send the message
 	if _, err := s.c.Write(b); err != nil {
-		return err
+		return nil, err
 	}
 
 	// register the handler
+	resp = make(chan Response)
 	s.mu.Lock()
-	s.handler[s.reqHeader.RequestHandle] = r
+	s.handler[s.reqHeader.RequestHandle] = resp
 	s.mu.Unlock()
-
-	return nil
+	return resp, nil
 }
 
 func (s *SecureChannel) recv() (services.Service, error) {
@@ -171,7 +182,7 @@ func (s *SecureChannel) recv() (services.Service, error) {
 		return nil, fmt.Errorf("sechan: read header failed: %s", err)
 	}
 
-	h := new(uasc.Header)
+	h := new(Header)
 	if _, err := h.Decode(hdr); err != nil {
 		return nil, fmt.Errorf("sechan: decode header failed: %s", err)
 	}
@@ -186,7 +197,7 @@ func (s *SecureChannel) recv() (services.Service, error) {
 	}
 
 	// todo(fs): handle ERR messages
-	m := new(uasc.Message)
+	m := new(Message)
 	if _, err := m.Decode(append(hdr, b...)); err != nil {
 		return nil, fmt.Errorf("sechan: decode message failed: %s", err)
 	}
@@ -236,20 +247,20 @@ func (s *SecureChannel) run(ctx context.Context) {
 
 			// check if we have a pending request handler for this response.
 			s.mu.Lock()
-			h := s.handler[resp.RequestHandle]
+			ch := s.handler[resp.RequestHandle]
 			delete(s.handler, resp.RequestHandle)
 			s.mu.Unlock()
 
 			// no handler -> next response
-			if h == nil {
+			if ch == nil {
 				log.Printf("%T: %s", svc, err)
 				continue
 			}
 
 			// send response to caller
 			go func() {
-				h <- asyncResponse{svc, err}
-				close(h)
+				ch <- Response{svc, err}
+				close(ch)
 			}()
 		}
 	}

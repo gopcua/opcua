@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/wmnsk/gopcua"
+	"github.com/wmnsk/gopcua/ua"
 )
 
 // NodeID type definitions.
@@ -358,7 +358,7 @@ func (n *NodeID) String() string {
 }
 
 func (n *NodeID) Decode(b []byte) (int, error) {
-	buf := gopcua.NewBuffer(b)
+	buf := ua.NewBuffer(b)
 
 	n.mask = buf.ReadByte()
 	typ := n.mask & 0xf
@@ -395,7 +395,7 @@ func (n *NodeID) Decode(b []byte) (int, error) {
 }
 
 func (n *NodeID) Encode() ([]byte, error) {
-	buf := gopcua.NewBuffer(nil)
+	buf := ua.NewBuffer(nil)
 	buf.WriteByte(n.mask)
 
 	switch n.Type() {

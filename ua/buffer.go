@@ -1,4 +1,4 @@
-package gopcua
+package ua
 
 import (
 	"encoding/binary"

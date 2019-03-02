@@ -25,9 +25,11 @@ type Config struct {
 	// previously connected Clients to accidentally ‘reuse’ SecureChannels that did not belong
 	// to them.
 	SecureChannelID uint32
+
 	// SecurityPolicyURI is the URI of the Security Policy used to secure the Message.
 	// This field is encoded as a UTF-8 string without a null terminator.
 	SecurityPolicyURI string
+
 	// Certificate is the X.509 v3 Certificate assigned to the sending application Instance.
 	// This is a DER encoded blob.
 	// The structure of an X.509 v3 Certificate is defined in X.509 v3.
@@ -38,6 +40,7 @@ type Config struct {
 	// transport layer.
 	// This field shall be null if the Message is not signed.
 	Certificate []byte
+
 	// Thumbprint is the thumbprint of the X.509 v3 Certificate assigned to the receiving
 	// application Instance.
 	// The thumbprint is the CertificateDigest of the DER encoded form of the
@@ -45,22 +48,27 @@ type Config struct {
 	// This indicates what public key was used to encrypt the MessageChunk.
 	// This field shall be null if the Message is not encrypted.
 	Thumbprint []byte
+
 	// SequenceNumber is a monotonically increasing sequence number assigned by the sender to each
 	// MessageChunk sent over the SecureChannel.
 	SequenceNumber uint32
+
 	// RequestID is an identifier assigned by the Client to OPC UA request Message. All MessageChunks
 	// for the request and the associated response use the same identifier
 	RequestID uint32
+
 	// SecurityMode is The type of security to apply to the messages. The type MessageSecurityMode
 	// is defined in 7.15.
 	// A SecureChannel may have to be created even if the securityMode is NONE. The exact behaviour
 	// depends on the mapping used and is described in the Part 6.
 	SecurityMode uint32
+
 	// SecurityTokenID is a unique identifier for the SecureChannel SecurityToken used to secure the Message.
 	// This identifier is returned by the Server in an OpenSecureChannel response Message.
 	// If a Server receives a TokenId which it does not recognize it shall return an appropriate
 	// transport layer error.
 	SecurityTokenID uint32
+
 	// Lifetime is the requested lifetime, in milliseconds, for the new SecurityToken when the
 	// SecureChannel works as client. It specifies when the Client expects to renew the SecureChannel
 	// by calling the OpenSecureChannel Service again. If a SecureChannel is not renewed, then all
@@ -70,24 +78,24 @@ type Config struct {
 	Lifetime uint32
 }
 
-// NewConfig creates a new Config.
-//
-// This contains all the parameter Config has, but the ones should be set depends on the application type.
-// It is good idea to use NewClientConfig or NewServerConfig instead if you don't have specific purpose to
-// create Config with full parameters.
-func NewConfig(chanID uint32, policyURI string, cert, thumbprint []byte, seqNum, reqID, secMode, tokenID, lifetime uint32) *Config {
-	return &Config{
-		SecureChannelID:   chanID,
-		SecurityPolicyURI: policyURI,
-		Certificate:       cert,
-		Thumbprint:        thumbprint,
-		SequenceNumber:    seqNum,
-		RequestID:         reqID,
-		SecurityMode:      secMode,
-		SecurityTokenID:   tokenID,
-		Lifetime:          lifetime,
-	}
-}
+// // NewConfig creates a new Config.
+// //
+// // This contains all the parameter Config has, but the ones should be set depends on the application type.
+// // It is good idea to use NewClientConfig or NewServerConfig instead if you don't have specific purpose to
+// // create Config with full parameters.
+// func NewConfig(chanID uint32, policyURI string, cert, thumbprint []byte, seqNum, reqID, secMode, tokenID, lifetime uint32) *Config {
+// 	return &Config{
+// 		SecureChannelID:   chanID,
+// 		SecurityPolicyURI: policyURI,
+// 		Certificate:       cert,
+// 		Thumbprint:        thumbprint,
+// 		SequenceNumber:    seqNum,
+// 		RequestID:         reqID,
+// 		SecurityMode:      secMode,
+// 		SecurityTokenID:   tokenID,
+// 		Lifetime:          lifetime,
+// 	}
+// }
 
 // NewClientConfig creates a new Config for Client.
 //
@@ -106,10 +114,12 @@ func NewClientConfig(policyURI string, cert, thumbprint []byte, reqID, secMode, 
 
 // NewClientConfigSecurityNone creates a new Config for Client, with SecurityMode=None.
 func NewClientConfigSecurityNone(reqID, lifetime uint32) *Config {
-	return NewClientConfig(
-		"http://opcfoundation.org/UA/SecurityPolicy#None",
-		nil, nil, reqID, services.SecModeNone, lifetime,
-	)
+	return &Config{
+		SecurityPolicyURI: "http://opcfoundation.org/UA/SecurityPolicy#None",
+		RequestID:         reqID,
+		SecurityMode:      services.SecModeNone,
+		Lifetime:          lifetime,
+	}
 }
 
 /* XXX - to be uncommented when encryption is
@@ -239,9 +249,11 @@ type SessionConfig struct {
 	// AuthenticationToken is the secret Session identifier used to verify that the request is
 	// associated with the Session. The SessionAuthenticationToken type is defined in 7.31.
 	AuthenticationToken *datatypes.NodeID
+
 	// ClientDescription is the information that describes the Client application.
 	// The type ApplicationDescription is defined in 7.1.
 	ClientDescription *services.ApplicationDescription
+
 	// ServerEndpoints is the list of Endpoints that the Server supports.
 	// The Server shall return a set of EndpointDescriptions available for the serverUri
 	// specified in the request. The EndpointDescription type is defined in 7.10. The Client
@@ -252,6 +264,7 @@ type SessionConfig struct {
 	// securityLevel with all other parameters set to null. Only the recommended
 	// parameters shall be verified by the client.
 	ServerEndpoints []*services.EndpointDescription
+
 	// LocaleIDs is the list of locale ids in priority order for localized strings. The first
 	// LocaleId in the list has the highest priority. If the Server returns a localized string
 	// to the Client, the Server shall return the translation with the highest priority that
@@ -263,6 +276,7 @@ type SessionConfig struct {
 	// a single application Session. If it is not specified the Server shall keep using the
 	// current localeIds for the Session.
 	LocaleIDs []string
+
 	// UserIdentityToken is the credentials of the user associated with the Client application.
 	// The Server uses these credentials to determine whether the Client should be allowed to
 	// activate a Session and what resources the Client has access to during this Session.
@@ -270,11 +284,13 @@ type SessionConfig struct {
 	// The EndpointDescription specifies what UserIdentityTokens the Server shall accept.
 	// Null or empty user token shall always be interpreted as anonymous.
 	UserIdentityToken datatypes.UserIdentityToken
+
 	// If the Client specified a user identity token that supports digital signatures, then it
 	// shall create a signature and pass it as this parameter. Otherwise the parameter is null.
 	// The SignatureAlgorithm depends on the identity token type.
 	// The SignatureData type is defined in 7.32.
 	UserTokenSignature *services.SignatureData
+
 	// If Session works as a client, SessionTimeout is the requested maximum number of milliseconds
 	// that a Session should remain open without activity. If the Client fails to issue a Service
 	// request within this interval, then the Server shall automatically terminate the Client Session.
@@ -282,10 +298,12 @@ type SessionConfig struct {
 	// that a Session shall remain open without activity. The Server should attempt to honour the
 	// Client request for this parameter,but may negotiate this value up or down to meet its own constraints.
 	SessionTimeout uint64
+
 	// mySignature is is the client/serverSignature expected to receive from the other endpoint.
 	// This parameter is automatically calculated and kept temporarily until being used to verify
 	// received client/serverSignature.
 	mySignature *services.SignatureData
+
 	// signatureToSend is the client/serverSignature defined in Part4, Table 15 and Table 17.
 	// This parameter is automatically calculated and kept temporarily until it is sent in next message.
 	signatureToSend *services.SignatureData
@@ -295,10 +313,12 @@ type SessionConfig struct {
 func NewClientSessionConfig(locales []string, userToken datatypes.UserIdentityToken) *SessionConfig {
 	return &SessionConfig{
 		SessionTimeout: 0xffff,
-		ClientDescription: services.NewApplicationDescription(
-			"urn:gopcua:client", "urn:gopcua", "gopcua - OPC UA implementation in pure Golang",
-			services.AppTypeClient, "", "", []string{""},
-		),
+		ClientDescription: &services.ApplicationDescription{
+			ApplicationURI:  "urn:gopcua:client",
+			ProductURI:      "urn:gopcua",
+			ApplicationName: datatypes.NewLocalizedText("", "gopcua - OPC UA implementation in pure Golang"),
+			ApplicationType: services.AppTypeClient,
+		},
 		LocaleIDs:          locales,
 		UserIdentityToken:  userToken,
 		UserTokenSignature: services.NewSignatureData("", nil),
@@ -322,7 +342,7 @@ func NewServerSessionConfig(secChan *SecureChannel) *SessionConfig {
 				),
 				secChan.cfg.Certificate, secChan.cfg.SecurityMode, secChan.cfg.SecurityPolicyURI,
 				[]*services.UserTokenPolicy{
-					services.NewUserTokenPolicy("", 0, "", "", ""),
+					&services.UserTokenPolicy{},
 				},
 				"", 0,
 			),

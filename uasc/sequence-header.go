@@ -7,7 +7,7 @@ package uasc
 import (
 	"fmt"
 
-	"github.com/wmnsk/gopcua"
+	"github.com/wmnsk/gopcua/ua"
 )
 
 // SequenceHeader represents a Sequence Header in OPC UA Secure Conversation.
@@ -25,14 +25,14 @@ func NewSequenceHeader(seq, req uint32) *SequenceHeader {
 }
 
 func (h *SequenceHeader) Decode(b []byte) (int, error) {
-	buf := gopcua.NewBuffer(b)
+	buf := ua.NewBuffer(b)
 	h.SequenceNumber = buf.ReadUint32()
 	h.RequestID = buf.ReadUint32()
 	return buf.Pos(), buf.Error()
 }
 
 func (h *SequenceHeader) Encode() ([]byte, error) {
-	buf := gopcua.NewBuffer(nil)
+	buf := ua.NewBuffer(nil)
 	buf.WriteUint32(h.SequenceNumber)
 	buf.WriteUint32(h.RequestID)
 	return buf.Bytes(), buf.Error()

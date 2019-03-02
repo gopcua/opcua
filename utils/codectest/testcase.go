@@ -4,9 +4,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/wmnsk/gopcua"
-
 	"github.com/pascaldekloe/goe/verify"
+	"github.com/wmnsk/gopcua/ua"
 )
 
 // Case describes a test case for a encoding and decoding an
@@ -37,7 +36,7 @@ func Run(t *testing.T, cases []Case) {
 					t.Fatalf("%T is not a pointer or a slice", c.Struct)
 				}
 
-				if err := gopcua.Decode(c.Bytes, v.Interface()); err != nil {
+				if err := ua.Decode(c.Bytes, v.Interface()); err != nil {
 					t.Fatal(err)
 				}
 
@@ -49,7 +48,7 @@ func Run(t *testing.T, cases []Case) {
 			})
 
 			t.Run("encode", func(t *testing.T) {
-				b, err := gopcua.Encode(c.Struct)
+				b, err := ua.Encode(c.Struct)
 				if err != nil {
 					t.Fatal(err)
 				}

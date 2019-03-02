@@ -7,9 +7,8 @@ package datatypes
 import (
 	"fmt"
 
-	"github.com/wmnsk/gopcua"
-
 	"github.com/wmnsk/gopcua/id"
+	"github.com/wmnsk/gopcua/ua"
 )
 
 // LocalizedText represents a LocalizedText.
@@ -40,7 +39,7 @@ func NewLocalizedText(locale, text string) *LocalizedText {
 }
 
 func (m *LocalizedText) Decode(b []byte) (int, error) {
-	buf := gopcua.NewBuffer(b)
+	buf := ua.NewBuffer(b)
 	m.EncodingMask = buf.ReadByte()
 	if m.HasLocale() {
 		m.Locale = buf.ReadString()
@@ -52,7 +51,7 @@ func (m *LocalizedText) Decode(b []byte) (int, error) {
 }
 
 func (m *LocalizedText) Encode() ([]byte, error) {
-	buf := gopcua.NewBuffer(nil)
+	buf := ua.NewBuffer(nil)
 	buf.WriteUint8(m.EncodingMask)
 	if m.HasLocale() {
 		buf.WriteString(m.Locale)

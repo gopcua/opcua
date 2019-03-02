@@ -5,9 +5,9 @@
 package services
 
 import (
-	"github.com/wmnsk/gopcua"
 	"github.com/wmnsk/gopcua/datatypes"
 	"github.com/wmnsk/gopcua/errors"
+	"github.com/wmnsk/gopcua/ua"
 )
 
 // ServiceType definitions.
@@ -109,7 +109,7 @@ func Decode(b []byte) (Service, error) {
 		return nil, errors.NewErrUnsupported(id, "unsupported or not implemented yet.")
 	}
 
-	if err := gopcua.Decode(b, s); err != nil {
+	if err := ua.Decode(b, s); err != nil {
 		return nil, err
 	}
 	return s, nil

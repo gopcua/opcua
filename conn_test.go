@@ -1,12 +1,17 @@
-package uascnew
+package gopcua
 
 import (
 	"testing"
 	"time"
+
+	uad "github.com/wmnsk/gopcua/datatypes"
+
+	"github.com/wmnsk/gopcua/uasc"
 )
 
 func TestDial(t *testing.T) {
-	conn, err := Dial("opc.tcp://localhost:4840")
+	t.Skip()
+	conn, err := uasc.Dial("opc.tcp://localhost:4840")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -15,26 +20,27 @@ func TestDial(t *testing.T) {
 }
 
 func TestSecureChannel(t *testing.T) {
-	conn, err := Dial("opc.tcp://localhost:4840")
+	t.Skip()
+	conn, err := uasc.Dial("opc.tcp://localhost:4840")
 	if err != nil {
 		t.Fatal(err)
 	}
-	s := NewSecureChannel(conn, nil)
+	s := uasc.NewSecureChannel(conn, nil)
 	if err := s.Open(); err != nil {
 		t.Fatal(err)
 	}
 	defer s.Close()
-
 }
 
 func TestClientRead(t *testing.T) {
+	t.Skip()
 	c := NewClient("opc.tcp://localhost:4840", nil)
-	if err := c.Connect(); err != nil {
+	if err := c.Open(); err != nil {
 		t.Fatal(err)
 	}
 	defer c.Close()
 
-	v, err := c.Read("ns=0;i=2258")
+	v, err := c.Read(uad.NewNumericNodeID(0, 2258))
 	if err != nil {
 		t.Fatal(err)
 	}
