@@ -4,57 +4,27 @@
 
 package main
 
+import (
+	"flag"
+	"log"
+
+	"github.com/wmnsk/gopcua"
+	uad "github.com/wmnsk/gopcua/datatypes"
+)
+
 func main() {
-	// 	endpoint := flag.String("endpoint", "opc.tcp://example.com/foo/bar", "OPC UA Endpoint URL")
-	// 	flag.Parse()
+	endpoint := flag.String("endpoint", "opc.tcp://localhost:4840", "OPC UA Endpoint URL")
+	flag.Parse()
 
-	// 	// Create context for UACP to be used by statemachine working background.
-	// 	ctx, cancel := context.WithCancel(context.Background())
-	// 	defer cancel()
+	c := gopcua.NewClient(*endpoint, nil)
+	if err := c.Open(); err != nil {
+		log.Fatal(err)
+	}
+	defer c.Close()
 
-	// 	// Establish UACP Connection with the Endpoint specified.
-	// 	conn, err := uacp.Dial(ctx, *endpoint)
-	// 	if err != nil {
-	// 		log.Fatal("uacp.Dial: ", err)
-	// 	}
-	// 	defer conn.Close()
-	// 	log.Printf("Successfully established connection with %v", conn.RemoteEndpoint())
-
-	// 	// Open SecureChannel on top of UACP Connection established above.
-	// 	cfg := uasc.NewClientConfigSecurityNone(3333, 3600000)
-	// 	secChan, err := uasc.OpenSecureChannel(ctx, conn, cfg, 5*time.Second, 3)
-	// 	if err != nil {
-	// 		log.Fatal(err)
-	// 	}
-	// 	defer secChan.Close()
-	// 	log.Printf("Successfully created secure channel with %v", secChan.RemoteEndpoint())
-
-	// 	sessCfg := uasc.NewClientSessionConfig(nil, datatypes.NewAnonymousIdentityToken(""))
-	// 	session, err := uasc.CreateSession(ctx, secChan, sessCfg, 3, 5*time.Second)
-	// 	if err != nil {
-	// 		log.Fatal(err)
-	// 	}
-	// 	defer session.Close()
-	// 	log.Printf("Successfully created session with %v", secChan.RemoteEndpoint())
-
-	// 	if err := session.Activate(); err != nil {
-	// 		log.Fatal(err)
-	// 	}
-	// 	log.Printf("Successfully activated session with %v", secChan.RemoteEndpoint())
-
-	// 	if err := session.ReadRequest(
-	// 		2000, services.TimestampsToReturnBoth, datatypes.NewReadValueID(
-	// 			datatypes.NewFourByteNodeID(0, 2258), datatypes.IntegerIDValue, "", 0, "",
-	// 		),
-	// 	); err != nil {
-	// 		log.Fatal(err)
-	// 	}
-	// 	log.Println("Successfully sent ReadRequest")
-
-	// 	// read response
-	// 	svc, err := session.ReadService()
-	// 	if err != nil {
-	// 		log.Fatal("ReadService: ", err)
-	// 	}
-	// 	log.Printf("svc: %#v", svc)
+	v, err := c.Read(uad.NewNumericNodeID(0, 2258))
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Printf("time: %v", v)
 }

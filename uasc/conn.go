@@ -102,7 +102,7 @@ func (a *Conn) handshake(endpoint string) error {
 		return fmt.Errorf("invalid version %d", ack.Version)
 	}
 	a.ack = ack
-	log.Printf("conn %d: ACK received. %s", a.id, ack)
+	log.Printf("conn %d: recv ACK:%v", a.id, ack)
 	return nil
 }
 
@@ -122,7 +122,7 @@ func (a *Conn) recv() ([]byte, error) {
 	}
 
 	if h.MessageSize > a.ack.ReceiveBufSize {
-		return nil, fmt.Errorf("received packet too large: %d > %d bytes", h.MessageSize, a.ack.ReceiveBufSize)
+		return nil, fmt.Errorf("packet too large: %d > %d bytes", h.MessageSize, a.ack.ReceiveBufSize)
 	}
 
 	b := make([]byte, h.MessageSize-hdrlen)
@@ -130,7 +130,7 @@ func (a *Conn) recv() ([]byte, error) {
 		return nil, fmt.Errorf("read msg failed: %s", err)
 	}
 
-	log.Printf("conn %d: rcvd %s%c with %d bytes", a.id, h.MessageType, h.ChunkType, len(b))
+	log.Printf("conn %d: recv %s%c with %d bytes", a.id, h.MessageType, h.ChunkType, len(b))
 	return b, nil
 }
 

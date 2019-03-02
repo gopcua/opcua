@@ -22,20 +22,27 @@ import (
 type Conn struct {
 	// mu is to Lock when updating state.
 	mu *sync.Mutex
+
 	// lowerConn is a net.Conn, typically net.TCPConn.
 	lowerConn net.Conn
+
 	// lep and rep are Local/Remote Endpoint.
 	lep, rep string
+
 	// rcvBuf and sndBuf are the buffers to read/send.
 	// XXX - sndBuf is not used in the current implementation.
 	rcvBuf, sndBuf []byte
+
 	// state represents the state of connection.
 	state state
+
 	// established is to notify parents(Dial() and Accept()) of
 	// the result of connection establishment.
 	established chan bool
+
 	// lenChan is to notify user the length of received packets.
 	lenChan chan int
+
 	// errChan is to pass errors to parents(Dial() and Accept()).
 	errChan chan error
 	// readDeadline time.Time

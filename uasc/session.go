@@ -30,27 +30,17 @@ func NewSession(sechan *SecureChannel, cfg *SessionConfig) *Session {
 }
 
 func (s *Session) Open() error {
-	if err := s.sendCreateSessionRequest(); err != nil {
+	if err := s.createSession(); err != nil {
 		return err
 	}
-	if err := s.handleCreateSessionResponse(); err != nil {
-		return err
-	}
-	if err := s.sendActivateSessionRequest(); err != nil {
-		return err
-	}
-	if err := s.handleActivateSessionResponse(); err != nil {
-		return err
-	}
-	go s.sechan.monitor()
-	return nil
+	return s.activateSession()
 }
 
 func (s *Session) Close() error {
 	return nil
 }
 
-func (s *Session) sendCreateSessionRequest() error {
+func (s *Session) createSession() error {
 	nonce := make([]byte, 32)
 	if _, err := rand.Read(nonce); err != nil {
 		return err
@@ -64,34 +54,25 @@ func (s *Session) sendCreateSessionRequest() error {
 		ClientCertificate: s.sechan.cfg.Certificate,
 	}
 
-	if err := s.sechan.Send(req, nil); err != nil {
-		return err
-	}
+	return s.sechan.Send(req, func(v interface{}) error {
+		resp, ok := v.(*services.CreateSessionResponse)
+		if !ok {
+			return fmt.Errorf("invalid response. Got %T, want CreateSessionResponse", v)
+		}
 
-	// keep SignatureData to verify serverSignature in CreateSessionResponse.
-	s.mySignature = services.NewSignatureDataFrom(s.sechan.cfg.Certificate, nonce)
-	return nil
+		s.sechan.reqhdr.AuthenticationToken = resp.AuthenticationToken
+		s.cfg.ServerEndpoints = resp.ServerEndpoints
+		s.cfg.SessionTimeout = resp.RevisedSessionTimeout
+		s.signatureToSend = services.NewSignatureDataFrom(resp.ServerCertificate, resp.ServerNonce)
+		s.maxRequestMessageSize = resp.MaxRequestMessageSize
+
+		// keep SignatureData to verify serverSignature in CreateSessionResponse.
+		s.mySignature = services.NewSignatureDataFrom(s.sechan.cfg.Certificate, nonce)
+		return nil
+	})
 }
 
-func (s *Session) handleCreateSessionResponse() error {
-	svc, err := s.sechan.recv()
-	if err != nil {
-		return err
-	}
-	resp, ok := svc.(*services.CreateSessionResponse)
-	if !ok {
-		return fmt.Errorf("invalid response. Got %T, want CreateSessionResponse", svc)
-	}
-
-	s.sechan.reqHeader.AuthenticationToken = resp.AuthenticationToken
-	s.cfg.ServerEndpoints = resp.ServerEndpoints
-	s.cfg.SessionTimeout = resp.RevisedSessionTimeout
-	s.signatureToSend = services.NewSignatureDataFrom(resp.ServerCertificate, resp.ServerNonce)
-	s.maxRequestMessageSize = resp.MaxRequestMessageSize
-	return nil
-}
-
-func (s *Session) sendActivateSessionRequest() error {
+func (s *Session) activateSession() error {
 	req := &services.ActivateSessionRequest{
 		ClientSignature:            s.signatureToSend,
 		ClientSoftwareCertificates: nil,
@@ -99,23 +80,17 @@ func (s *Session) sendActivateSessionRequest() error {
 		UserIdentityToken:          datatypes.NewExtensionObject(1, s.cfg.UserIdentityToken),
 		UserTokenSignature:         s.cfg.UserTokenSignature,
 	}
-	return s.sechan.Send(req, nil)
-}
-
-func (s *Session) handleActivateSessionResponse() error {
-	svc, err := s.sechan.recv()
-	if err != nil {
-		return err
-	}
-	resp, ok := svc.(*services.ActivateSessionResponse)
-	if !ok {
-		return fmt.Errorf("invalid response. Got %T, want ActivateSessionResponse", svc)
-	}
-
-	for _, result := range resp.Results {
-		if result != 0 {
-			return fmt.Errorf("rejected")
+	return s.sechan.Send(req, func(v interface{}) error {
+		resp, ok := v.(*services.ActivateSessionResponse)
+		if !ok {
+			return fmt.Errorf("invalid response. Got %T, want ActivateSessionResponse", v)
 		}
-	}
-	return nil
+
+		for _, result := range resp.Results {
+			if result != 0 {
+				return fmt.Errorf("rejected")
+			}
+		}
+		return nil
+	})
 }
