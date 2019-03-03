@@ -2,9 +2,9 @@
 
 gopcua provides easy and painless handling of OPC UA Binary Protocol in pure Golang.
 
-[![CircleCI](https://circleci.com/gh/wmnsk/gopcua.svg?style=svg)](https://circleci.com/gh/wmnsk/gopcua)
+[![CircleCI](https://circleci.com/gh/wmnsk/gopcua.svg?style=shield)](https://circleci.com/gh/wmnsk/gopcua)
 [![GoDoc](https://godoc.org/github.com/wmnsk/gopcua?status.svg)](https://godoc.org/github.com/wmnsk/gopcua)
-[![Go Report Card](https://goreportcard.com/badge/github.com/wmnsk/gopcua)](https://goreportcard.com/report/github.com/wmnsk/gopcua)
+[![GolangCI](https://golangci.com/badges/github.com/wmnsk/gopcua.svg)](https://golangci.com/r/github.com/wmnsk/gopcua)
 [![GitHub](https://img.shields.io/github/license/mashape/apistatus.svg)](https://github.com/wmnsk/gopcua/blob/master/LICENSE)
 
 
@@ -68,7 +68,7 @@ The number of stars or shares on Twitter(or anything else) is a great motivation
 ### Protocol Stack
 
 | Categories     | Features                         | Supported | Notes |
-| -------------- | -------------------------------- | --------- | ----- |
+|----------------|----------------------------------|-----------|-------|
 | Encoding       | OPC UA Binary                    | Yes       |       |
 |                | OPC UA JSON                      |           |       |
 |                | OPC UA XML                       |           |       |
@@ -88,7 +88,7 @@ The number of stars or shares on Twitter(or anything else) is a great motivation
 ### Services
 
 | Service Set                 | Service                       | Supported | Notes        |
-| --------------------------- | ----------------------------- | --------- | ------------ |
+|-----------------------------|-------------------------------|-----------|--------------|
 | Discovery Service Set       | FindServers                   | Yes       |              |
 |                             | FindServersOnNetwork          | Yes       |              |
 |                             | GetEndpoints                  | Yes       |              |
