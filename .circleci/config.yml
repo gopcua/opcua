@@ -11,8 +11,15 @@ jobs:
       - image: 'circleci/golang:1.11'
     steps: &ref_0
       - checkout
+      - restore_cache:
+          keys:
+            - go-mod-{{ checksum "go.sum" }}
       - run: go test -v ./...
       - run: go install ./...
+      - save_cache:
+          key: go-mod-{{ checksum "go.sum" }}
+          paths:
+            - "/go/pkg/mod"
   test-1.12:
     docker:
       - image: 'circleci/golang:1.12'
