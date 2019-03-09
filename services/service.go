@@ -33,6 +33,7 @@ const (
 	ServiceTypeWriteRequest                 uint16 = 673
 	ServiceTypeWriteResponse                uint16 = 676
 	ServiceTypeCreateSubscriptionRequest    uint16 = 787
+	ServiceTypeCreateSubscriptionResponse   uint16 = 790
 	ServiceTypeFindServersOnNetworkRequest  uint16 = 12208
 	ServiceTypeFindServersOnNetworkResponse uint16 = 12211
 )
@@ -101,6 +102,8 @@ func Decode(b []byte) (Service, error) {
 		s = &WriteResponse{}
 	case ServiceTypeCreateSubscriptionRequest:
 		s = &CreateSubscriptionRequest{}
+	case ServiceTypeCreateSubscriptionResponse:
+		s = &CreateSubscriptionResponse{}
 	case ServiceTypeFindServersOnNetworkRequest:
 		s = &FindServersOnNetworkRequest{}
 	case ServiceTypeFindServersOnNetworkResponse:

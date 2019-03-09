@@ -2,6 +2,7 @@ package gopcua
 
 import (
 	"fmt"
+	"time"
 
 	uad "github.com/wmnsk/gopcua/datatypes"
 	uas "github.com/wmnsk/gopcua/services"
@@ -76,6 +77,27 @@ func (c *Client) Read(id *uad.NodeID) (*uad.Variant, error) {
 		if len(r.Results) > 0 {
 			res = r.Results[0].Value
 		}
+		return nil
+	})
+	return res, err
+}
+
+// todo(fs): return subscription object with channel
+func (c *Client) Subscribe(intv time.Duration) (*uas.CreateSubscriptionResponse, error) {
+	req := &uas.CreateSubscriptionRequest{
+		RequestedPublishingInterval: float64(intv / time.Millisecond),
+		RequestedLifetimeCount:      60,
+		RequestedMaxKeepAliveCount:  20,
+		PublishingEnabled:           true,
+	}
+
+	var res *uas.CreateSubscriptionResponse
+	err := c.sechan.Send(req, func(v interface{}) error {
+		r, ok := v.(*uas.CreateSubscriptionResponse)
+		if !ok {
+			return fmt.Errorf("invalid response: %T", v)
+		}
+		res = r
 		return nil
 	})
 	return res, err
