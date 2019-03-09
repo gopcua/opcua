@@ -4,10 +4,6 @@
 
 package services
 
-import (
-	"github.com/wmnsk/gopcua/datatypes"
-)
-
 // CreateSubscriptionRequest is used to create a Subscription. Subscriptions monitor a set of MonitoredItems for
 // Notifications and return them to the Client in response to Publish requests.
 // Illegal request values for parameters that can be revised do not generate errors. Instead the
@@ -15,7 +11,6 @@ import (
 //
 // Specification: Part 4, 5.13.2
 type CreateSubscriptionRequest struct {
-	TypeID                      *datatypes.ExpandedNodeID
 	RequestHeader               *RequestHeader
 	RequestedPublishingInterval float64
 	RequestedLifetimeCount      uint32
@@ -36,7 +31,6 @@ func NewCreateSubscriptionRequest(
 	priority byte,
 ) *CreateSubscriptionRequest {
 	return &CreateSubscriptionRequest{
-		TypeID:                      datatypes.NewFourByteExpandedNodeID(0, ServiceTypeCreateSubscriptionRequest),
 		RequestHeader:               reqHeader,
 		RequestedPublishingInterval: pubInterval,
 		RequestedLifetimeCount:      lifetime,
@@ -45,9 +39,4 @@ func NewCreateSubscriptionRequest(
 		PublishingEnabled:           enabled,
 		Priority:                    priority,
 	}
-}
-
-// ServiceType returns type of Service in uint16.
-func (c *CreateSubscriptionRequest) ServiceType() uint16 {
-	return ServiceTypeCreateSubscriptionRequest
 }

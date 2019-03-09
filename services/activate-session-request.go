@@ -21,7 +21,6 @@ import (
 //
 // Specification: Part 4, 5.6.3.2
 type ActivateSessionRequest struct {
-	TypeID                     *datatypes.ExpandedNodeID
 	RequestHeader              *RequestHeader
 	ClientSignature            *SignatureData
 	ClientSoftwareCertificates []*SignedSoftwareCertificate
@@ -33,7 +32,6 @@ type ActivateSessionRequest struct {
 // NewActivateSessionRequest creates a new ActivateSessionRequest.
 func NewActivateSessionRequest(reqHeader *RequestHeader, sig *SignatureData, locales []string, userToken datatypes.UserIdentityToken, tokenSig *SignatureData) *ActivateSessionRequest {
 	return &ActivateSessionRequest{
-		TypeID:                     datatypes.NewFourByteExpandedNodeID(0, ServiceTypeActivateSessionRequest),
 		RequestHeader:              reqHeader,
 		ClientSignature:            sig,
 		ClientSoftwareCertificates: nil,
@@ -41,9 +39,4 @@ func NewActivateSessionRequest(reqHeader *RequestHeader, sig *SignatureData, loc
 		UserIdentityToken:          datatypes.NewExtensionObject(0x01, userToken),
 		UserTokenSignature:         tokenSig,
 	}
-}
-
-// ServiceType returns type of Service.
-func (a *ActivateSessionRequest) ServiceType() uint16 {
-	return ServiceTypeActivateSessionRequest
 }

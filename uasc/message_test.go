@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wmnsk/gopcua/id"
+
 	"github.com/wmnsk/gopcua/datatypes"
 	"github.com/wmnsk/gopcua/services"
 	"github.com/wmnsk/gopcua/utils/codectest"
@@ -28,6 +30,7 @@ func TestMessage(t *testing.T) {
 						0, services.ReqTypeIssue,
 						services.SecModeNone, 6000000, nil,
 					),
+					id.OpenSecureChannelRequest_Encoding_DefaultBinary,
 					&Config{
 						SecureChannelID:   0,
 						SecurityPolicyURI: "http://gopcua.example/OPCUA/SecurityPolicy#Foo",
@@ -118,6 +121,7 @@ func TestMessage(t *testing.T) {
 						"opc.tcp://wow.its.easy:11111/UA/Server",
 						nil, nil,
 					),
+					id.GetEndpointsRequest_Encoding_DefaultBinary,
 					&Config{
 						SecureChannelID:   0,
 						SecurityPolicyURI: "http://gopcua.example/OPCUA/SecurityPolicy#Foo",
@@ -182,6 +186,7 @@ func TestMessage(t *testing.T) {
 						),
 						1,
 					),
+					id.CloseSecureChannelRequest_Encoding_DefaultBinary,
 					&Config{
 						SecureChannelID:   0,
 						SecurityPolicyURI: "http://gopcua.example/OPCUA/SecurityPolicy#Foo",

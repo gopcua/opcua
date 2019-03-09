@@ -17,7 +17,6 @@ func TestCreateSubscriptionResponse(t *testing.T) {
 		{
 			Name: "normal",
 			Struct: &CreateSubscriptionResponse{
-				TypeID: datatypes.NewFourByteExpandedNodeID(0, ServiceTypeCreateSubscriptionResponse),
 				ResponseHeader: NewResponseHeader(
 					time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
 					1, 0, datatypes.NewNullDiagnosticInfo(), []string{}, NewNullAdditionalHeader(),
@@ -29,8 +28,6 @@ func TestCreateSubscriptionResponse(t *testing.T) {
 				RevisedMaxKeepAliveCount:  20,
 			},
 			Bytes: []byte{
-				// TypeID
-				0x01, 0x00, 0x16, 0x03,
 				// Timestamp
 				0x00, 0x98, 0x67, 0xdd, 0xfd, 0x30, 0xd4, 0x01,
 				// RequestHandle
@@ -55,11 +52,4 @@ func TestCreateSubscriptionResponse(t *testing.T) {
 		},
 	}
 	codectest.Run(t, cases)
-
-	t.Run("service-id", func(t *testing.T) {
-		id := new(CreateSubscriptionResponse).ServiceType()
-		if got, want := id, uint16(ServiceTypeCreateSubscriptionResponse); got != want {
-			t.Fatalf("got %d want %d", got, want)
-		}
-	})
 }

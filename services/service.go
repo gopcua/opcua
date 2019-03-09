@@ -5,115 +5,73 @@
 package services
 
 import (
+	"fmt"
+	"reflect"
+
 	"github.com/wmnsk/gopcua/datatypes"
 	"github.com/wmnsk/gopcua/errors"
+	"github.com/wmnsk/gopcua/id"
 	"github.com/wmnsk/gopcua/ua"
 )
 
-// ServiceType definitions.
-const (
-	ServiceTypeFindServersRequest           uint16 = 422
-	ServiceTypeFindServersResponse          uint16 = 425
-	ServiceTypeGetEndpointsRequest          uint16 = 428
-	ServiceTypeGetEndpointsResponse         uint16 = 431
-	ServiceTypeOpenSecureChannelRequest     uint16 = 446
-	ServiceTypeOpenSecureChannelResponse    uint16 = 449
-	ServiceTypeCloseSecureChannelRequest    uint16 = 452
-	ServiceTypeCloseSecureChannelResponse   uint16 = 455
-	ServiceTypeCreateSessionRequest         uint16 = 461
-	ServiceTypeCreateSessionResponse        uint16 = 464
-	ServiceTypeActivateSessionRequest       uint16 = 467
-	ServiceTypeActivateSessionResponse      uint16 = 470
-	ServiceTypeCloseSessionRequest          uint16 = 473
-	ServiceTypeCloseSessionResponse         uint16 = 476
-	ServiceTypeCancelRequest                uint16 = 479
-	ServiceTypeCancelResponse               uint16 = 482
-	ServiceTypeReadRequest                  uint16 = 631
-	ServiceTypeReadResponse                 uint16 = 634
-	ServiceTypeWriteRequest                 uint16 = 673
-	ServiceTypeWriteResponse                uint16 = 676
-	ServiceTypeCreateSubscriptionRequest    uint16 = 787
-	ServiceTypeCreateSubscriptionResponse   uint16 = 790
-	ServiceTypeFindServersOnNetworkRequest  uint16 = 12208
-	ServiceTypeFindServersOnNetworkResponse uint16 = 12211
-)
-
-type Service interface {
-	ServiceType() uint16
+func init() {
+	register(id.ActivateSessionRequest_Encoding_DefaultBinary, new(ActivateSessionRequest))
+	register(id.ActivateSessionResponse_Encoding_DefaultBinary, new(ActivateSessionResponse))
+	register(id.CancelRequest_Encoding_DefaultBinary, new(CancelRequest))
+	register(id.CancelResponse_Encoding_DefaultBinary, new(CancelResponse))
+	register(id.CloseSecureChannelRequest_Encoding_DefaultBinary, new(CloseSecureChannelRequest))
+	register(id.CloseSecureChannelResponse_Encoding_DefaultBinary, new(CloseSecureChannelResponse))
+	register(id.CloseSessionRequest_Encoding_DefaultBinary, new(CloseSessionRequest))
+	register(id.CloseSessionResponse_Encoding_DefaultBinary, new(CloseSessionResponse))
+	register(id.CreateSessionRequest_Encoding_DefaultBinary, new(CreateSessionRequest))
+	register(id.CreateSessionResponse_Encoding_DefaultBinary, new(CreateSessionResponse))
+	register(id.CreateSubscriptionRequest_Encoding_DefaultBinary, new(CreateSubscriptionRequest))
+	register(id.CreateSubscriptionResponse_Encoding_DefaultBinary, new(CreateSubscriptionResponse))
+	register(id.FindServersOnNetworkRequest_Encoding_DefaultBinary, new(FindServersOnNetworkRequest))
+	register(id.FindServersOnNetworkResponse_Encoding_DefaultBinary, new(FindServersOnNetworkResponse))
+	register(id.FindServersRequest_Encoding_DefaultBinary, new(FindServersRequest))
+	register(id.FindServersResponse_Encoding_DefaultBinary, new(FindServersResponse))
+	register(id.GetEndpointsRequest_Encoding_DefaultBinary, new(GetEndpointsRequest))
+	register(id.GetEndpointsResponse_Encoding_DefaultBinary, new(GetEndpointsResponse))
+	register(id.OpenSecureChannelRequest_Encoding_DefaultBinary, new(OpenSecureChannelRequest))
+	register(id.OpenSecureChannelResponse_Encoding_DefaultBinary, new(OpenSecureChannelResponse))
+	register(id.ReadRequest_Encoding_DefaultBinary, new(ReadRequest))
+	register(id.ReadResponse_Encoding_DefaultBinary, new(ReadResponse))
+	register(id.WriteRequest_Encoding_DefaultBinary, new(WriteRequest))
+	register(id.WriteResponse_Encoding_DefaultBinary, new(WriteResponse))
 }
 
-// Decode decodes given bytes into Service, depending on the type of service.
-func Decode(b []byte) (Service, error) {
-	// peek at the type id without stripping it from the buffer to determine
-	// the type of service. The type id will be decoded again with the reflective
-	// decoder.
-	typeID := new(datatypes.ExpandedNodeID)
-	_, err := typeID.Decode(b)
-	if err != nil {
-		return nil, errors.NewErrUnsupported(typeID, "cannot decode TypeID.")
-	}
-	if typeID.NodeID.Type() != datatypes.NodeIDTypeFourByte {
-		return nil, errors.NewErrUnsupported(typeID.NodeID, "should be FourByteNodeID.")
-	}
+var (
+	serviceType   = map[uint16]reflect.Type{}
+	serviceTypeID = map[reflect.Type]uint16{}
+)
 
-	var s Service
+func register(typeID uint16, v interface{}) {
+	typ := reflect.TypeOf(v) // *ServiceObject
+
+	if serviceType[typeID] != nil {
+		panic(fmt.Sprintf("Service %d is already registered", typeID))
+	}
+	serviceType[typeID] = typ
+
+	if _, ok := serviceTypeID[typ]; ok {
+		panic(fmt.Sprintf("Service %T is already registered", v))
+	}
+	serviceTypeID[typ] = typeID
+}
+
+func TypeID(v interface{}) uint16 {
+	return serviceTypeID[reflect.TypeOf(v)]
+}
+
+func Decode(typeID *datatypes.ExpandedNodeID, b []byte) (interface{}, error) {
 	id := uint16(typeID.NodeID.IntID())
-	// log.Printf("Decode: id:%d %d bytes %x", id, len(b), b)
-	switch id {
-	case ServiceTypeFindServersRequest:
-		s = &FindServersRequest{}
-	case ServiceTypeFindServersResponse:
-		s = &FindServersResponse{}
-	case ServiceTypeGetEndpointsRequest:
-		s = &GetEndpointsRequest{}
-	case ServiceTypeGetEndpointsResponse:
-		s = &GetEndpointsResponse{}
-	case ServiceTypeOpenSecureChannelRequest:
-		s = &OpenSecureChannelRequest{}
-	case ServiceTypeOpenSecureChannelResponse:
-		s = &OpenSecureChannelResponse{}
-	case ServiceTypeCloseSecureChannelRequest:
-		s = &CloseSecureChannelRequest{}
-	case ServiceTypeCloseSecureChannelResponse:
-		s = &CloseSecureChannelResponse{}
-	case ServiceTypeCreateSessionRequest:
-		s = &CreateSessionRequest{}
-	case ServiceTypeCreateSessionResponse:
-		s = &CreateSessionResponse{}
-	case ServiceTypeActivateSessionRequest:
-		s = &ActivateSessionRequest{}
-	case ServiceTypeActivateSessionResponse:
-		s = &ActivateSessionResponse{}
-	case ServiceTypeCloseSessionRequest:
-		s = &CloseSessionRequest{}
-	case ServiceTypeCloseSessionResponse:
-		s = &CloseSessionResponse{}
-	case ServiceTypeCancelRequest:
-		s = &CancelRequest{}
-	case ServiceTypeCancelResponse:
-		s = &CancelResponse{}
-	case ServiceTypeReadRequest:
-		s = &ReadRequest{}
-	case ServiceTypeReadResponse:
-		s = &ReadResponse{}
-	case ServiceTypeWriteRequest:
-		s = &WriteRequest{}
-	case ServiceTypeWriteResponse:
-		s = &WriteResponse{}
-	case ServiceTypeCreateSubscriptionRequest:
-		s = &CreateSubscriptionRequest{}
-	case ServiceTypeCreateSubscriptionResponse:
-		s = &CreateSubscriptionResponse{}
-	case ServiceTypeFindServersOnNetworkRequest:
-		s = &FindServersOnNetworkRequest{}
-	case ServiceTypeFindServersOnNetworkResponse:
-		s = &FindServersOnNetworkResponse{}
-	default:
+	typ := serviceType[id]
+	if typ == nil {
 		return nil, errors.NewErrUnsupported(id, "unsupported or not implemented yet.")
 	}
 
-	if err := ua.Decode(b, s); err != nil {
-		return nil, err
-	}
-	return s, nil
+	v := reflect.New(typ.Elem()).Interface()
+	err := ua.Decode(b, v)
+	return v, err
 }

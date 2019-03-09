@@ -26,8 +26,6 @@ func TestWriteResponse(t *testing.T) {
 				0,
 			),
 			Bytes: []byte{
-				// TypeID
-				0x01, 0x00, 0xa4, 0x02,
 				// Timestamp
 				0x00, 0x98, 0x67, 0xdd, 0xfd, 0x30, 0xd4, 0x01,
 				// RequestHandle
@@ -58,8 +56,6 @@ func TestWriteResponse(t *testing.T) {
 				0, status.BadUserAccessDenied,
 			),
 			Bytes: []byte{
-				// TypeID
-				0x01, 0x00, 0xa4, 0x02,
 				// Timestamp
 				0x00, 0x98, 0x67, 0xdd, 0xfd, 0x30, 0xd4, 0x01,
 				// RequestHandle
@@ -82,11 +78,4 @@ func TestWriteResponse(t *testing.T) {
 		},
 	}
 	codectest.Run(t, cases)
-
-	t.Run("service-id", func(t *testing.T) {
-		id := new(WriteResponse).ServiceType()
-		if got, want := id, uint16(ServiceTypeWriteResponse); got != want {
-			t.Fatalf("got %d want %d", got, want)
-		}
-	})
 }

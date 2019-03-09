@@ -17,7 +17,6 @@ func TestCreateSubscriptionRequest(t *testing.T) {
 		{
 			Name: "normal",
 			Struct: &CreateSubscriptionRequest{
-				TypeID: datatypes.NewFourByteExpandedNodeID(0, ServiceTypeCreateSubscriptionRequest),
 				RequestHeader: &RequestHeader{
 					AuthenticationToken: datatypes.NewOpaqueNodeID(0, []byte{
 						0xfe, 0x8d, 0x87, 0x79, 0xf7, 0x03, 0x27, 0x77,
@@ -40,7 +39,7 @@ func TestCreateSubscriptionRequest(t *testing.T) {
 				Priority:                    0,
 			},
 			Bytes: []byte{
-				0x01, 0x00, 0x13, 0x03, 0x05, 0x00, 0x00, 0x10,
+				0x05, 0x00, 0x00, 0x10,
 				0x00, 0x00, 0x00, 0xfe, 0x8d, 0x87, 0x79, 0xf7,
 				0x03, 0x27, 0x77, 0xc5, 0x03, 0xa1, 0x09, 0x50,
 				0x29, 0x27, 0x60, 0x00, 0x98, 0x67, 0xdd, 0xfd,
@@ -54,11 +53,4 @@ func TestCreateSubscriptionRequest(t *testing.T) {
 		},
 	}
 	codectest.Run(t, cases)
-
-	t.Run("service-id", func(t *testing.T) {
-		id := new(CreateSubscriptionRequest).ServiceType()
-		if got, want := id, uint16(ServiceTypeCreateSubscriptionRequest); got != want {
-			t.Fatalf("got %d want %d", got, want)
-		}
-	})
 }

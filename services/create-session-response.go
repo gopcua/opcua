@@ -5,8 +5,6 @@
 package services
 
 import (
-	"fmt"
-
 	"github.com/wmnsk/gopcua/datatypes"
 )
 
@@ -14,7 +12,6 @@ import (
 //
 // Specification: Part4, 5.6.2
 type CreateSessionResponse struct {
-	TypeID *datatypes.ExpandedNodeID
 	*ResponseHeader
 	SessionID                  *datatypes.NodeID
 	AuthenticationToken        *datatypes.NodeID
@@ -30,7 +27,6 @@ type CreateSessionResponse struct {
 // NewCreateSessionResponse creates a new NewCreateSessionResponse with the given parameters.
 func NewCreateSessionResponse(resHeader *ResponseHeader, sessionID, authToken *datatypes.NodeID, timeout uint64, nonce, cert []byte, svrSignature *SignatureData, maxRespSize uint32, endpoints ...*EndpointDescription) *CreateSessionResponse {
 	return &CreateSessionResponse{
-		TypeID:                     datatypes.NewFourByteExpandedNodeID(0, ServiceTypeCreateSessionResponse),
 		ResponseHeader:             resHeader,
 		SessionID:                  sessionID,
 		AuthenticationToken:        authToken,
@@ -42,26 +38,4 @@ func NewCreateSessionResponse(resHeader *ResponseHeader, sessionID, authToken *d
 		ServerSignature:            svrSignature,
 		MaxRequestMessageSize:      maxRespSize,
 	}
-}
-
-// String returns CreateSessionResponse in string.
-func (c *CreateSessionResponse) String() string {
-	return fmt.Sprintf("%v, %v, %v, %v, %d, %v, %v, %v, %v, %v, %d",
-		c.TypeID,
-		c.ResponseHeader,
-		c.SessionID,
-		c.AuthenticationToken,
-		c.RevisedSessionTimeout,
-		c.ServerNonce,
-		c.ServerCertificate,
-		c.ServerEndpoints,
-		c.ServerSoftwareCertificates,
-		c.ServerSignature,
-		c.MaxRequestMessageSize,
-	)
-}
-
-// ServiceType returns type of Service in uint16.
-func (c *CreateSessionResponse) ServiceType() uint16 {
-	return ServiceTypeCreateSessionResponse
 }

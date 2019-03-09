@@ -4,10 +4,6 @@
 
 package services
 
-import (
-	"github.com/wmnsk/gopcua/datatypes"
-)
-
 // FindServersOnNetworkRequest returns the Servers known to a Discovery Server. Unlike FindServers, this Service is
 // only implemented by Discovery Servers.
 //
@@ -31,7 +27,6 @@ import (
 //
 // Specification: Part 4, 5.4.3
 type FindServersOnNetworkRequest struct {
-	TypeID                 *datatypes.ExpandedNodeID
 	RequestHeader          *RequestHeader
 	StartingRecordID       uint32
 	MaxRecordsToReturn     uint32
@@ -41,15 +36,9 @@ type FindServersOnNetworkRequest struct {
 // NewFindServersOnNetworkRequest creates a new FindServersOnNetworkRequest.
 func NewFindServersOnNetworkRequest(reqHeader *RequestHeader, startRecord, maxRecords uint32, filters []string) *FindServersOnNetworkRequest {
 	return &FindServersOnNetworkRequest{
-		TypeID:                 datatypes.NewFourByteExpandedNodeID(0, ServiceTypeFindServersOnNetworkRequest),
 		RequestHeader:          reqHeader,
 		StartingRecordID:       startRecord,
 		MaxRecordsToReturn:     maxRecords,
 		ServerCapabilityFilter: filters,
 	}
-}
-
-// ServiceType returns type of Service.
-func (f *FindServersOnNetworkRequest) ServiceType() uint16 {
-	return ServiceTypeFindServersOnNetworkRequest
 }

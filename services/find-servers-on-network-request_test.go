@@ -36,8 +36,6 @@ func TestFindServersOnNetworkRequest(t *testing.T) {
 				nil,
 			),
 			Bytes: []byte{
-				// TypeID
-				0x01, 0x00, 0xb0, 0x2f,
 				// AuthenticationToken
 				0x05, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x08,
 				0x22, 0x87, 0x62, 0xba, 0x81, 0xe1, 0x11, 0xa6,
@@ -64,11 +62,4 @@ func TestFindServersOnNetworkRequest(t *testing.T) {
 		},
 	}
 	codectest.Run(t, cases)
-
-	t.Run("service-id", func(t *testing.T) {
-		id := new(FindServersOnNetworkRequest).ServiceType()
-		if got, want := id, uint16(ServiceTypeFindServersOnNetworkRequest); got != want {
-			t.Fatalf("got %d want %d", got, want)
-		}
-	})
 }

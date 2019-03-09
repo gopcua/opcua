@@ -33,8 +33,6 @@ func TestReadRequest(t *testing.T) {
 				),
 			),
 			Bytes: []byte{
-				// TypeID
-				0x01, 0x00, 0x77, 0x02,
 				// AuthenticationToken
 				0x05, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x08,
 				0x22, 0x87, 0x62, 0xba, 0x81, 0xe1, 0x11, 0xa6,
@@ -63,11 +61,4 @@ func TestReadRequest(t *testing.T) {
 		},
 	}
 	codectest.Run(t, cases)
-
-	t.Run("service-id", func(t *testing.T) {
-		id := new(ReadRequest).ServiceType()
-		if got, want := id, uint16(ServiceTypeReadRequest); got != want {
-			t.Fatalf("got %d want %d", got, want)
-		}
-	})
 }

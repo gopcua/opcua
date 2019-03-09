@@ -38,9 +38,6 @@ const (
 //
 // Specification: Part 4, 5.10.2.2
 type ReadRequest struct {
-	TypeID *datatypes.ExpandedNodeID
-
-	// Common request parameters.
 	*RequestHeader
 
 	// Maximum age of the value to be read in milliseconds.
@@ -83,15 +80,9 @@ type ReadRequest struct {
 // NewReadRequest creates a new ReadRequest.
 func NewReadRequest(reqHeader *RequestHeader, maxAge uint64, tsRet TimestampsToReturn, nodes ...*datatypes.ReadValueID) *ReadRequest {
 	return &ReadRequest{
-		TypeID:             datatypes.NewFourByteExpandedNodeID(0, ServiceTypeReadRequest),
 		RequestHeader:      reqHeader,
 		MaxAge:             maxAge,
 		TimestampsToReturn: tsRet,
 		NodesToRead:        nodes,
 	}
-}
-
-// ServiceType returns type of Service in uint16.
-func (r *ReadRequest) ServiceType() uint16 {
-	return ServiceTypeReadRequest
 }

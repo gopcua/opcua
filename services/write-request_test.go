@@ -41,8 +41,6 @@ func TestWriteRequest(t *testing.T) {
 				),
 			),
 			Bytes: []byte{
-				// TypeID
-				0x01, 0x00, 0xa1, 0x02,
 				// RequestHeader
 				// AuthenticationToken
 				0x05, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x08,
@@ -116,8 +114,6 @@ func TestWriteRequest(t *testing.T) {
 				),
 			),
 			Bytes: []byte{
-				// TypeID
-				0x01, 0x00, 0xa1, 0x02,
 				// RequestHeader
 				// AuthenticationToken
 				0x05, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x08,
@@ -162,11 +158,4 @@ func TestWriteRequest(t *testing.T) {
 		},
 	}
 	codectest.Run(t, cases)
-
-	t.Run("service-id", func(t *testing.T) {
-		id := new(WriteRequest).ServiceType()
-		if got, want := id, uint16(ServiceTypeWriteRequest); got != want {
-			t.Fatalf("got %d want %d", got, want)
-		}
-	})
 }

@@ -130,7 +130,7 @@ func (s *SecureChannel) closeSecureChannel() error {
 }
 
 // Send sends the service request and calls h with the response.
-func (s *SecureChannel) Send(svc services.Service, h func(interface{}) error) error {
+func (s *SecureChannel) Send(svc interface{}, h func(interface{}) error) error {
 	ch, err := s.SendAsync(svc)
 	if err != nil {
 		return err
@@ -150,20 +150,17 @@ func (s *SecureChannel) Send(svc services.Service, h func(interface{}) error) er
 
 // SendAsync sends the service request and returns a channel which will receive the
 // response when it arrives.
-func (s *SecureChannel) SendAsync(svc services.Service) (resp chan Response, err error) {
+func (s *SecureChannel) SendAsync(svc interface{}) (resp chan Response, err error) {
 	log.Printf("conn %d: send %T", s.c.id, svc)
 
-	// use reflection to set typeid and request header
-	// the send method will update the request header fields
-	// and reset them if the call failed.
-	//
-	// this is a workaround to avoid changing the existing datastructures
-	// and break existing code. We should send type id and request header
-	// separately here and remove these fields from the structs.:w
-	typeID := datatypes.NewFourByteExpandedNodeID(0, svc.ServiceType())
+	typeID := services.TypeID(svc)
+	if typeID == 0 {
+		return nil, fmt.Errorf("unknown service %T. Did you call register?", svc)
+	}
+
+	// the request header is always the first field
 	val := reflect.ValueOf(svc)
-	val.Elem().Field(0).Set(reflect.ValueOf(typeID))
-	val.Elem().Field(1).Set(reflect.ValueOf(s.reqhdr))
+	val.Elem().Field(0).Set(reflect.ValueOf(s.reqhdr))
 
 	// update counters and reset them on error
 	s.cfg.SequenceNumber++
@@ -176,9 +173,8 @@ func (s *SecureChannel) SendAsync(svc services.Service) (resp chan Response, err
 		}
 	}()
 
-	// todo(fs): should we drop the headers from Message and generate them here?
 	// encode the message
-	m := NewMessage(svc, s.cfg)
+	m := NewMessage(svc, typeID, s.cfg)
 	b, err := m.Encode()
 	if err != nil {
 		return nil, err
@@ -198,7 +194,7 @@ func (s *SecureChannel) SendAsync(svc services.Service) (resp chan Response, err
 	return resp, nil
 }
 
-func (s *SecureChannel) recvsvc() (services.Service, error) {
+func (s *SecureChannel) recvsvc() (interface{}, error) {
 	const hdrlen = 12
 
 	hdr := make([]byte, hdrlen)
@@ -270,9 +266,9 @@ func (s *SecureChannel) recv() {
 				continue
 			}
 
-			// the response header is always the second field
+			// the response header is always the first field
 			val := reflect.ValueOf(svc)
-			resp := val.Elem().Field(1).Interface().(*services.ResponseHeader)
+			resp := val.Elem().Field(0).Interface().(*services.ResponseHeader)
 
 			// check if we have a pending request handler for this response.
 			s.mu.Lock()

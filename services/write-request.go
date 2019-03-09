@@ -15,7 +15,6 @@ import (
 //
 // Specification: Part 4, 5.10.4
 type WriteRequest struct {
-	TypeID        *datatypes.ExpandedNodeID
 	RequestHeader *RequestHeader
 	NodesToWrite  []*datatypes.WriteValue
 }
@@ -23,13 +22,7 @@ type WriteRequest struct {
 // NewWriteRequest creates a new WriteRequest.
 func NewWriteRequest(reqHeader *RequestHeader, nodes ...*datatypes.WriteValue) *WriteRequest {
 	return &WriteRequest{
-		TypeID:        datatypes.NewFourByteExpandedNodeID(0, ServiceTypeWriteRequest),
 		RequestHeader: reqHeader,
 		NodesToWrite:  nodes,
 	}
-}
-
-// ServiceType returns type of Service in uint16.
-func (r *WriteRequest) ServiceType() uint16 {
-	return ServiceTypeWriteRequest
 }

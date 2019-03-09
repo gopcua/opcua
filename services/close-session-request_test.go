@@ -28,8 +28,6 @@ func TestCloseSessionRequest(t *testing.T) {
 				true,
 			),
 			Bytes: []byte{ // CloseSessionRequest
-				// TypeID
-				0x01, 0x00, 0xd9, 0x01,
 				// RequestHeader
 				// AuthenticationToken
 				0x05, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x08,
@@ -53,11 +51,4 @@ func TestCloseSessionRequest(t *testing.T) {
 		},
 	}
 	codectest.Run(t, cases)
-
-	t.Run("service-id", func(t *testing.T) {
-		id := new(CloseSessionRequest).ServiceType()
-		if got, want := id, uint16(ServiceTypeCloseSessionRequest); got != want {
-			t.Fatalf("got %d want %d", got, want)
-		}
-	})
 }

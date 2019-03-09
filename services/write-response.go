@@ -5,8 +5,6 @@
 package services
 
 import (
-	"fmt"
-
 	"github.com/wmnsk/gopcua/datatypes"
 )
 
@@ -17,7 +15,6 @@ import (
 //
 // Specification: Part 4, 5.10.4
 type WriteResponse struct {
-	TypeID          *datatypes.ExpandedNodeID
 	ResponseHeader  *ResponseHeader
 	Results         []uint32
 	DiagnosticInfos []*datatypes.DiagnosticInfo
@@ -26,24 +23,8 @@ type WriteResponse struct {
 // NewWriteResponse creates a new WriteResponse.
 func NewWriteResponse(resHeader *ResponseHeader, diags []*datatypes.DiagnosticInfo, results ...uint32) *WriteResponse {
 	return &WriteResponse{
-		TypeID:          datatypes.NewFourByteExpandedNodeID(0, ServiceTypeWriteResponse),
 		ResponseHeader:  resHeader,
 		Results:         results,
 		DiagnosticInfos: diags,
 	}
-}
-
-// String returns WriteResponse in string.
-func (w *WriteResponse) String() string {
-	return fmt.Sprintf("%v, %v, %v, %v",
-		w.TypeID,
-		w.ResponseHeader,
-		w.Results,
-		w.DiagnosticInfos,
-	)
-}
-
-// ServiceType returns type of Service in uint16.
-func (w *WriteResponse) ServiceType() uint16 {
-	return ServiceTypeWriteResponse
 }

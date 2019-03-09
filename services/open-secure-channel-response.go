@@ -4,33 +4,20 @@
 
 package services
 
-import (
-	"github.com/wmnsk/gopcua/datatypes"
-)
-
 // OpenSecureChannelResponse represents an OpenSecureChannelResponse.
 type OpenSecureChannelResponse struct {
-	TypeID                *datatypes.ExpandedNodeID
 	ResponseHeader        *ResponseHeader
 	ServerProtocolVersion uint32
 	SecurityToken         *ChannelSecurityToken
 	ServerNonce           []byte
 }
 
-var OpenSecureChannelResponseID = datatypes.NewFourByteExpandedNodeID(0, ServiceTypeOpenSecureChannelResponse)
-
 // NewOpenSecureChannelResponse creates an OpenSecureChannelResponse.
 func NewOpenSecureChannelResponse(resHeader *ResponseHeader, ver uint32, secToken *ChannelSecurityToken, nonce []byte) *OpenSecureChannelResponse {
 	return &OpenSecureChannelResponse{
-		TypeID:                OpenSecureChannelResponseID,
 		ResponseHeader:        resHeader,
 		ServerProtocolVersion: ver,
 		SecurityToken:         secToken,
 		ServerNonce:           nonce,
 	}
-}
-
-// ServiceType returns type of Service in uint16.
-func (o *OpenSecureChannelResponse) ServiceType() uint16 {
-	return ServiceTypeOpenSecureChannelResponse
 }

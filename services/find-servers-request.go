@@ -4,10 +4,6 @@
 
 package services
 
-import (
-	"github.com/wmnsk/gopcua/datatypes"
-)
-
 // FindServersRequest returns the Servers known to a Server or Discovery Server. The behaviour of
 // Discovery Servers is described in detail in Part 12.
 //
@@ -17,7 +13,6 @@ import (
 //
 // Specification: Part 4, 5.4.2
 type FindServersRequest struct {
-	TypeID        *datatypes.ExpandedNodeID
 	RequestHeader *RequestHeader
 	EndpointURL   string
 	LocaleIDs     []string
@@ -27,16 +22,10 @@ type FindServersRequest struct {
 // NewFindServersRequest creates a new FindServersRequest.
 func NewFindServersRequest(reqHeader *RequestHeader, url string, locales, serverURIs []string) *FindServersRequest {
 	f := &FindServersRequest{
-		TypeID:        datatypes.NewFourByteExpandedNodeID(0, ServiceTypeFindServersRequest),
 		RequestHeader: reqHeader,
 		EndpointURL:   url,
 		LocaleIDs:     locales,
 		ServerURIs:    serverURIs,
 	}
 	return f
-}
-
-// ServiceType returns type of Service.
-func (f *FindServersRequest) ServiceType() uint16 {
-	return ServiceTypeFindServersRequest
 }

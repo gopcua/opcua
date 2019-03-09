@@ -28,8 +28,6 @@ func TestOpenSecureChannelResponse(t *testing.T) {
 				[]byte{0xff},
 			),
 			Bytes: []byte{
-				// TypeID
-				0x01, 0x00, 0xc1, 0x01,
 				// Timestamp
 				0x00, 0x98, 0x67, 0xdd, 0xfd, 0x30, 0xd4, 0x01,
 				// RequestHandle
@@ -54,11 +52,4 @@ func TestOpenSecureChannelResponse(t *testing.T) {
 		},
 	}
 	codectest.Run(t, cases)
-
-	t.Run("service-id", func(t *testing.T) {
-		id := new(OpenSecureChannelResponse).ServiceType()
-		if got, want := id, uint16(ServiceTypeOpenSecureChannelResponse); got != want {
-			t.Fatalf("got %d want %d", got, want)
-		}
-	})
 }

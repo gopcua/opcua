@@ -6,8 +6,6 @@ package services
 
 import (
 	"time"
-
-	"github.com/wmnsk/gopcua/datatypes"
 )
 
 // FindServersOnNetworkResponse returns the Servers known to a Server or Discovery Server. The behaviour of
@@ -15,7 +13,6 @@ import (
 //
 // Specification: Part4, 5.4.2
 type FindServersOnNetworkResponse struct {
-	TypeID               *datatypes.ExpandedNodeID
 	ResponseHeader       *ResponseHeader
 	LastCounterResetTime time.Time
 	Servers              []*ServersOnNetwork
@@ -24,14 +21,8 @@ type FindServersOnNetworkResponse struct {
 // NewFindServersOnNetworkResponse creates an FindServersOnNetworkResponse.
 func NewFindServersOnNetworkResponse(resHeader *ResponseHeader, resetTime time.Time, servers ...*ServersOnNetwork) *FindServersOnNetworkResponse {
 	return &FindServersOnNetworkResponse{
-		TypeID:               datatypes.NewFourByteExpandedNodeID(0, ServiceTypeFindServersOnNetworkResponse),
 		ResponseHeader:       resHeader,
 		LastCounterResetTime: resetTime,
 		Servers:              servers,
 	}
-}
-
-// ServiceType returns type of Service in uint16.
-func (f *FindServersOnNetworkResponse) ServiceType() uint16 {
-	return ServiceTypeFindServersOnNetworkResponse
 }

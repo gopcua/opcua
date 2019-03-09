@@ -23,7 +23,6 @@ import (
 //
 // Specification: Part 4, 5.6.3.2
 type ActivateSessionResponse struct {
-	TypeID          *datatypes.ExpandedNodeID
 	ResponseHeader  *ResponseHeader
 	ServerNonce     []byte
 	Results         []uint32
@@ -33,15 +32,9 @@ type ActivateSessionResponse struct {
 // NewActivateSessionResponse creates a new NewActivateSessionResponse.
 func NewActivateSessionResponse(resHeader *ResponseHeader, nonce []byte, results []uint32, diags []*datatypes.DiagnosticInfo) *ActivateSessionResponse {
 	return &ActivateSessionResponse{
-		TypeID:          datatypes.NewFourByteExpandedNodeID(0, ServiceTypeActivateSessionResponse),
 		ResponseHeader:  resHeader,
 		ServerNonce:     nonce,
 		Results:         results,
 		DiagnosticInfos: diags,
 	}
-}
-
-// ServiceType returns type of Service.
-func (a *ActivateSessionResponse) ServiceType() uint16 {
-	return ServiceTypeActivateSessionResponse
 }

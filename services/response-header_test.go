@@ -12,8 +12,35 @@ import (
 	"github.com/wmnsk/gopcua/utils/codectest"
 )
 
+func NewNullResponseHeader() *ResponseHeader {
+	return &ResponseHeader{
+		Timestamp:          time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC),
+		ServiceDiagnostics: datatypes.NewNullDiagnosticInfo(),
+		AdditionalHeader:   NewNullAdditionalHeader(),
+	}
+}
+
+var nullResponseHeaderBytes = []byte{
+	// Timestamp
+	0x0, 0x80, 0x3e, 0xd5, 0xde, 0xb1, 0x9d, 0x1,
+	// RequestHandle
+	0x0, 0x0, 0x0, 0x0,
+	// ServiceResult
+	0x0, 0x0, 0x0, 0x0,
+	// ServiceDiagnostics
+	0x0,
+	// StringTable
+	0xff, 0xff, 0xff, 0xff,
+	// AdditionalHeader
+	0x00, 0x00, 0x00,
+}
+
 func TestResponseHeader(t *testing.T) {
 	cases := []codectest.Case{
+		{
+			Struct: NewNullResponseHeader(),
+			Bytes:  nullResponseHeaderBytes,
+		},
 		{
 			Struct: NewResponseHeader(
 				time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),

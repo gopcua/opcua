@@ -41,8 +41,6 @@ func TestFindServersResponse(t *testing.T) {
 				),
 			),
 			Bytes: []byte{
-				// TypeID
-				0x01, 0x00, 0xa9, 0x01,
 				// Timestamp
 				0x00, 0x98, 0x67, 0xdd, 0xfd, 0x30, 0xd4, 0x01,
 				// RequestHandle
@@ -96,11 +94,4 @@ func TestFindServersResponse(t *testing.T) {
 		},
 	}
 	codectest.Run(t, cases)
-
-	t.Run("service-id", func(t *testing.T) {
-		id := new(FindServersResponse).ServiceType()
-		if got, want := id, uint16(ServiceTypeFindServersResponse); got != want {
-			t.Fatalf("got %d want %d", got, want)
-		}
-	})
 }
