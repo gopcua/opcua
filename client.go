@@ -2,6 +2,7 @@ package gopcua
 
 import (
 	"fmt"
+	"time"
 
 	uad "github.com/wmnsk/gopcua/datatypes"
 	uas "github.com/wmnsk/gopcua/services"
@@ -97,27 +98,27 @@ func (c *Client) Browse(req *uas.BrowseRequest) (*uas.BrowseResponse, error) {
 
 // todo(fs): this is not done yet since we need to be able to register
 // todo(fs): monitored items.
-// type Subscription struct {
-// 	res *uas.CreateSubscriptionResponse
-// }
+type Subscription struct {
+	res *uas.CreateSubscriptionResponse
+}
 
-// // todo(fs): return subscription object with channel
-// func (c *Client) Subscribe(intv time.Duration) (*Subscription, error) {
-// 	req := &uas.CreateSubscriptionRequest{
-// 		RequestedPublishingInterval: float64(intv / time.Millisecond),
-// 		RequestedLifetimeCount:      60,
-// 		RequestedMaxKeepAliveCount:  20,
-// 		PublishingEnabled:           true,
-// 	}
+// todo(fs): return subscription object with channel
+func (c *Client) Subscribe(intv time.Duration) (*Subscription, error) {
+	req := &uas.CreateSubscriptionRequest{
+		RequestedPublishingInterval: float64(intv / time.Millisecond),
+		RequestedLifetimeCount:      60,
+		RequestedMaxKeepAliveCount:  20,
+		PublishingEnabled:           true,
+	}
 
-// 	var res *uas.CreateSubscriptionResponse
-// 	err := c.sechan.Send(req, func(v interface{}) error {
-// 		r, ok := v.(*uas.CreateSubscriptionResponse)
-// 		if !ok {
-// 			return fmt.Errorf("invalid response: %T", v)
-// 		}
-// 		res = r
-// 		return nil
-// 	})
-// 	return &Subscription{res}, err
-// }
+	var res *uas.CreateSubscriptionResponse
+	err := c.sechan.Send(req, func(v interface{}) error {
+		r, ok := v.(*uas.CreateSubscriptionResponse)
+		if !ok {
+			return fmt.Errorf("invalid response: %T", v)
+		}
+		res = r
+		return nil
+	})
+	return &Subscription{res}, err
+}
