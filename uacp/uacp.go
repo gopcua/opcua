@@ -29,7 +29,7 @@ func Decode(b []byte) (interface{}, error) {
 		u = &Generic{}
 	}
 
-	if err := ua.Decode(b, u); err != nil {
+	if _, err := ua.Decode(b, u); err != nil {
 		return nil, err
 	}
 	return u, nil

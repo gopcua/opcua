@@ -241,7 +241,7 @@ func TestCodec(t *testing.T) {
 				typ := reflect.ValueOf(tt.v).Type()
 				v := reflect.New(typ.Elem())
 
-				if err := Decode(tt.b, v.Interface()); err != nil {
+				if _, err := Decode(tt.b, v.Interface()); err != nil {
 					t.Fatal(err)
 				}
 

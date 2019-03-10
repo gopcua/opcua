@@ -36,7 +36,7 @@ func Run(t *testing.T, cases []Case) {
 					t.Fatalf("%T is not a pointer or a slice", c.Struct)
 				}
 
-				if err := ua.Decode(c.Bytes, v.Interface()); err != nil {
+				if _, err := ua.Decode(c.Bytes, v.Interface()); err != nil {
 					t.Fatal(err)
 				}
 

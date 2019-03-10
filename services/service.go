@@ -72,6 +72,6 @@ func Decode(typeID *datatypes.ExpandedNodeID, b []byte) (interface{}, error) {
 	}
 
 	v := reflect.New(typ.Elem()).Interface()
-	err := ua.Decode(b, v)
+	_, err := ua.Decode(b, v)
 	return v, err
 }

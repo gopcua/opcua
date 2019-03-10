@@ -71,21 +71,23 @@ func (m *Message) Decode(b []byte) (int, error) {
 
 	switch m.Header.MessageType {
 	case "OPN":
-		m.AsymmetricSecurityHeader = &AsymmetricSecurityHeader{}
+		m.AsymmetricSecurityHeader = new(AsymmetricSecurityHeader)
 		buf.ReadStruct(m.AsymmetricSecurityHeader)
 
 	case "MSG", "CLO":
-		m.SymmetricSecurityHeader = &SymmetricSecurityHeader{}
+		m.SymmetricSecurityHeader = new(SymmetricSecurityHeader)
 		buf.ReadStruct(m.SymmetricSecurityHeader)
 
 	default:
 		return buf.Pos(), errors.NewErrInvalidType(m, "decode", "should be one of OPN, MSG, CLO")
 	}
 
-	m.SequenceHeader = &SequenceHeader{}
-	m.TypeID = &datatypes.ExpandedNodeID{}
+	m.SequenceHeader = new(SequenceHeader)
 	buf.ReadStruct(m.SequenceHeader)
+
+	m.TypeID = new(datatypes.ExpandedNodeID)
 	buf.ReadStruct(m.TypeID)
+
 	if buf.Error() != nil {
 		return buf.Pos(), buf.Error()
 	}
@@ -99,42 +101,26 @@ func (m *Message) Decode(b []byte) (int, error) {
 }
 
 func (m *Message) Encode() ([]byte, error) {
-	var sechdr []byte
-	var err error
+	body := ua.NewBuffer(nil)
 	switch m.Header.MessageType {
 	case "OPN":
-		sechdr, err = m.AsymmetricSecurityHeader.Encode()
+		body.WriteStruct(m.AsymmetricSecurityHeader)
 	case "CLO", "MSG":
-		sechdr, err = m.SymmetricSecurityHeader.Encode()
+		body.WriteStruct(m.SymmetricSecurityHeader)
 	default:
 		return nil, errors.NewErrInvalidType(m, "serialize", "should be one of OPN, MSG, CLO")
 	}
-	if err != nil {
-		return nil, err
+	body.WriteStruct(m.SequenceHeader)
+	body.WriteStruct(m.TypeID)
+	body.WriteStruct(m.Service)
+	if body.Error() != nil {
+		return nil, body.Error()
 	}
 
-	seqhdr, err := m.SequenceHeader.Encode()
-	if err != nil {
-		return nil, err
-	}
-
-	typeid, err := m.TypeID.Encode()
-	if err != nil {
-		return nil, err
-	}
-
-	svc, err := ua.Encode(m.Service)
-	if err != nil {
-		return nil, err
-	}
-
-	m.Header.MessageSize = uint32(12 + len(sechdr) + len(seqhdr) + len(typeid) + len(svc))
+	m.Header.MessageSize = uint32(12 + body.Len())
 	buf := ua.NewBuffer(nil)
 	buf.WriteStruct(m.Header)
-	buf.Write(sechdr)
-	buf.Write(seqhdr)
-	buf.Write(typeid)
-	buf.Write(svc)
+	buf.Write(body.Bytes())
 	return buf.Bytes(), buf.Error()
 }
 

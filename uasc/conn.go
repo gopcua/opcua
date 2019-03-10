@@ -94,7 +94,7 @@ func (a *Conn) handshake(endpoint string) error {
 	}
 
 	ack := new(uacp.Acknowledge)
-	if err := ua.Decode(b, ack); err != nil {
+	if _, err := ua.Decode(b, ack); err != nil {
 		return fmt.Errorf("decode ACK failed: %s", err)
 	}
 
@@ -117,7 +117,7 @@ func (a *Conn) recv() ([]byte, error) {
 	}
 
 	var h uacp.Header
-	if err := ua.Decode(hdr, &h); err != nil {
+	if _, err := ua.Decode(hdr, &h); err != nil {
 		return nil, fmt.Errorf("hdr decode failed: %s", err)
 	}
 

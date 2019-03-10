@@ -109,7 +109,7 @@ func BenchmarkReflectDecode(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		v := new(NodeID)
-		if err := ua.Decode(data, v); err != nil {
+		if _, err := ua.Decode(data, v); err != nil {
 			b.Fatal(err)
 		}
 	}

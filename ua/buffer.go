@@ -156,11 +156,18 @@ func (b *Buffer) ReadBytes() []byte {
 	return d
 }
 
-func (b *Buffer) ReadStruct(r BinaryDecoder) {
+func (b *Buffer) ReadStruct(r interface{}) {
 	if b.err != nil {
 		return
 	}
-	n, err := r.Decode(b.buf[b.pos:])
+	var n int
+	var err error
+	switch x := r.(type) {
+	case BinaryDecoder:
+		n, err = x.Decode(b.buf[b.pos:])
+	default:
+		n, err = Decode(b.buf[b.pos:], r)
+	}
 	if err != nil {
 		b.err = err
 		return
@@ -279,12 +286,17 @@ func (b *Buffer) WriteByteString(d []byte) {
 	b.Write(d)
 }
 
-func (b *Buffer) WriteStruct(w BinaryEncoder) {
+func (b *Buffer) WriteStruct(w interface{}) {
 	if b.err != nil {
 		return
 	}
 	var d []byte
-	d, b.err = w.Encode()
+	switch x := w.(type) {
+	case BinaryEncoder:
+		d, b.err = x.Encode()
+	default:
+		d, b.err = Encode(w)
+	}
 	b.Write(d)
 }
 

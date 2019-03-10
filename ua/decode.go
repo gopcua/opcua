@@ -28,17 +28,17 @@ type BinaryDecoder interface {
 	Decode([]byte) (int, error)
 }
 
-func Decode(b []byte, v interface{}) error {
+func Decode(b []byte, v interface{}) (int, error) {
 	val := reflect.ValueOf(v)
-	_, err := decode(b, val, val.Type().String())
+	n, err := decode(b, val, val.Type().String())
 	if err != nil {
-		return err
+		return n, err
 	}
 	// todo(fs): this does not do what I think it does
 	// if n != len(b) {
 	// 	return fmt.Errorf("decode: got %d bytes want %d", n, len(b))
 	// }
-	return nil
+	return n, nil
 }
 
 func decode(b []byte, val reflect.Value, name string) (n int, err error) {
