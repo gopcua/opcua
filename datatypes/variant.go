@@ -308,5 +308,73 @@ func (m *Variant) Set(v interface{}) error {
 }
 
 func (m *Variant) String() string {
-	return fmt.Sprintf("%v", m.Value)
+	switch m.TypeID() {
+	case TypeString:
+		return m.Value.(string)
+	case TypeLocalizedText:
+		return m.Value.(*LocalizedText).Text
+	case TypeQualifiedName:
+		return m.Value.(*QualifiedName).Name
+	default:
+		return fmt.Sprintf("%v", m.Value)
+	}
+}
+
+func (m *Variant) Bool() bool {
+	switch m.TypeID() {
+	case TypeBoolean:
+		return m.Value.(bool)
+	default:
+		return false
+	}
+}
+
+func (m *Variant) Float() float64 {
+	switch m.TypeID() {
+	case TypeFloat:
+		return float64(m.Value.(float32))
+	case TypeDouble:
+		return m.Value.(float64)
+	default:
+		return 0
+	}
+}
+
+func (m *Variant) Int() int64 {
+	switch m.TypeID() {
+	case TypeSByte:
+		return int64(m.Value.(int8))
+	case TypeUint16:
+		return int64(m.Value.(int16))
+	case TypeUint32:
+		return int64(m.Value.(int32))
+	case TypeUint64:
+		return m.Value.(int64)
+	default:
+		return 0
+	}
+}
+
+func (m *Variant) Uint() uint64 {
+	switch m.TypeID() {
+	case TypeByte:
+		return uint64(m.Value.(byte))
+	case TypeUint16:
+		return uint64(m.Value.(uint16))
+	case TypeUint32:
+		return uint64(m.Value.(uint32))
+	case TypeUint64:
+		return m.Value.(uint64)
+	default:
+		return 0
+	}
+}
+
+func (m *Variant) Time() time.Time {
+	switch m.TypeID() {
+	case TypeDateTime:
+		return m.Value.(time.Time)
+	default:
+		return time.Time{}
+	}
 }

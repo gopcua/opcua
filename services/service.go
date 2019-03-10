@@ -17,6 +17,8 @@ import (
 func init() {
 	register(id.ActivateSessionRequest_Encoding_DefaultBinary, new(ActivateSessionRequest))
 	register(id.ActivateSessionResponse_Encoding_DefaultBinary, new(ActivateSessionResponse))
+	register(id.BrowseRequest_Encoding_DefaultBinary, new(BrowseRequest))
+	register(id.BrowseResponse_Encoding_DefaultBinary, new(BrowseResponse))
 	register(id.CancelRequest_Encoding_DefaultBinary, new(CancelRequest))
 	register(id.CancelResponse_Encoding_DefaultBinary, new(CancelResponse))
 	register(id.CloseSecureChannelRequest_Encoding_DefaultBinary, new(CloseSecureChannelRequest))

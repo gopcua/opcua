@@ -22,9 +22,9 @@ func main() {
 	}
 	defer c.Close()
 
-	v, err := c.Read(uad.NewNumericNodeID(0, 2258))
+	v, err := c.Node(uad.NewNumericNodeID(0, 2258)).Value()
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Printf("time: %v", v)
+	log.Printf("time: %v", v.Value)
 }

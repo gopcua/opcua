@@ -40,7 +40,7 @@ func TestClientRead(t *testing.T) {
 	}
 	defer c.Close()
 
-	v, err := c.Read(uad.NewNumericNodeID(0, 2258))
+	v, err := c.Node(uad.NewNumericNodeID(0, 2258)).Value()
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -11,6 +11,9 @@ import (
 	"time"
 )
 
+// debugCodec enables printing of debug messages in the opcua codec.
+const debugCodec = false
+
 // BinaryEncoder is the interface implemented by an object that can
 // marshal itself into a binary OPC/UA representation.
 type BinaryEncoder interface {
@@ -29,7 +32,9 @@ func Encode(v interface{}) ([]byte, error) {
 }
 
 func encode(val reflect.Value, name string) ([]byte, error) {
-	// fmt.Printf("encode: %s has type %s and is a %s\n", name, val.Type(), val.Type().Kind())
+	if debugCodec {
+		fmt.Printf("encode: %s has type %s and is a %s\n", name, val.Type(), val.Type().Kind())
+	}
 
 	buf := NewBuffer(nil)
 	switch {

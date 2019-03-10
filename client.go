@@ -2,13 +2,14 @@ package gopcua
 
 import (
 	"fmt"
-	"time"
 
 	uad "github.com/wmnsk/gopcua/datatypes"
 	uas "github.com/wmnsk/gopcua/services"
 	"github.com/wmnsk/gopcua/uasc"
 )
 
+// Client is a high-level client for an OPC/UA server.
+// It establishes a secure channel and a session.
 type Client struct {
 	Addr string
 
@@ -21,6 +22,8 @@ func NewClient(addr string, cfg *uasc.Config) *Client {
 	return &Client{Addr: addr, config: cfg}
 }
 
+// Open connects to the server and establishes a secure channel
+// and a session.
 func (c *Client) Open() error {
 	conn, err := uasc.Dial(c.Addr)
 	if err != nil {
@@ -34,6 +37,7 @@ func (c *Client) Open() error {
 	sechan.EndpointURL = c.Addr
 	c.sechan = sechan
 
+	// todo(fs): this should probably be configurable.
 	sessionCfg := uasc.NewClientSessionConfig(
 		[]string{"en-US"},
 		uad.NewAnonymousIdentityToken("open62541-anonymous-policy"),
@@ -48,6 +52,8 @@ func (c *Client) Open() error {
 	return nil
 }
 
+// Close closes the session, the secure channel and the network
+// connection to the server.
 func (c *Client) Close() error {
 	if c.session != nil {
 		c.session.Close()
@@ -55,45 +61,17 @@ func (c *Client) Close() error {
 	return c.sechan.Close()
 }
 
-func (c *Client) Read(id *uad.NodeID) (*uad.Variant, error) {
-	req := &uas.ReadRequest{
-		MaxAge:             0,
-		TimestampsToReturn: 0,
-		NodesToRead: []*uad.ReadValueID{
-			&uad.ReadValueID{
-				NodeID:       id,
-				AttributeID:  uad.IntegerIDValue,
-				DataEncoding: &uad.QualifiedName{},
-			},
-		},
-	}
-
-	var res *uad.Variant
-	err := c.sechan.Send(req, func(v interface{}) error {
-		r, ok := v.(*uas.ReadResponse)
-		if !ok {
-			return fmt.Errorf("invalid response: %T", v)
-		}
-		if len(r.Results) > 0 {
-			res = r.Results[0].Value
-		}
-		return nil
-	})
-	return res, err
+// Node returns a node object which accesses its attributes
+// through this client connection.
+func (c *Client) Node(id *uad.NodeID) *Node {
+	return &Node{ID: id, c: c}
 }
 
-// todo(fs): return subscription object with channel
-func (c *Client) Subscribe(intv time.Duration) (*uas.CreateSubscriptionResponse, error) {
-	req := &uas.CreateSubscriptionRequest{
-		RequestedPublishingInterval: float64(intv / time.Millisecond),
-		RequestedLifetimeCount:      60,
-		RequestedMaxKeepAliveCount:  20,
-		PublishingEnabled:           true,
-	}
-
-	var res *uas.CreateSubscriptionResponse
+// Read executes a synchronous read request.
+func (c *Client) Read(req *uas.ReadRequest) (*uas.ReadResponse, error) {
+	var res *uas.ReadResponse
 	err := c.sechan.Send(req, func(v interface{}) error {
-		r, ok := v.(*uas.CreateSubscriptionResponse)
+		r, ok := v.(*uas.ReadResponse)
 		if !ok {
 			return fmt.Errorf("invalid response: %T", v)
 		}
@@ -102,3 +80,44 @@ func (c *Client) Subscribe(intv time.Duration) (*uas.CreateSubscriptionResponse,
 	})
 	return res, err
 }
+
+// Browse executes a synchronous browse request.
+func (c *Client) Browse(req *uas.BrowseRequest) (*uas.BrowseResponse, error) {
+	var res *uas.BrowseResponse
+	err := c.sechan.Send(req, func(v interface{}) error {
+		r, ok := v.(*uas.BrowseResponse)
+		if !ok {
+			return fmt.Errorf("invalid response: %T", v)
+		}
+		res = r
+		return nil
+	})
+	return res, err
+}
+
+// todo(fs): this is not done yet since we need to be able to register
+// todo(fs): monitored items.
+// type Subscription struct {
+// 	res *uas.CreateSubscriptionResponse
+// }
+
+// // todo(fs): return subscription object with channel
+// func (c *Client) Subscribe(intv time.Duration) (*Subscription, error) {
+// 	req := &uas.CreateSubscriptionRequest{
+// 		RequestedPublishingInterval: float64(intv / time.Millisecond),
+// 		RequestedLifetimeCount:      60,
+// 		RequestedMaxKeepAliveCount:  20,
+// 		PublishingEnabled:           true,
+// 	}
+
+// 	var res *uas.CreateSubscriptionResponse
+// 	err := c.sechan.Send(req, func(v interface{}) error {
+// 		r, ok := v.(*uas.CreateSubscriptionResponse)
+// 		if !ok {
+// 			return fmt.Errorf("invalid response: %T", v)
+// 		}
+// 		res = r
+// 		return nil
+// 	})
+// 	return &Subscription{res}, err
+// }

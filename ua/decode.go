@@ -34,18 +34,16 @@ func Decode(b []byte, v interface{}) (int, error) {
 	if err != nil {
 		return n, err
 	}
-	// todo(fs): this does not do what I think it does
-	// if n != len(b) {
-	// 	return fmt.Errorf("decode: got %d bytes want %d", n, len(b))
-	// }
 	return n, nil
 }
 
 func decode(b []byte, val reflect.Value, name string) (n int, err error) {
-	// fmt.Printf("decode: %s has type %v and is a %s, %d bytes %x\n", name, val.Type(), val.Type().Kind(), len(b), b)
-	// defer func() {
-	// 	fmt.Printf("decode: decoded %d bytes (%x) into %s\n", n, b[:n], name)
-	// }()
+	if debugCodec {
+		fmt.Printf("decode: %s has type %v and is a %s, %d bytes %x\n", name, val.Type(), val.Type().Kind(), len(b), b)
+		defer func() {
+			fmt.Printf("decode: decoded %d bytes (%x) into %s\n", n, b[:n], name)
+		}()
+	}
 
 	buf := NewBuffer(b)
 	switch {
