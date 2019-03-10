@@ -4,8 +4,6 @@
 
 package datatypes
 
-import "github.com/wmnsk/gopcua/ua"
-
 // QualifiedName contains a qualified name. It is, for example, used as BrowseName.
 // The name part of the QualifiedName is restricted to 512 characters.
 //
@@ -23,16 +21,6 @@ func NewQualifiedName(index uint16, name string) *QualifiedName {
 	}
 }
 
-func (n *QualifiedName) Decode(b []byte) (int, error) {
-	buf := ua.NewBuffer(b)
-	n.NamespaceIndex = buf.ReadUint16()
-	n.Name = buf.ReadString()
-	return buf.Pos(), buf.Error()
-}
-
-func (n *QualifiedName) Encode() ([]byte, error) {
-	buf := ua.NewBuffer(nil)
-	buf.WriteUint16(n.NamespaceIndex)
-	buf.WriteString(n.Name)
-	return buf.Bytes(), buf.Error()
+func (q *QualifiedName) String() string {
+	return q.Name
 }
