@@ -258,8 +258,11 @@ func (a *Conn) srvhandshake(endpoint string) error {
 	}
 }
 
-func (a *Conn) sendError(code uint32) error {
-	return a.send("ERRF", &Error{Error: code})
+func (a *Conn) sendError(code uint32) {
+	// we swallow the error to silence complaints from the linter
+	// since sending an error will close the connection and we
+	// want to bubble a different error up.
+	_ = a.send("ERRF", &Error{Error: code})
 }
 
 // hdrlen is the size of the uacp header
