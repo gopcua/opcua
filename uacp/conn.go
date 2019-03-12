@@ -6,27 +6,37 @@ import (
 	"io"
 	"log"
 	"net"
-	"strings"
 	"sync/atomic"
 	"time"
 
 	"github.com/wmnsk/gopcua/ua"
+	"github.com/wmnsk/gopcua/utils"
 )
 
-var connid int32 = 1
+// connid stores the current connection id. updated with atomic.AddUint32
+var connid uint32
+
+// nextid returns the next connection id
+func nextid() uint32 {
+	return atomic.AddUint32(&connid, 1)
+}
 
 func Dial(ctx context.Context, endpoint string) (*Conn, error) {
 	log.Printf("Connect to %s", endpoint)
-	addr := strings.TrimPrefix(endpoint, "opc.tcp://")
-	c, err := net.Dial("tcp", addr)
+	network, raddr, err := utils.ResolveEndpoint(endpoint)
+	if err != nil {
+		return nil, err
+	}
+	c, err := net.DialTCP(network, nil, raddr)
 	if err != nil {
 		return nil, err
 	}
 
 	conn := &Conn{
-		id:  atomic.AddInt32(&connid, 1),
-		c:   c,
-		ack: &Acknowledge{ReceiveBufSize: 0xffff, SendBufSize: 0xffff},
+		id:         nextid(),
+		c:          c,
+		rcvBufSize: 0xffff,
+		sndBufSize: 0xffff,
 	}
 
 	log.Printf("conn %d: start HEL/ACK handshake", conn.id)
@@ -38,14 +48,84 @@ func Dial(ctx context.Context, endpoint string) (*Conn, error) {
 	return conn, nil
 }
 
-type Conn struct {
-	id  int32
-	c   net.Conn
-	ack *Acknowledge
+// Listener is a OPC UA Connection Protocol network listener.
+type Listener struct {
+	l          net.Listener
+	endpoint   string
+	rcvBufSize uint32
+	sndBufSize uint32
 }
 
-func (a *Conn) ID() int {
-	return int(a.id)
+// Listen acts like net.Listen for OPC UA Connection Protocol networks.
+//
+// Currently the endpoint can only be specified in "opc.tcp://<addr[:port]>/path" format.
+//
+// If the IP field of laddr is nil or an unspecified IP address, Listen listens
+// on all available unicast and anycast IP addresses of the local system.
+// If the Port field of laddr is 0, a port number is automatically chosen.
+func Listen(endpoint string, rcvBufSize uint32) (*Listener, error) {
+	network, laddr, err := utils.ResolveEndpoint(endpoint)
+	if err != nil {
+		return nil, err
+	}
+	l, err := net.Listen(network, laddr.String())
+	if err != nil {
+		return nil, err
+	}
+	return &Listener{
+		l:          l,
+		endpoint:   endpoint,
+		rcvBufSize: rcvBufSize,
+		sndBufSize: 0xffff,
+	}, nil
+}
+
+// Accept accepts the next incoming call and returns the new connection.
+//
+// The first param ctx is to be passed to monitor(), which monitors and handles
+// incoming messages automatically in another goroutine.
+func (l *Listener) Accept(ctx context.Context) (*Conn, error) {
+	c, err := l.l.Accept()
+	if err != nil {
+		return nil, err
+	}
+	conn := &Conn{
+		id:         nextid(),
+		c:          c,
+		rcvBufSize: 0xffff,
+		sndBufSize: 0xffff,
+	}
+	if err := conn.srvhandshake(l.endpoint); err != nil {
+		c.Close()
+		return nil, err
+	}
+	return conn, nil
+}
+
+// Close closes the Listener.
+func (l *Listener) Close() error {
+	return l.l.Close()
+}
+
+// Addr returns the listener's network address.
+func (l *Listener) Addr() net.Addr {
+	return l.l.Addr()
+}
+
+// Endpoint returns the listener's EndpointURL.
+func (l *Listener) Endpoint() string {
+	return l.endpoint
+}
+
+type Conn struct {
+	id         uint32
+	c          net.Conn
+	rcvBufSize uint32
+	sndBufSize uint32
+}
+
+func (a *Conn) ID() uint32 {
+	return a.id
 }
 
 func (a *Conn) Close() error {
@@ -100,23 +180,93 @@ func (a *Conn) handshake(endpoint string) error {
 		return err
 	}
 
+	msgtyp := string(b[:4])
+	if msgtyp != "ACKF" {
+		return fmt.Errorf("got %s want ACK", msgtyp)
+	}
+
 	ack := new(Acknowledge)
-	if _, err := ua.Decode(b, ack); err != nil {
+	if _, err := ua.Decode(b[hdrlen:], ack); err != nil {
 		return fmt.Errorf("decode ACK failed: %s", err)
 	}
 
 	if ack.Version != 0 {
 		return fmt.Errorf("invalid version %d", ack.Version)
 	}
-	a.ack = ack
+	a.rcvBufSize = ack.ReceiveBufSize
+	a.sndBufSize = ack.SendBufSize
 	log.Printf("conn %d: recv ACK:%v", a.id, ack)
 	return nil
 }
 
+func (a *Conn) srvhandshake(endpoint string) error {
+	b, err := a.recv()
+	if err != nil {
+		a.sendError(BadTCPInternalError)
+		return err
+	}
+
+	// HEL or RHE?
+	msgtyp := string(b[:4])
+	msg := b[hdrlen:]
+	switch msgtyp {
+	case "HELF":
+		hel := new(Hello)
+		if _, err := ua.Decode(msg, hel); err != nil {
+			a.sendError(BadTCPInternalError)
+			return err
+		}
+		if hel.EndPointURL != endpoint {
+			a.sendError(BadTCPEndpointURLInvalid)
+			return fmt.Errorf("invalid endpoint url %s", hel.EndPointURL)
+		}
+		ack := &Acknowledge{
+			Version:        0,
+			ReceiveBufSize: a.rcvBufSize,
+			SendBufSize:    a.sndBufSize,
+			MaxMessageSize: 0, // what is a sensible default?
+			MaxChunkCount:  1000,
+		}
+		if err := a.send("ACKF", ack); err != nil {
+			a.sendError(BadTCPInternalError)
+			return err
+		}
+		return nil
+
+	case "RHEF":
+		rhe := new(ReverseHello)
+		if _, err := ua.Decode(msg, rhe); err != nil {
+			a.sendError(BadTCPInternalError)
+			return err
+		}
+		if rhe.EndPointURL != endpoint {
+			a.sendError(BadTCPEndpointURLInvalid)
+			return fmt.Errorf("invalid endpoint url %s", rhe.EndPointURL)
+		}
+		log.Printf("conn %d: connecting to %s", a.id, rhe.ServerURI)
+		a.c.Close()
+		c, err := Dial(context.Background(), rhe.ServerURI)
+		if err != nil {
+			return err
+		}
+		a.c = c
+		return nil
+
+	default:
+		a.sendError(BadTCPInternalError)
+		return fmt.Errorf("invalid handshake packet %q", msgtyp)
+	}
+}
+
+func (a *Conn) sendError(code uint32) error {
+	return a.send("ERRF", &Error{Error: code})
+}
+
+// hdrlen is the size of the uacp header
+const hdrlen = 8
+
 // recv receives a message from the stream and returns it without the header.
 func (a *Conn) recv() ([]byte, error) {
-	const hdrlen = 8
-
 	hdr := make([]byte, hdrlen)
 	_, err := io.ReadFull(a.c, hdr)
 	if err != nil {
@@ -128,8 +278,8 @@ func (a *Conn) recv() ([]byte, error) {
 		return nil, fmt.Errorf("hdr decode failed: %s", err)
 	}
 
-	if h.MessageSize > a.ack.ReceiveBufSize {
-		return nil, fmt.Errorf("packet too large: %d > %d bytes", h.MessageSize, a.ack.ReceiveBufSize)
+	if h.MessageSize > a.rcvBufSize {
+		return nil, fmt.Errorf("packet too large: %d > %d bytes", h.MessageSize, a.rcvBufSize)
 	}
 
 	b := make([]byte, h.MessageSize-hdrlen)
@@ -138,7 +288,7 @@ func (a *Conn) recv() ([]byte, error) {
 	}
 
 	log.Printf("conn %d: recv %s%c with %d bytes", a.id, h.MessageType, h.ChunkType, len(b))
-	return b, nil
+	return append(hdr, b...), nil
 }
 
 func (a *Conn) send(typ string, msg interface{}) error {
@@ -157,8 +307,8 @@ func (a *Conn) send(typ string, msg interface{}) error {
 		MessageSize: uint32(len(body) + 8),
 	}
 
-	if h.MessageSize > a.ack.SendBufSize {
-		return fmt.Errorf("send packet too large: %d > %d bytes", h.MessageSize, a.ack.SendBufSize)
+	if h.MessageSize > a.sndBufSize {
+		return fmt.Errorf("send packet too large: %d > %d bytes", h.MessageSize, a.sndBufSize)
 	}
 
 	hdr, err := h.Encode()

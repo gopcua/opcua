@@ -23,13 +23,14 @@ func TestConn(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	done := make(chan int)
+	done := make(chan struct{})
 	go func() {
-		defer ln.Close()
-		if _, err := ln.Accept(ctx); err != nil {
+		c, err := ln.Accept(ctx)
+		if err != nil {
 			t.Fatal(err)
 		}
-		done <- 0
+		defer c.Close()
+		close(done)
 	}()
 
 	if _, err = Dial(ctx, ep); err != nil {
@@ -37,10 +38,7 @@ func TestConn(t *testing.T) {
 	}
 
 	select {
-	case _, ok := <-done:
-		if !ok {
-			t.Fatalf("timed out")
-		}
+	case <-done:
 	case <-time.After(10 * time.Second):
 		t.Fatalf("timed out")
 	}

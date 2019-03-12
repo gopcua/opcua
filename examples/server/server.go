@@ -2,17 +2,34 @@
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
-/*
-Command server provides a connection establishment of OPC UA Secure Conversation as a server.
-*/
 package main
 
+import (
+	"context"
+	"flag"
+	"log"
+
+	"github.com/wmnsk/gopcua/uacp"
+)
+
 func main() {
-	// var (
-	// 	endpoint = flag.String("endpoint", "opc.tcp://example.com/foo/bar", "OPC UA Endpoint URL")
-	// 	bufsize  = flag.Int("bufsize", 0xffff, "Receive Buffer Size")
-	// )
-	// flag.Parse()
+	var (
+		endpoint = flag.String("endpoint", "opc.tcp://example.com/foo/bar", "OPC UA Endpoint URL")
+		bufsize  = flag.Int("bufsize", 0xffff, "Receive Buffer Size")
+	)
+	flag.Parse()
+
+	log.Printf("Listening on %s", *endpoint)
+	l, err := uacp.Listen(*endpoint, uint32(*bufsize))
+	if err != nil {
+		log.Fatal(err)
+	}
+	c, err := l.Accept(context.Background())
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer c.Close()
+	log.Printf("conn %d: connection from %s", c.ID(), c.RemoteAddr())
 
 	// listener, err := uacp.Listen(*endpoint, uint32(*bufsize))
 	// if err != nil {

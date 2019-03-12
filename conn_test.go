@@ -7,7 +7,6 @@ import (
 
 	uad "github.com/wmnsk/gopcua/datatypes"
 	"github.com/wmnsk/gopcua/uacp"
-
 	"github.com/wmnsk/gopcua/uasc"
 )
 
