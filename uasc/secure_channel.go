@@ -12,6 +12,7 @@ import (
 
 	"github.com/wmnsk/gopcua/datatypes"
 	"github.com/wmnsk/gopcua/services"
+	"github.com/wmnsk/gopcua/uacp"
 )
 
 const (
@@ -29,7 +30,7 @@ type SecureChannel struct {
 	EndpointURL string
 
 	// c is the uacp connection.
-	c *Conn
+	c *uacp.Conn
 
 	// cfg is the configuration for the secure channel.
 	cfg *Config
@@ -51,7 +52,7 @@ type SecureChannel struct {
 	handler map[uint32]chan Response
 }
 
-func NewSecureChannel(c *Conn, cfg *Config) *SecureChannel {
+func NewSecureChannel(c *uacp.Conn, cfg *Config) *SecureChannel {
 	if cfg == nil {
 		cfg = NewClientConfigSecurityNone(3333, 3600000)
 	}
@@ -151,7 +152,7 @@ func (s *SecureChannel) Send(svc interface{}, h func(interface{}) error) error {
 // SendAsync sends the service request and returns a channel which will receive the
 // response when it arrives.
 func (s *SecureChannel) SendAsync(svc interface{}) (resp chan Response, err error) {
-	log.Printf("conn %d: send %T", s.c.id, svc)
+	log.Printf("conn %d: send %T", s.c.ID(), svc)
 
 	typeID := services.TypeID(svc)
 	if typeID == 0 {
@@ -184,7 +185,7 @@ func (s *SecureChannel) SendAsync(svc interface{}) (resp chan Response, err erro
 	if _, err := s.c.Write(b); err != nil {
 		return nil, err
 	}
-	log.Printf("conn %d: send %d bytes", s.c.id, len(b))
+	log.Printf("conn %d: send %d bytes", s.c.ID(), len(b))
 
 	// register the handler
 	resp = make(chan Response)
@@ -228,11 +229,11 @@ func (s *SecureChannel) recvsvc() (interface{}, error) {
 	if _, err := m.Decode(append(hdr, b...)); err != nil {
 		return nil, fmt.Errorf("sechan: decode message failed: %s", err)
 	}
-	log.Printf("conn %d: recv %d bytes", s.c.id, len(hdr)+len(b))
+	log.Printf("conn %d: recv %d bytes", s.c.ID(), len(hdr)+len(b))
 
 	if s.cfg.SecureChannelID == 0 {
 		s.cfg.SecureChannelID = h.SecureChannelID
-		log.Printf("conn %d: set secure channel id to %04x", s.c.id, s.cfg.SecureChannelID)
+		log.Printf("conn %d: set secure channel id to %04x", s.c.ID(), s.cfg.SecureChannelID)
 	}
 
 	return m.Service, nil
@@ -252,7 +253,7 @@ func (s *SecureChannel) recv() {
 			if err == io.EOF {
 				return
 			}
-			log.Printf("conn %d: recv %T", s.c.id, svc)
+			log.Printf("conn %d: recv %T", s.c.ID(), svc)
 
 			// since we are not decoding the ResponseHeader separately
 			// we need to drop every message that has an error since we
@@ -262,7 +263,7 @@ func (s *SecureChannel) recv() {
 			// structs and tests. We also need to add a deadline to all
 			// handlers and check them periodically to time them out.
 			if err != nil {
-				log.Printf("conn %d: recv %s", s.c.id, err)
+				log.Printf("conn %d: recv %s", s.c.ID(), err)
 				continue
 			}
 

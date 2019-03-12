@@ -1,11 +1,13 @@
 package gopcua
 
 import (
+	"context"
 	"fmt"
 	"time"
 
 	uad "github.com/wmnsk/gopcua/datatypes"
 	uas "github.com/wmnsk/gopcua/services"
+	"github.com/wmnsk/gopcua/uacp"
 	"github.com/wmnsk/gopcua/uasc"
 )
 
@@ -26,7 +28,8 @@ func NewClient(addr string, cfg *uasc.Config) *Client {
 // Open connects to the server and establishes a secure channel
 // and a session.
 func (c *Client) Open() error {
-	conn, err := uasc.Dial(c.Addr)
+	ctx := context.Background()
+	conn, err := uacp.Dial(ctx, c.Addr)
 	if err != nil {
 		return err
 	}

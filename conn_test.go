@@ -1,17 +1,20 @@
 package gopcua
 
 import (
+	"context"
 	"testing"
 	"time"
 
 	uad "github.com/wmnsk/gopcua/datatypes"
+	"github.com/wmnsk/gopcua/uacp"
 
 	"github.com/wmnsk/gopcua/uasc"
 )
 
 func TestDial(t *testing.T) {
 	t.Skip()
-	conn, err := uasc.Dial("opc.tcp://localhost:4840")
+	ctx := context.Background()
+	conn, err := uacp.Dial(ctx, "opc.tcp://localhost:4840")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -21,7 +24,8 @@ func TestDial(t *testing.T) {
 
 func TestSecureChannel(t *testing.T) {
 	t.Skip()
-	conn, err := uasc.Dial("opc.tcp://localhost:4840")
+	ctx := context.Background()
+	conn, err := uacp.Dial(ctx, "opc.tcp://localhost:4840")
 	if err != nil {
 		t.Fatal(err)
 	}

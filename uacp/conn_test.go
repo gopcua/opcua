@@ -20,8 +20,7 @@ func TestConn(t *testing.T) {
 	}
 	defer ln.Close()
 
-	ctx := context.Background()
-	ctx, cancel := context.WithCancel(ctx)
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	done := make(chan int)
@@ -55,8 +54,7 @@ func TestClientWrite(t *testing.T) {
 	}
 	defer ln.Close()
 
-	ctx := context.Background()
-	ctx, cancel := context.WithCancel(ctx)
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	var cliConn, srvConn *Conn
@@ -111,8 +109,7 @@ func TestServerWrite(t *testing.T) {
 	}
 	defer ln.Close()
 
-	ctx := context.Background()
-	ctx, cancel := context.WithCancel(ctx)
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	var cliConn, srvConn *Conn
@@ -156,46 +153,5 @@ NEXT:
 
 	if diff := cmp.Diff(buf[:n], expected); diff != "" {
 		t.Error(diff)
-	}
-}
-func TestConnGetState(t *testing.T) {
-	var cases = []struct {
-		conn     *Conn
-		expected string
-	}{
-		{
-			nil,
-			"",
-		},
-		{
-			&Conn{},
-			"unknown",
-		},
-		{
-			&Conn{state: cliStateClosed},
-			"client closed",
-		},
-		{
-			&Conn{state: cliStateHelloSent},
-			"client hello sent",
-		},
-		{
-			&Conn{state: cliStateEstablished},
-			"client established",
-		},
-		{
-			&Conn{state: srvStateClosed},
-			"server closed",
-		},
-		{
-			&Conn{state: srvStateEstablished},
-			"server established",
-		},
-	}
-
-	for i, c := range cases {
-		if diff := cmp.Diff(c.conn.GetState(), c.expected); diff != "" {
-			t.Errorf("case #%d failed\n%s", i, diff)
-		}
 	}
 }
