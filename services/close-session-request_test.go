@@ -23,13 +23,11 @@ func TestCloseSessionRequest(t *testing.T) {
 						0xa6, 0x43, 0xf8, 0x77, 0x7b, 0xc6, 0x2f, 0xc8,
 					}),
 					time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-					1, 0, 0, "", NewNullAdditionalHeader(), nil,
+					1, 0, 0, "", NewNullAdditionalHeader(),
 				),
 				true,
 			),
 			Bytes: []byte{ // CloseSessionRequest
-				// TypeID
-				0x01, 0x00, 0xd9, 0x01,
 				// RequestHeader
 				// AuthenticationToken
 				0x05, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x08,
@@ -52,19 +50,5 @@ func TestCloseSessionRequest(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases, func(b []byte) (codectest.S, error) {
-		v, err := DecodeCloseSessionRequest(b)
-		if err != nil {
-			return nil, err
-		}
-		v.Payload = nil
-		return v, nil
-	})
-
-	t.Run("service-id", func(t *testing.T) {
-		id := new(CloseSessionRequest).ServiceType()
-		if got, want := id, uint16(ServiceTypeCloseSessionRequest); got != want {
-			t.Fatalf("got %d want %d", got, want)
-		}
-	})
+	codectest.Run(t, cases)
 }

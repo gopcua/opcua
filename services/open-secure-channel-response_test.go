@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/wmnsk/gopcua/datatypes"
 	"github.com/wmnsk/gopcua/utils/codectest"
 )
 
@@ -18,7 +19,7 @@ func TestOpenSecureChannelResponse(t *testing.T) {
 			Struct: NewOpenSecureChannelResponse(
 				NewResponseHeader(
 					time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-					1, 0, NewNullDiagnosticInfo(), []string{}, NewNullAdditionalHeader(), nil,
+					1, 0, datatypes.NewNullDiagnosticInfo(), []string{}, NewNullAdditionalHeader(),
 				),
 				0,
 				NewChannelSecurityToken(
@@ -27,8 +28,6 @@ func TestOpenSecureChannelResponse(t *testing.T) {
 				[]byte{0xff},
 			),
 			Bytes: []byte{
-				// TypeID
-				0x01, 0x00, 0xc1, 0x01,
 				// Timestamp
 				0x00, 0x98, 0x67, 0xdd, 0xfd, 0x30, 0xd4, 0x01,
 				// RequestHandle
@@ -52,19 +51,5 @@ func TestOpenSecureChannelResponse(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases, func(b []byte) (codectest.S, error) {
-		v, err := DecodeOpenSecureChannelResponse(b)
-		if err != nil {
-			return nil, err
-		}
-		v.Payload = nil
-		return v, nil
-	})
-
-	t.Run("service-id", func(t *testing.T) {
-		id := new(OpenSecureChannelResponse).ServiceType()
-		if got, want := id, uint16(ServiceTypeOpenSecureChannelResponse); got != want {
-			t.Fatalf("got %d want %d", got, want)
-		}
-	})
+	codectest.Run(t, cases)
 }

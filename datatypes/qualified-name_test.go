@@ -16,8 +16,9 @@ func TestQualifiedName(t *testing.T) {
 			Name:   "normal",
 			Struct: NewQualifiedName(1, "foobar"),
 			Bytes: []byte{
-				0x01,
-				0x00,
+				// namespace index
+				0x01, 0x00,
+				// name
 				0x06, 0x00, 0x00, 0x00,
 				0x66, 0x6f, 0x6f, 0x62, 0x61, 0x72,
 			},
@@ -26,13 +27,12 @@ func TestQualifiedName(t *testing.T) {
 			Name:   "empty",
 			Struct: NewQualifiedName(1, ""),
 			Bytes: []byte{
-				0x01,
-				0x00,
+				// namespace index
+				0x01, 0x00,
+				// name
 				0xff, 0xff, 0xff, 0xff,
 			},
 		},
 	}
-	codectest.Run(t, cases, func(b []byte) (codectest.S, error) {
-		return DecodeQualifiedName(b)
-	})
+	codectest.Run(t, cases)
 }

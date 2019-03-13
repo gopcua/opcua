@@ -14,32 +14,12 @@ func TestHeader(t *testing.T) {
 	cases := []codectest.Case{
 		{
 			Name: "normal",
-			Struct: NewHeader(
-				MessageTypeMessage,
-				ChunkTypeFinal,
-				0,
-				[]byte{0xde, 0xad, 0xbe, 0xef},
-			),
-			Bytes: []byte{ // Message message
-				// MessageType: MSG
-				0x4d, 0x53, 0x47,
-				// Chunk Type: Final
-				0x46,
-				// MessageSize: 16
-				0x10, 0x00, 0x00, 0x00,
-				// SecureChannelID: 0
-				0x00, 0x00, 0x00, 0x00,
-				// dummy Payload
-				0xde, 0xad, 0xbe, 0xef,
+			Struct: &Header{
+				MessageType:     MessageTypeMessage,
+				ChunkType:       ChunkTypeFinal,
+				MessageSize:     12,
+				SecureChannelID: 0,
 			},
-		}, {
-			Name: "no-payload",
-			Struct: NewHeader(
-				MessageTypeMessage,
-				ChunkTypeFinal,
-				0,
-				nil,
-			),
 			Bytes: []byte{ // Message message
 				// MessageType: MSG
 				0x4d, 0x53, 0x47,
@@ -52,7 +32,5 @@ func TestHeader(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases, func(b []byte) (codectest.S, error) {
-		return DecodeHeader(b)
-	})
+	codectest.Run(t, cases)
 }

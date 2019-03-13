@@ -2,7 +2,7 @@
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
-package datatypes
+package services
 
 import (
 	"testing"
@@ -61,31 +61,27 @@ func TestDecodeServersOnNetwork(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases, func(b []byte) (codectest.S, error) {
-		return DecodeServersOnNetwork(b)
-	})
+	codectest.Run(t, cases)
 }
 
 func TestServersOnNetworkArray(t *testing.T) {
 	cases := []codectest.Case{
 		{
 			Name: "normal",
-			Struct: NewServersOnNetworkArray(
-				[]*ServersOnNetwork{
-					NewServersOnNetwork(
-						1,
-						"server-name",
-						"discov-uri",
-						[]string{"server-cap-1"},
-					),
-					NewServersOnNetwork(
-						1,
-						"server-name",
-						"discov-uri",
-						[]string{"server-cap-1", "server-cap-2"},
-					),
-				},
-			),
+			Struct: []*ServersOnNetwork{
+				NewServersOnNetwork(
+					1,
+					"server-name",
+					"discov-uri",
+					[]string{"server-cap-1"},
+				),
+				NewServersOnNetwork(
+					1,
+					"server-name",
+					"discov-uri",
+					[]string{"server-cap-1", "server-cap-2"},
+				),
+			},
 			Bytes: []byte{
 				// ArraySize
 				0x02, 0x00, 0x00, 0x00,
@@ -118,7 +114,5 @@ func TestServersOnNetworkArray(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases, func(b []byte) (codectest.S, error) {
-		return DecodeServersOnNetworkArray(b)
-	})
+	codectest.Run(t, cases)
 }

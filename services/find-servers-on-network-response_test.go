@@ -19,10 +19,10 @@ func TestFindServersOnNetworkResponse(t *testing.T) {
 			Struct: NewFindServersOnNetworkResponse(
 				NewResponseHeader(
 					time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-					1, 0, NewNullDiagnosticInfo(), []string{}, NewNullAdditionalHeader(), nil,
+					1, 0, datatypes.NewNullDiagnosticInfo(), []string{}, NewNullAdditionalHeader(),
 				),
 				time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-				datatypes.NewServersOnNetwork(
+				NewServersOnNetwork(
 					1,
 					"server-name",
 					"discov-uri",
@@ -30,8 +30,6 @@ func TestFindServersOnNetworkResponse(t *testing.T) {
 				),
 			),
 			Bytes: []byte{
-				// TypeID
-				0x01, 0x00, 0xb3, 0x2f,
 				// Timestamp
 				0x00, 0x98, 0x67, 0xdd, 0xfd, 0x30, 0xd4, 0x01,
 				// RequestHandle
@@ -69,16 +67,16 @@ func TestFindServersOnNetworkResponse(t *testing.T) {
 			Struct: NewFindServersOnNetworkResponse(
 				NewResponseHeader(
 					time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-					1, 0, NewNullDiagnosticInfo(), []string{}, NewNullAdditionalHeader(), nil,
+					1, 0, datatypes.NewNullDiagnosticInfo(), []string{}, NewNullAdditionalHeader(),
 				),
 				time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-				datatypes.NewServersOnNetwork(
+				NewServersOnNetwork(
 					1,
 					"server-name",
 					"discov-uri",
 					[]string{"server-cap-1"},
 				),
-				datatypes.NewServersOnNetwork(
+				NewServersOnNetwork(
 					1,
 					"server-name",
 					"discov-uri",
@@ -86,8 +84,6 @@ func TestFindServersOnNetworkResponse(t *testing.T) {
 				),
 			),
 			Bytes: []byte{
-				// TypeID
-				0x01, 0x00, 0xb3, 0x2f,
 				// Timestamp
 				0x00, 0x98, 0x67, 0xdd, 0xfd, 0x30, 0xd4, 0x01,
 				// RequestHandle
@@ -135,19 +131,5 @@ func TestFindServersOnNetworkResponse(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases, func(b []byte) (codectest.S, error) {
-		v, err := DecodeFindServersOnNetworkResponse(b)
-		if err != nil {
-			return nil, err
-		}
-		v.Payload = nil
-		return v, nil
-	})
-
-	t.Run("service-id", func(t *testing.T) {
-		id := new(FindServersOnNetworkResponse).ServiceType()
-		if got, want := id, uint16(ServiceTypeFindServersOnNetworkResponse); got != want {
-			t.Fatalf("got %d want %d", got, want)
-		}
-	})
+	codectest.Run(t, cases)
 }

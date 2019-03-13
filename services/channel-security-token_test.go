@@ -30,7 +30,5 @@ func TestChannelSecurityToken(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases, func(b []byte) (codectest.S, error) {
-		return DecodeChannelSecurityToken(b)
-	})
+	codectest.Run(t, cases)
 }

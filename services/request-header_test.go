@@ -12,8 +12,37 @@ import (
 	"github.com/wmnsk/gopcua/utils/codectest"
 )
 
+func NewNullRequestHeader() *RequestHeader {
+	return &RequestHeader{
+		AuthenticationToken: datatypes.NewTwoByteNodeID(0),
+		Timestamp:           time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC),
+		AdditionalHeader:    NewNullAdditionalHeader(),
+	}
+}
+
+var nullRequestHeaderBytes = []byte{
+	// AuthenticationToken
+	0x0, 0x0,
+	// Timestamp
+	0x00, 0x80, 0x3e, 0xd5, 0xde, 0xb1, 0x9d, 0x01,
+	// RequestHandle
+	0x0, 0x0, 0x0, 0x0,
+	// ReturnDiagnostics
+	0x0, 0x0, 0x0, 0x0,
+	// AuditEntryID
+	0xff, 0xff, 0xff, 0xff,
+	// TimeeoutHint
+	0x0, 0x0, 0x0, 0x0,
+	// AdditionalHeader
+	0x0, 0x0, 0x0,
+}
+
 func TestRequestHeader(t *testing.T) {
 	cases := []codectest.Case{
+		{
+			Struct: NewNullRequestHeader(),
+			Bytes:  nullRequestHeaderBytes,
+		},
 		{
 			Struct: func() *RequestHeader {
 				r := NewRequestHeader(
@@ -31,7 +60,6 @@ func TestRequestHeader(t *testing.T) {
 						),
 						0x00,
 					),
-					[]byte{0xde, 0xad, 0xbe, 0xef},
 				)
 				r.SetDiagAll()
 				return r
@@ -52,12 +80,8 @@ func TestRequestHeader(t *testing.T) {
 				0x00, 0x00, 0x00, 0x00,
 				// AdditionalHeader
 				0x00, 0xff, 0x00,
-				// dummy Payload
-				0xde, 0xad, 0xbe, 0xef,
 			},
 		},
 	}
-	codectest.Run(t, cases, func(b []byte) (codectest.S, error) {
-		return DecodeRequestHeader(b)
-	})
+	codectest.Run(t, cases)
 }

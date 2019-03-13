@@ -2,12 +2,11 @@
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
-package services
+package datatypes
 
 import (
 	"testing"
 
-	"github.com/wmnsk/gopcua/datatypes"
 	"github.com/wmnsk/gopcua/utils/codectest"
 )
 
@@ -24,7 +23,7 @@ func TestDiagnosticInfo(t *testing.T) {
 			Name: "Has SymbolicID",
 			Struct: NewDiagnosticInfo(
 				true, false, false, false, false, false, false,
-				1, 0, 0, 0, nil, 0, nil,
+				1, 0, 0, 0, "", 0, nil,
 			),
 			Bytes: []byte{
 				0x01, 0x01, 0x00, 0x00, 0x00,
@@ -34,7 +33,7 @@ func TestDiagnosticInfo(t *testing.T) {
 			Name: "Has NamespaceURI",
 			Struct: NewDiagnosticInfo(
 				false, true, false, false, false, false, false,
-				0, 2, 0, 0, nil, 0, nil,
+				0, 2, 0, 0, "", 0, nil,
 			),
 			Bytes: []byte{
 				0x02, 0x02, 0x00, 0x00, 0x00,
@@ -44,7 +43,7 @@ func TestDiagnosticInfo(t *testing.T) {
 			Name: "Has LocalizedText",
 			Struct: NewDiagnosticInfo(
 				false, false, true, false, false, false, false,
-				0, 0, 0, 3, nil, 0, nil,
+				0, 0, 0, 3, "", 0, nil,
 			),
 			Bytes: []byte{
 				0x04, 0x03, 0x00, 0x00, 0x00,
@@ -54,7 +53,7 @@ func TestDiagnosticInfo(t *testing.T) {
 			Name: "Has Locale",
 			Struct: NewDiagnosticInfo(
 				false, false, false, true, false, false, false,
-				0, 0, 4, 0, nil, 0, nil,
+				0, 0, 4, 0, "", 0, nil,
 			),
 			Bytes: []byte{
 				0x08, 0x04, 0x00, 0x00, 0x00,
@@ -65,7 +64,7 @@ func TestDiagnosticInfo(t *testing.T) {
 			Struct: NewDiagnosticInfo(
 				false, false, false, false, true, false, false,
 				0, 0, 0, 0,
-				datatypes.NewString("foobar"),
+				"foobar",
 				0, nil,
 			),
 			Bytes: []byte{
@@ -77,7 +76,7 @@ func TestDiagnosticInfo(t *testing.T) {
 			Name: "Has InnerStatusCode",
 			Struct: NewDiagnosticInfo(
 				false, false, false, false, false, true, false,
-				0, 0, 0, 0, nil, 6, nil,
+				0, 0, 0, 0, "", 6, nil,
 			),
 			Bytes: []byte{
 				0x20, 0x06, 0x00, 0x00, 0x00,
@@ -87,10 +86,10 @@ func TestDiagnosticInfo(t *testing.T) {
 			Name: "Has InnerDiagnosticInfo",
 			Struct: NewDiagnosticInfo(
 				false, false, false, false, false, false, true,
-				0, 0, 0, 0, nil, 0,
+				0, 0, 0, 0, "", 0,
 				NewDiagnosticInfo(
 					true, false, false, false, false, false, false,
-					7, 0, 0, 0, nil, 0, nil,
+					7, 0, 0, 0, "", 0, nil,
 				),
 			),
 			Bytes: []byte{
@@ -102,11 +101,11 @@ func TestDiagnosticInfo(t *testing.T) {
 			Struct: NewDiagnosticInfo(
 				true, true, true, true, true, true, true,
 				1, 2, 4, 3,
-				datatypes.NewString("foobar"),
+				"foobar",
 				6,
 				NewDiagnosticInfo(
 					true, false, false, false, false, false, false,
-					7, 0, 0, 0, nil, 0, nil,
+					7, 0, 0, 0, "", 0, nil,
 				),
 			),
 			Bytes: []byte{
@@ -128,23 +127,21 @@ func TestDiagnosticInfo(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases, func(b []byte) (codectest.S, error) {
-		return DecodeDiagnosticInfo(b)
-	})
+	codectest.Run(t, cases)
 }
 
 func TestDiagnosticInfoArray(t *testing.T) {
 	cases := []codectest.Case{
 		{
 			Name:   "Nothing",
-			Struct: NewDiagnosticInfoArray(nil),
+			Struct: []*DiagnosticInfo{},
 			Bytes: []byte{
 				0x00, 0x00, 0x00, 0x00,
 			},
 		},
 		{
 			Name:   "1 null DiagnosticInfo",
-			Struct: NewDiagnosticInfoArray([]*DiagnosticInfo{NewNullDiagnosticInfo()}),
+			Struct: []*DiagnosticInfo{NewNullDiagnosticInfo()},
 			Bytes: []byte{
 				0x01, 0x00, 0x00, 0x00,
 				0x00,
@@ -152,12 +149,12 @@ func TestDiagnosticInfoArray(t *testing.T) {
 		},
 		{
 			Name: "4 null DiagnosticInfo",
-			Struct: NewDiagnosticInfoArray([]*DiagnosticInfo{
+			Struct: []*DiagnosticInfo{
 				NewNullDiagnosticInfo(),
 				NewNullDiagnosticInfo(),
 				NewNullDiagnosticInfo(),
 				NewNullDiagnosticInfo(),
-			}),
+			},
 			Bytes: []byte{
 				0x04, 0x00, 0x00, 0x00,
 				0x00,
@@ -168,13 +165,13 @@ func TestDiagnosticInfoArray(t *testing.T) {
 		},
 		{
 			Name: "1 null DiagnosticInfo & 1 DiagnosticInfo with SymbolicID",
-			Struct: NewDiagnosticInfoArray([]*DiagnosticInfo{
+			Struct: []*DiagnosticInfo{
 				NewNullDiagnosticInfo(),
 				NewDiagnosticInfo(
 					true, false, false, false, false, false, false,
-					1, 0, 0, 0, nil, 0, nil,
+					1, 0, 0, 0, "", 0, nil,
 				),
-			}),
+			},
 			Bytes: []byte{
 				0x02, 0x00, 0x00, 0x00,
 				0x00,
@@ -182,7 +179,5 @@ func TestDiagnosticInfoArray(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases, func(b []byte) (codectest.S, error) {
-		return DecodeDiagnosticInfoArray(b)
-	})
+	codectest.Run(t, cases)
 }

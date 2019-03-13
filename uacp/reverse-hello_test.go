@@ -19,12 +19,6 @@ func TestReverseHello(t *testing.T) {
 				"opc.tcp://wow.its.easy:11111/UA/Server", // EndPointURL
 			),
 			Bytes: []byte{
-				// MessageType: RHE
-				0x52, 0x48, 0x45,
-				// Chunk Type: F
-				0x46,
-				// MessageSize: 12
-				0x5c, 0x00, 0x00, 0x00,
 				// ServerURI
 				0x26, 0x00, 0x00, 0x00, 0x6f, 0x70, 0x63, 0x2e,
 				0x74, 0x63, 0x70, 0x3a, 0x2f, 0x2f, 0x77, 0x6f,
@@ -42,12 +36,5 @@ func TestReverseHello(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases, func(b []byte) (codectest.S, error) {
-		v, err := DecodeReverseHello(b)
-		if err != nil {
-			return nil, err
-		}
-		v.Payload = nil
-		return v, nil
-	})
+	codectest.Run(t, cases)
 }

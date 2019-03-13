@@ -59,7 +59,5 @@ func TestExpandedNodeID(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases, func(b []byte) (codectest.S, error) {
-		return DecodeExpandedNodeID(b)
-	})
+	codectest.Run(t, cases)
 }

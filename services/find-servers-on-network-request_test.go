@@ -23,15 +23,19 @@ func TestFindServersOnNetworkRequest(t *testing.T) {
 						0xa6, 0x43, 0xf8, 0x77, 0x7b, 0xc6, 0x2f, 0xc8,
 					}),
 					time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-					1, 0, 0, "", NewNullAdditionalHeader(), nil,
+					1, 0, 0, "", NewNullAdditionalHeader(),
 				),
 				1000,
 				0,
-				"",
+				// todo(fs): adding an empty string here is a bug
+				// todo(fs): since this creates an array of size 1
+				// todo(fs): and not an empty array. Also, using
+				// todo(fs): ...string always generates an empty
+				// todo(fs): but never 'nil'.
+				//"",
+				nil,
 			),
 			Bytes: []byte{
-				// TypeID
-				0x01, 0x00, 0xb0, 0x2f,
 				// AuthenticationToken
 				0x05, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x08,
 				0x22, 0x87, 0x62, 0xba, 0x81, 0xe1, 0x11, 0xa6,
@@ -53,23 +57,9 @@ func TestFindServersOnNetworkRequest(t *testing.T) {
 				// MaxRecordsToReturn
 				0x00, 0x00, 0x00, 0x00,
 				// ServerCapabilityFilter
-				0x00, 0x00, 0x00, 0x00,
+				0xff, 0xff, 0xff, 0xff,
 			},
 		},
 	}
-	codectest.Run(t, cases, func(b []byte) (codectest.S, error) {
-		v, err := DecodeFindServersOnNetworkRequest(b)
-		if err != nil {
-			return nil, err
-		}
-		v.Payload = nil
-		return v, nil
-	})
-
-	t.Run("service-id", func(t *testing.T) {
-		id := new(FindServersOnNetworkRequest).ServiceType()
-		if got, want := id, uint16(ServiceTypeFindServersOnNetworkRequest); got != want {
-			t.Fatalf("got %d want %d", got, want)
-		}
-	})
+	codectest.Run(t, cases)
 }

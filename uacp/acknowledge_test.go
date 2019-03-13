@@ -20,12 +20,6 @@ func TestAcknowledge(t *testing.T) {
 				4000,  // MaxMessageSize
 			),
 			Bytes: []byte{
-				// MessageType: ACK
-				0x41, 0x43, 0x4b,
-				// Chunk Type: F
-				0x46,
-				// MessageSize: 28
-				0x1c, 0x00, 0x00, 0x00,
 				// Version: 0
 				0x00, 0x00, 0x00, 0x00,
 				// ReceiveBufSize: 65280
@@ -39,12 +33,5 @@ func TestAcknowledge(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases, func(b []byte) (codectest.S, error) {
-		v, err := DecodeAcknowledge(b)
-		if err != nil {
-			return nil, err
-		}
-		v.Payload = nil
-		return v, nil
-	})
+	codectest.Run(t, cases)
 }

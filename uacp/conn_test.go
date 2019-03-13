@@ -20,17 +20,17 @@ func TestConn(t *testing.T) {
 	}
 	defer ln.Close()
 
-	ctx := context.Background()
-	ctx, cancel := context.WithCancel(ctx)
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	done := make(chan int)
+	done := make(chan struct{})
 	go func() {
-		defer ln.Close()
-		if _, err := ln.Accept(ctx); err != nil {
+		c, err := ln.Accept(ctx)
+		if err != nil {
 			t.Fatal(err)
 		}
-		done <- 0
+		defer c.Close()
+		close(done)
 	}()
 
 	if _, err = Dial(ctx, ep); err != nil {
@@ -38,10 +38,7 @@ func TestConn(t *testing.T) {
 	}
 
 	select {
-	case _, ok := <-done:
-		if !ok {
-			t.Fatalf("timed out")
-		}
+	case <-done:
 	case <-time.After(10 * time.Second):
 		t.Fatalf("timed out")
 	}
@@ -55,8 +52,7 @@ func TestClientWrite(t *testing.T) {
 	}
 	defer ln.Close()
 
-	ctx := context.Background()
-	ctx, cancel := context.WithCancel(ctx)
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	var cliConn, srvConn *Conn
@@ -111,8 +107,7 @@ func TestServerWrite(t *testing.T) {
 	}
 	defer ln.Close()
 
-	ctx := context.Background()
-	ctx, cancel := context.WithCancel(ctx)
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	var cliConn, srvConn *Conn
@@ -156,46 +151,5 @@ NEXT:
 
 	if diff := cmp.Diff(buf[:n], expected); diff != "" {
 		t.Error(diff)
-	}
-}
-func TestConnGetState(t *testing.T) {
-	var cases = []struct {
-		conn     *Conn
-		expected string
-	}{
-		{
-			nil,
-			"",
-		},
-		{
-			&Conn{},
-			"unknown",
-		},
-		{
-			&Conn{state: cliStateClosed},
-			"client closed",
-		},
-		{
-			&Conn{state: cliStateHelloSent},
-			"client hello sent",
-		},
-		{
-			&Conn{state: cliStateEstablished},
-			"client established",
-		},
-		{
-			&Conn{state: srvStateClosed},
-			"server closed",
-		},
-		{
-			&Conn{state: srvStateEstablished},
-			"server established",
-		},
-	}
-
-	for i, c := range cases {
-		if diff := cmp.Diff(c.conn.GetState(), c.expected); diff != "" {
-			t.Errorf("case #%d failed\n%s", i, diff)
-		}
 	}
 }

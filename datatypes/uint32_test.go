@@ -14,7 +14,7 @@ func TestUint32Array(t *testing.T) {
 	cases := []codectest.Case{
 		{
 			Name:   "No contents",
-			Struct: NewUint32Array(nil),
+			Struct: []uint32{},
 			Bytes: []byte{
 				// todo(fs): this should be 0xffffffff
 				0x00, 0x00, 0x00, 0x00,
@@ -22,7 +22,7 @@ func TestUint32Array(t *testing.T) {
 		},
 		{
 			Name:   "1 value",
-			Struct: NewUint32Array([]uint32{1}),
+			Struct: []uint32{1},
 			Bytes: []byte{
 				// length
 				0x01, 0x00, 0x00, 0x00,
@@ -32,7 +32,7 @@ func TestUint32Array(t *testing.T) {
 		},
 		{
 			Name:   "4 values",
-			Struct: NewUint32Array([]uint32{1, 2, 3, 4}),
+			Struct: []uint32{1, 2, 3, 4},
 			Bytes: []byte{
 				// length
 				0x04, 0x00, 0x00, 0x00,
@@ -47,7 +47,5 @@ func TestUint32Array(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases, func(b []byte) (codectest.S, error) {
-		return DecodeUint32Array(b)
-	})
+	codectest.Run(t, cases)
 }

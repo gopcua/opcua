@@ -21,7 +21,7 @@ func TestWriteValue(t *testing.T) {
 				"",
 				NewDataValue(
 					true, false, true, false, true, false,
-					NewVariant(NewFloat(2.50017)),
+					MustVariant(float32(2.50017)),
 					0,
 					time.Date(2018, time.September, 17, 14, 28, 29, 112000000, time.UTC),
 					0,
@@ -44,47 +44,43 @@ func TestWriteValue(t *testing.T) {
 		},
 	}
 
-	codectest.Run(t, cases, func(b []byte) (codectest.S, error) {
-		return DecodeWriteValue(b)
-	})
+	codectest.Run(t, cases)
 }
 
 func TestWriteValueArray(t *testing.T) {
 	cases := []codectest.Case{
 		{
 			Name: "normal",
-			Struct: NewWriteValueArray(
-				[]*WriteValue{
-					NewWriteValue(
-						NewFourByteNodeID(0, 2256),
-						IntegerIDValue,
-						"",
-						NewDataValue(
-							true, false, true, false, true, false,
-							NewVariant(NewFloat(2.50017)),
-							0,
-							time.Date(2018, time.September, 17, 14, 28, 29, 112000000, time.UTC),
-							0,
-							time.Date(2018, time.September, 17, 14, 28, 29, 112000000, time.UTC),
-							0,
-						),
+			Struct: []*WriteValue{
+				NewWriteValue(
+					NewFourByteNodeID(0, 2256),
+					IntegerIDValue,
+					"",
+					NewDataValue(
+						true, false, true, false, true, false,
+						MustVariant(float32(2.50017)),
+						0,
+						time.Date(2018, time.September, 17, 14, 28, 29, 112000000, time.UTC),
+						0,
+						time.Date(2018, time.September, 17, 14, 28, 29, 112000000, time.UTC),
+						0,
 					),
-					NewWriteValue(
-						NewFourByteNodeID(0, 2256),
-						IntegerIDValue,
-						"",
-						NewDataValue(
-							true, false, true, false, true, false,
-							NewVariant(NewFloat(2.50017)),
-							0,
-							time.Date(2018, time.September, 17, 14, 28, 29, 112000000, time.UTC),
-							0,
-							time.Date(2018, time.September, 17, 14, 28, 29, 112000000, time.UTC),
-							0,
-						),
+				),
+				NewWriteValue(
+					NewFourByteNodeID(0, 2256),
+					IntegerIDValue,
+					"",
+					NewDataValue(
+						true, false, true, false, true, false,
+						MustVariant(float32(2.50017)),
+						0,
+						time.Date(2018, time.September, 17, 14, 28, 29, 112000000, time.UTC),
+						0,
+						time.Date(2018, time.September, 17, 14, 28, 29, 112000000, time.UTC),
+						0,
 					),
-				},
-			),
+				),
+			},
 			Bytes: []byte{
 				// ArraySize
 				0x02, 0x00, 0x00, 0x00,
@@ -111,7 +107,5 @@ func TestWriteValueArray(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases, func(b []byte) (codectest.S, error) {
-		return DecodeWriteValueArray(b)
-	})
+	codectest.Run(t, cases)
 }

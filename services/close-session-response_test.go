@@ -18,12 +18,10 @@ func TestCloseSessionResponse(t *testing.T) {
 			Struct: NewCloseSessionResponse(
 				NewResponseHeader(
 					time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-					1, 0, NewNullDiagnosticInfo(), []string{}, NewNullAdditionalHeader(), nil,
+					1, 0, nil, []string{}, NewNullAdditionalHeader(),
 				),
 			),
 			Bytes: []byte{
-				// TypeID
-				0x01, 0x00, 0xdc, 0x01,
 				// Timestamp
 				0x00, 0x98, 0x67, 0xdd, 0xfd, 0x30, 0xd4, 0x01,
 				// RequestHandle
@@ -39,19 +37,5 @@ func TestCloseSessionResponse(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases, func(b []byte) (codectest.S, error) {
-		v, err := DecodeCloseSessionResponse(b)
-		if err != nil {
-			return nil, err
-		}
-		v.Payload = nil
-		return v, nil
-	})
-
-	t.Run("service-id", func(t *testing.T) {
-		id := new(CloseSessionResponse).ServiceType()
-		if got, want := id, uint16(ServiceTypeCloseSessionResponse); got != want {
-			t.Fatalf("got %d want %d", got, want)
-		}
-	})
+	codectest.Run(t, cases)
 }

@@ -18,12 +18,6 @@ func TestError(t *testing.T) {
 				"foobar",
 			),
 			Bytes: []byte{
-				// MessageType: ERR
-				0x45, 0x52, 0x52,
-				// Chunk Type: F
-				0x46,
-				// MessageSize: 22
-				0x16, 0x00, 0x00, 0x00,
 				// Error: BadSecureChannelClosed
 				0x00, 0x00, 0x86, 0x80,
 				// Reason: dummy
@@ -31,12 +25,5 @@ func TestError(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases, func(b []byte) (codectest.S, error) {
-		v, err := DecodeError(b)
-		if err != nil {
-			return nil, err
-		}
-		v.Payload = nil
-		return v, nil
-	})
+	codectest.Run(t, cases)
 }

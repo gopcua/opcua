@@ -23,7 +23,7 @@ func TestWriteRequest(t *testing.T) {
 						0xa6, 0x43, 0xf8, 0x77, 0x7b, 0xc6, 0x2f, 0xc8,
 					}),
 					time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-					1, 0, 0, "", NewNullAdditionalHeader(), nil,
+					1, 0, 0, "", NewNullAdditionalHeader(),
 				),
 				datatypes.NewWriteValue(
 					datatypes.NewFourByteNodeID(0, 2256),
@@ -31,7 +31,7 @@ func TestWriteRequest(t *testing.T) {
 					"",
 					datatypes.NewDataValue(
 						true, false, true, false, true, false,
-						datatypes.NewVariant(datatypes.NewFloat(2.50017)),
+						datatypes.MustVariant(float32(2.50017)),
 						0,
 						time.Date(2018, time.September, 17, 14, 28, 29, 112000000, time.UTC),
 						0,
@@ -41,8 +41,6 @@ func TestWriteRequest(t *testing.T) {
 				),
 			),
 			Bytes: []byte{
-				// TypeID
-				0x01, 0x00, 0xa1, 0x02,
 				// RequestHeader
 				// AuthenticationToken
 				0x05, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x08,
@@ -84,7 +82,7 @@ func TestWriteRequest(t *testing.T) {
 						0xa6, 0x43, 0xf8, 0x77, 0x7b, 0xc6, 0x2f, 0xc8,
 					}),
 					time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-					1, 0, 0, "", NewNullAdditionalHeader(), nil,
+					1, 0, 0, "", NewNullAdditionalHeader(),
 				),
 				datatypes.NewWriteValue(
 					datatypes.NewFourByteNodeID(0, 2256),
@@ -92,7 +90,7 @@ func TestWriteRequest(t *testing.T) {
 					"",
 					datatypes.NewDataValue(
 						true, false, true, false, true, false,
-						datatypes.NewVariant(datatypes.NewFloat(2.50017)),
+						datatypes.MustVariant(float32(2.50017)),
 						0,
 						time.Date(2018, time.September, 17, 14, 28, 29, 112000000, time.UTC),
 						0,
@@ -106,7 +104,7 @@ func TestWriteRequest(t *testing.T) {
 					"",
 					datatypes.NewDataValue(
 						true, false, true, false, true, false,
-						datatypes.NewVariant(datatypes.NewFloat(2.50017)),
+						datatypes.MustVariant(float32(2.50017)),
 						0,
 						time.Date(2018, time.September, 17, 14, 28, 29, 112000000, time.UTC),
 						0,
@@ -116,8 +114,6 @@ func TestWriteRequest(t *testing.T) {
 				),
 			),
 			Bytes: []byte{
-				// TypeID
-				0x01, 0x00, 0xa1, 0x02,
 				// RequestHeader
 				// AuthenticationToken
 				0x05, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x08,
@@ -161,19 +157,5 @@ func TestWriteRequest(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases, func(b []byte) (codectest.S, error) {
-		v, err := DecodeWriteRequest(b)
-		if err != nil {
-			return nil, err
-		}
-		v.Payload = nil
-		return v, nil
-	})
-
-	t.Run("service-id", func(t *testing.T) {
-		id := new(WriteRequest).ServiceType()
-		if got, want := id, uint16(ServiceTypeWriteRequest); got != want {
-			t.Fatalf("got %d want %d", got, want)
-		}
-	})
+	codectest.Run(t, cases)
 }

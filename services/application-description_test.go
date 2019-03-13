@@ -44,37 +44,33 @@ func TestApplicationDescription(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases, func(b []byte) (codectest.S, error) {
-		return DecodeApplicationDescription(b)
-	})
+	codectest.Run(t, cases)
 }
 
 func TestApplicationDescriptionArray(t *testing.T) {
 	cases := []codectest.Case{
 		{
 			Name: "Normal",
-			Struct: NewApplicationDescriptionArray(
-				[]*ApplicationDescription{
-					NewApplicationDescription(
-						"app-uri",
-						"prod-uri",
-						"app-name",
-						AppTypeServer,
-						"gw-uri",
-						"prof-uri",
-						[]string{"discov-uri-1", "discov-uri-2"},
-					),
-					NewApplicationDescription(
-						"app-uri",
-						"prod-uri",
-						"app-name",
-						AppTypeServer,
-						"gw-uri",
-						"prof-uri",
-						[]string{"discov-uri-1", "discov-uri-2"},
-					),
-				},
-			),
+			Struct: []*ApplicationDescription{
+				NewApplicationDescription(
+					"app-uri",
+					"prod-uri",
+					"app-name",
+					AppTypeServer,
+					"gw-uri",
+					"prof-uri",
+					[]string{"discov-uri-1", "discov-uri-2"},
+				),
+				NewApplicationDescription(
+					"app-uri",
+					"prod-uri",
+					"app-name",
+					AppTypeServer,
+					"gw-uri",
+					"prof-uri",
+					[]string{"discov-uri-1", "discov-uri-2"},
+				),
+			},
 			Bytes: []byte{ // Array
 				// ArraySize
 				0x02, 0x00, 0x00, 0x00,
@@ -115,7 +111,5 @@ func TestApplicationDescriptionArray(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases, func(b []byte) (codectest.S, error) {
-		return DecodeApplicationDescriptionArray(b)
-	})
+	codectest.Run(t, cases)
 }

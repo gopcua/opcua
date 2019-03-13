@@ -5,8 +5,11 @@
 package uasc
 
 import (
+	"github.com/wmnsk/gopcua/datatypes"
 	"github.com/wmnsk/gopcua/errors"
+	"github.com/wmnsk/gopcua/id"
 	"github.com/wmnsk/gopcua/services"
+	"github.com/wmnsk/gopcua/ua"
 )
 
 // Message represents a OPC UA Secure Conversation message.
@@ -15,7 +18,8 @@ type Message struct {
 	*AsymmetricSecurityHeader
 	*SymmetricSecurityHeader
 	*SequenceHeader
-	Service services.Service
+	TypeID  *datatypes.ExpandedNodeID
+	Service interface{}
 }
 
 // New creates a OPC UA Secure Conversation message.New
@@ -26,272 +30,96 @@ type Message struct {
 // Service type: CloseSecureChannel => Message type: CLO.
 //
 // Service type: Others => Message type: MSG.
-func New(srv services.Service, cfg *Config) *Message {
-	if srv == nil {
-		return newMSG(srv, cfg)
-	}
-	switch srv.ServiceType() {
-	case services.ServiceTypeOpenSecureChannelRequest, services.ServiceTypeOpenSecureChannelResponse:
-		return newOPN(srv, cfg)
-	case services.ServiceTypeCloseSecureChannelRequest, services.ServiceTypeCloseSecureChannelResponse:
-		return newCLO(srv, cfg)
+//
+// todo(fs): this feels wrong and we should move this switching into the secure channel.
+func NewMessage(srv interface{}, typeID uint16, cfg *Config) *Message {
+	switch typeID {
+	case id.OpenSecureChannelRequest_Encoding_DefaultBinary, id.OpenSecureChannelResponse_Encoding_DefaultBinary:
+		return &Message{
+			Header:                   NewHeader(MessageTypeOpenSecureChannel, ChunkTypeFinal, cfg.SecureChannelID),
+			AsymmetricSecurityHeader: NewAsymmetricSecurityHeader(cfg.SecurityPolicyURI, cfg.Certificate, cfg.Thumbprint),
+			SequenceHeader:           NewSequenceHeader(cfg.SequenceNumber, cfg.RequestID),
+			TypeID:                   datatypes.NewFourByteExpandedNodeID(0, typeID),
+			Service:                  srv,
+		}
+
+	case id.CloseSecureChannelRequest_Encoding_DefaultBinary, id.CloseSecureChannelResponse_Encoding_DefaultBinary:
+		return &Message{
+			Header:                  NewHeader(MessageTypeCloseSecureChannel, ChunkTypeFinal, cfg.SecureChannelID),
+			SymmetricSecurityHeader: NewSymmetricSecurityHeader(cfg.SecurityTokenID),
+			SequenceHeader:          NewSequenceHeader(cfg.SequenceNumber, cfg.RequestID),
+			TypeID:                  datatypes.NewFourByteExpandedNodeID(0, typeID),
+			Service:                 srv,
+		}
+
 	default:
-		return newMSG(srv, cfg)
+		return &Message{
+			Header:                  NewHeader(MessageTypeMessage, ChunkTypeFinal, cfg.SecureChannelID),
+			SymmetricSecurityHeader: NewSymmetricSecurityHeader(cfg.SecurityTokenID),
+			SequenceHeader:          NewSequenceHeader(cfg.SequenceNumber, cfg.RequestID),
+			TypeID:                  datatypes.NewFourByteExpandedNodeID(0, typeID),
+			Service:                 srv,
+		}
 	}
 }
 
-func newOPN(srv services.Service, cfg *Config) *Message {
-	m := &Message{
-		Header: NewHeader(MessageTypeOpenSecureChannel, ChunkTypeFinal, cfg.SecureChannelID, nil),
-		AsymmetricSecurityHeader: NewAsymmetricSecurityHeader(
-			cfg.SecurityPolicyURI, cfg.Certificate, cfg.Thumbprint, nil,
-		),
-		SequenceHeader: NewSequenceHeader(
-			cfg.SequenceNumber, cfg.RequestID, nil,
-		),
-		Service: srv,
-	}
-	m.Header.MessageSize = uint32(m.Len())
+func (m *Message) Decode(b []byte) (int, error) {
+	buf := ua.NewBuffer(b)
 
-	return m
-}
+	m.Header = new(Header)
+	buf.ReadStruct(m.Header)
 
-func newMSG(srv services.Service, cfg *Config) *Message {
-	m := &Message{
-		Header:                  NewHeader(MessageTypeMessage, ChunkTypeFinal, cfg.SecureChannelID, nil),
-		SymmetricSecurityHeader: NewSymmetricSecurityHeader(cfg.SecurityTokenID, nil),
-		SequenceHeader: NewSequenceHeader(
-			cfg.SequenceNumber, cfg.RequestID, nil,
-		),
-		Service: srv,
-	}
-	m.Header.MessageSize = uint32(m.Len())
+	switch m.Header.MessageType {
+	case "OPN":
+		m.AsymmetricSecurityHeader = new(AsymmetricSecurityHeader)
+		buf.ReadStruct(m.AsymmetricSecurityHeader)
 
-	return m
-}
+	case "MSG", "CLO":
+		m.SymmetricSecurityHeader = new(SymmetricSecurityHeader)
+		buf.ReadStruct(m.SymmetricSecurityHeader)
 
-func newCLO(srv services.Service, cfg *Config) *Message {
-	m := &Message{
-		Header:                  NewHeader(MessageTypeCloseSecureChannel, ChunkTypeFinal, cfg.SecureChannelID, nil),
-		SymmetricSecurityHeader: NewSymmetricSecurityHeader(cfg.SecurityTokenID, nil),
-		SequenceHeader: NewSequenceHeader(
-			cfg.SequenceNumber, cfg.RequestID, nil,
-		),
-		Service: srv,
-	}
-	m.Header.MessageSize = uint32(m.Len())
-
-	return m
-}
-
-// Decode decodes given bytes into OPC UA Secure Conversation message.
-func Decode(b []byte) (*Message, error) {
-	m := &Message{}
-	if err := m.DecodeFromBytes(b); err != nil {
-		return nil, err
-	}
-
-	return m, nil
-}
-
-// DecodeFromBytes decodes given bytes into OPC UA Secure Conversation message.
-func (m *Message) DecodeFromBytes(b []byte) error {
-	if len(b) < 16 {
-		return errors.NewErrTooShortToDecode(m, "should be longer than 16 bytes")
-	}
-
-	m.Header = &Header{}
-	if err := m.Header.DecodeFromBytes(b); err != nil {
-		return err
-	}
-
-	switch m.Header.MessageTypeValue() {
-	case MessageTypeOpenSecureChannel:
-		return m.decodeOPNFromBytes(m.Header.Payload)
-	case MessageTypeMessage:
-		return m.decodeMSGFromBytes(m.Header.Payload)
-	case MessageTypeCloseSecureChannel:
-		return m.decodeCLOFromBytes(m.Header.Payload)
 	default:
-		return errors.NewErrInvalidType(m, "decode", "should be one of OPN, MSG, CLO")
-	}
-}
-
-func (m *Message) decodeOPNFromBytes(b []byte) error {
-	m.AsymmetricSecurityHeader = &AsymmetricSecurityHeader{}
-	if err := m.AsymmetricSecurityHeader.DecodeFromBytes(b); err != nil {
-		return err
-	}
-	m.SequenceHeader = &SequenceHeader{}
-	if err := m.SequenceHeader.DecodeFromBytes(m.AsymmetricSecurityHeader.Payload); err != nil {
-		return err
+		return buf.Pos(), errors.NewErrInvalidType(m, "decode", "should be one of OPN, MSG, CLO")
 	}
 
-	var err error
-	m.Service, err = services.Decode(m.SequenceHeader.Payload)
+	m.SequenceHeader = new(SequenceHeader)
+	buf.ReadStruct(m.SequenceHeader)
+
+	m.TypeID = new(datatypes.ExpandedNodeID)
+	buf.ReadStruct(m.TypeID)
+
+	if buf.Error() != nil {
+		return buf.Pos(), buf.Error()
+	}
+
+	svc, err := services.Decode(m.TypeID, buf.Bytes())
 	if err != nil {
-		return err
+		return 0, err
 	}
-
-	return nil
+	m.Service = svc
+	return 0, nil
 }
 
-func (m *Message) decodeMSGFromBytes(b []byte) error {
-	m.SymmetricSecurityHeader = &SymmetricSecurityHeader{}
-	if err := m.SymmetricSecurityHeader.DecodeFromBytes(b); err != nil {
-		return err
-	}
-	m.SequenceHeader = &SequenceHeader{}
-	if err := m.SequenceHeader.DecodeFromBytes(m.SymmetricSecurityHeader.Payload); err != nil {
-		return err
-	}
-
-	var err error
-	m.Service, err = services.Decode(m.SequenceHeader.Payload)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (m *Message) decodeCLOFromBytes(b []byte) error {
-	m.SymmetricSecurityHeader = &SymmetricSecurityHeader{}
-	if err := m.SymmetricSecurityHeader.DecodeFromBytes(b); err != nil {
-		return err
-	}
-	m.SequenceHeader = &SequenceHeader{}
-	if err := m.SequenceHeader.DecodeFromBytes(m.SymmetricSecurityHeader.Payload); err != nil {
-		return err
-	}
-
-	var err error
-	m.Service, err = services.Decode(m.SequenceHeader.Payload)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// Serialize serializes Message into bytes.
-func (m *Message) Serialize() ([]byte, error) {
-	b := make([]byte, m.Len())
-	if err := m.SerializeTo(b); err != nil {
-		return nil, err
-	}
-
-	return b, nil
-}
-
-// SerializeTo serializes Message into bytes.
-func (m *Message) SerializeTo(b []byte) error {
-	var offset = 0
-	if m.Header != nil {
-		if err := m.Header.SerializeTo(b[offset:]); err != nil {
-			return err
-		}
-		offset += m.Header.Len() - len(m.Header.Payload)
-	}
-	switch m.Header.MessageTypeValue() {
-	case MessageTypeOpenSecureChannel:
-		return m.serializeOPNTo(b[offset:])
-	case MessageTypeMessage:
-		return m.serializeMSGTo(b[offset:])
-	case MessageTypeCloseSecureChannel:
-		return m.serializeCLOTo(b[offset:])
+func (m *Message) Encode() ([]byte, error) {
+	body := ua.NewBuffer(nil)
+	switch m.Header.MessageType {
+	case "OPN":
+		body.WriteStruct(m.AsymmetricSecurityHeader)
+	case "CLO", "MSG":
+		body.WriteStruct(m.SymmetricSecurityHeader)
 	default:
-		return errors.NewErrInvalidType(m, "serialize", "should be one of OPN, MSG, CLO")
+		return nil, errors.NewErrInvalidType(m, "serialize", "should be one of OPN, MSG, CLO")
 	}
-}
-
-func (m *Message) serializeOPNTo(b []byte) error {
-	var offset = 0
-	if m.AsymmetricSecurityHeader != nil {
-		if err := m.AsymmetricSecurityHeader.SerializeTo(b[offset:]); err != nil {
-			return err
-		}
-		offset += m.AsymmetricSecurityHeader.Len() - len(m.AsymmetricSecurityHeader.Payload)
-	}
-	if m.SequenceHeader != nil {
-		if err := m.SequenceHeader.SerializeTo(b[offset:]); err != nil {
-			return err
-		}
-		offset += m.SequenceHeader.Len() - len(m.SequenceHeader.Payload)
-	}
-	if m.Service != nil {
-		if err := m.Service.SerializeTo(b[offset:]); err != nil {
-			return err
-		}
+	body.WriteStruct(m.SequenceHeader)
+	body.WriteStruct(m.TypeID)
+	body.WriteStruct(m.Service)
+	if body.Error() != nil {
+		return nil, body.Error()
 	}
 
-	return nil
-}
-
-func (m *Message) serializeMSGTo(b []byte) error {
-	var offset = 0
-	if m.SymmetricSecurityHeader != nil {
-		if err := m.SymmetricSecurityHeader.SerializeTo(b[offset:]); err != nil {
-			return err
-		}
-		offset += m.SymmetricSecurityHeader.Len() - len(m.SymmetricSecurityHeader.Payload)
-	}
-	if m.SequenceHeader != nil {
-		if err := m.SequenceHeader.SerializeTo(b[offset:]); err != nil {
-			return err
-		}
-		offset += m.SequenceHeader.Len() - len(m.SequenceHeader.Payload)
-	}
-	if m.Service != nil {
-		if err := m.Service.SerializeTo(b[offset:]); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (m *Message) serializeCLOTo(b []byte) error {
-	var offset = 0
-	if m.SymmetricSecurityHeader != nil {
-		if err := m.SymmetricSecurityHeader.SerializeTo(b[offset:]); err != nil {
-			return err
-		}
-		offset += m.SymmetricSecurityHeader.Len() - len(m.SymmetricSecurityHeader.Payload)
-	}
-	if m.SequenceHeader != nil {
-		if err := m.SequenceHeader.SerializeTo(b[offset:]); err != nil {
-			return err
-		}
-		offset += m.SequenceHeader.Len() - len(m.SequenceHeader.Payload)
-	}
-	if m.Service != nil {
-		if err := m.Service.SerializeTo(b[offset:]); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// Len returns the actual length of Message.
-func (m *Message) Len() int {
-	var l = 0
-	if m.Header != nil {
-		l += m.Header.Len()
-	}
-	if m.AsymmetricSecurityHeader != nil {
-		l += m.AsymmetricSecurityHeader.Len()
-	}
-	if m.SymmetricSecurityHeader != nil {
-		l += m.SymmetricSecurityHeader.Len()
-	}
-	if m.SequenceHeader != nil {
-		l += m.SequenceHeader.Len()
-	}
-	if m.Service != nil {
-		l += m.Service.Len()
-	}
-
-	return l
+	m.Header.MessageSize = uint32(12 + body.Len())
+	buf := ua.NewBuffer(nil)
+	buf.WriteStruct(m.Header)
+	buf.Write(body.Bytes())
+	return buf.Bytes(), buf.Error()
 }
