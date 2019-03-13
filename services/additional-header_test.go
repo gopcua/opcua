@@ -1,4 +1,4 @@
-// Copyright 2018 gopcua authors. All rights reserved.
+// Copyright 2018-2019 opcua authors. All rights reserved.
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
@@ -7,8 +7,8 @@ package services
 import (
 	"testing"
 
-	"github.com/wmnsk/gopcua/datatypes"
-	"github.com/wmnsk/gopcua/utils/codectest"
+	"github.com/gopcua/opcua/datatypes"
+	"github.com/gopcua/opcua/utils/codectest"
 )
 
 func TestAdditionalHeader(t *testing.T) {

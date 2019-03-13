@@ -1,4 +1,4 @@
-// Copyright 2018 gopcua authors. All rights reserved.
+// Copyright 2018-2019 opcua authors. All rights reserved.
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/wmnsk/gopcua/ua"
+	"github.com/gopcua/opcua/ua"
 )
 
 // Variant is a union of the built-in types.

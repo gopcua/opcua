@@ -7,7 +7,7 @@ import (
 	"math"
 	"time"
 
-	"github.com/wmnsk/gopcua/utils"
+	"github.com/gopcua/opcua/utils"
 )
 
 const (

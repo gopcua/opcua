@@ -10,9 +10,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/wmnsk/gopcua/datatypes"
-	"github.com/wmnsk/gopcua/services"
-	"github.com/wmnsk/gopcua/uacp"
+	"github.com/gopcua/opcua/datatypes"
+	"github.com/gopcua/opcua/services"
+	"github.com/gopcua/opcua/uacp"
 )
 
 const (

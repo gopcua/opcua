@@ -1,10 +1,10 @@
-package gopcua
+package opcua
 
 import (
 	"time"
 
-	uad "github.com/wmnsk/gopcua/datatypes"
-	uas "github.com/wmnsk/gopcua/services"
+	uad "github.com/gopcua/opcua/datatypes"
+	uas "github.com/gopcua/opcua/services"
 )
 
 // Node is a high-level object to interact with a node in the

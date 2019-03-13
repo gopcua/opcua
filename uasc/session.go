@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/wmnsk/gopcua/datatypes"
-	"github.com/wmnsk/gopcua/services"
+	"github.com/gopcua/opcua/datatypes"
+	"github.com/gopcua/opcua/services"
 )
 
 type Session struct {

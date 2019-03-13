@@ -1,10 +1,10 @@
-// Copyright 2018 gopcua authors. All rights reserved.
+// Copyright 2018-2019 opcua authors. All rights reserved.
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
 package datatypes
 
-import "github.com/wmnsk/gopcua/ua"
+import "github.com/gopcua/opcua/ua"
 
 // ExpandedNodeID extends the NodeID structure by allowing the NamespaceURI to be
 // explicitly specified instead of using the NamespaceIndex. The NamespaceURI is optional.

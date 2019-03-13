@@ -1,13 +1,13 @@
-package gopcua
+package opcua
 
 import (
 	"context"
 	"testing"
 	"time"
 
-	uad "github.com/wmnsk/gopcua/datatypes"
-	"github.com/wmnsk/gopcua/uacp"
-	"github.com/wmnsk/gopcua/uasc"
+	uad "github.com/gopcua/opcua/datatypes"
+	"github.com/gopcua/opcua/uacp"
+	"github.com/gopcua/opcua/uasc"
 )
 
 func TestDial(t *testing.T) {

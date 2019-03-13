@@ -1,4 +1,4 @@
-// Copyright 2018 gopcua authors. All rights reserved.
+// Copyright 2018-2019 opcua authors. All rights reserved.
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
@@ -7,7 +7,7 @@ package uasc
 import (
 	"fmt"
 
-	"github.com/wmnsk/gopcua/ua"
+	"github.com/gopcua/opcua/ua"
 )
 
 // AsymmetricSecurityHeader represents a Asymmetric Algorithm Security Header in OPC UA Secure Conversation.

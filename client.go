@@ -1,14 +1,14 @@
-package gopcua
+package opcua
 
 import (
 	"context"
 	"fmt"
 	"time"
 
-	uad "github.com/wmnsk/gopcua/datatypes"
-	uas "github.com/wmnsk/gopcua/services"
-	"github.com/wmnsk/gopcua/uacp"
-	"github.com/wmnsk/gopcua/uasc"
+	uad "github.com/gopcua/opcua/datatypes"
+	uas "github.com/gopcua/opcua/services"
+	"github.com/gopcua/opcua/uacp"
+	"github.com/gopcua/opcua/uasc"
 )
 
 // Client is a high-level client for an OPC/UA server.

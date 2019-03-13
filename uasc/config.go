@@ -1,4 +1,4 @@
-// Copyright 2018 gopcua authors. All rights reserved.
+// Copyright 2018-2019 opcua authors. All rights reserved.
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
@@ -9,9 +9,9 @@ import (
 	"encoding/binary"
 	"time"
 
-	"github.com/wmnsk/gopcua/datatypes"
-	"github.com/wmnsk/gopcua/errors"
-	"github.com/wmnsk/gopcua/services"
+	"github.com/gopcua/opcua/datatypes"
+	"github.com/gopcua/opcua/errors"
+	"github.com/gopcua/opcua/services"
 )
 
 // Config represents a configuration which UASC client/server has in common.

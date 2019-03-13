@@ -1,4 +1,4 @@
-// Copyright 2018 gopcua authors. All rights reserved.
+// Copyright 2018-2019 opcua authors. All rights reserved.
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
@@ -8,15 +8,15 @@ import (
 	"flag"
 	"log"
 
-	"github.com/wmnsk/gopcua"
-	uad "github.com/wmnsk/gopcua/datatypes"
+	"github.com/gopcua/opcua"
+	uad "github.com/gopcua/opcua/datatypes"
 )
 
 func main() {
 	endpoint := flag.String("endpoint", "opc.tcp://localhost:4840", "OPC UA Endpoint URL")
 	flag.Parse()
 
-	c := gopcua.NewClient(*endpoint, nil)
+	c := opcua.NewClient(*endpoint, nil)
 	if err := c.Open(); err != nil {
 		log.Fatal(err)
 	}

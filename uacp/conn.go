@@ -9,8 +9,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/wmnsk/gopcua/ua"
-	"github.com/wmnsk/gopcua/utils"
+	"github.com/gopcua/opcua/ua"
+	"github.com/gopcua/opcua/utils"
 )
 
 // connid stores the current connection id. updated with atomic.AddUint32

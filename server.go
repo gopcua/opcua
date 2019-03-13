@@ -1,4 +1,4 @@
-package gopcua
+package opcua
 
 // Server is a high-level OPC-UA Server
 type Server struct {

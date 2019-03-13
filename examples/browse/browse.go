@@ -1,4 +1,4 @@
-// Copyright 2018 gopcua authors. All rights reserved.
+// Copyright 2018-2019 opcua authors. All rights reserved.
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
@@ -9,9 +9,9 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/wmnsk/gopcua"
-	uad "github.com/wmnsk/gopcua/datatypes"
-	uid "github.com/wmnsk/gopcua/id"
+	"github.com/gopcua/opcua"
+	uad "github.com/gopcua/opcua/datatypes"
+	uid "github.com/gopcua/opcua/id"
 )
 
 func join(a, b string) string {
@@ -21,7 +21,7 @@ func join(a, b string) string {
 	return a + "." + b
 }
 
-func browse(n *gopcua.Node, path string, level int) ([]string, error) {
+func browse(n *opcua.Node, path string, level int) ([]string, error) {
 	if level > 10 {
 		return nil, nil
 	}
@@ -49,7 +49,7 @@ func main() {
 	endpoint := flag.String("endpoint", "opc.tcp://localhost:4840", "OPC UA Endpoint URL")
 	flag.Parse()
 
-	c := gopcua.NewClient(*endpoint, nil)
+	c := opcua.NewClient(*endpoint, nil)
 	if err := c.Open(); err != nil {
 		log.Fatal(err)
 	}

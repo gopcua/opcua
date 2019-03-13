@@ -3,7 +3,7 @@ package services
 import (
 	"time"
 
-	uad "github.com/wmnsk/gopcua/datatypes"
+	uad "github.com/gopcua/opcua/datatypes"
 )
 
 type BrowseRequest struct {

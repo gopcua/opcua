@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/pascaldekloe/goe/verify"
-	"github.com/wmnsk/gopcua/ua"
+	"github.com/gopcua/opcua/ua"
 )
 
 // Case describes a test case for a encoding and decoding an

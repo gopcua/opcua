@@ -1,4 +1,4 @@
-// Copyright 2018 gopcua authors. All rights reserved.
+// Copyright 2018-2019 opcua authors. All rights reserved.
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/wmnsk/gopcua/datatypes"
+	"github.com/gopcua/opcua/datatypes"
 )
 
 // RequestHeader represents a Request Header in each services.

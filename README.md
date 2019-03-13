@@ -1,11 +1,11 @@
-# gopcua
+# OPCUA
 
-gopcua provides easy and painless handling of OPC UA Binary Protocol in pure Golang.
+opcua provides easy and painless handling of OPC UA Binary Protocol in pure Golang.
 
-[![CircleCI](https://circleci.com/gh/wmnsk/gopcua.svg?style=shield)](https://circleci.com/gh/wmnsk/gopcua)
-[![GoDoc](https://godoc.org/github.com/wmnsk/gopcua?status.svg)](https://godoc.org/github.com/wmnsk/gopcua)
-[![GolangCI](https://golangci.com/badges/github.com/wmnsk/gopcua.svg)](https://golangci.com/r/github.com/wmnsk/gopcua)
-[![GitHub](https://img.shields.io/github/license/mashape/apistatus.svg)](https://github.com/wmnsk/gopcua/blob/master/LICENSE)
+[![CircleCI](https://circleci.com/gh/gopcua/opcua.svg?style=shield)](https://circleci.com/gh/gopcua/opcua)
+[![GoDoc](https://godoc.org/github.com/gopcua/opcua?status.svg)](https://godoc.org/github.com/gopcua/opcua)
+[![GolangCI](https://golangci.com/badges/github.com/gopcua/opcua.svg)](https://golangci.com/r/github.com/gopcua/opcua)
+[![GitHub](https://img.shields.io/github/license/mashape/apistatus.svg)](https://github.com/gopcua/opcua/blob/master/LICENSE)
 
 
 ## Quickstart
@@ -15,13 +15,13 @@ Currently simple `client`, `server` implementation and `sender`, which lets user
 
 ### Requirements
 
-gopcua is implemented in pure Golang. So just `go get` the following packages.
+opcua is implemented in pure Golang. So just `go get` the following packages.
 
 _Vendoring is planned to be implemented after Go 1.12 release._
 
 [github.com/pkg/errors](https://github.com/pkg/errors)  
 [github.com/google/go-cmp](https://github.com/google/go-cmp)  
-[github.com/wmnsk/gopcua](https://github.com/wmnsk/gopcua)  
+[github.com/gopcua/opcua](https://github.com/gopcua/opcua)  
 
 ### Running Examples
 
@@ -31,14 +31,14 @@ If `--payload` is given, it sends any data on top of UASC headers.
 
 ```shell-session
 cd examples/client
-go run client.go --endpoint "opc.tcp://endpoint.example/gopcua/server" --payload <payload in hex stream format>
+go run client.go --endpoint "opc.tcp://endpoint.example/opcua/server" --payload <payload in hex stream format>
 ```
 
 [`server`](./examples/server) listens and accepts the SecureChannel opening request from the client on specified network.
 
 ```shell-session
 cd examples/client
-go run server.go --endpoint "opc.tcp://endpoint.example/gopcua/server"
+go run server.go --endpoint "opc.tcp://endpoint.example/opcua/server"
 ```
 
 ## Help Wanted!
@@ -48,7 +48,7 @@ However, due to the lack of resources the progress is not quite good actually. S
 
 ### by writing codes
 
-As listed in GitHub [issues](https://github.com/wmnsk/gopcua/issues) and [projects](https://github.com/wmnsk/gopcua/projects/2), we still have a lot of things to be considered/implemented.
+As listed in GitHub [issues](https://github.com/gopcua/opcua/issues) and [projects](https://github.com/gopcua/opcua/projects/2), we still have a lot of things to be considered/implemented.
 Resolving the issues listed by writing your code would help really much.
 
 ### by reporting issues
@@ -137,8 +137,10 @@ This is still experimental project. Any part of the exported API may be changed 
 
 ## Author
 
-Yoshiyuki Kurauchi ([Twitter](https://twitter.com/wmnskdmms) / [LinkedIn](https://www.linkedin.com/in/yoshiyuki-kurauchi/))
+The [gopcua](https://github.com/gopcua) team.
+
+_website under construction... stay tuned!_
 
 ## License
 
-[MIT](https://github.com/wmnsk/gopc-ua/blob/master/LICENSE)
+[MIT](https://github.com/gopcua/opcua/blob/master/LICENSE)

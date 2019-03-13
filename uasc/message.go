@@ -1,15 +1,15 @@
-// Copyright 2018 gopcua authors. All rights reserved.
+// Copyright 2018-2019 opcua authors. All rights reserved.
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
 package uasc
 
 import (
-	"github.com/wmnsk/gopcua/datatypes"
-	"github.com/wmnsk/gopcua/errors"
-	"github.com/wmnsk/gopcua/id"
-	"github.com/wmnsk/gopcua/services"
-	"github.com/wmnsk/gopcua/ua"
+	"github.com/gopcua/opcua/datatypes"
+	"github.com/gopcua/opcua/errors"
+	"github.com/gopcua/opcua/id"
+	"github.com/gopcua/opcua/services"
+	"github.com/gopcua/opcua/ua"
 )
 
 // Message represents a OPC UA Secure Conversation message.

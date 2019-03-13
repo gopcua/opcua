@@ -1,4 +1,4 @@
-// Copyright 2018 gopcua authors. All rights reserved.
+// Copyright 2018-2019 opcua authors. All rights reserved.
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
@@ -63,7 +63,7 @@ func main() {
 	//	defer conn.Close()
 
 	//	// Send Hello and wait for Acknowledge to come
-	//	if err := gopcua.NewEncoder(conn).Encode(hello); err != nil {
+	//	if err := opcua.NewEncoder(conn).Encode(hello); err != nil {
 	//		log.Fatalf("Failed to send Hello: %s", err)
 	//	}
 	//	log.Printf("Successfully sent Hello: %x", hello)
