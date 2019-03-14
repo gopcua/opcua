@@ -66,14 +66,21 @@ func TypeID(v interface{}) uint16 {
 	return serviceTypeID[reflect.TypeOf(v)]
 }
 
-func Decode(typeID *datatypes.ExpandedNodeID, b []byte) (interface{}, error) {
+func Decode(b []byte) (*datatypes.ExpandedNodeID, interface{}, error) {
+	typeID := new(datatypes.ExpandedNodeID)
+	n, err := typeID.Decode(b)
+	if err != nil {
+		return nil, nil, err
+	}
+	b = b[n:]
+
 	id := uint16(typeID.NodeID.IntID())
 	typ := serviceType[id]
 	if typ == nil {
-		return nil, errors.NewErrUnsupported(id, "unsupported or not implemented yet.")
+		return nil, nil, errors.NewErrUnsupported(id, "unsupported or not implemented yet.")
 	}
 
 	v := reflect.New(typ.Elem()).Interface()
-	_, err := ua.Decode(b, v)
-	return v, err
+	_, err = ua.Decode(b, v)
+	return typeID, v, err
 }
