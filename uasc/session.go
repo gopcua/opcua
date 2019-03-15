@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/gopcua/opcua/services"
 	"github.com/gopcua/opcua/ua"
 )
 
@@ -18,11 +17,11 @@ type Session struct {
 	// mySignature is is the client/serverSignature expected to receive from the other endpoint.
 	// This parameter is automatically calculated and kept temporarily until being used to verify
 	// received client/serverSignature.
-	mySignature *services.SignatureData
+	mySignature *ua.SignatureData
 
 	// signatureToSend is the client/serverSignature defined in Part4, Table 15 and Table 17.
 	// This parameter is automatically calculated and kept temporarily until it is sent in next message.
-	signatureToSend *services.SignatureData
+	signatureToSend *ua.SignatureData
 }
 
 func NewSession(sechan *SecureChannel, cfg *SessionConfig) *Session {
@@ -46,7 +45,7 @@ func (s *Session) createSession() error {
 		return err
 	}
 
-	req := &services.CreateSessionRequest{
+	req := &ua.CreateSessionRequest{
 		ClientDescription: s.cfg.ClientDescription,
 		EndpointURL:       s.sechan.EndpointURL,
 		SessionName:       fmt.Sprintf("gopcua-%d", time.Now().UnixNano()),
@@ -55,7 +54,7 @@ func (s *Session) createSession() error {
 	}
 
 	return s.sechan.Send(req, func(v interface{}) error {
-		resp, ok := v.(*services.CreateSessionResponse)
+		resp, ok := v.(*ua.CreateSessionResponse)
 		if !ok {
 			return fmt.Errorf("invalid response. Got %T, want CreateSessionResponse", v)
 		}
@@ -63,17 +62,17 @@ func (s *Session) createSession() error {
 		s.sechan.reqhdr.AuthenticationToken = resp.AuthenticationToken
 		s.cfg.ServerEndpoints = resp.ServerEndpoints
 		s.cfg.SessionTimeout = resp.RevisedSessionTimeout
-		s.signatureToSend = services.NewSignatureDataFrom(resp.ServerCertificate, resp.ServerNonce)
+		s.signatureToSend = ua.NewSignatureDataFrom(resp.ServerCertificate, resp.ServerNonce)
 		s.maxRequestMessageSize = resp.MaxRequestMessageSize
 
 		// keep SignatureData to verify serverSignature in CreateSessionResponse.
-		s.mySignature = services.NewSignatureDataFrom(s.sechan.cfg.Certificate, nonce)
+		s.mySignature = ua.NewSignatureDataFrom(s.sechan.cfg.Certificate, nonce)
 		return nil
 	})
 }
 
 func (s *Session) activateSession() error {
-	req := &services.ActivateSessionRequest{
+	req := &ua.ActivateSessionRequest{
 		ClientSignature:            s.signatureToSend,
 		ClientSoftwareCertificates: nil,
 		LocaleIDs:                  s.cfg.LocaleIDs,
@@ -81,7 +80,7 @@ func (s *Session) activateSession() error {
 		UserTokenSignature:         s.cfg.UserTokenSignature,
 	}
 	return s.sechan.Send(req, func(v interface{}) error {
-		resp, ok := v.(*services.ActivateSessionResponse)
+		resp, ok := v.(*ua.ActivateSessionResponse)
 		if !ok {
 			return fmt.Errorf("invalid response. Got %T, want ActivateSessionResponse", v)
 		}

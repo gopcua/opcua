@@ -3,7 +3,6 @@ package opcua
 import (
 	"time"
 
-	uas "github.com/gopcua/opcua/services"
 	"github.com/gopcua/opcua/ua"
 )
 
@@ -18,12 +17,12 @@ type Node struct {
 }
 
 // NodeClass returns the node class attribute.
-func (a *Node) NodeClass() (uas.NodeClass, error) {
+func (a *Node) NodeClass() (ua.NodeClass, error) {
 	v, err := a.Attribute(ua.IntegerIDNodeClass)
 	if err != nil {
 		return 0, err
 	}
-	return uas.NodeClass(v.Int()), nil
+	return ua.NodeClass(v.Int()), nil
 }
 
 // BrowseName returns the browse name of the node.
@@ -52,7 +51,7 @@ func (a *Node) Value() (*ua.Variant, error) {
 // Attribute returns the attribute of the node. with the given id.
 func (a *Node) Attribute(attrID uint32) (*ua.Variant, error) {
 	rv := &ua.ReadValueID{NodeID: a.ID, AttributeID: attrID, DataEncoding: &ua.QualifiedName{}}
-	req := &uas.ReadRequest{NodesToRead: []*ua.ReadValueID{rv}}
+	req := &ua.ReadRequest{NodesToRead: []*ua.ReadValueID{rv}}
 	res, err := a.c.Read(req)
 	if err != nil {
 		return nil, err
@@ -66,23 +65,23 @@ func (a *Node) Attribute(attrID uint32) (*ua.Variant, error) {
 // References retrns all references for the node.
 // todo(fs): this is not complete since it only returns the
 // todo(fs): top-level reference at this point.
-func (a *Node) References(refs *ua.NodeID) (*uas.BrowseResponse, error) {
-	desc := &uas.BrowseDescription{
+func (a *Node) References(refs *ua.NodeID) (*ua.BrowseResponse, error) {
+	desc := &ua.BrowseDescription{
 		NodeID:          a.ID,
-		Direction:       uas.BrowseDirectionBoth,
+		Direction:       ua.BrowseDirectionBoth,
 		ReferenceTypeID: refs,
 		IncludeSubtypes: true,
-		NodeClassMask:   uas.NodeClassAll,
-		ResultMask:      uas.BrowseResultMaskAll,
+		NodeClassMask:   ua.NodeClassAll,
+		ResultMask:      ua.BrowseResultMaskAll,
 	}
 
-	req := &uas.BrowseRequest{
-		View: &uas.ViewDescription{
+	req := &ua.BrowseRequest{
+		View: &ua.ViewDescription{
 			ViewID:    ua.NewTwoByteNodeID(0),
 			Timestamp: time.Now(),
 		},
 		RequestedMaxReferencesPerNode: 1000,
-		NodesToBrowse:                 []*uas.BrowseDescription{desc},
+		NodesToBrowse:                 []*ua.BrowseDescription{desc},
 	}
 
 	return a.c.Browse(req)

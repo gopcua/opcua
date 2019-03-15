@@ -7,7 +7,6 @@ package uasc
 import (
 	"github.com/gopcua/opcua/errors"
 	"github.com/gopcua/opcua/id"
-	"github.com/gopcua/opcua/services"
 	"github.com/gopcua/opcua/ua"
 )
 
@@ -118,7 +117,7 @@ func (m *Message) Decode(b []byte) (int, error) {
 	if err != nil {
 		return n, err
 	}
-	m.TypeID, m.Service, err = services.Decode(b[n:])
+	m.TypeID, m.Service, err = ua.DecodeService(b[n:])
 	return len(b), err
 }
 
