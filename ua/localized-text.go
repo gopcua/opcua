@@ -2,13 +2,12 @@
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
-package datatypes
+package ua
 
 import (
 	"fmt"
 
 	"github.com/gopcua/opcua/id"
-	"github.com/gopcua/opcua/ua"
 )
 
 // LocalizedText represents a LocalizedText.
@@ -39,7 +38,7 @@ func NewLocalizedText(locale, text string) *LocalizedText {
 }
 
 func (m *LocalizedText) Decode(b []byte) (int, error) {
-	buf := ua.NewBuffer(b)
+	buf := NewBuffer(b)
 	m.EncodingMask = buf.ReadByte()
 	if m.HasLocale() {
 		m.Locale = buf.ReadString()
@@ -51,7 +50,7 @@ func (m *LocalizedText) Decode(b []byte) (int, error) {
 }
 
 func (m *LocalizedText) Encode() ([]byte, error) {
-	buf := ua.NewBuffer(nil)
+	buf := NewBuffer(nil)
 	buf.WriteUint8(m.EncodingMask)
 	if m.HasLocale() {
 		buf.WriteString(m.Locale)

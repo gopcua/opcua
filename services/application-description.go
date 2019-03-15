@@ -7,7 +7,7 @@ package services
 import (
 	"fmt"
 
-	"github.com/gopcua/opcua/datatypes"
+	"github.com/gopcua/opcua/ua"
 )
 
 // ApplicationType definitions.
@@ -26,7 +26,7 @@ const (
 type ApplicationDescription struct {
 	ApplicationURI      string
 	ProductURI          string
-	ApplicationName     *datatypes.LocalizedText
+	ApplicationName     *ua.LocalizedText
 	ApplicationType     uint32
 	GatewayServerURI    string
 	DiscoveryProfileURI string
@@ -38,7 +38,7 @@ func NewApplicationDescription(appURI, prodURI, appName string, appType uint32, 
 	return &ApplicationDescription{
 		ApplicationURI:      appURI,
 		ProductURI:          prodURI,
-		ApplicationName:     datatypes.NewLocalizedText("", appName),
+		ApplicationName:     ua.NewLocalizedText("", appName),
 		ApplicationType:     appType,
 		GatewayServerURI:    gwURI,
 		DiscoveryProfileURI: profileURI,

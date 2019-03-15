@@ -8,14 +8,14 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/gopcua/opcua/datatypes"
+	"github.com/gopcua/opcua/ua"
 )
 
 // RequestHeader represents a Request Header in each services.
 //
 // Specification: Part 4, 7.28
 type RequestHeader struct {
-	AuthenticationToken *datatypes.NodeID
+	AuthenticationToken *ua.NodeID
 	Timestamp           time.Time
 	RequestHandle       uint32
 	ReturnDiagnostics   uint32
@@ -25,7 +25,7 @@ type RequestHeader struct {
 }
 
 // NewRequestHeader creates a new RequestHeader.
-func NewRequestHeader(authToken *datatypes.NodeID, timestamp time.Time, handle, diag, timeout uint32, auditID string, additionalHeader *AdditionalHeader) *RequestHeader {
+func NewRequestHeader(authToken *ua.NodeID, timestamp time.Time, handle, diag, timeout uint32, auditID string, additionalHeader *AdditionalHeader) *RequestHeader {
 	return &RequestHeader{
 		AuthenticationToken: authToken,
 		Timestamp:           timestamp,

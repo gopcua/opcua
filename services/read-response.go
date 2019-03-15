@@ -5,7 +5,7 @@
 package services
 
 import (
-	"github.com/gopcua/opcua/datatypes"
+	"github.com/gopcua/opcua/ua"
 )
 
 // ReadResponse represents the response to a ReadRequest.
@@ -13,12 +13,12 @@ import (
 // Specification Part 4, 5.10.2.2
 type ReadResponse struct {
 	ResponseHeader  *ResponseHeader
-	Results         []*datatypes.DataValue
-	DiagnosticInfos []*datatypes.DiagnosticInfo
+	Results         []*ua.DataValue
+	DiagnosticInfos []*ua.DiagnosticInfo
 }
 
 // NewReadResponse creates a new ReadResponse.
-func NewReadResponse(resHeader *ResponseHeader, diag []*datatypes.DiagnosticInfo, results ...*datatypes.DataValue) *ReadResponse {
+func NewReadResponse(resHeader *ResponseHeader, diag []*ua.DiagnosticInfo, results ...*ua.DataValue) *ReadResponse {
 	return &ReadResponse{
 		ResponseHeader:  resHeader,
 		Results:         results,

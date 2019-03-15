@@ -4,17 +4,17 @@
 
 package services
 
-import "github.com/gopcua/opcua/datatypes"
+import "github.com/gopcua/opcua/ua"
 
 // AdditionalHeader represents the AdditionalHeader.
 // TODO: add body handling.
 type AdditionalHeader struct {
-	TypeID       *datatypes.ExpandedNodeID
+	TypeID       *ua.ExpandedNodeID
 	EncodingMask uint8
 }
 
 // NewAdditionalHeader creates a new AdditionalHeader.
-func NewAdditionalHeader(typeID *datatypes.ExpandedNodeID, mask uint8) *AdditionalHeader {
+func NewAdditionalHeader(typeID *ua.ExpandedNodeID, mask uint8) *AdditionalHeader {
 	return &AdditionalHeader{
 		TypeID:       typeID,
 		EncodingMask: mask,
@@ -24,7 +24,7 @@ func NewAdditionalHeader(typeID *datatypes.ExpandedNodeID, mask uint8) *Addition
 // NewNullAdditionalHeader creates a new AdditionalHeader without meaningful values.
 func NewNullAdditionalHeader() *AdditionalHeader {
 	return &AdditionalHeader{
-		TypeID:       datatypes.NewTwoByteExpandedNodeID(0),
+		TypeID:       ua.NewTwoByteExpandedNodeID(0),
 		EncodingMask: 0x00,
 	}
 }

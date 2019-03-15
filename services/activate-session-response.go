@@ -5,7 +5,7 @@
 package services
 
 import (
-	"github.com/gopcua/opcua/datatypes"
+	"github.com/gopcua/opcua/ua"
 )
 
 // ActivateSessionResponse is used by the Server to answer to the ActivateSessionRequest.
@@ -26,11 +26,11 @@ type ActivateSessionResponse struct {
 	ResponseHeader  *ResponseHeader
 	ServerNonce     []byte
 	Results         []uint32
-	DiagnosticInfos []*datatypes.DiagnosticInfo
+	DiagnosticInfos []*ua.DiagnosticInfo
 }
 
 // NewActivateSessionResponse creates a new NewActivateSessionResponse.
-func NewActivateSessionResponse(resHeader *ResponseHeader, nonce []byte, results []uint32, diags []*datatypes.DiagnosticInfo) *ActivateSessionResponse {
+func NewActivateSessionResponse(resHeader *ResponseHeader, nonce []byte, results []uint32, diags []*ua.DiagnosticInfo) *ActivateSessionResponse {
 	return &ActivateSessionResponse{
 		ResponseHeader:  resHeader,
 		ServerNonce:     nonce,

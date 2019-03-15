@@ -2,7 +2,7 @@
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
-package datatypes
+package ua
 
 // QualifiedName contains a qualified name. It is, for example, used as BrowseName.
 // The name part of the QualifiedName is restricted to 512 characters.

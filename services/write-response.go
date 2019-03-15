@@ -5,7 +5,7 @@
 package services
 
 import (
-	"github.com/gopcua/opcua/datatypes"
+	"github.com/gopcua/opcua/ua"
 )
 
 // WriteResponse is used to write values to one or more Attributes of one or more Nodes. For
@@ -17,11 +17,11 @@ import (
 type WriteResponse struct {
 	ResponseHeader  *ResponseHeader
 	Results         []uint32
-	DiagnosticInfos []*datatypes.DiagnosticInfo
+	DiagnosticInfos []*ua.DiagnosticInfo
 }
 
 // NewWriteResponse creates a new WriteResponse.
-func NewWriteResponse(resHeader *ResponseHeader, diags []*datatypes.DiagnosticInfo, results ...uint32) *WriteResponse {
+func NewWriteResponse(resHeader *ResponseHeader, diags []*ua.DiagnosticInfo, results ...uint32) *WriteResponse {
 	return &WriteResponse{
 		ResponseHeader:  resHeader,
 		Results:         results,

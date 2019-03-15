@@ -8,14 +8,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gopcua/opcua/datatypes"
+	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/utils/codectest"
 )
 
 func NewNullResponseHeader() *ResponseHeader {
 	return &ResponseHeader{
 		Timestamp:          time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC),
-		ServiceDiagnostics: datatypes.NewNullDiagnosticInfo(),
+		ServiceDiagnostics: ua.NewNullDiagnosticInfo(),
 		AdditionalHeader:   NewNullAdditionalHeader(),
 	}
 }
@@ -46,15 +46,15 @@ func TestResponseHeader(t *testing.T) {
 				time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
 				1,
 				0x00000000,
-				datatypes.NewDiagnosticInfo(
+				ua.NewDiagnosticInfo(
 					false, false, false, false, false, false, false,
 					0, 0, 0, 0, "", 0, nil,
 				),
 				[]string{"foo", "bar"},
 				NewAdditionalHeader(
-					datatypes.NewExpandedNodeID(
+					ua.NewExpandedNodeID(
 						false, false,
-						datatypes.NewTwoByteNodeID(255),
+						ua.NewTwoByteNodeID(255),
 						"", 0,
 					),
 					0x00,

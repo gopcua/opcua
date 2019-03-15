@@ -2,9 +2,7 @@
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
-package datatypes
-
-import "github.com/gopcua/opcua/ua"
+package ua
 
 // ExpandedNodeID extends the NodeID structure by allowing the NamespaceURI to be
 // explicitly specified instead of using the NamespaceIndex. The NamespaceURI is optional.
@@ -50,7 +48,7 @@ func NewFourByteExpandedNodeID(ns uint8, id uint16) *ExpandedNodeID {
 }
 
 func (e *ExpandedNodeID) Decode(b []byte) (int, error) {
-	buf := ua.NewBuffer(b)
+	buf := NewBuffer(b)
 	e.NodeID = new(NodeID)
 	buf.ReadStruct(e.NodeID)
 	if e.HasNamespaceURI() {
@@ -63,7 +61,7 @@ func (e *ExpandedNodeID) Decode(b []byte) (int, error) {
 }
 
 func (e *ExpandedNodeID) Encode() ([]byte, error) {
-	buf := ua.NewBuffer(nil)
+	buf := NewBuffer(nil)
 	buf.WriteStruct(e.NodeID)
 	if e.HasNamespaceURI() {
 		buf.WriteString(e.NamespaceURI)

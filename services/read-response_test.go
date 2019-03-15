@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gopcua/opcua/datatypes"
+	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/utils/codectest"
 )
 
@@ -19,14 +19,14 @@ func TestReadResponse(t *testing.T) {
 			Struct: NewReadResponse(
 				NewResponseHeader(
 					time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-					1, 0, datatypes.NewNullDiagnosticInfo(), []string{}, NewNullAdditionalHeader(),
+					1, 0, ua.NewNullDiagnosticInfo(), []string{}, NewNullAdditionalHeader(),
 				),
-				[]*datatypes.DiagnosticInfo{
-					datatypes.NewNullDiagnosticInfo(),
+				[]*ua.DiagnosticInfo{
+					ua.NewNullDiagnosticInfo(),
 				},
-				datatypes.NewDataValue(
+				ua.NewDataValue(
 					true, false, false, false, false, false,
-					datatypes.MustVariant(float32(2.5001559257507324)),
+					ua.MustVariant(float32(2.5001559257507324)),
 					0, time.Time{}, 0, time.Time{}, 0,
 				),
 			),

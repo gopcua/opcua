@@ -8,13 +8,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gopcua/opcua/datatypes"
+	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/utils/codectest"
 )
 
 func NewNullRequestHeader() *RequestHeader {
 	return &RequestHeader{
-		AuthenticationToken: datatypes.NewTwoByteNodeID(0),
+		AuthenticationToken: ua.NewTwoByteNodeID(0),
 		Timestamp:           time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC),
 		AdditionalHeader:    NewNullAdditionalHeader(),
 	}
@@ -46,16 +46,16 @@ func TestRequestHeader(t *testing.T) {
 		{
 			Struct: func() *RequestHeader {
 				r := NewRequestHeader(
-					datatypes.NewFourByteNodeID(0, 33008),
+					ua.NewFourByteNodeID(0, 33008),
 					time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
 					1,
 					0,
 					0,
 					"foobar",
 					NewAdditionalHeader(
-						datatypes.NewExpandedNodeID(
+						ua.NewExpandedNodeID(
 							false, false,
-							datatypes.NewTwoByteNodeID(255),
+							ua.NewTwoByteNodeID(255),
 							"", 0,
 						),
 						0x00,

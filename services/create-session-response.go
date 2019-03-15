@@ -5,7 +5,7 @@
 package services
 
 import (
-	"github.com/gopcua/opcua/datatypes"
+	"github.com/gopcua/opcua/ua"
 )
 
 // CreateSessionResponse represents a CreateSessionResponse.
@@ -13,8 +13,8 @@ import (
 // Specification: Part4, 5.6.2
 type CreateSessionResponse struct {
 	*ResponseHeader
-	SessionID                  *datatypes.NodeID
-	AuthenticationToken        *datatypes.NodeID
+	SessionID                  *ua.NodeID
+	AuthenticationToken        *ua.NodeID
 	RevisedSessionTimeout      uint64
 	ServerNonce                []byte
 	ServerCertificate          []byte
@@ -25,7 +25,7 @@ type CreateSessionResponse struct {
 }
 
 // NewCreateSessionResponse creates a new NewCreateSessionResponse with the given parameters.
-func NewCreateSessionResponse(resHeader *ResponseHeader, sessionID, authToken *datatypes.NodeID, timeout uint64, nonce, cert []byte, svrSignature *SignatureData, maxRespSize uint32, endpoints ...*EndpointDescription) *CreateSessionResponse {
+func NewCreateSessionResponse(resHeader *ResponseHeader, sessionID, authToken *ua.NodeID, timeout uint64, nonce, cert []byte, svrSignature *SignatureData, maxRespSize uint32, endpoints ...*EndpointDescription) *CreateSessionResponse {
 	return &CreateSessionResponse{
 		ResponseHeader:             resHeader,
 		SessionID:                  sessionID,

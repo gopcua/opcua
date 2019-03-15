@@ -2,7 +2,7 @@
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
-package datatypes
+package ua
 
 import (
 	"encoding/base64"
@@ -10,7 +10,6 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/utils/codectest"
 )
 
@@ -109,7 +108,7 @@ func BenchmarkReflectDecode(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		v := new(NodeID)
-		if _, err := ua.Decode(data, v); err != nil {
+		if _, err := Decode(data, v); err != nil {
 			b.Fatal(err)
 		}
 	}

@@ -35,7 +35,7 @@ func NewSignatureDataFrom(cert, nonce []byte) *SignatureData {
 	return NewSignatureData("", nil)
 }
 
-// datatypes.String returns SignatureData in string.
+// ua.String returns SignatureData in string.
 func (s *SignatureData) String() string {
 	return fmt.Sprintf("%s, %x", s.Algorithm, s.Signature)
 }

@@ -2,12 +2,10 @@
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
-package datatypes
+package ua
 
 import (
 	"time"
-
-	"github.com/gopcua/opcua/ua"
 )
 
 // DataValue is always preceded by a mask that indicates which fields are present in the stream.
@@ -56,7 +54,7 @@ func NewDataValue(hasValue, hasStatus, hasSrcTs, hasSrcPs, hasSvrTs, hasSvrPs bo
 }
 
 func (d *DataValue) Decode(b []byte) (int, error) {
-	buf := ua.NewBuffer(b)
+	buf := NewBuffer(b)
 	d.EncodingMask = buf.ReadByte()
 	if d.HasValue() {
 		d.Value = new(Variant)
@@ -81,7 +79,7 @@ func (d *DataValue) Decode(b []byte) (int, error) {
 }
 
 func (d *DataValue) Encode() ([]byte, error) {
-	buf := ua.NewBuffer(nil)
+	buf := NewBuffer(nil)
 	buf.WriteUint8(d.EncodingMask)
 	if d.HasValue() {
 		buf.WriteStruct(d.Value)

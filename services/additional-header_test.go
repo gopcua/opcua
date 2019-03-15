@@ -7,7 +7,7 @@ package services
 import (
 	"testing"
 
-	"github.com/gopcua/opcua/datatypes"
+	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/utils/codectest"
 )
 
@@ -16,9 +16,9 @@ func TestAdditionalHeader(t *testing.T) {
 		{
 			Name: "no-body",
 			Struct: NewAdditionalHeader(
-				datatypes.NewExpandedNodeID(
+				ua.NewExpandedNodeID(
 					false, false,
-					datatypes.NewTwoByteNodeID(255),
+					ua.NewTwoByteNodeID(255),
 					"", 0,
 				),
 				0x00,

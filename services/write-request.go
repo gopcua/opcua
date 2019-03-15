@@ -5,7 +5,7 @@
 package services
 
 import (
-	"github.com/gopcua/opcua/datatypes"
+	"github.com/gopcua/opcua/ua"
 )
 
 // WriteRequest is used to write values to one or more Attributes of one or more Nodes. For
@@ -16,11 +16,11 @@ import (
 // Specification: Part 4, 5.10.4
 type WriteRequest struct {
 	RequestHeader *RequestHeader
-	NodesToWrite  []*datatypes.WriteValue
+	NodesToWrite  []*ua.WriteValue
 }
 
 // NewWriteRequest creates a new WriteRequest.
-func NewWriteRequest(reqHeader *RequestHeader, nodes ...*datatypes.WriteValue) *WriteRequest {
+func NewWriteRequest(reqHeader *RequestHeader, nodes ...*ua.WriteValue) *WriteRequest {
 	return &WriteRequest{
 		RequestHeader: reqHeader,
 		NodesToWrite:  nodes,

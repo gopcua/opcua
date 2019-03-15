@@ -2,15 +2,13 @@
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
-package datatypes
+package ua
 
 import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"strings"
-
-	"github.com/gopcua/opcua/ua"
 )
 
 // GUID represents GUID in binary stream. It is a 16-byte globally unique identifier.
@@ -45,7 +43,7 @@ func NewGUID(guid string) *GUID {
 }
 
 func (g *GUID) Decode(b []byte) (int, error) {
-	buf := ua.NewBuffer(b)
+	buf := NewBuffer(b)
 	g.Data1 = buf.ReadUint32()
 	g.Data2 = buf.ReadUint16()
 	g.Data3 = buf.ReadUint16()
@@ -54,7 +52,7 @@ func (g *GUID) Decode(b []byte) (int, error) {
 }
 
 func (g *GUID) Encode() ([]byte, error) {
-	buf := ua.NewBuffer(nil)
+	buf := NewBuffer(nil)
 	buf.WriteUint32(g.Data1)
 	buf.WriteUint16(g.Data2)
 	buf.WriteUint16(g.Data3)

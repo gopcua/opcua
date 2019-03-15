@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gopcua/opcua/datatypes"
 	"github.com/gopcua/opcua/status"
+	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/utils/codectest"
 )
 
@@ -20,7 +20,7 @@ func TestWriteResponse(t *testing.T) {
 			Struct: NewWriteResponse(
 				NewResponseHeader(
 					time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-					1, 0, datatypes.NewNullDiagnosticInfo(), []string{}, NewNullAdditionalHeader(),
+					1, 0, ua.NewNullDiagnosticInfo(), []string{}, NewNullAdditionalHeader(),
 				),
 				nil,
 				0,
@@ -50,7 +50,7 @@ func TestWriteResponse(t *testing.T) {
 			Struct: NewWriteResponse(
 				NewResponseHeader(
 					time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-					1, 0, datatypes.NewNullDiagnosticInfo(), []string{}, NewNullAdditionalHeader(),
+					1, 0, ua.NewNullDiagnosticInfo(), []string{}, NewNullAdditionalHeader(),
 				),
 				nil,
 				0, status.BadUserAccessDenied,

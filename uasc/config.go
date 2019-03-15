@@ -9,9 +9,9 @@ import (
 	"encoding/binary"
 	"time"
 
-	"github.com/gopcua/opcua/datatypes"
 	"github.com/gopcua/opcua/errors"
 	"github.com/gopcua/opcua/services"
+	"github.com/gopcua/opcua/ua"
 )
 
 // Config represents a configuration which UASC client/server has in common.
@@ -248,7 +248,7 @@ func (c *Config) validateServerConfig() error {
 type SessionConfig struct {
 	// AuthenticationToken is the secret Session identifier used to verify that the request is
 	// associated with the Session. The SessionAuthenticationToken type is defined in 7.31.
-	AuthenticationToken *datatypes.NodeID
+	AuthenticationToken *ua.NodeID
 
 	// ClientDescription is the information that describes the Client application.
 	// The type ApplicationDescription is defined in 7.1.
@@ -283,7 +283,7 @@ type SessionConfig struct {
 	// The UserIdentityToken is an extensible parameter type defined in 7.36.
 	// The EndpointDescription specifies what UserIdentityTokens the Server shall accept.
 	// Null or empty user token shall always be interpreted as anonymous.
-	UserIdentityToken datatypes.UserIdentityToken
+	UserIdentityToken ua.UserIdentityToken
 
 	// If the Client specified a user identity token that supports digital signatures, then it
 	// shall create a signature and pass it as this parameter. Otherwise the parameter is null.
@@ -310,13 +310,13 @@ type SessionConfig struct {
 }
 
 // NewClientSessionConfig creates a SessionConfig for client.
-func NewClientSessionConfig(locales []string, userToken datatypes.UserIdentityToken) *SessionConfig {
+func NewClientSessionConfig(locales []string, userToken ua.UserIdentityToken) *SessionConfig {
 	return &SessionConfig{
 		SessionTimeout: 0xffff,
 		ClientDescription: &services.ApplicationDescription{
 			ApplicationURI:  "urn:gopcua:client",
 			ProductURI:      "urn:gopcua",
-			ApplicationName: datatypes.NewLocalizedText("", "gopcua - OPC UA implementation in pure Golang"),
+			ApplicationName: ua.NewLocalizedText("", "gopcua - OPC UA implementation in pure Golang"),
 			ApplicationType: services.AppTypeClient,
 		},
 		LocaleIDs:          locales,
@@ -332,7 +332,7 @@ func NewServerSessionConfig(secChan *SecureChannel) *SessionConfig {
 		binary.LittleEndian.PutUint16(rawToken, uint16(time.Now().UnixNano()))
 	}
 	return &SessionConfig{
-		AuthenticationToken: datatypes.NewFourByteNodeID(0, binary.LittleEndian.Uint16(rawToken)),
+		AuthenticationToken: ua.NewFourByteNodeID(0, binary.LittleEndian.Uint16(rawToken)),
 		SessionTimeout:      0xffff,
 		ServerEndpoints: []*services.EndpointDescription{
 			services.NewEndpointDescription(

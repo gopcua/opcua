@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gopcua/opcua/datatypes"
+	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/utils/codectest"
 )
 
@@ -18,7 +18,7 @@ func TestFindServersOnNetworkRequest(t *testing.T) {
 			Name: "normal",
 			Struct: NewFindServersOnNetworkRequest(
 				NewRequestHeader(
-					datatypes.NewOpaqueNodeID(0x00, []byte{
+					ua.NewOpaqueNodeID(0x00, []byte{
 						0x08, 0x22, 0x87, 0x62, 0xba, 0x81, 0xe1, 0x11,
 						0xa6, 0x43, 0xf8, 0x77, 0x7b, 0xc6, 0x2f, 0xc8,
 					}),

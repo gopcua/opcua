@@ -1,4 +1,4 @@
-package datatypes
+package ua
 
 const (
 	TypeBoolean         = 1

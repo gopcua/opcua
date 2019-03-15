@@ -10,8 +10,8 @@ import (
 
 	"github.com/gopcua/opcua/id"
 
-	"github.com/gopcua/opcua/datatypes"
 	"github.com/gopcua/opcua/services"
+	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/utils/codectest"
 )
 
@@ -23,7 +23,7 @@ func TestMessage(t *testing.T) {
 				m := NewMessage(
 					services.NewOpenSecureChannelRequest(
 						services.NewRequestHeader(
-							datatypes.NewTwoByteNodeID(0),
+							ua.NewTwoByteNodeID(0),
 							time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
 							1, 0x03ff, 0, "", services.NewNullAdditionalHeader(),
 						),
@@ -114,7 +114,7 @@ func TestMessage(t *testing.T) {
 				m := NewMessage(
 					services.NewGetEndpointsRequest(
 						services.NewRequestHeader(
-							datatypes.NewTwoByteNodeID(0),
+							ua.NewTwoByteNodeID(0),
 							time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
 							1, 0x03ff, 0, "", services.NewNullAdditionalHeader(),
 						),
@@ -180,7 +180,7 @@ func TestMessage(t *testing.T) {
 				m := NewMessage(
 					services.NewCloseSecureChannelRequest(
 						services.NewRequestHeader(
-							datatypes.NewTwoByteNodeID(0),
+							ua.NewTwoByteNodeID(0),
 							time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
 							1, 0x03ff, 0, "", services.NewNullAdditionalHeader(),
 						),

@@ -2,11 +2,10 @@
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
-package datatypes
+package ua
 
 import (
 	"github.com/gopcua/opcua/id"
-	"github.com/gopcua/opcua/ua"
 )
 
 // UserIdentityToken is an interface to handle all types of UserIdentityToken types as one type.
@@ -29,13 +28,13 @@ func NewAnonymousIdentityToken(policyID string) *AnonymousIdentityToken {
 }
 
 func (t *AnonymousIdentityToken) Decode(b []byte) (int, error) {
-	buf := ua.NewBuffer(b)
+	buf := NewBuffer(b)
 	t.PolicyID = buf.ReadString()
 	return buf.Pos(), buf.Error()
 }
 
 func (t *AnonymousIdentityToken) Encode() ([]byte, error) {
-	buf := ua.NewBuffer(nil)
+	buf := NewBuffer(nil)
 	buf.WriteString(t.PolicyID)
 	return buf.Bytes(), buf.Error()
 }
@@ -88,7 +87,7 @@ func NewUserNameIdentityToken(policyID, username string, password []byte, alg st
 }
 
 func (t *UserNameIdentityToken) Decode(b []byte) (int, error) {
-	buf := ua.NewBuffer(b)
+	buf := NewBuffer(b)
 	t.PolicyID = buf.ReadString()
 	t.UserName = buf.ReadString()
 	t.Password = buf.ReadBytes()
@@ -97,7 +96,7 @@ func (t *UserNameIdentityToken) Decode(b []byte) (int, error) {
 }
 
 func (t *UserNameIdentityToken) Encode() ([]byte, error) {
-	buf := ua.NewBuffer(nil)
+	buf := NewBuffer(nil)
 	buf.WriteString(t.PolicyID)
 	buf.WriteString(t.UserName)
 	buf.WriteByteString(t.Password)
@@ -135,14 +134,14 @@ func NewX509IdentityToken(policyID, cert string) *X509IdentityToken {
 }
 
 func (t *X509IdentityToken) Decode(b []byte) (int, error) {
-	buf := ua.NewBuffer(b)
+	buf := NewBuffer(b)
 	t.PolicyID = buf.ReadString()
 	t.CertificateData = buf.ReadString()
 	return buf.Pos(), buf.Error()
 }
 
 func (t *X509IdentityToken) Encode() ([]byte, error) {
-	buf := ua.NewBuffer(nil)
+	buf := NewBuffer(nil)
 	buf.WriteString(t.PolicyID)
 	buf.WriteString(t.CertificateData)
 	return buf.Bytes(), buf.Error()
@@ -195,7 +194,7 @@ func NewIssuedIdentityToken(policyID string, tokenData []byte, alg string) *Issu
 }
 
 func (t *IssuedIdentityToken) Decode(b []byte) (int, error) {
-	buf := ua.NewBuffer(b)
+	buf := NewBuffer(b)
 	t.PolicyID = buf.ReadString()
 	t.TokenData = buf.ReadBytes()
 	t.EncryptionAlgorithm = buf.ReadString()
@@ -203,7 +202,7 @@ func (t *IssuedIdentityToken) Decode(b []byte) (int, error) {
 }
 
 func (t *IssuedIdentityToken) Encode() ([]byte, error) {
-	buf := ua.NewBuffer(nil)
+	buf := NewBuffer(nil)
 	buf.WriteString(t.PolicyID)
 	buf.WriteByteString(t.TokenData)
 	buf.WriteString(t.EncryptionAlgorithm)

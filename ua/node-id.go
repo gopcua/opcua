@@ -2,7 +2,7 @@
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
-package datatypes
+package ua
 
 import (
 	"encoding/base64"
@@ -10,8 +10,6 @@ import (
 	"math"
 	"strconv"
 	"strings"
-
-	"github.com/gopcua/opcua/ua"
 )
 
 // NodeID type definitions.
@@ -358,7 +356,7 @@ func (n *NodeID) String() string {
 }
 
 func (n *NodeID) Decode(b []byte) (int, error) {
-	buf := ua.NewBuffer(b)
+	buf := NewBuffer(b)
 
 	n.mask = buf.ReadByte()
 	typ := n.mask & 0xf
@@ -395,7 +393,7 @@ func (n *NodeID) Decode(b []byte) (int, error) {
 }
 
 func (n *NodeID) Encode() ([]byte, error) {
-	buf := ua.NewBuffer(nil)
+	buf := NewBuffer(nil)
 	buf.WriteByte(n.mask)
 
 	switch n.Type() {

@@ -5,7 +5,7 @@
 package services
 
 import (
-	"github.com/gopcua/opcua/datatypes"
+	"github.com/gopcua/opcua/ua"
 )
 
 // ActivateSessionRequest is used by the Client to specify the identity of the user
@@ -25,18 +25,18 @@ type ActivateSessionRequest struct {
 	ClientSignature            *SignatureData
 	ClientSoftwareCertificates []*SignedSoftwareCertificate
 	LocaleIDs                  []string
-	UserIdentityToken          *datatypes.ExtensionObject
+	UserIdentityToken          *ua.ExtensionObject
 	UserTokenSignature         *SignatureData
 }
 
 // NewActivateSessionRequest creates a new ActivateSessionRequest.
-func NewActivateSessionRequest(reqHeader *RequestHeader, sig *SignatureData, locales []string, userToken datatypes.UserIdentityToken, tokenSig *SignatureData) *ActivateSessionRequest {
+func NewActivateSessionRequest(reqHeader *RequestHeader, sig *SignatureData, locales []string, userToken ua.UserIdentityToken, tokenSig *SignatureData) *ActivateSessionRequest {
 	return &ActivateSessionRequest{
 		RequestHeader:              reqHeader,
 		ClientSignature:            sig,
 		ClientSoftwareCertificates: nil,
 		LocaleIDs:                  locales,
-		UserIdentityToken:          datatypes.NewExtensionObject(0x01, userToken),
+		UserIdentityToken:          ua.NewExtensionObject(0x01, userToken),
 		UserTokenSignature:         tokenSig,
 	}
 }

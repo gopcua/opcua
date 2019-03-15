@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/gopcua/opcua/datatypes"
 	"github.com/gopcua/opcua/errors"
 	"github.com/gopcua/opcua/id"
 	"github.com/gopcua/opcua/ua"
@@ -66,8 +65,8 @@ func TypeID(v interface{}) uint16 {
 	return serviceTypeID[reflect.TypeOf(v)]
 }
 
-func Decode(b []byte) (*datatypes.ExpandedNodeID, interface{}, error) {
-	typeID := new(datatypes.ExpandedNodeID)
+func Decode(b []byte) (*ua.ExpandedNodeID, interface{}, error) {
+	typeID := new(ua.ExpandedNodeID)
 	n, err := typeID.Decode(b)
 	if err != nil {
 		return nil, nil, err

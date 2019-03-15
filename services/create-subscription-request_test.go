@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gopcua/opcua/datatypes"
+	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/utils/codectest"
 )
 
@@ -18,7 +18,7 @@ func TestCreateSubscriptionRequest(t *testing.T) {
 			Name: "normal",
 			Struct: &CreateSubscriptionRequest{
 				RequestHeader: &RequestHeader{
-					AuthenticationToken: datatypes.NewOpaqueNodeID(0, []byte{
+					AuthenticationToken: ua.NewOpaqueNodeID(0, []byte{
 						0xfe, 0x8d, 0x87, 0x79, 0xf7, 0x03, 0x27, 0x77,
 						0xc5, 0x03, 0xa1, 0x09, 0x50, 0x29, 0x27, 0x60,
 					}),
@@ -26,7 +26,7 @@ func TestCreateSubscriptionRequest(t *testing.T) {
 					RequestHandle: 1003429,
 					TimeoutHint:   10000,
 					AdditionalHeader: &AdditionalHeader{
-						TypeID:       datatypes.NewTwoByteExpandedNodeID(0),
+						TypeID:       ua.NewTwoByteExpandedNodeID(0),
 						EncodingMask: 0x00,
 					},
 					Timestamp: time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),

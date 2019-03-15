@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gopcua/opcua/datatypes"
+	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/utils/codectest"
 )
 
@@ -18,7 +18,7 @@ func TestReadRequest(t *testing.T) {
 			Name: "normal",
 			Struct: NewReadRequest(
 				NewRequestHeader(
-					datatypes.NewOpaqueNodeID(0x00, []byte{
+					ua.NewOpaqueNodeID(0x00, []byte{
 						0x08, 0x22, 0x87, 0x62, 0xba, 0x81, 0xe1, 0x11,
 						0xa6, 0x43, 0xf8, 0x77, 0x7b, 0xc6, 0x2f, 0xc8,
 					}),
@@ -26,9 +26,9 @@ func TestReadRequest(t *testing.T) {
 					1, 0, 0, "", NewNullAdditionalHeader(),
 				),
 				0, TimestampsToReturnBoth,
-				datatypes.NewReadValueID(
-					datatypes.NewFourByteNodeID(0, 2256),
-					datatypes.IntegerIDValue,
+				ua.NewReadValueID(
+					ua.NewFourByteNodeID(0, 2256),
+					ua.IntegerIDValue,
 					"", 0, "",
 				),
 			),

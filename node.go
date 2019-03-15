@@ -3,8 +3,8 @@ package opcua
 import (
 	"time"
 
-	uad "github.com/gopcua/opcua/datatypes"
 	uas "github.com/gopcua/opcua/services"
+	"github.com/gopcua/opcua/ua"
 )
 
 // Node is a high-level object to interact with a node in the
@@ -12,14 +12,14 @@ import (
 // access and manipulate the common attributes of a node.
 type Node struct {
 	// ID is the node id of the node.
-	ID *uad.NodeID
+	ID *ua.NodeID
 
 	c *Client
 }
 
 // NodeClass returns the node class attribute.
 func (a *Node) NodeClass() (uas.NodeClass, error) {
-	v, err := a.Attribute(uad.IntegerIDNodeClass)
+	v, err := a.Attribute(ua.IntegerIDNodeClass)
 	if err != nil {
 		return 0, err
 	}
@@ -27,32 +27,32 @@ func (a *Node) NodeClass() (uas.NodeClass, error) {
 }
 
 // BrowseName returns the browse name of the node.
-func (a *Node) BrowseName() (*uad.QualifiedName, error) {
-	v, err := a.Attribute(uad.IntegerIDBrowseName)
+func (a *Node) BrowseName() (*ua.QualifiedName, error) {
+	v, err := a.Attribute(ua.IntegerIDBrowseName)
 	if err != nil {
 		return nil, err
 	}
-	return v.Value.(*uad.QualifiedName), nil
+	return v.Value.(*ua.QualifiedName), nil
 }
 
 // DisplayName returns the display name of the node.
-func (a *Node) DisplayName() (*uad.LocalizedText, error) {
-	v, err := a.Attribute(uad.IntegerIDDisplayName)
+func (a *Node) DisplayName() (*ua.LocalizedText, error) {
+	v, err := a.Attribute(ua.IntegerIDDisplayName)
 	if err != nil {
 		return nil, err
 	}
-	return v.Value.(*uad.LocalizedText), nil
+	return v.Value.(*ua.LocalizedText), nil
 }
 
 // Value returns the value of the node.
-func (a *Node) Value() (*uad.Variant, error) {
-	return a.Attribute(uad.IntegerIDValue)
+func (a *Node) Value() (*ua.Variant, error) {
+	return a.Attribute(ua.IntegerIDValue)
 }
 
 // Attribute returns the attribute of the node. with the given id.
-func (a *Node) Attribute(attrID uint32) (*uad.Variant, error) {
-	rv := &uad.ReadValueID{NodeID: a.ID, AttributeID: attrID, DataEncoding: &uad.QualifiedName{}}
-	req := &uas.ReadRequest{NodesToRead: []*uad.ReadValueID{rv}}
+func (a *Node) Attribute(attrID uint32) (*ua.Variant, error) {
+	rv := &ua.ReadValueID{NodeID: a.ID, AttributeID: attrID, DataEncoding: &ua.QualifiedName{}}
+	req := &uas.ReadRequest{NodesToRead: []*ua.ReadValueID{rv}}
 	res, err := a.c.Read(req)
 	if err != nil {
 		return nil, err
@@ -66,7 +66,7 @@ func (a *Node) Attribute(attrID uint32) (*uad.Variant, error) {
 // References retrns all references for the node.
 // todo(fs): this is not complete since it only returns the
 // todo(fs): top-level reference at this point.
-func (a *Node) References(refs *uad.NodeID) (*uas.BrowseResponse, error) {
+func (a *Node) References(refs *ua.NodeID) (*uas.BrowseResponse, error) {
 	desc := &uas.BrowseDescription{
 		NodeID:          a.ID,
 		Direction:       uas.BrowseDirectionBoth,
@@ -78,7 +78,7 @@ func (a *Node) References(refs *uad.NodeID) (*uas.BrowseResponse, error) {
 
 	req := &uas.BrowseRequest{
 		View: &uas.ViewDescription{
-			ViewID:    uad.NewTwoByteNodeID(0),
+			ViewID:    ua.NewTwoByteNodeID(0),
 			Timestamp: time.Now(),
 		},
 		RequestedMaxReferencesPerNode: 1000,

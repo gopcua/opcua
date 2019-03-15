@@ -2,12 +2,10 @@
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
-package datatypes
+package ua
 
 import (
 	"fmt"
-
-	"github.com/gopcua/opcua/ua"
 )
 
 // DiagnosticInfo represents the DiagnosticInfo.
@@ -67,7 +65,7 @@ func NewNullDiagnosticInfo() *DiagnosticInfo {
 }
 
 func (d *DiagnosticInfo) Decode(b []byte) (int, error) {
-	buf := ua.NewBuffer(b)
+	buf := NewBuffer(b)
 	d.EncodingMask = buf.ReadByte()
 	if d.HasSymbolicID() {
 		d.SymbolicID = buf.ReadInt32()
@@ -95,7 +93,7 @@ func (d *DiagnosticInfo) Decode(b []byte) (int, error) {
 }
 
 func (d *DiagnosticInfo) Encode() ([]byte, error) {
-	buf := ua.NewBuffer(nil)
+	buf := NewBuffer(nil)
 	buf.WriteByte(d.EncodingMask)
 	if d.HasSymbolicID() {
 		buf.WriteInt32(d.SymbolicID)

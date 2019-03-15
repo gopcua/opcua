@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	uad "github.com/gopcua/opcua/datatypes"
 	uas "github.com/gopcua/opcua/services"
+	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uacp"
 	"github.com/gopcua/opcua/uasc"
 )
@@ -44,7 +44,7 @@ func (c *Client) Open() error {
 	// todo(fs): this should probably be configurable.
 	sessionCfg := uasc.NewClientSessionConfig(
 		[]string{"en-US"},
-		uad.NewAnonymousIdentityToken("open62541-anonymous-policy"),
+		ua.NewAnonymousIdentityToken("open62541-anonymous-policy"),
 	)
 
 	session := uasc.NewSession(sechan, sessionCfg)
@@ -67,7 +67,7 @@ func (c *Client) Close() error {
 
 // Node returns a node object which accesses its attributes
 // through this client connection.
-func (c *Client) Node(id *uad.NodeID) *Node {
+func (c *Client) Node(id *ua.NodeID) *Node {
 	return &Node{ID: id, c: c}
 }
 

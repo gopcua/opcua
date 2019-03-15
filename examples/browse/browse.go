@@ -10,8 +10,8 @@ import (
 	"log"
 
 	"github.com/gopcua/opcua"
-	uad "github.com/gopcua/opcua/datatypes"
 	uid "github.com/gopcua/opcua/id"
+	"github.com/gopcua/opcua/ua"
 )
 
 func join(a, b string) string {
@@ -35,7 +35,7 @@ func browse(n *opcua.Node, path string, level int) ([]string, error) {
 	}
 	path = join(path, browseName.Name)
 
-	typeDefs := uad.NewTwoByteNodeID(uid.HasTypeDefinition)
+	typeDefs := ua.NewTwoByteNodeID(uid.HasTypeDefinition)
 	refs, err := n.References(typeDefs)
 	if err != nil {
 		return nil, err
@@ -55,7 +55,7 @@ func main() {
 	}
 	defer c.Close()
 
-	root := c.Node(uad.NewStringNodeID(1, "Root"))
+	root := c.Node(ua.NewStringNodeID(1, "Root"))
 
 	nodeList, err := browse(root, "", 0)
 	if err != nil {

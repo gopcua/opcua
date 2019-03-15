@@ -2,9 +2,7 @@
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
-package datatypes
-
-import "github.com/gopcua/opcua/ua"
+package ua
 
 // WriteValue is a set of Node and Attribute to write.
 //
@@ -27,7 +25,7 @@ func NewWriteValue(node *NodeID, attr uint32, idxRange string, value *DataValue)
 }
 
 func (v *WriteValue) Decode(b []byte) (int, error) {
-	buf := ua.NewBuffer(b)
+	buf := NewBuffer(b)
 	v.NodeID = new(NodeID)
 	buf.ReadStruct(v.NodeID)
 	v.AttributeID = buf.ReadUint32()
@@ -38,7 +36,7 @@ func (v *WriteValue) Decode(b []byte) (int, error) {
 }
 
 func (v *WriteValue) Encode() ([]byte, error) {
-	buf := ua.NewBuffer(nil)
+	buf := NewBuffer(nil)
 	buf.WriteStruct(v.NodeID)
 	buf.WriteUint32(v.AttributeID)
 	buf.WriteString(v.IndexRange)

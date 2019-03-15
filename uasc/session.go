@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/gopcua/opcua/datatypes"
 	"github.com/gopcua/opcua/services"
+	"github.com/gopcua/opcua/ua"
 )
 
 type Session struct {
@@ -77,7 +77,7 @@ func (s *Session) activateSession() error {
 		ClientSignature:            s.signatureToSend,
 		ClientSoftwareCertificates: nil,
 		LocaleIDs:                  s.cfg.LocaleIDs,
-		UserIdentityToken:          datatypes.NewExtensionObject(1, s.cfg.UserIdentityToken),
+		UserIdentityToken:          ua.NewExtensionObject(1, s.cfg.UserIdentityToken),
 		UserTokenSignature:         s.cfg.UserTokenSignature,
 	}
 	return s.sechan.Send(req, func(v interface{}) error {

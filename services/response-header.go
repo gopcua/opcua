@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/gopcua/opcua/datatypes"
+	"github.com/gopcua/opcua/ua"
 )
 
 // ResponseHeader represents a Response Header in each services.
@@ -18,13 +18,13 @@ type ResponseHeader struct {
 	Timestamp          time.Time
 	RequestHandle      uint32
 	ServiceResult      uint32
-	ServiceDiagnostics *datatypes.DiagnosticInfo
+	ServiceDiagnostics *ua.DiagnosticInfo
 	StringTable        []string
 	AdditionalHeader   *AdditionalHeader
 }
 
 // NewResponseHeader creates a new ResponseHeader.
-func NewResponseHeader(timestamp time.Time, handle, code uint32, diag *datatypes.DiagnosticInfo, strs []string, additionalHeader *AdditionalHeader) *ResponseHeader {
+func NewResponseHeader(timestamp time.Time, handle, code uint32, diag *ua.DiagnosticInfo, strs []string, additionalHeader *AdditionalHeader) *ResponseHeader {
 	r := &ResponseHeader{
 		Timestamp:          timestamp,
 		RequestHandle:      handle,
@@ -34,7 +34,7 @@ func NewResponseHeader(timestamp time.Time, handle, code uint32, diag *datatypes
 		AdditionalHeader:   additionalHeader,
 	}
 	if diag == nil {
-		r.ServiceDiagnostics = datatypes.NewNullDiagnosticInfo()
+		r.ServiceDiagnostics = ua.NewNullDiagnosticInfo()
 	}
 
 	return r

@@ -5,7 +5,7 @@
 package services
 
 import (
-	"github.com/gopcua/opcua/datatypes"
+	"github.com/gopcua/opcua/ua"
 )
 
 // TimestampsToReturn is an enumeration that specifies the Timestamp Attributes to be
@@ -74,11 +74,11 @@ type ReadRequest struct {
 
 	// List of Nodes and their Attributes to read. For each entry in this list,
 	// a StatusCode is returned, and if it indicates success, the Attribute Value is also returned.
-	NodesToRead []*datatypes.ReadValueID
+	NodesToRead []*ua.ReadValueID
 }
 
 // NewReadRequest creates a new ReadRequest.
-func NewReadRequest(reqHeader *RequestHeader, maxAge uint64, tsRet TimestampsToReturn, nodes ...*datatypes.ReadValueID) *ReadRequest {
+func NewReadRequest(reqHeader *RequestHeader, maxAge uint64, tsRet TimestampsToReturn, nodes ...*ua.ReadValueID) *ReadRequest {
 	return &ReadRequest{
 		RequestHeader:      reqHeader,
 		MaxAge:             maxAge,

@@ -2,13 +2,11 @@
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
-package datatypes
+package ua
 
 import (
 	"fmt"
 	"time"
-
-	"github.com/gopcua/opcua/ua"
 )
 
 // Variant is a union of the built-in types.
@@ -73,7 +71,7 @@ func (m *Variant) HasArrayValues() bool {
 }
 
 func (m *Variant) Decode(b []byte) (int, error) {
-	buf := ua.NewBuffer(b)
+	buf := NewBuffer(b)
 
 	m.EncodingMask = buf.ReadByte()
 
@@ -177,7 +175,7 @@ func (m *Variant) Decode(b []byte) (int, error) {
 }
 
 func (m *Variant) Encode() ([]byte, error) {
-	buf := ua.NewBuffer(nil)
+	buf := NewBuffer(nil)
 
 	buf.WriteByte(m.EncodingMask)
 

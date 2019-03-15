@@ -11,8 +11,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/gopcua/opcua/datatypes"
 	"github.com/gopcua/opcua/services"
+	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uacp"
 )
 
@@ -66,7 +66,7 @@ func NewSecureChannel(c *uacp.Conn, cfg *Config) *SecureChannel {
 	cfg.SecureChannelID = 0
 
 	reqhdr := &services.RequestHeader{
-		AuthenticationToken: datatypes.NewTwoByteNodeID(0),
+		AuthenticationToken: ua.NewTwoByteNodeID(0),
 		Timestamp:           time.Now(),
 		TimeoutHint:         0xffff,
 		AdditionalHeader:    services.NewNullAdditionalHeader(),

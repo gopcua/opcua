@@ -2,13 +2,12 @@
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
-package datatypes
+package ua
 
 import (
 	"fmt"
 
 	"github.com/gopcua/opcua/id"
-	"github.com/gopcua/opcua/ua"
 )
 
 // ExtensionObject is encoded as sequence of bytes prefixed by the NodeId of its DataTypeEncoding
@@ -33,7 +32,7 @@ func NewExtensionObject(mask uint8, extParam ExtensionObjectValue) *ExtensionObj
 }
 
 func (e *ExtensionObject) Decode(b []byte) (int, error) {
-	buf := ua.NewBuffer(b)
+	buf := NewBuffer(b)
 	e.TypeID = new(ExpandedNodeID)
 	buf.ReadStruct(e.TypeID)
 	e.EncodingMask = buf.ReadByte()
@@ -51,7 +50,7 @@ func (e *ExtensionObject) Decode(b []byte) (int, error) {
 }
 
 func (e *ExtensionObject) Encode() ([]byte, error) {
-	buf := ua.NewBuffer(nil)
+	buf := NewBuffer(nil)
 	buf.WriteStruct(e.TypeID)
 	buf.WriteByte(e.EncodingMask)
 	if e.Value == nil {
@@ -68,8 +67,8 @@ func (e *ExtensionObject) Encode() ([]byte, error) {
 
 // ExtensionObjectValue represents the value in ExtensionObject.
 type ExtensionObjectValue interface {
-	ua.BinaryDecoder
-	ua.BinaryEncoder
+	BinaryDecoder
+	BinaryEncoder
 	Type() int
 }
 

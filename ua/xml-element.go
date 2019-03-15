@@ -1,3 +1,3 @@
-package datatypes
+package ua
 
 type XmlElement string

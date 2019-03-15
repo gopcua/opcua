@@ -24,7 +24,7 @@ func NewSignedSoftwareCertificate(cert, signature []byte) *SignedSoftwareCertifi
 	}
 }
 
-// datatypes.ByteString returns SignedSoftwareCertificate in string.
+// ua.ByteString returns SignedSoftwareCertificate in string.
 func (s *SignedSoftwareCertificate) String() string {
 	return fmt.Sprintf("%x, %x", s.CertificateData, s.Signature)
 }

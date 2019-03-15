@@ -7,10 +7,9 @@ package services
 import (
 	"testing"
 
-	"github.com/gopcua/opcua/datatypes"
+	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/utils/codectest"
 )
-
 
 func TestActivateSessionRequest(t *testing.T) {
 	cases := []codectest.Case{
@@ -20,7 +19,7 @@ func TestActivateSessionRequest(t *testing.T) {
 				NewNullRequestHeader(),
 				NewSignatureData("", nil),
 				nil,
-				datatypes.NewAnonymousIdentityToken("anonymous"),
+				ua.NewAnonymousIdentityToken("anonymous"),
 				NewSignatureData("", nil),
 			),
 			Bytes: flatten(
