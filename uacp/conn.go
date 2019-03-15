@@ -13,6 +13,16 @@ import (
 	"github.com/gopcua/opcua/utils"
 )
 
+const (
+	KB = 1024
+	MB = 1024 * KB
+
+	DefaultReceiveBufSize = 0xffff
+	DefaultSendBufSize    = 0xffff
+	DefaultMaxChunkCount  = 512
+	DefaultMaxMessageSize = 2 * MB
+)
+
 // connid stores the current connection id. updated with atomic.AddUint32
 var connid uint32
 
@@ -33,10 +43,14 @@ func Dial(ctx context.Context, endpoint string) (*Conn, error) {
 	}
 
 	conn := &Conn{
-		id:         nextid(),
-		c:          c,
-		rcvBufSize: 0xffff,
-		sndBufSize: 0xffff,
+		id: nextid(),
+		c:  c,
+		ack: &Acknowledge{
+			ReceiveBufSize: DefaultReceiveBufSize,
+			SendBufSize:    DefaultSendBufSize,
+			MaxChunkCount:  0, // use what the server wants
+			MaxMessageSize: 0, // use what the server wants
+		},
 	}
 
 	log.Printf("conn %d: start HEL/ACK handshake", conn.id)
@@ -50,10 +64,9 @@ func Dial(ctx context.Context, endpoint string) (*Conn, error) {
 
 // Listener is a OPC UA Connection Protocol network listener.
 type Listener struct {
-	l          net.Listener
-	endpoint   string
-	rcvBufSize uint32
-	sndBufSize uint32
+	l        net.Listener
+	ack      *Acknowledge
+	endpoint string
 }
 
 // Listen acts like net.Listen for OPC UA Connection Protocol networks.
@@ -63,7 +76,16 @@ type Listener struct {
 // If the IP field of laddr is nil or an unspecified IP address, Listen listens
 // on all available unicast and anycast IP addresses of the local system.
 // If the Port field of laddr is 0, a port number is automatically chosen.
-func Listen(endpoint string, rcvBufSize uint32) (*Listener, error) {
+func Listen(endpoint string, ack *Acknowledge) (*Listener, error) {
+	if ack == nil {
+		ack = &Acknowledge{
+			ReceiveBufSize: DefaultReceiveBufSize,
+			SendBufSize:    DefaultSendBufSize,
+			MaxChunkCount:  DefaultMaxChunkCount,
+			MaxMessageSize: DefaultMaxMessageSize,
+		}
+	}
+
 	network, laddr, err := utils.ResolveEndpoint(endpoint)
 	if err != nil {
 		return nil, err
@@ -73,10 +95,9 @@ func Listen(endpoint string, rcvBufSize uint32) (*Listener, error) {
 		return nil, err
 	}
 	return &Listener{
-		l:          l,
-		endpoint:   endpoint,
-		rcvBufSize: rcvBufSize,
-		sndBufSize: 0xffff,
+		l:        l,
+		ack:      ack,
+		endpoint: endpoint,
 	}, nil
 }
 
@@ -89,12 +110,7 @@ func (l *Listener) Accept(ctx context.Context) (*Conn, error) {
 	if err != nil {
 		return nil, err
 	}
-	conn := &Conn{
-		id:         nextid(),
-		c:          c,
-		rcvBufSize: 0xffff,
-		sndBufSize: 0xffff,
-	}
+	conn := &Conn{nextid(), c, l.ack}
 	if err := conn.srvhandshake(l.endpoint); err != nil {
 		c.Close()
 		return nil, err
@@ -118,64 +134,79 @@ func (l *Listener) Endpoint() string {
 }
 
 type Conn struct {
-	id         uint32
-	c          net.Conn
-	rcvBufSize uint32
-	sndBufSize uint32
+	id  uint32
+	c   net.Conn
+	ack *Acknowledge
 }
 
-func (a *Conn) ID() uint32 {
-	return a.id
+func (c *Conn) ID() uint32 {
+	return c.id
 }
 
-func (a *Conn) Close() error {
-	log.Printf("conn %d: close", a.id)
-	return a.c.Close()
+func (c *Conn) ReceiveBufSize() uint32 {
+	return c.ack.ReceiveBufSize
 }
 
-func (a *Conn) Read(b []byte) (int, error) {
-	return a.c.Read(b)
+func (c *Conn) SendBufSize() uint32 {
+	return c.ack.SendBufSize
 }
 
-func (a *Conn) Write(b []byte) (int, error) {
-	return a.c.Write(b)
+func (c *Conn) MaxMessageSize() uint32 {
+	return c.ack.MaxMessageSize
 }
 
-func (a *Conn) SetDeadline(t time.Time) error {
-	return a.c.SetDeadline(t)
+func (c *Conn) MaxChunkCount() uint32 {
+	return c.ack.MaxChunkCount
 }
 
-func (a *Conn) SetReadDeadline(t time.Time) error {
-	return a.c.SetReadDeadline(t)
+func (c *Conn) Close() error {
+	log.Printf("conn %d: close", c.id)
+	return c.c.Close()
 }
 
-func (a *Conn) SetWriteDeadline(t time.Time) error {
-	return a.c.SetWriteDeadline(t)
+func (c *Conn) Read(b []byte) (int, error) {
+	return c.c.Read(b)
 }
 
-func (a *Conn) LocalAddr() net.Addr {
-	return a.c.LocalAddr()
+func (c *Conn) Write(b []byte) (int, error) {
+	return c.c.Write(b)
 }
 
-func (a *Conn) RemoteAddr() net.Addr {
-	return a.c.RemoteAddr()
+func (c *Conn) SetDeadline(t time.Time) error {
+	return c.c.SetDeadline(t)
 }
 
-func (a *Conn) handshake(endpoint string) error {
-	m := &Hello{
-		Version:        0,
-		ReceiveBufSize: 0xffff,
-		SendBufSize:    0xffff,
-		MaxMessageSize: 0,
-		MaxChunkCount:  0,
+func (c *Conn) SetReadDeadline(t time.Time) error {
+	return c.c.SetReadDeadline(t)
+}
+
+func (c *Conn) SetWriteDeadline(t time.Time) error {
+	return c.c.SetWriteDeadline(t)
+}
+
+func (c *Conn) LocalAddr() net.Addr {
+	return c.c.LocalAddr()
+}
+
+func (c *Conn) RemoteAddr() net.Addr {
+	return c.c.RemoteAddr()
+}
+
+func (c *Conn) handshake(endpoint string) error {
+	hel := &Hello{
+		Version:        c.ack.Version,
+		ReceiveBufSize: c.ack.ReceiveBufSize,
+		SendBufSize:    c.ack.SendBufSize,
+		MaxMessageSize: c.ack.MaxMessageSize,
+		MaxChunkCount:  c.ack.MaxChunkCount,
 		EndPointURL:    endpoint,
 	}
 
-	if err := a.send("HELF", m); err != nil {
+	if err := c.send("HELF", hel); err != nil {
 		return err
 	}
 
-	b, err := a.recv()
+	b, err := c.recv()
 	if err != nil {
 		return err
 	}
@@ -193,16 +224,23 @@ func (a *Conn) handshake(endpoint string) error {
 	if ack.Version != 0 {
 		return fmt.Errorf("invalid version %d", ack.Version)
 	}
-	a.rcvBufSize = ack.ReceiveBufSize
-	a.sndBufSize = ack.SendBufSize
-	log.Printf("conn %d: recv ACK:%v", a.id, ack)
+	if ack.MaxChunkCount == 0 {
+		ack.MaxChunkCount = DefaultMaxChunkCount
+		log.Printf("conn %d: server has no chunk limit. Using %d", c.id, ack.MaxChunkCount)
+	}
+	if ack.MaxMessageSize == 0 {
+		ack.MaxMessageSize = DefaultMaxMessageSize
+		log.Printf("conn %d: server has no message size limit. Using %d", c.id, ack.MaxMessageSize)
+	}
+	c.ack = ack
+	log.Printf("conn %d: recv ACK:%v", c.id, ack)
 	return nil
 }
 
-func (a *Conn) srvhandshake(endpoint string) error {
-	b, err := a.recv()
+func (c *Conn) srvhandshake(endpoint string) error {
+	b, err := c.recv()
 	if err != nil {
-		a.sendError(BadTCPInternalError)
+		c.sendError(BadTCPInternalError)
 		return err
 	}
 
@@ -213,22 +251,15 @@ func (a *Conn) srvhandshake(endpoint string) error {
 	case "HELF":
 		hel := new(Hello)
 		if _, err := ua.Decode(msg, hel); err != nil {
-			a.sendError(BadTCPInternalError)
+			c.sendError(BadTCPInternalError)
 			return err
 		}
 		if hel.EndPointURL != endpoint {
-			a.sendError(BadTCPEndpointURLInvalid)
+			c.sendError(BadTCPEndpointURLInvalid)
 			return fmt.Errorf("invalid endpoint url %s", hel.EndPointURL)
 		}
-		ack := &Acknowledge{
-			Version:        0,
-			ReceiveBufSize: a.rcvBufSize,
-			SendBufSize:    a.sndBufSize,
-			MaxMessageSize: 0, // what is a sensible default?
-			MaxChunkCount:  1000,
-		}
-		if err := a.send("ACKF", ack); err != nil {
-			a.sendError(BadTCPInternalError)
+		if err := c.send("ACKF", c.ack); err != nil {
+			c.sendError(BadTCPInternalError)
 			return err
 		}
 		return nil
@@ -236,42 +267,42 @@ func (a *Conn) srvhandshake(endpoint string) error {
 	case "RHEF":
 		rhe := new(ReverseHello)
 		if _, err := ua.Decode(msg, rhe); err != nil {
-			a.sendError(BadTCPInternalError)
+			c.sendError(BadTCPInternalError)
 			return err
 		}
 		if rhe.EndPointURL != endpoint {
-			a.sendError(BadTCPEndpointURLInvalid)
+			c.sendError(BadTCPEndpointURLInvalid)
 			return fmt.Errorf("invalid endpoint url %s", rhe.EndPointURL)
 		}
-		log.Printf("conn %d: connecting to %s", a.id, rhe.ServerURI)
-		a.c.Close()
+		log.Printf("conn %d: connecting to %s", c.id, rhe.ServerURI)
+		c.c.Close()
 		c, err := Dial(context.Background(), rhe.ServerURI)
 		if err != nil {
 			return err
 		}
-		a.c = c
+		c.c = c
 		return nil
 
 	default:
-		a.sendError(BadTCPInternalError)
+		c.sendError(BadTCPInternalError)
 		return fmt.Errorf("invalid handshake packet %q", msgtyp)
 	}
 }
 
-func (a *Conn) sendError(code uint32) {
+func (c *Conn) sendError(code uint32) {
 	// we swallow the error to silence complaints from the linter
 	// since sending an error will close the connection and we
 	// want to bubble a different error up.
-	_ = a.send("ERRF", &Error{Error: code})
+	_ = c.send("ERRF", &Error{Error: code})
 }
 
 // hdrlen is the size of the uacp header
 const hdrlen = 8
 
 // recv receives a message from the stream and returns it without the header.
-func (a *Conn) recv() ([]byte, error) {
+func (c *Conn) recv() ([]byte, error) {
 	hdr := make([]byte, hdrlen)
-	_, err := io.ReadFull(a.c, hdr)
+	_, err := io.ReadFull(c.c, hdr)
 	if err != nil {
 		return nil, fmt.Errorf("hdr read faled: %s", err)
 	}
@@ -281,20 +312,20 @@ func (a *Conn) recv() ([]byte, error) {
 		return nil, fmt.Errorf("hdr decode failed: %s", err)
 	}
 
-	if h.MessageSize > a.rcvBufSize {
-		return nil, fmt.Errorf("packet too large: %d > %d bytes", h.MessageSize, a.rcvBufSize)
+	if h.MessageSize > c.ack.ReceiveBufSize {
+		return nil, fmt.Errorf("packet too large: %d > %d bytes", h.MessageSize, c.ack.ReceiveBufSize)
 	}
 
 	b := make([]byte, h.MessageSize-hdrlen)
-	if _, err := io.ReadFull(a.c, b); err != nil {
+	if _, err := io.ReadFull(c.c, b); err != nil {
 		return nil, fmt.Errorf("read msg failed: %s", err)
 	}
 
-	log.Printf("conn %d: recv %s%c with %d bytes", a.id, h.MessageType, h.ChunkType, len(b))
+	log.Printf("conn %d: recv %s%c with %d bytes", c.id, h.MessageType, h.ChunkType, len(b))
 	return append(hdr, b...), nil
 }
 
-func (a *Conn) send(typ string, msg interface{}) error {
+func (c *Conn) send(typ string, msg interface{}) error {
 	if len(typ) != 4 {
 		return fmt.Errorf("invalid msg type: %s", typ)
 	}
@@ -310,8 +341,8 @@ func (a *Conn) send(typ string, msg interface{}) error {
 		MessageSize: uint32(len(body) + 8),
 	}
 
-	if h.MessageSize > a.sndBufSize {
-		return fmt.Errorf("send packet too large: %d > %d bytes", h.MessageSize, a.sndBufSize)
+	if h.MessageSize > c.ack.SendBufSize {
+		return fmt.Errorf("send packet too large: %d > %d bytes", h.MessageSize, c.ack.SendBufSize)
 	}
 
 	hdr, err := h.Encode()
@@ -320,10 +351,10 @@ func (a *Conn) send(typ string, msg interface{}) error {
 	}
 
 	b := append(hdr, body...)
-	if _, err := a.c.Write(b); err != nil {
+	if _, err := c.c.Write(b); err != nil {
 		return fmt.Errorf("write failed: %s", err)
 	}
-	log.Printf("conn %d: sent %s with %d bytes", a.id, typ, len(b))
+	log.Printf("conn %d: sent %s with %d bytes", c.id, typ, len(b))
 
 	return nil
 }

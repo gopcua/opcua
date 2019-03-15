@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	mrand "math/rand"
 	"reflect"
 	"sync"
 	"sync/atomic"
@@ -52,9 +53,13 @@ type SecureChannel struct {
 	handler map[uint32]chan Response
 }
 
+func init() {
+	mrand.Seed(time.Now().UnixNano())
+}
+
 func NewSecureChannel(c *uacp.Conn, cfg *Config) *SecureChannel {
 	if cfg == nil {
-		cfg = NewClientConfigSecurityNone(3333, 3600000)
+		cfg = NewClientConfigSecurityNone(uint32(mrand.Int31()), 3600000)
 	}
 
 	// always reset the secure channel id
@@ -152,8 +157,6 @@ func (s *SecureChannel) Send(svc interface{}, h func(interface{}) error) error {
 // SendAsync sends the service request and returns a channel which will receive the
 // response when it arrives.
 func (s *SecureChannel) SendAsync(svc interface{}) (resp chan Response, err error) {
-	log.Printf("conn %d: send %T", s.c.ID(), svc)
-
 	typeID := services.TypeID(svc)
 	if typeID == 0 {
 		return nil, fmt.Errorf("unknown service %T. Did you call register?", svc)
@@ -180,26 +183,27 @@ func (s *SecureChannel) SendAsync(svc interface{}) (resp chan Response, err erro
 	if err != nil {
 		return nil, err
 	}
+	reqid := m.SequenceHeader.RequestID
 
 	// send the message
 	if _, err := s.c.Write(b); err != nil {
 		return nil, err
 	}
-	log.Printf("conn %d: send %d bytes", s.c.ID(), len(b))
+	log.Printf("conn %d/%d: send %T with %d bytes", s.c.ID(), reqid, svc, len(b))
 
 	// register the handler
 	resp = make(chan Response)
 	s.mu.Lock()
-	s.handler[s.reqhdr.RequestHandle] = resp
+	s.handler[reqid] = resp
 	s.mu.Unlock()
 	return resp, nil
 }
 
-func (s *SecureChannel) recvsvc() (interface{}, error) {
+func (s *SecureChannel) readchunk() (*MessageChunk, error) {
+	// read and decode the header to get the message size
 	const hdrlen = 12
-
-	hdr := make([]byte, hdrlen)
-	_, err := io.ReadFull(s.c, hdr)
+	b := make([]byte, s.c.ReceiveBufSize())
+	_, err := io.ReadFull(s.c, b[:hdrlen])
 	if err == io.EOF {
 		return nil, err
 	}
@@ -211,49 +215,86 @@ func (s *SecureChannel) recvsvc() (interface{}, error) {
 	}
 
 	h := new(Header)
-	if _, err := h.Decode(hdr); err != nil {
+	if _, err := h.Decode(b[:hdrlen]); err != nil {
 		return nil, fmt.Errorf("sechan: decode header failed: %s", err)
 	}
+	b = b[:h.MessageSize]
 
+	// drop if the channel id does not match
 	if s.cfg.SecureChannelID > 0 && s.cfg.SecureChannelID != h.SecureChannelID {
 		return nil, fmt.Errorf("sechan: secure channel id mismatch: got 0x%04x, want 0x%04x", h.SecureChannelID, s.cfg.SecureChannelID)
 	}
 
-	b := make([]byte, h.MessageSize-hdrlen)
-	if _, err := io.ReadFull(s.c, b); err != nil {
+	// read the rest of the message
+	if _, err := io.ReadFull(s.c, b[hdrlen:]); err != nil {
 		return nil, fmt.Errorf("sechan: read message failed")
 	}
 
-	// todo(fs): handle ERR messages
-	m := new(Message)
-	if _, err := m.Decode(append(hdr, b...)); err != nil {
+	// decode the other headers
+	m := new(MessageChunk)
+	if _, err := m.Decode(b); err != nil {
 		return nil, fmt.Errorf("sechan: decode message failed: %s", err)
 	}
-	log.Printf("conn %d: recv %d bytes", s.c.ID(), len(hdr)+len(b))
+
+	// todo(fs): handle ERR messages
+	// todo(fs): handle crypto
 
 	if s.cfg.SecureChannelID == 0 {
 		s.cfg.SecureChannelID = h.SecureChannelID
-		log.Printf("conn %d: set secure channel id to %04x", s.c.ID(), s.cfg.SecureChannelID)
+		log.Printf("conn %d/%d: set secure channel id to %d", s.c.ID(), m.SequenceHeader.RequestID, s.cfg.SecureChannelID)
 	}
 
-	return m.Service, nil
+	return m, nil
 }
 
-// recv receives messages from the secure channel, decodes and forwards
+// recv receives message chunks from the secure channel, decodes and forwards
 // them to the registered callback channel, if there is one. Otherwise,
 // the message is dropped.
 func (s *SecureChannel) recv() {
+	// chunks maps request id to message chunks
+	chunks := map[uint32][]*MessageChunk{}
+
 	for {
 		select {
 		case <-s.quit:
 			return
 
 		default:
-			svc, err := s.recvsvc()
+			chunk, err := s.readchunk()
 			if err == io.EOF {
 				return
 			}
-			log.Printf("conn %d: recv %T", s.c.ID(), svc)
+
+			hdr := chunk.Header
+			reqid := chunk.SequenceHeader.RequestID
+			log.Printf("conn %d/%d: recv %s%c with %d bytes", s.c.ID(), reqid, hdr.MessageType, hdr.ChunkType, hdr.MessageSize)
+
+			if hdr.ChunkType != 'F' {
+				chunks[reqid] = append(chunks[reqid], chunk)
+				if n := len(chunks[reqid]); uint32(n) > s.c.MaxChunkCount() {
+					// todo(fs): send error
+					delete(chunks, reqid)
+					s.notifyCaller(reqid, nil, fmt.Errorf("too many chunks: %d > %d", n, s.c.MaxChunkCount()))
+				}
+				continue
+			}
+
+			// merge chunks
+			all := append(chunks[reqid], chunk)
+			delete(chunks, reqid)
+			b, err := mergeChunks(all)
+			if err != nil {
+				// todo(fs): send error
+				s.notifyCaller(reqid, nil, fmt.Errorf("chunk merge error: %v", err))
+				continue
+			}
+
+			if uint32(len(b)) > s.c.MaxMessageSize() {
+				// todo(fs): send error
+				s.notifyCaller(reqid, nil, fmt.Errorf("message too large: %d > %d", uint32(len(b)), s.c.MaxMessageSize()))
+				continue
+			}
+			// fmt.Println(utils.Wireshark(0, b))
 
 			// since we are not decoding the ResponseHeader separately
 			// we need to drop every message that has an error since we
@@ -262,32 +303,70 @@ func (s *SecureChannel) recv() {
 			// and subsequently remove it and the TypeID from all service
 			// structs and tests. We also need to add a deadline to all
 			// handlers and check them periodically to time them out.
+			_, svc, err := services.Decode(b)
 			if err != nil {
-				log.Printf("conn %d: recv %s", s.c.ID(), err)
+				s.notifyCaller(reqid, nil, err)
 				continue
 			}
-
-			// the response header is always the first field
-			val := reflect.ValueOf(svc)
-			resp := val.Elem().Field(0).Interface().(*services.ResponseHeader)
-
-			// check if we have a pending request handler for this response.
-			s.mu.Lock()
-			ch := s.handler[resp.RequestHandle]
-			delete(s.handler, resp.RequestHandle)
-			s.mu.Unlock()
-
-			// no handler -> next response
-			if ch == nil {
-				log.Printf("%T: %s", svc, err)
-				continue
-			}
-
-			// send response to caller
-			go func() {
-				ch <- Response{svc, err}
-				close(ch)
-			}()
+			s.notifyCaller(reqid, svc, err)
 		}
 	}
 }
+
+func (s *SecureChannel) notifyCaller(reqid uint32, svc interface{}, err error) {
+	if err != nil {
+		log.Printf("conn %d/%d: %v", s.c.ID(), reqid, err)
+	} else {
+		log.Printf("conn %d/%d: recv %T", s.c.ID(), reqid, svc)
+	}
+
+	// check if we have a pending request handler for this response.
+	s.mu.Lock()
+	ch := s.handler[reqid]
+	delete(s.handler, reqid)
+	s.mu.Unlock()
+
+	// no handler -> next response
+	if ch == nil {
+		log.Printf("conn %d/%d: no handler for %T", s.c.ID(), reqid, svc)
+		return
+	}
+
+	// send response to caller
+	go func() {
+		ch <- Response{svc, err}
+		close(ch)
+	}()
+}
+
+func mergeChunks(chunks []*MessageChunk) ([]byte, error) {
+	if len(chunks) == 0 {
+		return nil, nil
+	}
+	if len(chunks) == 1 {
+		return chunks[0].Data, nil
+	}
+
+	// todo(fs): check if this is correct and necessary
+	// sort.Sort(bySequence(chunks))
+
+	var b []byte
+	var seqnr uint32
+	for _, c := range chunks {
+		if c.SequenceHeader.SequenceNumber == seqnr {
+			continue // duplicate chunk
+		}
+		seqnr = c.SequenceHeader.SequenceNumber
+		b = append(b, c.Data...)
+	}
+	return b, nil
+}
+
+// todo(fs): we only need this if we need to sort chunks. Need to check the spec
+// type bySequence []*MessageChunk
+
+// func (a bySequence) Len() int      { return len(a) }
+// func (a bySequence) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
+// func (a bySequence) Less(i, j int) bool {
+// 	return a[i].SequenceHeader.SequenceNumber < a[j].SequenceHeader.SequenceNumber
+// }

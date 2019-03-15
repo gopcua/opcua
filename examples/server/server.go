@@ -15,12 +15,11 @@ import (
 func main() {
 	var (
 		endpoint = flag.String("endpoint", "opc.tcp://example.com/foo/bar", "OPC UA Endpoint URL")
-		bufsize  = flag.Int("bufsize", 0xffff, "Receive Buffer Size")
 	)
 	flag.Parse()
 
 	log.Printf("Listening on %s", *endpoint)
-	l, err := uacp.Listen(*endpoint, uint32(*bufsize))
+	l, err := uacp.Listen(*endpoint, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
