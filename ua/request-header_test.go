@@ -7,8 +7,6 @@ package ua
 import (
 	"testing"
 	"time"
-
-	"github.com/gopcua/opcua/utils/codectest"
 )
 
 func NewNullRequestHeader() *RequestHeader {
@@ -37,7 +35,7 @@ var nullRequestHeaderBytes = []byte{
 }
 
 func TestRequestHeader(t *testing.T) {
-	cases := []codectest.Case{
+	cases := []CodecTestCase{
 		{
 			Struct: NewNullRequestHeader(),
 			Bytes:  nullRequestHeaderBytes,
@@ -82,5 +80,5 @@ func TestRequestHeader(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases)
+	RunCodecTest(t, cases)
 }

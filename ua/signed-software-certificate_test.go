@@ -6,12 +6,10 @@ package ua
 
 import (
 	"testing"
-
-	"github.com/gopcua/opcua/utils/codectest"
 )
 
 func TestSignedSoftwareCertificate(t *testing.T) {
-	cases := []codectest.Case{
+	cases := []CodecTestCase{
 		{
 			Name:   "empty",
 			Struct: NewSignedSoftwareCertificate(nil, nil),
@@ -33,11 +31,11 @@ func TestSignedSoftwareCertificate(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases)
+	RunCodecTest(t, cases)
 }
 
 func TestSignedSoftwareCertificateArray(t *testing.T) {
-	cases := []codectest.Case{
+	cases := []CodecTestCase{
 		{
 			Name:   "empty",
 			Struct: []*SignedSoftwareCertificate{},
@@ -66,5 +64,5 @@ func TestSignedSoftwareCertificateArray(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases)
+	RunCodecTest(t, cases)
 }

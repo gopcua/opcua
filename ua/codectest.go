@@ -1,16 +1,15 @@
-package codectest
+package ua
 
 import (
 	"reflect"
 	"testing"
 
 	"github.com/pascaldekloe/goe/verify"
-	"github.com/gopcua/opcua/ua"
 )
 
 // Case describes a test case for a encoding and decoding an
 // object from bytes.
-type Case struct {
+type CodecTestCase struct {
 	Name   string
 	Struct interface{}
 	Bytes  []byte
@@ -18,7 +17,7 @@ type Case struct {
 
 // Run tests encoding, decoding and length calclulation for the given
 // object.
-func Run(t *testing.T, cases []Case) {
+func RunCodecTest(t *testing.T, cases []CodecTestCase) {
 	t.Helper()
 
 	for _, c := range cases {
@@ -36,7 +35,7 @@ func Run(t *testing.T, cases []Case) {
 					t.Fatalf("%T is not a pointer or a slice", c.Struct)
 				}
 
-				if _, err := ua.Decode(c.Bytes, v.Interface()); err != nil {
+				if _, err := Decode(c.Bytes, v.Interface()); err != nil {
 					t.Fatal(err)
 				}
 
@@ -48,7 +47,7 @@ func Run(t *testing.T, cases []Case) {
 			})
 
 			t.Run("encode", func(t *testing.T) {
-				b, err := ua.Encode(c.Struct)
+				b, err := Encode(c.Struct)
 				if err != nil {
 					t.Fatal(err)
 				}

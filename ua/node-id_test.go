@@ -9,12 +9,10 @@ import (
 	"errors"
 	"reflect"
 	"testing"
-
-	"github.com/gopcua/opcua/utils/codectest"
 )
 
 func TestNodeID(t *testing.T) {
-	cases := []codectest.Case{
+	cases := []CodecTestCase{
 		{
 			Name:   "TwoByte",
 			Struct: NewTwoByteNodeID(0xff),
@@ -91,7 +89,7 @@ func TestNodeID(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases)
+	RunCodecTest(t, cases)
 }
 
 func BenchmarkReflectDecode(b *testing.B) {

@@ -6,12 +6,10 @@ package ua
 
 import (
 	"testing"
-
-	"github.com/gopcua/opcua/utils/codectest"
 )
 
 func TestReadValueID(t *testing.T) {
-	cases := []codectest.Case{
+	cases := []CodecTestCase{
 		{
 			Name: "Normal",
 			Struct: NewReadValueID(
@@ -34,11 +32,11 @@ func TestReadValueID(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases)
+	RunCodecTest(t, cases)
 }
 
 func TestReadValueIDArray(t *testing.T) {
-	cases := []codectest.Case{
+	cases := []CodecTestCase{
 		{
 			Name:   "empty",
 			Struct: []*ReadValueID{},
@@ -111,5 +109,5 @@ func TestReadValueIDArray(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases)
+	RunCodecTest(t, cases)
 }

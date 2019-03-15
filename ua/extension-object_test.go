@@ -6,12 +6,10 @@ package ua
 
 import (
 	"testing"
-
-	"github.com/gopcua/opcua/utils/codectest"
 )
 
 func TestExtensionObject(t *testing.T) {
-	cases := []codectest.Case{
+	cases := []CodecTestCase{
 		{
 			Name: "anonymous-user-identity-token",
 			Struct: NewExtensionObject(
@@ -29,5 +27,5 @@ func TestExtensionObject(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases)
+	RunCodecTest(t, cases)
 }

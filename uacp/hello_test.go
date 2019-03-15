@@ -7,11 +7,11 @@ package uacp
 import (
 	"testing"
 
-	"github.com/gopcua/opcua/utils/codectest"
+	"github.com/gopcua/opcua/ua"
 )
 
 func TestHello(t *testing.T) {
-	cases := []codectest.Case{
+	cases := []ua.CodecTestCase{
 		{
 			Struct: NewHello(
 				0,                                        // Version
@@ -41,5 +41,5 @@ func TestHello(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases)
+	ua.RunCodecTest(t, cases)
 }

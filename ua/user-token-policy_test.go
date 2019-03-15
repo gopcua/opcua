@@ -6,12 +6,10 @@ package ua
 
 import (
 	"testing"
-
-	"github.com/gopcua/opcua/utils/codectest"
 )
 
 func TestUserTokenPolicy(t *testing.T) {
-	cases := []codectest.Case{
+	cases := []CodecTestCase{
 		{
 			Struct: NewUserTokenPolicy(
 				"1", UserTokenAnonymous,
@@ -31,11 +29,11 @@ func TestUserTokenPolicy(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases)
+	RunCodecTest(t, cases)
 }
 
 func TestUserTokenPolicyArray(t *testing.T) {
-	cases := []codectest.Case{
+	cases := []CodecTestCase{
 		{
 			Struct: []*UserTokenPolicy{
 				NewUserTokenPolicy(
@@ -73,5 +71,5 @@ func TestUserTokenPolicyArray(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases)
+	RunCodecTest(t, cases)
 }

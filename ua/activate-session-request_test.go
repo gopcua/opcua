@@ -6,12 +6,10 @@ package ua
 
 import (
 	"testing"
-
-	"github.com/gopcua/opcua/utils/codectest"
 )
 
 func TestActivateSessionRequest(t *testing.T) {
-	cases := []codectest.Case{
+	cases := []CodecTestCase{
 		{
 			Name: "normal",
 			Struct: NewActivateSessionRequest(
@@ -46,5 +44,5 @@ func TestActivateSessionRequest(t *testing.T) {
 				}),
 		},
 	}
-	codectest.Run(t, cases)
+	RunCodecTest(t, cases)
 }

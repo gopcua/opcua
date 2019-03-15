@@ -6,12 +6,10 @@ package ua
 
 import (
 	"testing"
-
-	"github.com/gopcua/opcua/utils/codectest"
 )
 
 func TestDecodeServersOnNetwork(t *testing.T) {
-	cases := []codectest.Case{
+	cases := []CodecTestCase{
 		{
 			Name: "single-cap",
 			Struct: NewServersOnNetwork(
@@ -61,11 +59,11 @@ func TestDecodeServersOnNetwork(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases)
+	RunCodecTest(t, cases)
 }
 
 func TestServersOnNetworkArray(t *testing.T) {
-	cases := []codectest.Case{
+	cases := []CodecTestCase{
 		{
 			Name: "normal",
 			Struct: []*ServersOnNetwork{
@@ -114,5 +112,5 @@ func TestServersOnNetworkArray(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases)
+	RunCodecTest(t, cases)
 }

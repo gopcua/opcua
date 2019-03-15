@@ -6,12 +6,10 @@ package ua
 
 import (
 	"testing"
-
-	"github.com/gopcua/opcua/utils/codectest"
 )
 
 func TestAdditionalHeader(t *testing.T) {
-	cases := []codectest.Case{
+	cases := []CodecTestCase{
 		{
 			Name: "no-body",
 			Struct: NewAdditionalHeader(
@@ -25,5 +23,5 @@ func TestAdditionalHeader(t *testing.T) {
 			Bytes: []byte{0x00, 0xff, 0x00},
 		},
 	}
-	codectest.Run(t, cases)
+	RunCodecTest(t, cases)
 }

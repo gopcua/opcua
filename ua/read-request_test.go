@@ -7,12 +7,10 @@ package ua
 import (
 	"testing"
 	"time"
-
-	"github.com/gopcua/opcua/utils/codectest"
 )
 
 func TestReadRequest(t *testing.T) {
-	cases := []codectest.Case{
+	cases := []CodecTestCase{
 		{
 			Name: "normal",
 			Struct: NewReadRequest(
@@ -59,5 +57,5 @@ func TestReadRequest(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases)
+	RunCodecTest(t, cases)
 }

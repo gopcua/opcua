@@ -7,12 +7,10 @@ package ua
 import (
 	"testing"
 	"time"
-
-	"github.com/gopcua/opcua/utils/codectest"
 )
 
 func TestCloseSecureChannelRequest(t *testing.T) {
-	cases := []codectest.Case{
+	cases := []CodecTestCase{
 		{
 			Name: "normal",
 			Struct: NewCloseSecureChannelRequest(
@@ -48,5 +46,5 @@ func TestCloseSecureChannelRequest(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases)
+	RunCodecTest(t, cases)
 }

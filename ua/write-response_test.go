@@ -9,11 +9,10 @@ import (
 	"time"
 
 	"github.com/gopcua/opcua/status"
-	"github.com/gopcua/opcua/utils/codectest"
 )
 
 func TestWriteResponse(t *testing.T) {
-	cases := []codectest.Case{
+	cases := []CodecTestCase{
 		{
 			Name: "single-result",
 			Struct: NewWriteResponse(
@@ -76,5 +75,5 @@ func TestWriteResponse(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases)
+	RunCodecTest(t, cases)
 }

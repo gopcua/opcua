@@ -7,12 +7,10 @@ package ua
 import (
 	"testing"
 	"time"
-
-	"github.com/gopcua/opcua/utils/codectest"
 )
 
 func TestFindServersOnNetworkRequest(t *testing.T) {
-	cases := []codectest.Case{
+	cases := []CodecTestCase{
 		{
 			Name: "normal",
 			Struct: NewFindServersOnNetworkRequest(
@@ -60,5 +58,5 @@ func TestFindServersOnNetworkRequest(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases)
+	RunCodecTest(t, cases)
 }

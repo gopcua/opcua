@@ -6,12 +6,10 @@ package ua
 
 import (
 	"testing"
-
-	"github.com/gopcua/opcua/utils/codectest"
 )
 
 func TestAnonymousIdentityToken(t *testing.T) {
-	cases := []codectest.Case{
+	cases := []CodecTestCase{
 		{
 			Name:   "normal",
 			Struct: NewAnonymousIdentityToken("anonymous"),
@@ -21,11 +19,11 @@ func TestAnonymousIdentityToken(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases)
+	RunCodecTest(t, cases)
 }
 
 func TestUserNameIdentityToken(t *testing.T) {
-	cases := []codectest.Case{
+	cases := []CodecTestCase{
 		{
 			Name:   "normal",
 			Struct: NewUserNameIdentityToken("username", "user", []byte{0x70, 0x61, 0x73, 0x73, 0x77, 0x6f, 0x72, 0x64}, "plain"),
@@ -41,11 +39,11 @@ func TestUserNameIdentityToken(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases)
+	RunCodecTest(t, cases)
 }
 
 func TestX509IdentityToken(t *testing.T) {
-	cases := []codectest.Case{
+	cases := []CodecTestCase{
 		{
 			Name:   "normal",
 			Struct: NewX509IdentityToken("x509", "certificate"),
@@ -57,11 +55,11 @@ func TestX509IdentityToken(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases)
+	RunCodecTest(t, cases)
 }
 
 func TestIssuedIdentityToken(t *testing.T) {
-	cases := []codectest.Case{
+	cases := []CodecTestCase{
 		{
 			Name:   "normal",
 			Struct: NewIssuedIdentityToken("issued", []byte{0x70, 0x61, 0x73, 0x73, 0x77, 0x6f, 0x72, 0x64}, "plain"),
@@ -75,5 +73,5 @@ func TestIssuedIdentityToken(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases)
+	RunCodecTest(t, cases)
 }

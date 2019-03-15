@@ -7,12 +7,10 @@ package ua
 import (
 	"testing"
 	"time"
-
-	"github.com/gopcua/opcua/utils/codectest"
 )
 
 func TestWriteValue(t *testing.T) {
-	cases := []codectest.Case{
+	cases := []CodecTestCase{
 		{
 			Name: "normal",
 			Struct: NewWriteValue(
@@ -44,11 +42,11 @@ func TestWriteValue(t *testing.T) {
 		},
 	}
 
-	codectest.Run(t, cases)
+	RunCodecTest(t, cases)
 }
 
 func TestWriteValueArray(t *testing.T) {
-	cases := []codectest.Case{
+	cases := []CodecTestCase{
 		{
 			Name: "normal",
 			Struct: []*WriteValue{
@@ -107,5 +105,5 @@ func TestWriteValueArray(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases)
+	RunCodecTest(t, cases)
 }

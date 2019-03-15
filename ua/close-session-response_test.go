@@ -7,12 +7,10 @@ package ua
 import (
 	"testing"
 	"time"
-
-	"github.com/gopcua/opcua/utils/codectest"
 )
 
 func TestCloseSessionResponse(t *testing.T) {
-	cases := []codectest.Case{
+	cases := []CodecTestCase{
 		{ // Without dummy nonce, results nor diags
 			Name: "nothing",
 			Struct: NewCloseSessionResponse(
@@ -37,5 +35,5 @@ func TestCloseSessionResponse(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases)
+	RunCodecTest(t, cases)
 }

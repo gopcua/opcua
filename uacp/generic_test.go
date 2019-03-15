@@ -9,7 +9,7 @@ import (
 )
 
 func TestGeneric(t *testing.T) {
-	// cases := []codectest.Case{
+	// cases := []ua.CodecTestCase{
 	// 	{
 	// 		Struct: NewGeneric(
 	// 			"XXX",
@@ -23,5 +23,5 @@ func TestGeneric(t *testing.T) {
 	// 		},
 	// 	},
 	// }
-	// codectest.Run(t, cases)
+	// ua.RunCodecTest(t, cases)
 }

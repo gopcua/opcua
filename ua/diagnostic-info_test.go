@@ -6,12 +6,10 @@ package ua
 
 import (
 	"testing"
-
-	"github.com/gopcua/opcua/utils/codectest"
 )
 
 func TestDiagnosticInfo(t *testing.T) {
-	cases := []codectest.Case{
+	cases := []CodecTestCase{
 		{
 			Name:   "Nothing",
 			Struct: NewNullDiagnosticInfo(),
@@ -127,11 +125,11 @@ func TestDiagnosticInfo(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases)
+	RunCodecTest(t, cases)
 }
 
 func TestDiagnosticInfoArray(t *testing.T) {
-	cases := []codectest.Case{
+	cases := []CodecTestCase{
 		{
 			Name:   "Nothing",
 			Struct: []*DiagnosticInfo{},
@@ -179,5 +177,5 @@ func TestDiagnosticInfoArray(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases)
+	RunCodecTest(t, cases)
 }
