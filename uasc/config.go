@@ -301,11 +301,13 @@ type SessionConfig struct {
 	// mySignature is is the client/serverSignature expected to receive from the other endpoint.
 	// This parameter is automatically calculated and kept temporarily until being used to verify
 	// received client/serverSignature.
-	mySignature *ua.SignatureData
+	// todo(fs): temp disable until the security code is resurrected. keep golangcibot happy
+	// mySignature *ua.SignatureData
 
 	// signatureToSend is the client/serverSignature defined in Part4, Table 15 and Table 17.
 	// This parameter is automatically calculated and kept temporarily until it is sent in next message.
-	signatureToSend *ua.SignatureData
+	// todo(fs): temp disable until the security code is resurrected. keep golangcibot happy
+	// signatureToSend *ua.SignatureData
 }
 
 // NewClientSessionConfig creates a SessionConfig for client.
