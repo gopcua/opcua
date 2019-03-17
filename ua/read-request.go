@@ -4,29 +4,6 @@
 
 package ua
 
-// TimestampsToReturn is an enumeration that specifies the Timestamp Attributes to be
-// transmitted for MonitoredItems or Nodes in Read and HistoryRead.
-//
-// Specification: Part 4, 7.35
-type TimestampsToReturn uint32
-
-// TimestampsToReturn definitions.
-const (
-	// Return the source timestamp.
-	TimestampsToReturnSource TimestampsToReturn = iota
-
-	// Return the Server timestamp.
-	TimestampsToReturnServer
-
-	// Return both the source and Server timestamps.
-	TimestampsToReturnBoth
-
-	// Return neither timestamp.
-	// This is the default value for MonitoredItems if a Variable value is not being accessed.
-	// For HistoryRead this is not a valid setting.
-	TimestampsToReturnNeither
-)
-
 // ReadRequest is used to read one or more Attributes of one or more Nodes.
 // For constructed Attribute values whose elements are indexed, such as an array,
 // this Service allows Clients to read the entire set of indexed values as a composite,

@@ -19,7 +19,7 @@ func TestCreateSessionResponse(t *testing.T) {
 					1, 0, NewNullDiagnosticInfo(), []string{}, NewNullAdditionalHeader(),
 				),
 				NewNumericNodeID(0, 1),
-				NewOpaqueNodeID(0, []byte{
+				NewByteStringNodeID(0, []byte{
 					0x08, 0x22, 0x87, 0x62, 0xba, 0x81, 0xe1, 0x11,
 					0xa6, 0x43, 0xf8, 0x77, 0x7b, 0xc6, 0x2f, 0xc8,
 				}),

@@ -12,22 +12,10 @@ import (
 	"strings"
 )
 
-// NodeID type definitions.
-//
-// Specification: Part 6, 5.2.2.9
-const (
-	NodeIDTypeTwoByte = iota
-	NodeIDTypeFourByte
-	NodeIDTypeNumeric
-	NodeIDTypeString
-	NodeIDTypeGUID
-	NodeIDTypeOpaque
-)
-
 // NodeID is an identifier for a node in the address space of an OPC UA Server.
 // The NodeID object encodes all different node id types.
 type NodeID struct {
-	mask uint8
+	mask NodeIDType
 	ns   uint16
 	nid  uint32
 	bid  []byte
@@ -78,10 +66,10 @@ func NewGUIDNodeID(ns uint16, id string) *NodeID {
 	}
 }
 
-// NewOpaqueNodeID returns a new opaque node id.
-func NewOpaqueNodeID(ns uint16, id []byte) *NodeID {
+// NewByteStringNodeID returns a new byte string node id.
+func NewByteStringNodeID(ns uint16, id []byte) *NodeID {
 	return &NodeID{
-		mask: NodeIDTypeOpaque,
+		mask: NodeIDTypeByteString,
 		ns:   ns,
 		bid:  id,
 	}
@@ -161,7 +149,7 @@ func NewNodeID(s string) (*NodeID, error) {
 		if err != nil {
 			return nil, fmt.Errorf("invalid opaque node id: %s", s)
 		}
-		return NewOpaqueNodeID(ns, b), nil
+		return NewByteStringNodeID(ns, b), nil
 
 	default:
 		return NewStringNodeID(ns, idval), nil
@@ -170,13 +158,13 @@ func NewNodeID(s string) (*NodeID, error) {
 
 // EncodingMask returns the encoding mask field including the
 // type information and additional flags.
-func (n *NodeID) EncodingMask() uint8 {
+func (n *NodeID) EncodingMask() NodeIDType {
 	return n.mask
 }
 
 // Type returns the node id type in EncodingMask.
-func (n *NodeID) Type() uint8 {
-	return n.mask & 0xf
+func (n *NodeID) Type() NodeIDType {
+	return n.mask & NodeIDType(0xf)
 }
 
 // URIFlag returns whether the URI flag is set in EncodingMask.
@@ -281,7 +269,7 @@ func (n *NodeID) StringID() string {
 		return n.gid.String()
 	case NodeIDTypeString:
 		return string(n.bid)
-	case NodeIDTypeOpaque:
+	case NodeIDTypeByteString:
 		return base64.StdEncoding.EncodeToString(n.bid)
 	default:
 		return ""
@@ -300,7 +288,7 @@ func (n *NodeID) SetStringID(v string) error {
 		n.bid = []byte(v)
 		return nil
 
-	case NodeIDTypeOpaque:
+	case NodeIDTypeByteString:
 		b, err := base64.StdEncoding.DecodeString(v)
 		if err != nil {
 			return err
@@ -344,7 +332,7 @@ func (n *NodeID) String() string {
 		}
 		return fmt.Sprintf("ns=%d;g=%s", n.ns, n.StringID())
 
-	case NodeIDTypeOpaque:
+	case NodeIDTypeByteString:
 		if n.ns == 0 {
 			return fmt.Sprintf("o=%s", n.StringID())
 		}
@@ -358,7 +346,7 @@ func (n *NodeID) String() string {
 func (n *NodeID) Decode(b []byte) (int, error) {
 	buf := NewBuffer(b)
 
-	n.mask = buf.ReadByte()
+	n.mask = NodeIDType(buf.ReadByte())
 	typ := n.mask & 0xf
 
 	switch typ {
@@ -382,7 +370,7 @@ func (n *NodeID) Decode(b []byte) (int, error) {
 		buf.ReadStruct(n.gid)
 		return buf.Pos(), buf.Error()
 
-	case NodeIDTypeString, NodeIDTypeOpaque:
+	case NodeIDTypeByteString, NodeIDTypeString:
 		n.ns = buf.ReadUint16()
 		n.bid = buf.ReadBytes()
 		return buf.Pos(), buf.Error()
@@ -394,7 +382,7 @@ func (n *NodeID) Decode(b []byte) (int, error) {
 
 func (n *NodeID) Encode() ([]byte, error) {
 	buf := NewBuffer(nil)
-	buf.WriteByte(n.mask)
+	buf.WriteByte(byte(n.mask))
 
 	switch n.Type() {
 	case NodeIDTypeTwoByte:
@@ -408,7 +396,7 @@ func (n *NodeID) Encode() ([]byte, error) {
 	case NodeIDTypeGUID:
 		buf.WriteUint16(n.ns)
 		buf.WriteStruct(n.gid)
-	case NodeIDTypeOpaque, NodeIDTypeString:
+	case NodeIDTypeByteString, NodeIDTypeString:
 		buf.WriteUint16(n.ns)
 		buf.WriteByteString(n.bid)
 	default:

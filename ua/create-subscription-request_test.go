@@ -15,7 +15,7 @@ func TestCreateSubscriptionRequest(t *testing.T) {
 			Name: "normal",
 			Struct: &CreateSubscriptionRequest{
 				RequestHeader: &RequestHeader{
-					AuthenticationToken: NewOpaqueNodeID(0, []byte{
+					AuthenticationToken: NewByteStringNodeID(0, []byte{
 						0xfe, 0x8d, 0x87, 0x79, 0xf7, 0x03, 0x27, 0x77,
 						0xc5, 0x03, 0xa1, 0x09, 0x50, 0x29, 0x27, 0x60,
 					}),

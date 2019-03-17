@@ -76,7 +76,7 @@ func TestNodeID(t *testing.T) {
 		},
 		{
 			Name:   "Opaque",
-			Struct: NewOpaqueNodeID(32768, []byte{0xde, 0xad, 0xbe, 0xef}),
+			Struct: NewByteStringNodeID(32768, []byte{0xde, 0xad, 0xbe, 0xef}),
 			Bytes: []byte{
 				// mask
 				0x05,
@@ -126,7 +126,7 @@ func TestNewNodeID(t *testing.T) {
 		{s: "ns=1;i=65536", n: NewNumericNodeID(1, 65536)},
 		{s: "ns=65535;i=65536", n: NewNumericNodeID(65535, 65536)},
 		{s: "ns=1;g=5eac051c-c313-43d7-b790-24aa2c3cfd37", n: NewGUIDNodeID(1, "5eac051c-c313-43d7-b790-24aa2c3cfd37")},
-		{s: "ns=1;b=YWJj", n: NewOpaqueNodeID(1, []byte{'a', 'b', 'c'})},
+		{s: "ns=1;b=YWJj", n: NewByteStringNodeID(1, []byte{'a', 'b', 'c'})},
 		{s: "ns=1;s=a", n: NewStringNodeID(1, "a")},
 		{s: "ns=1;a", n: NewStringNodeID(1, "a")},
 
@@ -229,7 +229,7 @@ func TestSetIntID(t *testing.T) {
 		},
 		{
 			name: "Opaque.incompatible",
-			n:    NewOpaqueNodeID(0, []byte{0x01}),
+			n:    NewByteStringNodeID(0, []byte{0x01}),
 			v:    1,
 			err:  errors.New("incompatible node id type"),
 		},
@@ -280,7 +280,7 @@ func TestSetStringID(t *testing.T) {
 		},
 		{
 			name: "Opaque",
-			n:    NewOpaqueNodeID(0, []byte{'a'}),
+			n:    NewByteStringNodeID(0, []byte{'a'}),
 			v:    "Yg==",
 		},
 
@@ -305,7 +305,7 @@ func TestSetStringID(t *testing.T) {
 		},
 		{
 			name: "Opaque.badBase64",
-			n:    NewOpaqueNodeID(0, []byte{'a'}),
+			n:    NewByteStringNodeID(0, []byte{'a'}),
 			v:    "%",
 			err:  base64.CorruptInputError(0),
 		},
@@ -417,13 +417,13 @@ func TestSetNamespace(t *testing.T) {
 		},
 		{
 			name: "Opaque.tooSmall",
-			n:    NewOpaqueNodeID(0, []byte{'a'}),
+			n:    NewByteStringNodeID(0, []byte{'a'}),
 			v:    -1,
 			err:  errors.New("out of range [0..65535]: -1"),
 		},
 		{
 			name: "Opaque.tooBig",
-			n:    NewOpaqueNodeID(0, []byte{'a'}),
+			n:    NewByteStringNodeID(0, []byte{'a'}),
 			v:    65536,
 			err:  errors.New("out of range [0..65535]: 65536"),
 		},
