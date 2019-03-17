@@ -11,8 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/gopcua/opcua/datatypes"
-	"github.com/gopcua/opcua/services"
+	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uacp"
 )
 
@@ -37,7 +36,7 @@ type SecureChannel struct {
 	cfg *Config
 
 	// reqhdr is the header for the next request.
-	reqhdr *services.RequestHeader
+	reqhdr *ua.RequestHeader
 
 	// quit signals the termination of the recv loop.
 	quit chan struct{}
@@ -65,11 +64,11 @@ func NewSecureChannel(c *uacp.Conn, cfg *Config) *SecureChannel {
 	// always reset the secure channel id
 	cfg.SecureChannelID = 0
 
-	reqhdr := &services.RequestHeader{
-		AuthenticationToken: datatypes.NewTwoByteNodeID(0),
+	reqhdr := &ua.RequestHeader{
+		AuthenticationToken: ua.NewTwoByteNodeID(0),
 		Timestamp:           time.Now(),
 		TimeoutHint:         0xffff,
-		AdditionalHeader:    services.NewNullAdditionalHeader(),
+		AdditionalHeader:    ua.NewNullAdditionalHeader(),
 	}
 
 	return &SecureChannel{
@@ -106,16 +105,16 @@ func (s *SecureChannel) openSecureChannel() error {
 		return err
 	}
 
-	req := &services.OpenSecureChannelRequest{
+	req := &ua.OpenSecureChannelRequest{
 		ClientProtocolVersion:    0,
-		SecurityTokenRequestType: services.ReqTypeIssue,
+		SecurityTokenRequestType: ua.ReqTypeIssue,
 		MessageSecurityMode:      s.cfg.SecurityMode,
 		ClientNonce:              nonce,
 		RequestedLifetime:        s.cfg.Lifetime,
 	}
 
 	return s.Send(req, func(v interface{}) error {
-		resp, ok := v.(*services.OpenSecureChannelResponse)
+		resp, ok := v.(*ua.OpenSecureChannelResponse)
 		if !ok {
 			return fmt.Errorf("got %T, want OpenSecureChannelResponse", req)
 		}
@@ -127,7 +126,7 @@ func (s *SecureChannel) openSecureChannel() error {
 
 // closeSecureChannel sends CloseSecureChannelRequest on top of UASC to SecureChannel.
 func (s *SecureChannel) closeSecureChannel() error {
-	req := &services.CloseSecureChannelRequest{
+	req := &ua.CloseSecureChannelRequest{
 		SecureChannelID: s.cfg.SecureChannelID,
 	}
 
@@ -157,7 +156,7 @@ func (s *SecureChannel) Send(svc interface{}, h func(interface{}) error) error {
 // SendAsync sends the service request and returns a channel which will receive the
 // response when it arrives.
 func (s *SecureChannel) SendAsync(svc interface{}) (resp chan Response, err error) {
-	typeID := services.TypeID(svc)
+	typeID := ua.TypeID(svc)
 	if typeID == 0 {
 		return nil, fmt.Errorf("unknown service %T. Did you call register?", svc)
 	}
@@ -303,7 +302,7 @@ func (s *SecureChannel) recv() {
 			// and subsequently remove it and the TypeID from all service
 			// structs and tests. We also need to add a deadline to all
 			// handlers and check them periodically to time them out.
-			_, svc, err := services.Decode(b)
+			_, svc, err := ua.DecodeService(b)
 			if err != nil {
 				s.notifyCaller(reqid, nil, err)
 				continue

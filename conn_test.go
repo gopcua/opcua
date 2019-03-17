@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	uad "github.com/gopcua/opcua/datatypes"
+	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uacp"
 	"github.com/gopcua/opcua/uasc"
 )
@@ -43,7 +43,7 @@ func TestClientRead(t *testing.T) {
 	}
 	defer c.Close()
 
-	v, err := c.Node(uad.NewNumericNodeID(0, 2258)).Value()
+	v, err := c.Node(ua.NewNumericNodeID(0, 2258)).Value()
 	if err != nil {
 		t.Fatal(err)
 	}

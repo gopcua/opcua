@@ -7,11 +7,11 @@ package uacp
 import (
 	"testing"
 
-	"github.com/gopcua/opcua/utils/codectest"
+	"github.com/gopcua/opcua/ua"
 )
 
 func TestUACPMessage(t *testing.T) {
-	cases := []codectest.Case{
+	cases := []ua.CodecTestCase{
 		{
 			Name: "Hello",
 			Struct: NewHello(
@@ -112,5 +112,5 @@ func TestUACPMessage(t *testing.T) {
 		// 	},
 		// },
 	}
-	codectest.Run(t, cases)
+	ua.RunCodecTest(t, cases)
 }

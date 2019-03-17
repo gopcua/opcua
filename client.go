@@ -5,8 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	uad "github.com/gopcua/opcua/datatypes"
-	uas "github.com/gopcua/opcua/services"
+	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uacp"
 	"github.com/gopcua/opcua/uasc"
 )
@@ -44,7 +43,7 @@ func (c *Client) Open() error {
 	// todo(fs): this should probably be configurable.
 	sessionCfg := uasc.NewClientSessionConfig(
 		[]string{"en-US"},
-		uad.NewAnonymousIdentityToken("open62541-anonymous-policy"),
+		ua.NewAnonymousIdentityToken("open62541-anonymous-policy"),
 	)
 
 	session := uasc.NewSession(sechan, sessionCfg)
@@ -67,15 +66,15 @@ func (c *Client) Close() error {
 
 // Node returns a node object which accesses its attributes
 // through this client connection.
-func (c *Client) Node(id *uad.NodeID) *Node {
+func (c *Client) Node(id *ua.NodeID) *Node {
 	return &Node{ID: id, c: c}
 }
 
 // Read executes a synchronous read request.
-func (c *Client) Read(req *uas.ReadRequest) (*uas.ReadResponse, error) {
-	var res *uas.ReadResponse
+func (c *Client) Read(req *ua.ReadRequest) (*ua.ReadResponse, error) {
+	var res *ua.ReadResponse
 	err := c.sechan.Send(req, func(v interface{}) error {
-		r, ok := v.(*uas.ReadResponse)
+		r, ok := v.(*ua.ReadResponse)
 		if !ok {
 			return fmt.Errorf("invalid response: %T", v)
 		}
@@ -86,10 +85,10 @@ func (c *Client) Read(req *uas.ReadRequest) (*uas.ReadResponse, error) {
 }
 
 // Browse executes a synchronous browse request.
-func (c *Client) Browse(req *uas.BrowseRequest) (*uas.BrowseResponse, error) {
-	var res *uas.BrowseResponse
+func (c *Client) Browse(req *ua.BrowseRequest) (*ua.BrowseResponse, error) {
+	var res *ua.BrowseResponse
 	err := c.sechan.Send(req, func(v interface{}) error {
-		r, ok := v.(*uas.BrowseResponse)
+		r, ok := v.(*ua.BrowseResponse)
 		if !ok {
 			return fmt.Errorf("invalid response: %T", v)
 		}
@@ -102,21 +101,21 @@ func (c *Client) Browse(req *uas.BrowseRequest) (*uas.BrowseResponse, error) {
 // todo(fs): this is not done yet since we need to be able to register
 // todo(fs): monitored items.
 type Subscription struct {
-	res *uas.CreateSubscriptionResponse
+	res *ua.CreateSubscriptionResponse
 }
 
 // todo(fs): return subscription object with channel
 func (c *Client) Subscribe(intv time.Duration) (*Subscription, error) {
-	req := &uas.CreateSubscriptionRequest{
+	req := &ua.CreateSubscriptionRequest{
 		RequestedPublishingInterval: float64(intv / time.Millisecond),
 		RequestedLifetimeCount:      60,
 		RequestedMaxKeepAliveCount:  20,
 		PublishingEnabled:           true,
 	}
 
-	var res *uas.CreateSubscriptionResponse
+	var res *ua.CreateSubscriptionResponse
 	err := c.sechan.Send(req, func(v interface{}) error {
-		r, ok := v.(*uas.CreateSubscriptionResponse)
+		r, ok := v.(*ua.CreateSubscriptionResponse)
 		if !ok {
 			return fmt.Errorf("invalid response: %T", v)
 		}

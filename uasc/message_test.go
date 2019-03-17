@@ -10,25 +10,23 @@ import (
 
 	"github.com/gopcua/opcua/id"
 
-	"github.com/gopcua/opcua/datatypes"
-	"github.com/gopcua/opcua/services"
-	"github.com/gopcua/opcua/utils/codectest"
+	"github.com/gopcua/opcua/ua"
 )
 
 func TestMessage(t *testing.T) {
-	cases := []codectest.Case{
+	cases := []ua.CodecTestCase{
 		{
 			Name: "OPN",
 			Struct: func() interface{} {
 				m := NewMessage(
-					services.NewOpenSecureChannelRequest(
-						services.NewRequestHeader(
-							datatypes.NewTwoByteNodeID(0),
+					ua.NewOpenSecureChannelRequest(
+						ua.NewRequestHeader(
+							ua.NewTwoByteNodeID(0),
 							time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-							1, 0x03ff, 0, "", services.NewNullAdditionalHeader(),
+							1, 0x03ff, 0, "", ua.NewNullAdditionalHeader(),
 						),
-						0, services.ReqTypeIssue,
-						services.SecModeNone, 6000000, nil,
+						0, ua.ReqTypeIssue,
+						ua.SecModeNone, 6000000, nil,
 					),
 					id.OpenSecureChannelRequest_Encoding_DefaultBinary,
 					&Config{
@@ -112,11 +110,11 @@ func TestMessage(t *testing.T) {
 			Name: "MSG",
 			Struct: func() interface{} {
 				m := NewMessage(
-					services.NewGetEndpointsRequest(
-						services.NewRequestHeader(
-							datatypes.NewTwoByteNodeID(0),
+					ua.NewGetEndpointsRequest(
+						ua.NewRequestHeader(
+							ua.NewTwoByteNodeID(0),
 							time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-							1, 0x03ff, 0, "", services.NewNullAdditionalHeader(),
+							1, 0x03ff, 0, "", ua.NewNullAdditionalHeader(),
 						),
 						"opc.tcp://wow.its.easy:11111/UA/Server",
 						nil, nil,
@@ -178,11 +176,11 @@ func TestMessage(t *testing.T) {
 			Name: "CLO",
 			Struct: func() interface{} {
 				m := NewMessage(
-					services.NewCloseSecureChannelRequest(
-						services.NewRequestHeader(
-							datatypes.NewTwoByteNodeID(0),
+					ua.NewCloseSecureChannelRequest(
+						ua.NewRequestHeader(
+							ua.NewTwoByteNodeID(0),
 							time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-							1, 0x03ff, 0, "", services.NewNullAdditionalHeader(),
+							1, 0x03ff, 0, "", ua.NewNullAdditionalHeader(),
 						),
 						1,
 					),
@@ -232,5 +230,5 @@ func TestMessage(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases)
+	ua.RunCodecTest(t, cases)
 }

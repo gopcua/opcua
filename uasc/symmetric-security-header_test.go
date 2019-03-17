@@ -7,11 +7,11 @@ package uasc
 import (
 	"testing"
 
-	"github.com/gopcua/opcua/utils/codectest"
+	"github.com/gopcua/opcua/ua"
 )
 
 func TestSymmetricSecurityHeader(t *testing.T) {
-	cases := []codectest.Case{
+	cases := []ua.CodecTestCase{
 		{
 			Name: "normal",
 			Struct: NewSymmetricSecurityHeader(
@@ -32,5 +32,5 @@ func TestSymmetricSecurityHeader(t *testing.T) {
 			},
 		},
 	}
-	codectest.Run(t, cases)
+	ua.RunCodecTest(t, cases)
 }

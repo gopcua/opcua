@@ -7,7 +7,7 @@ package uacp
 // todo(fs): this test should be removed since the header is now sent in conn.go
 // todo(fs): and is no longer part of the message itself.
 // func TestHeader(t *testing.T) {
-// 	cases := []codectest.Case{
+// 	cases := []ua.CodecTestCase{
 // 		{
 // 			Struct: &Header{
 // 				MessageType: MessageTypeHello,
@@ -24,5 +24,5 @@ package uacp
 // 			},
 // 		},
 // 	}
-// 	codectest.Run(t, cases)
+// 	ua.RunCodecTest(t, cases)
 // }

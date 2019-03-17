@@ -5,10 +5,8 @@
 package uasc
 
 import (
-	"github.com/gopcua/opcua/datatypes"
 	"github.com/gopcua/opcua/errors"
 	"github.com/gopcua/opcua/id"
-	"github.com/gopcua/opcua/services"
 	"github.com/gopcua/opcua/ua"
 )
 
@@ -62,7 +60,7 @@ func (m *MessageChunk) Decode(b []byte) (int, error) {
 // Message represents a OPC UA Secure Conversation message.
 type Message struct {
 	*MessageHeader
-	TypeID  *datatypes.ExpandedNodeID
+	TypeID  *ua.ExpandedNodeID
 	Service interface{}
 }
 
@@ -85,7 +83,7 @@ func NewMessage(srv interface{}, typeID uint16, cfg *Config) *Message {
 				AsymmetricSecurityHeader: NewAsymmetricSecurityHeader(cfg.SecurityPolicyURI, cfg.Certificate, cfg.Thumbprint),
 				SequenceHeader:           NewSequenceHeader(cfg.SequenceNumber, cfg.RequestID),
 			},
-			TypeID:  datatypes.NewFourByteExpandedNodeID(0, typeID),
+			TypeID:  ua.NewFourByteExpandedNodeID(0, typeID),
 			Service: srv,
 		}
 
@@ -96,7 +94,7 @@ func NewMessage(srv interface{}, typeID uint16, cfg *Config) *Message {
 				SymmetricSecurityHeader: NewSymmetricSecurityHeader(cfg.SecurityTokenID),
 				SequenceHeader:          NewSequenceHeader(cfg.SequenceNumber, cfg.RequestID),
 			},
-			TypeID:  datatypes.NewFourByteExpandedNodeID(0, typeID),
+			TypeID:  ua.NewFourByteExpandedNodeID(0, typeID),
 			Service: srv,
 		}
 
@@ -107,7 +105,7 @@ func NewMessage(srv interface{}, typeID uint16, cfg *Config) *Message {
 				SymmetricSecurityHeader: NewSymmetricSecurityHeader(cfg.SecurityTokenID),
 				SequenceHeader:          NewSequenceHeader(cfg.SequenceNumber, cfg.RequestID),
 			},
-			TypeID:  datatypes.NewFourByteExpandedNodeID(0, typeID),
+			TypeID:  ua.NewFourByteExpandedNodeID(0, typeID),
 			Service: srv,
 		}
 	}
@@ -119,7 +117,7 @@ func (m *Message) Decode(b []byte) (int, error) {
 	if err != nil {
 		return n, err
 	}
-	m.TypeID, m.Service, err = services.Decode(b[n:])
+	m.TypeID, m.Service, err = ua.DecodeService(b[n:])
 	return len(b), err
 }
 
