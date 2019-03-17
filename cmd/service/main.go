@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"strings"
 	"text/template"
-	"unicode"
 )
 
 func main() {
@@ -50,25 +49,25 @@ func main() {
 
 }
 
-func snakeCase(s string) string {
-	var x []rune
+// func snakeCase(s string) string {
+// 	var x []rune
 
-	for i, r := range s {
-		if r >= 'A' && r <= 'Z' {
-			if i > 0 {
-				x = append(x, '_')
-			}
-			x = append(x, unicode.ToLower(r))
-		} else {
-			x = append(x, r)
-		}
-	}
+// 	for i, r := range s {
+// 		if r >= 'A' && r <= 'Z' {
+// 			if i > 0 {
+// 				x = append(x, '_')
+// 			}
+// 			x = append(x, unicode.ToLower(r))
+// 		} else {
+// 			x = append(x, r)
+// 		}
+// 	}
 
-	s = string(x)
-	// quick fix for "ID" -> "i_d" until the function is fixed
-	s = strings.Replace(s, "i_d", "id", -1)
-	return s
-}
+// 	s = string(x)
+// 	// quick fix for "ID" -> "i_d" until the function is fixed
+// 	s = strings.Replace(s, "i_d", "id", -1)
+// 	return s
+// }
 
 func Enums(dict *TypeDictionary) []*Enum {
 	var enums []*Enum
