@@ -16,17 +16,17 @@ package ua
 // calculating the signature of the resulting sequence of bytes.
 //
 // Specification: Part 4, 5.6.3.2
-type ActivateSessionRequest struct {
-	RequestHeader              *RequestHeader
-	ClientSignature            *SignatureData
-	ClientSoftwareCertificates []*SignedSoftwareCertificate
-	LocaleIDs                  []string
-	UserIdentityToken          *ExtensionObject
-	UserTokenSignature         *SignatureData
-}
+// type ActivateSessionRequest struct {
+// 	RequestHeader              *RequestHeader
+// 	ClientSignature            *SignatureData
+// 	ClientSoftwareCertificates []*SignedSoftwareCertificate
+// 	LocaleIDs                  []string
+// 	UserIdentityToken          *ExtensionObject
+// 	UserTokenSignature         *SignatureData
+// }
 
 // NewActivateSessionRequest creates a new ActivateSessionRequest.
-func NewActivateSessionRequest(reqHeader *RequestHeader, sig *SignatureData, locales []string, userToken UserIdentityToken, tokenSig *SignatureData) *ActivateSessionRequest {
+func NewActivateSessionRequest(reqHeader *RequestHeader, sig *SignatureData, locales []string, userToken interface{}, tokenSig *SignatureData) *ActivateSessionRequest {
 	return &ActivateSessionRequest{
 		RequestHeader:              reqHeader,
 		ClientSignature:            sig,

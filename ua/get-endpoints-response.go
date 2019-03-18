@@ -5,10 +5,10 @@
 package ua
 
 // GetEndpointsResponse represents an GetEndpointsResponse.
-type GetEndpointsResponse struct {
-	ResponseHeader *ResponseHeader
-	Endpoints      []*EndpointDescription
-}
+// type GetEndpointsResponse struct {
+// 	ResponseHeader *ResponseHeader
+// 	Endpoints      []*EndpointDescription
+// }
 
 // NewGetEndpointsResponse creates an GetEndpointsResponse.
 func NewGetEndpointsResponse(resHeader *ResponseHeader, endpoints ...*EndpointDescription) *GetEndpointsResponse {

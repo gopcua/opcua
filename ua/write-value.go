@@ -7,12 +7,12 @@ package ua
 // WriteValue is a set of Node and Attribute to write.
 //
 // Specification: Part4, 5.10.4.2
-type WriteValue struct {
-	NodeID      *NodeID
-	AttributeID uint32
-	IndexRange  string
-	Value       *DataValue
-}
+// type WriteValue struct {
+// 	NodeID      *NodeID
+// 	AttributeID uint32
+// 	IndexRange  string
+// 	Value       *DataValue
+// }
 
 // NewWriteValue creates a new NewWriteValue.
 func NewWriteValue(node *NodeID, attr uint32, idxRange string, value *DataValue) *WriteValue {

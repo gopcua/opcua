@@ -4,24 +4,20 @@
 
 package ua
 
-import (
-	"testing"
-)
-
-func TestAdditionalHeader(t *testing.T) {
-	cases := []CodecTestCase{
-		{
-			Name: "no-body",
-			Struct: NewAdditionalHeader(
-				NewExpandedNodeID(
-					false, false,
-					NewTwoByteNodeID(255),
-					"", 0,
-				),
-				0x00,
-			),
-			Bytes: []byte{0x00, 0xff, 0x00},
-		},
-	}
-	RunCodecTest(t, cases)
-}
+// func TestAdditionalHeader(t *testing.T) {
+// 	cases := []CodecTestCase{
+// 		{
+// 			Name: "no-body",
+// 			Struct: NewAdditionalHeader(
+// 				NewExpandedNodeID(
+// 					false, false,
+// 					NewTwoByteNodeID(255),
+// 					"", 0,
+// 				),
+// 				0x00,
+// 			),
+// 			Bytes: []byte{0x00, 0xff, 0x00},
+// 		},
+// 	}
+// 	RunCodecTest(t, cases)
+// }

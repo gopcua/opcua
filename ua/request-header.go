@@ -12,18 +12,18 @@ import (
 // RequestHeader represents a Request Header in each services.
 //
 // Specification: Part 4, 7.28
-type RequestHeader struct {
-	AuthenticationToken *NodeID
-	Timestamp           time.Time
-	RequestHandle       uint32
-	ReturnDiagnostics   uint32
-	AuditEntryID        string
-	TimeoutHint         uint32
-	AdditionalHeader    *AdditionalHeader
-}
+// type RequestHeader struct {
+// 	AuthenticationToken *NodeID
+// 	Timestamp           time.Time
+// 	RequestHandle       uint32
+// 	ReturnDiagnostics   uint32
+// 	AuditEntryID        string
+// 	TimeoutHint         uint32
+// 	AdditionalHeader    *AdditionalHeader
+// }
 
 // NewRequestHeader creates a new RequestHeader.
-func NewRequestHeader(authToken *NodeID, timestamp time.Time, handle, diag, timeout uint32, auditID string, additionalHeader *AdditionalHeader) *RequestHeader {
+func NewRequestHeader(authToken *NodeID, timestamp time.Time, handle, diag, timeout uint32, auditID string, additionalHeader *ExtensionObject) *RequestHeader {
 	return &RequestHeader{
 		AuthenticationToken: authToken,
 		Timestamp:           timestamp,

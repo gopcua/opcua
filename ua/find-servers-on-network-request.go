@@ -26,12 +26,12 @@ package ua
 // Service. This can be achieved by preparing the result in advance.
 //
 // Specification: Part 4, 5.4.3
-type FindServersOnNetworkRequest struct {
-	RequestHeader          *RequestHeader
-	StartingRecordID       uint32
-	MaxRecordsToReturn     uint32
-	ServerCapabilityFilter []string
-}
+// type FindServersOnNetworkRequest struct {
+// 	RequestHeader          *RequestHeader
+// 	StartingRecordID       uint32
+// 	MaxRecordsToReturn     uint32
+// 	ServerCapabilityFilter []string
+// }
 
 // NewFindServersOnNetworkRequest creates a new FindServersOnNetworkRequest.
 func NewFindServersOnNetworkRequest(reqHeader *RequestHeader, startRecord, maxRecords uint32, filters []string) *FindServersOnNetworkRequest {

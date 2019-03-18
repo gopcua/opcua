@@ -12,12 +12,12 @@ package ua
 // criteria supported by this Service are described in 5.4.2.2.
 //
 // Specification: Part 4, 5.4.2
-type FindServersRequest struct {
-	RequestHeader *RequestHeader
-	EndpointURL   string
-	LocaleIDs     []string
-	ServerURIs    []string
-}
+// type FindServersRequest struct {
+// 	RequestHeader *RequestHeader
+// 	EndpointURL   string
+// 	LocaleIDs     []string
+// 	ServerURIs    []string
+// }
 
 // NewFindServersRequest creates a new FindServersRequest.
 func NewFindServersRequest(reqHeader *RequestHeader, url string, locales, serverURIs []string) *FindServersRequest {

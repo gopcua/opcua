@@ -7,21 +7,21 @@ package ua
 // CreateSessionResponse represents a CreateSessionResponse.
 //
 // Specification: Part4, 5.6.2
-type CreateSessionResponse struct {
-	*ResponseHeader
-	SessionID                  *NodeID
-	AuthenticationToken        *NodeID
-	RevisedSessionTimeout      uint64
-	ServerNonce                []byte
-	ServerCertificate          []byte
-	ServerEndpoints            []*EndpointDescription
-	ServerSoftwareCertificates []*SignedSoftwareCertificate
-	ServerSignature            *SignatureData
-	MaxRequestMessageSize      uint32
-}
+// type CreateSessionResponse struct {
+// 	*ResponseHeader
+// 	SessionID                  *NodeID
+// 	AuthenticationToken        *NodeID
+// 	RevisedSessionTimeout      uint64
+// 	ServerNonce                []byte
+// 	ServerCertificate          []byte
+// 	ServerEndpoints            []*EndpointDescription
+// 	ServerSoftwareCertificates []*SignedSoftwareCertificate
+// 	ServerSignature            *SignatureData
+// 	MaxRequestMessageSize      uint32
+// }
 
 // NewCreateSessionResponse creates a new NewCreateSessionResponse with the given parameters.
-func NewCreateSessionResponse(resHeader *ResponseHeader, sessionID, authToken *NodeID, timeout uint64, nonce, cert []byte, svrSignature *SignatureData, maxRespSize uint32, endpoints ...*EndpointDescription) *CreateSessionResponse {
+func NewCreateSessionResponse(resHeader *ResponseHeader, sessionID, authToken *NodeID, timeout float64, nonce, cert []byte, svrSignature *SignatureData, maxRespSize uint32, endpoints ...*EndpointDescription) *CreateSessionResponse {
 	return &CreateSessionResponse{
 		ResponseHeader:             resHeader,
 		SessionID:                  sessionID,

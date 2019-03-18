@@ -34,15 +34,15 @@ const (
 	OpenFileModeAppend        OpenFileMode = 8
 )
 
-type IDentityCriteriaType uint32
+type IdentityCriteriaType uint32
 
 const (
-	IdentityCriteriaTypeUserName          IDentityCriteriaType = 1
-	IdentityCriteriaTypeThumbprint        IDentityCriteriaType = 2
-	IdentityCriteriaTypeRole              IDentityCriteriaType = 3
-	IdentityCriteriaTypeGroupID           IDentityCriteriaType = 4
-	IdentityCriteriaTypeAnonymous         IDentityCriteriaType = 5
-	IdentityCriteriaTypeAuthenticatedUser IDentityCriteriaType = 6
+	IdentityCriteriaTypeUserName          IdentityCriteriaType = 1
+	IdentityCriteriaTypeThumbprint        IdentityCriteriaType = 2
+	IdentityCriteriaTypeRole              IdentityCriteriaType = 3
+	IdentityCriteriaTypeGroupID           IdentityCriteriaType = 4
+	IdentityCriteriaTypeAnonymous         IdentityCriteriaType = 5
+	IdentityCriteriaTypeAuthenticatedUser IdentityCriteriaType = 6
 )
 
 type TrustListMasks uint32

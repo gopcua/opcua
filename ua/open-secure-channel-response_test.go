@@ -16,7 +16,7 @@ func TestOpenSecureChannelResponse(t *testing.T) {
 			Struct: NewOpenSecureChannelResponse(
 				NewResponseHeader(
 					time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-					1, 0, NewNullDiagnosticInfo(), []string{}, NewNullAdditionalHeader(),
+					1, 0, NewNullDiagnosticInfo(), []string{}, NewNullExtensionObject(),
 				),
 				0,
 				NewChannelSecurityToken(

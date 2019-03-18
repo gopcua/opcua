@@ -5,12 +5,12 @@
 package ua
 
 // OpenSecureChannelResponse represents an OpenSecureChannelResponse.
-type OpenSecureChannelResponse struct {
-	ResponseHeader        *ResponseHeader
-	ServerProtocolVersion uint32
-	SecurityToken         *ChannelSecurityToken
-	ServerNonce           []byte
-}
+// type OpenSecureChannelResponse struct {
+// 	ResponseHeader        *ResponseHeader
+// 	ServerProtocolVersion uint32
+// 	SecurityToken         *ChannelSecurityToken
+// 	ServerNonce           []byte
+// }
 
 // NewOpenSecureChannelResponse creates an OpenSecureChannelResponse.
 func NewOpenSecureChannelResponse(resHeader *ResponseHeader, ver uint32, secToken *ChannelSecurityToken, nonce []byte) *OpenSecureChannelResponse {

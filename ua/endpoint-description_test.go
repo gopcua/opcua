@@ -15,19 +15,19 @@ func TestEndpointDescription(t *testing.T) {
 			Struct: NewEndpointDescription(
 				"ep-url",
 				NewApplicationDescription(
-					"app-uri", "prod-uri", "app-name", AppTypeServer,
+					"app-uri", "prod-uri", "app-name", ApplicationTypeServer,
 					"gw-uri", "prof-uri", []string{"discov-uri-1", "discov-uri-2"},
 				),
 				nil,
-				SecModeNone,
+				MessageSecurityModeNone,
 				"sec-uri",
 				[]*UserTokenPolicy{
 					NewUserTokenPolicy(
-						"1", UserTokenAnonymous,
+						"1", UserTokenTypeAnonymous,
 						"issued-token", "issuer-uri", "sec-uri",
 					),
 					NewUserTokenPolicy(
-						"1", UserTokenAnonymous,
+						"1", UserTokenTypeAnonymous,
 						"issued-token", "issuer-uri", "sec-uri",
 					),
 				},
@@ -102,19 +102,19 @@ func TestEndpointDescriptionArray(t *testing.T) {
 				NewEndpointDescription(
 					"ep-url",
 					NewApplicationDescription(
-						"app-uri", "prod-uri", "app-name", AppTypeServer,
+						"app-uri", "prod-uri", "app-name", ApplicationTypeServer,
 						"gw-uri", "prof-uri", []string{"discov-uri-1", "discov-uri-2"},
 					),
 					nil,
-					SecModeNone,
+					MessageSecurityModeNone,
 					"sec-uri",
 					[]*UserTokenPolicy{
 						NewUserTokenPolicy(
-							"1", UserTokenAnonymous,
+							"1", UserTokenTypeAnonymous,
 							"issued-token", "issuer-uri", "sec-uri",
 						),
 						NewUserTokenPolicy(
-							"1", UserTokenAnonymous,
+							"1", UserTokenTypeAnonymous,
 							"issued-token", "issuer-uri", "sec-uri",
 						),
 					},
@@ -124,19 +124,19 @@ func TestEndpointDescriptionArray(t *testing.T) {
 				NewEndpointDescription(
 					"ep-url",
 					NewApplicationDescription(
-						"app-uri", "prod-uri", "app-name", AppTypeServer,
+						"app-uri", "prod-uri", "app-name", ApplicationTypeServer,
 						"gw-uri", "prof-uri", []string{"discov-uri-1", "discov-uri-2"},
 					),
 					nil,
-					SecModeNone,
+					MessageSecurityModeNone,
 					"sec-uri",
 					[]*UserTokenPolicy{
 						NewUserTokenPolicy(
-							"1", UserTokenAnonymous,
+							"1", UserTokenTypeAnonymous,
 							"issued-token", "issuer-uri", "sec-uri",
 						),
 						NewUserTokenPolicy(
-							"1", UserTokenAnonymous,
+							"1", UserTokenTypeAnonymous,
 							"issued-token", "issuer-uri", "sec-uri",
 						),
 					},

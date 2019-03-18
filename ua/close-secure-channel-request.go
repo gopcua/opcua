@@ -8,15 +8,14 @@ package ua
 // This Service is used to terminate a SecureChannel.
 //
 // Specification: Part 4, 5.5.3.2
-type CloseSecureChannelRequest struct {
-	RequestHeader   *RequestHeader
-	SecureChannelID uint32
-}
+// type CloseSecureChannelRequest struct {
+// 	RequestHeader   *RequestHeader
+// 	SecureChannelID uint32
+// }
 
 // NewCloseSecureChannelRequest creates an CloseSecureChannelRequest.
-func NewCloseSecureChannelRequest(reqHeader *RequestHeader, chanID uint32) *CloseSecureChannelRequest {
+func NewCloseSecureChannelRequest(reqHeader *RequestHeader) *CloseSecureChannelRequest {
 	return &CloseSecureChannelRequest{
-		RequestHeader:   reqHeader,
-		SecureChannelID: chanID,
+		RequestHeader: reqHeader,
 	}
 }

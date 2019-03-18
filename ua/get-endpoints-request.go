@@ -9,12 +9,12 @@ package ua
 // required to establish a SecureChannel and a Session.
 //
 // Specification: Part 4, 5.4.4.2
-type GetEndpointsRequest struct {
-	RequestHeader *RequestHeader
-	EndpointURL   string
-	LocaleIDs     []string
-	ProfileURIs   []string
-}
+// type GetEndpointsRequest struct {
+// 	RequestHeader *RequestHeader
+// 	EndpointURL   string
+// 	LocaleIDs     []string
+// 	ProfileURIs   []string
+// }
 
 // NewGetEndpointsRequest creates an GetEndpointsRequest.
 func NewGetEndpointsRequest(reqHeader *RequestHeader, endpoint string, localIDs, profileURIs []string) *GetEndpointsRequest {

@@ -11,10 +11,10 @@ import (
 // SignedSoftwareCertificate represents a SignedSoftwareCertificate.
 //
 // Specification: Part 4, 7.33
-type SignedSoftwareCertificate struct {
-	CertificateData []byte
-	Signature       []byte
-}
+// type SignedSoftwareCertificate struct {
+// 	CertificateData []byte
+// 	Signature       []byte
+// }
 
 // NewSignedSoftwareCertificate creates a new SignedSoftwareCertificate.
 func NewSignedSoftwareCertificate(cert, signature []byte) *SignedSoftwareCertificate {

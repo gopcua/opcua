@@ -13,7 +13,7 @@ func NewNullRequestHeader() *RequestHeader {
 	return &RequestHeader{
 		AuthenticationToken: NewTwoByteNodeID(0),
 		Timestamp:           time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC),
-		AdditionalHeader:    NewNullAdditionalHeader(),
+		AdditionalHeader:    NewNullExtensionObject(),
 	}
 }
 
@@ -49,14 +49,9 @@ func TestRequestHeader(t *testing.T) {
 					0,
 					0,
 					"foobar",
-					NewAdditionalHeader(
-						NewExpandedNodeID(
-							false, false,
-							NewTwoByteNodeID(255),
-							"", 0,
-						),
-						0x00,
-					),
+					&ExtensionObject{
+						TypeID: NewTwoByteExpandedNodeID(255),
+					},
 				)
 				r.SetDiagAll()
 				return r

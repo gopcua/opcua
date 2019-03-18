@@ -16,10 +16,10 @@ func TestFindServersOnNetworkResponse(t *testing.T) {
 			Struct: NewFindServersOnNetworkResponse(
 				NewResponseHeader(
 					time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-					1, 0, NewNullDiagnosticInfo(), []string{}, NewNullAdditionalHeader(),
+					1, 0, NewNullDiagnosticInfo(), []string{}, NewNullExtensionObject(),
 				),
 				time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-				NewServersOnNetwork(
+				NewServerOnNetwork(
 					1,
 					"server-name",
 					"discov-uri",
@@ -64,16 +64,16 @@ func TestFindServersOnNetworkResponse(t *testing.T) {
 			Struct: NewFindServersOnNetworkResponse(
 				NewResponseHeader(
 					time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-					1, 0, NewNullDiagnosticInfo(), []string{}, NewNullAdditionalHeader(),
+					1, 0, NewNullDiagnosticInfo(), []string{}, NewNullExtensionObject(),
 				),
 				time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-				NewServersOnNetwork(
+				NewServerOnNetwork(
 					1,
 					"server-name",
 					"discov-uri",
 					[]string{"server-cap-1"},
 				),
-				NewServersOnNetwork(
+				NewServerOnNetwork(
 					1,
 					"server-name",
 					"discov-uri",

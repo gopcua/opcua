@@ -18,15 +18,15 @@ package ua
 // shall reject requests sent via the old SecureChannel.
 //
 // Specification: Part 4, 5.6.3.2
-type ActivateSessionResponse struct {
-	ResponseHeader  *ResponseHeader
-	ServerNonce     []byte
-	Results         []uint32
-	DiagnosticInfos []*DiagnosticInfo
-}
+// type ActivateSessionResponse struct {
+// 	ResponseHeader  *ResponseHeader
+// 	ServerNonce     []byte
+// 	Results         []uint32
+// 	DiagnosticInfos []*DiagnosticInfo
+// }
 
 // NewActivateSessionResponse creates a new NewActivateSessionResponse.
-func NewActivateSessionResponse(resHeader *ResponseHeader, nonce []byte, results []uint32, diags []*DiagnosticInfo) *ActivateSessionResponse {
+func NewActivateSessionResponse(resHeader *ResponseHeader, nonce []byte, results []StatusCode, diags []*DiagnosticInfo) *ActivateSessionResponse {
 	return &ActivateSessionResponse{
 		ResponseHeader:  resHeader,
 		ServerNonce:     nonce,

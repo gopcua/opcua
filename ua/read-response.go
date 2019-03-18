@@ -7,11 +7,11 @@ package ua
 // ReadResponse represents the response to a ReadRequest.
 //
 // Specification Part 4, 5.10.2.2
-type ReadResponse struct {
-	ResponseHeader  *ResponseHeader
-	Results         []*DataValue
-	DiagnosticInfos []*DiagnosticInfo
-}
+// type ReadResponse struct {
+// 	ResponseHeader  *ResponseHeader
+// 	Results         []*DataValue
+// 	DiagnosticInfos []*DiagnosticInfo
+// }
 
 // NewReadResponse creates a new ReadResponse.
 func NewReadResponse(resHeader *ResponseHeader, diag []*DiagnosticInfo, results ...*DataValue) *ReadResponse {

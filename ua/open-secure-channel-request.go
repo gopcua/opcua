@@ -15,35 +15,35 @@ const (
 // MessageSecurityMode definitions.
 //
 // Specification: Part 4, 7.15
-const (
-	SecModeInvalid uint32 = iota
-	SecModeNone
-	SecModeSign
-	SecModeSignAndEncrypt
-)
+// const (
+// 	SecModeInvalid uint32 = iota
+// 	SecModeNone
+// 	SecModeSign
+// 	SecModeSignAndEncrypt
+// )
 
 // OpenSecureChannelRequest represents an OpenSecureChannelRequest.
 // This Service is used to open or renew a SecureChannel that can be used to ensure Confidentiality
 // and Integrity for Message exchange during a Session.
 //
 // Specification: Part 4, 5.5.2.2
-type OpenSecureChannelRequest struct {
-	RequestHeader            *RequestHeader
-	ClientProtocolVersion    uint32
-	SecurityTokenRequestType uint32
-	MessageSecurityMode      uint32
-	ClientNonce              []byte
-	RequestedLifetime        uint32
-}
+// type OpenSecureChannelRequest struct {
+// 	RequestHeader            *RequestHeader
+// 	ClientProtocolVersion    uint32
+// 	SecurityTokenRequestType uint32
+// 	MessageSecurityMode      uint32
+// 	ClientNonce              []byte
+// 	RequestedLifetime        uint32
+// }
 
 // NewOpenSecureChannelRequest creates an OpenSecureChannelRequest.
-func NewOpenSecureChannelRequest(reqHeader *RequestHeader, ver, tokenType, securityMode, lifetime uint32, nonce []byte) *OpenSecureChannelRequest {
+func NewOpenSecureChannelRequest(reqHeader *RequestHeader, ver uint32, tokenType SecurityTokenRequestType, securityMode MessageSecurityMode, lifetime uint32, nonce []byte) *OpenSecureChannelRequest {
 	return &OpenSecureChannelRequest{
-		RequestHeader:            reqHeader,
-		ClientProtocolVersion:    ver,
-		SecurityTokenRequestType: tokenType,
-		MessageSecurityMode:      securityMode,
-		ClientNonce:              nonce,
-		RequestedLifetime:        lifetime,
+		RequestHeader:         reqHeader,
+		ClientProtocolVersion: ver,
+		RequestType:           tokenType,
+		SecurityMode:          securityMode,
+		ClientNonce:           nonce,
+		RequestedLifetime:     lifetime,
 	}
 }

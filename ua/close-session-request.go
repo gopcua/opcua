@@ -8,10 +8,10 @@ package ua
 // This Service is used to terminate a Session.
 //
 // Specification: Part 4, 5.6.4.2
-type CloseSessionRequest struct {
-	RequestHeader       *RequestHeader
-	DeleteSubscriptions bool
-}
+// type CloseSessionRequest struct {
+// 	RequestHeader       *RequestHeader
+// 	DeleteSubscriptions bool
+// }
 
 // NewCloseSessionRequest creates a CloseSessionRequest.
 func NewCloseSessionRequest(reqHeader *RequestHeader, deleteSubs bool) *CloseSessionRequest {

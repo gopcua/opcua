@@ -11,10 +11,10 @@ import (
 // SignatureData represents a SignatureData.
 //
 // Specification: Part 4, 7.32
-type SignatureData struct {
-	Algorithm string
-	Signature []byte
-}
+// type SignatureData struct {
+// 	Algorithm string
+// 	Signature []byte
+// }
 
 // NewSignatureData creates a new SignatureData.
 func NewSignatureData(algorithm string, signature []byte) *SignatureData {

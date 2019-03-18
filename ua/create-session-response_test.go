@@ -16,7 +16,7 @@ func TestCreateSessionResponse(t *testing.T) {
 			Struct: NewCreateSessionResponse(
 				NewResponseHeader(
 					time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-					1, 0, NewNullDiagnosticInfo(), []string{}, NewNullAdditionalHeader(),
+					1, 0, NewNullDiagnosticInfo(), []string{}, NewNullExtensionObject(),
 				),
 				NewNumericNodeID(0, 1),
 				NewByteStringNodeID(0, []byte{
@@ -32,19 +32,19 @@ func TestCreateSessionResponse(t *testing.T) {
 				NewEndpointDescription(
 					"ep-url",
 					NewApplicationDescription(
-						"app-uri", "prod-uri", "app-name", AppTypeServer,
+						"app-uri", "prod-uri", "app-name", ApplicationTypeServer,
 						"gw-uri", "prof-uri", []string{"discov-uri-1", "discov-uri-2"},
 					),
 					nil,
-					SecModeNone,
+					MessageSecurityModeNone,
 					"sec-uri",
 					[]*UserTokenPolicy{
 						NewUserTokenPolicy(
-							"1", UserTokenAnonymous,
+							"1", UserTokenTypeAnonymous,
 							"issued-token", "issuer-uri", "sec-uri",
 						),
 						NewUserTokenPolicy(
-							"1", UserTokenAnonymous,
+							"1", UserTokenTypeAnonymous,
 							"issued-token", "issuer-uri", "sec-uri",
 						),
 					},
@@ -54,19 +54,19 @@ func TestCreateSessionResponse(t *testing.T) {
 				NewEndpointDescription(
 					"ep-url",
 					NewApplicationDescription(
-						"app-uri", "prod-uri", "app-name", AppTypeServer,
+						"app-uri", "prod-uri", "app-name", ApplicationTypeServer,
 						"gw-uri", "prof-uri", []string{"discov-uri-1", "discov-uri-2"},
 					),
 					nil,
-					SecModeNone,
+					MessageSecurityModeNone,
 					"sec-uri",
 					[]*UserTokenPolicy{
 						NewUserTokenPolicy(
-							"1", UserTokenAnonymous,
+							"1", UserTokenTypeAnonymous,
 							"issued-token", "issuer-uri", "sec-uri",
 						),
 						NewUserTokenPolicy(
-							"1", UserTokenAnonymous,
+							"1", UserTokenTypeAnonymous,
 							"issued-token", "issuer-uri", "sec-uri",
 						),
 					},
@@ -94,7 +94,7 @@ func TestCreateSessionResponse(t *testing.T) {
 				0x22, 0x87, 0x62, 0xba, 0x81, 0xe1, 0x11, 0xa6,
 				0x43, 0xf8, 0x77, 0x7b, 0xc6, 0x2f, 0xc8,
 				// RevisedSessionTimeout
-				0x80, 0x8d, 0x5b, 0x00, 0x00, 0x00, 0x00, 0x00,
+				0x00, 0x00, 0x00, 0x00, 0x60, 0xe3, 0x56, 0x41,
 				// ServerNonce
 				0xff, 0xff, 0xff, 0xff,
 				// ServerCertificate

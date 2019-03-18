@@ -16,7 +16,7 @@ func TestCloseSecureChannelResponse(t *testing.T) {
 			Struct: NewCloseSecureChannelResponse(
 				NewResponseHeader(
 					time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-					1, 0, nil, []string{}, NewNullAdditionalHeader(),
+					1, 0, nil, []string{}, NewNullExtensionObject(),
 				),
 			),
 			Bytes: []byte{

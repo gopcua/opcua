@@ -19,7 +19,7 @@ func main() {
 	log.SetFlags(0)
 
 	in := flag.String("in", "schema/NodeIds.csv", "path to NodeIds.csv")
-	out := flag.String("out", "id/id.go", "path to generated file")
+	out := flag.String("out", "id/id_gen.go", "path to generated file")
 	flag.Parse()
 
 	if *in == "" {

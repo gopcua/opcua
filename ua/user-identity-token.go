@@ -4,44 +4,23 @@
 
 package ua
 
-import (
-	"github.com/gopcua/opcua/id"
-)
-
 // UserIdentityToken is an interface to handle all types of UserIdentityToken types as one type.
-type UserIdentityToken interface {
-	ExtensionObjectValue
-}
+// type UserIdentityToken interface {
+// 	ExtensionObjectValue
+// }
 
 // AnonymousIdentityToken is used to indicate that the Client has no user credentials.
 //
 // Specification: Part4, 7.36.5
-type AnonymousIdentityToken struct {
-	PolicyID string
-}
+// type AnonymousIdentityToken struct {
+// 	PolicyID string
+// }
 
 // NewAnonymousIdentityToken creates a new AnonymousIdentityToken.
 func NewAnonymousIdentityToken(policyID string) *AnonymousIdentityToken {
 	return &AnonymousIdentityToken{
 		PolicyID: policyID,
 	}
-}
-
-func (t *AnonymousIdentityToken) Decode(b []byte) (int, error) {
-	buf := NewBuffer(b)
-	t.PolicyID = buf.ReadString()
-	return buf.Pos(), buf.Error()
-}
-
-func (t *AnonymousIdentityToken) Encode() ([]byte, error) {
-	buf := NewBuffer(nil)
-	buf.WriteString(t.PolicyID)
-	return buf.Bytes(), buf.Error()
-}
-
-// Type returns type of token defined in NodeIds.csv in int.
-func (a *AnonymousIdentityToken) Type() int {
-	return id.AnonymousIdentityToken_Encoding_DefaultBinary
 }
 
 // ID returns PolicyID in string.
@@ -69,12 +48,12 @@ func (a *AnonymousIdentityToken) ID() string {
 // password visible in clear text.
 //
 // Specification: Part4, 7.36.4
-type UserNameIdentityToken struct {
-	PolicyID            string
-	UserName            string
-	Password            []byte
-	EncryptionAlgorithm string
-}
+// type UserNameIdentityToken struct {
+// 	PolicyID            string
+// 	UserName            string
+// 	Password            []byte
+// 	EncryptionAlgorithm string
+// }
 
 // NewUserNameIdentityToken creates a new UserNameIdentityToken.
 func NewUserNameIdentityToken(policyID, username string, password []byte, alg string) *UserNameIdentityToken {
@@ -84,29 +63,6 @@ func NewUserNameIdentityToken(policyID, username string, password []byte, alg st
 		Password:            password,
 		EncryptionAlgorithm: alg,
 	}
-}
-
-func (t *UserNameIdentityToken) Decode(b []byte) (int, error) {
-	buf := NewBuffer(b)
-	t.PolicyID = buf.ReadString()
-	t.UserName = buf.ReadString()
-	t.Password = buf.ReadBytes()
-	t.EncryptionAlgorithm = buf.ReadString()
-	return buf.Pos(), buf.Error()
-}
-
-func (t *UserNameIdentityToken) Encode() ([]byte, error) {
-	buf := NewBuffer(nil)
-	buf.WriteString(t.PolicyID)
-	buf.WriteString(t.UserName)
-	buf.WriteByteString(t.Password)
-	buf.WriteString(t.EncryptionAlgorithm)
-	return buf.Bytes(), buf.Error()
-}
-
-// Type returns type of token defined in NodeIds.csv in int.
-func (u *UserNameIdentityToken) Type() int {
-	return id.UserNameIdentityToken_Encoding_DefaultBinary
 }
 
 // ID returns PolicyID in string.
@@ -120,36 +76,17 @@ func (u *UserNameIdentityToken) ID() string {
 // the UserTokenPolicy if the SecureChannel has a SecurityPolicy of None.
 //
 // Specification: Part4, 7.36.5
-type X509IdentityToken struct {
-	PolicyID        string
-	CertificateData string
-}
+// type X509IdentityToken struct {
+// 	PolicyID        string
+// 	CertificateData string
+// }
 
 // NewX509IdentityToken creates a new X509IdentityToken.
-func NewX509IdentityToken(policyID, cert string) *X509IdentityToken {
+func NewX509IdentityToken(policyID string, cert []byte) *X509IdentityToken {
 	return &X509IdentityToken{
 		PolicyID:        policyID,
 		CertificateData: cert,
 	}
-}
-
-func (t *X509IdentityToken) Decode(b []byte) (int, error) {
-	buf := NewBuffer(b)
-	t.PolicyID = buf.ReadString()
-	t.CertificateData = buf.ReadString()
-	return buf.Pos(), buf.Error()
-}
-
-func (t *X509IdentityToken) Encode() ([]byte, error) {
-	buf := NewBuffer(nil)
-	buf.WriteString(t.PolicyID)
-	buf.WriteString(t.CertificateData)
-	return buf.Bytes(), buf.Error()
-}
-
-// Type returns type of token defined in NodeIds.csv in int.
-func (x *X509IdentityToken) Type() int {
-	return id.X509IdentityToken_Encoding_DefaultBinary
 }
 
 // ID returns PolicyID in string.
@@ -178,11 +115,11 @@ func (x *X509IdentityToken) ID() string {
 // visible in clear text.
 //
 // Specification: Part4, 7.36.6
-type IssuedIdentityToken struct {
-	PolicyID            string
-	TokenData           []byte
-	EncryptionAlgorithm string
-}
+// type IssuedIdentityToken struct {
+// 	PolicyID            string
+// 	TokenData           []byte
+// 	EncryptionAlgorithm string
+// }
 
 // NewIssuedIdentityToken creates a new IssuedIdentityToken.
 func NewIssuedIdentityToken(policyID string, tokenData []byte, alg string) *IssuedIdentityToken {
@@ -191,27 +128,6 @@ func NewIssuedIdentityToken(policyID string, tokenData []byte, alg string) *Issu
 		TokenData:           tokenData,
 		EncryptionAlgorithm: alg,
 	}
-}
-
-func (t *IssuedIdentityToken) Decode(b []byte) (int, error) {
-	buf := NewBuffer(b)
-	t.PolicyID = buf.ReadString()
-	t.TokenData = buf.ReadBytes()
-	t.EncryptionAlgorithm = buf.ReadString()
-	return buf.Pos(), buf.Error()
-}
-
-func (t *IssuedIdentityToken) Encode() ([]byte, error) {
-	buf := NewBuffer(nil)
-	buf.WriteString(t.PolicyID)
-	buf.WriteByteString(t.TokenData)
-	buf.WriteString(t.EncryptionAlgorithm)
-	return buf.Bytes(), buf.Error()
-}
-
-// Type returns type of token defined in NodeIds.csv in int.
-func (i *IssuedIdentityToken) Type() int {
-	return id.IssuedIdentityToken_Encoding_DefaultBinary
 }
 
 // ID returns PolicyID in string.

@@ -12,17 +12,17 @@ import (
 // ResponseHeader represents a Response Header in each services.
 //
 // Specification: Part 4, 7.29
-type ResponseHeader struct {
-	Timestamp          time.Time
-	RequestHandle      uint32
-	ServiceResult      uint32
-	ServiceDiagnostics *DiagnosticInfo
-	StringTable        []string
-	AdditionalHeader   *AdditionalHeader
-}
+// type ResponseHeader struct {
+// 	Timestamp          time.Time
+// 	RequestHandle      uint32
+// 	ServiceResult      uint32
+// 	ServiceDiagnostics *DiagnosticInfo
+// 	StringTable        []string
+// 	AdditionalHeader   *AdditionalHeader
+// }
 
 // NewResponseHeader creates a new ResponseHeader.
-func NewResponseHeader(timestamp time.Time, handle, code uint32, diag *DiagnosticInfo, strs []string, additionalHeader *AdditionalHeader) *ResponseHeader {
+func NewResponseHeader(timestamp time.Time, handle uint32, code StatusCode, diag *DiagnosticInfo, strs []string, additionalHeader *ExtensionObject) *ResponseHeader {
 	r := &ResponseHeader{
 		Timestamp:          timestamp,
 		RequestHandle:      handle,
@@ -34,7 +34,6 @@ func NewResponseHeader(timestamp time.Time, handle, code uint32, diag *Diagnosti
 	if diag == nil {
 		r.ServiceDiagnostics = NewNullDiagnosticInfo()
 	}
-
 	return r
 }
 

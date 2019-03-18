@@ -10,15 +10,15 @@ package ua
 // Server will choose default values and indicate them in the corresponding revised parameter.
 //
 // Specification: Part 4, 5.13.2
-type CreateSubscriptionRequest struct {
-	RequestHeader               *RequestHeader
-	RequestedPublishingInterval float64
-	RequestedLifetimeCount      uint32
-	RequestedMaxKeepAliveCount  uint32
-	MaxNotificationsPerPublish  uint32
-	PublishingEnabled           bool
-	Priority                    byte
-}
+// type CreateSubscriptionRequest struct {
+// 	RequestHeader               *RequestHeader
+// 	RequestedPublishingInterval float64
+// 	RequestedLifetimeCount      uint32
+// 	RequestedMaxKeepAliveCount  uint32
+// 	MaxNotificationsPerPublish  uint32
+// 	PublishingEnabled           bool
+// 	Priority                    byte
+// }
 
 // NewCreateSubscriptionRequest creates a new CreateSubscriptionRequest with the given parameters.
 func NewCreateSubscriptionRequest(

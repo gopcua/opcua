@@ -16,13 +16,13 @@ func TestFindServersResponse(t *testing.T) {
 			Struct: NewFindServersResponse(
 				NewResponseHeader(
 					time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-					1, 0, NewNullDiagnosticInfo(), []string{}, NewNullAdditionalHeader(),
+					1, 0, NewNullDiagnosticInfo(), []string{}, NewNullExtensionObject(),
 				),
 				NewApplicationDescription(
 					"app-uri",
 					"prod-uri",
 					"app-name",
-					AppTypeServer,
+					ApplicationTypeServer,
 					"gw-uri",
 					"prof-uri",
 					[]string{"discov-uri-1", "discov-uri-2"},
@@ -31,7 +31,7 @@ func TestFindServersResponse(t *testing.T) {
 					"app-uri",
 					"prod-uri",
 					"app-name",
-					AppTypeServer,
+					ApplicationTypeServer,
 					"gw-uri",
 					"prof-uri",
 					[]string{"discov-uri-1", "discov-uri-2"},

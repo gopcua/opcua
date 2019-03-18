@@ -8,10 +8,10 @@ package ua
 // requests shall respond with Bad_RequestCancelledByClient.
 //
 // Specification: Part4, 5.6.5
-type CancelRequest struct {
-	*RequestHeader
-	RequestHandle uint32
-}
+// type CancelRequest struct {
+// 	*RequestHeader
+// 	RequestHandle uint32
+// }
 
 // NewCancelRequest creates a new CancelRequest.
 func NewCancelRequest(reqHeader *RequestHeader, reqHandle uint32) *CancelRequest {

@@ -18,7 +18,7 @@ func TestWriteResponse(t *testing.T) {
 			Struct: NewWriteResponse(
 				NewResponseHeader(
 					time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-					1, 0, NewNullDiagnosticInfo(), []string{}, NewNullAdditionalHeader(),
+					1, 0, NewNullDiagnosticInfo(), []string{}, NewNullExtensionObject(),
 				),
 				nil,
 				0,
@@ -48,7 +48,7 @@ func TestWriteResponse(t *testing.T) {
 			Struct: NewWriteResponse(
 				NewResponseHeader(
 					time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-					1, 0, NewNullDiagnosticInfo(), []string{}, NewNullAdditionalHeader(),
+					1, 0, NewNullDiagnosticInfo(), []string{}, NewNullExtensionObject(),
 				),
 				nil,
 				0, status.BadUserAccessDenied,

@@ -10,10 +10,10 @@ package ua
 // write ranges of elements of the composite.
 //
 // Specification: Part 4, 5.10.4
-type WriteRequest struct {
-	RequestHeader *RequestHeader
-	NodesToWrite  []*WriteValue
-}
+// type WriteRequest struct {
+// 	RequestHeader *RequestHeader
+// 	NodesToWrite  []*WriteValue
+// }
 
 // NewWriteRequest creates a new WriteRequest.
 func NewWriteRequest(reqHeader *RequestHeader, nodes ...*WriteValue) *WriteRequest {

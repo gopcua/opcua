@@ -8,11 +8,11 @@ import (
 	"testing"
 )
 
-func TestDecodeServersOnNetwork(t *testing.T) {
+func TestDecodeServerOnNetwork(t *testing.T) {
 	cases := []CodecTestCase{
 		{
 			Name: "single-cap",
-			Struct: NewServersOnNetwork(
+			Struct: NewServerOnNetwork(
 				1,
 				"server-name",
 				"discov-uri",
@@ -35,7 +35,7 @@ func TestDecodeServersOnNetwork(t *testing.T) {
 		},
 		{
 			Name: "multiple-caps",
-			Struct: NewServersOnNetwork(
+			Struct: NewServerOnNetwork(
 				1,
 				"server-name",
 				"discov-uri",
@@ -62,18 +62,18 @@ func TestDecodeServersOnNetwork(t *testing.T) {
 	RunCodecTest(t, cases)
 }
 
-func TestServersOnNetworkArray(t *testing.T) {
+func TestServerOnNetworkArray(t *testing.T) {
 	cases := []CodecTestCase{
 		{
 			Name: "normal",
-			Struct: []*ServersOnNetwork{
-				NewServersOnNetwork(
+			Struct: []*ServerOnNetwork{
+				NewServerOnNetwork(
 					1,
 					"server-name",
 					"discov-uri",
 					[]string{"server-cap-1"},
 				),
-				NewServersOnNetwork(
+				NewServerOnNetwork(
 					1,
 					"server-name",
 					"discov-uri",

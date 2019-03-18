@@ -13,7 +13,7 @@ func NewNullResponseHeader() *ResponseHeader {
 	return &ResponseHeader{
 		Timestamp:          time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC),
 		ServiceDiagnostics: NewNullDiagnosticInfo(),
-		AdditionalHeader:   NewNullAdditionalHeader(),
+		AdditionalHeader:   NewNullExtensionObject(),
 	}
 }
 
@@ -48,14 +48,9 @@ func TestResponseHeader(t *testing.T) {
 					0, 0, 0, 0, "", 0, nil,
 				),
 				[]string{"foo", "bar"},
-				NewAdditionalHeader(
-					NewExpandedNodeID(
-						false, false,
-						NewTwoByteNodeID(255),
-						"", 0,
-					),
-					0x00,
-				),
+				&ExtensionObject{
+					TypeID: NewTwoByteExpandedNodeID(255),
+				},
 			),
 			Bytes: []byte{
 				// Timestamp

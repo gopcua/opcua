@@ -12,14 +12,14 @@ import (
 // Discovery Servers is described in detail in Part 12.
 //
 // Specification: Part4, 5.4.2
-type FindServersOnNetworkResponse struct {
-	ResponseHeader       *ResponseHeader
-	LastCounterResetTime time.Time
-	Servers              []*ServersOnNetwork
-}
+// type FindServersOnNetworkResponse struct {
+// 	ResponseHeader       *ResponseHeader
+// 	LastCounterResetTime time.Time
+// 	Servers              []*ServersOnNetwork
+// }
 
 // NewFindServersOnNetworkResponse creates an FindServersOnNetworkResponse.
-func NewFindServersOnNetworkResponse(resHeader *ResponseHeader, resetTime time.Time, servers ...*ServersOnNetwork) *FindServersOnNetworkResponse {
+func NewFindServersOnNetworkResponse(resHeader *ResponseHeader, resetTime time.Time, servers ...*ServerOnNetwork) *FindServersOnNetworkResponse {
 	return &FindServersOnNetworkResponse{
 		ResponseHeader:       resHeader,
 		LastCounterResetTime: resetTime,

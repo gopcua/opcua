@@ -10,14 +10,14 @@ package ua
 // write ranges of elements of the composite.
 //
 // Specification: Part 4, 5.10.4
-type WriteResponse struct {
-	ResponseHeader  *ResponseHeader
-	Results         []uint32
-	DiagnosticInfos []*DiagnosticInfo
-}
+// type WriteResponse struct {
+// 	ResponseHeader  *ResponseHeader
+// 	Results         []uint32
+// 	DiagnosticInfos []*DiagnosticInfo
+// }
 
 // NewWriteResponse creates a new WriteResponse.
-func NewWriteResponse(resHeader *ResponseHeader, diags []*DiagnosticInfo, results ...uint32) *WriteResponse {
+func NewWriteResponse(resHeader *ResponseHeader, diags []*DiagnosticInfo, results ...StatusCode) *WriteResponse {
 	return &WriteResponse{
 		ResponseHeader:  resHeader,
 		Results:         results,

@@ -12,7 +12,7 @@ func TestUserTokenPolicy(t *testing.T) {
 	cases := []CodecTestCase{
 		{
 			Struct: NewUserTokenPolicy(
-				"1", UserTokenAnonymous,
+				"1", UserTokenTypeAnonymous,
 				"issued-token", "issuer-uri", "sec-uri",
 			),
 			Bytes: []byte{
@@ -37,11 +37,11 @@ func TestUserTokenPolicyArray(t *testing.T) {
 		{
 			Struct: []*UserTokenPolicy{
 				NewUserTokenPolicy(
-					"1", UserTokenAnonymous,
+					"1", UserTokenTypeAnonymous,
 					"issued-token", "issuer-uri", "sec-uri",
 				),
 				NewUserTokenPolicy(
-					"1", UserTokenAnonymous,
+					"1", UserTokenTypeAnonymous,
 					"issued-token", "issuer-uri", "sec-uri",
 				),
 			},

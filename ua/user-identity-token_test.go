@@ -46,7 +46,7 @@ func TestX509IdentityToken(t *testing.T) {
 	cases := []CodecTestCase{
 		{
 			Name:   "normal",
-			Struct: NewX509IdentityToken("x509", "certificate"),
+			Struct: NewX509IdentityToken("x509", []byte("certificate")),
 			Bytes: []byte{
 				// PolicyID
 				0x04, 0x00, 0x00, 0x00, 0x78, 0x35, 0x30, 0x39,

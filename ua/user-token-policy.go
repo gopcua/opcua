@@ -23,21 +23,21 @@ const (
 // UserTokenPolicy represents an UserTokenPolicy.
 //
 // Specification: Part 4, 7.37
-type UserTokenPolicy struct {
-	PolicyID          string
-	TokenType         uint32
-	IssuedTokenType   string
-	IssuerEndpointURI string
-	SecurityPolicyURI string
-}
+// type UserTokenPolicy struct {
+// 	PolicyID          string
+// 	TokenType         uint32
+// 	IssuedTokenType   string
+// 	IssuerEndpointURI string
+// 	SecurityPolicyURI string
+// }
 
 // NewUserTokenPolicy creates a new NewUserTokenPolicy.
-func NewUserTokenPolicy(id string, tokenType uint32, issuedToken, issuerURI, secURI string) *UserTokenPolicy {
+func NewUserTokenPolicy(id string, tokenType UserTokenType, issuedToken, issuerURL, secURI string) *UserTokenPolicy {
 	return &UserTokenPolicy{
 		PolicyID:          id,
 		TokenType:         tokenType,
 		IssuedTokenType:   issuedToken,
-		IssuerEndpointURI: issuerURI,
+		IssuerEndpointURL: issuerURL,
 		SecurityPolicyURI: secURI,
 	}
 }
@@ -48,7 +48,7 @@ func (u *UserTokenPolicy) String() string {
 		u.PolicyID,
 		u.TokenType,
 		u.IssuedTokenType,
-		u.IssuerEndpointURI,
+		u.IssuerEndpointURL,
 		u.SecurityPolicyURI,
 	)
 }

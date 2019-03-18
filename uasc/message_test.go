@@ -23,10 +23,10 @@ func TestMessage(t *testing.T) {
 						ua.NewRequestHeader(
 							ua.NewTwoByteNodeID(0),
 							time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-							1, 0x03ff, 0, "", ua.NewNullAdditionalHeader(),
+							1, 0x03ff, 0, "", ua.NewNullExtensionObject(),
 						),
-						0, ua.ReqTypeIssue,
-						ua.SecModeNone, 6000000, nil,
+						0, ua.SecurityTokenRequestTypeIssue,
+						ua.MessageSecurityModeNone, 6000000, nil,
 					),
 					id.OpenSecureChannelRequest_Encoding_DefaultBinary,
 					&Config{
@@ -94,7 +94,6 @@ func TestMessage(t *testing.T) {
 				0x00, 0x00,
 				//   - EncodingMask
 				0x00,
-
 				// ClientProtocolVersion
 				0x00, 0x00, 0x00, 0x00,
 				// SecurityTokenRequestType
@@ -114,7 +113,7 @@ func TestMessage(t *testing.T) {
 						ua.NewRequestHeader(
 							ua.NewTwoByteNodeID(0),
 							time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-							1, 0x03ff, 0, "", ua.NewNullAdditionalHeader(),
+							1, 0x03ff, 0, "", ua.NewNullExtensionObject(),
 						),
 						"opc.tcp://wow.its.easy:11111/UA/Server",
 						nil, nil,
@@ -180,9 +179,8 @@ func TestMessage(t *testing.T) {
 						ua.NewRequestHeader(
 							ua.NewTwoByteNodeID(0),
 							time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-							1, 0x03ff, 0, "", ua.NewNullAdditionalHeader(),
+							1, 0x03ff, 0, "", ua.NewNullExtensionObject(),
 						),
-						1,
 					),
 					id.CloseSecureChannelRequest_Encoding_DefaultBinary,
 					&Config{
@@ -196,7 +194,7 @@ func TestMessage(t *testing.T) {
 
 				// set message size manually, since it is computed in Encode
 				// otherwise, the decode tests failed.
-				m.Header.MessageSize = 61
+				m.Header.MessageSize = 57
 
 				return m
 			}(),
@@ -206,8 +204,8 @@ func TestMessage(t *testing.T) {
 				0x43, 0x4c, 0x4f,
 				// Chunk Type: Final
 				0x46,
-				// MessageSize: 61
-				0x3d, 0x00, 0x00, 0x00,
+				// MessageSize: 57
+				0x39, 0x00, 0x00, 0x00,
 				// SecureChannelID: 0
 				0x00, 0x00, 0x00, 0x00,
 				// SymmetricSecurityHeader
@@ -225,8 +223,6 @@ func TestMessage(t *testing.T) {
 				0xd4, 0x01, 0x01, 0x00, 0x00, 0x00, 0xff, 0x03,
 				0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0x00, 0x00,
 				0x00, 0x00, 0x00, 0x00, 0x00,
-				// SecureChannelID
-				0x01, 0x00, 0x00, 0x00,
 			},
 		},
 	}

@@ -22,9 +22,8 @@ func TestCreateSubscriptionRequest(t *testing.T) {
 					AuditEntryID:  "",
 					RequestHandle: 1003429,
 					TimeoutHint:   10000,
-					AdditionalHeader: &AdditionalHeader{
-						TypeID:       NewTwoByteExpandedNodeID(0),
-						EncodingMask: 0x00,
+					AdditionalHeader: &ExtensionObject{
+						TypeID: NewTwoByteExpandedNodeID(0),
 					},
 					Timestamp: time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
 				},

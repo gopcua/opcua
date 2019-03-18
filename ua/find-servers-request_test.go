@@ -20,7 +20,7 @@ func TestFindServersRequest(t *testing.T) {
 						0xa6, 0x43, 0xf8, 0x77, 0x7b, 0xc6, 0x2f, 0xc8,
 					}),
 					time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-					1, 0, 0, "", NewNullAdditionalHeader(),
+					1, 0, 0, "", NewNullExtensionObject(),
 				),
 				"opc.tcp://wow.its.easy:11111/UA/Server",
 				nil,

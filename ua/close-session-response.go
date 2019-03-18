@@ -8,9 +8,9 @@ package ua
 // This Service is used to terminate a Session.
 //
 // Specification: Part 4, 5.6.4.2
-type CloseSessionResponse struct {
-	ResponseHeader *ResponseHeader
-}
+// type CloseSessionResponse struct {
+// 	ResponseHeader *ResponseHeader
+// }
 
 // NewCloseSessionResponse creates an CloseSessionResponse.
 func NewCloseSessionResponse(resHeader *ResponseHeader) *CloseSessionResponse {

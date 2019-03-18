@@ -8,19 +8,19 @@ package ua
 // This list is empty if no Servers meet the criteria.
 //
 // Specification: Part4, 5.4.3.2
-type ServersOnNetwork struct {
-	RecordID           uint32
-	ServerName         string
-	DiscoveryURI       string
-	ServerCapabilities []string
-}
+// type ServersOnNetwork struct {
+// 	RecordID           uint32
+// 	ServerName         string
+// 	DiscoveryURI       string
+// 	ServerCapabilities []string
+// }
 
 // NewServersOnNetwork creates a new NewServersOnNetwork.
-func NewServersOnNetwork(record uint32, serverName, discoveryURI string, serverCap []string) *ServersOnNetwork {
-	return &ServersOnNetwork{
+func NewServerOnNetwork(record uint32, serverName, discoveryURL string, serverCap []string) *ServerOnNetwork {
+	return &ServerOnNetwork{
 		RecordID:           record,
 		ServerName:         serverName,
-		DiscoveryURI:       discoveryURI,
+		DiscoveryURL:       discoveryURL,
 		ServerCapabilities: serverCap,
 	}
 }

@@ -20,10 +20,10 @@ func TestCreateSessionRequest(t *testing.T) {
 						0xa6, 0x43, 0xf8, 0x77, 0x7b, 0xc6, 0x2f, 0xc8,
 					}),
 					time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-					1, 0, 0, "", NewNullAdditionalHeader(),
+					1, 0, 0, "", NewNullExtensionObject(),
 				),
 				NewApplicationDescription(
-					"app-uri", "prod-uri", "app-name", AppTypeClient,
+					"app-uri", "prod-uri", "app-name", ApplicationTypeClient,
 					"gw-uri", "profile-uri", []string{"1", "2"},
 				),
 				"server-uri", "endpoint-url", "session-name", nil,
@@ -72,7 +72,7 @@ func TestCreateSessionRequest(t *testing.T) {
 				// ClientCertificate
 				0xff, 0xff, 0xff, 0xff,
 				// RequestedTimeout
-				0x80, 0x8d, 0x5b, 0x00, 0x00, 0x00, 0x00, 0x00,
+				0x00, 0x00, 0x00, 0x00, 0x60, 0xe3, 0x56, 0x41,
 				// MaxResponseMessageSize
 				0xfe, 0xff, 0x00, 0x00,
 			},

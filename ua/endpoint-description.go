@@ -11,24 +11,24 @@ import (
 // EndpointDescription represents an EndpointDescription.
 //
 // Specification: Part 4, 7.10
-type EndpointDescription struct {
-	EndpointURL         string
-	Server              *ApplicationDescription
-	ServerCertificate   []byte
-	MessageSecurityMode uint32
-	SecurityPolicyURI   string
-	UserIdentityTokens  []*UserTokenPolicy
-	TransportProfileURI string
-	SecurityLevel       uint8
-}
+// type EndpointDescription struct {
+// 	EndpointURL         string
+// 	Server              *ApplicationDescription
+// 	ServerCertificate   []byte
+// 	MessageSecurityMode uint32
+// 	SecurityPolicyURI   string
+// 	UserIdentityTokens  []*UserTokenPolicy
+// 	TransportProfileURI string
+// 	SecurityLevel       uint8
+// }
 
 // NewEndpointDescription creates a new NewEndpointDescription.
-func NewEndpointDescription(url string, server *ApplicationDescription, cert []byte, secMode uint32, secURI string, tokens []*UserTokenPolicy, transportURI string, secLevel uint8) *EndpointDescription {
+func NewEndpointDescription(url string, server *ApplicationDescription, cert []byte, secMode MessageSecurityMode, secURI string, tokens []*UserTokenPolicy, transportURI string, secLevel uint8) *EndpointDescription {
 	return &EndpointDescription{
 		EndpointURL:         url,
 		Server:              server,
 		ServerCertificate:   cert,
-		MessageSecurityMode: secMode,
+		SecurityMode:        secMode,
 		SecurityPolicyURI:   secURI,
 		UserIdentityTokens:  tokens,
 		TransportProfileURI: transportURI,
@@ -42,7 +42,7 @@ func (e *EndpointDescription) String() string {
 		e.EndpointURL,
 		e.Server,
 		e.ServerCertificate,
-		e.MessageSecurityMode,
+		e.SecurityMode,
 		e.SecurityPolicyURI,
 		e.TransportProfileURI,
 		e.SecurityLevel,

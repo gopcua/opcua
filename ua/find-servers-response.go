@@ -8,10 +8,10 @@ package ua
 // Discovery Servers is described in detail in Part 12.
 //
 // Specification: Part4, 5.4.2
-type FindServersResponse struct {
-	ResponseHeader *ResponseHeader
-	Servers        []*ApplicationDescription
-}
+// type FindServersResponse struct {
+// 	ResponseHeader *ResponseHeader
+// 	Servers        []*ApplicationDescription
+// }
 
 // NewFindServersResponse creates an FindServersResponse.
 func NewFindServersResponse(resHeader *ResponseHeader, servers ...*ApplicationDescription) *FindServersResponse {

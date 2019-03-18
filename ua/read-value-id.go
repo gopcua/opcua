@@ -47,12 +47,12 @@ const (
 // ReadValueID is an identifier for an item to read or to monitor.
 //
 // Specification: Part 4, 7.24
-type ReadValueID struct {
-	NodeID       *NodeID
-	AttributeID  uint32
-	IndexRange   string
-	DataEncoding *QualifiedName
-}
+// type ReadValueID struct {
+// 	NodeID       *NodeID
+// 	AttributeID  uint32
+// 	IndexRange   string
+// 	DataEncoding *QualifiedName
+// }
 
 // NewReadValueID creates a new ReadValueID.
 func NewReadValueID(nodeID *NodeID, attrID uint32, idxRange string, qIdx uint16, qName string) *ReadValueID {

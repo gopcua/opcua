@@ -11,28 +11,22 @@ import (
 // ApplicationType definitions.
 //
 // Specification: Part 4, 7.1
-const (
-	AppTypeServer uint32 = iota
-	AppTypeClient
-	AppTypeClientAndServer
-	AppTypeDiscoveryServer
-)
 
 // ApplicationDescription represents an ApplicationDescription.
 //
 // Specification: Part 4, 7.1
-type ApplicationDescription struct {
-	ApplicationURI      string
-	ProductURI          string
-	ApplicationName     *LocalizedText
-	ApplicationType     uint32
-	GatewayServerURI    string
-	DiscoveryProfileURI string
-	DiscoveryURIs       []string
-}
+// type ApplicationDescription struct {
+// 	ApplicationURI      string
+// 	ProductURI          string
+// 	ApplicationName     *LocalizedText
+// 	ApplicationType     uint32
+// 	GatewayServerURI    string
+// 	DiscoveryProfileURI string
+// 	DiscoveryURIs       []string
+// }
 
 // NewApplicationDescription creates a new NewApplicationDescription.
-func NewApplicationDescription(appURI, prodURI, appName string, appType uint32, gwURI, profileURI string, discovURIs []string) *ApplicationDescription {
+func NewApplicationDescription(appURI, prodURI, appName string, appType ApplicationType, gwURI, profileURI string, discovURLs []string) *ApplicationDescription {
 	return &ApplicationDescription{
 		ApplicationURI:      appURI,
 		ProductURI:          prodURI,
@@ -40,7 +34,7 @@ func NewApplicationDescription(appURI, prodURI, appName string, appType uint32, 
 		ApplicationType:     appType,
 		GatewayServerURI:    gwURI,
 		DiscoveryProfileURI: profileURI,
-		DiscoveryURIs:       discovURIs,
+		DiscoveryURLs:       discovURLs,
 	}
 }
 
@@ -52,6 +46,6 @@ func (a *ApplicationDescription) String() string {
 		a.ApplicationName.Text,
 		a.GatewayServerURI,
 		a.DiscoveryProfileURI,
-		a.DiscoveryURIs,
+		a.DiscoveryURLs,
 	)
 }
