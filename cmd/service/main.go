@@ -15,10 +15,11 @@ import (
 	"github.com/iancoleman/strcase"
 )
 
+var in, out, pkg string
+
 func main() {
 	log.SetFlags(0)
 
-	var in, out, pkg string
 	flag.StringVar(&in, "in", "schema/Opc.Ua.Types.bsd", "Path to Opc.Ua.Types.bsd file")
 	flag.StringVar(&out, "out", "ua", "Path to output directory")
 	flag.StringVar(&pkg, "pkg", "ua", "Go package name")
@@ -29,32 +30,55 @@ func main() {
 		log.Fatalf("Failed to read type definitions: %s", err)
 	}
 
-	write(pkg, Enums(dict), path.Join(out, "enums_gen.go"))
-	for _, t := range ExtObjects(dict) {
+	writeEnums(Enums(dict))
+	writeServiceRegister(ExtObjects(dict))
+	writeExtObjects(ExtObjects(dict))
+}
+
+func writeEnums(enums []Type) {
+	var b bytes.Buffer
+	if err := FormatTypes(&b, enums); err != nil {
+		log.Fatal(err)
+	}
+	write(b.Bytes(), path.Join(out, "enums_gen.go"))
+}
+
+func writeExtObjects(objs []Type) {
+	for _, t := range objs {
+		var b bytes.Buffer
+		if err := FormatType(&b, t); err != nil {
+			log.Fatal(err)
+		}
 		filename := strcase.ToKebab(t.Name) + "_gen.go"
-		write(pkg, []Type{t}, path.Join(out, filename))
+		write(b.Bytes(), path.Join(out, filename))
 	}
 }
 
-func write(pkg string, types []Type, filename string) {
+func writeServiceRegister(objs []Type) {
+	var b bytes.Buffer
+	if err := tmplRegister.Execute(&b, objs); err != nil {
+		log.Fatal(err)
+	}
+	write(b.Bytes(), path.Join(out, "service_gen.go"))
+}
+
+func write(src []byte, filename string) {
 	var b bytes.Buffer
 	if err := tmplHeader.Execute(&b, pkg); err != nil {
 		log.Fatalf("Failed to generate header: %s", err)
 	}
 
-	for _, t := range types {
-		if err := FormatType(&b, t); err != nil {
-			log.Fatalf("Failed to generate code for %s: %v", t.Name, err)
-		}
-	}
+	b.Write(src)
 
 	if err := ioutil.WriteFile(filename, b.Bytes(), 0644); err != nil {
 		log.Fatalf("Failed to write %s: %v", filename, err)
 	}
 
 	if err := exec.Command("goimports", "-w", filename).Run(); err != nil {
+		fmt.Println(string(src))
 		log.Fatalf("Failed to format %s: %v", filename, err)
 	}
+
 	log.Printf("Wrote %s", filename)
 }
 
@@ -145,7 +169,6 @@ func ExtObjects(dict *TypeDictionary) []Type {
 		// we need to register it with target namespace 'tns:' since t.Name only contains the
 		// base name.
 		baseTypes["tns:"+t.Name] = &o
-		log.Printf("register tns.%s", t.Name)
 
 		objects = append(objects, o)
 	}
@@ -155,8 +178,7 @@ func ExtObjects(dict *TypeDictionary) []Type {
 type Kind int
 
 const (
-	KindInvalid Kind = iota
-	KindEnum
+	KindEnum Kind = iota
 	KindExtensionObject
 )
 
@@ -190,6 +212,15 @@ type Field struct {
 	Type string
 }
 
+func FormatTypes(w io.Writer, types []Type) error {
+	for _, t := range types {
+		if err := FormatType(w, t); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func FormatType(w io.Writer, t Type) error {
 	switch t.Kind {
 	case KindEnum:
@@ -218,6 +249,25 @@ type {{.Name}} struct {
 	{{end}}
 }
 {{end}}
+`))
+
+var funcs = template.FuncMap{
+	"isService": func(s string) bool {
+		return strings.HasSuffix(s, "Request") || strings.HasSuffix(s, "Response")
+	},
+}
+
+var tmplRegister = template.Must(template.New("").Funcs(funcs).Parse(`
+
+import "github.com/gopcua/opcua/id"
+
+func init() {
+	{{- range $i, $v := . -}}
+		{{- if isService $v.Name -}}
+			register(id.{{$v.Name}}_Encoding_DefaultBinary, new({{$v.Name}}))
+		{{end -}}
+	{{end -}}
+}
 `))
 
 var builtins = map[string]string{
@@ -263,6 +313,7 @@ func goName(s string) string {
 		"Uadp", "UADP",
 		"Uri", "URI",
 		"Url", "URL",
+		"Xml", "XML",
 	)
 	r2 := strings.NewReplacer(
 		"IDentity", "Identity",

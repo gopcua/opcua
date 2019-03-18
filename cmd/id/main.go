@@ -12,6 +12,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"strings"
 	"text/template"
 )
 
@@ -38,6 +39,10 @@ func main() {
 	rows, err := csv.NewReader(f).ReadAll()
 	if err != nil {
 		log.Fatalf("Error parsing %s: %v", *in, err)
+	}
+
+	for i := range rows {
+		rows[i][0] = goName(rows[i][0])
 	}
 
 	var b bytes.Buffer
@@ -70,3 +75,20 @@ const (
 	{{end}}
 )
 `))
+
+func goName(s string) string {
+	r1 := strings.NewReplacer(
+		"Guid", "GUID",
+		"Id", "ID",
+		"Json", "JSON",
+		"QualityOfService", "QoS",
+		"Uadp", "UADP",
+		"Uri", "URI",
+		"Url", "URL",
+		"Xml", "XML",
+	)
+	r2 := strings.NewReplacer(
+		"IDentity", "Identity",
+	)
+	return r2.Replace(r1.Replace(s))
+}
