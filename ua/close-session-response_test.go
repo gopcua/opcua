@@ -15,9 +15,11 @@ func TestCloseSessionResponse(t *testing.T) {
 			Name: "nothing",
 			Struct: &CloseSessionResponse{
 				ResponseHeader: &ResponseHeader{
-					Timestamp:        time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-					RequestHandle:    1,
-					AdditionalHeader: NewExtensionObject(nil),
+					Timestamp:          time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
+					RequestHandle:      1,
+					ServiceDiagnostics: &DiagnosticInfo{},
+					StringTable:        []string{},
+					AdditionalHeader:   NewExtensionObject(nil),
 				},
 			},
 			// Struct: NewCloseSessionResponse(

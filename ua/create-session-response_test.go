@@ -18,6 +18,7 @@ func TestCreateSessionResponse(t *testing.T) {
 					Timestamp:          time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
 					RequestHandle:      1,
 					ServiceDiagnostics: &DiagnosticInfo{},
+					StringTable:        []string{},
 					AdditionalHeader:   NewExtensionObject(nil),
 				},
 				SessionID: NewNumericNodeID(0, 1),
@@ -35,7 +36,7 @@ func TestCreateSessionResponse(t *testing.T) {
 						EndpointURL: "ep-url",
 						Server: &ApplicationDescription{
 							ApplicationURI:      "app-uri",
-							ProductURI:          "prod-urk",
+							ProductURI:          "prod-uri",
 							ApplicationName:     &LocalizedText{Text: "app-name"},
 							ApplicationType:     ApplicationTypeServer,
 							GatewayServerURI:    "gw-uri",
@@ -67,7 +68,7 @@ func TestCreateSessionResponse(t *testing.T) {
 						EndpointURL: "ep-url",
 						Server: &ApplicationDescription{
 							ApplicationURI:      "app-uri",
-							ProductURI:          "prod-urk",
+							ProductURI:          "prod-uri",
 							ApplicationName:     &LocalizedText{Text: "app-name"},
 							ApplicationType:     ApplicationTypeServer,
 							GatewayServerURI:    "gw-uri",

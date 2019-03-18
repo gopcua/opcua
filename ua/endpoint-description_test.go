@@ -16,7 +16,7 @@ func TestEndpointDescription(t *testing.T) {
 				EndpointURL: "ep-url",
 				Server: &ApplicationDescription{
 					ApplicationURI:      "app-uri",
-					ProductURI:          "prod-urk",
+					ProductURI:          "prod-uri",
 					ApplicationName:     &LocalizedText{Text: "app-name"},
 					ApplicationType:     ApplicationTypeServer,
 					GatewayServerURI:    "gw-uri",
@@ -136,7 +136,7 @@ func TestEndpointDescriptionArray(t *testing.T) {
 					EndpointURL: "ep-url",
 					Server: &ApplicationDescription{
 						ApplicationURI:      "app-uri",
-						ProductURI:          "prod-urk",
+						ProductURI:          "prod-uri",
 						ApplicationName:     &LocalizedText{Text: "app-name"},
 						ApplicationType:     ApplicationTypeServer,
 						GatewayServerURI:    "gw-uri",
@@ -168,7 +168,7 @@ func TestEndpointDescriptionArray(t *testing.T) {
 					EndpointURL: "ep-url",
 					Server: &ApplicationDescription{
 						ApplicationURI:      "app-uri",
-						ProductURI:          "prod-urk",
+						ProductURI:          "prod-uri",
 						ApplicationName:     &LocalizedText{Text: "app-name"},
 						ApplicationType:     ApplicationTypeServer,
 						GatewayServerURI:    "gw-uri",

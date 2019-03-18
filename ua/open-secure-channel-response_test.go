@@ -18,6 +18,7 @@ func TestOpenSecureChannelResponse(t *testing.T) {
 					Timestamp:          time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
 					RequestHandle:      1,
 					ServiceDiagnostics: &DiagnosticInfo{},
+					StringTable:        []string{},
 					AdditionalHeader:   NewExtensionObject(nil),
 				},
 				ServerProtocolVersion: 0,

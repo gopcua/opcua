@@ -21,7 +21,7 @@ func TestOpenSecureChannelRequest(t *testing.T) {
 					}),
 					Timestamp:        time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
 					RequestHandle:    1,
-					AdditionalHeader: &ExtensionObject{},
+					AdditionalHeader: NewExtensionObject(nil),
 				},
 				ClientProtocolVersion: 0,
 				RequestType:           SecurityTokenRequestTypeIssue,
