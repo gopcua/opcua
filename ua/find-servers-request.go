@@ -19,13 +19,13 @@ package ua
 // 	ServerURIs    []string
 // }
 
-// NewFindServersRequest creates a new FindServersRequest.
-func NewFindServersRequest(reqHeader *RequestHeader, url string, locales, serverURIs []string) *FindServersRequest {
-	f := &FindServersRequest{
-		RequestHeader: reqHeader,
-		EndpointURL:   url,
-		LocaleIDs:     locales,
-		ServerURIs:    serverURIs,
-	}
-	return f
-}
+// // NewFindServersRequest creates a new FindServersRequest.
+// func NewFindServersRequest(reqHeader *RequestHeader, url string, locales, serverURIs []string) *FindServersRequest {
+// 	f := &FindServersRequest{
+// 		RequestHeader: reqHeader,
+// 		EndpointURL:   url,
+// 		LocaleIDs:     locales,
+// 		ServerURIs:    serverURIs,
+// 	}
+// 	return f
+// }

@@ -12,13 +12,14 @@ func TestActivateSessionRequest(t *testing.T) {
 	cases := []CodecTestCase{
 		{
 			Name: "normal",
-			Struct: NewActivateSessionRequest(
-				NewNullRequestHeader(),
-				NewSignatureData("", nil),
-				nil,
-				NewAnonymousIdentityToken("anonymous"),
-				NewSignatureData("", nil),
-			),
+			Struct: &ActivateSessionRequest{
+				RequestHeader:              NewNullRequestHeader(),
+				ClientSignature:            &SignatureData{},
+				ClientSoftwareCertificates: nil,
+				LocaleIDs:                  nil,
+				UserIdentityToken:          NewExtensionObject(NewAnonymousIdentityToken("anonymous")),
+				UserTokenSignature:         &SignatureData{},
+			},
 			Bytes: flatten(
 				nullRequestHeaderBytes,
 				[]byte{

@@ -14,8 +14,8 @@ package ua
 // }
 
 // NewCloseSecureChannelRequest creates an CloseSecureChannelRequest.
-func NewCloseSecureChannelRequest(reqHeader *RequestHeader) *CloseSecureChannelRequest {
-	return &CloseSecureChannelRequest{
-		RequestHeader: reqHeader,
-	}
-}
+// func NewCloseSecureChannelRequest(reqHeader *RequestHeader) *CloseSecureChannelRequest {
+// 	return &CloseSecureChannelRequest{
+// 		RequestHeader: reqHeader,
+// 	}
+// }

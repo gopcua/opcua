@@ -13,30 +13,58 @@ func TestFindServersResponse(t *testing.T) {
 	cases := []CodecTestCase{
 		{
 			Name: "normal",
-			Struct: NewFindServersResponse(
-				NewResponseHeader(
-					time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-					1, 0, NewNullDiagnosticInfo(), []string{}, NewNullExtensionObject(),
-				),
-				NewApplicationDescription(
-					"app-uri",
-					"prod-uri",
-					"app-name",
-					ApplicationTypeServer,
-					"gw-uri",
-					"prof-uri",
-					[]string{"discov-uri-1", "discov-uri-2"},
-				),
-				NewApplicationDescription(
-					"app-uri",
-					"prod-uri",
-					"app-name",
-					ApplicationTypeServer,
-					"gw-uri",
-					"prof-uri",
-					[]string{"discov-uri-1", "discov-uri-2"},
-				),
-			),
+			Struct: &FindServersResponse{
+				ResponseHeader: &ResponseHeader{
+					Timestamp:          time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
+					RequestHandle:      1,
+					ServiceDiagnostics: &DiagnosticInfo{},
+					AdditionalHeader:   NewExtensionObject(nil),
+				},
+				Servers: []*ApplicationDescription{
+					&ApplicationDescription{
+						ApplicationURI:      "app-uri",
+						ProductURI:          "prod-urk",
+						ApplicationName:     &LocalizedText{Text: "app-name"},
+						ApplicationType:     ApplicationTypeServer,
+						GatewayServerURI:    "gw-uri",
+						DiscoveryProfileURI: "prof-uri",
+						DiscoveryURLs:       []string{"discov-uri-1", "discov-uri-2"},
+					},
+					&ApplicationDescription{
+						ApplicationURI:      "app-uri",
+						ProductURI:          "prod-urk",
+						ApplicationName:     &LocalizedText{Text: "app-name"},
+						ApplicationType:     ApplicationTypeServer,
+						GatewayServerURI:    "gw-uri",
+						DiscoveryProfileURI: "prof-uri",
+						DiscoveryURLs:       []string{"discov-uri-1", "discov-uri-2"},
+					},
+				},
+			},
+			// Struct: NewFindServersResponse(
+			// 	NewResponseHeader(
+			// 		time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
+			// 		1, 0, NewNullDiagnosticInfo(), []string{}, NewExtensionObject(nil),
+			// 	),
+			// 	NewApplicationDescription(
+			// 		"app-uri",
+			// 		"prod-uri",
+			// 		"app-name",
+			// 		ApplicationTypeServer,
+			// 		"gw-uri",
+			// 		"prof-uri",
+			// 		[]string{"discov-uri-1", "discov-uri-2"},
+			// 	),
+			// 	NewApplicationDescription(
+			// 		"app-uri",
+			// 		"prod-uri",
+			// 		"app-name",
+			// 		ApplicationTypeServer,
+			// 		"gw-uri",
+			// 		"prof-uri",
+			// 		[]string{"discov-uri-1", "discov-uri-2"},
+			// 	),
+			// ),
 			Bytes: []byte{
 				// Timestamp
 				0x00, 0x98, 0x67, 0xdd, 0xfd, 0x30, 0xd4, 0x01,

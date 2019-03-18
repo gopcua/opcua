@@ -13,10 +13,10 @@ package ua
 // 	DeleteSubscriptions bool
 // }
 
-// NewCloseSessionRequest creates a CloseSessionRequest.
-func NewCloseSessionRequest(reqHeader *RequestHeader, deleteSubs bool) *CloseSessionRequest {
-	return &CloseSessionRequest{
-		RequestHeader:       reqHeader,
-		DeleteSubscriptions: deleteSubs,
-	}
-}
+// // NewCloseSessionRequest creates a CloseSessionRequest.
+// func NewCloseSessionRequest(reqHeader *RequestHeader, deleteSubs bool) *CloseSessionRequest {
+// 	return &CloseSessionRequest{
+// 		RequestHeader:       reqHeader,
+// 		DeleteSubscriptions: deleteSubs,
+// 	}
+// }

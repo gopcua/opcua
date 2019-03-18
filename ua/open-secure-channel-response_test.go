@@ -13,17 +13,33 @@ func TestOpenSecureChannelResponse(t *testing.T) {
 	cases := []CodecTestCase{
 		{
 			Name: "normal",
-			Struct: NewOpenSecureChannelResponse(
-				NewResponseHeader(
-					time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-					1, 0, NewNullDiagnosticInfo(), []string{}, NewNullExtensionObject(),
-				),
-				0,
-				NewChannelSecurityToken(
-					1, 2, time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC), 6000000,
-				),
-				[]byte{0xff},
-			),
+			Struct: &OpenSecureChannelResponse{
+				ResponseHeader: &ResponseHeader{
+					Timestamp:          time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
+					RequestHandle:      1,
+					ServiceDiagnostics: &DiagnosticInfo{},
+					AdditionalHeader:   NewExtensionObject(nil),
+				},
+				ServerProtocolVersion: 0,
+				SecurityToken: &ChannelSecurityToken{
+					ChannelID:       1,
+					TokenID:         2,
+					CreatedAt:       time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
+					RevisedLifetime: 6000000,
+				},
+				ServerNonce: []byte{0xff},
+			},
+			// Struct: NewOpenSecureChannelResponse(
+			// 	NewResponseHeader(
+			// 		time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
+			// 		1, 0, NewNullDiagnosticInfo(), []string{}, NewExtensionObject(nil),
+			// 	),
+			// 	0,
+			// 	NewChannelSecurityToken(
+			// 		1, 2, time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC), 6000000,
+			// 	),
+			// 	[]byte{0xff},
+			// ),
 			Bytes: []byte{
 				// Timestamp
 				0x00, 0x98, 0x67, 0xdd, 0xfd, 0x30, 0xd4, 0x01,

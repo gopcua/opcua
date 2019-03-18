@@ -12,15 +12,15 @@ func TestApplicationDescription(t *testing.T) {
 	cases := []CodecTestCase{
 		{
 			Name: "Normal",
-			Struct: NewApplicationDescription(
-				"app-uri",
-				"prod-uri",
-				"app-name",
-				ApplicationTypeServer,
-				"gw-uri",
-				"prof-uri",
-				[]string{"discov-uri-1", "discov-uri-2"},
-			),
+			Struct: &ApplicationDescription{
+				ApplicationURI:      "app-uri",
+				ProductURI:          "prod-uri",
+				ApplicationName:     &LocalizedText{Text: "app-name"},
+				ApplicationType:     ApplicationTypeServer,
+				GatewayServerURI:    "gw-uri",
+				DiscoveryProfileURI: "prof-uri",
+				DiscoveryURLs:       []string{"discov-uri-1", "discov-uri-2"},
+			},
 			Bytes: []byte{ // Single
 				// ApplicationURI
 				0x07, 0x00, 0x00, 0x00, 0x61, 0x70, 0x70, 0x2d, 0x75, 0x72, 0x69,
@@ -50,25 +50,45 @@ func TestApplicationDescriptionArray(t *testing.T) {
 		{
 			Name: "Normal",
 			Struct: []*ApplicationDescription{
-				NewApplicationDescription(
-					"app-uri",
-					"prod-uri",
-					"app-name",
-					ApplicationTypeServer,
-					"gw-uri",
-					"prof-uri",
-					[]string{"discov-uri-1", "discov-uri-2"},
-				),
-				NewApplicationDescription(
-					"app-uri",
-					"prod-uri",
-					"app-name",
-					ApplicationTypeServer,
-					"gw-uri",
-					"prof-uri",
-					[]string{"discov-uri-1", "discov-uri-2"},
-				),
+				&ApplicationDescription{
+					ApplicationURI:      "app-uri",
+					ProductURI:          "prod-uri",
+					ApplicationName:     &LocalizedText{Text: "app-name"},
+					ApplicationType:     ApplicationTypeServer,
+					GatewayServerURI:    "gw-uri",
+					DiscoveryProfileURI: "prof-uri",
+					DiscoveryURLs:       []string{"discov-uri-1", "discov-uri-2"},
+				},
+				&ApplicationDescription{
+					ApplicationURI:      "app-uri",
+					ProductURI:          "prod-uri",
+					ApplicationName:     &LocalizedText{Text: "app-name"},
+					ApplicationType:     ApplicationTypeServer,
+					GatewayServerURI:    "gw-uri",
+					DiscoveryProfileURI: "prof-uri",
+					DiscoveryURLs:       []string{"discov-uri-1", "discov-uri-2"},
+				},
 			},
+			// Struct: []*ApplicationDescription{
+			// 	NewApplicationDescription(
+			// 		"app-uri",
+			// 		"prod-uri",
+			// 		"app-name",
+			// 		ApplicationTypeServer,
+			// 		"gw-uri",
+			// 		"prof-uri",
+			// 		[]string{"discov-uri-1", "discov-uri-2"},
+			// 	),
+			// 	NewApplicationDescription(
+			// 		"app-uri",
+			// 		"prod-uri",
+			// 		"app-name",
+			// 		ApplicationTypeServer,
+			// 		"gw-uri",
+			// 		"prof-uri",
+			// 		[]string{"discov-uri-1", "discov-uri-2"},
+			// 	),
+			// },
 			Bytes: []byte{ // Array
 				// ArraySize
 				0x02, 0x00, 0x00, 0x00,

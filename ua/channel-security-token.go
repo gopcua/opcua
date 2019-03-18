@@ -4,11 +4,6 @@
 
 package ua
 
-import (
-	"fmt"
-	"time"
-)
-
 // ChannelSecurityToken represents a ChannelSecurityToken.
 // It describes the new SecurityToken issued by the Server.
 //
@@ -21,21 +16,21 @@ import (
 // }
 
 // NewChannelSecurityToken creates a new ChannelSecurityToken.
-func NewChannelSecurityToken(chanID, tokenID uint32, createdAt time.Time, lifetime uint32) *ChannelSecurityToken {
-	return &ChannelSecurityToken{
-		ChannelID:       chanID,
-		TokenID:         tokenID,
-		CreatedAt:       createdAt,
-		RevisedLifetime: lifetime,
-	}
-}
+// func NewChannelSecurityToken(chanID, tokenID uint32, createdAt time.Time, lifetime uint32) *ChannelSecurityToken {
+	// return &ChannelSecurityToken{
+	// 	ChannelID:       chanID,
+	// 	TokenID:         tokenID,
+	// 	CreatedAt:       createdAt,
+	// 	RevisedLifetime: lifetime,
+	// }
+// }
 
-// String returns ChannelSecurityToken in string.
-func (c *ChannelSecurityToken) String() string {
-	return fmt.Sprintf("%d, %d, %v, %d",
-		c.ChannelID,
-		c.TokenID,
-		c.CreatedAt,
-		c.RevisedLifetime,
-	)
-}
+// // String returns ChannelSecurityToken in string.
+// func (c *ChannelSecurityToken) String() string {
+// 	return fmt.Sprintf("%d, %d, %v, %d",
+// 		c.ChannelID,
+// 		c.TokenID,
+// 		c.CreatedAt,
+// 		c.RevisedLifetime,
+// 	)
+// }

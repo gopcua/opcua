@@ -14,9 +14,9 @@ package ua
 // }
 
 // NewCancelResponse creates a new CancelResponse.
-func NewCancelResponse(resHeader *ResponseHeader, cancelCount uint32) *CancelResponse {
-	return &CancelResponse{
-		ResponseHeader: resHeader,
-		CancelCount:    cancelCount,
-	}
-}
+// func NewCancelResponse(resHeader *ResponseHeader, cancelCount uint32) *CancelResponse {
+// 	return &CancelResponse{
+// 		ResponseHeader: resHeader,
+// 		CancelCount:    cancelCount,
+// 	}
+// }

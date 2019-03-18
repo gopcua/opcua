@@ -12,12 +12,9 @@ func TestActivateSessionResponse(t *testing.T) {
 	cases := []CodecTestCase{
 		{ // Without dummy nonce, results nor diags
 			Name: "nothing",
-			Struct: NewActivateSessionResponse(
-				NewNullResponseHeader(),
-				nil,
-				nil,
-				nil,
-			),
+			Struct: &ActivateSessionResponse{
+				ResponseHeader: NewNullResponseHeader(),
+			},
 			Bytes: flatten(
 				nullResponseHeaderBytes,
 				[]byte{
@@ -30,12 +27,10 @@ func TestActivateSessionResponse(t *testing.T) {
 				}),
 		}, { // With dummy nonce, no results and diags
 			Name: "with-nonce",
-			Struct: NewActivateSessionResponse(
-				NewNullResponseHeader(),
-				[]byte{0xde, 0xad, 0xbe, 0xef},
-				nil,
-				nil,
-			),
+			Struct: &ActivateSessionResponse{
+				ResponseHeader: NewNullResponseHeader(),
+				ServerNonce:    []byte{0xde, 0xad, 0xbe, 0xef},
+			},
 			Bytes: flatten(
 				nullResponseHeaderBytes,
 				[]byte{

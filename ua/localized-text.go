@@ -4,89 +4,51 @@
 
 package ua
 
-import (
-	"fmt"
-
-	"github.com/gopcua/opcua/id"
-)
-
 // LocalizedText represents a LocalizedText.
 // A LocalizedText structure contains two fields that could be missing.
 // For that reason, the encoding uses a bit mask to indicate which fields
-// are actually present in the encoded form.
+// are actually present in the encoded forl.
 //
 // Specification: Part 6, 5.2.2.14
 type LocalizedText struct {
-	EncodingMask uint8
-	Locale       string
-	Text         string
+	Locale string
+	Text   string
 }
 
-// NewLocalizedText creates a new NewLocalizedText.
-func NewLocalizedText(locale, text string) *LocalizedText {
-	l := &LocalizedText{
-		Locale: locale,
-		Text:   text,
-	}
-	if locale != "" {
-		l.SetLocaleMask()
-	}
-	if text != "" {
-		l.SetTextMask()
-	}
-	return l
-}
-
-func (m *LocalizedText) Decode(b []byte) (int, error) {
+func (l *LocalizedText) Decode(b []byte) (int, error) {
 	buf := NewBuffer(b)
-	m.EncodingMask = buf.ReadByte()
-	if m.HasLocale() {
-		m.Locale = buf.ReadString()
+	mask := buf.ReadByte()
+
+	l.Locale = ""
+	if mask&0x1 == 1 {
+		l.Locale = buf.ReadString()
 	}
-	if m.HasText() {
-		m.Text = buf.ReadString()
+
+	l.Text = ""
+	if mask&0x2 == 2 {
+		l.Text = buf.ReadString()
 	}
+
 	return buf.Pos(), buf.Error()
 }
 
-func (m *LocalizedText) Encode() ([]byte, error) {
+func (l *LocalizedText) Encode() ([]byte, error) {
 	buf := NewBuffer(nil)
-	buf.WriteUint8(m.EncodingMask)
-	if m.HasLocale() {
-		buf.WriteString(m.Locale)
+
+	var mask byte
+	if l.Locale != "" {
+		mask |= 0x1
 	}
-	if m.HasText() {
-		buf.WriteString(m.Text)
+	if l.Text != "" {
+		mask |= 0x2
+	}
+	buf.WriteUint8(mask)
+
+	if l.Locale != "" {
+		buf.WriteString(l.Locale)
+	}
+	if l.Text != "" {
+		buf.WriteString(l.Text)
 	}
 	return buf.Bytes(), buf.Error()
-}
-
-// HasLocale checks if the LocalizedText has HasLocale mask in EncodingMask.
-func (l *LocalizedText) HasLocale() bool {
-	return l.EncodingMask&0x1 == 1
-}
-
-// SetLocaleMask sets the HasLocale mask in EncodingMask.
-func (l *LocalizedText) SetLocaleMask() {
-	l.EncodingMask |= 0x1
-}
-
-// HasText checks if the LocalizedText has HasText mask in EncodingMask.
-func (l *LocalizedText) HasText() bool {
-	return (l.EncodingMask>>1)&0x1 == 1
-}
-
-// SetTextMask sets the HasText mask in EncodingMask.
-func (l *LocalizedText) SetTextMask() {
-	l.EncodingMask |= 0x2
-}
-
-// String returns LocalizedText in string.
-func (l *LocalizedText) String() string {
-	return fmt.Sprintf("%x, %s, %s", l.EncodingMask, l.Locale, l.Text)
-}
-
-// DataType returns type of Data.
-func (l *LocalizedText) DataType() uint16 {
-	return id.LocalizedText
 }

@@ -37,13 +37,13 @@ const (
 // }
 
 // NewOpenSecureChannelRequest creates an OpenSecureChannelRequest.
-func NewOpenSecureChannelRequest(reqHeader *RequestHeader, ver uint32, tokenType SecurityTokenRequestType, securityMode MessageSecurityMode, lifetime uint32, nonce []byte) *OpenSecureChannelRequest {
-	return &OpenSecureChannelRequest{
-		RequestHeader:         reqHeader,
-		ClientProtocolVersion: ver,
-		RequestType:           tokenType,
-		SecurityMode:          securityMode,
-		ClientNonce:           nonce,
-		RequestedLifetime:     lifetime,
-	}
-}
+// func NewOpenSecureChannelRequest(reqHeader *RequestHeader, ver uint32, tokenType SecurityTokenRequestType, securityMode MessageSecurityMode, lifetime uint32, nonce []byte) *OpenSecureChannelRequest {
+// 	return &OpenSecureChannelRequest{
+// 		RequestHeader:         reqHeader,
+// 		ClientProtocolVersion: ver,
+// 		RequestType:           tokenType,
+// 		SecurityMode:          securityMode,
+// 		ClientNonce:           nonce,
+// 		RequestedLifetime:     lifetime,
+// 	}
+// }

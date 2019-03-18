@@ -13,8 +13,8 @@ package ua
 // }
 
 // NewCloseSessionResponse creates an CloseSessionResponse.
-func NewCloseSessionResponse(resHeader *ResponseHeader) *CloseSessionResponse {
-	return &CloseSessionResponse{
-		ResponseHeader: resHeader,
-	}
-}
+// func NewCloseSessionResponse(resHeader *ResponseHeader) *CloseSessionResponse {
+// 	return &CloseSessionResponse{
+// 		ResponseHeader: resHeader,
+// 	}
+// }

@@ -12,12 +12,12 @@ func TestLocalizedText(t *testing.T) {
 	cases := []CodecTestCase{
 		{
 			Name:   "nothing",
-			Struct: NewLocalizedText("", ""),
+			Struct: &LocalizedText{},
 			Bytes:  []byte{0x00},
 		},
 		{
 			Name:   "has-locale",
-			Struct: NewLocalizedText("foo", ""),
+			Struct: &LocalizedText{Locale: "foo"},
 			Bytes: []byte{
 				0x01,
 				0x03, 0x00, 0x00, 0x00, 0x66, 0x6f, 0x6f,
@@ -25,7 +25,7 @@ func TestLocalizedText(t *testing.T) {
 		},
 		{
 			Name:   "has-text",
-			Struct: NewLocalizedText("", "bar"),
+			Struct: &LocalizedText{Text: "bar"},
 			Bytes: []byte{
 				0x02,
 				0x03, 0x00, 0x00, 0x00, 0x62, 0x61, 0x72,
@@ -33,7 +33,7 @@ func TestLocalizedText(t *testing.T) {
 		},
 		{
 			Name:   "has-both",
-			Struct: NewLocalizedText("foo", "bar"),
+			Struct: &LocalizedText{Locale: "foo", Text: "bar"},
 			Bytes: []byte{
 				0x03,
 				0x03, 0x00, 0x00, 0x00, 0x66, 0x6f, 0x6f,

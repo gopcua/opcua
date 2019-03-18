@@ -13,12 +13,19 @@ func TestCloseSecureChannelResponse(t *testing.T) {
 	cases := []CodecTestCase{
 		{
 			Name: "normal",
-			Struct: NewCloseSecureChannelResponse(
-				NewResponseHeader(
-					time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-					1, 0, nil, []string{}, NewNullExtensionObject(),
-				),
-			),
+			Struct: &CloseSecureChannelResponse{
+				ResponseHeader: &ResponseHeader{
+					Timestamp:        time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
+					RequestHandle:    1,
+					AdditionalHeader: NewExtensionObject(nil),
+				},
+			},
+			// Struct: NewCloseSecureChannelResponse(
+			// 	NewResponseHeader(
+			// 		time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
+			// 		1, 0, nil, []string{}, NewExtensionObject(nil),
+			// 	),
+			// ),
 			Bytes: []byte{
 				// Timestamp
 				0x00, 0x98, 0x67, 0xdd, 0xfd, 0x30, 0xd4, 0x01,

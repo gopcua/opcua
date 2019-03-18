@@ -13,11 +13,11 @@ package ua
 // }
 
 // NewOpenSecureChannelResponse creates an OpenSecureChannelResponse.
-func NewOpenSecureChannelResponse(resHeader *ResponseHeader, ver uint32, secToken *ChannelSecurityToken, nonce []byte) *OpenSecureChannelResponse {
-	return &OpenSecureChannelResponse{
-		ResponseHeader:        resHeader,
-		ServerProtocolVersion: ver,
-		SecurityToken:         secToken,
-		ServerNonce:           nonce,
-	}
-}
+// func NewOpenSecureChannelResponse(resHeader *ResponseHeader, ver uint32, secToken *ChannelSecurityToken, nonce []byte) *OpenSecureChannelResponse {
+// 	return &OpenSecureChannelResponse{
+// 		ResponseHeader:        resHeader,
+// 		ServerProtocolVersion: ver,
+// 		SecurityToken:         secToken,
+// 		ServerNonce:           nonce,
+// 	}
+// }

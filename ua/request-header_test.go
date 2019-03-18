@@ -13,7 +13,7 @@ func NewNullRequestHeader() *RequestHeader {
 	return &RequestHeader{
 		AuthenticationToken: NewTwoByteNodeID(0),
 		Timestamp:           time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC),
-		AdditionalHeader:    NewNullExtensionObject(),
+		AdditionalHeader:    NewExtensionObject(nil),
 	}
 }
 

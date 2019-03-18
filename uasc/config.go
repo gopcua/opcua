@@ -317,12 +317,12 @@ func NewClientSessionConfig(locales []string, userToken interface{}) *SessionCon
 		ClientDescription: &ua.ApplicationDescription{
 			ApplicationURI:  "urn:gopcua:client",
 			ProductURI:      "urn:gopcua",
-			ApplicationName: ua.NewLocalizedText("", "gopcua - OPC UA implementation in pure Golang"),
+			ApplicationName: &ua.LocalizedText{Text: "gopcua - OPC UA implementation in pure Golang"},
 			ApplicationType: ua.ApplicationTypeClient,
 		},
 		LocaleIDs:          locales,
 		UserIdentityToken:  userToken,
-		UserTokenSignature: ua.NewSignatureData("", nil),
+		UserTokenSignature: &ua.SignatureData{},
 	}
 }
 
@@ -336,17 +336,19 @@ func NewServerSessionConfig(secChan *SecureChannel) *SessionConfig {
 		AuthenticationToken: ua.NewFourByteNodeID(0, binary.LittleEndian.Uint16(rawToken)),
 		SessionTimeout:      0xffff,
 		ServerEndpoints: []*ua.EndpointDescription{
-			ua.NewEndpointDescription(
-				secChan.LocalEndpoint(), ua.NewApplicationDescription(
-					"urn:gopcua:client", "urn:gopcua", "gopcua - OPC UA implementation in pure Golang",
-					ua.ApplicationTypeServer, "", "", []string{""},
-				),
-				secChan.cfg.Certificate, secChan.cfg.SecurityMode, secChan.cfg.SecurityPolicyURI,
-				[]*ua.UserTokenPolicy{
-					&ua.UserTokenPolicy{},
+			&ua.EndpointDescription{
+				EndpointURL: secChan.LocalEndpoint(),
+				Server: &ua.ApplicationDescription{
+					ApplicationURI:  "urn:gopcua:client",
+					ProductURI:      "urn:gopcua",
+					ApplicationName: &ua.LocalizedText{Text: "gopcua - OPC UA implementation in pure Golang"},
+					ApplicationType: ua.ApplicationTypeServer,
 				},
-				"", 0,
-			),
+				ServerCertificate: secChan.cfg.Certificate,
+				SecurityMode:      secChan.cfg.SecurityMode,
+				SecurityPolicyURI: secChan.cfg.SecurityPolicyURI,
+				// UserIdentityTokens: []*ua.UserTokenPolicy{&ua.UserTokenPolicy{}},
+			},
 		},
 	}
 }

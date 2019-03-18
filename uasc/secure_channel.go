@@ -68,7 +68,7 @@ func NewSecureChannel(c *uacp.Conn, cfg *Config) *SecureChannel {
 		AuthenticationToken: ua.NewTwoByteNodeID(0),
 		Timestamp:           time.Now(),
 		TimeoutHint:         0xffff,
-		AdditionalHeader:    ua.NewNullExtensionObject(),
+		AdditionalHeader:    ua.NewExtensionObject(nil),
 	}
 
 	return &SecureChannel{

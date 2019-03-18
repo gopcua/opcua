@@ -19,23 +19,14 @@ const (
 //
 // Specification: Part 6, 5.2.2.15
 type ExtensionObject struct {
-	TypeID       *ExpandedNodeID
-	EncodingMask byte
-	Value        interface{}
+	TypeID *ExpandedNodeID
+	Value  interface{}
 }
 
-// NewExtensionObject creates a new ExtensionObject from the ExtensionObjectValue given.
-func NewExtensionObject(mask uint8, value interface{}) *ExtensionObject {
+func NewExtensionObject(value interface{}) *ExtensionObject {
 	return &ExtensionObject{
-		TypeID:       NewFourByteExpandedNodeID(0, ExtObjID(value)),
-		EncodingMask: mask,
-		Value:        value,
-	}
-}
-
-func NewNullExtensionObject() *ExtensionObject {
-	return &ExtensionObject{
-		TypeID: NewTwoByteExpandedNodeID(0),
+		TypeID: ExtensionObjectTypeID(value),
+		Value:  value,
 	}
 }
 
@@ -43,9 +34,9 @@ func (e *ExtensionObject) Decode(b []byte) (int, error) {
 	buf := NewBuffer(b)
 	e.TypeID = new(ExpandedNodeID)
 	buf.ReadStruct(e.TypeID)
-	e.EncodingMask = buf.ReadByte()
 
-	if e.EncodingMask == ExtensionObjectNoBody {
+	mask := buf.ReadByte()
+	if mask == ExtensionObjectNoBody {
 		return buf.Pos(), buf.Error()
 	}
 
@@ -59,7 +50,7 @@ func (e *ExtensionObject) Decode(b []byte) (int, error) {
 		return buf.Pos(), buf.Error()
 	}
 
-	switch e.EncodingMask {
+	switch mask {
 	case ExtensionObjectXMLElementBody:
 		e.Value = new(XmlElement)
 		body.ReadStruct(e.Value)
@@ -95,11 +86,22 @@ func (e *ExtensionObject) Decode(b []byte) (int, error) {
 
 func (e *ExtensionObject) Encode() ([]byte, error) {
 	buf := NewBuffer(nil)
-	buf.WriteStruct(e.TypeID)
-	buf.WriteByte(e.EncodingMask)
+	if e.TypeID == nil {
+		buf.WriteStruct(NewTwoByteExpandedNodeID(0))
+	} else {
+		buf.WriteStruct(e.TypeID)
+	}
 
-	if e.EncodingMask == ExtensionObjectNoBody {
-		return buf.Bytes(), buf.Error()
+	switch e.Value.(type) {
+	case *XmlElement:
+		buf.WriteByte(ExtensionObjectXMLElementBody)
+	default:
+		if e.Value != nil {
+			buf.WriteByte(ExtensionObjectByteStringBody)
+		} else {
+			buf.WriteByte(ExtensionObjectNoBody)
+			return buf.Bytes(), buf.Error()
+		}
 	}
 
 	if e.Value == nil {
@@ -118,17 +120,17 @@ func (e *ExtensionObject) Encode() ([]byte, error) {
 	return buf.Bytes(), buf.Error()
 }
 
-func ExtObjID(v interface{}) uint16 {
+func ExtensionObjectTypeID(v interface{}) *ExpandedNodeID {
 	switch v.(type) {
 	case *AnonymousIdentityToken:
-		return id.AnonymousIdentityToken_Encoding_DefaultBinary
+		return NewFourByteExpandedNodeID(0, id.AnonymousIdentityToken_Encoding_DefaultBinary)
 	case *UserNameIdentityToken:
-		return id.UserNameIdentityToken_Encoding_DefaultBinary
+		return NewFourByteExpandedNodeID(0, id.UserNameIdentityToken_Encoding_DefaultBinary)
 	case *X509IdentityToken:
-		return id.X509IdentityToken_Encoding_DefaultBinary
+		return NewFourByteExpandedNodeID(0, id.X509IdentityToken_Encoding_DefaultBinary)
 	case *IssuedIdentityToken:
-		return id.IssuedIdentityToken_Encoding_DefaultBinary
+		return NewFourByteExpandedNodeID(0, id.IssuedIdentityToken_Encoding_DefaultBinary)
 	default:
-		return 0
+		return NewTwoByteExpandedNodeID(0)
 	}
 }

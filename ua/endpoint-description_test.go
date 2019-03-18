@@ -12,28 +12,61 @@ func TestEndpointDescription(t *testing.T) {
 	cases := []CodecTestCase{
 		{
 			Name: "Normal",
-			Struct: NewEndpointDescription(
-				"ep-url",
-				NewApplicationDescription(
-					"app-uri", "prod-uri", "app-name", ApplicationTypeServer,
-					"gw-uri", "prof-uri", []string{"discov-uri-1", "discov-uri-2"},
-				),
-				nil,
-				MessageSecurityModeNone,
-				"sec-uri",
-				[]*UserTokenPolicy{
-					NewUserTokenPolicy(
-						"1", UserTokenTypeAnonymous,
-						"issued-token", "issuer-uri", "sec-uri",
-					),
-					NewUserTokenPolicy(
-						"1", UserTokenTypeAnonymous,
-						"issued-token", "issuer-uri", "sec-uri",
-					),
+			Struct: &EndpointDescription{
+				EndpointURL: "ep-url",
+				Server: &ApplicationDescription{
+					ApplicationURI:      "app-uri",
+					ProductURI:          "prod-urk",
+					ApplicationName:     &LocalizedText{Text: "app-name"},
+					ApplicationType:     ApplicationTypeServer,
+					GatewayServerURI:    "gw-uri",
+					DiscoveryProfileURI: "prof-uri",
+					DiscoveryURLs:       []string{"discov-uri-1", "discov-uri-2"},
 				},
-				"trans-uri",
-				0,
-			),
+				ServerCertificate: nil,
+				SecurityMode:      MessageSecurityModeNone,
+				SecurityPolicyURI: "sec-uri",
+				UserIdentityTokens: []*UserTokenPolicy{
+					&UserTokenPolicy{
+						PolicyID:          "1",
+						TokenType:         UserTokenTypeAnonymous,
+						IssuedTokenType:   "issued-token",
+						IssuerEndpointURL: "issuer-uri",
+						SecurityPolicyURI: "sec-uri",
+					},
+					&UserTokenPolicy{
+						PolicyID:          "1",
+						TokenType:         UserTokenTypeAnonymous,
+						IssuedTokenType:   "issued-token",
+						IssuerEndpointURL: "issuer-uri",
+						SecurityPolicyURI: "sec-uri",
+					},
+				},
+				TransportProfileURI: "trans-uri",
+			},
+
+			// Struct: NewEndpointDescription(
+			// 	"ep-url",
+			// 	NewApplicationDescription(
+			// 		"app-uri", "prod-uri", "app-name", ApplicationTypeServer,
+			// 		"gw-uri", "prof-uri", []string{"discov-uri-1", "discov-uri-2"},
+			// 	),
+			// 	nil,
+			// 	MessageSecurityModeNone,
+			// 	"sec-uri",
+			// 	[]*UserTokenPolicy{
+			// 		NewUserTokenPolicy(
+			// 			"1", UserTokenTypeAnonymous,
+			// 			"issued-token", "issuer-uri", "sec-uri",
+			// 		),
+			// 		NewUserTokenPolicy(
+			// 			"1", UserTokenTypeAnonymous,
+			// 			"issued-token", "issuer-uri", "sec-uri",
+			// 		),
+			// 	},
+			// 	"trans-uri",
+			// 	0,
+			// ),
 			Bytes: []byte{
 				// EndpointURI
 				0x06, 0x00, 0x00, 0x00, 0x65, 0x70, 0x2d, 0x75, 0x72, 0x6c,
@@ -99,51 +132,117 @@ func TestEndpointDescriptionArray(t *testing.T) {
 		{
 			Name: "Normal",
 			Struct: []*EndpointDescription{
-				NewEndpointDescription(
-					"ep-url",
-					NewApplicationDescription(
-						"app-uri", "prod-uri", "app-name", ApplicationTypeServer,
-						"gw-uri", "prof-uri", []string{"discov-uri-1", "discov-uri-2"},
-					),
-					nil,
-					MessageSecurityModeNone,
-					"sec-uri",
-					[]*UserTokenPolicy{
-						NewUserTokenPolicy(
-							"1", UserTokenTypeAnonymous,
-							"issued-token", "issuer-uri", "sec-uri",
-						),
-						NewUserTokenPolicy(
-							"1", UserTokenTypeAnonymous,
-							"issued-token", "issuer-uri", "sec-uri",
-						),
+				&EndpointDescription{
+					EndpointURL: "ep-url",
+					Server: &ApplicationDescription{
+						ApplicationURI:      "app-uri",
+						ProductURI:          "prod-urk",
+						ApplicationName:     &LocalizedText{Text: "app-name"},
+						ApplicationType:     ApplicationTypeServer,
+						GatewayServerURI:    "gw-uri",
+						DiscoveryProfileURI: "prof-uri",
+						DiscoveryURLs:       []string{"discov-uri-1", "discov-uri-2"},
 					},
-					"trans-uri",
-					0,
-				),
-				NewEndpointDescription(
-					"ep-url",
-					NewApplicationDescription(
-						"app-uri", "prod-uri", "app-name", ApplicationTypeServer,
-						"gw-uri", "prof-uri", []string{"discov-uri-1", "discov-uri-2"},
-					),
-					nil,
-					MessageSecurityModeNone,
-					"sec-uri",
-					[]*UserTokenPolicy{
-						NewUserTokenPolicy(
-							"1", UserTokenTypeAnonymous,
-							"issued-token", "issuer-uri", "sec-uri",
-						),
-						NewUserTokenPolicy(
-							"1", UserTokenTypeAnonymous,
-							"issued-token", "issuer-uri", "sec-uri",
-						),
+					ServerCertificate: nil,
+					SecurityMode:      MessageSecurityModeNone,
+					SecurityPolicyURI: "sec-uri",
+					UserIdentityTokens: []*UserTokenPolicy{
+						&UserTokenPolicy{
+							PolicyID:          "1",
+							TokenType:         UserTokenTypeAnonymous,
+							IssuedTokenType:   "issued-token",
+							IssuerEndpointURL: "issuer-uri",
+							SecurityPolicyURI: "sec-uri",
+						},
+						&UserTokenPolicy{
+							PolicyID:          "1",
+							TokenType:         UserTokenTypeAnonymous,
+							IssuedTokenType:   "issued-token",
+							IssuerEndpointURL: "issuer-uri",
+							SecurityPolicyURI: "sec-uri",
+						},
 					},
-					"trans-uri",
-					0,
-				),
+					TransportProfileURI: "trans-uri",
+				},
+				&EndpointDescription{
+					EndpointURL: "ep-url",
+					Server: &ApplicationDescription{
+						ApplicationURI:      "app-uri",
+						ProductURI:          "prod-urk",
+						ApplicationName:     &LocalizedText{Text: "app-name"},
+						ApplicationType:     ApplicationTypeServer,
+						GatewayServerURI:    "gw-uri",
+						DiscoveryProfileURI: "prof-uri",
+						DiscoveryURLs:       []string{"discov-uri-1", "discov-uri-2"},
+					},
+					ServerCertificate: nil,
+					SecurityMode:      MessageSecurityModeNone,
+					SecurityPolicyURI: "sec-uri",
+					UserIdentityTokens: []*UserTokenPolicy{
+						&UserTokenPolicy{
+							PolicyID:          "1",
+							TokenType:         UserTokenTypeAnonymous,
+							IssuedTokenType:   "issued-token",
+							IssuerEndpointURL: "issuer-uri",
+							SecurityPolicyURI: "sec-uri",
+						},
+						&UserTokenPolicy{
+							PolicyID:          "1",
+							TokenType:         UserTokenTypeAnonymous,
+							IssuedTokenType:   "issued-token",
+							IssuerEndpointURL: "issuer-uri",
+							SecurityPolicyURI: "sec-uri",
+						},
+					},
+					TransportProfileURI: "trans-uri",
+				},
 			},
+			// Struct: []*EndpointDescription{
+			// 	NewEndpointDescription(
+			// 		"ep-url",
+			// 		NewApplicationDescription(
+			// 			"app-uri", "prod-uri", "app-name", ApplicationTypeServer,
+			// 			"gw-uri", "prof-uri", []string{"discov-uri-1", "discov-uri-2"},
+			// 		),
+			// 		nil,
+			// 		MessageSecurityModeNone,
+			// 		"sec-uri",
+			// 		[]*UserTokenPolicy{
+			// 			NewUserTokenPolicy(
+			// 				"1", UserTokenTypeAnonymous,
+			// 				"issued-token", "issuer-uri", "sec-uri",
+			// 			),
+			// 			NewUserTokenPolicy(
+			// 				"1", UserTokenTypeAnonymous,
+			// 				"issued-token", "issuer-uri", "sec-uri",
+			// 			),
+			// 		},
+			// 		"trans-uri",
+			// 		0,
+			// 	),
+			// 	NewEndpointDescription(
+			// 		"ep-url",
+			// 		NewApplicationDescription(
+			// 			"app-uri", "prod-uri", "app-name", ApplicationTypeServer,
+			// 			"gw-uri", "prof-uri", []string{"discov-uri-1", "discov-uri-2"},
+			// 		),
+			// 		nil,
+			// 		MessageSecurityModeNone,
+			// 		"sec-uri",
+			// 		[]*UserTokenPolicy{
+			// 			NewUserTokenPolicy(
+			// 				"1", UserTokenTypeAnonymous,
+			// 				"issued-token", "issuer-uri", "sec-uri",
+			// 			),
+			// 			NewUserTokenPolicy(
+			// 				"1", UserTokenTypeAnonymous,
+			// 				"issued-token", "issuer-uri", "sec-uri",
+			// 			),
+			// 		},
+			// 		"trans-uri",
+			// 		0,
+			// 	),
+			// },
 			Bytes: []byte{
 				// ArraySize
 				0x02, 0x00, 0x00, 0x00,

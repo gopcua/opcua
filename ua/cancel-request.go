@@ -14,9 +14,9 @@ package ua
 // }
 
 // NewCancelRequest creates a new CancelRequest.
-func NewCancelRequest(reqHeader *RequestHeader, reqHandle uint32) *CancelRequest {
-	return &CancelRequest{
-		RequestHeader: reqHeader,
-		RequestHandle: reqHandle,
-	}
-}
+// func NewCancelRequest(reqHeader *RequestHeader, reqHandle uint32) *CancelRequest {
+// 	return &CancelRequest{
+// 		RequestHeader: reqHeader,
+// 		RequestHandle: reqHandle,
+// 	}
+// }

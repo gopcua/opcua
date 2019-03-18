@@ -19,15 +19,28 @@ func TestMessage(t *testing.T) {
 			Name: "OPN",
 			Struct: func() interface{} {
 				m := NewMessage(
-					ua.NewOpenSecureChannelRequest(
-						ua.NewRequestHeader(
-							ua.NewTwoByteNodeID(0),
-							time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-							1, 0x03ff, 0, "", ua.NewNullExtensionObject(),
-						),
-						0, ua.SecurityTokenRequestTypeIssue,
-						ua.MessageSecurityModeNone, 6000000, nil,
-					),
+					&ua.OpenSecureChannelRequest{
+						RequestHeader: &ua.RequestHeader{
+							AuthenticationToken: ua.NewTwoByteNodeID(0),
+							Timestamp:           time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
+							RequestHandle:       1,
+							ReturnDiagnostics:   0x03ff,
+							AdditionalHeader:    ua.NewExtensionObject(nil),
+						},
+						ClientProtocolVersion: 0,
+						RequestType:           ua.SecurityTokenRequestTypeIssue,
+						SecurityMode:          ua.MessageSecurityModeNone,
+						RequestedLifetime:     6000000,
+					},
+					// ua.NewOpenSecureChannelRequest(
+					// 	ua.NewRequestHeader(
+					// 		ua.NewTwoByteNodeID(0),
+					// 		time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
+					// 		1, 0x03ff, 0, "", ua.NewExtensionObject(nil),
+					// 	),
+					// 	0, ua.SecurityTokenRequestTypeIssue,
+					// 	ua.MessageSecurityModeNone, 6000000, nil,
+					// ),
 					id.OpenSecureChannelRequest_Encoding_DefaultBinary,
 					&Config{
 						SecureChannelID:   0,
@@ -113,7 +126,7 @@ func TestMessage(t *testing.T) {
 						ua.NewRequestHeader(
 							ua.NewTwoByteNodeID(0),
 							time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-							1, 0x03ff, 0, "", ua.NewNullExtensionObject(),
+							1, 0x03ff, 0, "", ua.NewExtensionObject(nil),
 						),
 						"opc.tcp://wow.its.easy:11111/UA/Server",
 						nil, nil,
@@ -175,13 +188,22 @@ func TestMessage(t *testing.T) {
 			Name: "CLO",
 			Struct: func() interface{} {
 				m := NewMessage(
-					ua.NewCloseSecureChannelRequest(
-						ua.NewRequestHeader(
-							ua.NewTwoByteNodeID(0),
-							time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-							1, 0x03ff, 0, "", ua.NewNullExtensionObject(),
-						),
-					),
+					&ua.CloseSecureChannelRequest{
+						RequestHeader: &ua.RequestHeader{
+							AuthenticationToken: ua.NewTwoByteNodeID(0),
+							Timestamp:           time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
+							RequestHandle:       1,
+							ReturnDiagnostics:   0x03ff,
+							AdditionalHeader:    ua.NewExtensionObject(nil),
+						},
+					},
+					// ua.CloseSecureChannelRequest(
+					// 	ua.NewRequestHeader(
+					// 		ua.NewTwoByteNodeID(0),
+					// 		time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
+					// 		1, 0x03ff, 0, "", ua.NewExtensionObject(nil),
+					// 	),
+					// ),
 					id.CloseSecureChannelRequest_Encoding_DefaultBinary,
 					&Config{
 						SecureChannelID:   0,

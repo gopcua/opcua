@@ -14,9 +14,9 @@ package ua
 // }
 
 // NewFindServersResponse creates an FindServersResponse.
-func NewFindServersResponse(resHeader *ResponseHeader, servers ...*ApplicationDescription) *FindServersResponse {
-	return &FindServersResponse{
-		ResponseHeader: resHeader,
-		Servers:        servers,
-	}
-}
+// func NewFindServersResponse(resHeader *ResponseHeader, servers ...*ApplicationDescription) *FindServersResponse {
+// 	return &FindServersResponse{
+// 		ResponseHeader: resHeader,
+// 		Servers:        servers,
+// 	}
+// }

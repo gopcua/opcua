@@ -11,8 +11,6 @@ import (
 	"path"
 	"strings"
 	"text/template"
-
-	"github.com/iancoleman/strcase"
 )
 
 var in, out, pkg string
@@ -44,14 +42,11 @@ func writeEnums(enums []Type) {
 }
 
 func writeExtObjects(objs []Type) {
-	for _, t := range objs {
-		var b bytes.Buffer
-		if err := FormatType(&b, t); err != nil {
-			log.Fatal(err)
-		}
-		filename := strcase.ToKebab(t.Name) + "_gen.go"
-		write(b.Bytes(), path.Join(out, filename))
+	var b bytes.Buffer
+	if err := FormatTypes(&b, objs); err != nil {
+		log.Fatal(err)
 	}
+	write(b.Bytes(), path.Join(out, "extobjs_gen.go"))
 }
 
 func writeServiceRegister(objs []Type) {

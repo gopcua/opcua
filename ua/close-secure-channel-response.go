@@ -13,8 +13,8 @@ package ua
 // }
 
 // NewCloseSecureChannelResponse creates an CloseSecureChannelResponse.
-func NewCloseSecureChannelResponse(resHeader *ResponseHeader) *CloseSecureChannelResponse {
-	return &CloseSecureChannelResponse{
-		ResponseHeader: resHeader,
-	}
-}
+// func NewCloseSecureChannelResponse(resHeader *ResponseHeader) *CloseSecureChannelResponse {
+// 	return &CloseSecureChannelResponse{
+// 		ResponseHeader: resHeader,
+// 	}
+// }

@@ -233,7 +233,7 @@ func TestVariant(t *testing.T) {
 		},
 		{
 			Name:   "LocalizedText",
-			Struct: MustVariant(NewLocalizedText("", "Gross value")),
+			Struct: MustVariant(&LocalizedText{Text: "Gross value"}),
 			Bytes: []byte{
 				// variant encoding mask
 				0x15,
@@ -247,7 +247,7 @@ func TestVariant(t *testing.T) {
 		{
 			Name: "ExtensionObjeject",
 			Struct: MustVariant(NewExtensionObject(
-				0x01, NewAnonymousIdentityToken("anonymous"),
+				NewAnonymousIdentityToken("anonymous"),
 			)),
 			Bytes: []byte{
 				// variant encoding mask

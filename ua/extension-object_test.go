@@ -11,10 +11,8 @@ import (
 func TestExtensionObject(t *testing.T) {
 	cases := []CodecTestCase{
 		{
-			Name: "anonymous-user-identity-token",
-			Struct: NewExtensionObject(
-				0x01, NewAnonymousIdentityToken("anonymous"),
-			),
+			Name:   "anonymous-user-identity-token",
+			Struct: NewExtensionObject(NewAnonymousIdentityToken("anonymous")),
 			Bytes: []byte{
 				// TypeID
 				0x01, 0x00, 0x41, 0x01,

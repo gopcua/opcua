@@ -16,7 +16,7 @@ func TestCreateSubscriptionResponse(t *testing.T) {
 			Struct: &CreateSubscriptionResponse{
 				ResponseHeader: NewResponseHeader(
 					time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-					1, 0, NewNullDiagnosticInfo(), []string{}, NewNullExtensionObject(),
+					1, 0, NewNullDiagnosticInfo(), []string{}, NewExtensionObject(nil),
 				),
 
 				SubscriptionID:            1,

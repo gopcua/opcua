@@ -4,10 +4,6 @@
 
 package ua
 
-import (
-	"fmt"
-)
-
 // ApplicationType definitions.
 //
 // Specification: Part 4, 7.1
@@ -25,27 +21,27 @@ import (
 // 	DiscoveryURIs       []string
 // }
 
-// NewApplicationDescription creates a new NewApplicationDescription.
-func NewApplicationDescription(appURI, prodURI, appName string, appType ApplicationType, gwURI, profileURI string, discovURLs []string) *ApplicationDescription {
-	return &ApplicationDescription{
-		ApplicationURI:      appURI,
-		ProductURI:          prodURI,
-		ApplicationName:     NewLocalizedText("", appName),
-		ApplicationType:     appType,
-		GatewayServerURI:    gwURI,
-		DiscoveryProfileURI: profileURI,
-		DiscoveryURLs:       discovURLs,
-	}
-}
+// // NewApplicationDescription creates a new NewApplicationDescription.
+// func NewApplicationDescription(appURI, prodURI, appName string, appType ApplicationType, gwURI, profileURI string, discovURLs []string) *ApplicationDescription {
+// 	return &ApplicationDescription{
+// 		ApplicationURI:      appURI,
+// 		ProductURI:          prodURI,
+// 		ApplicationName:     NewLocalizedText("", appName),
+// 		ApplicationType:     appType,
+// 		GatewayServerURI:    gwURI,
+// 		DiscoveryProfileURI: profileURI,
+// 		DiscoveryURLs:       discovURLs,
+// 	}
+// }
 
-// String returns ApplicationDescription in string.
-func (a *ApplicationDescription) String() string {
-	return fmt.Sprintf("%s, %s, %s, %s, %s, %v",
-		a.ApplicationURI,
-		a.ProductURI,
-		a.ApplicationName.Text,
-		a.GatewayServerURI,
-		a.DiscoveryProfileURI,
-		a.DiscoveryURLs,
-	)
-}
+// // String returns ApplicationDescription in string.
+// func (a *ApplicationDescription) String() string {
+// 	return fmt.Sprintf("%s, %s, %s, %s, %s, %v",
+// 		a.ApplicationURI,
+// 		a.ProductURI,
+// 		a.ApplicationName.Text,
+// 		a.GatewayServerURI,
+// 		a.DiscoveryProfileURI,
+// 		a.DiscoveryURLs,
+// 	)
+// }
