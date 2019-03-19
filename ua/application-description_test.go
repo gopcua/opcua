@@ -69,26 +69,6 @@ func TestApplicationDescriptionArray(t *testing.T) {
 					DiscoveryURLs:       []string{"discov-uri-1", "discov-uri-2"},
 				},
 			},
-			// Struct: []*ApplicationDescription{
-			// 	NewApplicationDescription(
-			// 		"app-uri",
-			// 		"prod-uri",
-			// 		"app-name",
-			// 		ApplicationTypeServer,
-			// 		"gw-uri",
-			// 		"prof-uri",
-			// 		[]string{"discov-uri-1", "discov-uri-2"},
-			// 	),
-			// 	NewApplicationDescription(
-			// 		"app-uri",
-			// 		"prod-uri",
-			// 		"app-name",
-			// 		ApplicationTypeServer,
-			// 		"gw-uri",
-			// 		"prof-uri",
-			// 		[]string{"discov-uri-1", "discov-uri-2"},
-			// 	),
-			// },
 			Bytes: []byte{ // Array
 				// ArraySize
 				0x02, 0x00, 0x00, 0x00,

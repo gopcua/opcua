@@ -23,13 +23,6 @@ func TestCancelResponse(t *testing.T) {
 				},
 				CancelCount: 1,
 			},
-			// Struct: NewCancelResponse(
-			// 	NewResponseHeader(
-			// 		time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-			// 		1, 0, nil, []string{}, NewExtensionObject(nil),
-			// 	),
-			// 	1,
-			// ),
 			Bytes: []byte{
 				// Timestamp
 				0x00, 0x98, 0x67, 0xdd, 0xfd, 0x30, 0xd4, 0x01,

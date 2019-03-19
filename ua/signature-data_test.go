@@ -23,7 +23,6 @@ func TestSignatureData(t *testing.T) {
 		{
 			Name:   "dummy data",
 			Struct: &SignatureData{Algorithm: "alg", Signature: []byte{0xde, 0xad, 0xbe, 0xef}},
-			// Struct: NewSignatureData("alg", []byte{0xde, 0xad, 0xbe, 0xef}),
 			Bytes: []byte{
 				// Algorithm
 				0x03, 0x00, 0x00, 0x00, 0x61, 0x6c, 0x67,

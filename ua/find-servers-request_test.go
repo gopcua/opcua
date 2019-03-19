@@ -25,23 +25,6 @@ func TestFindServersRequest(t *testing.T) {
 				},
 				EndpointURL: "opc.tcp://wow.its.easy:11111/UA/Server",
 			},
-			// Struct: NewFindServersRequest(
-			// 	NewRequestHeader(
-			// 		NewByteStringNodeID(0x00, []byte{
-			// 			0x08, 0x22, 0x87, 0x62, 0xba, 0x81, 0xe1, 0x11,
-			// 			0xa6, 0x43, 0xf8, 0x77, 0x7b, 0xc6, 0x2f, 0xc8,
-			// 		}),
-			// 		time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-			// 		1, 0, 0, "", NewExtensionObject(nil),
-			// 	),
-			// 	"opc.tcp://wow.its.easy:11111/UA/Server",
-			// 	nil,
-			// 	// []string{},
-			// 	// todo(fs): this looks like a bug since providing an empty string
-			// 	// todo(fs): actually creates an array of length 1 and not zero.
-			// 	// "",
-			// 	nil,
-			// ),
 			Bytes: []byte{
 				// AuthenticationToken
 				0x05, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x08,

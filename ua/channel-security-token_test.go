@@ -19,9 +19,6 @@ func TestChannelSecurityToken(t *testing.T) {
 				CreatedAt:       time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
 				RevisedLifetime: 6000000,
 			},
-			// Struct: NewChannelSecurityToken(
-			// 	1, 2, time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC), 6000000,
-			// ),
 			Bytes: []byte{
 				// ChannelID
 				0x01, 0x00, 0x00, 0x00,

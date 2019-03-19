@@ -42,30 +42,6 @@ func TestFindServersResponse(t *testing.T) {
 					},
 				},
 			},
-			// Struct: NewFindServersResponse(
-			// 	NewResponseHeader(
-			// 		time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-			// 		1, 0, NewNullDiagnosticInfo(), []string{}, NewExtensionObject(nil),
-			// 	),
-			// 	NewApplicationDescription(
-			// 		"app-uri",
-			// 		"prod-uri",
-			// 		"app-name",
-			// 		ApplicationTypeServer,
-			// 		"gw-uri",
-			// 		"prof-uri",
-			// 		[]string{"discov-uri-1", "discov-uri-2"},
-			// 	),
-			// 	NewApplicationDescription(
-			// 		"app-uri",
-			// 		"prod-uri",
-			// 		"app-name",
-			// 		ApplicationTypeServer,
-			// 		"gw-uri",
-			// 		"prof-uri",
-			// 		[]string{"discov-uri-1", "discov-uri-2"},
-			// 	),
-			// ),
 			Bytes: []byte{
 				// Timestamp
 				0x00, 0x98, 0x67, 0xdd, 0xfd, 0x30, 0xd4, 0x01,

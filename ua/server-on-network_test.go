@@ -18,12 +18,6 @@ func TestDecodeServerOnNetwork(t *testing.T) {
 				DiscoveryURL:       "discov-uri",
 				ServerCapabilities: []string{"server-cap-1"},
 			},
-			// Struct: NewServerOnNetwork(
-			// 	1,
-			// 	"server-name",
-			// 	"discov-uri",
-			// 	[]string{"server-cap-1"},
-			// ),
 			Bytes: []byte{
 				// RecordID
 				0x01, 0x00, 0x00, 0x00,
@@ -47,12 +41,6 @@ func TestDecodeServerOnNetwork(t *testing.T) {
 				DiscoveryURL:       "discov-uri",
 				ServerCapabilities: []string{"server-cap-1", "server-cap-2"},
 			},
-			// Struct: NewServerOnNetwork(
-			// 	1,
-			// 	"server-name",
-			// 	"discov-uri",
-			// 	[]string{"server-cap-1", "server-cap-2"},
-			// ),
 			Bytes: []byte{
 				// RecordID
 				0x01, 0x00, 0x00, 0x00,
@@ -92,20 +80,6 @@ func TestServerOnNetworkArray(t *testing.T) {
 					ServerCapabilities: []string{"server-cap-1", "server-cap-2"},
 				},
 			},
-			// Struct: []*ServerOnNetwork{
-			// 	NewServerOnNetwork(
-			// 		1,
-			// 		"server-name",
-			// 		"discov-uri",
-			// 		[]string{"server-cap-1"},
-			// 	),
-			// 	NewServerOnNetwork(
-			// 		1,
-			// 		"server-name",
-			// 		"discov-uri",
-			// 		[]string{"server-cap-1", "server-cap-2"},
-			// 	),
-			// },
 			Bytes: []byte{
 				// ArraySize
 				0x02, 0x00, 0x00, 0x00,

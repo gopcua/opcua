@@ -44,29 +44,6 @@ func TestEndpointDescription(t *testing.T) {
 				},
 				TransportProfileURI: "trans-uri",
 			},
-
-			// Struct: NewEndpointDescription(
-			// 	"ep-url",
-			// 	NewApplicationDescription(
-			// 		"app-uri", "prod-uri", "app-name", ApplicationTypeServer,
-			// 		"gw-uri", "prof-uri", []string{"discov-uri-1", "discov-uri-2"},
-			// 	),
-			// 	nil,
-			// 	MessageSecurityModeNone,
-			// 	"sec-uri",
-			// 	[]*UserTokenPolicy{
-			// 		NewUserTokenPolicy(
-			// 			"1", UserTokenTypeAnonymous,
-			// 			"issued-token", "issuer-uri", "sec-uri",
-			// 		),
-			// 		NewUserTokenPolicy(
-			// 			"1", UserTokenTypeAnonymous,
-			// 			"issued-token", "issuer-uri", "sec-uri",
-			// 		),
-			// 	},
-			// 	"trans-uri",
-			// 	0,
-			// ),
 			Bytes: []byte{
 				// EndpointURI
 				0x06, 0x00, 0x00, 0x00, 0x65, 0x70, 0x2d, 0x75, 0x72, 0x6c,
@@ -197,52 +174,6 @@ func TestEndpointDescriptionArray(t *testing.T) {
 					TransportProfileURI: "trans-uri",
 				},
 			},
-			// Struct: []*EndpointDescription{
-			// 	NewEndpointDescription(
-			// 		"ep-url",
-			// 		NewApplicationDescription(
-			// 			"app-uri", "prod-uri", "app-name", ApplicationTypeServer,
-			// 			"gw-uri", "prof-uri", []string{"discov-uri-1", "discov-uri-2"},
-			// 		),
-			// 		nil,
-			// 		MessageSecurityModeNone,
-			// 		"sec-uri",
-			// 		[]*UserTokenPolicy{
-			// 			NewUserTokenPolicy(
-			// 				"1", UserTokenTypeAnonymous,
-			// 				"issued-token", "issuer-uri", "sec-uri",
-			// 			),
-			// 			NewUserTokenPolicy(
-			// 				"1", UserTokenTypeAnonymous,
-			// 				"issued-token", "issuer-uri", "sec-uri",
-			// 			),
-			// 		},
-			// 		"trans-uri",
-			// 		0,
-			// 	),
-			// 	NewEndpointDescription(
-			// 		"ep-url",
-			// 		NewApplicationDescription(
-			// 			"app-uri", "prod-uri", "app-name", ApplicationTypeServer,
-			// 			"gw-uri", "prof-uri", []string{"discov-uri-1", "discov-uri-2"},
-			// 		),
-			// 		nil,
-			// 		MessageSecurityModeNone,
-			// 		"sec-uri",
-			// 		[]*UserTokenPolicy{
-			// 			NewUserTokenPolicy(
-			// 				"1", UserTokenTypeAnonymous,
-			// 				"issued-token", "issuer-uri", "sec-uri",
-			// 			),
-			// 			NewUserTokenPolicy(
-			// 				"1", UserTokenTypeAnonymous,
-			// 				"issued-token", "issuer-uri", "sec-uri",
-			// 			),
-			// 		},
-			// 		"trans-uri",
-			// 		0,
-			// 	),
-			// },
 			Bytes: []byte{
 				// ArraySize
 				0x02, 0x00, 0x00, 0x00,

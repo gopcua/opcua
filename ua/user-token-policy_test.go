@@ -18,10 +18,6 @@ func TestUserTokenPolicy(t *testing.T) {
 				IssuerEndpointURL: "issuer-uri",
 				SecurityPolicyURI: "sec-uri",
 			},
-			// Struct: NewUserTokenPolicy(
-			// 	"1", UserTokenTypeAnonymous,
-			// 	"issued-token", "issuer-uri", "sec-uri",
-			// ),
 			Bytes: []byte{
 				// PolicyID
 				0x01, 0x00, 0x00, 0x00, 0x31,
@@ -58,16 +54,6 @@ func TestUserTokenPolicyArray(t *testing.T) {
 					SecurityPolicyURI: "sec-uri",
 				},
 			},
-			// Struct: []*UserTokenPolicy{
-			// 	NewUserTokenPolicy(
-			// 		"1", UserTokenTypeAnonymous,
-			// 		"issued-token", "issuer-uri", "sec-uri",
-			// 	),
-			// 	NewUserTokenPolicy(
-			// 		"1", UserTokenTypeAnonymous,
-			// 		"issued-token", "issuer-uri", "sec-uri",
-			// 	),
-			// },
 			Bytes: []byte{
 				// ArraySize
 				0x02, 0x00, 0x00, 0x00,

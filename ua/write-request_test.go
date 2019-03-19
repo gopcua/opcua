@@ -36,30 +36,6 @@ func TestWriteRequest(t *testing.T) {
 					},
 				},
 			},
-			// Struct: NewWriteRequest(
-			// 	NewRequestHeader(
-			// 		NewByteStringNodeID(0x00, []byte{
-			// 			0x08, 0x22, 0x87, 0x62, 0xba, 0x81, 0xe1, 0x11,
-			// 			0xa6, 0x43, 0xf8, 0x77, 0x7b, 0xc6, 0x2f, 0xc8,
-			// 		}),
-			// 		time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-			// 		1, 0, 0, "", NewExtensionObject(nil),
-			// 	),
-			// 	NewWriteValue(
-			// 		NewFourByteNodeID(0, 2256),
-			// 		IntegerIDValue,
-			// 		"",
-			// 		NewDataValue(
-			// 			true, false, true, false, true, false,
-			// 			MustVariant(float32(2.50017)),
-			// 			0,
-			// 			time.Date(2018, time.September, 17, 14, 28, 29, 112000000, time.UTC),
-			// 			0,
-			// 			time.Date(2018, time.September, 17, 14, 28, 29, 112000000, time.UTC),
-			// 			0,
-			// 		),
-			// 	),
-			// ),
 			Bytes: []byte{
 				// RequestHeader
 				// AuthenticationToken
@@ -128,44 +104,6 @@ func TestWriteRequest(t *testing.T) {
 					},
 				},
 			},
-			// Struct: NewWriteRequest(
-			// 	NewRequestHeader(
-			// 		NewByteStringNodeID(0x00, []byte{
-			// 			0x08, 0x22, 0x87, 0x62, 0xba, 0x81, 0xe1, 0x11,
-			// 			0xa6, 0x43, 0xf8, 0x77, 0x7b, 0xc6, 0x2f, 0xc8,
-			// 		}),
-			// 		time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-			// 		1, 0, 0, "", NewExtensionObject(nil),
-			// 	),
-			// 	NewWriteValue(
-			// 		NewFourByteNodeID(0, 2256),
-			// 		IntegerIDValue,
-			// 		"",
-			// 		NewDataValue(
-			// 			true, false, true, false, true, false,
-			// 			MustVariant(float32(2.50017)),
-			// 			0,
-			// 			time.Date(2018, time.September, 17, 14, 28, 29, 112000000, time.UTC),
-			// 			0,
-			// 			time.Date(2018, time.September, 17, 14, 28, 29, 112000000, time.UTC),
-			// 			0,
-			// 		),
-			// 	),
-			// 	NewWriteValue(
-			// 		NewFourByteNodeID(0, 2256),
-			// 		IntegerIDValue,
-			// 		"",
-			// 		NewDataValue(
-			// 			true, false, true, false, true, false,
-			// 			MustVariant(float32(2.50017)),
-			// 			0,
-			// 			time.Date(2018, time.September, 17, 14, 28, 29, 112000000, time.UTC),
-			// 			0,
-			// 			time.Date(2018, time.September, 17, 14, 28, 29, 112000000, time.UTC),
-			// 			0,
-			// 		),
-			// 	),
-			// ),
 			Bytes: []byte{
 				// RequestHeader
 				// AuthenticationToken

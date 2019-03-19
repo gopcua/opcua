@@ -26,7 +26,6 @@ func TestSignedSoftwareCertificate(t *testing.T) {
 				CertificateData: []byte{0xca, 0xfe},
 				Signature:       []byte{0xde, 0xad, 0xbe, 0xef},
 			},
-			// Struct: NewSignedSoftwareCertificate([]byte{0xca, 0xfe}, []byte{0xde, 0xad, 0xbe, 0xef}),
 			Bytes: []byte{
 				// CertificateData
 				0x02, 0x00, 0x00, 0x00, 0xca, 0xfe,
@@ -60,10 +59,6 @@ func TestSignedSoftwareCertificateArray(t *testing.T) {
 					Signature:       []byte{0xde, 0xad, 0xbe, 0xef},
 				},
 			},
-			// Struct: []*SignedSoftwareCertificate{
-			// 	NewSignedSoftwareCertificate([]byte{0xca, 0xfe}, []byte{0xde, 0xad, 0xbe, 0xef}),
-			// 	NewSignedSoftwareCertificate([]byte{0xca, 0xfe}, []byte{0xde, 0xad, 0xbe, 0xef}),
-			// },
 			Bytes: []byte{
 				// ArraySize
 				0x02, 0x00, 0x00, 0x00,

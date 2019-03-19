@@ -23,20 +23,6 @@ func TestWriteValue(t *testing.T) {
 					ServerTimestamp: time.Date(2018, time.September, 17, 14, 28, 29, 112000000, time.UTC),
 				},
 			},
-			// Struct: NewWriteValue(
-			// 	NewFourByteNodeID(0, 2256),
-			// 	IntegerIDValue,
-			// 	"",
-			// 	NewDataValue(
-			// 		true, false, true, false, true, false,
-			// 		MustVariant(float32(2.50017)),
-			// 		0,
-			// 		time.Date(2018, time.September, 17, 14, 28, 29, 112000000, time.UTC),
-			// 		0,
-			// 		time.Date(2018, time.September, 17, 14, 28, 29, 112000000, time.UTC),
-			// 		0,
-			// 	),
-			// ),
 			Bytes: []byte{
 				// NodeID
 				0x01, 0x00, 0xd0, 0x08,
@@ -81,36 +67,6 @@ func TestWriteValueArray(t *testing.T) {
 					},
 				},
 			},
-			// Struct: []*WriteValue{
-			// 	NewWriteValue(
-			// 		NewFourByteNodeID(0, 2256),
-			// 		IntegerIDValue,
-			// 		"",
-			// 		NewDataValue(
-			// 			true, false, true, false, true, false,
-			// 			MustVariant(float32(2.50017)),
-			// 			0,
-			// 			time.Date(2018, time.September, 17, 14, 28, 29, 112000000, time.UTC),
-			// 			0,
-			// 			time.Date(2018, time.September, 17, 14, 28, 29, 112000000, time.UTC),
-			// 			0,
-			// 		),
-			// 	),
-			// 	NewWriteValue(
-			// 		NewFourByteNodeID(0, 2256),
-			// 		IntegerIDValue,
-			// 		"",
-			// 		NewDataValue(
-			// 			true, false, true, false, true, false,
-			// 			MustVariant(float32(2.50017)),
-			// 			0,
-			// 			time.Date(2018, time.September, 17, 14, 28, 29, 112000000, time.UTC),
-			// 			0,
-			// 			time.Date(2018, time.September, 17, 14, 28, 29, 112000000, time.UTC),
-			// 			0,
-			// 		),
-			// 	),
-			// },
 			Bytes: []byte{
 				// ArraySize
 				0x02, 0x00, 0x00, 0x00,

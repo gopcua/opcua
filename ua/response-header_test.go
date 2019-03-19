@@ -48,19 +48,6 @@ func TestResponseHeader(t *testing.T) {
 					TypeID: NewTwoByteExpandedNodeID(255),
 				},
 			},
-			// Struct: NewResponseHeader(
-			// 	time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-			// 	1,
-			// 	0x00000000,
-			// 	NewDiagnosticInfo(
-			// 		false, false, false, false, false, false, false,
-			// 		0, 0, 0, 0, "", 0, nil,
-			// 	),
-			// 	[]string{"foo", "bar"},
-			// 	&ExtensionObject{
-			// 		TypeID: NewTwoByteExpandedNodeID(255),
-			// 	},
-			// ),
 			Bytes: []byte{
 				// Timestamp
 				0x00, 0x98, 0x67, 0xdd, 0xfd, 0x30, 0xd4, 0x01,

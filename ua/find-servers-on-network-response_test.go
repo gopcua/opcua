@@ -31,19 +31,6 @@ func TestFindServersOnNetworkResponse(t *testing.T) {
 					},
 				},
 			},
-			// Struct: NewFindServersOnNetworkResponse(
-			// 	NewResponseHeader(
-			// 		time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-			// 		1, 0, NewNullDiagnosticInfo(), []string{}, NewExtensionObject(nil),
-			// 	),
-			// 	time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-			// 	NewServerOnNetwork(
-			// 		1,
-			// 		"server-name",
-			// 		"discov-uri",
-			// 		[]string{"server-cap-1"},
-			// 	),
-			// ),
 			Bytes: []byte{
 				// Timestamp
 				0x00, 0x98, 0x67, 0xdd, 0xfd, 0x30, 0xd4, 0x01,
@@ -103,25 +90,6 @@ func TestFindServersOnNetworkResponse(t *testing.T) {
 					},
 				},
 			},
-			// Struct: NewFindServersOnNetworkResponse(
-			// 	NewResponseHeader(
-			// 		time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-			// 		1, 0, NewNullDiagnosticInfo(), []string{}, NewExtensionObject(nil),
-			// 	),
-			// 	time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-			// 	NewServerOnNetwork(
-			// 		1,
-			// 		"server-name",
-			// 		"discov-uri",
-			// 		[]string{"server-cap-1"},
-			// 	),
-			// 	NewServerOnNetwork(
-			// 		1,
-			// 		"server-name",
-			// 		"discov-uri",
-			// 		[]string{"server-cap-1", "server-cap-2"},
-			// 	),
-			// ),
 			Bytes: []byte{
 				// Timestamp
 				0x00, 0x98, 0x67, 0xdd, 0xfd, 0x30, 0xd4, 0x01,

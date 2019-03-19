@@ -98,67 +98,6 @@ func TestCreateSessionResponse(t *testing.T) {
 					},
 				},
 			},
-			// Struct: NewCreateSessionResponse(
-			// 	NewResponseHeader(
-			// 		time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-			// 		1, 0, NewNullDiagnosticInfo(), []string{}, NewExtensionObject(nil),
-			// 	),
-			// 	NewNumericNodeID(0, 1),
-			// 	NewByteStringNodeID(0, []byte{
-			// 		0x08, 0x22, 0x87, 0x62, 0xba, 0x81, 0xe1, 0x11,
-			// 		0xa6, 0x43, 0xf8, 0x77, 0x7b, 0xc6, 0x2f, 0xc8,
-			// 	}),
-			// 	6000000, nil, nil,
-			// 	NewSignatureData(
-			// 		"http://www.w3.org/2000/09/xmldsig#rsa-sha1",
-			// 		nil,
-			// 	),
-			// 	65534,
-			// 	NewEndpointDescription(
-			// 		"ep-url",
-			// 		NewApplicationDescription(
-			// 			"app-uri", "prod-uri", "app-name", ApplicationTypeServer,
-			// 			"gw-uri", "prof-uri", []string{"discov-uri-1", "discov-uri-2"},
-			// 		),
-			// 		nil,
-			// 		MessageSecurityModeNone,
-			// 		"sec-uri",
-			// 		[]*UserTokenPolicy{
-			// 			NewUserTokenPolicy(
-			// 				"1", UserTokenTypeAnonymous,
-			// 				"issued-token", "issuer-uri", "sec-uri",
-			// 			),
-			// 			NewUserTokenPolicy(
-			// 				"1", UserTokenTypeAnonymous,
-			// 				"issued-token", "issuer-uri", "sec-uri",
-			// 			),
-			// 		},
-			// 		"trans-uri",
-			// 		0,
-			// 	),
-			// 	NewEndpointDescription(
-			// 		"ep-url",
-			// 		NewApplicationDescription(
-			// 			"app-uri", "prod-uri", "app-name", ApplicationTypeServer,
-			// 			"gw-uri", "prof-uri", []string{"discov-uri-1", "discov-uri-2"},
-			// 		),
-			// 		nil,
-			// 		MessageSecurityModeNone,
-			// 		"sec-uri",
-			// 		[]*UserTokenPolicy{
-			// 			NewUserTokenPolicy(
-			// 				"1", UserTokenTypeAnonymous,
-			// 				"issued-token", "issuer-uri", "sec-uri",
-			// 			),
-			// 			NewUserTokenPolicy(
-			// 				"1", UserTokenTypeAnonymous,
-			// 				"issued-token", "issuer-uri", "sec-uri",
-			// 			),
-			// 		},
-			// 		"trans-uri",
-			// 		0,
-			// 	),
-			// ),
 			Bytes: []byte{
 				// Timestamp
 				0x00, 0x98, 0x67, 0xdd, 0xfd, 0x30, 0xd4, 0x01,
