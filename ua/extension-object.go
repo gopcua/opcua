@@ -8,10 +8,12 @@ import (
 	"github.com/gopcua/opcua/id"
 )
 
+// These flags define the value type of an ExtensionObject.
+// They cannot be combined.
 const (
-	ExtensionObjectNoBody         = 0
-	ExtensionObjectByteStringBody = 1
-	ExtensionObjectXMLElementBody = 2
+	ExtensionObjectEmpty  = 0
+	ExtensionObjectBinary = 1
+	ExtensionObjectXML    = 2
 )
 
 // ExtensionObject is encoded as sequence of bytes prefixed by the NodeId of its DataTypeEncoding
@@ -19,15 +21,18 @@ const (
 //
 // Specification: Part 6, 5.2.2.15
 type ExtensionObject struct {
-	TypeID *ExpandedNodeID
-	Value  interface{}
+	EncodingMask uint8
+	TypeID       *ExpandedNodeID
+	Value        interface{}
 }
 
 func NewExtensionObject(value interface{}) *ExtensionObject {
-	return &ExtensionObject{
+	e := &ExtensionObject{
 		TypeID: ExtensionObjectTypeID(value),
 		Value:  value,
 	}
+	e.UpdateMask()
+	return e
 }
 
 func (e *ExtensionObject) Decode(b []byte) (int, error) {
@@ -35,8 +40,8 @@ func (e *ExtensionObject) Decode(b []byte) (int, error) {
 	e.TypeID = new(ExpandedNodeID)
 	buf.ReadStruct(e.TypeID)
 
-	mask := buf.ReadByte()
-	if mask == ExtensionObjectNoBody {
+	e.EncodingMask = buf.ReadByte()
+	if e.EncodingMask == ExtensionObjectEmpty {
 		return buf.Pos(), buf.Error()
 	}
 
@@ -50,62 +55,36 @@ func (e *ExtensionObject) Decode(b []byte) (int, error) {
 		return buf.Pos(), buf.Error()
 	}
 
-	switch mask {
-	case ExtensionObjectXMLElementBody:
+	if e.EncodingMask == ExtensionObjectXML {
 		e.Value = new(XmlElement)
 		body.ReadStruct(e.Value)
-
-	case ExtensionObjectByteStringBody:
-		switch e.TypeID.NodeID.IntID() {
-		case id.AnonymousIdentityToken_Encoding_DefaultBinary:
-			e.Value = new(AnonymousIdentityToken)
-			body.ReadStruct(e.Value)
-
-		case id.UserNameIdentityToken_Encoding_DefaultBinary:
-			e.Value = new(UserNameIdentityToken)
-			body.ReadStruct(e.Value)
-
-		case id.X509IdentityToken_Encoding_DefaultBinary:
-			e.Value = new(X509IdentityToken)
-			body.ReadStruct(e.Value)
-
-		case id.IssuedIdentityToken_Encoding_DefaultBinary:
-			e.Value = new(IssuedIdentityToken)
-			body.ReadStruct(e.Value)
-
-		default:
-			e.Value = body.ReadBytes()
-		}
-
-	default:
-		e.Value = buf.ReadBytes()
+		return buf.Pos(), body.Error()
 	}
 
+	switch e.TypeID.NodeID.IntID() {
+	case id.AnonymousIdentityToken_Encoding_DefaultBinary:
+		e.Value = new(AnonymousIdentityToken)
+		body.ReadStruct(e.Value)
+	case id.UserNameIdentityToken_Encoding_DefaultBinary:
+		e.Value = new(UserNameIdentityToken)
+		body.ReadStruct(e.Value)
+	case id.X509IdentityToken_Encoding_DefaultBinary:
+		e.Value = new(X509IdentityToken)
+		body.ReadStruct(e.Value)
+	case id.IssuedIdentityToken_Encoding_DefaultBinary:
+		e.Value = new(IssuedIdentityToken)
+		body.ReadStruct(e.Value)
+	default:
+		e.Value = body.ReadBytes()
+	}
 	return buf.Pos(), body.Error()
 }
 
 func (e *ExtensionObject) Encode() ([]byte, error) {
 	buf := NewBuffer(nil)
-	if e.TypeID == nil {
-		buf.WriteStruct(NewTwoByteExpandedNodeID(0))
-	} else {
-		buf.WriteStruct(e.TypeID)
-	}
-
-	switch e.Value.(type) {
-	case *XmlElement:
-		buf.WriteByte(ExtensionObjectXMLElementBody)
-	default:
-		if e.Value != nil {
-			buf.WriteByte(ExtensionObjectByteStringBody)
-		} else {
-			buf.WriteByte(ExtensionObjectNoBody)
-			return buf.Bytes(), buf.Error()
-		}
-	}
-
-	if e.Value == nil {
-		buf.WriteUint32(0xffffffff)
+	buf.WriteStruct(e.TypeID)
+	buf.WriteByte(e.EncodingMask)
+	if e.EncodingMask == ExtensionObjectEmpty {
 		return buf.Bytes(), buf.Error()
 	}
 
@@ -114,10 +93,19 @@ func (e *ExtensionObject) Encode() ([]byte, error) {
 	if body.Error() != nil {
 		return nil, body.Error()
 	}
-
 	buf.WriteUint32(uint32(body.Len()))
 	buf.Write(body.Bytes())
 	return buf.Bytes(), buf.Error()
+}
+
+func (e *ExtensionObject) UpdateMask() {
+	if e.Value == nil {
+		e.EncodingMask = ExtensionObjectEmpty
+	} else if _, ok := e.Value.(*XmlElement); ok {
+		e.EncodingMask = ExtensionObjectXML
+	} else {
+		e.EncodingMask = ExtensionObjectBinary
+	}
 }
 
 func ExtensionObjectTypeID(v interface{}) *ExpandedNodeID {
