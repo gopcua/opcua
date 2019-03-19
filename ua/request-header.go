@@ -6,7 +6,6 @@ package ua
 
 import (
 	"fmt"
-	"time"
 )
 
 // RequestHeader represents a Request Header in each services.
@@ -23,17 +22,17 @@ import (
 // }
 
 // NewRequestHeader creates a new RequestHeader.
-func NewRequestHeader(authToken *NodeID, timestamp time.Time, handle, diag, timeout uint32, auditID string, additionalHeader *ExtensionObject) *RequestHeader {
-	return &RequestHeader{
-		AuthenticationToken: authToken,
-		Timestamp:           timestamp,
-		RequestHandle:       handle,
-		ReturnDiagnostics:   diag,
-		AuditEntryID:        auditID,
-		TimeoutHint:         timeout,
-		AdditionalHeader:    additionalHeader,
-	}
-}
+// func NewRequestHeader(authToken *NodeID, timestamp time.Time, handle, diag, timeout uint32, auditID string, additionalHeader *ExtensionObject) *RequestHeader {
+// 	return &RequestHeader{
+// 		AuthenticationToken: authToken,
+// 		Timestamp:           timestamp,
+// 		RequestHandle:       handle,
+// 		ReturnDiagnostics:   diag,
+// 		AuditEntryID:        auditID,
+// 		TimeoutHint:         timeout,
+// 		AdditionalHeader:    additionalHeader,
+// 	}
+// }
 
 // SetDiagServiceLevelSymbolicID sets the ServiceLevelSymbolicID bit in ReturnDiagnostics.
 func (r *RequestHeader) SetDiagServiceLevelSymbolicID() {

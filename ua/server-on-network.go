@@ -16,11 +16,11 @@ package ua
 // }
 
 // NewServersOnNetwork creates a new NewServersOnNetwork.
-func NewServerOnNetwork(record uint32, serverName, discoveryURL string, serverCap []string) *ServerOnNetwork {
-	return &ServerOnNetwork{
-		RecordID:           record,
-		ServerName:         serverName,
-		DiscoveryURL:       discoveryURL,
-		ServerCapabilities: serverCap,
-	}
-}
+// func NewServerOnNetwork(record uint32, serverName, discoveryURL string, serverCap []string) *ServerOnNetwork {
+// 	return &ServerOnNetwork{
+// 		RecordID:           record,
+// 		ServerName:         serverName,
+// 		DiscoveryURL:       discoveryURL,
+// 		ServerCapabilities: serverCap,
+// 	}
+// }

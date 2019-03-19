@@ -17,7 +17,7 @@ func TestActivateSessionRequest(t *testing.T) {
 				ClientSignature:            &SignatureData{},
 				ClientSoftwareCertificates: nil,
 				LocaleIDs:                  nil,
-				UserIdentityToken:          NewExtensionObject(NewAnonymousIdentityToken("anonymous")),
+				UserIdentityToken:          NewExtensionObject(&AnonymousIdentityToken{PolicyID: "anonymous"}),
 				UserTokenSignature:         &SignatureData{},
 			},
 			Bytes: flatten(

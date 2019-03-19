@@ -4,11 +4,6 @@
 
 package ua
 
-import (
-	"fmt"
-	"time"
-)
-
 // ResponseHeader represents a Response Header in each services.
 //
 // Specification: Part 4, 7.29
@@ -22,29 +17,29 @@ import (
 // }
 
 // NewResponseHeader creates a new ResponseHeader.
-func NewResponseHeader(timestamp time.Time, handle uint32, code StatusCode, diag *DiagnosticInfo, strs []string, additionalHeader *ExtensionObject) *ResponseHeader {
-	r := &ResponseHeader{
-		Timestamp:          timestamp,
-		RequestHandle:      handle,
-		ServiceResult:      code,
-		ServiceDiagnostics: diag,
-		StringTable:        strs,
-		AdditionalHeader:   additionalHeader,
-	}
-	if diag == nil {
-		r.ServiceDiagnostics = NewNullDiagnosticInfo()
-	}
-	return r
-}
+// func NewResponseHeader(timestamp time.Time, handle uint32, code StatusCode, diag *DiagnosticInfo, strs []string, additionalHeader *ExtensionObject) *ResponseHeader {
+// 	r := &ResponseHeader{
+// 		Timestamp:          timestamp,
+// 		RequestHandle:      handle,
+// 		ServiceResult:      code,
+// 		ServiceDiagnostics: diag,
+// 		StringTable:        strs,
+// 		AdditionalHeader:   additionalHeader,
+// 	}
+// 	if diag == nil {
+// 		r.ServiceDiagnostics = NewNullDiagnosticInfo()
+// 	}
+// 	return r
+// }
 
-// String returns ResponseHeader in string.
-func (r *ResponseHeader) String() string {
-	return fmt.Sprintf("%v, %d, %v, %v, %v, %v",
-		r.Timestamp,
-		r.RequestHandle,
-		r.ServiceResult,
-		r.ServiceDiagnostics,
-		r.StringTable,
-		r.AdditionalHeader,
-	)
-}
+// // String returns ResponseHeader in string.
+// func (r *ResponseHeader) String() string {
+// 	return fmt.Sprintf("%v, %d, %v, %v, %v, %v",
+// 		r.Timestamp,
+// 		r.RequestHandle,
+// 		r.ServiceResult,
+// 		r.ServiceDiagnostics,
+// 		r.StringTable,
+// 		r.AdditionalHeader,
+// 	)
+// }

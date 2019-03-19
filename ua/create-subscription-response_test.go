@@ -14,11 +14,13 @@ func TestCreateSubscriptionResponse(t *testing.T) {
 		{
 			Name: "normal",
 			Struct: &CreateSubscriptionResponse{
-				ResponseHeader: NewResponseHeader(
-					time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-					1, 0, NewNullDiagnosticInfo(), []string{}, NewExtensionObject(nil),
-				),
-
+				ResponseHeader: &ResponseHeader{
+					Timestamp:          time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
+					RequestHandle:      1,
+					ServiceDiagnostics: &DiagnosticInfo{},
+					StringTable:        []string{},
+					AdditionalHeader:   NewExtensionObject(nil),
+				},
 				SubscriptionID:            1,
 				RevisedPublishingInterval: 1000,
 				RevisedLifetimeCount:      60,

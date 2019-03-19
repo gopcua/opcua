@@ -12,7 +12,7 @@ func TestQualifiedName(t *testing.T) {
 	cases := []CodecTestCase{
 		{
 			Name:   "normal",
-			Struct: NewQualifiedName(1, "foobar"),
+			Struct: &QualifiedName{NamespaceIndex: 1, Name: "foobar"},
 			Bytes: []byte{
 				// namespace index
 				0x01, 0x00,
@@ -23,7 +23,7 @@ func TestQualifiedName(t *testing.T) {
 		},
 		{
 			Name:   "empty",
-			Struct: NewQualifiedName(1, ""),
+			Struct: &QualifiedName{NamespaceIndex: 1},
 			Bytes: []byte{
 				// namespace index
 				0x01, 0x00,

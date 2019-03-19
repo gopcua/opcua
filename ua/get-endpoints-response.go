@@ -11,9 +11,9 @@ package ua
 // }
 
 // NewGetEndpointsResponse creates an GetEndpointsResponse.
-func NewGetEndpointsResponse(resHeader *ResponseHeader, endpoints ...*EndpointDescription) *GetEndpointsResponse {
-	return &GetEndpointsResponse{
-		ResponseHeader: resHeader,
-		Endpoints:      endpoints,
-	}
-}
+// func NewGetEndpointsResponse(resHeader *ResponseHeader, endpoints ...*EndpointDescription) *GetEndpointsResponse {
+// 	return &GetEndpointsResponse{
+// 		ResponseHeader: resHeader,
+// 		Endpoints:      endpoints,
+// 	}
+// }

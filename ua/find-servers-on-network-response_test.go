@@ -13,19 +13,37 @@ func TestFindServersOnNetworkResponse(t *testing.T) {
 	cases := []CodecTestCase{
 		{
 			Name: "single-server",
-			Struct: NewFindServersOnNetworkResponse(
-				NewResponseHeader(
-					time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-					1, 0, NewNullDiagnosticInfo(), []string{}, NewExtensionObject(nil),
-				),
-				time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-				NewServerOnNetwork(
-					1,
-					"server-name",
-					"discov-uri",
-					[]string{"server-cap-1"},
-				),
-			),
+			Struct: &FindServersOnNetworkResponse{
+				ResponseHeader: &ResponseHeader{
+					Timestamp:          time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
+					RequestHandle:      1,
+					ServiceDiagnostics: &DiagnosticInfo{},
+					StringTable:        []string{},
+					AdditionalHeader:   NewExtensionObject(nil),
+				},
+				LastCounterResetTime: time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
+				Servers: []*ServerOnNetwork{
+					&ServerOnNetwork{
+						RecordID:           1,
+						ServerName:         "server-name",
+						DiscoveryURL:       "discov-uri",
+						ServerCapabilities: []string{"server-cap-1"},
+					},
+				},
+			},
+			// Struct: NewFindServersOnNetworkResponse(
+			// 	NewResponseHeader(
+			// 		time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
+			// 		1, 0, NewNullDiagnosticInfo(), []string{}, NewExtensionObject(nil),
+			// 	),
+			// 	time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
+			// 	NewServerOnNetwork(
+			// 		1,
+			// 		"server-name",
+			// 		"discov-uri",
+			// 		[]string{"server-cap-1"},
+			// 	),
+			// ),
 			Bytes: []byte{
 				// Timestamp
 				0x00, 0x98, 0x67, 0xdd, 0xfd, 0x30, 0xd4, 0x01,
@@ -61,25 +79,49 @@ func TestFindServersOnNetworkResponse(t *testing.T) {
 		},
 		{
 			Name: "multiple-servers",
-			Struct: NewFindServersOnNetworkResponse(
-				NewResponseHeader(
-					time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-					1, 0, NewNullDiagnosticInfo(), []string{}, NewExtensionObject(nil),
-				),
-				time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-				NewServerOnNetwork(
-					1,
-					"server-name",
-					"discov-uri",
-					[]string{"server-cap-1"},
-				),
-				NewServerOnNetwork(
-					1,
-					"server-name",
-					"discov-uri",
-					[]string{"server-cap-1", "server-cap-2"},
-				),
-			),
+			Struct: &FindServersOnNetworkResponse{
+				ResponseHeader: &ResponseHeader{
+					Timestamp:          time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
+					RequestHandle:      1,
+					ServiceDiagnostics: &DiagnosticInfo{},
+					StringTable:        []string{},
+					AdditionalHeader:   NewExtensionObject(nil),
+				},
+				LastCounterResetTime: time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
+				Servers: []*ServerOnNetwork{
+					&ServerOnNetwork{
+						RecordID:           1,
+						ServerName:         "server-name",
+						DiscoveryURL:       "discov-uri",
+						ServerCapabilities: []string{"server-cap-1"},
+					},
+					&ServerOnNetwork{
+						RecordID:           1,
+						ServerName:         "server-name",
+						DiscoveryURL:       "discov-uri",
+						ServerCapabilities: []string{"server-cap-1", "server-cap-2"},
+					},
+				},
+			},
+			// Struct: NewFindServersOnNetworkResponse(
+			// 	NewResponseHeader(
+			// 		time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
+			// 		1, 0, NewNullDiagnosticInfo(), []string{}, NewExtensionObject(nil),
+			// 	),
+			// 	time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
+			// 	NewServerOnNetwork(
+			// 		1,
+			// 		"server-name",
+			// 		"discov-uri",
+			// 		[]string{"server-cap-1"},
+			// 	),
+			// 	NewServerOnNetwork(
+			// 		1,
+			// 		"server-name",
+			// 		"discov-uri",
+			// 		[]string{"server-cap-1", "server-cap-2"},
+			// 	),
+			// ),
 			Bytes: []byte{
 				// Timestamp
 				0x00, 0x98, 0x67, 0xdd, 0xfd, 0x30, 0xd4, 0x01,

@@ -13,20 +13,38 @@ func TestReadResponse(t *testing.T) {
 	cases := []CodecTestCase{
 		{
 			Name: "read response with single float value",
-			Struct: NewReadResponse(
-				NewResponseHeader(
-					time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-					1, 0, NewNullDiagnosticInfo(), []string{}, NewExtensionObject(nil),
-				),
-				[]*DiagnosticInfo{
-					NewNullDiagnosticInfo(),
+			Struct: &ReadResponse{
+				ResponseHeader: &ResponseHeader{
+					Timestamp:          time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
+					RequestHandle:      1,
+					ServiceDiagnostics: &DiagnosticInfo{},
+					StringTable:        []string{},
+					AdditionalHeader:   NewExtensionObject(nil),
 				},
-				NewDataValue(
-					true, false, false, false, false, false,
-					MustVariant(float32(2.5001559257507324)),
-					0, time.Time{}, 0, time.Time{}, 0,
-				),
-			),
+				Results: []*DataValue{
+					&DataValue{
+						EncodingMask: DataValueValue,
+						Value:        MustVariant(float32(2.5001559257507324)),
+					},
+				},
+				DiagnosticInfos: []*DiagnosticInfo{
+					&DiagnosticInfo{},
+				},
+			},
+			// Struct: NewReadResponse(
+			// 	NewResponseHeader(
+			// 		time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
+			// 		1, 0, NewNullDiagnosticInfo(), []string{}, NewExtensionObject(nil),
+			// 	),
+			// 	[]*DiagnosticInfo{
+			// 		NewNullDiagnosticInfo(),
+			// 	},
+			// 	NewDataValue(
+			// 		true, false, false, false, false, false,
+			// 		MustVariant(float32(2.5001559257507324)),
+			// 		0, time.Time{}, 0, time.Time{}, 0,
+			// 	),
+			// ),
 			Bytes: []byte{
 				// Timestamp
 				0x00, 0x98, 0x67, 0xdd, 0xfd, 0x30, 0xd4, 0x01,

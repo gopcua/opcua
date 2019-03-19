@@ -21,22 +21,22 @@ package ua
 // }
 
 // NewCreateSubscriptionRequest creates a new CreateSubscriptionRequest with the given parameters.
-func NewCreateSubscriptionRequest(
-	reqHeader *RequestHeader,
-	pubInterval float64,
-	lifetime uint32,
-	keepAlive uint32,
-	notifications uint32,
-	enabled bool,
-	priority byte,
-) *CreateSubscriptionRequest {
-	return &CreateSubscriptionRequest{
-		RequestHeader:               reqHeader,
-		RequestedPublishingInterval: pubInterval,
-		RequestedLifetimeCount:      lifetime,
-		RequestedMaxKeepAliveCount:  keepAlive,
-		MaxNotificationsPerPublish:  notifications,
-		PublishingEnabled:           enabled,
-		Priority:                    priority,
-	}
-}
+// func NewCreateSubscriptionRequest(
+// 	reqHeader *RequestHeader,
+// 	pubInterval float64,
+// 	lifetime uint32,
+// 	keepAlive uint32,
+// 	notifications uint32,
+// 	enabled bool,
+// 	priority byte,
+// ) *CreateSubscriptionRequest {
+// 	return &CreateSubscriptionRequest{
+// 		RequestHeader:               reqHeader,
+// 		RequestedPublishingInterval: pubInterval,
+// 		RequestedLifetimeCount:      lifetime,
+// 		RequestedMaxKeepAliveCount:  keepAlive,
+// 		MaxNotificationsPerPublish:  notifications,
+// 		PublishingEnabled:           enabled,
+// 		Priority:                    priority,
+// 	}
+// }

@@ -4,10 +4,6 @@
 
 package ua
 
-import (
-	"time"
-)
-
 // FindServersOnNetworkResponse returns the Servers known to a Server or Discovery Server. The behaviour of
 // Discovery Servers is described in detail in Part 12.
 //
@@ -19,10 +15,10 @@ import (
 // }
 
 // NewFindServersOnNetworkResponse creates an FindServersOnNetworkResponse.
-func NewFindServersOnNetworkResponse(resHeader *ResponseHeader, resetTime time.Time, servers ...*ServerOnNetwork) *FindServersOnNetworkResponse {
-	return &FindServersOnNetworkResponse{
-		ResponseHeader:       resHeader,
-		LastCounterResetTime: resetTime,
-		Servers:              servers,
-	}
-}
+// func NewFindServersOnNetworkResponse(resHeader *ResponseHeader, resetTime time.Time, servers ...*ServerOnNetwork) *FindServersOnNetworkResponse {
+// 	return &FindServersOnNetworkResponse{
+// 		ResponseHeader:       resHeader,
+// 		LastCounterResetTime: resetTime,
+// 		Servers:              servers,
+// 	}
+// }

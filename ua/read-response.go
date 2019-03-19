@@ -14,10 +14,10 @@ package ua
 // }
 
 // NewReadResponse creates a new ReadResponse.
-func NewReadResponse(resHeader *ResponseHeader, diag []*DiagnosticInfo, results ...*DataValue) *ReadResponse {
-	return &ReadResponse{
-		ResponseHeader:  resHeader,
-		Results:         results,
-		DiagnosticInfos: diag,
-	}
-}
+// func NewReadResponse(resHeader *ResponseHeader, diag []*DiagnosticInfo, results ...*DataValue) *ReadResponse {
+// 	return &ReadResponse{
+// 		ResponseHeader:  resHeader,
+// 		Results:         results,
+// 		DiagnosticInfos: diag,
+// 	}
+// }

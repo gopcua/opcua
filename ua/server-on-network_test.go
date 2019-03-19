@@ -12,12 +12,18 @@ func TestDecodeServerOnNetwork(t *testing.T) {
 	cases := []CodecTestCase{
 		{
 			Name: "single-cap",
-			Struct: NewServerOnNetwork(
-				1,
-				"server-name",
-				"discov-uri",
-				[]string{"server-cap-1"},
-			),
+			Struct: &ServerOnNetwork{
+				RecordID:           1,
+				ServerName:         "server-name",
+				DiscoveryURL:       "discov-uri",
+				ServerCapabilities: []string{"server-cap-1"},
+			},
+			// Struct: NewServerOnNetwork(
+			// 	1,
+			// 	"server-name",
+			// 	"discov-uri",
+			// 	[]string{"server-cap-1"},
+			// ),
 			Bytes: []byte{
 				// RecordID
 				0x01, 0x00, 0x00, 0x00,
@@ -35,12 +41,18 @@ func TestDecodeServerOnNetwork(t *testing.T) {
 		},
 		{
 			Name: "multiple-caps",
-			Struct: NewServerOnNetwork(
-				1,
-				"server-name",
-				"discov-uri",
-				[]string{"server-cap-1", "server-cap-2"},
-			),
+			Struct: &ServerOnNetwork{
+				RecordID:           1,
+				ServerName:         "server-name",
+				DiscoveryURL:       "discov-uri",
+				ServerCapabilities: []string{"server-cap-1", "server-cap-2"},
+			},
+			// Struct: NewServerOnNetwork(
+			// 	1,
+			// 	"server-name",
+			// 	"discov-uri",
+			// 	[]string{"server-cap-1", "server-cap-2"},
+			// ),
 			Bytes: []byte{
 				// RecordID
 				0x01, 0x00, 0x00, 0x00,
@@ -67,19 +79,33 @@ func TestServerOnNetworkArray(t *testing.T) {
 		{
 			Name: "normal",
 			Struct: []*ServerOnNetwork{
-				NewServerOnNetwork(
-					1,
-					"server-name",
-					"discov-uri",
-					[]string{"server-cap-1"},
-				),
-				NewServerOnNetwork(
-					1,
-					"server-name",
-					"discov-uri",
-					[]string{"server-cap-1", "server-cap-2"},
-				),
+				&ServerOnNetwork{
+					RecordID:           1,
+					ServerName:         "server-name",
+					DiscoveryURL:       "discov-uri",
+					ServerCapabilities: []string{"server-cap-1"},
+				},
+				&ServerOnNetwork{
+					RecordID:           1,
+					ServerName:         "server-name",
+					DiscoveryURL:       "discov-uri",
+					ServerCapabilities: []string{"server-cap-1", "server-cap-2"},
+				},
 			},
+			// Struct: []*ServerOnNetwork{
+			// 	NewServerOnNetwork(
+			// 		1,
+			// 		"server-name",
+			// 		"discov-uri",
+			// 		[]string{"server-cap-1"},
+			// 	),
+			// 	NewServerOnNetwork(
+			// 		1,
+			// 		"server-name",
+			// 		"discov-uri",
+			// 		[]string{"server-cap-1", "server-cap-2"},
+			// 	),
+			// },
 			Bytes: []byte{
 				// ArraySize
 				0x02, 0x00, 0x00, 0x00,

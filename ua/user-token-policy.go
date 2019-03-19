@@ -4,10 +4,6 @@
 
 package ua
 
-import (
-	"fmt"
-)
-
 // UserIdentityToken structure used in the Server Service Set allows Clients to specify the
 // identity of the user they are acting on behalf of. The exact mechanism used to identify users
 // depends on the system configuration.
@@ -32,23 +28,23 @@ const (
 // }
 
 // NewUserTokenPolicy creates a new NewUserTokenPolicy.
-func NewUserTokenPolicy(id string, tokenType UserTokenType, issuedToken, issuerURL, secURI string) *UserTokenPolicy {
-	return &UserTokenPolicy{
-		PolicyID:          id,
-		TokenType:         tokenType,
-		IssuedTokenType:   issuedToken,
-		IssuerEndpointURL: issuerURL,
-		SecurityPolicyURI: secURI,
-	}
-}
+// func NewUserTokenPolicy(id string, tokenType UserTokenType, issuedToken, issuerURL, secURI string) *UserTokenPolicy {
+// 	return &UserTokenPolicy{
+// 		PolicyID:          id,
+// 		TokenType:         tokenType,
+// 		IssuedTokenType:   issuedToken,
+// 		IssuerEndpointURL: issuerURL,
+// 		SecurityPolicyURI: secURI,
+// 	}
+// }
 
-//
-func (u *UserTokenPolicy) String() string {
-	return fmt.Sprintf("%s, %#x, %s, %s, %s",
-		u.PolicyID,
-		u.TokenType,
-		u.IssuedTokenType,
-		u.IssuerEndpointURL,
-		u.SecurityPolicyURI,
-	)
-}
+// //
+// func (u *UserTokenPolicy) String() string {
+// 	return fmt.Sprintf("%s, %#x, %s, %s, %s",
+// 		u.PolicyID,
+// 		u.TokenType,
+// 		u.IssuedTokenType,
+// 		u.IssuerEndpointURL,
+// 		u.SecurityPolicyURI,
+// 	)
+// }

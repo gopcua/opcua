@@ -12,7 +12,7 @@ func TestExtensionObject(t *testing.T) {
 	cases := []CodecTestCase{
 		{
 			Name:   "anonymous-user-identity-token",
-			Struct: NewExtensionObject(NewAnonymousIdentityToken("anonymous")),
+			Struct: NewExtensionObject(&AnonymousIdentityToken{PolicyID: "anonymous"}),
 			Bytes: []byte{
 				// TypeID
 				0x01, 0x00, 0x41, 0x01,

@@ -34,11 +34,11 @@ package ua
 // }
 
 // NewFindServersOnNetworkRequest creates a new FindServersOnNetworkRequest.
-func NewFindServersOnNetworkRequest(reqHeader *RequestHeader, startRecord, maxRecords uint32, filters []string) *FindServersOnNetworkRequest {
-	return &FindServersOnNetworkRequest{
-		RequestHeader:          reqHeader,
-		StartingRecordID:       startRecord,
-		MaxRecordsToReturn:     maxRecords,
-		ServerCapabilityFilter: filters,
-	}
-}
+// func NewFindServersOnNetworkRequest(reqHeader *RequestHeader, startRecord, maxRecords uint32, filters []string) *FindServersOnNetworkRequest {
+// 	return &FindServersOnNetworkRequest{
+// 		RequestHeader:          reqHeader,
+// 		StartingRecordID:       startRecord,
+// 		MaxRecordsToReturn:     maxRecords,
+// 		ServerCapabilityFilter: filters,
+// 	}
+// }

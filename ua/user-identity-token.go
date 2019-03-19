@@ -17,16 +17,16 @@ package ua
 // }
 
 // NewAnonymousIdentityToken creates a new AnonymousIdentityToken.
-func NewAnonymousIdentityToken(policyID string) *AnonymousIdentityToken {
-	return &AnonymousIdentityToken{
-		PolicyID: policyID,
-	}
-}
+// func NewAnonymousIdentityToken(policyID string) *AnonymousIdentityToken {
+// 	return &AnonymousIdentityToken{
+// 		PolicyID: policyID,
+// 	}
+// }
 
-// ID returns PolicyID in string.
-func (a *AnonymousIdentityToken) ID() string {
-	return a.PolicyID
-}
+// // ID returns PolicyID in string.
+// func (a *AnonymousIdentityToken) ID() string {
+// 	return a.PolicyID
+// }
 
 // UserNameIdentityToken is used to pass simple username/password credentials to the Server.
 //
@@ -56,19 +56,19 @@ func (a *AnonymousIdentityToken) ID() string {
 // }
 
 // NewUserNameIdentityToken creates a new UserNameIdentityToken.
-func NewUserNameIdentityToken(policyID, username string, password []byte, alg string) *UserNameIdentityToken {
-	return &UserNameIdentityToken{
-		PolicyID:            policyID,
-		UserName:            username,
-		Password:            password,
-		EncryptionAlgorithm: alg,
-	}
-}
+// func NewUserNameIdentityToken(policyID, username string, password []byte, alg string) *UserNameIdentityToken {
+// 	return &UserNameIdentityToken{
+// 		PolicyID:            policyID,
+// 		UserName:            username,
+// 		Password:            password,
+// 		EncryptionAlgorithm: alg,
+// 	}
+// }
 
-// ID returns PolicyID in string.
-func (u *UserNameIdentityToken) ID() string {
-	return u.PolicyID
-}
+// // ID returns PolicyID in string.
+// func (u *UserNameIdentityToken) ID() string {
+// 	return u.PolicyID
+// }
 
 // X509IdentityToken is used to pass an X.509 v3 Certificate which is issued by the user.
 // This token shall always be accompanied by a Signature in the userTokenSignature parameter of
@@ -82,17 +82,17 @@ func (u *UserNameIdentityToken) ID() string {
 // }
 
 // NewX509IdentityToken creates a new X509IdentityToken.
-func NewX509IdentityToken(policyID string, cert []byte) *X509IdentityToken {
-	return &X509IdentityToken{
-		PolicyID:        policyID,
-		CertificateData: cert,
-	}
-}
+// func NewX509IdentityToken(policyID string, cert []byte) *X509IdentityToken {
+// 	return &X509IdentityToken{
+// 		PolicyID:        policyID,
+// 		CertificateData: cert,
+// 	}
+// }
 
-// ID returns PolicyID in string.
-func (x *X509IdentityToken) ID() string {
-	return x.PolicyID
-}
+// // ID returns PolicyID in string.
+// func (x *X509IdentityToken) ID() string {
+// 	return x.PolicyID
+// }
 
 // IssuedIdentityToken is used to pass SecurityTokens issued by an external Authorization
 // Service to the Server. These tokens may be text or binary.
@@ -122,15 +122,15 @@ func (x *X509IdentityToken) ID() string {
 // }
 
 // NewIssuedIdentityToken creates a new IssuedIdentityToken.
-func NewIssuedIdentityToken(policyID string, tokenData []byte, alg string) *IssuedIdentityToken {
-	return &IssuedIdentityToken{
-		PolicyID:            policyID,
-		TokenData:           tokenData,
-		EncryptionAlgorithm: alg,
-	}
-}
+// func NewIssuedIdentityToken(policyID string, tokenData []byte, alg string) *IssuedIdentityToken {
+// 	return &IssuedIdentityToken{
+// 		PolicyID:            policyID,
+// 		TokenData:           tokenData,
+// 		EncryptionAlgorithm: alg,
+// 	}
+// }
 
-// ID returns PolicyID in string.
-func (i *IssuedIdentityToken) ID() string {
-	return i.PolicyID
-}
+// // ID returns PolicyID in string.
+// func (i *IssuedIdentityToken) ID() string {
+// 	return i.PolicyID
+// }

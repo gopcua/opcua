@@ -12,7 +12,7 @@ func TestAnonymousIdentityToken(t *testing.T) {
 	cases := []CodecTestCase{
 		{
 			Name:   "normal",
-			Struct: NewAnonymousIdentityToken("anonymous"),
+			Struct: &AnonymousIdentityToken{PolicyID: "anonymous"},
 			Bytes: []byte{
 				0x09, 0x00, 0x00, 0x00,
 				0x61, 0x6e, 0x6f, 0x6e, 0x79, 0x6d, 0x6f, 0x75, 0x73,
@@ -25,8 +25,14 @@ func TestAnonymousIdentityToken(t *testing.T) {
 func TestUserNameIdentityToken(t *testing.T) {
 	cases := []CodecTestCase{
 		{
-			Name:   "normal",
-			Struct: NewUserNameIdentityToken("username", "user", []byte{0x70, 0x61, 0x73, 0x73, 0x77, 0x6f, 0x72, 0x64}, "plain"),
+			Name: "normal",
+			Struct: &UserNameIdentityToken{
+				PolicyID:            "username",
+				UserName:            "user",
+				Password:            []byte{0x70, 0x61, 0x73, 0x73, 0x77, 0x6f, 0x72, 0x64},
+				EncryptionAlgorithm: "plain",
+			},
+			// Struct: NewUserNameIdentityToken("username", "user", []byte{0x70, 0x61, 0x73, 0x73, 0x77, 0x6f, 0x72, 0x64}, "plain"),
 			Bytes: []byte{
 				// PolicyID
 				0x08, 0x00, 0x00, 0x00, 0x75, 0x73, 0x65, 0x72, 0x6e, 0x61, 0x6d, 0x65,
@@ -45,8 +51,12 @@ func TestUserNameIdentityToken(t *testing.T) {
 func TestX509IdentityToken(t *testing.T) {
 	cases := []CodecTestCase{
 		{
-			Name:   "normal",
-			Struct: NewX509IdentityToken("x509", []byte("certificate")),
+			Name: "normal",
+			Struct: &X509IdentityToken{
+				PolicyID:        "x509",
+				CertificateData: []byte("certificate"),
+			},
+			// Struct: NewX509IdentityToken("x509", []byte("certificate")),
 			Bytes: []byte{
 				// PolicyID
 				0x04, 0x00, 0x00, 0x00, 0x78, 0x35, 0x30, 0x39,
@@ -61,8 +71,13 @@ func TestX509IdentityToken(t *testing.T) {
 func TestIssuedIdentityToken(t *testing.T) {
 	cases := []CodecTestCase{
 		{
-			Name:   "normal",
-			Struct: NewIssuedIdentityToken("issued", []byte{0x70, 0x61, 0x73, 0x73, 0x77, 0x6f, 0x72, 0x64}, "plain"),
+			Name: "normal",
+			Struct: &IssuedIdentityToken{
+				PolicyID:            "issued",
+				TokenData:           []byte{0x70, 0x61, 0x73, 0x73, 0x77, 0x6f, 0x72, 0x64},
+				EncryptionAlgorithm: "plain",
+			},
+			// Struct: NewIssuedIdentityToken("issued", []byte{0x70, 0x61, 0x73, 0x73, 0x77, 0x6f, 0x72, 0x64}, "plain"),
 			Bytes: []byte{
 				// PolicyID
 				0x06, 0x00, 0x00, 0x00, 0x69, 0x73, 0x73, 0x75, 0x65, 0x64,

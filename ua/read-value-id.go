@@ -55,31 +55,31 @@ const (
 // }
 
 // NewReadValueID creates a new ReadValueID.
-func NewReadValueID(nodeID *NodeID, attrID uint32, idxRange string, qIdx uint16, qName string) *ReadValueID {
-	return &ReadValueID{
-		NodeID:       nodeID,
-		AttributeID:  attrID,
-		IndexRange:   idxRange,
-		DataEncoding: NewQualifiedName(qIdx, qName),
-	}
-}
+// func NewReadValueID(nodeID *NodeID, attrID uint32, idxRange string, qIdx uint16, qName string) *ReadValueID {
+// 	return &ReadValueID{
+// 		NodeID:       nodeID,
+// 		AttributeID:  attrID,
+// 		IndexRange:   idxRange,
+// 		DataEncoding: NewQualifiedName(qIdx, qName),
+// 	}
+// }
 
-func (v *ReadValueID) Decode(b []byte) (int, error) {
-	buf := NewBuffer(b)
-	v.NodeID = new(NodeID)
-	buf.ReadStruct(v.NodeID)
-	v.AttributeID = buf.ReadUint32()
-	v.IndexRange = buf.ReadString()
-	v.DataEncoding = new(QualifiedName)
-	buf.ReadStruct(v.DataEncoding)
-	return buf.Pos(), buf.Error()
-}
+// func (v *ReadValueID) Decode(b []byte) (int, error) {
+// 	buf := NewBuffer(b)
+// 	v.NodeID = new(NodeID)
+// 	buf.ReadStruct(v.NodeID)
+// 	v.AttributeID = buf.ReadUint32()
+// 	v.IndexRange = buf.ReadString()
+// 	v.DataEncoding = new(QualifiedName)
+// 	buf.ReadStruct(v.DataEncoding)
+// 	return buf.Pos(), buf.Error()
+// }
 
-func (v *ReadValueID) Encode() ([]byte, error) {
-	buf := NewBuffer(nil)
-	buf.WriteStruct(v.NodeID)
-	buf.WriteUint32(v.AttributeID)
-	buf.WriteString(v.IndexRange)
-	buf.WriteStruct(v.DataEncoding)
-	return buf.Bytes(), buf.Error()
-}
+// func (v *ReadValueID) Encode() ([]byte, error) {
+// 	buf := NewBuffer(nil)
+// 	buf.WriteStruct(v.NodeID)
+// 	buf.WriteUint32(v.AttributeID)
+// 	buf.WriteString(v.IndexRange)
+// 	buf.WriteStruct(v.DataEncoding)
+// 	return buf.Bytes(), buf.Error()
+// }

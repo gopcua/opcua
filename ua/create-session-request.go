@@ -20,16 +20,16 @@ package ua
 // }
 
 // NewCreateSessionRequest creates a new NewCreateSessionRequest with the given parameters.
-func NewCreateSessionRequest(reqHeader *RequestHeader, appDescr *ApplicationDescription, serverURI, endpoint, sessionName string, nonce, cert []byte, timeout float64, maxRespSize uint32) *CreateSessionRequest {
-	return &CreateSessionRequest{
-		RequestHeader:           reqHeader,
-		ClientDescription:       appDescr,
-		ServerURI:               serverURI,
-		EndpointURL:             endpoint,
-		SessionName:             sessionName,
-		ClientNonce:             nonce,
-		ClientCertificate:       cert,
-		RequestedSessionTimeout: timeout,
-		MaxResponseMessageSize:  maxRespSize,
-	}
-}
+// func NewCreateSessionRequest(reqHeader *RequestHeader, appDescr *ApplicationDescription, serverURI, endpoint, sessionName string, nonce, cert []byte, timeout float64, maxRespSize uint32) *CreateSessionRequest {
+// 	return &CreateSessionRequest{
+// 		RequestHeader:           reqHeader,
+// 		ClientDescription:       appDescr,
+// 		ServerURI:               serverURI,
+// 		EndpointURL:             endpoint,
+// 		SessionName:             sessionName,
+// 		ClientNonce:             nonce,
+// 		ClientCertificate:       cert,
+// 		RequestedSessionTimeout: timeout,
+// 		MaxResponseMessageSize:  maxRespSize,
+// 	}
+// }

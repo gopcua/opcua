@@ -4,10 +4,6 @@
 
 package ua
 
-import (
-	"fmt"
-)
-
 // SignatureData represents a SignatureData.
 //
 // Specification: Part 4, 7.32
@@ -17,25 +13,22 @@ import (
 // }
 
 // NewSignatureData creates a new SignatureData.
-func NewSignatureData(algorithm string, signature []byte) *SignatureData {
-	return &SignatureData{
-		Algorithm: algorithm,
-		Signature: signature,
-	}
-}
+// func NewSignatureData(algorithm string, signature []byte) *SignatureData {
+// 	return &SignatureData{
+// 		Algorithm: algorithm,
+// 		Signature: signature,
+// 	}
+// }
 
 // NewSignatureDataFrom generates SignatureData from certificate and nonce given.
 //
 // Specification: Part4, Table 15 and Table 17 (serverSignature and clientSignature).
 func NewSignatureDataFrom(cert, nonce []byte) *SignatureData {
-	// TODO: add calculation here.
-	if cert == nil && nonce == nil {
-		return NewSignatureData("", nil)
-	}
-	return NewSignatureData("", nil)
+	// todo(crypto): add calculation here.
+	return &SignatureData{}
 }
 
-//String returns SignatureData in string.
-func (s *SignatureData) String() string {
-	return fmt.Sprintf("%s, %x", s.Algorithm, s.Signature)
-}
+// //String returns SignatureData in string.
+// func (s *SignatureData) String() string {
+// 	return fmt.Sprintf("%s, %x", s.Algorithm, s.Signature)
+// }

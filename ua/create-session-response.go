@@ -21,17 +21,17 @@ package ua
 // }
 
 // NewCreateSessionResponse creates a new NewCreateSessionResponse with the given parameters.
-func NewCreateSessionResponse(resHeader *ResponseHeader, sessionID, authToken *NodeID, timeout float64, nonce, cert []byte, svrSignature *SignatureData, maxRespSize uint32, endpoints ...*EndpointDescription) *CreateSessionResponse {
-	return &CreateSessionResponse{
-		ResponseHeader:             resHeader,
-		SessionID:                  sessionID,
-		AuthenticationToken:        authToken,
-		RevisedSessionTimeout:      timeout,
-		ServerNonce:                nonce,
-		ServerCertificate:          cert,
-		ServerEndpoints:            endpoints,
-		ServerSoftwareCertificates: nil,
-		ServerSignature:            svrSignature,
-		MaxRequestMessageSize:      maxRespSize,
-	}
-}
+// func NewCreateSessionResponse(resHeader *ResponseHeader, sessionID, authToken *NodeID, timeout float64, nonce, cert []byte, svrSignature *SignatureData, maxRespSize uint32, endpoints ...*EndpointDescription) *CreateSessionResponse {
+// 	return &CreateSessionResponse{
+// 		ResponseHeader:             resHeader,
+// 		SessionID:                  sessionID,
+// 		AuthenticationToken:        authToken,
+// 		RevisedSessionTimeout:      timeout,
+// 		ServerNonce:                nonce,
+// 		ServerCertificate:          cert,
+// 		ServerEndpoints:            endpoints,
+// 		ServerSoftwareCertificates: nil,
+// 		ServerSignature:            svrSignature,
+// 		MaxRequestMessageSize:      maxRespSize,
+// 	}
+// }

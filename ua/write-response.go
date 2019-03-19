@@ -17,10 +17,10 @@ package ua
 // }
 
 // NewWriteResponse creates a new WriteResponse.
-func NewWriteResponse(resHeader *ResponseHeader, diags []*DiagnosticInfo, results ...StatusCode) *WriteResponse {
-	return &WriteResponse{
-		ResponseHeader:  resHeader,
-		Results:         results,
-		DiagnosticInfos: diags,
-	}
-}
+// func NewWriteResponse(resHeader *ResponseHeader, diags []*DiagnosticInfo, results ...StatusCode) *WriteResponse {
+// 	return &WriteResponse{
+// 		ResponseHeader:  resHeader,
+// 		Results:         results,
+// 		DiagnosticInfos: diags,
+// 	}
+// }

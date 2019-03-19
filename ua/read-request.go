@@ -51,11 +51,11 @@ package ua
 // }
 
 // NewReadRequest creates a new ReadRequest.
-func NewReadRequest(reqHeader *RequestHeader, maxAge float64, tsRet TimestampsToReturn, nodes ...*ReadValueID) *ReadRequest {
-	return &ReadRequest{
-		RequestHeader:      reqHeader,
-		MaxAge:             maxAge,
-		TimestampsToReturn: tsRet,
-		NodesToRead:        nodes,
-	}
-}
+// func NewReadRequest(reqHeader *RequestHeader, maxAge float64, tsRet TimestampsToReturn, nodes ...*ReadValueID) *ReadRequest {
+// 	return &ReadRequest{
+// 		RequestHeader:      reqHeader,
+// 		MaxAge:             maxAge,
+// 		TimestampsToReturn: tsRet,
+// 		NodesToRead:        nodes,
+// 	}
+// }

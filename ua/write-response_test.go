@@ -15,14 +15,24 @@ func TestWriteResponse(t *testing.T) {
 	cases := []CodecTestCase{
 		{
 			Name: "single-result",
-			Struct: NewWriteResponse(
-				NewResponseHeader(
-					time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-					1, 0, NewNullDiagnosticInfo(), []string{}, NewExtensionObject(nil),
-				),
-				nil,
-				0,
-			),
+			Struct: &WriteResponse{
+				ResponseHeader: &ResponseHeader{
+					Timestamp:          time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
+					RequestHandle:      1,
+					ServiceDiagnostics: &DiagnosticInfo{},
+					StringTable:        []string{},
+					AdditionalHeader:   NewExtensionObject(nil),
+				},
+				Results: []StatusCode{0},
+			},
+			// Struct: NewWriteResponse(
+			// 	NewResponseHeader(
+			// 		time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
+			// 		1, 0, NewNullDiagnosticInfo(), []string{}, NewExtensionObject(nil),
+			// 	),
+			// 	nil,
+			// 	0,
+			// ),
 			Bytes: []byte{
 				// Timestamp
 				0x00, 0x98, 0x67, 0xdd, 0xfd, 0x30, 0xd4, 0x01,
@@ -45,14 +55,24 @@ func TestWriteResponse(t *testing.T) {
 		},
 		{
 			Name: "multiple-results",
-			Struct: NewWriteResponse(
-				NewResponseHeader(
-					time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-					1, 0, NewNullDiagnosticInfo(), []string{}, NewExtensionObject(nil),
-				),
-				nil,
-				0, status.BadUserAccessDenied,
-			),
+			Struct: &WriteResponse{
+				ResponseHeader: &ResponseHeader{
+					Timestamp:          time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
+					RequestHandle:      1,
+					ServiceDiagnostics: &DiagnosticInfo{},
+					StringTable:        []string{},
+					AdditionalHeader:   NewExtensionObject(nil),
+				},
+				Results: []StatusCode{0, status.BadUserAccessDenied},
+			},
+			// Struct: NewWriteResponse(
+			// 	NewResponseHeader(
+			// 		time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
+			// 		1, 0, NewNullDiagnosticInfo(), []string{}, NewExtensionObject(nil),
+			// 	),
+			// 	nil,
+			// 	0, status.BadUserAccessDenied,
+			// ),
 			Bytes: []byte{
 				// Timestamp
 				0x00, 0x98, 0x67, 0xdd, 0xfd, 0x30, 0xd4, 0x01,

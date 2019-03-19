@@ -16,9 +16,9 @@ package ua
 // }
 
 // NewWriteRequest creates a new WriteRequest.
-func NewWriteRequest(reqHeader *RequestHeader, nodes ...*WriteValue) *WriteRequest {
-	return &WriteRequest{
-		RequestHeader: reqHeader,
-		NodesToWrite:  nodes,
-	}
-}
+// func NewWriteRequest(reqHeader *RequestHeader, nodes ...*WriteValue) *WriteRequest {
+// 	return &WriteRequest{
+// 		RequestHeader: reqHeader,
+// 		NodesToWrite:  nodes,
+// 	}
+// }

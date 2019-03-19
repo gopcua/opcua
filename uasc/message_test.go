@@ -122,15 +122,25 @@ func TestMessage(t *testing.T) {
 			Name: "MSG",
 			Struct: func() interface{} {
 				m := NewMessage(
-					ua.NewGetEndpointsRequest(
-						ua.NewRequestHeader(
-							ua.NewTwoByteNodeID(0),
-							time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-							1, 0x03ff, 0, "", ua.NewExtensionObject(nil),
-						),
-						"opc.tcp://wow.its.easy:11111/UA/Server",
-						nil, nil,
-					),
+					&ua.GetEndpointsRequest{
+						RequestHeader: &ua.RequestHeader{
+							AuthenticationToken: ua.NewTwoByteNodeID(0),
+							Timestamp:           time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
+							RequestHandle:       1,
+							ReturnDiagnostics:   0x03ff,
+							AdditionalHeader:    ua.NewExtensionObject(nil),
+						},
+						EndpointURL: "opc.tcp://wow.its.easy:11111/UA/Server",
+					},
+					// ua.NewGetEndpointsRequest(
+					// 	ua.NewRequestHeader(
+					// 		ua.NewTwoByteNodeID(0),
+					// 		time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
+					// 		1, 0x03ff, 0, "", ua.NewExtensionObject(nil),
+					// 	),
+					// 	"opc.tcp://wow.its.easy:11111/UA/Server",
+					// 	nil, nil,
+					// ),
 					id.GetEndpointsRequest_Encoding_DefaultBinary,
 					&Config{
 						SecureChannelID:   0,

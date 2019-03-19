@@ -12,7 +12,7 @@ func TestSignedSoftwareCertificate(t *testing.T) {
 	cases := []CodecTestCase{
 		{
 			Name:   "empty",
-			Struct: NewSignedSoftwareCertificate(nil, nil),
+			Struct: &SignedSoftwareCertificate{},
 			Bytes: []byte{
 				// CertificateData
 				0xff, 0xff, 0xff, 0xff,
@@ -21,8 +21,12 @@ func TestSignedSoftwareCertificate(t *testing.T) {
 			},
 		},
 		{
-			Name:   "dummy data",
-			Struct: NewSignedSoftwareCertificate([]byte{0xca, 0xfe}, []byte{0xde, 0xad, 0xbe, 0xef}),
+			Name: "dummy data",
+			Struct: &SignedSoftwareCertificate{
+				CertificateData: []byte{0xca, 0xfe},
+				Signature:       []byte{0xde, 0xad, 0xbe, 0xef},
+			},
+			// Struct: NewSignedSoftwareCertificate([]byte{0xca, 0xfe}, []byte{0xde, 0xad, 0xbe, 0xef}),
 			Bytes: []byte{
 				// CertificateData
 				0x02, 0x00, 0x00, 0x00, 0xca, 0xfe,
@@ -47,9 +51,19 @@ func TestSignedSoftwareCertificateArray(t *testing.T) {
 		{
 			Name: "dummy data",
 			Struct: []*SignedSoftwareCertificate{
-				NewSignedSoftwareCertificate([]byte{0xca, 0xfe}, []byte{0xde, 0xad, 0xbe, 0xef}),
-				NewSignedSoftwareCertificate([]byte{0xca, 0xfe}, []byte{0xde, 0xad, 0xbe, 0xef}),
+				&SignedSoftwareCertificate{
+					CertificateData: []byte{0xca, 0xfe},
+					Signature:       []byte{0xde, 0xad, 0xbe, 0xef},
+				},
+				&SignedSoftwareCertificate{
+					CertificateData: []byte{0xca, 0xfe},
+					Signature:       []byte{0xde, 0xad, 0xbe, 0xef},
+				},
 			},
+			// Struct: []*SignedSoftwareCertificate{
+			// 	NewSignedSoftwareCertificate([]byte{0xca, 0xfe}, []byte{0xde, 0xad, 0xbe, 0xef}),
+			// 	NewSignedSoftwareCertificate([]byte{0xca, 0xfe}, []byte{0xde, 0xad, 0xbe, 0xef}),
+			// },
 			Bytes: []byte{
 				// ArraySize
 				0x02, 0x00, 0x00, 0x00,

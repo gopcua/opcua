@@ -220,7 +220,7 @@ func TestVariant(t *testing.T) {
 		},
 		{
 			Name:   "QualifiedName",
-			Struct: MustVariant(NewQualifiedName(1, "foobar")),
+			Struct: MustVariant(&QualifiedName{NamespaceIndex: 1, Name: "foobar"}),
 			Bytes: []byte{
 				// variant encoding mask
 				0x14,
@@ -247,7 +247,7 @@ func TestVariant(t *testing.T) {
 		{
 			Name: "ExtensionObjeject",
 			Struct: MustVariant(NewExtensionObject(
-				NewAnonymousIdentityToken("anonymous"),
+				&AnonymousIdentityToken{PolicyID: "anonymous"},
 			)),
 			Bytes: []byte{
 				// variant encoding mask

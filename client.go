@@ -43,7 +43,7 @@ func (c *Client) Open() error {
 	// todo(fs): this should probably be configurable.
 	sessionCfg := uasc.NewClientSessionConfig(
 		[]string{"en-US"},
-		ua.NewAnonymousIdentityToken("open62541-anonymous-policy"),
+		&ua.AnonymousIdentityToken{PolicyID: "open62541-anonymous-policy"},
 	)
 
 	session := uasc.NewSession(sechan, sessionCfg)

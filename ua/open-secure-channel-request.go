@@ -7,10 +7,6 @@ package ua
 // SecurityTokenRequestType definitions.
 //
 // Specification: Part 4, 5.5.2.2
-const (
-	ReqTypeIssue uint32 = iota
-	ReqTypeRenew
-)
 
 // MessageSecurityMode definitions.
 //

@@ -17,11 +17,11 @@ package ua
 // }
 
 // NewGetEndpointsRequest creates an GetEndpointsRequest.
-func NewGetEndpointsRequest(reqHeader *RequestHeader, endpoint string, localIDs, profileURIs []string) *GetEndpointsRequest {
-	return &GetEndpointsRequest{
-		RequestHeader: reqHeader,
-		EndpointURL:   endpoint,
-		LocaleIDs:     localIDs,
-		ProfileURIs:   profileURIs,
-	}
-}
+// func NewGetEndpointsRequest(reqHeader *RequestHeader, endpoint string, localIDs, profileURIs []string) *GetEndpointsRequest {
+// 	return &GetEndpointsRequest{
+// 		RequestHeader: reqHeader,
+// 		EndpointURL:   endpoint,
+// 		LocaleIDs:     localIDs,
+// 		ProfileURIs:   profileURIs,
+// 	}
+// }

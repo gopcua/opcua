@@ -4,10 +4,6 @@
 
 package ua
 
-import (
-	"fmt"
-)
-
 // SignedSoftwareCertificate represents a SignedSoftwareCertificate.
 //
 // Specification: Part 4, 7.33
@@ -17,14 +13,14 @@ import (
 // }
 
 // NewSignedSoftwareCertificate creates a new SignedSoftwareCertificate.
-func NewSignedSoftwareCertificate(cert, signature []byte) *SignedSoftwareCertificate {
-	return &SignedSoftwareCertificate{
-		CertificateData: cert,
-		Signature:       signature,
-	}
-}
+// func NewSignedSoftwareCertificate(cert, signature []byte) *SignedSoftwareCertificate {
+// 	return &SignedSoftwareCertificate{
+// 		CertificateData: cert,
+// 		Signature:       signature,
+// 	}
+// }
 
-//ByteString returns SignedSoftwareCertificate in string.
-func (s *SignedSoftwareCertificate) String() string {
-	return fmt.Sprintf("%x, %x", s.CertificateData, s.Signature)
-}
+// //ByteString returns SignedSoftwareCertificate in string.
+// func (s *SignedSoftwareCertificate) String() string {
+// 	return fmt.Sprintf("%x, %x", s.CertificateData, s.Signature)
+// }
