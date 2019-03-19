@@ -175,7 +175,12 @@ func (g *GUID) String() string {
 	)
 }
 
-// todo(fs): fix mask
+// These flags define which fields of a LocalizedText are set.
+// Bits are or'ed together if multiple fields are set.
+const (
+	LocalizedTextLocale = 0x1
+	LocalizedTextText   = 0x2
+)
 
 // LocalizedText represents a LocalizedText.
 // A LocalizedText structure contains two fields that could be missing.
@@ -184,46 +189,49 @@ func (g *GUID) String() string {
 //
 // Specification: Part 6, 5.2.2.14
 type LocalizedText struct {
-	Locale string
-	Text   string
+	EncodingMask uint8
+	Locale       string
+	Text         string
 }
 
 func (l *LocalizedText) Decode(b []byte) (int, error) {
 	buf := NewBuffer(b)
-	mask := buf.ReadByte()
-
+	l.EncodingMask = buf.ReadByte()
 	l.Locale = ""
-	if mask&0x1 == 1 {
+	l.Text = ""
+	if l.Has(LocalizedTextLocale) {
 		l.Locale = buf.ReadString()
 	}
-
-	l.Text = ""
-	if mask&0x2 == 2 {
+	if l.Has(LocalizedTextText) {
 		l.Text = buf.ReadString()
 	}
-
 	return buf.Pos(), buf.Error()
 }
 
 func (l *LocalizedText) Encode() ([]byte, error) {
 	buf := NewBuffer(nil)
-
-	var mask byte
-	if l.Locale != "" {
-		mask |= 0x1
-	}
-	if l.Text != "" {
-		mask |= 0x2
-	}
-	buf.WriteUint8(mask)
-
-	if l.Locale != "" {
+	buf.WriteUint8(l.EncodingMask)
+	if l.Has(LocalizedTextLocale) {
 		buf.WriteString(l.Locale)
 	}
-	if l.Text != "" {
+	if l.Has(LocalizedTextText) {
 		buf.WriteString(l.Text)
 	}
 	return buf.Bytes(), buf.Error()
+}
+
+func (l *LocalizedText) Has(mask byte) bool {
+	return l.EncodingMask&mask == mask
+}
+
+func (l *LocalizedText) UpdateMask() {
+	l.EncodingMask = 0
+	if l.Locale != "" {
+		l.EncodingMask |= LocalizedTextLocale
+	}
+	if l.Text != "" {
+		l.EncodingMask |= LocalizedTextText
+	}
 }
 
 type StatusCode uint32

@@ -25,9 +25,12 @@ func TestGetEndpointsResponse(t *testing.T) {
 					&EndpointDescription{
 						EndpointURL: "ep-url",
 						Server: &ApplicationDescription{
-							ApplicationURI:      "app-uri",
-							ProductURI:          "prod-uri",
-							ApplicationName:     &LocalizedText{Text: "app-name"},
+							ApplicationURI: "app-uri",
+							ProductURI:     "prod-uri",
+							ApplicationName: &LocalizedText{
+								EncodingMask: LocalizedTextText,
+								Text:         "app-name",
+							},
 							ApplicationType:     ApplicationTypeServer,
 							GatewayServerURI:    "gw-uri",
 							DiscoveryProfileURI: "prof-uri",
@@ -57,9 +60,12 @@ func TestGetEndpointsResponse(t *testing.T) {
 					&EndpointDescription{
 						EndpointURL: "ep-url",
 						Server: &ApplicationDescription{
-							ApplicationURI:      "app-uri",
-							ProductURI:          "prod-uri",
-							ApplicationName:     &LocalizedText{Text: "app-name"},
+							ApplicationURI: "app-uri",
+							ProductURI:     "prod-uri",
+							ApplicationName: &LocalizedText{
+								EncodingMask: LocalizedTextText,
+								Text:         "app-name",
+							},
 							ApplicationType:     ApplicationTypeServer,
 							GatewayServerURI:    "gw-uri",
 							DiscoveryProfileURI: "prof-uri",

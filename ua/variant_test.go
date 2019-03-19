@@ -232,8 +232,11 @@ func TestVariant(t *testing.T) {
 			},
 		},
 		{
-			Name:   "LocalizedText",
-			Struct: MustVariant(&LocalizedText{Text: "Gross value"}),
+			Name: "LocalizedText",
+			Struct: MustVariant(&LocalizedText{
+				EncodingMask: LocalizedTextText,
+				Text:         "Gross value",
+			}),
 			Bytes: []byte{
 				// variant encoding mask
 				0x15,

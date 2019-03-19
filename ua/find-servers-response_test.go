@@ -23,18 +23,24 @@ func TestFindServersResponse(t *testing.T) {
 				},
 				Servers: []*ApplicationDescription{
 					&ApplicationDescription{
-						ApplicationURI:      "app-uri",
-						ProductURI:          "prod-uri",
-						ApplicationName:     &LocalizedText{Text: "app-name"},
+						ApplicationURI: "app-uri",
+						ProductURI:     "prod-uri",
+						ApplicationName: &LocalizedText{
+							EncodingMask: LocalizedTextText,
+							Text:         "app-name",
+						},
 						ApplicationType:     ApplicationTypeServer,
 						GatewayServerURI:    "gw-uri",
 						DiscoveryProfileURI: "prof-uri",
 						DiscoveryURLs:       []string{"discov-uri-1", "discov-uri-2"},
 					},
 					&ApplicationDescription{
-						ApplicationURI:      "app-uri",
-						ProductURI:          "prod-uri",
-						ApplicationName:     &LocalizedText{Text: "app-name"},
+						ApplicationURI: "app-uri",
+						ProductURI:     "prod-uri",
+						ApplicationName: &LocalizedText{
+							EncodingMask: LocalizedTextText,
+							Text:         "app-name",
+						},
 						ApplicationType:     ApplicationTypeServer,
 						GatewayServerURI:    "gw-uri",
 						DiscoveryProfileURI: "prof-uri",

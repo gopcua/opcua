@@ -112,24 +112,34 @@ func TestLocalizedText(t *testing.T) {
 			Bytes:  []byte{0x00},
 		},
 		{
-			Name:   "has-locale",
-			Struct: &LocalizedText{Locale: "foo"},
+			Name: "has-locale",
+			Struct: &LocalizedText{
+				EncodingMask: LocalizedTextLocale,
+				Locale:       "foo",
+			},
 			Bytes: []byte{
 				0x01,
 				0x03, 0x00, 0x00, 0x00, 0x66, 0x6f, 0x6f,
 			},
 		},
 		{
-			Name:   "has-text",
-			Struct: &LocalizedText{Text: "bar"},
+			Name: "has-text",
+			Struct: &LocalizedText{
+				EncodingMask: LocalizedTextText,
+				Text:         "bar",
+			},
 			Bytes: []byte{
 				0x02,
 				0x03, 0x00, 0x00, 0x00, 0x62, 0x61, 0x72,
 			},
 		},
 		{
-			Name:   "has-both",
-			Struct: &LocalizedText{Locale: "foo", Text: "bar"},
+			Name: "has-both",
+			Struct: &LocalizedText{
+				EncodingMask: LocalizedTextLocale | LocalizedTextText,
+				Locale:       "foo",
+				Text:         "bar",
+			},
 			Bytes: []byte{
 				0x03,
 				0x03, 0x00, 0x00, 0x00, 0x66, 0x6f, 0x6f,
