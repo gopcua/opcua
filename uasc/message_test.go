@@ -32,15 +32,6 @@ func TestMessage(t *testing.T) {
 						SecurityMode:          ua.MessageSecurityModeNone,
 						RequestedLifetime:     6000000,
 					},
-					// ua.NewOpenSecureChannelRequest(
-					// 	ua.NewRequestHeader(
-					// 		ua.NewTwoByteNodeID(0),
-					// 		time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-					// 		1, 0x03ff, 0, "", ua.NewExtensionObject(nil),
-					// 	),
-					// 	0, ua.SecurityTokenRequestTypeIssue,
-					// 	ua.MessageSecurityModeNone, 6000000, nil,
-					// ),
 					id.OpenSecureChannelRequest_Encoding_DefaultBinary,
 					&Config{
 						SecureChannelID:   0,
@@ -132,15 +123,6 @@ func TestMessage(t *testing.T) {
 						},
 						EndpointURL: "opc.tcp://wow.its.easy:11111/UA/Server",
 					},
-					// ua.NewGetEndpointsRequest(
-					// 	ua.NewRequestHeader(
-					// 		ua.NewTwoByteNodeID(0),
-					// 		time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-					// 		1, 0x03ff, 0, "", ua.NewExtensionObject(nil),
-					// 	),
-					// 	"opc.tcp://wow.its.easy:11111/UA/Server",
-					// 	nil, nil,
-					// ),
 					id.GetEndpointsRequest_Encoding_DefaultBinary,
 					&Config{
 						SecureChannelID:   0,
@@ -207,13 +189,6 @@ func TestMessage(t *testing.T) {
 							AdditionalHeader:    ua.NewExtensionObject(nil),
 						},
 					},
-					// ua.CloseSecureChannelRequest(
-					// 	ua.NewRequestHeader(
-					// 		ua.NewTwoByteNodeID(0),
-					// 		time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-					// 		1, 0x03ff, 0, "", ua.NewExtensionObject(nil),
-					// 	),
-					// ),
 					id.CloseSecureChannelRequest_Encoding_DefaultBinary,
 					&Config{
 						SecureChannelID:   0,
