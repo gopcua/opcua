@@ -9,7 +9,11 @@ import (
 	"time"
 )
 
-// todo(fs): fix mask
+// These flags define the size and dimension of a Variant value.
+const (
+	VariantArrayDimensions = 0x40
+	VariantArrayValues     = 0x80
+)
 
 // Variant is a union of the built-in types.
 //
@@ -64,12 +68,8 @@ func (m *Variant) TypeID() byte {
 	return m.EncodingMask & 0x3f
 }
 
-func (m *Variant) HasArrayDimensions() bool {
-	return m.EncodingMask&0x40 == 0x40
-}
-
-func (m *Variant) HasArrayValues() bool {
-	return m.EncodingMask&0x80 == 0x80
+func (m *Variant) Has(mask byte) bool {
+	return m.EncodingMask&mask == mask
 }
 
 func (m *Variant) Decode(b []byte) (int, error) {
@@ -78,7 +78,7 @@ func (m *Variant) Decode(b []byte) (int, error) {
 	m.EncodingMask = buf.ReadByte()
 
 	elems := 1
-	if m.HasArrayValues() {
+	if m.Has(VariantArrayValues) {
 		m.ArrayLength = buf.ReadInt32()
 		elems = int(m.ArrayLength)
 	}
@@ -160,7 +160,7 @@ func (m *Variant) Decode(b []byte) (int, error) {
 		}
 	}
 
-	if m.HasArrayDimensions() {
+	if m.Has(VariantArrayDimensions) {
 		m.ArrayDimensionsLength = buf.ReadInt32()
 		m.ArrayDimensions = make([]int32, m.ArrayDimensionsLength)
 		for i := 0; i < int(m.ArrayDimensionsLength); i++ {
@@ -181,7 +181,7 @@ func (m *Variant) Encode() ([]byte, error) {
 
 	buf.WriteByte(m.EncodingMask)
 
-	if m.HasArrayValues() {
+	if m.Has(VariantArrayValues) {
 		buf.WriteInt32(m.ArrayLength)
 	}
 
@@ -238,7 +238,7 @@ func (m *Variant) Encode() ([]byte, error) {
 		buf.WriteStruct(v)
 	}
 
-	if m.HasArrayDimensions() {
+	if m.Has(VariantArrayDimensions) {
 		buf.WriteInt32(m.ArrayDimensionsLength)
 		for i := 0; i < int(m.ArrayDimensionsLength); i++ {
 			buf.WriteInt32(m.ArrayDimensions[i])
