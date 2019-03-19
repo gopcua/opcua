@@ -46,23 +46,12 @@ func TestRequestHeader(t *testing.T) {
 					AuthenticationToken: NewFourByteNodeID(0, 33008),
 					Timestamp:           time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
 					RequestHandle:       1,
+					ReturnDiagnostics:   ReturnDiagnosticsAll,
 					AuditEntryID:        "foobar",
 					AdditionalHeader: &ExtensionObject{
 						TypeID: NewTwoByteExpandedNodeID(255),
 					},
 				}
-				// r := NewRequestHeader(
-				// 	NewFourByteNodeID(0, 33008),
-				// 	time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
-				// 	1,
-				// 	0,
-				// 	0,
-				// 	"foobar",
-				// 	&ExtensionObject{
-				// 		TypeID: NewTwoByteExpandedNodeID(255),
-				// 	},
-				// )
-				r.SetDiagAll()
 				return r
 			}(),
 			Bytes: []byte{
