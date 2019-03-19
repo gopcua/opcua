@@ -4,11 +4,17 @@
 
 package ua
 
-import (
-	"fmt"
+// These flags define which fields of a DiagnosticInfo are set.
+// Bits are or'ed together if multiple fields are set.
+const (
+	DiagnosticInfoSymbolicID          = 0x1
+	DiagnosticInfoNamespaceURI        = 0x2
+	DiagnosticInfoLocalizedText       = 0x4
+	DiagnosticInfoLocale              = 0x8
+	DiagnosticInfoAdditionalInfo      = 0x10
+	DiagnosticInfoInnerStatusCode     = 0x20
+	DiagnosticInfoInnerDiagnosticInfo = 0x40
 )
-
-// todo(fs): fix mask
 
 // DiagnosticInfo represents the DiagnosticInfo.
 //
@@ -20,74 +26,32 @@ type DiagnosticInfo struct {
 	Locale              int32
 	LocalizedText       int32
 	AdditionalInfo      string
-	InnerStatusCode     uint32
+	InnerStatusCode     StatusCode
 	InnerDiagnosticInfo *DiagnosticInfo
-}
-
-// NewDiagnosticInfo creates a new DiagnosticInfo.
-func NewDiagnosticInfo(hasSymID, hasURI, hasText, hasLocale, hasInfo, hasInnerStatus, hasInnerDiag bool, symID, uri, locale, text int32, info string, code uint32, diag *DiagnosticInfo) *DiagnosticInfo {
-	d := &DiagnosticInfo{
-		SymbolicID:          symID,
-		NamespaceURI:        uri,
-		Locale:              locale,
-		LocalizedText:       text,
-		AdditionalInfo:      info,
-		InnerStatusCode:     code,
-		InnerDiagnosticInfo: diag,
-	}
-
-	if hasSymID {
-		d.SetSymbolicIDFlag()
-	}
-	if hasURI {
-		d.SetNamespaceURIFlag()
-	}
-	if hasText {
-		d.SetLocalizedTextFlag()
-	}
-	if hasLocale {
-		d.SetLocaleFlag()
-	}
-	if hasInfo {
-		d.SetAdditionalInfoFlag()
-	}
-	if hasInnerStatus {
-		d.SetInnerStatusCodeFlag()
-	}
-	if hasInnerDiag {
-		d.SetInnerDiagnosticInfoFlag()
-	}
-
-	return d
-}
-
-// NewNullDiagnosticInfo creates a DiagnosticInfo without any info.
-func NewNullDiagnosticInfo() *DiagnosticInfo {
-	return new(DiagnosticInfo)
 }
 
 func (d *DiagnosticInfo) Decode(b []byte) (int, error) {
 	buf := NewBuffer(b)
 	d.EncodingMask = buf.ReadByte()
-	if d.HasSymbolicID() {
+	if d.Has(DiagnosticInfoSymbolicID) {
 		d.SymbolicID = buf.ReadInt32()
 	}
-	if d.HasNamespaceURI() {
+	if d.Has(DiagnosticInfoNamespaceURI) {
 		d.NamespaceURI = buf.ReadInt32()
 	}
-	if d.HasLocale() {
+	if d.Has(DiagnosticInfoLocale) {
 		d.Locale = buf.ReadInt32()
 	}
-	if d.HasLocalizedText() {
+	if d.Has(DiagnosticInfoLocalizedText) {
 		d.LocalizedText = buf.ReadInt32()
 	}
-	if d.HasAdditionalInfo() {
+	if d.Has(DiagnosticInfoAdditionalInfo) {
 		d.AdditionalInfo = buf.ReadString()
 	}
-	if d.HasInnerStatusCode() {
-		d.InnerStatusCode = buf.ReadUint32()
+	if d.Has(DiagnosticInfoInnerStatusCode) {
+		d.InnerStatusCode = StatusCode(buf.ReadUint32())
 	}
-	if d.HasInnerDiagnosticInfo() {
+	if d.Has(DiagnosticInfoInnerDiagnosticInfo) {
 		d.InnerDiagnosticInfo = new(DiagnosticInfo)
 		buf.ReadStruct(d.InnerDiagnosticInfo)
 	}
@@ -97,124 +61,55 @@ func (d *DiagnosticInfo) Decode(b []byte) (int, error) {
 func (d *DiagnosticInfo) Encode() ([]byte, error) {
 	buf := NewBuffer(nil)
 	buf.WriteByte(d.EncodingMask)
-	if d.HasSymbolicID() {
+	if d.Has(DiagnosticInfoSymbolicID) {
 		buf.WriteInt32(d.SymbolicID)
 	}
-	if d.HasNamespaceURI() {
+	if d.Has(DiagnosticInfoNamespaceURI) {
 		buf.WriteInt32(d.NamespaceURI)
 	}
-	if d.HasLocale() {
+	if d.Has(DiagnosticInfoLocale) {
 		buf.WriteInt32(d.Locale)
 	}
-	if d.HasLocalizedText() {
+	if d.Has(DiagnosticInfoLocalizedText) {
 		buf.WriteInt32(d.LocalizedText)
 	}
-	if d.HasAdditionalInfo() {
+	if d.Has(DiagnosticInfoAdditionalInfo) {
 		buf.WriteString(d.AdditionalInfo)
 	}
-	if d.HasInnerStatusCode() {
-		buf.WriteUint32(d.InnerStatusCode)
+	if d.Has(DiagnosticInfoInnerStatusCode) {
+		buf.WriteUint32(uint32(d.InnerStatusCode))
 	}
-	if d.HasInnerDiagnosticInfo() {
+	if d.Has(DiagnosticInfoInnerDiagnosticInfo) {
 		buf.WriteStruct(d.InnerDiagnosticInfo)
 	}
 	return buf.Bytes(), buf.Error()
 }
 
-// HasSymbolicID checks if DiagnosticInfo has SymbolicID or not.
-func (d *DiagnosticInfo) HasSymbolicID() bool {
-	return d.EncodingMask&0x1 == 1
+func (d *DiagnosticInfo) Has(mask byte) bool {
+	return d.EncodingMask&mask == mask
 }
 
-// SetSymbolicIDFlag sets SymbolicIDFlag in EncodingMask in DiagnosticInfo.
-func (d *DiagnosticInfo) SetSymbolicIDFlag() {
-	d.EncodingMask |= 0x1
-}
-
-// HasNamespaceURI checks if DiagnosticInfo has NamespaceURI or not.
-func (d *DiagnosticInfo) HasNamespaceURI() bool {
-	return (d.EncodingMask>>1)&0x1 == 1
-}
-
-// SetNamespaceURIFlag sets NamespaceURIFlag in EncodingMask in DiagnosticInfo.
-func (d *DiagnosticInfo) SetNamespaceURIFlag() {
-	d.EncodingMask |= 0x2
-}
-
-// HasLocalizedText checks if DiagnosticInfo has LocalizedText or not.
-func (d *DiagnosticInfo) HasLocalizedText() bool {
-	return (d.EncodingMask>>2)&0x1 == 1
-}
-
-// SetLocalizedTextFlag sets LocalizedTextFlag in EncodingMask in DiagnosticInfo.
-func (d *DiagnosticInfo) SetLocalizedTextFlag() {
-	d.EncodingMask |= 0x4
-}
-
-// HasLocale checks if DiagnosticInfo has Locale or not.
-func (d *DiagnosticInfo) HasLocale() bool {
-	return (d.EncodingMask>>3)&0x1 == 1
-}
-
-// SetLocaleFlag sets LocaleFlag in EncodingMask in DiagnosticInfo.
-func (d *DiagnosticInfo) SetLocaleFlag() {
-	d.EncodingMask |= 0x8
-}
-
-// HasAdditionalInfo checks if DiagnosticInfo has AdditionalInfo or not.
-func (d *DiagnosticInfo) HasAdditionalInfo() bool {
-	return (d.EncodingMask>>4)&0x1 == 1
-}
-
-// SetAdditionalInfoFlag sets AdditionalInfoFlag in EncodingMask in DiagnosticInfo.
-func (d *DiagnosticInfo) SetAdditionalInfoFlag() {
-	d.EncodingMask |= 0x10
-}
-
-// HasInnerStatusCode checks if DiagnosticInfo has InnerStatusCode or not.
-func (d *DiagnosticInfo) HasInnerStatusCode() bool {
-	return (d.EncodingMask>>5)&0x1 == 1
-}
-
-// SetInnerStatusCodeFlag sets InnerStatusCodeFlag in EncodingMask in DiagnosticInfo.
-func (d *DiagnosticInfo) SetInnerStatusCodeFlag() {
-	d.EncodingMask |= 0x20
-}
-
-// HasInnerDiagnosticInfo checks if DiagnosticInfo has InnerDiagnosticInfo or not.
-func (d *DiagnosticInfo) HasInnerDiagnosticInfo() bool {
-	return (d.EncodingMask>>6)&0x1 == 1
-}
-
-// SetInnerDiagnosticInfoFlag sets InnerDiagnosticInfoFlag in EncodingMask in DiagnosticInfo.
-func (d *DiagnosticInfo) SetInnerDiagnosticInfoFlag() {
-	d.EncodingMask |= 0x40
-}
-
-// datatypes.String returns DiagnosticInfo in string.
-func (d *DiagnosticInfo) String() string {
-	var str []string
-	str = append(str, fmt.Sprintf("%x", d.EncodingMask))
-	if d.HasSymbolicID() {
-		str = append(str, fmt.Sprintf("%d", d.SymbolicID))
+func (d *DiagnosticInfo) UpdateMask() {
+	d.EncodingMask = 0
+	if d.SymbolicID != 0 {
+		d.EncodingMask |= DiagnosticInfoSymbolicID
 	}
-	if d.HasNamespaceURI() {
-		str = append(str, fmt.Sprintf("%d", d.NamespaceURI))
+	if d.NamespaceURI != 0 {
+		d.EncodingMask |= DiagnosticInfoNamespaceURI
 	}
-	if d.HasLocale() {
-		str = append(str, fmt.Sprintf("%d", d.Locale))
+	if d.Locale != 0 {
+		d.EncodingMask |= DiagnosticInfoLocale
 	}
-	if d.HasLocalizedText() {
-		str = append(str, fmt.Sprintf("%d", d.LocalizedText))
+	if d.LocalizedText != 0 {
+		d.EncodingMask |= DiagnosticInfoLocalizedText
 	}
-	if d.HasAdditionalInfo() {
-		str = append(str, d.AdditionalInfo)
+	if d.AdditionalInfo != "" {
+		d.EncodingMask |= DiagnosticInfoAdditionalInfo
 	}
-	if d.HasInnerStatusCode() {
-		str = append(str, fmt.Sprintf("%d", d.InnerStatusCode))
+	if d.InnerStatusCode != 0 {
+		d.EncodingMask |= DiagnosticInfoInnerStatusCode
 	}
-	if d.HasInnerDiagnosticInfo() {
-		str = append(str, d.InnerDiagnosticInfo.String())
+	if d.InnerDiagnosticInfo != nil {
+		d.EncodingMask |= DiagnosticInfoInnerDiagnosticInfo
 	}
-	return fmt.Sprintf("%v", str)
 }

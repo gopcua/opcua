@@ -296,10 +296,10 @@ func TestVariant(t *testing.T) {
 		},
 		{
 			Name: "DiagnosticInfo",
-			Struct: MustVariant(NewDiagnosticInfo(
-				true, false, false, false, false, false, false,
-				1, 0, 0, 0, "", 0, nil,
-			)),
+			Struct: MustVariant(&DiagnosticInfo{
+				EncodingMask: DiagnosticInfoSymbolicID,
+				SymbolicID:   1,
+			}),
 			Bytes: []byte{
 				// variant encoding mask
 				0x19,
