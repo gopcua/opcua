@@ -12,15 +12,3 @@ type QualifiedName struct {
 	NamespaceIndex uint16
 	Name           string
 }
-
-// NewQualifiedName creates a new QualifiedName.
-// func NewQualifiedName(index uint16, name string) *QualifiedName {
-// 	return &QualifiedName{
-// 		NamespaceIndex: index,
-// 		Name:           name,
-// 	}
-// }
-
-// func (q *QualifiedName) String() string {
-// 	return q.Name
-// }

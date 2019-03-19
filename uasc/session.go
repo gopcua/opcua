@@ -62,12 +62,15 @@ func (s *Session) createSession() error {
 		s.sechan.reqhdr.AuthenticationToken = resp.AuthenticationToken
 		s.cfg.ServerEndpoints = resp.ServerEndpoints
 		s.cfg.SessionTimeout = resp.RevisedSessionTimeout
-		// todo(crypto): calculate signature data
-		s.signatureToSend = ua.NewSignatureDataFrom(resp.ServerCertificate, resp.ServerNonce)
+		// todo(fs): fix crypto: calculate signature data
+		// s.signatureToSend = ua.NewSignatureDataFrom(resp.ServerCertificate, resp.ServerNonce)
+		s.signatureToSend = &ua.SignatureData{}
 		s.maxRequestMessageSize = resp.MaxRequestMessageSize
 
+		// todo(fs): fix crypto
 		// keep SignatureData to verify serverSignature in CreateSessionResponse.
-		s.mySignature = ua.NewSignatureDataFrom(s.sechan.cfg.Certificate, nonce)
+		// s.mySignature = ua.NewSignatureDataFrom(s.sechan.cfg.Certificate, nonce)
+		s.mySignature = &ua.SignatureData{}
 		return nil
 	})
 }

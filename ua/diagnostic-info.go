@@ -8,6 +8,8 @@ import (
 	"fmt"
 )
 
+// todo(fs): fix mask
+
 // DiagnosticInfo represents the DiagnosticInfo.
 //
 // Specification: Part 4, 7.8

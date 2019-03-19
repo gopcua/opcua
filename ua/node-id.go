@@ -12,6 +12,8 @@ import (
 	"strings"
 )
 
+// todo(fs): fix mask
+
 // NodeID is an identifier for a node in the address space of an OPC UA Server.
 // The NodeID object encodes all different node id types.
 type NodeID struct {

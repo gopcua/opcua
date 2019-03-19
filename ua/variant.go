@@ -9,6 +9,8 @@ import (
 	"time"
 )
 
+// todo(fs): fix mask
+
 // Variant is a union of the built-in types.
 //
 // Specification: Part 6, 5.2.2.16

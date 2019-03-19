@@ -4,6 +4,8 @@
 
 package ua
 
+// todo(fs): fix mask
+
 // LocalizedText represents a LocalizedText.
 // A LocalizedText structure contains two fields that could be missing.
 // For that reason, the encoding uses a bit mask to indicate which fields
