@@ -19,8 +19,8 @@ import (
 func main() {
 	log.SetFlags(0)
 
-	in := flag.String("in", "cmd/status/StatusCode.csv", "path to StatusCodes.csv")
-	out := flag.String("out", "status/status.go", "path to generated file")
+	in := flag.String("in", "schema/StatusCode.csv", "path to StatusCodes.csv")
+	out := flag.String("out", "status/status_gen.go", "path to generated file")
 	flag.Parse()
 
 	if *in == "" {

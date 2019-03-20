@@ -60,7 +60,7 @@ type Config struct {
 	// is defined in 7.15.
 	// A SecureChannel may have to be created even if the securityMode is NONE. The exact behaviour
 	// depends on the mapping used and is described in the Part 6.
-	SecurityMode uint32
+	SecurityMode ua.MessageSecurityMode
 
 	// SecurityTokenID is a unique identifier for the SecureChannel SecurityToken used to secure the Message.
 	// This identifier is returned by the Server in an OpenSecureChannel response Message.
@@ -100,7 +100,7 @@ type Config struct {
 //
 // With all the parameter given, it is sufficient for client to open SecureChannel.
 // If the secMode is None, cert and thumbprint is not required(can be nil).
-func NewClientConfig(policyURI string, cert, thumbprint []byte, reqID, secMode, lifetime uint32) *Config {
+func NewClientConfig(policyURI string, cert, thumbprint []byte, reqID uint32, secMode ua.MessageSecurityMode, lifetime uint32) *Config {
 	return &Config{
 		SecurityPolicyURI: policyURI,
 		Certificate:       cert,
@@ -116,7 +116,7 @@ func NewClientConfigSecurityNone(reqID, lifetime uint32) *Config {
 	return &Config{
 		SecurityPolicyURI: "http://opcfoundation.org/UA/SecurityPolicy#None",
 		RequestID:         reqID,
-		SecurityMode:      ua.SecModeNone,
+		SecurityMode:      ua.MessageSecurityModeNone,
 		Lifetime:          lifetime,
 	}
 }
@@ -127,7 +127,7 @@ func NewClientConfigSecurityNone(reqID, lifetime uint32) *Config {
 func NewClientConfigSignBasic256Sha256(cert, thumbprint []byte, reqID, lifetime uint32) *Config {
 	return NewClientConfig(
 		"http://opcfoundation.org/UA/SecurityPolicy#Basic256Sha256",
-		cert, thumbprint, reqID, ua.SecModeSign, lifetime,
+		cert, thumbprint, reqID, ua.MessageSecurityModeSign, lifetime,
 	)
 }
 
@@ -136,7 +136,7 @@ func NewClientConfigSignBasic256Sha256(cert, thumbprint []byte, reqID, lifetime 
 func NewClientConfigSignAndEncryptBasic256Sha256(cert, thumbprint []byte, reqID, lifetime uint32) *Config {
 	return NewClientConfig(
 		"http://opcfoundation.org/UA/SecurityPolicy#Basic256Sha256",
-		cert, thumbprint, reqID, ua.SecModeSignAndEncrypt, lifetime,
+		cert, thumbprint, reqID, ua.MessageSecurityModeSignAndEncrypt, lifetime,
 	)
 }
 
@@ -145,7 +145,7 @@ func NewClientConfigSignAndEncryptBasic256Sha256(cert, thumbprint []byte, reqID,
 func NewClientConfigSignAes128Sha256RsaOaep(cert, thumbprint []byte, reqID, lifetime uint32) *Config {
 	return NewClientConfig(
 		"http://opcfoundation.org/UA/SecurityPolicy#Aes128_Sha256_RsaOaep",
-		cert, thumbprint, reqID, ua.SecModeSign, lifetime,
+		cert, thumbprint, reqID, ua.MessageSecurityModeSign, lifetime,
 	)
 }
 
@@ -154,7 +154,7 @@ func NewClientConfigSignAes128Sha256RsaOaep(cert, thumbprint []byte, reqID, life
 func NewClientConfigSignAndEncryptAes128Sha256RsaOaep(cert, thumbprint []byte, reqID, lifetime uint32) *Config {
 	return NewClientConfig(
 		"http://opcfoundation.org/UA/SecurityPolicy#Aes128_Sha256_RsaOaep",
-		cert, thumbprint, reqID, ua.SecModeSignAndEncrypt, lifetime,
+		cert, thumbprint, reqID, ua.MessageSecurityModeSignAndEncrypt, lifetime,
 	)
 }
 
@@ -163,7 +163,7 @@ func NewClientConfigSignAndEncryptAes128Sha256RsaOaep(cert, thumbprint []byte, r
 func NewClientConfigSignPubSubAes128CTR(cert, thumbprint []byte, reqID, lifetime uint32) *Config {
 	return NewClientConfig(
 		"http://opcfoundation.org/UA/SecurityPolicy#PubSub_Aes128_CTR",
-		cert, thumbprint, reqID, ua.SecModeSign, lifetime,
+		cert, thumbprint, reqID, ua.MessageSecurityModeSign, lifetime,
 	)
 }
 
@@ -172,7 +172,7 @@ func NewClientConfigSignPubSubAes128CTR(cert, thumbprint []byte, reqID, lifetime
 func NewClientConfigSignAndEncryptPubSubAes128CTR(cert, thumbprint []byte, reqID, lifetime uint32) *Config {
 	return NewClientConfig(
 		"http://opcfoundation.org/UA/SecurityPolicy#PubSub_Aes128_CTR",
-		cert, thumbprint, reqID, ua.SecModeSignAndEncrypt, lifetime,
+		cert, thumbprint, reqID, ua.MessageSecurityModeSignAndEncrypt, lifetime,
 	)
 }
 
@@ -181,7 +181,7 @@ func NewClientConfigSignAndEncryptPubSubAes128CTR(cert, thumbprint []byte, reqID
 func NewClientConfigSignPubSubAes256CTR(cert, thumbprint []byte, reqID, lifetime uint32) *Config {
 	return NewClientConfig(
 		"http://opcfoundation.org/UA/SecurityPolicy#PubSub_Aes256_CTR",
-		cert, thumbprint, reqID, ua.SecModeSign, lifetime,
+		cert, thumbprint, reqID, ua.MessageSecurityModeSign, lifetime,
 	)
 }
 
@@ -190,7 +190,7 @@ func NewClientConfigSignPubSubAes256CTR(cert, thumbprint []byte, reqID, lifetime
 func NewClientConfigSignAndEncryptPubSubAes256CTR(cert, thumbprint []byte, reqID, lifetime uint32) *Config {
 	return NewClientConfig(
 		"http://opcfoundation.org/UA/SecurityPolicy#PubSub_Aes256_CTR",
-		cert, thumbprint, reqID, ua.SecModeSignAndEncrypt, lifetime,
+		cert, thumbprint, reqID, ua.MessageSecurityModeSignAndEncrypt, lifetime,
 	)
 }
 */
@@ -199,7 +199,7 @@ func NewClientConfigSignAndEncryptPubSubAes256CTR(cert, thumbprint []byte, reqID
 //
 // With all the parameter given, it is sufficient for server to accept SecureChannel.
 // If the secMode is None, cert and thumbprint is not required(can be nil).
-func NewServerConfig(policyURI string, cert, thumbprint []byte, chanID, secMode, tokenID, lifetime uint32) *Config {
+func NewServerConfig(policyURI string, cert, thumbprint []byte, chanID uint32, secMode ua.MessageSecurityMode, tokenID, lifetime uint32) *Config {
 	return &Config{
 		SecurityPolicyURI: policyURI,
 		Certificate:       cert,
@@ -224,11 +224,11 @@ func (c *Config) validate(appType string) error {
 }
 
 func (c *Config) validateClientConfig() error {
-	if c.SecurityMode == ua.SecModeSignAndEncrypt && (c.Certificate == nil || c.Thumbprint == nil) {
+	if c.SecurityMode == ua.MessageSecurityModeSignAndEncrypt && (c.Certificate == nil || c.Thumbprint == nil) {
 		return errors.New("Certificate, Thumbprint is required when using SignAndEncrypt")
 	}
 
-	if c.SecurityMode == ua.SecModeNone {
+	if c.SecurityMode == ua.MessageSecurityModeNone {
 		c.Certificate = nil
 		c.Thumbprint = nil
 	}
@@ -236,7 +236,7 @@ func (c *Config) validateClientConfig() error {
 }
 
 func (c *Config) validateServerConfig() error {
-	if c.SecurityMode == ua.SecModeNone {
+	if c.SecurityMode == ua.MessageSecurityModeNone {
 		c.Certificate = nil
 		c.Thumbprint = nil
 	}
@@ -282,7 +282,7 @@ type SessionConfig struct {
 	// The UserIdentityToken is an extensible parameter type defined in 7.36.
 	// The EndpointDescription specifies what UserIdentityTokens the Server shall accept.
 	// Null or empty user token shall always be interpreted as anonymous.
-	UserIdentityToken ua.UserIdentityToken
+	UserIdentityToken interface{}
 
 	// If the Client specified a user identity token that supports digital signatures, then it
 	// shall create a signature and pass it as this parameter. Otherwise the parameter is null.
@@ -296,7 +296,7 @@ type SessionConfig struct {
 	// If Session works as a server, SessionTimeout is an actual maximum number of milliseconds
 	// that a Session shall remain open without activity. The Server should attempt to honour the
 	// Client request for this parameter,but may negotiate this value up or down to meet its own constraints.
-	SessionTimeout uint64
+	SessionTimeout float64
 
 	// mySignature is is the client/serverSignature expected to receive from the other endpoint.
 	// This parameter is automatically calculated and kept temporarily until being used to verify
@@ -311,18 +311,18 @@ type SessionConfig struct {
 }
 
 // NewClientSessionConfig creates a SessionConfig for client.
-func NewClientSessionConfig(locales []string, userToken ua.UserIdentityToken) *SessionConfig {
+func NewClientSessionConfig(locales []string, userToken interface{}) *SessionConfig {
 	return &SessionConfig{
 		SessionTimeout: 0xffff,
 		ClientDescription: &ua.ApplicationDescription{
 			ApplicationURI:  "urn:gopcua:client",
 			ProductURI:      "urn:gopcua",
-			ApplicationName: ua.NewLocalizedText("", "gopcua - OPC UA implementation in pure Golang"),
-			ApplicationType: ua.AppTypeClient,
+			ApplicationName: &ua.LocalizedText{Text: "gopcua - OPC UA implementation in pure Golang"},
+			ApplicationType: ua.ApplicationTypeClient,
 		},
 		LocaleIDs:          locales,
 		UserIdentityToken:  userToken,
-		UserTokenSignature: ua.NewSignatureData("", nil),
+		UserTokenSignature: &ua.SignatureData{},
 	}
 }
 
@@ -336,17 +336,19 @@ func NewServerSessionConfig(secChan *SecureChannel) *SessionConfig {
 		AuthenticationToken: ua.NewFourByteNodeID(0, binary.LittleEndian.Uint16(rawToken)),
 		SessionTimeout:      0xffff,
 		ServerEndpoints: []*ua.EndpointDescription{
-			ua.NewEndpointDescription(
-				secChan.LocalEndpoint(), ua.NewApplicationDescription(
-					"urn:gopcua:client", "urn:gopcua", "gopcua - OPC UA implementation in pure Golang",
-					ua.AppTypeServer, "", "", []string{""},
-				),
-				secChan.cfg.Certificate, secChan.cfg.SecurityMode, secChan.cfg.SecurityPolicyURI,
-				[]*ua.UserTokenPolicy{
-					&ua.UserTokenPolicy{},
+			&ua.EndpointDescription{
+				EndpointURL: secChan.LocalEndpoint(),
+				Server: &ua.ApplicationDescription{
+					ApplicationURI:  "urn:gopcua:client",
+					ProductURI:      "urn:gopcua",
+					ApplicationName: &ua.LocalizedText{Text: "gopcua - OPC UA implementation in pure Golang"},
+					ApplicationType: ua.ApplicationTypeServer,
 				},
-				"", 0,
-			),
+				ServerCertificate: secChan.cfg.Certificate,
+				SecurityMode:      secChan.cfg.SecurityMode,
+				SecurityPolicyURI: secChan.cfg.SecurityPolicyURI,
+				// UserIdentityTokens: []*ua.UserTokenPolicy{&ua.UserTokenPolicy{}},
+			},
 		},
 	}
 }

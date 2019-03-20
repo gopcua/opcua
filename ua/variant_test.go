@@ -220,7 +220,7 @@ func TestVariant(t *testing.T) {
 		},
 		{
 			Name:   "QualifiedName",
-			Struct: MustVariant(NewQualifiedName(1, "foobar")),
+			Struct: MustVariant(&QualifiedName{NamespaceIndex: 1, Name: "foobar"}),
 			Bytes: []byte{
 				// variant encoding mask
 				0x14,
@@ -232,8 +232,11 @@ func TestVariant(t *testing.T) {
 			},
 		},
 		{
-			Name:   "LocalizedText",
-			Struct: MustVariant(NewLocalizedText("", "Gross value")),
+			Name: "LocalizedText",
+			Struct: MustVariant(&LocalizedText{
+				EncodingMask: LocalizedTextText,
+				Text:         "Gross value",
+			}),
 			Bytes: []byte{
 				// variant encoding mask
 				0x15,
@@ -247,7 +250,7 @@ func TestVariant(t *testing.T) {
 		{
 			Name: "ExtensionObjeject",
 			Struct: MustVariant(NewExtensionObject(
-				0x01, NewAnonymousIdentityToken("anonymous"),
+				&AnonymousIdentityToken{PolicyID: "anonymous"},
 			)),
 			Bytes: []byte{
 				// variant encoding mask
@@ -293,10 +296,10 @@ func TestVariant(t *testing.T) {
 		},
 		{
 			Name: "DiagnosticInfo",
-			Struct: MustVariant(NewDiagnosticInfo(
-				true, false, false, false, false, false, false,
-				1, 0, 0, 0, "", 0, nil,
-			)),
+			Struct: MustVariant(&DiagnosticInfo{
+				EncodingMask: DiagnosticInfoSymbolicID,
+				SymbolicID:   1,
+			}),
 			Bytes: []byte{
 				// variant encoding mask
 				0x19,

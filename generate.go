@@ -1,3 +1,3 @@
-//go:generate go run cmd/status/main.go
+//go:generate ./generate.sh
 
 package opcua

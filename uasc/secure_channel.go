@@ -68,7 +68,7 @@ func NewSecureChannel(c *uacp.Conn, cfg *Config) *SecureChannel {
 		AuthenticationToken: ua.NewTwoByteNodeID(0),
 		Timestamp:           time.Now(),
 		TimeoutHint:         0xffff,
-		AdditionalHeader:    ua.NewNullAdditionalHeader(),
+		AdditionalHeader:    ua.NewExtensionObject(nil),
 	}
 
 	return &SecureChannel{
@@ -106,11 +106,11 @@ func (s *SecureChannel) openSecureChannel() error {
 	}
 
 	req := &ua.OpenSecureChannelRequest{
-		ClientProtocolVersion:    0,
-		SecurityTokenRequestType: ua.ReqTypeIssue,
-		MessageSecurityMode:      s.cfg.SecurityMode,
-		ClientNonce:              nonce,
-		RequestedLifetime:        s.cfg.Lifetime,
+		ClientProtocolVersion: 0,
+		RequestType:           ua.SecurityTokenRequestTypeIssue,
+		SecurityMode:          s.cfg.SecurityMode,
+		ClientNonce:           nonce,
+		RequestedLifetime:     s.cfg.Lifetime,
 	}
 
 	return s.Send(req, func(v interface{}) error {
@@ -126,9 +126,7 @@ func (s *SecureChannel) openSecureChannel() error {
 
 // closeSecureChannel sends CloseSecureChannelRequest on top of UASC to SecureChannel.
 func (s *SecureChannel) closeSecureChannel() error {
-	req := &ua.CloseSecureChannelRequest{
-		SecureChannelID: s.cfg.SecureChannelID,
-	}
+	req := &ua.CloseSecureChannelRequest{}
 
 	defer atomic.StoreInt32(&s.state, secureChannelClosed)
 	return s.Send(req, nil)

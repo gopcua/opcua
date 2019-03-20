@@ -68,11 +68,11 @@ func (a *Node) Attribute(attrID uint32) (*ua.Variant, error) {
 func (a *Node) References(refs *ua.NodeID) (*ua.BrowseResponse, error) {
 	desc := &ua.BrowseDescription{
 		NodeID:          a.ID,
-		Direction:       ua.BrowseDirectionBoth,
+		BrowseDirection: ua.BrowseDirectionBoth,
 		ReferenceTypeID: refs,
 		IncludeSubtypes: true,
-		NodeClassMask:   ua.NodeClassAll,
-		ResultMask:      ua.BrowseResultMaskAll,
+		NodeClassMask:   uint32(ua.NodeClassAll),
+		ResultMask:      uint32(ua.BrowseResultMaskAll),
 	}
 
 	req := &ua.BrowseRequest{

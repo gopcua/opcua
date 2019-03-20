@@ -1,46 +1,80 @@
+// Copyright 2018-2019 opcua authors. All rights reserved.
+// Use of this source code is governed by a MIT-style license that can be
+// found in the LICENSE file.
+
 package ua
 
-type BrowseDirection uint32
+// additional enum values which are not generated.
 
 const (
-	BrowseDirectionForward BrowseDirection = 0
-	BrowseDirectionInverse BrowseDirection = 1
-	BrowseDirectionBoth    BrowseDirection = 2
-	BrowseDirectionInvalid BrowseDirection = 3
+	NodeClassAll NodeClass = 0xff
 )
 
-type BrowseResultMask uint32
+// IntegerID is a UInt32 that is used as an identifier, such as a handle.
+// All values, except for 0, are valid.
+//
+// Specification: Part 4, 7.14
+// type IntegerID uint32
 
+// Identifiers assigned to Attributes.
+//
+// Specification: Part 6, A.1
 const (
-	BrowseResultMaskNone           BrowseResultMask = 0x00
-	BrowseResultMaskReferenceType  BrowseResultMask = 0x01
-	BrowseResultMaskIsForward      BrowseResultMask = 0x02
-	BrowseResultMaskNodeClass      BrowseResultMask = 0x04
-	BrowseResultMaskBrowseName     BrowseResultMask = 0x08
-	BrowseResultMaskDisplayName    BrowseResultMask = 0x10
-	BrowseResultMaskTypeDefinition BrowseResultMask = 0x20
-	BrowseResultMaskAll            BrowseResultMask = 0x3f
+	IntegerIDInvalid = iota
+	IntegerIDNodeID
+	IntegerIDNodeClass
+	IntegerIDBrowseName
+	IntegerIDDisplayName
+	IntegerIDDescription
+	IntegerIDWriteMask
+	IntegerIDUserWriteMask
+	IntegerIDIsAbstract
+	IntegerIDSymmetric
+	IntegerIDInverseName
+	IntegerIDContainsNoLoops
+	IntegerIDEventNotifier
+	IntegerIDValue
+	IntegerIDDataType
+	IntegerIDValueRank
+	IntegerIDArrayDimensions
+	IntegerIDAccessLevel
+	IntegerIDUserAccessLevel
+	IntegerIDMinimumSamplingInterval
+	IntegerIDHistorizing
+	IntegerIDExecutable
+	IntegerIDUserExecutable
+	IntegerIDDataTypeDefinition
+	IntegerIDRolePermissions
+	IntegerIDUserRolePermissions
+	IntegerIDAccessRestrictions
+	IntegerIDAccessLevelEx
 )
 
-type NodeClass uint32
-
+// datatypes
 const (
-	NodeClassNone          NodeClass = 0x00
-	NodeClassObject        NodeClass = 0x01
-	NodeClassVariable      NodeClass = 0x02
-	NodeClassMethod        NodeClass = 0x04
-	NodeClassObjectType    NodeClass = 0x08
-	NodeClassVariableType  NodeClass = 0x10
-	NodeClassReferenceType NodeClass = 0x20
-	NodeClassDataType      NodeClass = 0x40
-	NodeClassView          NodeClass = 0x80
-	NodeClassAll           NodeClass = 0xff
-)
-
-type MonitoringMode uint32
-
-const (
-	MonitoringModeDisabled  MonitoringMode = 0
-	MonitoringModeSampling  MonitoringMode = 1
-	MonitoringModeReporting MonitoringMode = 2
+	TypeBoolean         = 1
+	TypeSByte           = 2
+	TypeByte            = 3
+	TypeInt16           = 4
+	TypeUint16          = 5
+	TypeInt32           = 6
+	TypeUint32          = 7
+	TypeInt64           = 8
+	TypeUint64          = 9
+	TypeFloat           = 10
+	TypeDouble          = 11
+	TypeString          = 12
+	TypeDateTime        = 13
+	TypeGuid            = 14
+	TypeByteString      = 15
+	TypeXmlElement      = 16
+	TypeNodeId          = 17
+	TypeExpandedNodeId  = 18
+	TypeStatusCode      = 19
+	TypeQualifiedName   = 20
+	TypeLocalizedText   = 21
+	TypeExtensionObject = 22
+	TypeDataValue       = 23
+	TypeVariant         = 24
+	TypeDiagnosticInfo  = 25
 )
