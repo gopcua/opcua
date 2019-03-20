@@ -9,8 +9,9 @@ import (
 	"encoding/binary"
 	"time"
 
-	"github.com/gopcua/opcua/errors"
 	"github.com/gopcua/opcua/ua"
+
+	"github.com/pkg/errors"
 )
 
 // Config represents a configuration which UASC client/server has in common.

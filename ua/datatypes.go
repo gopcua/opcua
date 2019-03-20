@@ -234,6 +234,4 @@ func (l *LocalizedText) UpdateMask() {
 	}
 }
 
-type StatusCode uint32
-
 type XmlElement string

@@ -11,6 +11,8 @@ import (
 	"path"
 	"strings"
 	"text/template"
+
+	"github.com/gopcua/opcua/cmd/service/goname"
 )
 
 var in, out, pkg string
@@ -94,7 +96,7 @@ func Enums(dict *TypeDictionary) []Type {
 	var enums []Type
 	for _, t := range dict.Enums {
 		e := Type{
-			Name: goName(t.Name),
+			Name: goname.Format(t.Name),
 			Kind: KindEnum,
 		}
 
@@ -111,7 +113,7 @@ func Enums(dict *TypeDictionary) []Type {
 
 		for _, val := range t.Values {
 			v := Value{
-				Name:  goName(e.Name + val.Name),
+				Name:  goname.Format(e.Name + val.Name),
 				Value: val.Value,
 			}
 			e.Values = append(e.Values, v)
@@ -141,7 +143,7 @@ func ExtObjects(dict *TypeDictionary) []Type {
 		}
 
 		o := Type{
-			Name: goName(t.Name),
+			Name: goname.Format(t.Name),
 			Kind: KindExtensionObject,
 			Base: baseType,
 		}
@@ -154,7 +156,7 @@ func ExtObjects(dict *TypeDictionary) []Type {
 			}
 
 			of := Field{
-				Name: goName(f.Name),
+				Name: goname.Format(f.Name),
 				Type: goFieldType(f),
 			}
 			o.Fields = append(o.Fields, of)
@@ -288,7 +290,7 @@ func goFieldType(f *StructField) string {
 	t, builtin := builtins[f.Type]
 	if t == "" {
 		prefix := strings.NewReplacer("ua:", "", "tns:", "")
-		t = goName(prefix.Replace(f.Type))
+		t = goname.Format(prefix.Replace(f.Type))
 	}
 	if !f.IsEnum && !builtin {
 		t = "*" + t
@@ -297,21 +299,4 @@ func goFieldType(f *StructField) string {
 		t = "[]" + t
 	}
 	return t
-}
-
-func goName(s string) string {
-	r1 := strings.NewReplacer(
-		"Guid", "GUID",
-		"Id", "ID",
-		"Json", "JSON",
-		"QualityOfService", "QoS",
-		"Uadp", "UADP",
-		"Uri", "URI",
-		"Url", "URL",
-		"Xml", "XML",
-	)
-	r2 := strings.NewReplacer(
-		"IDentity", "Identity",
-	)
-	return r2.Replace(r1.Replace(s))
 }

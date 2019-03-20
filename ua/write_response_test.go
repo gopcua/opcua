@@ -7,8 +7,6 @@ package ua
 import (
 	"testing"
 	"time"
-
-	"github.com/gopcua/opcua/status"
 )
 
 func TestWriteResponse(t *testing.T) {
@@ -23,7 +21,7 @@ func TestWriteResponse(t *testing.T) {
 					StringTable:        []string{},
 					AdditionalHeader:   NewExtensionObject(nil),
 				},
-				Results: []StatusCode{0},
+				Results: []StatusCode{StatusOK},
 			},
 			Bytes: []byte{
 				// Timestamp
@@ -55,7 +53,7 @@ func TestWriteResponse(t *testing.T) {
 					StringTable:        []string{},
 					AdditionalHeader:   NewExtensionObject(nil),
 				},
-				Results: []StatusCode{0, status.BadUserAccessDenied},
+				Results: []StatusCode{StatusOK, StatusBadUserAccessDenied},
 			},
 			Bytes: []byte{
 				// Timestamp

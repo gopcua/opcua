@@ -58,7 +58,7 @@ func main() {
 	if err := ioutil.WriteFile(*out, bfmt, 0644); err != nil {
 		log.Fatalf("Error writing %s: %v", *out, err)
 	}
-	log.Printf("Wrote node ids to %s", *out)
+	log.Printf("Wrote %s", *out)
 }
 
 var tmpl = template.Must(template.New("").Parse(`

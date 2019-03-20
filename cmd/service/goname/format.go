@@ -1,0 +1,24 @@
+package goname
+
+import "strings"
+
+var (
+	idents = strings.NewReplacer(
+		"Guid", "GUID",
+		"Id", "ID",
+		"Json", "JSON",
+		"QualityOfService", "QoS",
+		"Uadp", "UADP",
+		"Uri", "URI",
+		"Url", "URL",
+		"Xml", "XML",
+	)
+
+	fixes = strings.NewReplacer(
+		"IDentity", "Identity",
+	)
+)
+
+func Format(s string) string {
+	return fixes.Replace(idents.Replace(s))
+}

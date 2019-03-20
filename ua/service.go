@@ -7,8 +7,6 @@ package ua
 import (
 	"fmt"
 	"reflect"
-
-	"github.com/gopcua/opcua/errors"
 )
 
 var (
@@ -45,7 +43,7 @@ func DecodeService(b []byte) (*ExpandedNodeID, interface{}, error) {
 	id := uint16(typeID.NodeID.IntID())
 	typ := serviceType[id]
 	if typ == nil {
-		return nil, nil, errors.NewErrUnsupported(id, "unsupported or not implemented yet.")
+		return nil, nil, StatusBadServiceUnsupported
 	}
 
 	v := reflect.New(typ.Elem()).Interface()
