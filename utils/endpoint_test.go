@@ -49,13 +49,13 @@ func TestResolveEndpoint(t *testing.T) {
 			"tcp://10.0.0.1:4840/foo/bar",
 			"",
 			nil,
-			"unsupported string: should be in \"opc.tcp://<addr[:port]>/path/to/somewhere\" format.",
+			"invalid endpoint tcp://10.0.0.1:4840/foo/bar",
 		},
 		{ // Invalid, bad formatted schema
 			"opc.tcp:/10.0.0.1:4840/foo/bar",
 			"",
 			nil,
-			"could not resolve address",
+			"could not resolve address foo:4840",
 		},
 	}
 
