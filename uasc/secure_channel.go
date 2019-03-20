@@ -291,7 +291,6 @@ func (s *SecureChannel) recv() {
 				s.notifyCaller(reqid, nil, fmt.Errorf("message too large: %d > %d", uint32(len(b)), s.c.MaxMessageSize()))
 				continue
 			}
-			// fmt.Println(utils.Wireshark(0, b))
 
 			// since we are not decoding the ResponseHeader separately
 			// we need to drop every message that has an error since we
