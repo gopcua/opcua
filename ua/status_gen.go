@@ -13,9 +13,9 @@ type StatusCode uint32
 
 func (n StatusCode) Error() string {
 	if d, ok := StatusCodes[n]; ok {
-		return fmt.Sprintf("%s (%s/0x%8X)", d.Text, d.Name, n)
+		return fmt.Sprintf("%s %s (0x%X)", d.Text, d.Name, uint32(n))
 	}
-	return fmt.Sprintf("0x%08X", n)
+	return fmt.Sprintf("0x%X", uint32(n))
 }
 
 var (
@@ -264,7 +264,7 @@ type StatusCodeDesc struct {
 
 // StatusCodes maps status codes to the status code error types.
 var StatusCodes = map[StatusCode]StatusCodeDesc{
-	StatusOK:                                      StatusCodeDesc{Name: "OK", Text: "OK"},
+	StatusOK:                                      StatusCodeDesc{Name: "OK", Text: ""},
 	StatusBadUnexpectedError:                      StatusCodeDesc{Name: "StatusBadUnexpectedError", Text: "An unexpected error occurred."},
 	StatusBadInternalError:                        StatusCodeDesc{Name: "StatusBadInternalError", Text: "An internal error occurred as a result of a programming or configuration error."},
 	StatusBadOutOfMemory:                          StatusCodeDesc{Name: "StatusBadOutOfMemory", Text: "Not enough memory to complete the operation."},

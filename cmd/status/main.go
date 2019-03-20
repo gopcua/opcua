@@ -88,9 +88,9 @@ type StatusCode uint32
 
 func (n StatusCode) Error() string {
 	if d, ok := StatusCodes[n]; ok {
-		return fmt.Sprintf("%s (%s/0x%8X)", d.Text, d.Name, n)
+		return fmt.Sprintf("%s %s (0x%X)", d.Text, d.Name, uint32(n))
 	}
-	return fmt.Sprintf("0x%08X", n)
+	return fmt.Sprintf("0x%X", uint32(n))
 }
 
 var (
@@ -106,7 +106,7 @@ type StatusCodeDesc struct {
 
 // StatusCodes maps status codes to the status code error types.
 var StatusCodes = map[StatusCode]StatusCodeDesc{
-	StatusOK: StatusCodeDesc{Name: "OK", Text: "OK"},
+	StatusOK: StatusCodeDesc{Name: "OK", Text: ""},
 	{{range .}}{{index . 0}}: StatusCodeDesc{ Name: "{{index . 0}}", Text: "{{index . 2}}" },
 	{{end}}
 }
