@@ -1,69 +1,64 @@
 # OPCUA
 
-opcua provides easy and painless handling of OPC UA Binary Protocol in pure Golang.
+opcua is a native Go implementation of the OPC/UA Binary Protocol.
 
 [![CircleCI](https://circleci.com/gh/gopcua/opcua.svg?style=shield)](https://circleci.com/gh/gopcua/opcua)
 [![GoDoc](https://godoc.org/github.com/gopcua/opcua?status.svg)](https://godoc.org/github.com/gopcua/opcua)
 [![GolangCI](https://golangci.com/badges/github.com/gopcua/opcua.svg)](https://golangci.com/r/github.com/gopcua/opcua)
 [![GitHub](https://img.shields.io/github/license/mashape/apistatus.svg)](https://github.com/gopcua/opcua/blob/master/LICENSE)
 
-
 ## Quickstart
 
-See example directory for sample codes.
-Currently simple `client`, `server` implementation and `sender`, which lets user to manipulate any parts including connection setup sequence, are available.
-
-### Requirements
-
-opcua is implemented in pure Golang. So just `go get` the following packages.
-
-_Vendoring is planned to be implemented after Go 1.12 release._
-
-[github.com/pkg/errors](https://github.com/pkg/errors)  
-[github.com/google/go-cmp](https://github.com/google/go-cmp)  
-[github.com/gopcua/opcua](https://github.com/gopcua/opcua)  
-
-### Running Examples
-
-[`client`](./examples/client) opens the SecureChannel with the endpoint specified in command-line arguments.
-
-If `--payload` is given, it sends any data on top of UASC headers.
-
-```shell-session
-cd examples/client
-go run client.go --endpoint "opc.tcp://endpoint.example/opcua/server" --payload <payload in hex stream format>
+```sh
+go get -u github.com/gopcua/opcua
+go run examples/datetime/datetime.go -endpoint opc.tcp://localhost:4840
 ```
 
-[`server`](./examples/server) listens and accepts the SecureChannel opening request from the client on specified network.
+### Current State (20 Mar 2019)
 
-```shell-session
-cd examples/client
-go run server.go --endpoint "opc.tcp://endpoint.example/opcua/server"
-```
+Our goal is to make this the native Go library for OPC/UA. 
 
-## Help Wanted!
+This code is not ready for production but we intend to get it there.
 
-We believe our idea to implement the OPC-UA protocol in Golang can contribute to fostering the industry, and we are trying to make this project production-ready.
-However, due to the lack of resources the progress is not quite good actually. So, we want your help.
+We are testing the code against real-world PLCs and other OPC/UA
+implementations but this needs to be more formalized. The goal is to have the
+examples working with real PLCs. Please let us know if they don't.
 
-### by writing codes
+We are working on the library and some things are working but others are not. 
 
-As listed in GitHub [issues](https://github.com/gopcua/opcua/issues) and [projects](https://github.com/gopcua/opcua/projects/2), we still have a lot of things to be considered/implemented.
-Resolving the issues listed by writing your code would help really much.
+Here is what currently works:
 
-### by reporting issues
+ * client connection handshake, create secure channel and session
+ * async request/response dispatching on the secure channel
+ * support for chunking when receiving (not sending)
+ * all structures and enums are generated from official OPC Foundation defintions
+ * basic `uasc` listener available but no server implementation
+ * start of a high-level Client implementation. See `client.go` and 
+   `examples/datetime` for a usage example.
+ * decent tests of the binary protocol codec
 
-Please feel free to open an issue to report anything you face when using the package.
+Here is what is not yet working:
 
-### by reviewing
+ * `ERR` messages are not yet bubbled up to the caller (not hard but need to do it)
+ * service calls need to check `ServiceStatus` and bubble that error up (also not hard)
+ * no security protocol support. @dwhutchinson provided the crypto code but it needs to be
+   integrated into the network layer. 
+ * no high-level server implementation, address space, etc.
 
-Please don't hesitate to post your thoughts on some issues and/or pull requests. It also helps us a lot.
+## Your Help is Appreciated
 
-### by sharing
+If you are looking for ways to contribute you can
 
-The number of stars or shares on Twitter(or anything else) is a great motivation for us to work on the project continuously.
+ * test the high-level client against real OPC/UA servers
+ * add functions to the client or tell us which functions you need for `gopcua` to be useful
+ * work on the security layer, server and other components
+ * and last but not least, file issues, review code and write/update documentation
+
+Also, if the library is already useful please spread the word as a motivation.
 
 ## Supported Features
+
+The current focus is on the OPC UA Binary protocol over TCP. No other protocols are supported at this point.
 
 ### Protocol Stack
 
@@ -87,11 +82,13 @@ The number of stars or shares on Twitter(or anything else) is a great motivation
 
 ### Services
 
+The current set of supported services is only for the high-level client.
+
 | Service Set                 | Service                       | Supported | Notes        |
 |-----------------------------|-------------------------------|-----------|--------------|
-| Discovery Service Set       | FindServers                   | Yes       |              |
-|                             | FindServersOnNetwork          | Yes       |              |
-|                             | GetEndpoints                  | Yes       |              |
+| Discovery Service Set       | FindServers                   |           |              |
+|                             | FindServersOnNetwork          |           |              |
+|                             | GetEndpoints                  |           |              |
 |                             | RegisterServer                |           |              |
 |                             | RegisterServer2               |           |              |
 | Secure Channel Service Set  | OpenSecureChannel             | Yes       |              |
@@ -99,12 +96,12 @@ The number of stars or shares on Twitter(or anything else) is a great motivation
 | Session Service Set         | CreateSession                 | Yes       |              |
 |                             | CloseSession                  | Yes       |              |
 |                             | ActivateSession               | Yes       |              |
-|                             | Cancel                        | Yes       |              |
+|                             | Cancel                        |           |              |
 | Node Management Service Set | AddNodes                      |           |              |
 |                             | AddReferences                 |           |              |
 |                             | DeleteNodes                   |           |              |
 |                             | DeleteReferences              |           |              |
-| View Service Set            | Browse                        |           |              |
+| View Service Set            | Browse                        | Started   |              |
 |                             | BrowseNext                    |           |              |
 |                             | TranslateBrowsePathsToNodeIds |           |              |
 |                             | RegisterNodes                 |           |              |
@@ -121,7 +118,7 @@ The number of stars or shares on Twitter(or anything else) is a great motivation
 |                             | ModifyMonitoredItems          |           |              |
 |                             | SetMonitoringMode             |           |              |
 |                             | SetTriggering                 |           |              |
-| Subscription Service Set    | CreateSubscription            | Partial   | Request-only |
+| Subscription Service Set    | CreateSubscription            |           |              |
 |                             | ModifySubscription            |           |              |
 |                             | SetPublishingMode             |           |              |
 |                             | Publish                       |           |              |
@@ -138,8 +135,6 @@ This is still experimental project. Any part of the exported API may be changed 
 ## Author
 
 The [gopcua](https://github.com/gopcua) team.
-
-_website under construction... stay tuned!_
 
 ## License
 
