@@ -304,6 +304,22 @@ func (s *SecureChannel) recv() {
 				s.notifyCaller(reqid, nil, err)
 				continue
 			}
+
+			// extract the ServiceStatus field from the
+			// ResponseHeader which is always the first
+			// field in the struct.
+			//
+			// If the service status is not OK then bubble
+			// that error up to the caller.
+			val := reflect.ValueOf(svc)
+			field0 := val.Elem().Field(0).Interface()
+			if hdr, ok := field0.(*ua.ResponseHeader); ok {
+				log.Printf("conn %d/%d: res:%v", s.c.ID(), reqid, hdr.ServiceResult)
+				if hdr.ServiceResult != ua.StatusOK {
+					s.notifyCaller(reqid, svc, hdr.ServiceResult)
+					return
+				}
+			}
 			s.notifyCaller(reqid, svc, err)
 		}
 	}
