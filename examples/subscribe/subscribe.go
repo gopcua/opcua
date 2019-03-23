@@ -10,11 +10,14 @@ import (
 	"time"
 
 	"github.com/gopcua/opcua"
+	"github.com/gopcua/opcua/debug"
 )
 
 func main() {
 	endpoint := flag.String("endpoint", "opc.tcp://localhost:4840", "OPC UA Endpoint URL")
+	flag.BoolVar(&debug.Enable, "debug", false, "enable debug logging")
 	flag.Parse()
+	log.SetFlags(0)
 
 	c := opcua.NewClient(*endpoint, nil)
 	if err := c.Open(); err != nil {
