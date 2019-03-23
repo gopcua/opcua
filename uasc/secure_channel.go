@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/gopcua/opcua/debug"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uacp"
 )
@@ -186,7 +187,7 @@ func (s *SecureChannel) SendAsync(svc interface{}) (resp chan Response, err erro
 	if _, err := s.c.Write(b); err != nil {
 		return nil, err
 	}
-	log.Printf("conn %d/%d: send %T with %d bytes", s.c.ID(), reqid, svc, len(b))
+	debug.Printf("conn %d/%d: send %T with %d bytes", s.c.ID(), reqid, svc, len(b))
 
 	// register the handler
 	resp = make(chan Response)
@@ -238,7 +239,7 @@ func (s *SecureChannel) readchunk() (*MessageChunk, error) {
 
 	if s.cfg.SecureChannelID == 0 {
 		s.cfg.SecureChannelID = h.SecureChannelID
-		log.Printf("conn %d/%d: set secure channel id to %d", s.c.ID(), m.SequenceHeader.RequestID, s.cfg.SecureChannelID)
+		debug.Printf("conn %d/%d: set secure channel id to %d", s.c.ID(), m.SequenceHeader.RequestID, s.cfg.SecureChannelID)
 	}
 
 	return m, nil
@@ -264,7 +265,7 @@ func (s *SecureChannel) recv() {
 
 			hdr := chunk.Header
 			reqid := chunk.SequenceHeader.RequestID
-			log.Printf("conn %d/%d: recv %s%c with %d bytes", s.c.ID(), reqid, hdr.MessageType, hdr.ChunkType, hdr.MessageSize)
+			debug.Printf("conn %d/%d: recv %s%c with %d bytes", s.c.ID(), reqid, hdr.MessageType, hdr.ChunkType, hdr.MessageSize)
 
 			if hdr.ChunkType != 'F' {
 				chunks[reqid] = append(chunks[reqid], chunk)
@@ -314,7 +315,7 @@ func (s *SecureChannel) recv() {
 			val := reflect.ValueOf(svc)
 			field0 := val.Elem().Field(0).Interface()
 			if hdr, ok := field0.(*ua.ResponseHeader); ok {
-				log.Printf("conn %d/%d: res:%v", s.c.ID(), reqid, hdr.ServiceResult)
+				debug.Printf("conn %d/%d: res:%v", s.c.ID(), reqid, hdr.ServiceResult)
 				if hdr.ServiceResult != ua.StatusOK {
 					s.notifyCaller(reqid, svc, hdr.ServiceResult)
 					return
@@ -327,9 +328,9 @@ func (s *SecureChannel) recv() {
 
 func (s *SecureChannel) notifyCaller(reqid uint32, svc interface{}, err error) {
 	if err != nil {
-		log.Printf("conn %d/%d: %v", s.c.ID(), reqid, err)
+		debug.Printf("conn %d/%d: %v", s.c.ID(), reqid, err)
 	} else {
-		log.Printf("conn %d/%d: recv %T", s.c.ID(), reqid, svc)
+		debug.Printf("conn %d/%d: recv %T", s.c.ID(), reqid, svc)
 	}
 
 	// check if we have a pending request handler for this response.
@@ -340,7 +341,7 @@ func (s *SecureChannel) notifyCaller(reqid uint32, svc interface{}, err error) {
 
 	// no handler -> next response
 	if ch == nil {
-		log.Printf("conn %d/%d: no handler for %T", s.c.ID(), reqid, svc)
+		debug.Printf("conn %d/%d: no handler for %T", s.c.ID(), reqid, svc)
 		return
 	}
 
