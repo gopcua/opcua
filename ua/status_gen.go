@@ -13,7 +13,7 @@ type StatusCode uint32
 
 func (n StatusCode) Error() string {
 	if d, ok := StatusCodes[n]; ok {
-		return fmt.Sprintf("%s %s (0x%X)", d.Text, d.Name, uint32(n))
+		return fmt.Sprintf("%s: %s (0x%X)", d.Name, d.Text, uint32(n))
 	}
 	return fmt.Sprintf("0x%X", uint32(n))
 }
