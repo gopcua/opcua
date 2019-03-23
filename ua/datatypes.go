@@ -16,7 +16,7 @@ import (
 // Bits are or'ed together if multiple fields are set.
 const (
 	DataValueValue             = 0x1
-	DataValueStatus            = 0x2
+	DataValueStatusCode        = 0x2
 	DataValueSourceTimestamp   = 0x4
 	DataValueServerTimestamp   = 0x8
 	DataValueSourcePicoseconds = 0x10
@@ -29,7 +29,7 @@ const (
 type DataValue struct {
 	EncodingMask      byte
 	Value             *Variant
-	Status            uint32
+	Status            StatusCode
 	SourceTimestamp   time.Time
 	SourcePicoseconds uint16
 	ServerTimestamp   time.Time
@@ -43,8 +43,8 @@ func (d *DataValue) Decode(b []byte) (int, error) {
 		d.Value = new(Variant)
 		buf.ReadStruct(d.Value)
 	}
-	if d.Has(DataValueStatus) {
-		d.Status = buf.ReadUint32()
+	if d.Has(DataValueStatusCode) {
+		d.Status = StatusCode(buf.ReadUint32())
 	}
 	if d.Has(DataValueSourceTimestamp) {
 		d.SourceTimestamp = buf.ReadTime()
@@ -68,8 +68,8 @@ func (d *DataValue) Encode() ([]byte, error) {
 	if d.Has(DataValueValue) {
 		buf.WriteStruct(d.Value)
 	}
-	if d.Has(DataValueStatus) {
-		buf.WriteUint32(d.Status)
+	if d.Has(DataValueStatusCode) {
+		buf.WriteUint32(uint32(d.Status))
 	}
 	if d.Has(DataValueSourceTimestamp) {
 		buf.WriteTime(d.SourceTimestamp)
@@ -96,7 +96,7 @@ func (d *DataValue) UpdateMask() {
 		d.EncodingMask |= DataValueValue
 	}
 	if d.Status != 0 {
-		d.EncodingMask |= DataValueStatus
+		d.EncodingMask |= DataValueStatusCode
 	}
 	if !d.SourceTimestamp.IsZero() {
 		d.EncodingMask |= DataValueSourceTimestamp
