@@ -50,7 +50,7 @@ func (a *Node) Value() (*ua.Variant, error) {
 
 // Attribute returns the attribute of the node. with the given id.
 func (a *Node) Attribute(attrID uint32) (*ua.Variant, error) {
-	rv := &ua.ReadValueID{NodeID: a.ID, AttributeID: attrID, DataEncoding: &ua.QualifiedName{}}
+	rv := &ua.ReadValueID{NodeID: a.ID, AttributeID: attrID}
 	req := &ua.ReadRequest{NodesToRead: []*ua.ReadValueID{rv}}
 	res, err := a.c.Read(req)
 	if err != nil {
