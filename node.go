@@ -17,8 +17,8 @@ type Node struct {
 }
 
 // NodeClass returns the node class attribute.
-func (a *Node) NodeClass() (ua.NodeClass, error) {
-	v, err := a.Attribute(ua.IntegerIDNodeClass)
+func (n *Node) NodeClass() (ua.NodeClass, error) {
+	v, err := n.Attribute(ua.IntegerIDNodeClass)
 	if err != nil {
 		return 0, err
 	}
@@ -26,8 +26,8 @@ func (a *Node) NodeClass() (ua.NodeClass, error) {
 }
 
 // BrowseName returns the browse name of the node.
-func (a *Node) BrowseName() (*ua.QualifiedName, error) {
-	v, err := a.Attribute(ua.IntegerIDBrowseName)
+func (n *Node) BrowseName() (*ua.QualifiedName, error) {
+	v, err := n.Attribute(ua.IntegerIDBrowseName)
 	if err != nil {
 		return nil, err
 	}
@@ -35,8 +35,8 @@ func (a *Node) BrowseName() (*ua.QualifiedName, error) {
 }
 
 // DisplayName returns the display name of the node.
-func (a *Node) DisplayName() (*ua.LocalizedText, error) {
-	v, err := a.Attribute(ua.IntegerIDDisplayName)
+func (n *Node) DisplayName() (*ua.LocalizedText, error) {
+	v, err := n.Attribute(ua.IntegerIDDisplayName)
 	if err != nil {
 		return nil, err
 	}
@@ -44,15 +44,15 @@ func (a *Node) DisplayName() (*ua.LocalizedText, error) {
 }
 
 // Value returns the value of the node.
-func (a *Node) Value() (*ua.Variant, error) {
-	return a.Attribute(ua.IntegerIDValue)
+func (n *Node) Value() (*ua.Variant, error) {
+	return n.Attribute(ua.IntegerIDValue)
 }
 
 // Attribute returns the attribute of the node. with the given id.
-func (a *Node) Attribute(attrID uint32) (*ua.Variant, error) {
-	rv := &ua.ReadValueID{NodeID: a.ID, AttributeID: attrID}
+func (n *Node) Attribute(attrID uint32) (*ua.Variant, error) {
+	rv := &ua.ReadValueID{NodeID: n.ID, AttributeID: attrID}
 	req := &ua.ReadRequest{NodesToRead: []*ua.ReadValueID{rv}}
-	res, err := a.c.Read(req)
+	res, err := n.c.Read(req)
 	if err != nil {
 		return nil, err
 	}
@@ -65,9 +65,9 @@ func (a *Node) Attribute(attrID uint32) (*ua.Variant, error) {
 // References retrns all references for the node.
 // todo(fs): this is not complete since it only returns the
 // todo(fs): top-level reference at this point.
-func (a *Node) References(refs *ua.NodeID) (*ua.BrowseResponse, error) {
+func (n *Node) References(refs *ua.NodeID) (*ua.BrowseResponse, error) {
 	desc := &ua.BrowseDescription{
-		NodeID:          a.ID,
+		NodeID:          n.ID,
 		BrowseDirection: ua.BrowseDirectionBoth,
 		ReferenceTypeID: refs,
 		IncludeSubtypes: true,
@@ -84,6 +84,6 @@ func (a *Node) References(refs *ua.NodeID) (*ua.BrowseResponse, error) {
 		NodesToBrowse:                 []*ua.BrowseDescription{desc},
 	}
 
-	return a.c.Browse(req)
+	return n.c.Browse(req)
 	// implement browse_next
 }
