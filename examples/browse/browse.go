@@ -10,7 +10,8 @@ import (
 	"log"
 
 	"github.com/gopcua/opcua"
-	uid "github.com/gopcua/opcua/id"
+	"github.com/gopcua/opcua/debug"
+	"github.com/gopcua/opcua/id"
 	"github.com/gopcua/opcua/ua"
 )
 
@@ -35,7 +36,7 @@ func browse(n *opcua.Node, path string, level int) ([]string, error) {
 	}
 	path = join(path, browseName.Name)
 
-	typeDefs := ua.NewTwoByteNodeID(uid.HasTypeDefinition)
+	typeDefs := ua.NewTwoByteNodeID(id.HasTypeDefinition)
 	refs, err := n.References(typeDefs)
 	if err != nil {
 		return nil, err
@@ -47,7 +48,9 @@ func browse(n *opcua.Node, path string, level int) ([]string, error) {
 
 func main() {
 	endpoint := flag.String("endpoint", "opc.tcp://localhost:4840", "OPC UA Endpoint URL")
+	flag.BoolVar(&debug.Enable, "debug", false, "enable debug logging")
 	flag.Parse()
+	log.SetFlags(0)
 
 	c := opcua.NewClient(*endpoint, nil)
 	if err := c.Open(); err != nil {

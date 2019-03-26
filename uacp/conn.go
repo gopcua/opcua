@@ -4,11 +4,11 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"sync/atomic"
 	"time"
 
+	"github.com/gopcua/opcua/debug"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/utils"
 )
@@ -32,7 +32,7 @@ func nextid() uint32 {
 }
 
 func Dial(ctx context.Context, endpoint string) (*Conn, error) {
-	log.Printf("Connect to %s", endpoint)
+	debug.Printf("Connect to %s", endpoint)
 	network, raddr, err := utils.ResolveEndpoint(endpoint)
 	if err != nil {
 		return nil, err
@@ -53,9 +53,9 @@ func Dial(ctx context.Context, endpoint string) (*Conn, error) {
 		},
 	}
 
-	log.Printf("conn %d: start HEL/ACK handshake", conn.id)
+	debug.Printf("conn %d: start HEL/ACK handshake", conn.id)
 	if err := conn.handshake(endpoint); err != nil {
-		log.Printf("conn %d: HEL/ACK handshake failed: %s", conn.id, err)
+		debug.Printf("conn %d: HEL/ACK handshake failed: %s", conn.id, err)
 		conn.Close()
 		return nil, err
 	}
@@ -160,7 +160,7 @@ func (c *Conn) MaxChunkCount() uint32 {
 }
 
 func (c *Conn) Close() error {
-	log.Printf("conn %d: close", c.id)
+	debug.Printf("conn %d: close", c.id)
 	return c.c.Close()
 }
 
@@ -226,14 +226,14 @@ func (c *Conn) handshake(endpoint string) error {
 	}
 	if ack.MaxChunkCount == 0 {
 		ack.MaxChunkCount = DefaultMaxChunkCount
-		log.Printf("conn %d: server has no chunk limit. Using %d", c.id, ack.MaxChunkCount)
+		debug.Printf("conn %d: server has no chunk limit. Using %d", c.id, ack.MaxChunkCount)
 	}
 	if ack.MaxMessageSize == 0 {
 		ack.MaxMessageSize = DefaultMaxMessageSize
-		log.Printf("conn %d: server has no message size limit. Using %d", c.id, ack.MaxMessageSize)
+		debug.Printf("conn %d: server has no message size limit. Using %d", c.id, ack.MaxMessageSize)
 	}
 	c.ack = ack
-	log.Printf("conn %d: recv ACK:%v", c.id, ack)
+	debug.Printf("conn %d: recv ACK:%v", c.id, ack)
 	return nil
 }
 
@@ -274,7 +274,7 @@ func (c *Conn) srvhandshake(endpoint string) error {
 			c.sendError(BadTCPEndpointURLInvalid)
 			return fmt.Errorf("invalid endpoint url %s", rhe.EndPointURL)
 		}
-		log.Printf("conn %d: connecting to %s", c.id, rhe.ServerURI)
+		debug.Printf("conn %d: connecting to %s", c.id, rhe.ServerURI)
 		c.c.Close()
 		c, err := Dial(context.Background(), rhe.ServerURI)
 		if err != nil {
@@ -321,7 +321,7 @@ func (c *Conn) recv() ([]byte, error) {
 		return nil, fmt.Errorf("read msg failed: %s", err)
 	}
 
-	log.Printf("conn %d: recv %s%c with %d bytes", c.id, h.MessageType, h.ChunkType, len(b))
+	debug.Printf("conn %d: recv %s%c with %d bytes", c.id, h.MessageType, h.ChunkType, len(b))
 	return append(hdr, b...), nil
 }
 
@@ -354,7 +354,7 @@ func (c *Conn) send(typ string, msg interface{}) error {
 	if _, err := c.c.Write(b); err != nil {
 		return fmt.Errorf("write failed: %s", err)
 	}
-	log.Printf("conn %d: sent %s with %d bytes", c.id, typ, len(b))
+	debug.Printf("conn %d: sent %s with %d bytes", c.id, typ, len(b))
 
 	return nil
 }

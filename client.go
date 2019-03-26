@@ -71,7 +71,30 @@ func (c *Client) Node(id *ua.NodeID) *Node {
 }
 
 // Read executes a synchronous read request.
+//
+// By default, the function requests the value of the nodes
+// in the default encoding of the server.
 func (c *Client) Read(req *ua.ReadRequest) (*ua.ReadResponse, error) {
+	// clone the request and the ReadValueIDs to set defaults without
+	// manipulating them in-place.
+	rvs := make([]*ua.ReadValueID, len(req.NodesToRead))
+	for i, rv := range req.NodesToRead {
+		rc := &ua.ReadValueID{}
+		*rc = *rv
+		if rc.AttributeID == 0 {
+			rc.AttributeID = ua.IntegerIDValue
+		}
+		if rc.DataEncoding == nil {
+			rc.DataEncoding = &ua.QualifiedName{}
+		}
+		rvs[i] = rc
+	}
+	req = &ua.ReadRequest{
+		MaxAge:             req.MaxAge,
+		TimestampsToReturn: req.TimestampsToReturn,
+		NodesToRead:        rvs,
+	}
+
 	var res *ua.ReadResponse
 	err := c.sechan.Send(req, func(v interface{}) error {
 		r, ok := v.(*ua.ReadResponse)

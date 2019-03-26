@@ -7,14 +7,15 @@ package main
 import (
 	"flag"
 	"log"
-	"time"
 
 	"github.com/gopcua/opcua"
 	"github.com/gopcua/opcua/debug"
+	"github.com/gopcua/opcua/ua"
 )
 
 func main() {
 	endpoint := flag.String("endpoint", "opc.tcp://localhost:4840", "OPC UA Endpoint URL")
+	nodeID := flag.String("node", "", "NodeID to read")
 	flag.BoolVar(&debug.Enable, "debug", false, "enable debug logging")
 	flag.Parse()
 	log.SetFlags(0)
@@ -25,9 +26,25 @@ func main() {
 	}
 	defer c.Close()
 
-	sub, err := c.Subscribe(time.Second)
+	id, err := ua.NewNodeID(*nodeID)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("invalid node id: %v", err)
 	}
-	log.Printf("sub: %v", sub)
+
+	req := &ua.ReadRequest{
+		MaxAge: 2000,
+		NodesToRead: []*ua.ReadValueID{
+			&ua.ReadValueID{NodeID: id},
+		},
+		TimestampsToReturn: ua.TimestampsToReturnBoth,
+	}
+
+	resp, err := c.Read(req)
+	if err != nil {
+		log.Fatalf("Read failed: %s", err)
+	}
+	if resp.Results[0].Status != ua.StatusOK {
+		log.Fatalf("Status not OK: %v", resp.Results[0].Status)
+	}
+	log.Print(resp.Results[0].Value)
 }
