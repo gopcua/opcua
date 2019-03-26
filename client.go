@@ -107,6 +107,19 @@ func (c *Client) Read(req *ua.ReadRequest) (*ua.ReadResponse, error) {
 	return res, err
 }
 
+// Write executes a synchronous write request.
+func (c *Client) Write(req *ua.WriteRequest) (res *ua.WriteResponse, err error) {
+	err = c.sechan.Send(req, func(v interface{}) error {
+		r, ok := v.(*ua.WriteResponse)
+		if !ok {
+			return fmt.Errorf("invalid response: %T", v)
+		}
+		res = r
+		return nil
+	})
+	return
+}
+
 // Browse executes a synchronous browse request.
 func (c *Client) Browse(req *ua.BrowseRequest) (*ua.BrowseResponse, error) {
 	var res *ua.BrowseResponse
