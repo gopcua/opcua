@@ -65,11 +65,11 @@ const (
 	TypeDouble          = 11
 	TypeString          = 12
 	TypeDateTime        = 13
-	TypeGuid            = 14
+	TypeGUID            = 14
 	TypeByteString      = 15
-	TypeXmlElement      = 16
-	TypeNodeId          = 17
-	TypeExpandedNodeId  = 18
+	TypeXMLElement      = 16
+	TypeNodeID          = 17
+	TypeExpandedNodeID  = 18
 	TypeStatusCode      = 19
 	TypeQualifiedName   = 20
 	TypeLocalizedText   = 21

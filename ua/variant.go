@@ -113,19 +113,19 @@ func (m *Variant) Decode(b []byte) (int, error) {
 			values[i] = buf.ReadString()
 		case TypeDateTime:
 			values[i] = buf.ReadTime()
-		case TypeGuid:
+		case TypeGUID:
 			v := new(GUID)
 			buf.ReadStruct(v)
 			values[i] = v
 		case TypeByteString:
 			values[i] = buf.ReadBytes()
-		case TypeXmlElement:
+		case TypeXMLElement:
 			values[i] = XmlElement(buf.ReadString())
-		case TypeNodeId:
+		case TypeNodeID:
 			v := new(NodeID)
 			buf.ReadStruct(v)
 			values[i] = v
-		case TypeExpandedNodeId:
+		case TypeExpandedNodeID:
 			v := new(ExpandedNodeID)
 			buf.ReadStruct(v)
 			values[i] = v
@@ -277,15 +277,15 @@ func (m *Variant) Set(v interface{}) error {
 	case time.Time:
 		m.EncodingMask = TypeDateTime
 	case *GUID:
-		m.EncodingMask = TypeGuid
+		m.EncodingMask = TypeGUID
 	case []byte:
 		m.EncodingMask = TypeByteString
 	case XmlElement:
-		m.EncodingMask = TypeXmlElement
+		m.EncodingMask = TypeXMLElement
 	case *NodeID:
-		m.EncodingMask = TypeNodeId
+		m.EncodingMask = TypeNodeID
 	case *ExpandedNodeID:
-		m.EncodingMask = TypeExpandedNodeId
+		m.EncodingMask = TypeExpandedNodeID
 	case StatusCode:
 		m.EncodingMask = TypeStatusCode
 	case *QualifiedName:
