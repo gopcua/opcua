@@ -27,7 +27,7 @@ func newNoneAsymmetric(*rsa.PrivateKey, *rsa.PublicKey) (*EncryptionAlgorithm, e
 	e := new(EncryptionAlgorithm)
 
 	e.blockSize = blockSizeNone()
-	e.minPadding = minPaddingNone()
+	e.plainttextBlockSize = blockSizeNone() - minPaddingNone()
 	e.encrypt = encryptNone
 	e.decrypt = decryptNone
 	e.signature = signatureNone
@@ -41,7 +41,7 @@ func newNoneSymmetric([]byte, []byte) (*EncryptionAlgorithm, error) {
 	e := new(EncryptionAlgorithm)
 
 	e.blockSize = blockSizeNone()
-	e.minPadding = minPaddingNone()
+	e.plainttextBlockSize = blockSizeNone() - minPaddingNone()
 	e.encrypt = encryptNone
 	e.decrypt = decryptNone
 	e.signature = signatureNone

@@ -53,7 +53,7 @@ func newBasic128Rsa15Symmetric(localNonce []byte, remoteNonce []byte) (*Encrypti
 	remoteKeys := generateKeys(computeHmac(crypto.SHA1, remoteNonce), localNonce, signatureKeyLength, encryptionKeyLength, encryptionBlockSize)
 
 	e.blockSize = aes.BlockSize
-	e.minPadding = minPaddingAES()
+	e.plainttextBlockSize = aes.BlockSize - minPaddingAES()
 	e.encrypt = encryptAES(128, remoteKeys.iv, remoteKeys.encryption) // AES128
 	e.decrypt = decryptAES(128, localKeys.iv, localKeys.encryption)   // AES128
 	e.signature = computeHmac(crypto.SHA1, remoteKeys.signing)        // HMAC-SHA1
@@ -69,6 +69,7 @@ func newBasic128Rsa15Asymmetric(localKey *rsa.PrivateKey, remoteKey *rsa.PublicK
 	const (
 		minAsymmetricKeyLength = 128 // 1024 bits
 		maxAsymmetricKeyLength = 256 // 2048 bits
+		nonceLength            = 16
 	)
 
 	if localKey != nil && (localKey.PublicKey.Size() < minAsymmetricKeyLength || localKey.PublicKey.Size() > maxAsymmetricKeyLength) {
@@ -84,11 +85,12 @@ func newBasic128Rsa15Asymmetric(localKey *rsa.PrivateKey, remoteKey *rsa.PublicK
 	e := new(EncryptionAlgorithm)
 
 	e.blockSize = remoteKey.Size()
-	e.minPadding = minPaddingRsaPKCS1v15()
+	e.plainttextBlockSize = remoteKey.Size() - minPaddingRsaPKCS1v15()
 	e.encrypt = encryptPKCS1v15(remoteKey)                     // RSA-SHA15+KWRSA15
 	e.decrypt = decryptPKCS1v15(localKey)                      // RSA-SHA15+KWRSA15
 	e.signature = signPKCS1v15(crypto.SHA1, localKey)          // RSA-SHA1
 	e.verifySignature = verifyPKCS1v15(crypto.SHA1, remoteKey) // RSA-SHA1
+	e.nonceLength = nonceLength
 	e.signatureLength = localKey.PublicKey.Size()
 	e.encryptionURI = "http://www.w3.org/2001/04/xmlenc#rsa-1_5"
 	e.signatureURI = "http://www.w3.org/2000/09/xmldsig#rsa-sha1"

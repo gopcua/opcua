@@ -67,11 +67,12 @@ func newBasic256Rsa256Symmetric(localNonce []byte, remoteNonce []byte) (*Encrypt
 	remoteKeys := generateKeys(computeHmac(crypto.SHA256, remoteNonce), localNonce, signatureKeyLength, encryptionKeyLength, encryptionBlockSize)
 
 	e.blockSize = aes.BlockSize
-	e.minPadding = minPaddingAES()
+	e.plainttextBlockSize = aes.BlockSize - minPaddingAES()
 	e.encrypt = encryptAES(256, remoteKeys.iv, remoteKeys.encryption) // AES256-CBC
 	e.decrypt = decryptAES(256, localKeys.iv, localKeys.encryption)   // AES256-CBC
 	e.signature = computeHmac(crypto.SHA256, remoteKeys.signing)      // HMAC-SHA2-256
 	e.verifySignature = verifyHmac(crypto.SHA256, localKeys.signing)  // HMAC-SHA2-256
+	e.signatureLength = 256 / 8
 	e.encryptionURI = "http://www.w3.org/2001/04/xmlenc#aes256-cbc"
 	e.signatureURI = "http://www.w3.org/2000/09/xmldsig#hmac-sha256"
 
@@ -82,6 +83,7 @@ func newBasic256Rsa256Asymmetric(localKey *rsa.PrivateKey, remoteKey *rsa.Public
 	const (
 		minAsymmetricKeyLength = 256 // 2048 bits
 		maxAsymmetricKeyLength = 512 // 4096 bits
+		nonceLength            = 32
 	)
 
 	if localKey != nil && (localKey.PublicKey.Size() < minAsymmetricKeyLength || localKey.PublicKey.Size() > maxAsymmetricKeyLength) {
@@ -97,11 +99,12 @@ func newBasic256Rsa256Asymmetric(localKey *rsa.PrivateKey, remoteKey *rsa.Public
 	e := new(EncryptionAlgorithm)
 
 	e.blockSize = remoteKey.Size()
-	e.minPadding = minPaddingRsaOAEP(crypto.SHA1)
+	e.plainttextBlockSize = remoteKey.Size() - minPaddingRsaOAEP(crypto.SHA1)
 	e.encrypt = encryptRsaOAEP(crypto.SHA1, remoteKey)           // RSA-OAEP-SHA1
 	e.decrypt = decryptRsaOAEP(crypto.SHA1, localKey)            // RSA-OAEP-SHA1
 	e.signature = signPKCS1v15(crypto.SHA256, localKey)          // RSA-PKCS15-SHA2-256
 	e.verifySignature = verifyPKCS1v15(crypto.SHA256, remoteKey) // RSA-PKCS15-SHA2-256
+	e.nonceLength = nonceLength
 	e.signatureLength = localKey.PublicKey.Size()
 	e.encryptionURI = "http://www.w3.org/2001/04/xmlenc#rsa-oaep"
 	e.signatureURI = "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"

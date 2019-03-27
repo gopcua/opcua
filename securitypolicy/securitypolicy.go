@@ -23,15 +23,16 @@ import (
 // The zero value of this struct will use SecurityPolicy#None although
 // using in this manner is discouraged for readability
 type EncryptionAlgorithm struct {
-	blockSize       int
-	minPadding      int
-	encrypt         func(cleartext []byte) (ciphertext []byte, err error)
-	decrypt         func(ciphertext []byte) (cleartext []byte, err error)
-	signature       func(message []byte) (signature []byte, err error)
-	verifySignature func(message, signature []byte) error
-	signatureLength int
-	encryptionURI   string
-	signatureURI    string
+	blockSize           int
+	plainttextBlockSize int
+	encrypt             func(cleartext []byte) (ciphertext []byte, err error)
+	decrypt             func(ciphertext []byte) (cleartext []byte, err error)
+	signature           func(message []byte) (signature []byte, err error)
+	verifySignature     func(message, signature []byte) error
+	nonceLength         int
+	signatureLength     int
+	encryptionURI       string
+	signatureURI        string
 }
 
 // Asymmetric returns the EncryptionAlgorithm struct seeded with the required public
@@ -75,11 +76,12 @@ func (e *EncryptionAlgorithm) BlockSize() int {
 	return e.blockSize
 }
 
-// MinPadding returns the underlying encryption algorithm's minimum padding.
-// Used to calculate the maximum plaintext blocksize that can be fed into
-// the encryption algorithm.
-func (e *EncryptionAlgorithm) MinPadding() int {
-	return e.minPadding
+// PlaintextBlockSize returns the size of the plaintext blocksize that
+// can be fed into the encryption algorithm.
+// Used to calculate the amount of padding to add to the
+// unencrypted message
+func (e *EncryptionAlgorithm) PlaintextBlockSize() int {
+	return e.plainttextBlockSize
 }
 
 // Encrypt encrypts the input cleartext based on the algorithms and keys passed in
@@ -123,6 +125,13 @@ func (e *EncryptionAlgorithm) VerifySignature(message, signature []byte) error {
 // SignatureLength returns the length in bytes for the signature algorithm
 func (e *EncryptionAlgorithm) SignatureLength() int {
 	return e.signatureLength
+}
+
+// NonceLength returns the recommended nonce length in bytes for the security policy
+// Only applicable for the Asymmetric security algorithm.  Symmetric algorithms should
+// report NonceLength as zero
+func (e *EncryptionAlgorithm) NonceLength() int {
+	return e.nonceLength
 }
 
 // EncryptionURI returns the URI for the encryption algorithm as defined
