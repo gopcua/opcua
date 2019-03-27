@@ -53,7 +53,7 @@ func newBasic256Symmetric(localNonce []byte, remoteNonce []byte) (*EncryptionAlg
 	remoteKeys := generateKeys(computeHmac(crypto.SHA1, remoteNonce), localNonce, signatureKeyLength, encryptionKeyLength, encryptionBlockSize)
 
 	e.blockSize = aes.BlockSize
-	e.minPadding = minPaddingAES()
+	e.plainttextBlockSize = aes.BlockSize - minPaddingAES()
 	e.encrypt = encryptAES(256, remoteKeys.iv, remoteKeys.encryption) // AES256-CBC
 	e.decrypt = decryptAES(256, localKeys.iv, localKeys.encryption)   // AES256-CBC
 	e.signature = computeHmac(crypto.SHA1, remoteKeys.signing)        // HMAC-SHA1
@@ -69,6 +69,7 @@ func newBasic256Asymmetric(localKey *rsa.PrivateKey, remoteKey *rsa.PublicKey) (
 	const (
 		minAsymmetricKeyLength = 128 // 1024 bits
 		maxAsymmetricKeyLength = 256 // 2048 bits
+		nonceLength            = 32
 	)
 
 	if localKey != nil && (localKey.PublicKey.Size() < minAsymmetricKeyLength || localKey.PublicKey.Size() > maxAsymmetricKeyLength) {
@@ -84,11 +85,12 @@ func newBasic256Asymmetric(localKey *rsa.PrivateKey, remoteKey *rsa.PublicKey) (
 	e := new(EncryptionAlgorithm)
 
 	e.blockSize = remoteKey.Size()
-	e.minPadding = minPaddingRsaPKCS1v15()
+	e.plainttextBlockSize = remoteKey.Size() - minPaddingRsaOAEP(crypto.SHA1)
 	e.encrypt = encryptRsaOAEP(crypto.SHA1, remoteKey)         // RSA-OAEP
 	e.decrypt = decryptRsaOAEP(crypto.SHA1, localKey)          // RSA-OAEP
 	e.signature = signPKCS1v15(crypto.SHA1, localKey)          // RSA-SHA1
 	e.verifySignature = verifyPKCS1v15(crypto.SHA1, remoteKey) // RSA-SHA1
+	e.nonceLength = nonceLength
 	e.signatureLength = localKey.PublicKey.Size()
 	e.encryptionURI = "http://www.w3.org/2001/04/xmlenc#rsa-oaep"
 	e.signatureURI = "http://www.w3.org/2000/09/xmldsig#rsa-sha1"

@@ -109,18 +109,9 @@ func TestEncryptionAlgorithms(t *testing.T) {
 	payloadRef := make([]byte, len(payload))
 	copy(payloadRef, payload)
 
-	localNonce := make([]byte, 32)
-	remoteNonce := make([]byte, 32)
-	_, err = rand.Read(localNonce)
-	if err != nil {
-		t.Fatalf("could not generate local nonce")
-	}
-
-	_, err = rand.Read(remoteNonce)
-	if err != nil {
-		t.Fatalf("could not generate remote nonce")
-	}
-
+	// todo (dh): 2048 happens to be a keysize compatable with all current algorithms.
+	// This won't be the case forever and will be too small for future algorithms
+	// and the test will need to be able to input keys of varying size
 	localKey, err := generatePrivateKey(2048)
 	if err != nil {
 		t.Fatalf("Unable to generate local private key\n")
@@ -133,14 +124,37 @@ func TestEncryptionAlgorithms(t *testing.T) {
 	cases := SupportedPolicies()
 
 	for _, c := range cases {
+		localAsymmetric, err := Asymmetric(c, localKey, &remoteKey.PublicKey)
+		if err != nil {
+			t.Fatalf("failed local Asymmetric New(%s) : %s", c, err)
+		}
+
+		nonceLength := localAsymmetric.NonceLength()
+		var localNonce []byte
+		var remoteNonce []byte
+
+		if nonceLength > 0 {
+			localNonce = make([]byte, nonceLength)
+			remoteNonce = make([]byte, nonceLength)
+
+			_, err = rand.Read(localNonce)
+			if err != nil {
+				t.Fatalf("could not generate local nonce for %s", c)
+			}
+
+			_, err = rand.Read(remoteNonce)
+			if err != nil {
+				t.Fatalf("could not generate remote nonce for %s", c)
+			}
+		}
+
+		if nonceLength == 0 && c != "http://opcfoundation.org/UA/SecurityPolicy#None" {
+			t.Fatalf("client nonce length zero for %s", c)
+		}
 
 		localSymmetric, err := Symmetric(c, localNonce, remoteNonce)
 		if err != nil {
 			t.Fatalf("failed local Symmetric New(%s) : %s", c, err)
-		}
-		localAsymmetric, err := Asymmetric(c, localKey, &remoteKey.PublicKey)
-		if err != nil {
-			t.Fatalf("failed local Asymmetric New(%s) : %s", c, err)
 		}
 
 		remoteSymmetric, err := Symmetric(c, remoteNonce, localNonce)
@@ -242,11 +256,12 @@ func TestZeroStruct(t *testing.T) {
 
 	// Call all the methods and make sure they don't panic due to nil pointers
 	_ = ze.BlockSize()
-	_ = ze.MinPadding()
+	_ = ze.PlaintextBlockSize()
 	_, _ = ze.Encrypt(plaintext)
 	_, _ = ze.Decrypt(plaintext)
 	_, _ = ze.Signature(plaintext)
 	_ = ze.VerifySignature(plaintext, plaintext)
+	_ = ze.NonceLength()
 	_ = ze.SignatureLength()
 	_ = ze.EncryptionURI()
 	_ = ze.SignatureURI()
