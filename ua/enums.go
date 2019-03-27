@@ -46,11 +46,11 @@ const (
 	AttributeIDAccessLevelEx           AttributeID = 27
 )
 
-// Built-in Type identifiers.
+// Built-in type identifiers.
 //
 // All OPC UA DataEncodings are based on rules that are defined for a standard
 // set of built-in types. These built-in types are then used to construct
-// structures, arrays and Messages.
+// structures, arrays and messages.
 //
 // Specification: Part 6, 5.1.2
 type TypeID byte
