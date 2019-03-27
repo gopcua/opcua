@@ -16,6 +16,10 @@ type Node struct {
 	c *Client
 }
 
+func (n *Node) String() string {
+	return n.ID.String()
+}
+
 // NodeClass returns the node class attribute.
 func (n *Node) NodeClass() (ua.NodeClass, error) {
 	v, err := n.Attribute(ua.AttributeIDNodeClass)
