@@ -10,11 +10,11 @@ const (
 	NodeClassAll NodeClass = 0xff
 )
 
-type AttributeID uint32
-
 // Identifiers assigned to Attributes.
 //
 // Specification: Part 6, A.1
+type AttributeID uint32
+
 const (
 	AttributeIDInvalid                 AttributeID = 0
 	AttributeIDNodeID                  AttributeID = 1
@@ -46,8 +46,6 @@ const (
 	AttributeIDAccessLevelEx           AttributeID = 27
 )
 
-type Type byte
-
 // Built-in Type identifiers.
 //
 // All OPC UA DataEncodings are based on rules that are defined for a standard
@@ -55,30 +53,32 @@ type Type byte
 // structures, arrays and Messages.
 //
 // Specification: Part 6, 5.1.2
+type TypeID byte
+
 const (
-	TypeBoolean         Type = 1
-	TypeSByte           Type = 2
-	TypeByte            Type = 3
-	TypeInt16           Type = 4
-	TypeUint16          Type = 5
-	TypeInt32           Type = 6
-	TypeUint32          Type = 7
-	TypeInt64           Type = 8
-	TypeUint64          Type = 9
-	TypeFloat           Type = 10
-	TypeDouble          Type = 11
-	TypeString          Type = 12
-	TypeDateTime        Type = 13
-	TypeGUID            Type = 14
-	TypeByteString      Type = 15
-	TypeXMLElement      Type = 16
-	TypeNodeID          Type = 17
-	TypeExpandedNodeID  Type = 18
-	TypeStatusCode      Type = 19
-	TypeQualifiedName   Type = 20
-	TypeLocalizedText   Type = 21
-	TypeExtensionObject Type = 22
-	TypeDataValue       Type = 23
-	TypeVariant         Type = 24
-	TypeDiagnosticInfo  Type = 25
+	TypeIDBoolean         TypeID = 1
+	TypeIDSByte           TypeID = 2
+	TypeIDByte            TypeID = 3
+	TypeIDInt16           TypeID = 4
+	TypeIDUint16          TypeID = 5
+	TypeIDInt32           TypeID = 6
+	TypeIDUint32          TypeID = 7
+	TypeIDInt64           TypeID = 8
+	TypeIDUint64          TypeID = 9
+	TypeIDFloat           TypeID = 10
+	TypeIDDouble          TypeID = 11
+	TypeIDString          TypeID = 12
+	TypeIDDateTime        TypeID = 13
+	TypeIDGUID            TypeID = 14
+	TypeIDByteString      TypeID = 15
+	TypeIDXMLElement      TypeID = 16
+	TypeIDNodeID          TypeID = 17
+	TypeIDExpandedNodeID  TypeID = 18
+	TypeIDStatusCode      TypeID = 19
+	TypeIDQualifiedName   TypeID = 20
+	TypeIDLocalizedText   TypeID = 21
+	TypeIDExtensionObject TypeID = 22
+	TypeIDDataValue       TypeID = 23
+	TypeIDVariant         TypeID = 24
+	TypeIDDiagnosticInfo  TypeID = 25
 )
