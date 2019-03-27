@@ -534,6 +534,20 @@ func (c *Client) Call(req *ua.CallMethodRequest) (*ua.CallMethodResult, error) {
 	return res.Results[0], nil
 }
 
+// BrowseNext executes a synchronous browse request.
+func (c *Client) BrowseNext(req *ua.BrowseNextRequest) (*ua.BrowseNextResponse, error) {
+	var res *ua.BrowseNextResponse
+	err := c.Send(req, func(v interface{}) error {
+		r, ok := v.(*ua.BrowseNextResponse)
+		if !ok {
+			return fmt.Errorf("invalid response: %T", v)
+		}
+		res = r
+		return nil
+	})
+	return res, err
+}
+
 // Subscribe creates a Subscription with given parameters. Parameters that have not been set
 // (have zero values) are overwritten with default values.
 // See opcua.DefaultSubscription* constants

@@ -451,6 +451,15 @@ func (m *Variant) set(v interface{}) error {
 	return nil
 }
 
+func (m *Variant) NodeID() *NodeID {
+	switch m.Type() {
+	case TypeIDNodeID:
+		return m.value.(*NodeID)
+	default:
+		return nil
+	}
+}
+
 // todo(fs): this should probably be StringValue or we need to handle all types
 // todo(fs): and recursion
 func (m *Variant) String() string {

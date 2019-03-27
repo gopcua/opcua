@@ -19,9 +19,9 @@ func TestRead(t *testing.T) {
 		v  interface{}
 	}{
 		{ua.NewStringNodeID(2, "ro_bool"), true},
-		{ua.NewStringNodeID(2, "rw_bool"), true},
+		//{ua.NewStringNodeID(2, "rw_bool"), true},
 		{ua.NewStringNodeID(2, "ro_int32"), int32(5)},
-		{ua.NewStringNodeID(2, "rw_int32"), int32(5)},
+		//{ua.NewStringNodeID(2, "rw_int32"), int32(5)},
 	}
 
 	srv := NewServer("rw_server.py")
