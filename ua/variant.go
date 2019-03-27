@@ -64,8 +64,12 @@ func MustVariant(v interface{}) *Variant {
 	return va
 }
 
-func (m *Variant) TypeID() byte {
-	return m.EncodingMask & 0x3f
+func (m *Variant) Type() Type {
+	return Type(m.EncodingMask & 0x3f)
+}
+
+func (m *Variant) SetType(t Type) {
+	m.EncodingMask = byte(t & 0x3f)
 }
 
 func (m *Variant) Has(mask byte) bool {
@@ -85,8 +89,7 @@ func (m *Variant) Decode(b []byte) (int, error) {
 
 	values := make([]interface{}, elems)
 	for i := 0; i < elems; i++ {
-		mask := m.EncodingMask & 0x3f
-		switch mask {
+		switch m.Type() {
 		case TypeBoolean:
 			values[i] = buf.ReadBool()
 		case TypeSByte:
@@ -251,55 +254,55 @@ func (m *Variant) Encode() ([]byte, error) {
 func (m *Variant) Set(v interface{}) error {
 	switch v.(type) {
 	case bool:
-		m.EncodingMask = TypeBoolean
+		m.SetType(TypeBoolean)
 	case int8:
-		m.EncodingMask = TypeSByte
+		m.SetType(TypeSByte)
 	case byte:
-		m.EncodingMask = TypeByte
+		m.SetType(TypeByte)
 	case int16:
-		m.EncodingMask = TypeInt16
+		m.SetType(TypeInt16)
 	case uint16:
-		m.EncodingMask = TypeUint16
+		m.SetType(TypeUint16)
 	case int32:
-		m.EncodingMask = TypeInt32
+		m.SetType(TypeInt32)
 	case uint32:
-		m.EncodingMask = TypeUint32
+		m.SetType(TypeUint32)
 	case int64:
-		m.EncodingMask = TypeInt64
+		m.SetType(TypeInt64)
 	case uint64:
-		m.EncodingMask = TypeUint64
+		m.SetType(TypeUint64)
 	case float32:
-		m.EncodingMask = TypeFloat
+		m.SetType(TypeFloat)
 	case float64:
-		m.EncodingMask = TypeDouble
+		m.SetType(TypeDouble)
 	case string:
-		m.EncodingMask = TypeString
+		m.SetType(TypeString)
 	case time.Time:
-		m.EncodingMask = TypeDateTime
+		m.SetType(TypeDateTime)
 	case *GUID:
-		m.EncodingMask = TypeGUID
+		m.SetType(TypeGUID)
 	case []byte:
-		m.EncodingMask = TypeByteString
+		m.SetType(TypeByteString)
 	case XmlElement:
-		m.EncodingMask = TypeXMLElement
+		m.SetType(TypeXMLElement)
 	case *NodeID:
-		m.EncodingMask = TypeNodeID
+		m.SetType(TypeNodeID)
 	case *ExpandedNodeID:
-		m.EncodingMask = TypeExpandedNodeID
+		m.SetType(TypeExpandedNodeID)
 	case StatusCode:
-		m.EncodingMask = TypeStatusCode
+		m.SetType(TypeStatusCode)
 	case *QualifiedName:
-		m.EncodingMask = TypeQualifiedName
+		m.SetType(TypeQualifiedName)
 	case *LocalizedText:
-		m.EncodingMask = TypeLocalizedText
+		m.SetType(TypeLocalizedText)
 	case *ExtensionObject:
-		m.EncodingMask = TypeExtensionObject
+		m.SetType(TypeExtensionObject)
 	case *DataValue:
-		m.EncodingMask = TypeDataValue
+		m.SetType(TypeDataValue)
 	case *Variant:
-		m.EncodingMask = TypeVariant
+		m.SetType(TypeVariant)
 	case *DiagnosticInfo:
-		m.EncodingMask = TypeDiagnosticInfo
+		m.SetType(TypeDiagnosticInfo)
 	default:
 		return fmt.Errorf("opcua: cannot set variant to %T", v)
 	}
@@ -308,7 +311,7 @@ func (m *Variant) Set(v interface{}) error {
 }
 
 func (m *Variant) String() string {
-	switch m.TypeID() {
+	switch m.Type() {
 	case TypeString:
 		return m.Value.(string)
 	case TypeLocalizedText:
@@ -321,7 +324,7 @@ func (m *Variant) String() string {
 }
 
 func (m *Variant) Bool() bool {
-	switch m.TypeID() {
+	switch m.Type() {
 	case TypeBoolean:
 		return m.Value.(bool)
 	default:
@@ -330,7 +333,7 @@ func (m *Variant) Bool() bool {
 }
 
 func (m *Variant) Float() float64 {
-	switch m.TypeID() {
+	switch m.Type() {
 	case TypeFloat:
 		return float64(m.Value.(float32))
 	case TypeDouble:
@@ -341,7 +344,7 @@ func (m *Variant) Float() float64 {
 }
 
 func (m *Variant) Int() int64 {
-	switch m.TypeID() {
+	switch m.Type() {
 	case TypeSByte:
 		return int64(m.Value.(int8))
 	case TypeUint16:
@@ -356,7 +359,7 @@ func (m *Variant) Int() int64 {
 }
 
 func (m *Variant) Uint() uint64 {
-	switch m.TypeID() {
+	switch m.Type() {
 	case TypeByte:
 		return uint64(m.Value.(byte))
 	case TypeUint16:
@@ -371,7 +374,7 @@ func (m *Variant) Uint() uint64 {
 }
 
 func (m *Variant) Time() time.Time {
-	switch m.TypeID() {
+	switch m.Type() {
 	case TypeDateTime:
 		return m.Value.(time.Time)
 	default:

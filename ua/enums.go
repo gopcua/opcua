@@ -46,31 +46,37 @@ const (
 	AttributeIDAccessLevelEx           AttributeID = 27
 )
 
-// datatypes
+type Type byte
+
+// Built-in Type identifiers.
+//
+// All OPC UA DataEncodings are based on rules that are defined for a standard set of built-in types. These built-in types are then used to construct structures, arrays and Messages.
+//
+// Part 6, 5.1.2
 const (
-	TypeBoolean         = 1
-	TypeSByte           = 2
-	TypeByte            = 3
-	TypeInt16           = 4
-	TypeUint16          = 5
-	TypeInt32           = 6
-	TypeUint32          = 7
-	TypeInt64           = 8
-	TypeUint64          = 9
-	TypeFloat           = 10
-	TypeDouble          = 11
-	TypeString          = 12
-	TypeDateTime        = 13
-	TypeGUID            = 14
-	TypeByteString      = 15
-	TypeXMLElement      = 16
-	TypeNodeID          = 17
-	TypeExpandedNodeID  = 18
-	TypeStatusCode      = 19
-	TypeQualifiedName   = 20
-	TypeLocalizedText   = 21
-	TypeExtensionObject = 22
-	TypeDataValue       = 23
-	TypeVariant         = 24
-	TypeDiagnosticInfo  = 25
+	TypeBoolean         Type = 1
+	TypeSByte           Type = 2
+	TypeByte            Type = 3
+	TypeInt16           Type = 4
+	TypeUint16          Type = 5
+	TypeInt32           Type = 6
+	TypeUint32          Type = 7
+	TypeInt64           Type = 8
+	TypeUint64          Type = 9
+	TypeFloat           Type = 10
+	TypeDouble          Type = 11
+	TypeString          Type = 12
+	TypeDateTime        Type = 13
+	TypeGUID            Type = 14
+	TypeByteString      Type = 15
+	TypeXMLElement      Type = 16
+	TypeNodeID          Type = 17
+	TypeExpandedNodeID  Type = 18
+	TypeStatusCode      Type = 19
+	TypeQualifiedName   Type = 20
+	TypeLocalizedText   Type = 21
+	TypeExtensionObject Type = 22
+	TypeDataValue       Type = 23
+	TypeVariant         Type = 24
+	TypeDiagnosticInfo  Type = 25
 )
