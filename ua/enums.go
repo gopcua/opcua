@@ -50,9 +50,11 @@ type Type byte
 
 // Built-in Type identifiers.
 //
-// All OPC UA DataEncodings are based on rules that are defined for a standard set of built-in types. These built-in types are then used to construct structures, arrays and Messages.
+// All OPC UA DataEncodings are based on rules that are defined for a standard
+// set of built-in types. These built-in types are then used to construct
+// structures, arrays and Messages.
 //
-// Part 6, 5.1.2
+// Specification: Part 6, 5.1.2
 const (
 	TypeBoolean         Type = 1
 	TypeSByte           Type = 2
