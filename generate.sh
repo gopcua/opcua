@@ -9,7 +9,7 @@ go run cmd/service/*.go
 command -v stringer || go get -u golang.org/x/tools/cmd/stringer
 
 # find all enum types
-enums=$(grep -w type ua/enums*.go | awk '{print $2;}' | paste -sd, -)
+enums=$(grep -w '^type' ua/enums*.go | awk '{print $2;}' | paste -sd, -)
 
 # generate enum string method
 (cd ua && stringer -type $enums -output enums_strings_gen.go)
