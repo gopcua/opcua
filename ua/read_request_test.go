@@ -28,7 +28,7 @@ func TestReadRequest(t *testing.T) {
 				NodesToRead: []*ReadValueID{
 					&ReadValueID{
 						NodeID:       NewFourByteNodeID(0, 2256),
-						AttributeID:  IntegerIDValue,
+						AttributeID:  AttributeIDValue,
 						DataEncoding: &QualifiedName{},
 					},
 				},

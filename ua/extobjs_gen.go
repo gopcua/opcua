@@ -129,7 +129,7 @@ type PublishedDataSetDataType struct {
 
 type PublishedVariableDataType struct {
 	PublishedVariable    *NodeID
-	AttributeID          uint32
+	AttributeID          AttributeID
 	SamplingIntervalHint float64
 	DeadbandType         uint32
 	DeadbandValue        float64
@@ -251,7 +251,7 @@ type FieldTargetDataType struct {
 	DataSetFieldID        *GUID
 	ReceiverIndexRange    string
 	TargetNodeID          *NodeID
-	AttributeID           uint32
+	AttributeID           AttributeID
 	WriteIndexRange       string
 	OverrideValueHandling OverrideValueHandling
 	OverrideValue         *Variant
@@ -958,7 +958,7 @@ type ViewAttributes struct {
 }
 
 type GenericAttributeValue struct {
-	AttributeID uint32
+	AttributeID AttributeID
 	Value       *Variant
 }
 
@@ -1178,7 +1178,7 @@ type EndpointConfiguration struct {
 
 type QueryDataDescription struct {
 	RelativePath *RelativePath
-	AttributeID  uint32
+	AttributeID  AttributeID
 	IndexRange   string
 }
 
@@ -1222,14 +1222,14 @@ type AttributeOperand struct {
 	NodeID      *NodeID
 	Alias       string
 	BrowsePath  *RelativePath
-	AttributeID uint32
+	AttributeID AttributeID
 	IndexRange  string
 }
 
 type SimpleAttributeOperand struct {
 	TypeDefinitionID *NodeID
 	BrowsePath       []*QualifiedName
-	AttributeID      uint32
+	AttributeID      AttributeID
 	IndexRange       string
 }
 
@@ -1282,7 +1282,7 @@ type QueryNextResponse struct {
 
 type ReadValueID struct {
 	NodeID       *NodeID
-	AttributeID  uint32
+	AttributeID  AttributeID
 	IndexRange   string
 	DataEncoding *QualifiedName
 }
@@ -1376,7 +1376,7 @@ type HistoryReadResponse struct {
 
 type WriteValue struct {
 	NodeID      *NodeID
-	AttributeID uint32
+	AttributeID AttributeID
 	IndexRange  string
 	Value       *DataValue
 }

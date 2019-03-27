@@ -18,7 +18,7 @@ type Node struct {
 
 // NodeClass returns the node class attribute.
 func (n *Node) NodeClass() (ua.NodeClass, error) {
-	v, err := n.Attribute(ua.IntegerIDNodeClass)
+	v, err := n.Attribute(ua.AttributeIDNodeClass)
 	if err != nil {
 		return 0, err
 	}
@@ -27,7 +27,7 @@ func (n *Node) NodeClass() (ua.NodeClass, error) {
 
 // BrowseName returns the browse name of the node.
 func (n *Node) BrowseName() (*ua.QualifiedName, error) {
-	v, err := n.Attribute(ua.IntegerIDBrowseName)
+	v, err := n.Attribute(ua.AttributeIDBrowseName)
 	if err != nil {
 		return nil, err
 	}
@@ -36,7 +36,7 @@ func (n *Node) BrowseName() (*ua.QualifiedName, error) {
 
 // DisplayName returns the display name of the node.
 func (n *Node) DisplayName() (*ua.LocalizedText, error) {
-	v, err := n.Attribute(ua.IntegerIDDisplayName)
+	v, err := n.Attribute(ua.AttributeIDDisplayName)
 	if err != nil {
 		return nil, err
 	}
@@ -45,11 +45,11 @@ func (n *Node) DisplayName() (*ua.LocalizedText, error) {
 
 // Value returns the value of the node.
 func (n *Node) Value() (*ua.Variant, error) {
-	return n.Attribute(ua.IntegerIDValue)
+	return n.Attribute(ua.AttributeIDValue)
 }
 
 // Attribute returns the attribute of the node. with the given id.
-func (n *Node) Attribute(attrID uint32) (*ua.Variant, error) {
+func (n *Node) Attribute(attrID ua.AttributeID) (*ua.Variant, error) {
 	rv := &ua.ReadValueID{NodeID: n.ID, AttributeID: attrID}
 	req := &ua.ReadRequest{NodesToRead: []*ua.ReadValueID{rv}}
 	res, err := n.c.Read(req)

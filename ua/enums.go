@@ -10,44 +10,40 @@ const (
 	NodeClassAll NodeClass = 0xff
 )
 
-// IntegerID is a UInt32 that is used as an identifier, such as a handle.
-// All values, except for 0, are valid.
-//
-// Specification: Part 4, 7.14
-// type IntegerID uint32
+type AttributeID uint32
 
 // Identifiers assigned to Attributes.
 //
 // Specification: Part 6, A.1
 const (
-	IntegerIDInvalid = iota
-	IntegerIDNodeID
-	IntegerIDNodeClass
-	IntegerIDBrowseName
-	IntegerIDDisplayName
-	IntegerIDDescription
-	IntegerIDWriteMask
-	IntegerIDUserWriteMask
-	IntegerIDIsAbstract
-	IntegerIDSymmetric
-	IntegerIDInverseName
-	IntegerIDContainsNoLoops
-	IntegerIDEventNotifier
-	IntegerIDValue
-	IntegerIDDataType
-	IntegerIDValueRank
-	IntegerIDArrayDimensions
-	IntegerIDAccessLevel
-	IntegerIDUserAccessLevel
-	IntegerIDMinimumSamplingInterval
-	IntegerIDHistorizing
-	IntegerIDExecutable
-	IntegerIDUserExecutable
-	IntegerIDDataTypeDefinition
-	IntegerIDRolePermissions
-	IntegerIDUserRolePermissions
-	IntegerIDAccessRestrictions
-	IntegerIDAccessLevelEx
+	AttributeIDInvalid                 AttributeID = 0
+	AttributeIDNodeID                  AttributeID = 1
+	AttributeIDNodeClass               AttributeID = 2
+	AttributeIDBrowseName              AttributeID = 3
+	AttributeIDDisplayName             AttributeID = 4
+	AttributeIDDescription             AttributeID = 5
+	AttributeIDWriteMask               AttributeID = 6
+	AttributeIDUserWriteMask           AttributeID = 7
+	AttributeIDIsAbstract              AttributeID = 8
+	AttributeIDSymmetric               AttributeID = 9
+	AttributeIDInverseName             AttributeID = 10
+	AttributeIDContainsNoLoops         AttributeID = 11
+	AttributeIDEventNotifier           AttributeID = 12
+	AttributeIDValue                   AttributeID = 13
+	AttributeIDDataType                AttributeID = 14
+	AttributeIDValueRank               AttributeID = 15
+	AttributeIDArrayDimensions         AttributeID = 16
+	AttributeIDAccessLevel             AttributeID = 17
+	AttributeIDUserAccessLevel         AttributeID = 18
+	AttributeIDMinimumSamplingInterval AttributeID = 19
+	AttributeIDHistorizing             AttributeID = 20
+	AttributeIDExecutable              AttributeID = 21
+	AttributeIDUserExecutable          AttributeID = 22
+	AttributeIDDataTypeDefinition      AttributeID = 23
+	AttributeIDRolePermissions         AttributeID = 24
+	AttributeIDUserRolePermissions     AttributeID = 25
+	AttributeIDAccessRestrictions      AttributeID = 26
+	AttributeIDAccessLevelEx           AttributeID = 27
 )
 
 // datatypes

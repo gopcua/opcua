@@ -82,7 +82,7 @@ func (c *Client) Read(req *ua.ReadRequest) (*ua.ReadResponse, error) {
 		rc := &ua.ReadValueID{}
 		*rc = *rv
 		if rc.AttributeID == 0 {
-			rc.AttributeID = ua.IntegerIDValue
+			rc.AttributeID = ua.AttributeIDValue
 		}
 		if rc.DataEncoding == nil {
 			rc.DataEncoding = &ua.QualifiedName{}

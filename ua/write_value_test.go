@@ -15,7 +15,7 @@ func TestWriteValue(t *testing.T) {
 			Name: "normal",
 			Struct: &WriteValue{
 				NodeID:      NewFourByteNodeID(0, 2256),
-				AttributeID: IntegerIDValue,
+				AttributeID: AttributeIDValue,
 				Value: &DataValue{
 					EncodingMask:    DataValueValue | DataValueSourceTimestamp | DataValueServerTimestamp,
 					Value:           MustVariant(float32(2.50017)),
@@ -48,7 +48,7 @@ func TestWriteValueArray(t *testing.T) {
 			Struct: []*WriteValue{
 				&WriteValue{
 					NodeID:      NewFourByteNodeID(0, 2256),
-					AttributeID: IntegerIDValue,
+					AttributeID: AttributeIDValue,
 					Value: &DataValue{
 						EncodingMask:    DataValueValue | DataValueSourceTimestamp | DataValueServerTimestamp,
 						Value:           MustVariant(float32(2.50017)),
@@ -58,7 +58,7 @@ func TestWriteValueArray(t *testing.T) {
 				},
 				&WriteValue{
 					NodeID:      NewFourByteNodeID(0, 2256),
-					AttributeID: IntegerIDValue,
+					AttributeID: AttributeIDValue,
 					Value: &DataValue{
 						EncodingMask:    DataValueValue | DataValueSourceTimestamp | DataValueServerTimestamp,
 						Value:           MustVariant(float32(2.50017)),
