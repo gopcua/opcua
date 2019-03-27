@@ -10,71 +10,75 @@ const (
 	NodeClassAll NodeClass = 0xff
 )
 
-// IntegerID is a UInt32 that is used as an identifier, such as a handle.
-// All values, except for 0, are valid.
-//
-// Specification: Part 4, 7.14
-// type IntegerID uint32
-
 // Identifiers assigned to Attributes.
 //
 // Specification: Part 6, A.1
+type AttributeID uint32
+
 const (
-	IntegerIDInvalid = iota
-	IntegerIDNodeID
-	IntegerIDNodeClass
-	IntegerIDBrowseName
-	IntegerIDDisplayName
-	IntegerIDDescription
-	IntegerIDWriteMask
-	IntegerIDUserWriteMask
-	IntegerIDIsAbstract
-	IntegerIDSymmetric
-	IntegerIDInverseName
-	IntegerIDContainsNoLoops
-	IntegerIDEventNotifier
-	IntegerIDValue
-	IntegerIDDataType
-	IntegerIDValueRank
-	IntegerIDArrayDimensions
-	IntegerIDAccessLevel
-	IntegerIDUserAccessLevel
-	IntegerIDMinimumSamplingInterval
-	IntegerIDHistorizing
-	IntegerIDExecutable
-	IntegerIDUserExecutable
-	IntegerIDDataTypeDefinition
-	IntegerIDRolePermissions
-	IntegerIDUserRolePermissions
-	IntegerIDAccessRestrictions
-	IntegerIDAccessLevelEx
+	AttributeIDInvalid                 AttributeID = 0
+	AttributeIDNodeID                  AttributeID = 1
+	AttributeIDNodeClass               AttributeID = 2
+	AttributeIDBrowseName              AttributeID = 3
+	AttributeIDDisplayName             AttributeID = 4
+	AttributeIDDescription             AttributeID = 5
+	AttributeIDWriteMask               AttributeID = 6
+	AttributeIDUserWriteMask           AttributeID = 7
+	AttributeIDIsAbstract              AttributeID = 8
+	AttributeIDSymmetric               AttributeID = 9
+	AttributeIDInverseName             AttributeID = 10
+	AttributeIDContainsNoLoops         AttributeID = 11
+	AttributeIDEventNotifier           AttributeID = 12
+	AttributeIDValue                   AttributeID = 13
+	AttributeIDDataType                AttributeID = 14
+	AttributeIDValueRank               AttributeID = 15
+	AttributeIDArrayDimensions         AttributeID = 16
+	AttributeIDAccessLevel             AttributeID = 17
+	AttributeIDUserAccessLevel         AttributeID = 18
+	AttributeIDMinimumSamplingInterval AttributeID = 19
+	AttributeIDHistorizing             AttributeID = 20
+	AttributeIDExecutable              AttributeID = 21
+	AttributeIDUserExecutable          AttributeID = 22
+	AttributeIDDataTypeDefinition      AttributeID = 23
+	AttributeIDRolePermissions         AttributeID = 24
+	AttributeIDUserRolePermissions     AttributeID = 25
+	AttributeIDAccessRestrictions      AttributeID = 26
+	AttributeIDAccessLevelEx           AttributeID = 27
 )
 
-// datatypes
+// Built-in type identifiers.
+//
+// All OPC UA DataEncodings are based on rules that are defined for a standard
+// set of built-in types. These built-in types are then used to construct
+// structures, arrays and messages.
+//
+// Specification: Part 6, 5.1.2
+type TypeID byte
+
 const (
-	TypeBoolean         = 1
-	TypeSByte           = 2
-	TypeByte            = 3
-	TypeInt16           = 4
-	TypeUint16          = 5
-	TypeInt32           = 6
-	TypeUint32          = 7
-	TypeInt64           = 8
-	TypeUint64          = 9
-	TypeFloat           = 10
-	TypeDouble          = 11
-	TypeString          = 12
-	TypeDateTime        = 13
-	TypeGuid            = 14
-	TypeByteString      = 15
-	TypeXmlElement      = 16
-	TypeNodeId          = 17
-	TypeExpandedNodeId  = 18
-	TypeStatusCode      = 19
-	TypeQualifiedName   = 20
-	TypeLocalizedText   = 21
-	TypeExtensionObject = 22
-	TypeDataValue       = 23
-	TypeVariant         = 24
-	TypeDiagnosticInfo  = 25
+	TypeIDBoolean         TypeID = 1
+	TypeIDSByte           TypeID = 2
+	TypeIDByte            TypeID = 3
+	TypeIDInt16           TypeID = 4
+	TypeIDUint16          TypeID = 5
+	TypeIDInt32           TypeID = 6
+	TypeIDUint32          TypeID = 7
+	TypeIDInt64           TypeID = 8
+	TypeIDUint64          TypeID = 9
+	TypeIDFloat           TypeID = 10
+	TypeIDDouble          TypeID = 11
+	TypeIDString          TypeID = 12
+	TypeIDDateTime        TypeID = 13
+	TypeIDGUID            TypeID = 14
+	TypeIDByteString      TypeID = 15
+	TypeIDXMLElement      TypeID = 16
+	TypeIDNodeID          TypeID = 17
+	TypeIDExpandedNodeID  TypeID = 18
+	TypeIDStatusCode      TypeID = 19
+	TypeIDQualifiedName   TypeID = 20
+	TypeIDLocalizedText   TypeID = 21
+	TypeIDExtensionObject TypeID = 22
+	TypeIDDataValue       TypeID = 23
+	TypeIDVariant         TypeID = 24
+	TypeIDDiagnosticInfo  TypeID = 25
 )

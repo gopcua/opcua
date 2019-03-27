@@ -64,8 +64,13 @@ func MustVariant(v interface{}) *Variant {
 	return va
 }
 
-func (m *Variant) TypeID() byte {
-	return m.EncodingMask & 0x3f
+// Type returns the type id of the value.
+func (m *Variant) Type() TypeID {
+	return TypeID(m.EncodingMask & 0x3f)
+}
+
+func (m *Variant) setType(t TypeID) {
+	m.EncodingMask = byte(t & 0x3f)
 }
 
 func (m *Variant) Has(mask byte) bool {
@@ -85,74 +90,73 @@ func (m *Variant) Decode(b []byte) (int, error) {
 
 	values := make([]interface{}, elems)
 	for i := 0; i < elems; i++ {
-		mask := m.EncodingMask & 0x3f
-		switch mask {
-		case TypeBoolean:
+		switch m.Type() {
+		case TypeIDBoolean:
 			values[i] = buf.ReadBool()
-		case TypeSByte:
+		case TypeIDSByte:
 			values[i] = buf.ReadInt8()
-		case TypeByte:
+		case TypeIDByte:
 			values[i] = buf.ReadByte()
-		case TypeInt16:
+		case TypeIDInt16:
 			values[i] = buf.ReadInt16()
-		case TypeUint16:
+		case TypeIDUint16:
 			values[i] = buf.ReadUint16()
-		case TypeInt32:
+		case TypeIDInt32:
 			values[i] = buf.ReadInt32()
-		case TypeUint32:
+		case TypeIDUint32:
 			values[i] = buf.ReadUint32()
-		case TypeInt64:
+		case TypeIDInt64:
 			values[i] = buf.ReadInt64()
-		case TypeUint64:
+		case TypeIDUint64:
 			values[i] = buf.ReadUint64()
-		case TypeFloat:
+		case TypeIDFloat:
 			values[i] = buf.ReadFloat32()
-		case TypeDouble:
+		case TypeIDDouble:
 			values[i] = buf.ReadFloat64()
-		case TypeString:
+		case TypeIDString:
 			values[i] = buf.ReadString()
-		case TypeDateTime:
+		case TypeIDDateTime:
 			values[i] = buf.ReadTime()
-		case TypeGuid:
+		case TypeIDGUID:
 			v := new(GUID)
 			buf.ReadStruct(v)
 			values[i] = v
-		case TypeByteString:
+		case TypeIDByteString:
 			values[i] = buf.ReadBytes()
-		case TypeXmlElement:
+		case TypeIDXMLElement:
 			values[i] = XmlElement(buf.ReadString())
-		case TypeNodeId:
+		case TypeIDNodeID:
 			v := new(NodeID)
 			buf.ReadStruct(v)
 			values[i] = v
-		case TypeExpandedNodeId:
+		case TypeIDExpandedNodeID:
 			v := new(ExpandedNodeID)
 			buf.ReadStruct(v)
 			values[i] = v
-		case TypeStatusCode:
+		case TypeIDStatusCode:
 			values[i] = StatusCode(buf.ReadUint32())
-		case TypeQualifiedName:
+		case TypeIDQualifiedName:
 			v := new(QualifiedName)
 			buf.ReadStruct(v)
 			values[i] = v
-		case TypeLocalizedText:
+		case TypeIDLocalizedText:
 			v := new(LocalizedText)
 			buf.ReadStruct(v)
 			values[i] = v
-		case TypeExtensionObject:
+		case TypeIDExtensionObject:
 			v := new(ExtensionObject)
 			buf.ReadStruct(v)
 			values[i] = v
-		case TypeDataValue:
+		case TypeIDDataValue:
 			v := new(DataValue)
 			buf.ReadStruct(v)
 			values[i] = v
-		case TypeVariant:
+		case TypeIDVariant:
 			// todo(fs): limit recursion depth to 100
 			v := new(Variant)
 			buf.ReadStruct(v)
 			values[i] = v
-		case TypeDiagnosticInfo:
+		case TypeIDDiagnosticInfo:
 			// todo(fs): limit recursion depth to 100
 			v := new(DiagnosticInfo)
 			buf.ReadStruct(v)
@@ -251,55 +255,55 @@ func (m *Variant) Encode() ([]byte, error) {
 func (m *Variant) Set(v interface{}) error {
 	switch v.(type) {
 	case bool:
-		m.EncodingMask = TypeBoolean
+		m.setType(TypeIDBoolean)
 	case int8:
-		m.EncodingMask = TypeSByte
+		m.setType(TypeIDSByte)
 	case byte:
-		m.EncodingMask = TypeByte
+		m.setType(TypeIDByte)
 	case int16:
-		m.EncodingMask = TypeInt16
+		m.setType(TypeIDInt16)
 	case uint16:
-		m.EncodingMask = TypeUint16
+		m.setType(TypeIDUint16)
 	case int32:
-		m.EncodingMask = TypeInt32
+		m.setType(TypeIDInt32)
 	case uint32:
-		m.EncodingMask = TypeUint32
+		m.setType(TypeIDUint32)
 	case int64:
-		m.EncodingMask = TypeInt64
+		m.setType(TypeIDInt64)
 	case uint64:
-		m.EncodingMask = TypeUint64
+		m.setType(TypeIDUint64)
 	case float32:
-		m.EncodingMask = TypeFloat
+		m.setType(TypeIDFloat)
 	case float64:
-		m.EncodingMask = TypeDouble
+		m.setType(TypeIDDouble)
 	case string:
-		m.EncodingMask = TypeString
+		m.setType(TypeIDString)
 	case time.Time:
-		m.EncodingMask = TypeDateTime
+		m.setType(TypeIDDateTime)
 	case *GUID:
-		m.EncodingMask = TypeGuid
+		m.setType(TypeIDGUID)
 	case []byte:
-		m.EncodingMask = TypeByteString
+		m.setType(TypeIDByteString)
 	case XmlElement:
-		m.EncodingMask = TypeXmlElement
+		m.setType(TypeIDXMLElement)
 	case *NodeID:
-		m.EncodingMask = TypeNodeId
+		m.setType(TypeIDNodeID)
 	case *ExpandedNodeID:
-		m.EncodingMask = TypeExpandedNodeId
+		m.setType(TypeIDExpandedNodeID)
 	case StatusCode:
-		m.EncodingMask = TypeStatusCode
+		m.setType(TypeIDStatusCode)
 	case *QualifiedName:
-		m.EncodingMask = TypeQualifiedName
+		m.setType(TypeIDQualifiedName)
 	case *LocalizedText:
-		m.EncodingMask = TypeLocalizedText
+		m.setType(TypeIDLocalizedText)
 	case *ExtensionObject:
-		m.EncodingMask = TypeExtensionObject
+		m.setType(TypeIDExtensionObject)
 	case *DataValue:
-		m.EncodingMask = TypeDataValue
+		m.setType(TypeIDDataValue)
 	case *Variant:
-		m.EncodingMask = TypeVariant
+		m.setType(TypeIDVariant)
 	case *DiagnosticInfo:
-		m.EncodingMask = TypeDiagnosticInfo
+		m.setType(TypeIDDiagnosticInfo)
 	default:
 		return fmt.Errorf("opcua: cannot set variant to %T", v)
 	}
@@ -308,12 +312,12 @@ func (m *Variant) Set(v interface{}) error {
 }
 
 func (m *Variant) String() string {
-	switch m.TypeID() {
-	case TypeString:
+	switch m.Type() {
+	case TypeIDString:
 		return m.Value.(string)
-	case TypeLocalizedText:
+	case TypeIDLocalizedText:
 		return m.Value.(*LocalizedText).Text
-	case TypeQualifiedName:
+	case TypeIDQualifiedName:
 		return m.Value.(*QualifiedName).Name
 	default:
 		return fmt.Sprintf("%v", m.Value)
@@ -321,8 +325,8 @@ func (m *Variant) String() string {
 }
 
 func (m *Variant) Bool() bool {
-	switch m.TypeID() {
-	case TypeBoolean:
+	switch m.Type() {
+	case TypeIDBoolean:
 		return m.Value.(bool)
 	default:
 		return false
@@ -330,10 +334,10 @@ func (m *Variant) Bool() bool {
 }
 
 func (m *Variant) Float() float64 {
-	switch m.TypeID() {
-	case TypeFloat:
+	switch m.Type() {
+	case TypeIDFloat:
 		return float64(m.Value.(float32))
-	case TypeDouble:
+	case TypeIDDouble:
 		return m.Value.(float64)
 	default:
 		return 0
@@ -341,14 +345,14 @@ func (m *Variant) Float() float64 {
 }
 
 func (m *Variant) Int() int64 {
-	switch m.TypeID() {
-	case TypeSByte:
+	switch m.Type() {
+	case TypeIDSByte:
 		return int64(m.Value.(int8))
-	case TypeUint16:
+	case TypeIDUint16:
 		return int64(m.Value.(int16))
-	case TypeUint32:
+	case TypeIDUint32:
 		return int64(m.Value.(int32))
-	case TypeUint64:
+	case TypeIDUint64:
 		return m.Value.(int64)
 	default:
 		return 0
@@ -356,14 +360,14 @@ func (m *Variant) Int() int64 {
 }
 
 func (m *Variant) Uint() uint64 {
-	switch m.TypeID() {
-	case TypeByte:
+	switch m.Type() {
+	case TypeIDByte:
 		return uint64(m.Value.(byte))
-	case TypeUint16:
+	case TypeIDUint16:
 		return uint64(m.Value.(uint16))
-	case TypeUint32:
+	case TypeIDUint32:
 		return uint64(m.Value.(uint32))
-	case TypeUint64:
+	case TypeIDUint64:
 		return m.Value.(uint64)
 	default:
 		return 0
@@ -371,8 +375,8 @@ func (m *Variant) Uint() uint64 {
 }
 
 func (m *Variant) Time() time.Time {
-	switch m.TypeID() {
-	case TypeDateTime:
+	switch m.Type() {
+	case TypeIDDateTime:
 		return m.Value.(time.Time)
 	default:
 		return time.Time{}

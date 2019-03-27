@@ -28,7 +28,7 @@ func register(typeID uint16, v interface{}) {
 	serviceTypeID[typ] = typeID
 }
 
-func TypeID(v interface{}) uint16 {
+func ServiceTypeID(v interface{}) uint16 {
 	return serviceTypeID[reflect.TypeOf(v)]
 }
 

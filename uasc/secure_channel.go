@@ -155,7 +155,7 @@ func (s *SecureChannel) Send(svc interface{}, h func(interface{}) error) error {
 // SendAsync sends the service request and returns a channel which will receive the
 // response when it arrives.
 func (s *SecureChannel) SendAsync(svc interface{}) (resp chan Response, err error) {
-	typeID := ua.TypeID(svc)
+	typeID := ua.ServiceTypeID(svc)
 	if typeID == 0 {
 		return nil, fmt.Errorf("unknown service %T. Did you call register?", svc)
 	}

@@ -41,7 +41,7 @@ func main() {
 		NodesToWrite: []*ua.WriteValue{
 			&ua.WriteValue{
 				NodeID:      id,
-				AttributeID: ua.IntegerIDValue,
+				AttributeID: ua.AttributeIDValue,
 				Value: &ua.DataValue{
 					EncodingMask: ua.DataValueValue,
 					Value:        v,

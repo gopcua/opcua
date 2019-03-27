@@ -159,6 +159,9 @@ func ExtObjects(dict *TypeDictionary) []Type {
 				Name: goname.Format(f.Name),
 				Type: goFieldType(f),
 			}
+			if of.Name == "AttributeID" {
+				of.Type = "AttributeID"
+			}
 			o.Fields = append(o.Fields, of)
 		}
 
