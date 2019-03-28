@@ -22,7 +22,7 @@ func signRsaPss(hash crypto.Hash, privKey *rsa.PrivateKey) func([]byte) ([]byte,
 		h.Write(msg)
 		hashed := h.Sum(nil)
 
-		signature, err := rsa.SignPSS(rng, privKey, hash, hashed[:], nil)
+		signature, err := rsa.SignPSS(rng, privKey, hash, hashed[:], &rsa.PSSOptions{SaltLength: rsa.PSSSaltLengthEqualsHash})
 		if err != nil {
 			return nil, err
 		}

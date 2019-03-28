@@ -101,9 +101,9 @@ func newAes256Sha256RsaPssAsymmetric(localKey *rsa.PrivateKey, remoteKey *rsa.Pu
 	e := new(EncryptionAlgorithm)
 
 	e.blockSize = remoteKey.Size()
-	e.plainttextBlockSize = remoteKey.Size() - minPaddingRsaOAEP(crypto.SHA1)
-	e.encrypt = encryptRsaOAEP(crypto.SHA1, remoteKey)         // RSA-OAEP-SHA1
-	e.decrypt = decryptRsaOAEP(crypto.SHA1, localKey)          // RSA-OAEP-SHA1
+	e.plainttextBlockSize = remoteKey.Size() - minPaddingRsaOAEP(crypto.SHA256)
+	e.encrypt = encryptRsaOAEP(crypto.SHA256, remoteKey)       // RSA-OAEP-SHA256
+	e.decrypt = decryptRsaOAEP(crypto.SHA256, localKey)        // RSA-OAEP-SHA256
 	e.signature = signRsaPss(crypto.SHA256, localKey)          // RSA-PSS-SHA2-256
 	e.verifySignature = verifyRsaPss(crypto.SHA256, remoteKey) // RSA-PSS-SHA2-256
 	e.nonceLength = nonceLength

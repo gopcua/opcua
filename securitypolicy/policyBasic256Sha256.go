@@ -72,6 +72,7 @@ func newBasic256Rsa256Symmetric(localNonce []byte, remoteNonce []byte) (*Encrypt
 	e.decrypt = decryptAES(256, localKeys.iv, localKeys.encryption)   // AES256-CBC
 	e.signature = computeHmac(crypto.SHA256, remoteKeys.signing)      // HMAC-SHA2-256
 	e.verifySignature = verifyHmac(crypto.SHA256, localKeys.signing)  // HMAC-SHA2-256
+	e.signatureLength = 256 / 8
 	e.encryptionURI = "http://www.w3.org/2001/04/xmlenc#aes256-cbc"
 	e.signatureURI = "http://www.w3.org/2000/09/xmldsig#hmac-sha256"
 
