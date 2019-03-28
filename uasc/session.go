@@ -2,9 +2,13 @@ package uasc
 
 import (
 	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
 	"fmt"
 	"time"
 
+	"github.com/gopcua/opcua/keyring"
+	"github.com/gopcua/opcua/securitypolicy"
 	"github.com/gopcua/opcua/ua"
 )
 
@@ -50,7 +54,7 @@ func (s *Session) createSession() error {
 		EndpointURL:       s.sechan.EndpointURL,
 		SessionName:       fmt.Sprintf("gopcua-%d", time.Now().UnixNano()),
 		ClientNonce:       nonce,
-		ClientCertificate: s.sechan.cfg.Certificate,
+		ClientCertificate: s.sechan.cfg.LocalCertificate,
 	}
 
 	return s.sechan.Send(req, func(v interface{}) error {
@@ -59,12 +63,44 @@ func (s *Session) createSession() error {
 			return fmt.Errorf("invalid response. Got %T, want CreateSessionResponse", v)
 		}
 
+		var sig []byte
+		var sigAlg string
+		if s.sechan.cfg.ServerEndpoint.SecurityMode != ua.MessageSecurityModeNone {
+			localKey, err := keyring.PrivateKey(s.sechan.cfg.LocalThumbprint)
+			if err != nil {
+				return err
+			}
+
+			remoteCert, err := x509.ParseCertificate(resp.ServerCertificate)
+			if err != nil {
+				return err
+			}
+			remoteKey := remoteCert.PublicKey.(*rsa.PublicKey)
+
+			enc, err := securitypolicy.Asymmetric(s.sechan.cfg.ServerEndpoint.SecurityPolicyURI, localKey, remoteKey)
+			if err != nil {
+				return err
+			}
+			err = enc.VerifySignature(append(s.sechan.cfg.LocalCertificate, nonce...), resp.ServerSignature.Signature)
+			if err != nil {
+				return err
+			}
+
+			sig, err = enc.Signature(append(resp.ServerCertificate, resp.ServerNonce...))
+			if err != nil {
+				return err
+			}
+			sigAlg = enc.SignatureURI()
+		}
 		s.sechan.reqhdr.AuthenticationToken = resp.AuthenticationToken
 		s.cfg.ServerEndpoints = resp.ServerEndpoints
 		s.cfg.SessionTimeout = resp.RevisedSessionTimeout
-		// todo(fs): fix crypto: calculate signature data
-		// s.signatureToSend = ua.NewSignatureDataFrom(resp.ServerCertificate, resp.ServerNonce)
-		s.signatureToSend = &ua.SignatureData{}
+
+		s.signatureToSend = &ua.SignatureData{
+			Algorithm: sigAlg,
+			Signature: sig,
+		}
+
 		s.maxRequestMessageSize = resp.MaxRequestMessageSize
 
 		// todo(fs): fix crypto

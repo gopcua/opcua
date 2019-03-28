@@ -7,6 +7,7 @@ package uasc
 import (
 	"fmt"
 
+	"github.com/gopcua/opcua/keyring"
 	"github.com/gopcua/opcua/ua"
 )
 
@@ -18,7 +19,20 @@ type AsymmetricSecurityHeader struct {
 }
 
 // NewAsymmetricSecurityHeader creates a new OPC UA Secure Conversation Asymmetric Algorithm Security Header.
-func NewAsymmetricSecurityHeader(uri string, cert, thumbprint []byte) *AsymmetricSecurityHeader {
+func NewAsymmetricSecurityHeader(serverEndpoint *ua.EndpointDescription, senderCert []byte) *AsymmetricSecurityHeader {
+	var senderThumbprint []byte
+	if serverEndpoint.ServerCertificate != nil {
+		senderThumbprint = keyring.Thumbprint(serverEndpoint.ServerCertificate)
+	}
+	return &AsymmetricSecurityHeader{
+		SecurityPolicyURI:             serverEndpoint.SecurityPolicyURI,
+		SenderCertificate:             senderCert,
+		ReceiverCertificateThumbprint: senderThumbprint,
+	}
+}
+
+// todo(dh): Delete this; merely a band-aid to let tests pass while finalizing this code
+func OldAsymmetricSecurityHeader(uri string, cert, thumbprint []byte) *AsymmetricSecurityHeader {
 	return &AsymmetricSecurityHeader{
 		SecurityPolicyURI:             uri,
 		SenderCertificate:             cert,
@@ -43,11 +57,22 @@ func (h *AsymmetricSecurityHeader) Encode() ([]byte, error) {
 }
 
 // String returns Header in string.
-func (a *AsymmetricSecurityHeader) String() string {
+func (h *AsymmetricSecurityHeader) String() string {
 	return fmt.Sprintf(
 		"SecurityPolicyURI: %v, SenderCertificate: %v, ReceiverCertificateThumbprint: %v",
-		a.SecurityPolicyURI,
-		a.SenderCertificate,
-		a.ReceiverCertificateThumbprint,
+		h.SecurityPolicyURI,
+		h.SenderCertificate,
+		h.ReceiverCertificateThumbprint,
 	)
+}
+
+// Len returns the Header Length in bytes.
+func (h *AsymmetricSecurityHeader) Len() int {
+	var l int
+	l += 12
+	l += len(h.SecurityPolicyURI)
+	l += len(h.SenderCertificate)
+	l += len(h.ReceiverCertificateThumbprint)
+
+	return l
 }

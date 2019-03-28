@@ -6,9 +6,13 @@ package uasc
 
 import (
 	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
 	"encoding/binary"
+	mrand "math/rand"
 	"time"
 
+	"github.com/gopcua/opcua/keyring"
 	"github.com/gopcua/opcua/ua"
 
 	"github.com/pkg/errors"
@@ -26,11 +30,21 @@ type Config struct {
 	// to them.
 	SecureChannelID uint32
 
+	// ServerEndpoint is endpoint description to connect to.  Received from the GetEndpointsRequest
+	// Contains:
+	//   - SecurityPolicyURI
+	//   - MessageSecurityMode
+	//   - Server Certificate
+	//   - Authentication Profile URI
+	ServerEndpoint *ua.EndpointDescription
+
 	// SecurityPolicyURI is the URI of the Security Policy used to secure the Message.
 	// This field is encoded as a UTF-8 string without a null terminator.
 	SecurityPolicyURI string
 
-	// Certificate is the X.509 v3 Certificate assigned to the sending application Instance.
+	// Certificate []byte
+	// Thumbprint  []byte
+	// LocalCertificate is the X.509 v3 Certificate assigned to the sending application Instance.
 	// This is a DER encoded blob.
 	// The structure of an X.509 v3 Certificate is defined in X.509 v3.
 	// The DER format for a Certificate is defined in X690.
@@ -39,15 +53,34 @@ type Config struct {
 	// the Certificate is too large for the buffer size supported by the
 	// transport layer.
 	// This field shall be null if the Message is not signed.
-	Certificate []byte
+	LocalCertificate []byte
 
-	// Thumbprint is the thumbprint of the X.509 v3 Certificate assigned to the receiving
+	// LocalThumbprint is the thumbprint of the X.509 v3 Certificate assigned to the receiving
 	// application Instance.
 	// The thumbprint is the CertificateDigest of the DER encoded form of the
 	// Certificate.
 	// This indicates what public key was used to encrypt the MessageChunk.
 	// This field shall be null if the Message is not encrypted.
-	Thumbprint []byte
+	LocalThumbprint []byte
+
+	// RemoteCertificate is the X.509 v3 Certificate assigned to the receiving application Instance.
+	// This is a DER encoded blob.
+	// The structure of an X.509 v3 Certificate is defined in X.509 v3.
+	// The DER format for a Certificate is defined in X690.
+	// This indicates what Private Key was used to sign the MessageChunk.
+	// The Stack shall close the channel and report an error to the application if
+	// the Certificate is too large for the buffer size supported by the
+	// transport layer.
+	// This field shall be null if the Message is not signed.
+	//RemoteCertificate []byte
+
+	// RemoteThumbprint is the thumbprint of the X.509 v3 Certificate assigned to the receiving
+	// application Instance.
+	// The thumbprint is the CertificateDigest of the DER encoded form of the
+	// Certificate.
+	// This indicates what public key was used to encrypt the MessageChunk.
+	// This field shall be null if the Message is not encrypted.
+	//RemoteThumbprint []byte
 
 	// SequenceNumber is a monotonically increasing sequence number assigned by the sender to each
 	// MessageChunk sent over the SecureChannel.
@@ -61,7 +94,7 @@ type Config struct {
 	// is defined in 7.15.
 	// A SecureChannel may have to be created even if the securityMode is NONE. The exact behaviour
 	// depends on the mapping used and is described in the Part 6.
-	SecurityMode ua.MessageSecurityMode
+	// SecurityMode ua.MessageSecurityMode
 
 	// SecurityTokenID is a unique identifier for the SecureChannel SecurityToken used to secure the Message.
 	// This identifier is returned by the Server in an OpenSecureChannel response Message.
@@ -101,24 +134,65 @@ type Config struct {
 //
 // With all the parameter given, it is sufficient for client to open SecureChannel.
 // If the secMode is None, cert and thumbprint is not required(can be nil).
-func NewClientConfig(policyURI string, cert, thumbprint []byte, reqID uint32, secMode ua.MessageSecurityMode, lifetime uint32) *Config {
+func NewClientConfig(serverEndpoint *ua.EndpointDescription, localKey *rsa.PrivateKey, localCert []byte, lifetime uint32) *Config {
+	var err error
+
+	if serverEndpoint == nil || localKey == nil || localCert == nil {
+		return NewClientConfigSecurityNone(lifetime)
+	}
+
+	remoteX509, err := x509.ParseCertificate(serverEndpoint.ServerCertificate)
+	if err != nil {
+		return nil // Bad Security Error instead?
+	}
+	_ = keyring.Add(remoteX509, nil)
+
+	localX509, err := x509.ParseCertificate(localCert)
+	if err != nil {
+		return nil // Bad Security Error instead?
+	}
+	localThumb := keyring.Add(localX509, localKey)
+
 	return &Config{
-		SecurityPolicyURI: policyURI,
-		Certificate:       cert,
-		Thumbprint:        thumbprint,
-		RequestID:         reqID,
-		SecurityMode:      secMode,
-		Lifetime:          lifetime,
+		ServerEndpoint: serverEndpoint,
+		//		SecurityPolicyURI: policyURI,
+		LocalCertificate: localCert,
+		//		RemoteCertificate: remoteCert,
+		LocalThumbprint: localThumb,
+		//		RemoteThumbprint:  remoteThumb,
+		RequestID: uint32(mrand.Int31()),
+		//		SecurityMode:      secMode,
+		Lifetime: lifetime,
 	}
 }
 
 // NewClientConfigSecurityNone creates a new Config for Client, with SecurityMode=None.
-func NewClientConfigSecurityNone(reqID, lifetime uint32) *Config {
-	return &Config{
+func NewClientConfigSecurityNone(lifetime uint32) *Config {
+	serverEndpoint := &ua.EndpointDescription{
+		//EndpointURL:       "ep-url",
 		SecurityPolicyURI: "http://opcfoundation.org/UA/SecurityPolicy#None",
-		RequestID:         reqID,
 		SecurityMode:      ua.MessageSecurityModeNone,
-		Lifetime:          lifetime,
+		SecurityLevel:     1,
+		ServerCertificate: nil,
+		UserIdentityTokens: []*ua.UserTokenPolicy{
+			&ua.UserTokenPolicy{
+				PolicyID:          "Anonymous",
+				TokenType:         ua.UserTokenTypeAnonymous,
+				IssuedTokenType:   "",
+				IssuerEndpointURL: "",
+				SecurityPolicyURI: "http://opcfoundation.org/UA/SecurityPolicy#None",
+			},
+		},
+		TransportProfileURI: "http://opcfoundation.org/UA-Profile/Transport/uatcp-uasc-uabinary",
+	}
+
+	return &Config{
+		//SecurityPolicyURI: "http://opcfoundation.org/UA/SecurityPolicy#None",
+		ServerEndpoint: serverEndpoint,
+		RequestID:      uint32(mrand.Int31()),
+		//		SecurityMode:   ua.MessageSecurityModeNone,
+		LocalThumbprint: nil,
+		Lifetime:        lifetime,
 	}
 }
 
@@ -200,49 +274,52 @@ func NewClientConfigSignAndEncryptPubSubAes256CTR(cert, thumbprint []byte, reqID
 //
 // With all the parameter given, it is sufficient for server to accept SecureChannel.
 // If the secMode is None, cert and thumbprint is not required(can be nil).
-func NewServerConfig(policyURI string, cert, thumbprint []byte, chanID uint32, secMode ua.MessageSecurityMode, tokenID, lifetime uint32) *Config {
+func NewServerConfig(serverEndpoint *ua.EndpointDescription, localKey *rsa.PrivateKey, localCert []byte, chanID, tokenID, lifetime uint32) *Config {
+	//func NewServerConfig(policyURI string, cert, thumbprint []byte, chanID uint32, secMode ua.MessageSecurityMode, tokenID, lifetime uint32) *Config {
 	return &Config{
-		SecurityPolicyURI: policyURI,
-		Certificate:       cert,
-		Thumbprint:        thumbprint,
-		SecureChannelID:   chanID,
-		SecurityMode:      secMode,
-		SecurityTokenID:   tokenID,
-		Lifetime:          lifetime,
+		//SecurityPolicyURI: policyURI,
+		ServerEndpoint: serverEndpoint,
+		//Certificate:       cert,
+		//Thumbprint:        thumbprint,
+		SecureChannelID: chanID,
+		//SecurityMode:      secMode,
+		SecurityTokenID: tokenID,
+		Lifetime:        lifetime,
 	}
 }
 
+// todo(dh): Temporarily disable validation of configs until the structure stops changing
 // validate validates Config. This is just to avoid crash. Strange values would be accepted for flexibility.
-func (c *Config) validate(appType string) error {
-	switch appType {
-	case "client":
-		return c.validateClientConfig()
-	case "server":
-		return c.validateClientConfig()
-	default:
-		return errors.New("invalid type. should be client or server")
-	}
-}
+//func (c *Config) validate(appType string) error {
+//	switch appType {
+//	case "client":
+//		return c.validateClientConfig()
+//	case "server":
+//		return c.validateClientConfig()
+//	default:
+//		return errors.New("invalid type. should be client or server")
+//	}
+//}
 
-func (c *Config) validateClientConfig() error {
-	if c.SecurityMode == ua.MessageSecurityModeSignAndEncrypt && (c.Certificate == nil || c.Thumbprint == nil) {
-		return errors.New("Certificate, Thumbprint is required when using SignAndEncrypt")
-	}
+//func (c *Config) validateClientConfig() error {
+//	if c.SecurityMode == ua.MessageSecurityModeSignAndEncrypt && (c.Certificate == nil || c.Thumbprint == nil) {
+//		return errors.New("Certificate, Thumbprint is required when using SignAndEncrypt")
+//	}
+//
+//	if c.SecurityMode == ua.MessageSecurityModeNone {
+//		c.Certificate = nil
+//		c.Thumbprint = nil
+//	}
+//	return nil
+//}
 
-	if c.SecurityMode == ua.MessageSecurityModeNone {
-		c.Certificate = nil
-		c.Thumbprint = nil
-	}
-	return nil
-}
-
-func (c *Config) validateServerConfig() error {
-	if c.SecurityMode == ua.MessageSecurityModeNone {
-		c.Certificate = nil
-		c.Thumbprint = nil
-	}
-	return nil
-}
+//func (c *Config) validateServerConfig() error {
+//	if c.SecurityMode == ua.MessageSecurityModeNone {
+//		c.Certificate = nil
+//		c.Thumbprint = nil
+//	}
+//	return nil
+//}
 
 // SessionConfig is a set of common configurations used in Session.
 type SessionConfig struct {
@@ -312,13 +389,16 @@ type SessionConfig struct {
 }
 
 // NewClientSessionConfig creates a SessionConfig for client.
-func NewClientSessionConfig(locales []string, userToken interface{}) *SessionConfig {
+func NewClientSessionConfig(applicationURI string, locales []string, userToken interface{}) *SessionConfig {
+	if applicationURI == "" {
+		applicationURI = "urn:gopcua:client"
+	}
 	return &SessionConfig{
 		SessionTimeout: 0xffff,
 		ClientDescription: &ua.ApplicationDescription{
-			ApplicationURI:  "urn:gopcua:client",
+			ApplicationURI:  applicationURI,
 			ProductURI:      "urn:gopcua",
-			ApplicationName: &ua.LocalizedText{Text: "gopcua - OPC UA implementation in pure Golang"},
+			ApplicationName: &ua.LocalizedText{Text: "gopcua - OPC UA implementation in pure Go"},
 			ApplicationType: ua.ApplicationTypeClient,
 		},
 		LocaleIDs:          locales,
@@ -342,12 +422,12 @@ func NewServerSessionConfig(secChan *SecureChannel) *SessionConfig {
 				Server: &ua.ApplicationDescription{
 					ApplicationURI:  "urn:gopcua:client",
 					ProductURI:      "urn:gopcua",
-					ApplicationName: &ua.LocalizedText{Text: "gopcua - OPC UA implementation in pure Golang"},
+					ApplicationName: &ua.LocalizedText{Text: "gopcua - OPC UA implementation in pure Go"},
 					ApplicationType: ua.ApplicationTypeServer,
 				},
-				ServerCertificate: secChan.cfg.Certificate,
-				SecurityMode:      secChan.cfg.SecurityMode,
-				SecurityPolicyURI: secChan.cfg.SecurityPolicyURI,
+				ServerCertificate: secChan.cfg.ServerEndpoint.ServerCertificate,
+				SecurityMode:      secChan.cfg.ServerEndpoint.SecurityMode,
+				SecurityPolicyURI: secChan.cfg.ServerEndpoint.SecurityPolicyURI,
 				// UserIdentityTokens: []*ua.UserTokenPolicy{&ua.UserTokenPolicy{}},
 			},
 		},

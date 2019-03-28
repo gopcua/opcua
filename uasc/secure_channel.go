@@ -2,6 +2,8 @@ package uasc
 
 import (
 	"crypto/rand"
+	"crypto/rsa"
+	"encoding/binary"
 	"fmt"
 	"io"
 	"log"
@@ -12,6 +14,9 @@ import (
 	"time"
 
 	"github.com/gopcua/opcua/debug"
+	"github.com/gopcua/opcua/keyring"
+
+	"github.com/gopcua/opcua/securitypolicy"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uacp"
 )
@@ -51,6 +56,12 @@ type SecureChannel struct {
 	// handle which is part of the Request and Response headers.
 	mu      sync.Mutex
 	handler map[uint32]chan Response
+
+	// Encryption Algorithms for sending and receiving messages
+	// During the OpenSecureChannel phase, this contains the Asymmetric Algorithms
+	// After both secure nonces are received from the OpenSecureChannel phase,
+	// this is replaced by the Symmetric algorithm methods for all other communication.
+	encryptionAlgorithm *securitypolicy.EncryptionAlgorithm
 }
 
 func init() {
@@ -59,7 +70,7 @@ func init() {
 
 func NewSecureChannel(c *uacp.Conn, cfg *Config) *SecureChannel {
 	if cfg == nil {
-		cfg = NewClientConfigSecurityNone(uint32(mrand.Int31()), 3600000)
+		cfg = NewClientConfigSecurityNone(3600000)
 	}
 
 	// always reset the secure channel id
@@ -100,8 +111,32 @@ func (s *SecureChannel) LocalEndpoint() string {
 }
 
 func (s *SecureChannel) openSecureChannel() error {
-	// todo(fs): do we need to set the nonce if the security policy is None?
-	nonce := make([]byte, 32)
+	var err error
+	var localKey *rsa.PrivateKey
+	var remoteKey *rsa.PublicKey
+
+	// Set the encryption methods to Asymmetric with the appropriate
+	// public keys.  OpenSecureChannel is always encrypted with the
+	// asymmetric algorithms.
+	// The default value of the encryption algorithm method is the
+	// SecurityModeNone so no additional work is required for that case
+	if s.cfg.ServerEndpoint.SecurityMode != ua.MessageSecurityModeNone {
+		localKey, err = keyring.PrivateKey(s.cfg.LocalThumbprint)
+		if err != nil {
+			return err
+		}
+		remoteKey, err = keyring.PublicKey(keyring.Thumbprint(s.cfg.ServerEndpoint.ServerCertificate))
+		if err != nil {
+			return err
+		}
+	}
+
+	s.encryptionAlgorithm, err = securitypolicy.Asymmetric(s.cfg.ServerEndpoint.SecurityPolicyURI, localKey, remoteKey)
+	if err != nil {
+		return err
+	}
+
+	nonce := make([]byte, s.encryptionAlgorithm.NonceLength())
 	if _, err := rand.Read(nonce); err != nil {
 		return err
 	}
@@ -109,7 +144,7 @@ func (s *SecureChannel) openSecureChannel() error {
 	req := &ua.OpenSecureChannelRequest{
 		ClientProtocolVersion: 0,
 		RequestType:           ua.SecurityTokenRequestTypeIssue,
-		SecurityMode:          s.cfg.SecurityMode,
+		SecurityMode:          s.cfg.ServerEndpoint.SecurityMode,
 		ClientNonce:           nonce,
 		RequestedLifetime:     s.cfg.Lifetime,
 	}
@@ -119,7 +154,16 @@ func (s *SecureChannel) openSecureChannel() error {
 		if !ok {
 			return fmt.Errorf("got %T, want OpenSecureChannelResponse", req)
 		}
+
 		s.cfg.SecurityTokenID = resp.SecurityToken.TokenID
+
+		// Reset the encryption algorithm to the symmetric version.
+		// The asymmetric information is unavailable and irrelevant at after point
+		s.encryptionAlgorithm, err = securitypolicy.Symmetric(s.cfg.ServerEndpoint.SecurityPolicyURI, nonce, resp.ServerNonce)
+		if err != nil {
+			return err
+		}
+
 		atomic.StoreInt32(&s.state, secureChannelOpen)
 		return nil
 	})
@@ -183,6 +227,12 @@ func (s *SecureChannel) SendAsync(svc interface{}) (resp chan Response, err erro
 	}
 	reqid := m.SequenceHeader.RequestID
 
+	// Encrypt the encoded message
+	// If securitypolicy = None, this returns the input untouched
+	//fmt.Printf("%X\n\n===\n\n", b)
+
+	b, err = s.signAndEncrypt(m, b)
+
 	// send the message
 	if _, err := s.c.Write(b); err != nil {
 		return nil, err
@@ -195,6 +245,99 @@ func (s *SecureChannel) SendAsync(svc interface{}) (resp chan Response, err erro
 	s.handler[reqid] = resp
 	s.mu.Unlock()
 	return resp, nil
+}
+
+func (s *SecureChannel) signAndEncrypt(m *Message, b []byte) ([]byte, error) {
+	// Nothing to do
+	if s.cfg.ServerEndpoint.SecurityMode == ua.MessageSecurityModeNone {
+		return b, nil
+	}
+
+	var isAsymmetric bool
+	if atomic.LoadInt32(&s.state) != secureChannelOpen {
+		isAsymmetric = true
+	}
+
+	var headerLength int
+	if isAsymmetric {
+		headerLength = 12 + m.AsymmetricSecurityHeader.Len()
+	} else {
+		headerLength = 12 + m.SymmetricSecurityHeader.Len()
+	}
+
+	var encryptedLength int
+	if s.cfg.ServerEndpoint.SecurityMode == ua.MessageSecurityModeSignAndEncrypt || isAsymmetric {
+		plaintextBlockSize := s.encryptionAlgorithm.PlaintextBlockSize()
+		paddingLength := plaintextBlockSize - ((len(b[headerLength:]) + s.encryptionAlgorithm.SignatureLength() + 1) % plaintextBlockSize)
+		for i := 0; i <= paddingLength; i++ {
+			b = append(b, byte(paddingLength))
+		}
+		encryptedLength = ((len(b[headerLength:]) + s.encryptionAlgorithm.SignatureLength()) / plaintextBlockSize) * s.encryptionAlgorithm.BlockSize()
+	} else { // MessageSecurityModeSign
+		encryptedLength = len(b[headerLength:]) + s.encryptionAlgorithm.SignatureLength()
+	}
+
+	// Fix header size to account for signing / encryption
+	binary.LittleEndian.PutUint32(b[4:], uint32(headerLength+encryptedLength))
+	m.Header.MessageSize = uint32(headerLength + encryptedLength)
+
+	signature, err := s.encryptionAlgorithm.Signature(b)
+	if err != nil {
+		return nil, ua.StatusBadSecurityChecksFailed
+	}
+
+	b = append(b, signature...)
+	c := b[headerLength:]
+	if s.cfg.ServerEndpoint.SecurityMode == ua.MessageSecurityModeSignAndEncrypt || isAsymmetric {
+		c, err = s.encryptionAlgorithm.Encrypt(c)
+		if err != nil {
+			return nil, ua.StatusBadSecurityChecksFailed
+		}
+	}
+
+	return append(b[:headerLength], c...), nil
+}
+
+func (s *SecureChannel) verifyAndDecrypt(m *MessageChunk, b []byte) ([]byte, error) {
+	var err error
+
+	var isAsymmetric bool
+	if atomic.LoadInt32(&s.state) != secureChannelOpen {
+		isAsymmetric = true
+	}
+
+	var headerLength int
+	if isAsymmetric {
+		headerLength = 12 + m.AsymmetricSecurityHeader.Len()
+	} else {
+		headerLength = 12 + m.SymmetricSecurityHeader.Len()
+	}
+
+	// Nothing to do
+	if s.cfg.ServerEndpoint.SecurityMode == ua.MessageSecurityModeNone {
+		return b[headerLength:], nil
+	}
+
+	if s.cfg.ServerEndpoint.SecurityMode == ua.MessageSecurityModeSignAndEncrypt || isAsymmetric {
+		p, err := s.encryptionAlgorithm.Decrypt(b[headerLength:])
+		if err != nil {
+			return nil, ua.StatusBadSecurityChecksFailed
+		}
+		b = append(b[:headerLength], p...)
+	}
+
+	signature := b[len(b)-s.encryptionAlgorithm.SignatureLength():]
+	messageToVerify := b[:len(b)-s.encryptionAlgorithm.SignatureLength()]
+
+	if err = s.encryptionAlgorithm.VerifySignature(messageToVerify, signature); err != nil {
+		return nil, ua.StatusBadSecurityChecksFailed
+	}
+
+	paddingLength := messageToVerify[len(messageToVerify)-1]
+
+	b = messageToVerify[:len(messageToVerify)-int(paddingLength)]
+
+	return b[headerLength:], nil
 }
 
 func (s *SecureChannel) readchunk() (*MessageChunk, error) {
@@ -234,8 +377,18 @@ func (s *SecureChannel) readchunk() (*MessageChunk, error) {
 		return nil, fmt.Errorf("sechan: decode message failed: %s", err)
 	}
 
+	m.Data, err = s.verifyAndDecrypt(m, b)
+	if err != nil {
+		return nil, err
+	}
+
+	n, err := m.SequenceHeader.Decode(m.Data)
+	if err != nil {
+		return nil, err
+	}
+	m.Data = m.Data[n:]
+
 	// todo(fs): handle ERR messages
-	// todo(fs): handle crypto
 
 	if s.cfg.SecureChannelID == 0 {
 		s.cfg.SecureChannelID = h.SecureChannelID
@@ -261,6 +414,9 @@ func (s *SecureChannel) recv() {
 			chunk, err := s.readchunk()
 			if err == io.EOF {
 				return
+			}
+			if err != nil {
+				log.Fatal(err)
 			}
 
 			hdr := chunk.Header

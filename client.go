@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/gopcua/opcua/keyring"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uacp"
 	"github.com/gopcua/opcua/uasc"
@@ -32,7 +33,12 @@ func (c *Client) Open() error {
 	if err != nil {
 		return err
 	}
-	sechan := uasc.NewSecureChannel(conn, nil)
+
+	if c.config == nil {
+		c.config = uasc.NewClientConfigSecurityNone(3600000)
+	}
+
+	sechan := uasc.NewSecureChannel(conn, c.config)
 	if err := sechan.Open(); err != nil {
 		conn.Close()
 		return err
@@ -40,10 +46,32 @@ func (c *Client) Open() error {
 	sechan.EndpointURL = c.Addr
 	c.sechan = sechan
 
+	// todo(dh): Should probably be able to use a different cert than the secchan cert
+	var appURI string
+	if c.config.LocalThumbprint != nil {
+		cert, err := keyring.Certificate(c.config.LocalThumbprint)
+		if err == nil && len(cert.URIs) > 0 {
+			appURI = cert.URIs[0].String()
+		}
+	}
+
+	var tokenID *ua.AnonymousIdentityToken
+	for _, t := range c.config.ServerEndpoint.UserIdentityTokens {
+		// todo(dh): Allow more than anonymous authentication eventually
+		if t.TokenType == ua.UserTokenTypeAnonymous {
+			tokenID = &ua.AnonymousIdentityToken{PolicyID: t.PolicyID}
+			break
+		}
+	}
+	if tokenID == nil {
+		tokenID = &ua.AnonymousIdentityToken{PolicyID: "Anonymous"}
+	}
+
 	// todo(fs): this should probably be configurable.
 	sessionCfg := uasc.NewClientSessionConfig(
+		appURI,
 		[]string{"en-US"},
-		&ua.AnonymousIdentityToken{PolicyID: "open62541-anonymous-policy"},
+		tokenID,
 	)
 
 	session := uasc.NewSession(sechan, sessionCfg)
@@ -132,6 +160,49 @@ func (c *Client) Browse(req *ua.BrowseRequest) (*ua.BrowseResponse, error) {
 		return nil
 	})
 	return res, err
+}
+
+// GetEndpoints reads all available endpoints from the server at endpoint
+func GetEndpoints(endpoint string) ([]*ua.EndpointDescription, error) {
+	var res *ua.GetEndpointsResponse
+
+	ctx := context.Background()
+
+	c := NewClient(endpoint, nil)
+	conn, err := uacp.Dial(ctx, c.Addr)
+	if err != nil {
+		return nil, err
+	}
+	sechan := uasc.NewSecureChannel(conn, nil)
+	if err := sechan.Open(); err != nil {
+		conn.Close()
+		return nil, err
+	}
+	sechan.EndpointURL = c.Addr
+	c.sechan = sechan
+
+	reqHeader := &ua.RequestHeader{
+		AuthenticationToken: ua.NewTwoByteNodeID(0),
+		Timestamp:           time.Now(),
+		AdditionalHeader:    ua.NewExtensionObject(nil),
+	}
+
+	req := &ua.GetEndpointsRequest{
+		RequestHeader: reqHeader,
+		EndpointURL:   endpoint,
+	}
+
+	err = c.sechan.Send(req, func(v interface{}) error {
+		r, ok := v.(*ua.GetEndpointsResponse)
+		if !ok {
+			return fmt.Errorf("invalid response: %T", v)
+		}
+		res = r
+		return nil
+	})
+
+	c.Close()
+	return res.Endpoints, err
 }
 
 // todo(fs): this is not done yet since we need to be able to register
