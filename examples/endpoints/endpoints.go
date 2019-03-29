@@ -2,6 +2,7 @@
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
+// Package main provides an example to query the available endpoints of a server.
 package main
 
 import (
@@ -10,28 +11,20 @@ import (
 
 	"github.com/gopcua/opcua"
 	"github.com/gopcua/opcua/debug"
-	"github.com/gopcua/opcua/ua"
 )
 
 func main() {
-	endpoint := flag.String("endpoint", "opc.tcp://localhost:4840", "OPC UA Endpoint URL")
+	var endpoint = flag.String("endpoint", "opc.tcp://localhost:4840", "OPC UA Endpoint URL")
 	flag.BoolVar(&debug.Enable, "debug", false, "enable debug logging")
 	flag.Parse()
 	log.SetFlags(0)
 
-	c := &opcua.Client{EndpointURL: *endpoint}
-	if err := c.Connect(); err != nil {
-		log.Fatal(err)
-	}
-	defer c.Close()
-
-	v, err := c.Node(ua.NewNumericNodeID(0, 2258)).Value()
+	eps, err := opcua.GetEndpoints(*endpoint)
 	if err != nil {
 		log.Fatal(err)
 	}
-	if v != nil {
-		log.Print(v.Value)
-	} else {
-		log.Print("v == nil")
+
+	for _, ep := range eps {
+		log.Println(ep.EndpointURL, ep.SecurityPolicyURI, ep.SecurityMode)
 	}
 }

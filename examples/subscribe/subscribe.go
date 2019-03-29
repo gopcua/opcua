@@ -19,8 +19,8 @@ func main() {
 	flag.Parse()
 	log.SetFlags(0)
 
-	c := opcua.NewClient(*endpoint, nil)
-	if err := c.Open(); err != nil {
+	c := &opcua.Client{EndpointURL: *endpoint}
+	if err := c.Connect(); err != nil {
 		log.Fatal(err)
 	}
 	defer c.Close()

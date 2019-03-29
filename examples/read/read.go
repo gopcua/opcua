@@ -14,14 +14,16 @@ import (
 )
 
 func main() {
-	endpoint := flag.String("endpoint", "opc.tcp://localhost:4840", "OPC UA Endpoint URL")
-	nodeID := flag.String("node", "", "NodeID to read")
+	var (
+		endpoint = flag.String("endpoint", "opc.tcp://localhost:4840", "OPC UA Endpoint URL")
+		nodeID   = flag.String("node", "", "NodeID to read")
+	)
 	flag.BoolVar(&debug.Enable, "debug", false, "enable debug logging")
 	flag.Parse()
 	log.SetFlags(0)
 
-	c := opcua.NewClient(*endpoint, nil)
-	if err := c.Open(); err != nil {
+	c := &opcua.Client{EndpointURL: *endpoint}
+	if err := c.Connect(); err != nil {
 		log.Fatal(err)
 	}
 	defer c.Close()
