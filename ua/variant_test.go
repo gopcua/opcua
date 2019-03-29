@@ -309,3 +309,133 @@ func TestVariant(t *testing.T) {
 	}
 	RunCodecTest(t, cases)
 }
+
+func TestVariantUnsupportedType(t *testing.T) {
+	_, err := NewVariant(int(5))
+	if err == nil {
+		t.Fatal("got nil want err")
+	}
+}
+
+func TestVariantBool(t *testing.T) {
+	tests := []struct {
+		v interface{}
+		n bool
+	}{
+		{true, true},
+		{"", false},
+	}
+	for _, tt := range tests {
+		v, err := NewVariant(tt.v)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got, want := v.Bool(), tt.n; got != want {
+			t.Fatalf("got %v want %v", got, want)
+		}
+	}
+}
+
+func TestVariantString(t *testing.T) {
+	tests := []struct {
+		v interface{}
+		n string
+	}{
+		{"a", "a"},
+		{&LocalizedText{Text: "a"}, "a"},
+		{&QualifiedName{Name: "a"}, "a"},
+		{int32(5), ""},
+	}
+	for _, tt := range tests {
+		v, err := NewVariant(tt.v)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got, want := v.String(), tt.n; got != want {
+			t.Fatalf("got %v want %v", got, want)
+		}
+	}
+}
+
+func TestVariantFloat(t *testing.T) {
+	tests := []struct {
+		v interface{}
+		n float64
+	}{
+		{float32(5), 5},
+		{float64(5), 5},
+		{int32(5), 0},
+	}
+	for _, tt := range tests {
+		v, err := NewVariant(tt.v)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got, want := v.Float(), tt.n; got != want {
+			t.Fatalf("got %v want %v", got, want)
+		}
+	}
+}
+
+func TestVariantInt(t *testing.T) {
+	tests := []struct {
+		v interface{}
+		n int64
+	}{
+		{int8(5), 5},
+		{int16(5), 5},
+		{int32(5), 5},
+		{int64(5), 5},
+		{"", 0},
+	}
+	for _, tt := range tests {
+		v, err := NewVariant(tt.v)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got, want := v.Int(), tt.n; got != want {
+			t.Fatalf("got %v want %v", got, want)
+		}
+	}
+}
+
+func TestVariantUint(t *testing.T) {
+	tests := []struct {
+		v interface{}
+		n uint64
+	}{
+		{uint8(5), 5},
+		{uint16(5), 5},
+		{uint32(5), 5},
+		{uint64(5), 5},
+		{"", 0},
+	}
+	for _, tt := range tests {
+		v, err := NewVariant(tt.v)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got, want := v.Uint(), tt.n; got != want {
+			t.Fatalf("got %v want %v", got, want)
+		}
+	}
+}
+
+func TestVariantTime(t *testing.T) {
+	tests := []struct {
+		v interface{}
+		n time.Time
+	}{
+		{time.Date(2019, 1, 1, 12, 13, 14, 0, time.UTC), time.Date(2019, 1, 1, 12, 13, 14, 0, time.UTC)},
+		{"", time.Time{}},
+	}
+	for _, tt := range tests {
+		v, err := NewVariant(tt.v)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got, want := v.Time(), tt.n; got != want {
+			t.Fatalf("got %v want %v", got, want)
+		}
+	}
+}

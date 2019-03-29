@@ -311,6 +311,8 @@ func (m *Variant) Set(v interface{}) error {
 	return nil
 }
 
+// todo(fs): this should probably be StringValue or we need to handle all types
+// todo(fs): and recursion
 func (m *Variant) String() string {
 	switch m.Type() {
 	case TypeIDString:
@@ -320,7 +322,8 @@ func (m *Variant) String() string {
 	case TypeIDQualifiedName:
 		return m.Value.(*QualifiedName).Name
 	default:
-		return fmt.Sprintf("%v", m.Value)
+		return ""
+		//return fmt.Sprintf("%v", m.Value)
 	}
 }
 
@@ -348,11 +351,11 @@ func (m *Variant) Int() int64 {
 	switch m.Type() {
 	case TypeIDSByte:
 		return int64(m.Value.(int8))
-	case TypeIDUint16:
+	case TypeIDInt16:
 		return int64(m.Value.(int16))
-	case TypeIDUint32:
+	case TypeIDInt32:
 		return int64(m.Value.(int32))
-	case TypeIDUint64:
+	case TypeIDInt64:
 		return m.Value.(int64)
 	default:
 		return 0
