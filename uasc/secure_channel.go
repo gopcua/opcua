@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	mrand "math/rand"
 	"reflect"
 	"sync"
 	"sync/atomic"
@@ -53,33 +52,31 @@ type SecureChannel struct {
 	handler map[uint32]chan Response
 }
 
-func init() {
-	mrand.Seed(time.Now().UnixNano())
-}
-
-func NewSecureChannel(c *uacp.Conn, cfg *Config) *SecureChannel {
+func NewSecureChannel(endpoint string, c *uacp.Conn, cfg *Config) (*SecureChannel, error) {
+	if c == nil {
+		return nil, fmt.Errorf("no connection")
+	}
 	if cfg == nil {
-		cfg = NewClientConfigSecurityNone(uint32(mrand.Int31()), 3600000)
+		return nil, fmt.Errorf("no secure channel config")
 	}
 
 	// always reset the secure channel id
 	cfg.SecureChannelID = 0
 
-	reqhdr := &ua.RequestHeader{
-		AuthenticationToken: ua.NewTwoByteNodeID(0),
-		Timestamp:           time.Now(),
-		TimeoutHint:         0xffff,
-		AdditionalHeader:    ua.NewExtensionObject(nil),
-	}
-
 	return &SecureChannel{
-		c:       c,
-		cfg:     cfg,
-		reqhdr:  reqhdr,
+		EndpointURL: endpoint,
+		c:           c,
+		cfg:         cfg,
+		reqhdr: &ua.RequestHeader{
+			AuthenticationToken: ua.NewTwoByteNodeID(0),
+			Timestamp:           time.Now(),
+			TimeoutHint:         0xffff,
+			AdditionalHeader:    ua.NewExtensionObject(nil),
+		},
 		state:   secureChannelCreated,
 		quit:    make(chan struct{}),
 		handler: make(map[uint32]chan Response),
-	}
+	}, nil
 }
 
 func (s *SecureChannel) Open() error {
@@ -114,7 +111,7 @@ func (s *SecureChannel) openSecureChannel() error {
 		RequestedLifetime:     s.cfg.Lifetime,
 	}
 
-	return s.Send(req, func(v interface{}) error {
+	return s.Send(req, nil, func(v interface{}) error {
 		resp, ok := v.(*ua.OpenSecureChannelResponse)
 		if !ok {
 			return fmt.Errorf("got %T, want OpenSecureChannelResponse", req)
@@ -130,12 +127,12 @@ func (s *SecureChannel) closeSecureChannel() error {
 	req := &ua.CloseSecureChannelRequest{}
 
 	defer atomic.StoreInt32(&s.state, secureChannelClosed)
-	return s.Send(req, nil)
+	return s.Send(req, nil, nil)
 }
 
 // Send sends the service request and calls h with the response.
-func (s *SecureChannel) Send(svc interface{}, h func(interface{}) error) error {
-	ch, err := s.SendAsync(svc)
+func (s *SecureChannel) Send(svc interface{}, authToken *ua.NodeID, h func(interface{}) error) error {
+	ch, err := s.SendAsync(svc, authToken)
 	if err != nil {
 		return err
 	}
@@ -154,10 +151,13 @@ func (s *SecureChannel) Send(svc interface{}, h func(interface{}) error) error {
 
 // SendAsync sends the service request and returns a channel which will receive the
 // response when it arrives.
-func (s *SecureChannel) SendAsync(svc interface{}) (resp chan Response, err error) {
+func (s *SecureChannel) SendAsync(svc interface{}, authToken *ua.NodeID) (resp chan Response, err error) {
 	typeID := ua.ServiceTypeID(svc)
 	if typeID == 0 {
 		return nil, fmt.Errorf("unknown service %T. Did you call register?", svc)
+	}
+	if authToken == nil {
+		authToken = ua.NewTwoByteNodeID(0)
 	}
 
 	// the request header is always the first field
@@ -166,6 +166,7 @@ func (s *SecureChannel) SendAsync(svc interface{}) (resp chan Response, err erro
 
 	// update counters and reset them on error
 	s.cfg.SequenceNumber++
+	s.reqhdr.AuthenticationToken = authToken
 	s.reqhdr.RequestHandle++
 	s.reqhdr.Timestamp = time.Now()
 	defer func() {
