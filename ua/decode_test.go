@@ -148,6 +148,11 @@ func TestCodec(t *testing.T) {
 			b:    []byte{0x00, 0x98, 0x67, 0xdd, 0xfd, 0x30, 0xd4, 0x01},
 		},
 		{
+			name: "DateTimeZero",
+			v:    &struct{ V time.Time }{time.Time{}},
+			b:    []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+		},
+		{
 			name: "[]uint32==nil",
 			v:    &struct{ V []uint32 }{},
 			b: []byte{

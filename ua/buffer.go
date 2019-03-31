@@ -6,8 +6,6 @@ import (
 	"io"
 	"math"
 	"time"
-
-	"github.com/gopcua/opcua/utils"
 )
 
 const (
@@ -180,7 +178,12 @@ func (b *Buffer) ReadTime() time.Time {
 	if b.err != nil {
 		return time.Time{}
 	}
-	return utils.DecodeTimestamp(d)
+	ts := binary.LittleEndian.Uint64(d)
+	if ts == 0 {
+		return time.Time{}
+	}
+	// decode time in "100 nanosecond intervals since January 1, 1601" manner.
+	return time.Unix(0, int64((ts-116444736000000000)*100)).UTC()
 }
 
 func (b *Buffer) ReadN(n int) []byte {
@@ -302,7 +305,11 @@ func (b *Buffer) WriteStruct(w interface{}) {
 
 func (b *Buffer) WriteTime(v time.Time) {
 	d := make([]byte, 8)
-	utils.EncodeTimestamp(d, v)
+	if !v.IsZero() {
+		// encode time in "100 nanosecond intervals since January 1, 1601"
+		ts := uint64(v.UTC().UnixNano()/100 + 116444736000000000)
+		binary.LittleEndian.PutUint64(d, ts)
+	}
 	b.Write(d)
 }
 
