@@ -65,7 +65,7 @@ func main() {
 	defer c.Close()
 
 	// Use our connection (read the server's time)
-	v, err := c.Node(ua.NewNumericNodeID(0, 2258)).Value()
+	v, err := c.Node(ua.NewNodeID(0, 2258)).Value()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -94,7 +94,7 @@ func main() {
 	}
 
 	// Read the time again to prove our session is still OK
-	v, err = d.Node(ua.NewNumericNodeID(0, 2258)).Value()
+	v, err = d.Node(ua.NewNodeID(0, 2258)).Value()
 	if err != nil {
 		log.Fatal(err)
 	}

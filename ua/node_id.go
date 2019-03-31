@@ -77,7 +77,64 @@ func NewByteStringNodeID(ns uint16, id []byte) *NodeID {
 	}
 }
 
-// NewNodeID returns a node id from a string definition of the format
+// NewNodeID returns a NodeID according to the given type
+// and value. If the value does not represent a valid node
+// id the function returns an empty node id.
+//
+//  * If v is a []byte then a ByteStringNodeID is returned.
+//  * If v is a string then a StringNodeID is returned.
+//  * If v is a *GUID then a GUIDNodeID is returned.
+//  * If v is one of the basic integer types then then smallest
+//    numeric node id type (2byte, 4byte, numeric) which can
+//    hold the value is returned. The value must be in the
+//    range of [0..math.MaxUint32-1].
+func NewNodeID(ns uint16, v interface{}) *NodeID {
+	switch x := v.(type) {
+	case []byte:
+		return NewByteStringNodeID(ns, x)
+	case string:
+		return NewStringNodeID(ns, x)
+	case *GUID:
+		return &NodeID{mask: NodeIDTypeGUID, ns: ns, gid: x}
+	case int:
+		return newIntNodeID(ns, int64(x))
+	case int8:
+		return newIntNodeID(ns, int64(x))
+	case int16:
+		return newIntNodeID(ns, int64(x))
+	case int32:
+		return newIntNodeID(ns, int64(x))
+	case int64:
+		return newIntNodeID(ns, int64(x))
+	case uint:
+		return newIntNodeID(ns, int64(x))
+	case uint8:
+		return newIntNodeID(ns, int64(x))
+	case uint16:
+		return newIntNodeID(ns, int64(x))
+	case uint32:
+		return newIntNodeID(ns, int64(x))
+	case uint64:
+		return newIntNodeID(ns, int64(x))
+	default:
+		return NewTwoByteNodeID(0)
+	}
+}
+
+func newIntNodeID(ns uint16, id int64) *NodeID {
+	switch {
+	case id < 0 || id >= math.MaxUint32:
+		return NewTwoByteNodeID(0)
+	case ns == 0 && id < 256:
+		return NewTwoByteNodeID(byte(id))
+	case ns < 256 && id <= math.MaxUint16:
+		return NewFourByteNodeID(byte(ns), uint16(id))
+	default:
+		return NewNumericNodeID(uint16(ns), uint32(id))
+	}
+}
+
+// ParseNodeID returns a node id from a string definition of the format
 // 'ns=<namespace>;{s,i,b,g}=<identifier>'.
 //
 // For string node ids the 's=' prefix can be omitted.
@@ -87,7 +144,7 @@ func NewByteStringNodeID(ns uint16, id []byte) *NodeID {
 //
 // Namespace URLs 'nsu=' are not supported since they require a lookup.
 //
-func NewNodeID(s string) (*NodeID, error) {
+func ParseNodeID(s string) (*NodeID, error) {
 	if s == "" {
 		return NewTwoByteNodeID(0), nil
 	}
@@ -125,16 +182,11 @@ func NewNodeID(s string) (*NodeID, error) {
 		if err != nil {
 			return nil, fmt.Errorf("invalid numeric id: %s", s)
 		}
-		switch {
-		case ns == 0 && id < 256:
-			return NewTwoByteNodeID(byte(id)), nil
-		case ns < 256 && id >= 0 && id < math.MaxUint16:
-			return NewFourByteNodeID(byte(ns), uint16(id)), nil
-		case id >= 0 && id < math.MaxUint32:
-			return NewNumericNodeID(ns, uint32(id)), nil
-		default:
+		n := NewNodeID(ns, id)
+		if id > 0 && n.nid == 0 {
 			return nil, fmt.Errorf("numeric id out of range (0..2^32-1): %s", s)
 		}
+		return n, nil
 
 	case strings.HasPrefix(idval, "s="):
 		return NewStringNodeID(ns, idval[2:]), nil

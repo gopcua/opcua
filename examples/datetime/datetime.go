@@ -25,7 +25,7 @@ func main() {
 	}
 	defer c.Close()
 
-	v, err := c.Node(ua.NewNumericNodeID(0, 2258)).Value()
+	v, err := c.Node(ua.NewNodeID(0, 2258)).Value()
 	if err != nil {
 		log.Fatal(err)
 	}

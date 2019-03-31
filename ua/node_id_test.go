@@ -7,8 +7,12 @@ package ua
 import (
 	"encoding/base64"
 	"errors"
+	"math"
 	"reflect"
 	"testing"
+	"time"
+
+	"github.com/pascaldekloe/goe/verify"
 )
 
 func TestNodeID(t *testing.T) {
@@ -112,7 +116,7 @@ func BenchmarkReflectDecode(b *testing.B) {
 	}
 }
 
-func TestNewNodeID(t *testing.T) {
+func TestParseNodeID(t *testing.T) {
 	cases := []struct {
 		s   string
 		n   *NodeID
@@ -143,7 +147,7 @@ func TestNewNodeID(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.s, func(t *testing.T) {
-			n, err := NewNodeID(c.s)
+			n, err := ParseNodeID(c.s)
 			if got, want := err, c.err; !reflect.DeepEqual(got, want) {
 				t.Fatalf("got error %v want %v", got, want)
 			}
@@ -365,6 +369,55 @@ func TestSetNamespace(t *testing.T) {
 			if got, want := tt.n.Namespace(), tt.v; got != want {
 				t.Fatalf("got value %d want %d", got, want)
 			}
+		})
+	}
+}
+
+func TestNewNodeID(t *testing.T) {
+	const guid = "AAAABBBB-CCDD-EEFF-0101-0123456789AB"
+
+	tests := []struct {
+		name      string
+		got, want *NodeID
+	}{
+		// happy flows
+		{"two byte", NewNodeID(0, 5), NewTwoByteNodeID(5)},
+		{"four byte", NewNodeID(0, 256), NewFourByteNodeID(0, 256)},
+		{"four byte", NewNodeID(1, 5), NewFourByteNodeID(1, 5)},
+		{"numeric", NewNodeID(1, 1<<17), NewNumericNodeID(1, 1<<17)},
+		{"numeric", NewNodeID(256, 1), NewNumericNodeID(256, 1)},
+		{"string", NewNodeID(0, "abc"), NewStringNodeID(0, "abc")},
+		{"byte string", NewNodeID(0, []byte("abc")), NewByteStringNodeID(0, []byte("abc"))},
+		{"guid", NewNodeID(0, NewGUID(guid)), NewGUIDNodeID(0, guid)},
+		{"int", NewNodeID(0, int(5)), NewTwoByteNodeID(5)},
+		{"int8", NewNodeID(0, int8(5)), NewTwoByteNodeID(5)},
+		{"int16", NewNodeID(0, int16(5)), NewTwoByteNodeID(5)},
+		{"int32", NewNodeID(0, int32(5)), NewTwoByteNodeID(5)},
+		{"int64", NewNodeID(0, int64(5)), NewTwoByteNodeID(5)},
+		{"uint", NewNodeID(0, uint(5)), NewTwoByteNodeID(5)},
+		{"uint8", NewNodeID(0, uint8(5)), NewTwoByteNodeID(5)},
+		{"uint16", NewNodeID(0, uint16(5)), NewTwoByteNodeID(5)},
+		{"uint32", NewNodeID(0, uint32(5)), NewTwoByteNodeID(5)},
+		{"uint64", NewNodeID(0, uint64(5)), NewTwoByteNodeID(5)},
+
+		// error flows
+		{"nil", NewNodeID(0, nil), NewTwoByteNodeID(0)},
+		{"unknown type", NewNodeID(0, time.Time{}), NewTwoByteNodeID(0)},
+		{"int < 0", NewNodeID(0, int(-1)), NewTwoByteNodeID(0)},
+		{"int8 < 0", NewNodeID(0, int8(-1)), NewTwoByteNodeID(0)},
+		{"int16 < 0", NewNodeID(0, int16(-1)), NewTwoByteNodeID(0)},
+		{"int32 < 0", NewNodeID(0, int32(-1)), NewTwoByteNodeID(0)},
+		{"int64 < 0", NewNodeID(0, int64(-1)), NewTwoByteNodeID(0)},
+		{"int64 == uint32", NewNodeID(0, int64(math.MaxUint32)), NewTwoByteNodeID(0)},
+		{"int64 > uint32", NewNodeID(0, int64(math.MaxUint32+1)), NewTwoByteNodeID(0)},
+		{"uint64 == uint32", NewNodeID(0, uint64(math.MaxUint32)), NewTwoByteNodeID(0)},
+		{"uint64 > uint32", NewNodeID(0, uint64(math.MaxUint32+1)), NewTwoByteNodeID(0)},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			verify.Values(t, "", tt.got, tt.want)
+			verify.Values(t, "", tt.got.String(), tt.want.String())
 		})
 	}
 }
