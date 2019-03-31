@@ -8,7 +8,13 @@ package debug
 import (
 	"log"
 	"os"
+	"strings"
 )
+
+// Flags contains the debug flags set by OPCUA_DEBUG.
+//
+//  * codec : print detailed debugging information when encoding/decoding
+var Flags = os.Getenv("OPCUA_DEBUG")
 
 // Enable controls whether debug logging is enabled. It is disabled by default.
 var Enable bool
@@ -22,4 +28,19 @@ func Printf(format string, args ...interface{}) {
 		return
 	}
 	Logger.Printf(format, args...)
+}
+
+// FlagSet returns true if the OPCUA_DEBUG environment variable contains the
+// given flag.
+func FlagSet(name string) bool {
+	return stringSliceContains(name, strings.Fields(Flags))
+}
+
+func stringSliceContains(s string, vals []string) bool {
+	for _, v := range vals {
+		if s == v {
+			return true
+		}
+	}
+	return false
 }

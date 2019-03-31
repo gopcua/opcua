@@ -5,6 +5,8 @@
 package ua
 
 import (
+	"fmt"
+
 	"github.com/gopcua/opcua/id"
 )
 
@@ -64,19 +66,18 @@ func (e *ExtensionObject) Decode(b []byte) (int, error) {
 	switch e.TypeID.NodeID.IntID() {
 	case id.AnonymousIdentityToken_Encoding_DefaultBinary:
 		e.Value = new(AnonymousIdentityToken)
-		body.ReadStruct(e.Value)
 	case id.UserNameIdentityToken_Encoding_DefaultBinary:
 		e.Value = new(UserNameIdentityToken)
-		body.ReadStruct(e.Value)
 	case id.X509IdentityToken_Encoding_DefaultBinary:
 		e.Value = new(X509IdentityToken)
-		body.ReadStruct(e.Value)
 	case id.IssuedIdentityToken_Encoding_DefaultBinary:
 		e.Value = new(IssuedIdentityToken)
-		body.ReadStruct(e.Value)
+	case id.ServerStatusDataType_Encoding_DefaultBinary:
+		e.Value = new(ServerStatusDataType)
 	default:
-		e.Value = body.ReadBytes()
+		return buf.Pos(), fmt.Errorf("invalid extension object 0x%x", e.TypeID.NodeID.IntID())
 	}
+	body.ReadStruct(e.Value)
 	return buf.Pos(), body.Error()
 }
 
@@ -118,6 +119,8 @@ func ExtensionObjectTypeID(v interface{}) *ExpandedNodeID {
 		return NewFourByteExpandedNodeID(0, id.X509IdentityToken_Encoding_DefaultBinary)
 	case *IssuedIdentityToken:
 		return NewFourByteExpandedNodeID(0, id.IssuedIdentityToken_Encoding_DefaultBinary)
+	case *ServerStatusDataType:
+		return NewFourByteExpandedNodeID(0, id.ServerStatusDataType_Encoding_DefaultBinary)
 	default:
 		return NewTwoByteExpandedNodeID(0)
 	}

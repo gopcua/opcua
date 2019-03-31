@@ -9,10 +9,12 @@ import (
 	"math"
 	"reflect"
 	"time"
+
+	"github.com/gopcua/opcua/debug"
 )
 
 // debugCodec enables printing of debug messages in the opcua codec.
-const debugCodec = false
+var debugCodec = debug.FlagSet("codec")
 
 // BinaryEncoder is the interface implemented by an object that can
 // marshal itself into a binary OPC/UA representation.
