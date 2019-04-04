@@ -29,7 +29,7 @@ var DefaultSessionConfig = uasc.NewClientSessionConfig(
 // GetEndpoints returns the available endpoint descriptions for the server.
 func GetEndpoints(endpoint string) ([]*ua.EndpointDescription, error) {
 	c := &Client{EndpointURL: endpoint}
-	if err := c.Connect(); err != nil {
+	if err := c.Dial(c.Config); err != nil {
 		return nil, err
 	}
 	defer c.Close()
