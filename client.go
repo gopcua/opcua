@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
-	mrand "math/rand"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -14,21 +13,9 @@ import (
 	"github.com/gopcua/opcua/uasc"
 )
 
-func init() {
-	mrand.Seed(time.Now().UnixNano())
-}
-
-var DefaultClientConfig = uasc.NewClientConfigSecurityNone(uint32(mrand.Int31()), 3600000)
-
-// DefaultSessionConfig is the default configuration for a session.
-var DefaultSessionConfig = uasc.NewClientSessionConfig(
-	[]string{"en-US"},
-	&ua.AnonymousIdentityToken{PolicyID: "open62541-anonymous-policy"},
-)
-
 // GetEndpoints returns the available endpoint descriptions for the server.
 func GetEndpoints(endpoint string) ([]*ua.EndpointDescription, error) {
-	c := &Client{EndpointURL: endpoint}
+	c := NewClient(endpoint)
 	if err := c.Connect(); err != nil {
 		return nil, err
 	}
@@ -43,15 +30,11 @@ func GetEndpoints(endpoint string) ([]*ua.EndpointDescription, error) {
 // Client is a high-level client for an OPC/UA server.
 // It establishes a secure channel and a session.
 type Client struct {
-	// EndpointURL is the endpoint URL the client connects to.
-	EndpointURL string
+	// endpointURL is the endpoint URL the client connects to.
+	endpointURL string
 
-	// Config is the configuration for the secure channel.
-	Config *uasc.Config
-
-	// SessionConfig is the configuration for the session.
-	// The client uses DefaultSessionConfig if not set.
-	SessionConfig *uasc.SessionConfig
+	// cfg is the configuration for the client.
+	cfg *uasc.Config
 
 	// sechan is the open secure channel.
 	sechan *uasc.SecureChannel
@@ -63,15 +46,23 @@ type Client struct {
 	once sync.Once
 }
 
+func NewClient(endpoint string, opts ...Option) *Client {
+	c := &Client{endpointURL: endpoint, cfg: DefaultClientConfig()}
+	for _, opt := range opts {
+		opt(c.cfg)
+	}
+	return c
+}
+
 // Connect establishes a secure channel and creates a new session.
 func (c *Client) Connect() (err error) {
 	if c.sechan != nil {
 		return fmt.Errorf("already connected")
 	}
-	if err := c.Dial(c.Config); err != nil {
+	if err := c.Dial(); err != nil {
 		return err
 	}
-	s, err := c.CreateSession(c.SessionConfig)
+	s, err := c.CreateSession(c.cfg.Session)
 	if err != nil {
 		_ = c.Close()
 		return err
@@ -84,19 +75,16 @@ func (c *Client) Connect() (err error) {
 }
 
 // Dial establishes a secure channel.
-func (c *Client) Dial(cfg *uasc.Config) error {
+func (c *Client) Dial() error {
 	c.once.Do(func() { c.session.Store((*Session)(nil)) })
 	if c.sechan != nil {
 		return fmt.Errorf("secure channel already connected")
 	}
-	conn, err := uacp.Dial(context.Background(), c.EndpointURL)
+	conn, err := uacp.Dial(context.Background(), c.endpointURL)
 	if err != nil {
 		return err
 	}
-	if cfg == nil {
-		cfg = DefaultClientConfig
-	}
-	sechan, err := uasc.NewSecureChannel(c.EndpointURL, conn, cfg)
+	sechan, err := uasc.NewSecureChannel(c.endpointURL, conn, c.cfg)
 	if err != nil {
 		_ = conn.Close()
 		return err
@@ -150,14 +138,6 @@ func (c *Client) CreateSession(cfg *uasc.SessionConfig) (*Session, error) {
 	if c.sechan == nil {
 		return nil, fmt.Errorf("secure channel not connected")
 	}
-	if cfg == nil {
-		cfg = DefaultSessionConfig
-	}
-
-	var clientCert []byte
-	if c.Config != nil {
-		clientCert = c.Config.Certificate
-	}
 
 	nonce := make([]byte, 32)
 	if _, err := rand.Read(nonce); err != nil {
@@ -166,10 +146,10 @@ func (c *Client) CreateSession(cfg *uasc.SessionConfig) (*Session, error) {
 
 	req := &ua.CreateSessionRequest{
 		ClientDescription: cfg.ClientDescription,
-		EndpointURL:       c.EndpointURL,
+		EndpointURL:       c.endpointURL,
 		SessionName:       fmt.Sprintf("gopcua-%d", time.Now().UnixNano()),
 		ClientNonce:       nonce,
-		ClientCertificate: clientCert,
+		ClientCertificate: c.cfg.Certificate,
 	}
 
 	var s *Session
@@ -280,7 +260,7 @@ func (c *Client) Node(id *ua.NodeID) *Node {
 
 func (c *Client) GetEndpoints() (*ua.GetEndpointsResponse, error) {
 	req := &ua.GetEndpointsRequest{
-		EndpointURL: c.EndpointURL,
+		EndpointURL: c.endpointURL,
 	}
 	var res *ua.GetEndpointsResponse
 	err := c.Send(req, func(v interface{}) error {

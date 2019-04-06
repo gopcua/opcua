@@ -5,13 +5,16 @@
 package uasc
 
 import (
-	"crypto/rand"
-	"encoding/binary"
-	"time"
-
 	"github.com/gopcua/opcua/ua"
+)
 
-	"github.com/pkg/errors"
+// SecurityPolicy URIs
+const (
+	SecurityPolicyNone                = "http://opcfoundation.org/UA/SecurityPolicy#None"
+	SecurityPolicyBasic256Sha256      = "http://opcfoundation.org/UA/SecurityPolicy#Basic256Sha256"
+	SecurityPolicyAes128Sha256RsaOaep = "http://opcfoundation.org/UA/SecurityPolicy#Aes128_Sha256_RsaOaep"
+	SecurityPolicyPubSubAes128CTR     = "http://opcfoundation.org/UA/SecurityPolicy#PubSub_Aes128_CTR"
+	SecurityPolicyPubSubAes256CTR     = "http://opcfoundation.org/UA/SecurityPolicy#PubSub_Aes256_CTR"
 )
 
 // Config represents a configuration which UASC client/server has in common.
@@ -76,172 +79,9 @@ type Config struct {
 	// Lifetime can also be the revised lifetime, the lifetime of the SecurityToken in milliseconds.
 	// The UTC expiration time for the token may be calculated by adding the lifetime to the createdAt time.
 	Lifetime uint32
-}
 
-// // NewConfig creates a new Config.
-// //
-// // This contains all the parameter Config has, but the ones should be set depends on the application type.
-// // It is good idea to use NewClientConfig or NewServerConfig instead if you don't have specific purpose to
-// // create Config with full parameters.
-// func NewConfig(chanID uint32, policyURI string, cert, thumbprint []byte, seqNum, reqID, secMode, tokenID, lifetime uint32) *Config {
-// 	return &Config{
-// 		SecureChannelID:   chanID,
-// 		SecurityPolicyURI: policyURI,
-// 		Certificate:       cert,
-// 		Thumbprint:        thumbprint,
-// 		SequenceNumber:    seqNum,
-// 		RequestID:         reqID,
-// 		SecurityMode:      secMode,
-// 		SecurityTokenID:   tokenID,
-// 		Lifetime:          lifetime,
-// 	}
-// }
-
-// NewClientConfig creates a new Config for Client.
-//
-// With all the parameter given, it is sufficient for client to open SecureChannel.
-// If the secMode is None, cert and thumbprint is not required(can be nil).
-func NewClientConfig(policyURI string, cert, thumbprint []byte, reqID uint32, secMode ua.MessageSecurityMode, lifetime uint32) *Config {
-	return &Config{
-		SecurityPolicyURI: policyURI,
-		Certificate:       cert,
-		Thumbprint:        thumbprint,
-		RequestID:         reqID,
-		SecurityMode:      secMode,
-		Lifetime:          lifetime,
-	}
-}
-
-// NewClientConfigSecurityNone creates a new Config for Client, with SecurityMode=None.
-func NewClientConfigSecurityNone(reqID, lifetime uint32) *Config {
-	return &Config{
-		SecurityPolicyURI: "http://opcfoundation.org/UA/SecurityPolicy#None",
-		RequestID:         reqID,
-		SecurityMode:      ua.MessageSecurityModeNone,
-		Lifetime:          lifetime,
-	}
-}
-
-/* XXX - to be uncommented when encryption is
-// NewClientConfigSignBasic256Sha256 creates a new Config for Client, with SecurityMode=Sign
-// and SecurityPolicy=Basic256Sha256.
-func NewClientConfigSignBasic256Sha256(cert, thumbprint []byte, reqID, lifetime uint32) *Config {
-	return NewClientConfig(
-		"http://opcfoundation.org/UA/SecurityPolicy#Basic256Sha256",
-		cert, thumbprint, reqID, ua.MessageSecurityModeSign, lifetime,
-	)
-}
-
-// NewClientConfigSignAndEncryptBasic256Sha256 creates a new Config for Client, with SecurityMode=SignAndEncrypt
-// and SecurityPolicy=Basic256Sha256.
-func NewClientConfigSignAndEncryptBasic256Sha256(cert, thumbprint []byte, reqID, lifetime uint32) *Config {
-	return NewClientConfig(
-		"http://opcfoundation.org/UA/SecurityPolicy#Basic256Sha256",
-		cert, thumbprint, reqID, ua.MessageSecurityModeSignAndEncrypt, lifetime,
-	)
-}
-
-// NewClientConfigSignAes128Sha256RsaOaep creates a new Config for Client, with SecurityMode=Sign
-// and SecurityPolicy=Aes128_Sha256_RsaOaep.
-func NewClientConfigSignAes128Sha256RsaOaep(cert, thumbprint []byte, reqID, lifetime uint32) *Config {
-	return NewClientConfig(
-		"http://opcfoundation.org/UA/SecurityPolicy#Aes128_Sha256_RsaOaep",
-		cert, thumbprint, reqID, ua.MessageSecurityModeSign, lifetime,
-	)
-}
-
-// NewClientConfigSignAndEncryptAes128Sha256RsaOaep creates a new Config for Client, with SecurityMode=SignAndEncrypt
-// and SecurityPolicy=Aes128_Sha256_RsaOaep.
-func NewClientConfigSignAndEncryptAes128Sha256RsaOaep(cert, thumbprint []byte, reqID, lifetime uint32) *Config {
-	return NewClientConfig(
-		"http://opcfoundation.org/UA/SecurityPolicy#Aes128_Sha256_RsaOaep",
-		cert, thumbprint, reqID, ua.MessageSecurityModeSignAndEncrypt, lifetime,
-	)
-}
-
-// NewClientConfigSignPubSubAes128CTR creates a new Config for Client, with SecurityMode=Sign
-// and SecurityPolicy=PubSub_Aes128_CTR.
-func NewClientConfigSignPubSubAes128CTR(cert, thumbprint []byte, reqID, lifetime uint32) *Config {
-	return NewClientConfig(
-		"http://opcfoundation.org/UA/SecurityPolicy#PubSub_Aes128_CTR",
-		cert, thumbprint, reqID, ua.MessageSecurityModeSign, lifetime,
-	)
-}
-
-// NewClientConfigSignAndEncryptPubSubAes128CTR creates a new Config for Client, with SecurityMode=SignAndEncrypt
-// and SecurityPolicy=PubSub_Aes128_CTR.
-func NewClientConfigSignAndEncryptPubSubAes128CTR(cert, thumbprint []byte, reqID, lifetime uint32) *Config {
-	return NewClientConfig(
-		"http://opcfoundation.org/UA/SecurityPolicy#PubSub_Aes128_CTR",
-		cert, thumbprint, reqID, ua.MessageSecurityModeSignAndEncrypt, lifetime,
-	)
-}
-
-// NewClientConfigSignPubSubAes256CTR creates a new Config for Client, with SecurityMode=Sign
-// and SecurityPolicy=PubSub_Aes256_CTR.
-func NewClientConfigSignPubSubAes256CTR(cert, thumbprint []byte, reqID, lifetime uint32) *Config {
-	return NewClientConfig(
-		"http://opcfoundation.org/UA/SecurityPolicy#PubSub_Aes256_CTR",
-		cert, thumbprint, reqID, ua.MessageSecurityModeSign, lifetime,
-	)
-}
-
-// NewClientConfigSignAndEncryptPubSubAes256CTR creates a new Config for Client, with SecurityMode=SignAndEncrypt
-// and SecurityPolicy=PubSub_Aes256_CTR.
-func NewClientConfigSignAndEncryptPubSubAes256CTR(cert, thumbprint []byte, reqID, lifetime uint32) *Config {
-	return NewClientConfig(
-		"http://opcfoundation.org/UA/SecurityPolicy#PubSub_Aes256_CTR",
-		cert, thumbprint, reqID, ua.MessageSecurityModeSignAndEncrypt, lifetime,
-	)
-}
-*/
-
-// NewServerConfig creates a new Config for Server.
-//
-// With all the parameter given, it is sufficient for server to accept SecureChannel.
-// If the secMode is None, cert and thumbprint is not required(can be nil).
-func NewServerConfig(policyURI string, cert, thumbprint []byte, chanID uint32, secMode ua.MessageSecurityMode, tokenID, lifetime uint32) *Config {
-	return &Config{
-		SecurityPolicyURI: policyURI,
-		Certificate:       cert,
-		Thumbprint:        thumbprint,
-		SecureChannelID:   chanID,
-		SecurityMode:      secMode,
-		SecurityTokenID:   tokenID,
-		Lifetime:          lifetime,
-	}
-}
-
-// validate validates Config. This is just to avoid crash. Strange values would be accepted for flexibility.
-func (c *Config) validate(appType string) error {
-	switch appType {
-	case "client":
-		return c.validateClientConfig()
-	case "server":
-		return c.validateClientConfig()
-	default:
-		return errors.New("invalid type. should be client or server")
-	}
-}
-
-func (c *Config) validateClientConfig() error {
-	if c.SecurityMode == ua.MessageSecurityModeSignAndEncrypt && (c.Certificate == nil || c.Thumbprint == nil) {
-		return errors.New("Certificate, Thumbprint is required when using SignAndEncrypt")
-	}
-
-	if c.SecurityMode == ua.MessageSecurityModeNone {
-		c.Certificate = nil
-		c.Thumbprint = nil
-	}
-	return nil
-}
-
-func (c *Config) validateServerConfig() error {
-	if c.SecurityMode == ua.MessageSecurityModeNone {
-		c.Certificate = nil
-		c.Thumbprint = nil
-	}
-	return nil
+	// Session is the session configuration.
+	Session *SessionConfig
 }
 
 // SessionConfig is a set of common configurations used in Session.
@@ -298,78 +138,31 @@ type SessionConfig struct {
 	// that a Session shall remain open without activity. The Server should attempt to honour the
 	// Client request for this parameter,but may negotiate this value up or down to meet its own constraints.
 	SessionTimeout float64
-
-	// mySignature is is the client/serverSignature expected to receive from the other endpoint.
-	// This parameter is automatically calculated and kept temporarily until being used to verify
-	// received client/serverSignature.
-	// todo(fs): temp disable until the security code is resurrected. keep golangcibot happy
-	// mySignature *ua.SignatureData
-
-	// signatureToSend is the client/serverSignature defined in Part4, Table 15 and Table 17.
-	// This parameter is automatically calculated and kept temporarily until it is sent in next message.
-	// todo(fs): temp disable until the security code is resurrected. keep golangcibot happy
-	// signatureToSend *ua.SignatureData
 }
 
-// NewClientSessionConfig creates a SessionConfig for client.
-func NewClientSessionConfig(locales []string, userToken interface{}) *SessionConfig {
-	return &SessionConfig{
-		SessionTimeout: 0xffff,
-		ClientDescription: &ua.ApplicationDescription{
-			ApplicationURI:  "urn:gopcua:client",
-			ProductURI:      "urn:gopcua",
-			ApplicationName: &ua.LocalizedText{Text: "gopcua - OPC UA implementation in pure Golang"},
-			ApplicationType: ua.ApplicationTypeClient,
-		},
-		LocaleIDs:          locales,
-		UserIdentityToken:  userToken,
-		UserTokenSignature: &ua.SignatureData{},
-	}
-}
-
-// NewServerSessionConfig creates a new SessionConfigServer for server.
-func NewServerSessionConfig(secChan *SecureChannel) *SessionConfig {
-	rawToken := make([]byte, 2)
-	if _, err := rand.Read(rawToken); err != nil {
-		binary.LittleEndian.PutUint16(rawToken, uint16(time.Now().UnixNano()))
-	}
-	return &SessionConfig{
-		AuthenticationToken: ua.NewFourByteNodeID(0, binary.LittleEndian.Uint16(rawToken)),
-		SessionTimeout:      0xffff,
-		ServerEndpoints: []*ua.EndpointDescription{
-			&ua.EndpointDescription{
-				EndpointURL: secChan.LocalEndpoint(),
-				Server: &ua.ApplicationDescription{
-					ApplicationURI:  "urn:gopcua:client",
-					ProductURI:      "urn:gopcua",
-					ApplicationName: &ua.LocalizedText{Text: "gopcua - OPC UA implementation in pure Golang"},
-					ApplicationType: ua.ApplicationTypeServer,
-				},
-				ServerCertificate: secChan.cfg.Certificate,
-				SecurityMode:      secChan.cfg.SecurityMode,
-				SecurityPolicyURI: secChan.cfg.SecurityPolicyURI,
-				// UserIdentityTokens: []*ua.UserTokenPolicy{&ua.UserTokenPolicy{}},
-			},
-		},
-	}
-}
-
-// validate validates SessionConfig. This is just to avoid crash. Strange values would be accepted for flexibility.
-func (s *SessionConfig) validate(appType string) error {
-	switch appType {
-	case "client":
-		return s.validateClientSessionConfig()
-	case "server":
-		return s.validateClientSessionConfig()
-	default:
-		return errors.New("invalid type. should be client or server")
-	}
-}
-
-func (s *SessionConfig) validateClientSessionConfig() error {
-	return nil
-}
-
-func (s *SessionConfig) validateServerSessionConfig() error {
-	return nil
-}
+// // NewServerSessionConfig creates a new SessionConfigServer for server.
+// func NewServerSessionConfig(secChan *SecureChannel) SessionConfig {
+// 	rawToken := make([]byte, 2)
+// 	if _, err := rand.Read(rawToken); err != nil {
+// 		binary.LittleEndian.PutUint16(rawToken, uint16(time.Now().UnixNano()))
+// 	}
+// 	return SessionConfig{
+// 		AuthenticationToken: ua.NewFourByteNodeID(0, binary.LittleEndian.Uint16(rawToken)),
+// 		SessionTimeout:      0xffff,
+// 		ServerEndpoints: []*ua.EndpointDescription{
+// 			&ua.EndpointDescription{
+// 				EndpointURL: secChan.LocalEndpoint(),
+// 				Server: &ua.ApplicationDescription{
+// 					ApplicationURI:  "urn:gopcua:client",
+// 					ProductURI:      "urn:gopcua",
+// 					ApplicationName: &ua.LocalizedText{Text: "gopcua - OPC UA implementation in Go"},
+// 					ApplicationType: ua.ApplicationTypeServer,
+// 				},
+// 				ServerCertificate: secChan.cfg.Certificate,
+// 				SecurityMode:      secChan.cfg.SecurityMode,
+// 				SecurityPolicyURI: secChan.cfg.SecurityPolicyURI,
+// 				// UserIdentityTokens: []*ua.UserTokenPolicy{&ua.UserTokenPolicy{}},
+// 			},
+// 		},
+// 	}
+// }
