@@ -1,6 +1,9 @@
 package opcua
 
 import (
+	"math/rand"
+	"time"
+
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uasc"
 )
@@ -11,6 +14,7 @@ func DefaultClientConfig() *uasc.Config {
 	return &uasc.Config{
 		SecurityPolicyURI: uasc.SecurityPolicyNone,
 		SecurityMode:      ua.MessageSecurityModeNone,
+		Lifetime:          uint32(time.Hour / time.Millisecond),
 		Session: &uasc.SessionConfig{
 			SessionTimeout: 0xffff,
 			ClientDescription: &ua.ApplicationDescription{
@@ -42,10 +46,24 @@ func ApplicationName(s string) Option {
 	}
 }
 
+// Lifetime sets the lifetime of the secure channel in milliseconds.
+func Lifetime(d time.Duration) Option {
+	return func(c *uasc.Config) {
+		c.Lifetime = uint32(d / time.Millisecond)
+	}
+}
+
 // Locales sets the locales in the session configuration.
 func Locales(locale ...string) Option {
 	return func(c *uasc.Config) {
 		c.Session.LocaleIDs = locale
+	}
+}
+
+// RandomRequestID assigns a random initial request id.
+func RandomRequestID() Option {
+	return func(c *uasc.Config) {
+		c.RequestID = uint32(rand.Int31())
 	}
 }
 
