@@ -33,8 +33,11 @@ type Client struct {
 	// endpointURL is the endpoint URL the client connects to.
 	endpointURL string
 
-	// cfg is the configuration for the client.
+	// cfg is the configuration for the secure channel.
 	cfg *uasc.Config
+
+	// sessionCfg is the configuration for the session.
+	sessionCfg *uasc.SessionConfig
 
 	// sechan is the open secure channel.
 	sechan *uasc.SecureChannel
@@ -47,9 +50,13 @@ type Client struct {
 }
 
 func NewClient(endpoint string, opts ...Option) *Client {
-	c := &Client{endpointURL: endpoint, cfg: DefaultClientConfig()}
+	c := &Client{
+		endpointURL: endpoint,
+		cfg:         DefaultClientConfig(),
+		sessionCfg:  DefaultSessionConfig(),
+	}
 	for _, opt := range opts {
-		opt(c.cfg)
+		opt(c.cfg, c.sessionCfg)
 	}
 	return c
 }
@@ -62,7 +69,7 @@ func (c *Client) Connect() (err error) {
 	if err := c.Dial(); err != nil {
 		return err
 	}
-	s, err := c.CreateSession(c.cfg.Session)
+	s, err := c.CreateSession(c.sessionCfg)
 	if err != nil {
 		_ = c.Close()
 		return err

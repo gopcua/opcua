@@ -79,9 +79,6 @@ type Config struct {
 	// Lifetime can also be the revised lifetime, the lifetime of the SecurityToken in milliseconds.
 	// The UTC expiration time for the token may be calculated by adding the lifetime to the createdAt time.
 	Lifetime uint32
-
-	// Session is the session configuration.
-	Session *SessionConfig
 }
 
 // SessionConfig is a set of common configurations used in Session.
