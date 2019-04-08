@@ -27,8 +27,9 @@ func DefaultSessionConfig() *uasc.SessionConfig {
 			ApplicationName: &ua.LocalizedText{Text: "gopcua - OPC UA implementation in Go"},
 			ApplicationType: ua.ApplicationTypeClient,
 		},
-		LocaleIDs:         []string{"en-us"},
-		UserIdentityToken: &ua.AnonymousIdentityToken{PolicyID: "open62541-anonymous-policy"},
+		LocaleIDs:          []string{"en-us"},
+		UserIdentityToken:  &ua.AnonymousIdentityToken{PolicyID: "open62541-anonymous-policy"},
+		UserTokenSignature: &ua.SignatureData{},
 	}
 }
 
