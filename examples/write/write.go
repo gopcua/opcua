@@ -23,7 +23,7 @@ func main() {
 	flag.Parse()
 	log.SetFlags(0)
 
-	c := &opcua.Client{EndpointURL: *endpoint}
+	c := opcua.NewClient(*endpoint)
 	if err := c.Connect(); err != nil {
 		log.Fatal(err)
 	}
