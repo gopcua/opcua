@@ -57,20 +57,20 @@ func TestResolveEndpoint(t *testing.T) {
 		},
 	}
 
-	for i, c := range cases {
+	for _, c := range cases {
 		var errStr string
 		network, addr, err := ResolveEndpoint(c.input)
 		if err != nil {
 			errStr = err.Error()
 		}
 		if got, want := network, c.network; got != want {
-			t.Fatalf("got %s want %s", got, want)
+			t.Fatalf("got network %q want %q", got, want)
 		}
-		if got, want := addr, c.addr; got != want {
-			t.Fatalf("got %s want %s", got, want)
+		if got, want := addr.String(), c.addr.String(); got != want {
+			t.Fatalf("got addr %q want %q", got, want)
 		}
 		if got, want := errStr, c.errStr; got != want {
-			t.Fatalf("got %s want %s", got, want)
+			t.Fatalf("got error %q want %q", got, want)
 		}
 	}
 }
@@ -103,7 +103,7 @@ func TestGetPath(t *testing.T) {
 		},
 	}
 
-	for i, c := range cases {
+	for _, c := range cases {
 		var errStr string
 		path, err := GetPath(c.input)
 		if err != nil {
