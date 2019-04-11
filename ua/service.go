@@ -7,6 +7,8 @@ package ua
 import (
 	"fmt"
 	"reflect"
+
+	"github.com/gopcua/opcua/debug"
 )
 
 var (
@@ -47,6 +49,10 @@ func DecodeService(b []byte) (*ExpandedNodeID, interface{}, error) {
 	}
 
 	v := reflect.New(typ.Elem()).Interface()
+
+	if debug.FlagSet("packet") {
+		fmt.Printf("%T: %#v\n", v, b)
+	}
 	_, err = Decode(b, v)
 	return typeID, v, err
 }
