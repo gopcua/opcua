@@ -11,13 +11,13 @@ import (
 	"strings"
 )
 
-// Flags contains the debug flags set by OPCUA_DEBUG.
+// Flags contains the debug flags set by OPC_DEBUG.
 //
 //  * codec : print detailed debugging information when encoding/decoding
-var Flags = os.Getenv("OPCUA_DEBUG")
+var Flags = os.Getenv("OPC_DEBUG")
 
 // Enable controls whether debug logging is enabled. It is disabled by default.
-var Enable bool
+var Enable bool = FlagSet("debug")
 
 // Logger logs the debug messages when debug logging is enabled.
 var Logger = log.New(os.Stderr, "debug: ", 0)
