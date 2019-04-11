@@ -171,13 +171,13 @@ var (
 	StatusBadInsufficientClientProfile            StatusCode = 0x807C0000
 	StatusBadStateNotActive                       StatusCode = 0x80BF0000
 	StatusBadAlreadyExists                        StatusCode = 0x81150000
-	StatusBadTcpServerTooBusy                     StatusCode = 0x807D0000
-	StatusBadTcpMessageTypeInvalid                StatusCode = 0x807E0000
-	StatusBadTcpSecureChannelUnknown              StatusCode = 0x807F0000
-	StatusBadTcpMessageTooLarge                   StatusCode = 0x80800000
-	StatusBadTcpNotEnoughResources                StatusCode = 0x80810000
-	StatusBadTcpInternalError                     StatusCode = 0x80820000
-	StatusBadTcpEndpointURLInvalid                StatusCode = 0x80830000
+	StatusBadTCPServerTooBusy                     StatusCode = 0x807D0000
+	StatusBadTCPMessageTypeInvalid                StatusCode = 0x807E0000
+	StatusBadTCPSecureChannelUnknown              StatusCode = 0x807F0000
+	StatusBadTCPMessageTooLarge                   StatusCode = 0x80800000
+	StatusBadTCPNotEnoughResources                StatusCode = 0x80810000
+	StatusBadTCPInternalError                     StatusCode = 0x80820000
+	StatusBadTCPEndpointURLInvalid                StatusCode = 0x80830000
 	StatusBadRequestInterrupted                   StatusCode = 0x80840000
 	StatusBadRequestTimeout                       StatusCode = 0x80850000
 	StatusBadSecureChannelClosed                  StatusCode = 0x80860000
@@ -416,13 +416,13 @@ var StatusCodes = map[StatusCode]StatusCodeDesc{
 	StatusBadInsufficientClientProfile:            StatusCodeDesc{Name: "StatusBadInsufficientClientProfile", Text: "The client of the current session does not support one or more Profiles that are necessary for the subscription."},
 	StatusBadStateNotActive:                       StatusCodeDesc{Name: "StatusBadStateNotActive", Text: "The sub-state machine is not currently active."},
 	StatusBadAlreadyExists:                        StatusCodeDesc{Name: "StatusBadAlreadyExists", Text: "An equivalent rule already exists."},
-	StatusBadTcpServerTooBusy:                     StatusCodeDesc{Name: "StatusBadTcpServerTooBusy", Text: "The server cannot process the request because it is too busy."},
-	StatusBadTcpMessageTypeInvalid:                StatusCodeDesc{Name: "StatusBadTcpMessageTypeInvalid", Text: "The type of the message specified in the header invalid."},
-	StatusBadTcpSecureChannelUnknown:              StatusCodeDesc{Name: "StatusBadTcpSecureChannelUnknown", Text: "The SecureChannelId and/or TokenId are not currently in use."},
-	StatusBadTcpMessageTooLarge:                   StatusCodeDesc{Name: "StatusBadTcpMessageTooLarge", Text: "The size of the message specified in the header is too large."},
-	StatusBadTcpNotEnoughResources:                StatusCodeDesc{Name: "StatusBadTcpNotEnoughResources", Text: "There are not enough resources to process the request."},
-	StatusBadTcpInternalError:                     StatusCodeDesc{Name: "StatusBadTcpInternalError", Text: "An internal error occurred."},
-	StatusBadTcpEndpointURLInvalid:                StatusCodeDesc{Name: "StatusBadTcpEndpointURLInvalid", Text: "The server does not recognize the QueryString specified."},
+	StatusBadTCPServerTooBusy:                     StatusCodeDesc{Name: "StatusBadTCPServerTooBusy", Text: "The server cannot process the request because it is too busy."},
+	StatusBadTCPMessageTypeInvalid:                StatusCodeDesc{Name: "StatusBadTCPMessageTypeInvalid", Text: "The type of the message specified in the header invalid."},
+	StatusBadTCPSecureChannelUnknown:              StatusCodeDesc{Name: "StatusBadTCPSecureChannelUnknown", Text: "The SecureChannelId and/or TokenId are not currently in use."},
+	StatusBadTCPMessageTooLarge:                   StatusCodeDesc{Name: "StatusBadTCPMessageTooLarge", Text: "The size of the message specified in the header is too large."},
+	StatusBadTCPNotEnoughResources:                StatusCodeDesc{Name: "StatusBadTCPNotEnoughResources", Text: "There are not enough resources to process the request."},
+	StatusBadTCPInternalError:                     StatusCodeDesc{Name: "StatusBadTCPInternalError", Text: "An internal error occurred."},
+	StatusBadTCPEndpointURLInvalid:                StatusCodeDesc{Name: "StatusBadTCPEndpointURLInvalid", Text: "The server does not recognize the QueryString specified."},
 	StatusBadRequestInterrupted:                   StatusCodeDesc{Name: "StatusBadRequestInterrupted", Text: "The request could not be sent because of a network interruption."},
 	StatusBadRequestTimeout:                       StatusCodeDesc{Name: "StatusBadRequestTimeout", Text: "Timeout occurred while processing the request."},
 	StatusBadSecureChannelClosed:                  StatusCodeDesc{Name: "StatusBadSecureChannelClosed", Text: "The secure channel has been closed."},

@@ -12,6 +12,7 @@ var (
 		"Id", "ID",
 		"Json", "JSON",
 		"QualityOfService", "QoS",
+		"Tcp", "TCP",
 		"Uadp", "UADP",
 		"Uri", "URI",
 		"Url", "URL",
