@@ -5,9 +5,12 @@
 package opcua
 
 import (
+	"crypto/rsa"
+	"crypto/x509"
 	"math/rand"
 	"time"
 
+	"github.com/gopcua/opcua/securitypolicy"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uasc"
 )
@@ -100,5 +103,56 @@ func SecurityPolicy(s string) Option {
 func SessionTimeout(seconds float64) Option {
 	return func(c *uasc.Config, sc *uasc.SessionConfig) {
 		sc.SessionTimeout = seconds
+	}
+}
+
+// PrivateKey sets the RSA private key in the secure channel configuration.
+func PrivateKey(key *rsa.PrivateKey) Option {
+	return func(c *uasc.Config, sc *uasc.SessionConfig) {
+		c.LocalKey = key
+	}
+}
+
+// Certificate sets the client X509 certificate in the secure channel configuration
+// and also detects and sets the ApplicationURI from the URI within the certificate
+func Certificate(cert []byte) Option {
+	return func(c *uasc.Config, sc *uasc.SessionConfig) {
+		c.Certificate = cert
+
+		// Extract the application URI from the certificate.
+		var appURI string
+		x509cert, err := x509.ParseCertificate(cert)
+		if err == nil && len(x509cert.URIs) > 0 {
+			appURI = x509cert.URIs[0].String()
+		}
+
+		sc.ClientDescription.ApplicationURI = appURI
+	}
+}
+
+// SecurityFromEndpoint sets the server-related security parameters from
+// a chosen endpoint (received from GetEndpoints())
+func SecurityFromEndpoint(ep *ua.EndpointDescription) Option {
+	return func(c *uasc.Config, sc *uasc.SessionConfig) {
+		c.SecurityPolicyURI = ep.SecurityPolicyURI
+		c.SecurityMode = ep.SecurityMode
+		c.RemoteCertificate = ep.ServerCertificate
+		c.Thumbprint = securitypolicy.Thumbprint(ep.ServerCertificate)
+
+		// Find the PolicyID from the endpoint
+		var userToken *ua.AnonymousIdentityToken
+		for _, t := range ep.UserIdentityTokens {
+			// todo(dh): Allow more than anonymous authentication
+			if t.TokenType == ua.UserTokenTypeAnonymous {
+				userToken = &ua.AnonymousIdentityToken{PolicyID: t.PolicyID}
+				break
+			}
+		}
+
+		if userToken == nil {
+			userToken = &ua.AnonymousIdentityToken{PolicyID: "Anonymous"}
+		}
+
+		sc.UserIdentityToken = userToken
 	}
 }

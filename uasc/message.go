@@ -37,8 +37,9 @@ func (m *MessageHeader) Decode(b []byte) (int, error) {
 		return buf.Pos(), fmt.Errorf("invalid message type %q", m.Header.MessageType)
 	}
 
+	// Sequence header could be encrypted, defer decoding until after decryption
 	m.SequenceHeader = new(SequenceHeader)
-	buf.ReadStruct(m.SequenceHeader)
+	//buf.ReadStruct(m.SequenceHeader)
 
 	return buf.Pos(), buf.Error()
 }
@@ -114,11 +115,21 @@ func NewMessage(srv interface{}, typeID uint16, cfg *Config) *Message {
 
 func (m *Message) Decode(b []byte) (int, error) {
 	m.MessageHeader = new(MessageHeader)
+	var pos int
 	n, err := m.MessageHeader.Decode(b)
 	if err != nil {
 		return n, err
 	}
-	m.TypeID, m.Service, err = ua.DecodeService(b[n:])
+	pos += n
+
+	m.SequenceHeader = new(SequenceHeader)
+	n, err = m.SequenceHeader.Decode(b[pos:])
+	if err != nil {
+		return n, err
+	}
+	pos += n
+
+	m.TypeID, m.Service, err = ua.DecodeService(b[pos:])
 	return len(b), err
 }
 

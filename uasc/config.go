@@ -5,14 +5,19 @@
 package uasc
 
 import (
+	"crypto/rsa"
+
 	"github.com/gopcua/opcua/ua"
 )
 
 // SecurityPolicy URIs
 const (
 	SecurityPolicyNone                = "http://opcfoundation.org/UA/SecurityPolicy#None"
+	SecurityPolicyBasic128Rsa15       = "http://opcfoundation.org/UA/SecurityPolicy#Basic128Rsa15"
+	SecurityPolicyBasic256            = "http://opcfoundation.org/UA/SecurityPolicy#Basic256"
 	SecurityPolicyBasic256Sha256      = "http://opcfoundation.org/UA/SecurityPolicy#Basic256Sha256"
 	SecurityPolicyAes128Sha256RsaOaep = "http://opcfoundation.org/UA/SecurityPolicy#Aes128_Sha256_RsaOaep"
+	SecurityPolicyAes256Sha256RsaPss  = "http://opcfoundation.org/UA/SecurityPolicy#Aes256_Sha256_RsaPss"
 	SecurityPolicyPubSubAes128CTR     = "http://opcfoundation.org/UA/SecurityPolicy#PubSub_Aes128_CTR"
 	SecurityPolicyPubSubAes256CTR     = "http://opcfoundation.org/UA/SecurityPolicy#PubSub_Aes256_CTR"
 )
@@ -44,6 +49,10 @@ type Config struct {
 	// This field shall be null if the Message is not signed.
 	Certificate []byte
 
+	// LocalKey is a RSA Private Key which will be used to encrypt the OpenSecureChannel
+	// messages.  It is the key associated with Certificate
+	LocalKey *rsa.PrivateKey
+
 	// Thumbprint is the thumbprint of the X.509 v3 Certificate assigned to the receiving
 	// application Instance.
 	// The thumbprint is the CertificateDigest of the DER encoded form of the
@@ -51,6 +60,10 @@ type Config struct {
 	// This indicates what public key was used to encrypt the MessageChunk.
 	// This field shall be null if the Message is not encrypted.
 	Thumbprint []byte
+
+	// RemoteCertificate is the X.509 Certificate for the receiving instance.
+	// Used to encrypt the message chunks in the OpenSecureChannel phase.
+	RemoteCertificate []byte
 
 	// SequenceNumber is a monotonically increasing sequence number assigned by the sender to each
 	// MessageChunk sent over the SecureChannel.
