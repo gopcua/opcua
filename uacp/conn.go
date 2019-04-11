@@ -203,48 +203,58 @@ func (c *Conn) handshake(endpoint string) error {
 		SendBufSize:    c.ack.SendBufSize,
 		MaxMessageSize: c.ack.MaxMessageSize,
 		MaxChunkCount:  c.ack.MaxChunkCount,
-		EndPointURL:    endpoint,
+		EndpointURL:    endpoint,
 	}
 
-	if err := c.send("HELF", hel); err != nil {
+	if err := c.Send("HELF", hel); err != nil {
 		return err
 	}
 
-	b, err := c.recv()
+	b, err := c.Receive()
 	if err != nil {
 		return err
 	}
 
 	msgtyp := string(b[:4])
-	if msgtyp != "ACKF" {
-		return fmt.Errorf("got %s want ACK", msgtyp)
-	}
+	switch msgtyp {
+	case "ACKF":
+		ack := new(Acknowledge)
+		if _, err := ack.Decode(b[hdrlen:]); err != nil {
+			return fmt.Errorf("uacp: decode ACK failed: %s", err)
+		}
+		if ack.Version != 0 {
+			return fmt.Errorf("uacp: invalid version %d", ack.Version)
+		}
+		if ack.MaxChunkCount == 0 {
+			ack.MaxChunkCount = DefaultMaxChunkCount
+			debug.Printf("conn %d: server has no chunk limit. Using %d", c.id, ack.MaxChunkCount)
+		}
+		if ack.MaxMessageSize == 0 {
+			ack.MaxMessageSize = DefaultMaxMessageSize
+			debug.Printf("conn %d: server has no message size limit. Using %d", c.id, ack.MaxMessageSize)
+		}
+		c.ack = ack
+		debug.Printf("conn %d: recv %#v", c.id, ack)
+		return nil
 
-	ack := new(Acknowledge)
-	if _, err := ua.Decode(b[hdrlen:], ack); err != nil {
-		return fmt.Errorf("decode ACK failed: %s", err)
-	}
+	case "ERRF":
+		errf := new(Error)
+		if _, err := errf.Decode(b[hdrlen:]); err != nil {
+			return fmt.Errorf("uacp: decode ERR failed: %s", err)
+		}
+		debug.Printf("conn %d: recv %#v", c.id, errf)
+		return errf
 
-	if ack.Version != 0 {
-		return fmt.Errorf("invalid version %d", ack.Version)
+	default:
+		c.SendError(ua.StatusBadTCPInternalError)
+		return fmt.Errorf("invalid handshake packet %q", msgtyp)
 	}
-	if ack.MaxChunkCount == 0 {
-		ack.MaxChunkCount = DefaultMaxChunkCount
-		debug.Printf("conn %d: server has no chunk limit. Using %d", c.id, ack.MaxChunkCount)
-	}
-	if ack.MaxMessageSize == 0 {
-		ack.MaxMessageSize = DefaultMaxMessageSize
-		debug.Printf("conn %d: server has no message size limit. Using %d", c.id, ack.MaxMessageSize)
-	}
-	c.ack = ack
-	debug.Printf("conn %d: recv ACK:%v", c.id, ack)
-	return nil
 }
 
 func (c *Conn) srvhandshake(endpoint string) error {
-	b, err := c.recv()
+	b, err := c.Receive()
 	if err != nil {
-		c.sendError(BadTCPInternalError)
+		c.SendError(ua.StatusBadTCPInternalError)
 		return err
 	}
 
@@ -254,29 +264,30 @@ func (c *Conn) srvhandshake(endpoint string) error {
 	switch msgtyp {
 	case "HELF":
 		hel := new(Hello)
-		if _, err := ua.Decode(msg, hel); err != nil {
-			c.sendError(BadTCPInternalError)
+		if _, err := hel.Decode(msg); err != nil {
+			c.SendError(ua.StatusBadTCPInternalError)
 			return err
 		}
-		if hel.EndPointURL != endpoint {
-			c.sendError(BadTCPEndpointURLInvalid)
-			return fmt.Errorf("invalid endpoint url %s", hel.EndPointURL)
+		if hel.EndpointURL != endpoint {
+			c.SendError(ua.StatusBadTCPEndpointURLInvalid)
+			return fmt.Errorf("uacp: invalid endpoint url %s", hel.EndpointURL)
 		}
-		if err := c.send("ACKF", c.ack); err != nil {
-			c.sendError(BadTCPInternalError)
+		if err := c.Send("ACKF", c.ack); err != nil {
+			c.SendError(ua.StatusBadTCPInternalError)
 			return err
 		}
+		debug.Printf("conn %d: recv %#v", c.id, hel)
 		return nil
 
 	case "RHEF":
 		rhe := new(ReverseHello)
-		if _, err := ua.Decode(msg, rhe); err != nil {
-			c.sendError(BadTCPInternalError)
+		if _, err := rhe.Decode(msg); err != nil {
+			c.SendError(ua.StatusBadTCPInternalError)
 			return err
 		}
-		if rhe.EndPointURL != endpoint {
-			c.sendError(BadTCPEndpointURLInvalid)
-			return fmt.Errorf("invalid endpoint url %s", rhe.EndPointURL)
+		if rhe.EndpointURL != endpoint {
+			c.SendError(ua.StatusBadTCPEndpointURLInvalid)
+			return fmt.Errorf("uacp: invalid endpoint url %s", rhe.EndpointURL)
 		}
 		debug.Printf("conn %d: connecting to %s", c.id, rhe.ServerURI)
 		c.c.Close()
@@ -285,51 +296,54 @@ func (c *Conn) srvhandshake(endpoint string) error {
 			return err
 		}
 		c.c = c
+		debug.Printf("conn %d: recv %#v", c.id, rhe)
 		return nil
 
+	case "ERRF":
+		errf := new(Error)
+		if _, err := errf.Decode(b[hdrlen:]); err != nil {
+			return fmt.Errorf("uacp: decode ERR failed: %s", err)
+		}
+		debug.Printf("conn %d: recv %#v", c.id, errf)
+		return errf
+
 	default:
-		c.sendError(BadTCPInternalError)
+		c.SendError(ua.StatusBadTCPInternalError)
 		return fmt.Errorf("invalid handshake packet %q", msgtyp)
 	}
-}
-
-func (c *Conn) sendError(code uint32) {
-	// we swallow the error to silence complaints from the linter
-	// since sending an error will close the connection and we
-	// want to bubble a different error up.
-	_ = c.send("ERRF", &Error{Error: code})
 }
 
 // hdrlen is the size of the uacp header
 const hdrlen = 8
 
-// recv receives a message from the stream and returns it without the header.
-func (c *Conn) recv() ([]byte, error) {
-	hdr := make([]byte, hdrlen)
-	_, err := io.ReadFull(c.c, hdr)
-	if err != nil {
-		return nil, fmt.Errorf("hdr read faled: %s", err)
+// Receive reads a full UACP message from the underlying connection.
+// The size of b must be at least ReceiveBufSize. Otherwise,
+// the function returns an error.
+func (c *Conn) Receive() ([]byte, error) {
+	b := make([]byte, c.ack.ReceiveBufSize)
+
+	if _, err := io.ReadFull(c.c, b[:hdrlen]); err != nil {
+		return nil, fmt.Errorf("uacp: header read failed: %s", err)
 	}
 
 	var h Header
-	if _, err := ua.Decode(hdr, &h); err != nil {
-		return nil, fmt.Errorf("hdr decode failed: %s", err)
+	if _, err := h.Decode(b[:hdrlen]); err != nil {
+		return nil, fmt.Errorf("uacp: header decode failed: %s", err)
 	}
 
 	if h.MessageSize > c.ack.ReceiveBufSize {
-		return nil, fmt.Errorf("packet too large: %d > %d bytes", h.MessageSize, c.ack.ReceiveBufSize)
+		return nil, fmt.Errorf("uacp: message too large: %d > %d bytes", h.MessageSize, c.ack.ReceiveBufSize)
 	}
 
-	b := make([]byte, h.MessageSize-hdrlen)
-	if _, err := io.ReadFull(c.c, b); err != nil {
-		return nil, fmt.Errorf("read msg failed: %s", err)
+	if _, err := io.ReadFull(c.c, b[hdrlen:h.MessageSize]); err != nil {
+		return nil, fmt.Errorf("uacp: read msg failed: %s", err)
 	}
 
-	debug.Printf("conn %d: recv %s%c with %d bytes", c.id, h.MessageType, h.ChunkType, len(b))
-	return append(hdr, b...), nil
+	debug.Printf("conn %d: recv %s%c with %d bytes", c.id, h.MessageType, h.ChunkType, h.MessageSize)
+	return b[:h.MessageSize], nil
 }
 
-func (c *Conn) send(typ string, msg interface{}) error {
+func (c *Conn) Send(typ string, msg interface{}) error {
 	if len(typ) != 4 {
 		return fmt.Errorf("invalid msg type: %s", typ)
 	}
@@ -342,7 +356,7 @@ func (c *Conn) send(typ string, msg interface{}) error {
 	h := Header{
 		MessageType: typ[:3],
 		ChunkType:   typ[3],
-		MessageSize: uint32(len(body) + 8),
+		MessageSize: uint32(len(body) + hdrlen),
 	}
 
 	if h.MessageSize > c.ack.SendBufSize {
@@ -361,4 +375,11 @@ func (c *Conn) send(typ string, msg interface{}) error {
 	debug.Printf("conn %d: sent %s with %d bytes", c.id, typ, len(b))
 
 	return nil
+}
+
+func (c *Conn) SendError(code ua.StatusCode) {
+	// we swallow the error to silence complaints from the linter
+	// since sending an error will close the connection and we
+	// want to bubble a different error up.
+	_ = c.Send("ERRF", &Error{ErrorCode: uint32(code)})
 }

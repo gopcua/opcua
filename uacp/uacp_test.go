@@ -10,17 +10,17 @@ import (
 	"github.com/gopcua/opcua/ua"
 )
 
-func TestUACPMessage(t *testing.T) {
+func TestHello(t *testing.T) {
 	cases := []ua.CodecTestCase{
 		{
-			Name: "Hello",
-			Struct: NewHello(
-				0,                                        // Version
-				65280,                                    // ReceiveBufSize
-				65535,                                    // SendBufSize
-				4000,                                     // MaxMessageSize
-				"opc.tcp://wow.its.easy:11111/UA/Server", // EndPointURL
-			),
+			Struct: &Hello{
+				Version:        0,
+				ReceiveBufSize: 65280,
+				SendBufSize:    65535,
+				MaxMessageSize: 4000,
+				MaxChunkCount:  1234,
+				EndpointURL:    "opc.tcp://wow.its.easy:11111/UA/Server",
+			},
 			Bytes: []byte{ // Hello message
 				// Version: 0
 				0x00, 0x00, 0x00, 0x00,
@@ -30,8 +30,8 @@ func TestUACPMessage(t *testing.T) {
 				0xff, 0xff, 0x00, 0x00,
 				// MaxMessageSize: 4000
 				0xa0, 0x0f, 0x00, 0x00,
-				// MaxChunkCount: 0
-				0x00, 0x00, 0x00, 0x00,
+				// MaxChunkCount: 1234
+				0xd2, 0x04, 0x00, 0x00,
 				// EndPointURL
 				0x26, 0x00, 0x00, 0x00, 0x6f, 0x70, 0x63, 0x2e,
 				0x74, 0x63, 0x70, 0x3a, 0x2f, 0x2f, 0x77, 0x6f,
@@ -41,14 +41,20 @@ func TestUACPMessage(t *testing.T) {
 				0x65, 0x72,
 			},
 		},
+	}
+	ua.RunCodecTest(t, cases)
+}
+
+func TestAcknowledge(t *testing.T) {
+	cases := []ua.CodecTestCase{
 		{
-			Name: "Acknowledge",
-			Struct: NewAcknowledge(
-				0,     //Version
-				65280, // ReceiveBufSize
-				65535, // SendBufSize
-				4000,  // MaxMessageSize
-			),
+			Struct: &Acknowledge{
+				Version:        0,
+				ReceiveBufSize: 65280,
+				SendBufSize:    65535,
+				MaxMessageSize: 4000,
+				MaxChunkCount:  1234,
+			},
 			Bytes: []byte{
 				// Version: 0
 				0x00, 0x00, 0x00, 0x00,
@@ -58,29 +64,22 @@ func TestUACPMessage(t *testing.T) {
 				0xff, 0xff, 0x00, 0x00,
 				// MaxMessageSize: 4000
 				0xa0, 0x0f, 0x00, 0x00,
-				// MaxChunkCount: 0
-				0x00, 0x00, 0x00, 0x00,
+				// MaxChunkCount: 1234
+				0xd2, 0x04, 0x00, 0x00,
 			},
 		},
+	}
+	ua.RunCodecTest(t, cases)
+}
+
+func TestReverseHello(t *testing.T) {
+	cases := []ua.CodecTestCase{
 		{
-			Name: "Error",
-			Struct: NewError(
-				BadSecureChannelClosed, // Error
-				"foobar",
-			),
-			Bytes: []byte{
-				// Error: BadSecureChannelClosed
-				0x00, 0x00, 0x86, 0x80,
-				// Reason: dummy
-				0x06, 0x00, 0x00, 0x00, 0x66, 0x6f, 0x6f, 0x62, 0x61, 0x72,
+			Name: "Normal",
+			Struct: &ReverseHello{
+				ServerURI:   "opc.tcp://wow.its.easy:11111/UA/Server",
+				EndpointURL: "opc.tcp://wow.its.easy:11111/UA/Server",
 			},
-		},
-		{
-			Name: "ReverseHello",
-			Struct: NewReverseHello(
-				"opc.tcp://wow.its.easy:11111/UA/Server", // ServerURI
-				"opc.tcp://wow.its.easy:11111/UA/Server", // EndPointURL
-			),
 			Bytes: []byte{
 				// ServerURI
 				0x26, 0x00, 0x00, 0x00, 0x6f, 0x70, 0x63, 0x2e,
@@ -98,19 +97,24 @@ func TestUACPMessage(t *testing.T) {
 				0x65, 0x72,
 			},
 		},
-		// {
-		// 	Name: "Generic",
-		// 	Struct: NewGeneric(
-		// 		"XXX",
-		// 		'X',
-		// 	),
-		// 	Bytes: []byte{
-		// 		// MessageType: XXX
-		// 		0x58, 0x58, 0x58,
-		// 		// Chunk Type: X
-		// 		0x58,
-		// 	},
-		// },
+	}
+	ua.RunCodecTest(t, cases)
+}
+
+func TestError(t *testing.T) {
+	cases := []ua.CodecTestCase{
+		{
+			Struct: &Error{
+				ErrorCode: uint32(ua.StatusBadSecureChannelClosed),
+				Reason:    "foobar",
+			},
+			Bytes: []byte{
+				// Error: BadSecureChannelClosed
+				0x00, 0x00, 0x86, 0x80,
+				// Reason: dummy
+				0x06, 0x00, 0x00, 0x00, 0x66, 0x6f, 0x6f, 0x62, 0x61, 0x72,
+			},
+		},
 	}
 	ua.RunCodecTest(t, cases)
 }
