@@ -10,16 +10,24 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"strings"
 
 	"github.com/gopcua/opcua"
 	"github.com/gopcua/opcua/debug"
 	"github.com/gopcua/opcua/ua"
+	"github.com/gopcua/opcua/uasc"
 )
 
 func main() {
-	endpoint := flag.String("endpoint", "opc.tcp://localhost:4840", "OPC UA Endpoint URL")
-	certFile := flag.String("certfile", "cert.pem", "Path to certificate file; will be generated if not found")
-	keyFile := flag.String("keyfile", "key.pem", "Path to PEM Private Key file; will be generated if not found")
+	var (
+		endpoint = flag.String("endpoint", "opc.tcp://localhost:4840", "OPC UA Endpoint URL")
+		certfile = flag.String("cert", "cert.pem", "Path to certificate file")
+		keyfile  = flag.String("key", "key.pem", "Path to PEM Private Key file")
+		gencert  = flag.Bool("gen-cert", false, "Generate a new certificate")
+		policy   = flag.String("sec-policy", "", "Security Policy URL or one of None, Basic128Rsa15, Basic256, Basic256Sha256")
+		mode     = flag.String("sec-mode", "", "Security Mode: one of None, Sign, SignAndEncrypt")
+		appuri   = flag.String("app-uri", "urn:gopcua:client", "Application URI")
+	)
 	flag.BoolVar(&debug.Enable, "debug", false, "enable debug logging")
 	flag.Parse()
 	log.SetFlags(0)
@@ -38,39 +46,59 @@ func main() {
 		}
 	}
 
-	// Local certificate
-	var localKey *rsa.PrivateKey
-	var localCert []byte
-	if serverEndpoint.SecurityMode != ua.MessageSecurityModeNone {
-		var cert tls.Certificate
-		cert, err = tls.LoadX509KeyPair(*certFile, *keyFile)
+	var secPolicy string
+	switch {
+	case *policy != "" && !strings.HasPrefix(*policy, "http://"):
+		secPolicy = "http://opcfoundation.org/UA/SecurityPolicy#" + *policy
+	case strings.HasPrefix(*policy, "http://"):
+		secPolicy = *policy
+	default:
+		secPolicy = serverEndpoint.SecurityPolicyURI
+	}
+
+	var secMode ua.MessageSecurityMode
+	switch *mode {
+	case "None":
+		secMode = ua.MessageSecurityModeNone
+	case "Sign":
+		secMode = ua.MessageSecurityModeSign
+	case "SignAndEncrypt":
+		secMode = ua.MessageSecurityModeSignAndEncrypt
+	default:
+		secMode = serverEndpoint.SecurityMode
+	}
+
+	opts := []opcua.Option{
+		opcua.SecurityFromEndpoint(serverEndpoint),
+		opcua.SecurityPolicy(secPolicy),
+		opcua.SecurityMode(secMode),
+		opcua.ApplicationURI(*appuri),
+	}
+
+	switch secPolicy {
+	case uasc.SecurityPolicyNone:
+		if *certfile != "" || *gencert {
+			log.Fatal("Cannot use certificate with security policy ", secPolicy)
+		}
+	default:
+		if *gencert {
+			generate_cert(*appuri, 2048, *certfile, *keyfile)
+		}
+		log.Printf("Loading cert/key from %s/%s", *certfile, *keyfile)
+		cert, err := tls.LoadX509KeyPair(*certfile, *keyfile)
 		if err != nil {
-			debug.Printf("could not load certificate and key; generating new ones")
-			generate_cert("urn:gopcua-example-client", 2048, *certFile, *keyFile)
-			cert, err = tls.LoadX509KeyPair(*certFile, *keyFile)
-			if err != nil {
-				log.Printf("could not load certificate and key again; exiting")
-				return
-			}
+			log.Fatalf("Failed to load certificate: %s", err)
 		}
-
-		localCert = cert.Certificate[0]
-
-		var ok bool
-		localKey, ok = cert.PrivateKey.(*rsa.PrivateKey)
+		pk, ok := cert.PrivateKey.(*rsa.PrivateKey)
 		if !ok {
-			log.Printf("Private key invalid\n")
-			return
+			log.Fatalf("Invalid private key")
 		}
+		opts = append(opts, opcua.PrivateKey(pk), opcua.Certificate(cert.Certificate[0]))
 	}
 
 	// Finally, create our Client object
-	c := opcua.NewClient(*endpoint,
-		opcua.SecurityFromEndpoint(serverEndpoint),
-		opcua.PrivateKey(localKey),
-		opcua.Certificate(localCert),
-	)
-	log.Printf("Connecting to %s, security mode: %s, %s \n", *endpoint, serverEndpoint.SecurityPolicyURI, serverEndpoint.SecurityMode)
+	c := opcua.NewClient(*endpoint, opts...)
+	log.Printf("Connecting to %s, security mode: %s, %s \n", *endpoint, secPolicy, secMode)
 	if err := c.Connect(); err != nil {
 		log.Fatal(err)
 	}
@@ -93,11 +121,7 @@ func main() {
 		log.Fatalf("Error detaching session: %s", err)
 	}
 
-	d := opcua.NewClient(*endpoint,
-		opcua.SecurityFromEndpoint(serverEndpoint),
-		opcua.PrivateKey(localKey),
-		opcua.Certificate(localCert),
-	)
+	d := opcua.NewClient(*endpoint, opts...)
 
 	// Create a channel only and do not activate it automatically
 	d.Dial()
@@ -119,5 +143,4 @@ func main() {
 	} else {
 		log.Print("v == nil")
 	}
-
 }
