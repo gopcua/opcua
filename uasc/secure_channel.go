@@ -105,6 +105,14 @@ func (s *SecureChannel) LocalEndpoint() string {
 	return s.EndpointURL
 }
 
+func (s *SecureChannel) setState(n int32) {
+	atomic.StoreInt32(&s.state, n)
+}
+
+func (s *SecureChannel) hasState(n int32) bool {
+	return atomic.LoadInt32(&s.state) == n
+}
+
 func (s *SecureChannel) openSecureChannel() error {
 	var err error
 	var localKey *rsa.PrivateKey
@@ -160,7 +168,7 @@ func (s *SecureChannel) openSecureChannel() error {
 			return err
 		}
 
-		atomic.StoreInt32(&s.state, secureChannelOpen)
+		s.setState(secureChannelOpen)
 		return nil
 	})
 }
@@ -169,7 +177,7 @@ func (s *SecureChannel) openSecureChannel() error {
 func (s *SecureChannel) closeSecureChannel() error {
 	req := &ua.CloseSecureChannelRequest{}
 
-	defer atomic.StoreInt32(&s.state, secureChannelClosed)
+	defer s.setState(secureChannelClosed)
 	return s.Send(req, nil, nil)
 }
 
@@ -225,8 +233,8 @@ func (s *SecureChannel) SendAsync(svc interface{}, authToken *ua.NodeID) (resp c
 	}
 	reqid := m.SequenceHeader.RequestID
 
-	// Encrypt the message prior to sending it
-	// If SecurityMode = None, this returns the byte stream untouched
+	// encrypt the message prior to sending it
+	// if SecurityMode == None, this returns the byte stream untouched
 	b, err = s.signAndEncrypt(m, b)
 
 	// send the message
@@ -244,43 +252,37 @@ func (s *SecureChannel) SendAsync(svc interface{}, authToken *ua.NodeID) (resp c
 }
 
 func (s *SecureChannel) readchunk() (*MessageChunk, error) {
-	// read and decode the header to get the message size
-	const hdrlen = 12
-	b := make([]byte, s.c.ReceiveBufSize())
-	_, err := io.ReadFull(s.c, b[:hdrlen])
-	if err == io.EOF {
-		return nil, err
-	}
-	if atomic.LoadInt32(&s.state) == secureChannelClosed {
+	// read a full message from the underlying conn.
+	b, err := s.c.Receive()
+	if err == io.EOF || s.hasState(secureChannelClosed) {
 		return nil, io.EOF
 	}
 	if err != nil {
 		return nil, fmt.Errorf("sechan: read header failed: %s %#v", err, err)
 	}
 
+	const hdrlen = 12
 	h := new(Header)
 	if _, err := h.Decode(b[:hdrlen]); err != nil {
 		return nil, fmt.Errorf("sechan: decode header failed: %s", err)
 	}
-	b = b[:h.MessageSize]
 
 	// drop if the channel id does not match
 	if s.cfg.SecureChannelID > 0 && s.cfg.SecureChannelID != h.SecureChannelID {
 		return nil, fmt.Errorf("sechan: secure channel id mismatch: got 0x%04x, want 0x%04x", h.SecureChannelID, s.cfg.SecureChannelID)
 	}
 
-	// read the rest of the message
-	if _, err := io.ReadFull(s.c, b[hdrlen:]); err != nil {
-		return nil, fmt.Errorf("sechan: read message failed")
-	}
+	// todo(fs): check for ERRF here
 
 	// decode the other headers
 	m := new(MessageChunk)
 	if _, err := m.Decode(b); err != nil {
-		return nil, fmt.Errorf("sechan: decode message failed: %s", err)
+		return nil, fmt.Errorf("sechan: decode chunk failed: %s", err)
 	}
 
-	// Decrypts the block and returns data back into m.Data
+	// todo(fs): check for MSGA here
+
+	// decrypt the block
 	m.Data, err = s.verifyAndDecrypt(m, b)
 	if err != nil {
 		return nil, err
@@ -288,12 +290,10 @@ func (s *SecureChannel) readchunk() (*MessageChunk, error) {
 
 	n, err := m.SequenceHeader.Decode(m.Data)
 	if err != nil {
-		debug.Printf("Error decoding Sequence Header: %s", err)
-		return nil, err
+		return nil, fmt.Errorf("sechan: decode sequence header failed: %s", err)
 	}
 	m.Data = m.Data[n:]
 
-	// todo(fs): handle ERR messages
 	if s.cfg.SecureChannelID == 0 {
 		s.cfg.SecureChannelID = h.SecureChannelID
 		debug.Printf("conn %d/%d: set secure channel id to %d", s.c.ID(), m.SequenceHeader.RequestID, s.cfg.SecureChannelID)
