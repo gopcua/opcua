@@ -1,11 +1,15 @@
-# OPCUA
+<p align="center">
+   <img width="50%" src="https://raw.githubusercontent.com/gopcua/opcua/master/gopher.png">
+</p>
 
-opcua is a native Go implementation of the OPC/UA Binary Protocol.
+<h1 align="center">OPCUA</h1>
+
+A native Go implementation of the OPC/UA Binary Protocol.
 
 [![CircleCI](https://circleci.com/gh/gopcua/opcua.svg?style=shield)](https://circleci.com/gh/gopcua/opcua)
 [![GoDoc](https://godoc.org/github.com/gopcua/opcua?status.svg)](https://godoc.org/github.com/gopcua/opcua)
 [![GolangCI](https://golangci.com/badges/github.com/gopcua/opcua.svg)](https://golangci.com/r/github.com/gopcua/opcua)
-[![GitHub](https://img.shields.io/github/license/mashape/apistatus.svg)](https://github.com/gopcua/opcua/blob/master/LICENSE)
+[![GitHub](https://img.shields.io/github/license/mashape/apistatus.svg)]  (https://github.com/gopcua/opcua/blob/master/LICENSE)
 
 ## Quickstart
 
