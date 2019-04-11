@@ -5,12 +5,11 @@
 package securitypolicy
 
 import (
+	"bytes"
 	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
 	"testing"
-
-	"github.com/google/go-cmp/cmp"
 )
 
 func TestSupportedPolicies(t *testing.T) {
@@ -72,25 +71,25 @@ func TestGenerateKeys(t *testing.T) {
 	}
 
 	keys := generateKeys(computeHmac(crypto.SHA1, localNonce), remoteNonce, 16, 16, 16)
-	if diff := cmp.Diff(keys.signing, localKeys.signing, nil); diff != "" {
-		t.Errorf("local signing key generation failed:\n%s\n", diff)
+	if got, want := keys.signing, localKeys.signing; !bytes.Equal(got, want) {
+		t.Errorf("local signing key generation failed:\ngot %#v want %#v\n", got, want)
 	}
-	if diff := cmp.Diff(keys.encryption, localKeys.encryption, nil); diff != "" {
-		t.Errorf("local encryption key generation failed:\n%s\n", diff)
+	if got, want := keys.encryption, localKeys.encryption; !bytes.Equal(got, want) {
+		t.Errorf("local encryption key generation failed:\ngot %#v want %#v\n", got, want)
 	}
-	if diff := cmp.Diff(keys.iv, localKeys.iv, nil); diff != "" {
-		t.Errorf("local iv key generation failed:\n%s\n", diff)
+	if got, want := keys.iv, localKeys.iv; !bytes.Equal(got, want) {
+		t.Errorf("local iv key generation failed:\ngot %#v want %#v\n", got, want)
 	}
 
 	keys = generateKeys(computeHmac(crypto.SHA1, remoteNonce), localNonce, 16, 16, 16)
-	if diff := cmp.Diff(keys.signing, remoteKeys.signing, nil); diff != "" {
-		t.Errorf("remote signing key generation failed:\n%s\n", diff)
+	if got, want := keys.signing, remoteKeys.signing; !bytes.Equal(got, want) {
+		t.Errorf("remote signing key generation failed:\ngot %#v want %#v\n", got, want)
 	}
-	if diff := cmp.Diff(keys.encryption, remoteKeys.encryption, nil); diff != "" {
-		t.Errorf("remote encryption key generation failed:\n%s\n", diff)
+	if got, want := keys.encryption, remoteKeys.encryption; !bytes.Equal(got, want) {
+		t.Errorf("remote encryption key generation failed:\ngot %#v want %#v\n", got, want)
 	}
-	if diff := cmp.Diff(keys.iv, remoteKeys.iv, nil); diff != "" {
-		t.Errorf("remote iv key generation failed:\n%s\n", diff)
+	if got, want := keys.iv, remoteKeys.iv; !bytes.Equal(got, want) {
+		t.Errorf("remote iv key generation failed:\ngot %#v want %#v\n", got, want)
 	}
 }
 
@@ -188,16 +187,16 @@ func TestEncryptionAlgorithms(t *testing.T) {
 			t.Fatalf("failed to decrypt Symmetric (%s) : %s", c, err)
 		}
 		symDeciphered = symDeciphered[:len(symDeciphered)-padSize] // Trim off padding
-		if diff := cmp.Diff(symDeciphered, plaintext); diff != "" {
-			t.Errorf("Policy: %s\nsymmetric encryption failed:\n%s\n", c, diff)
+		if got, want := symDeciphered, plaintext; !bytes.Equal(got, want) {
+			t.Errorf("Policy: %s\nsymmetric encryption failed:\ngot %#v want %#v\n", c, got, want)
 		}
 
 		// Modify the plaintext and detect if the decrypted message changes; if it does,
 		// our byte slices are referencing the same data and the previous test may have
 		// been a false positive
 		paddedPlaintext[4] = 0xff ^ paddedPlaintext[4]
-		if diff := cmp.Diff(symDeciphered, payloadRef); diff != "" {
-			t.Errorf("Policy: %s\nsymmetric input corruption detected:\n%s\n", c, diff)
+		if got, want := symDeciphered, payloadRef; !bytes.Equal(got, want) {
+			t.Errorf("Policy: %s\nsymmetric input corruption detected:\ngot %#v want %#v\n", c, got, want)
 		}
 
 		symSignature, err := localSymmetric.Signature(paddedPlaintext)
@@ -219,13 +218,13 @@ func TestEncryptionAlgorithms(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to decrypt Asymmetric (%s) : %s", c, err)
 		}
-		if diff := cmp.Diff(asymDeciphered, plaintext); diff != "" {
-			t.Errorf("Policy: %s\nasymmetric encryption failed:\n%s\n", c, diff)
+		if got, want := asymDeciphered, plaintext; !bytes.Equal(got, want) {
+			t.Errorf("Policy: %s\nasymmetric encryption failed:\ngot %#v want %#v\n", c, got, want)
 		}
 
 		paddedPlaintext[4] = 0xff ^ paddedPlaintext[4]
-		if diff := cmp.Diff(asymDeciphered, payloadRef); diff != "" {
-			t.Errorf("Policy: %s\nasymmetric input corruption detected:\n%s\n", c, diff)
+		if got, want := asymDeciphered, payloadRef; !bytes.Equal(got, want) {
+			t.Errorf("Policy: %s\nasymmetric input corruption detected:\ngot %#v want %#v\n", c, got, want)
 		}
 
 		asymSignature, err := localAsymmetric.Signature(plaintext)

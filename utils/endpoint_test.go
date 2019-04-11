@@ -7,8 +7,6 @@ package utils
 import (
 	"net"
 	"testing"
-
-	"github.com/google/go-cmp/cmp"
 )
 
 func TestResolveEndpoint(t *testing.T) {
@@ -65,14 +63,14 @@ func TestResolveEndpoint(t *testing.T) {
 		if err != nil {
 			errStr = err.Error()
 		}
-		if diff := cmp.Diff(network, c.network); diff != "" {
-			t.Errorf("case #%d failed.\n%s", i, diff)
+		if got, want := network, c.network; got != want {
+			t.Fatalf("got %s want %s", got, want)
 		}
-		if diff := cmp.Diff(addr, c.addr); diff != "" {
-			t.Errorf("case #%d failed.\n%s", i, diff)
+		if got, want := addr, c.addr; got != want {
+			t.Fatalf("got %s want %s", got, want)
 		}
-		if diff := cmp.Diff(errStr, c.errStr); diff != "" {
-			t.Errorf("case #%d failed.\n%s", i, diff)
+		if got, want := errStr, c.errStr; got != want {
+			t.Fatalf("got %s want %s", got, want)
 		}
 	}
 }
@@ -111,12 +109,11 @@ func TestGetPath(t *testing.T) {
 		if err != nil {
 			errStr = err.Error()
 		}
-
-		if diff := cmp.Diff(path, c.path); diff != "" {
-			t.Errorf("case #%d failed.\n%s", i, diff)
+		if got, want := path, c.path; got != want {
+			t.Fatalf("got %s want %s", got, want)
 		}
-		if diff := cmp.Diff(errStr, c.errStr); diff != "" {
-			t.Errorf("case #%d failed.\n%s", i, diff)
+		if got, want := errStr, c.errStr; got != want {
+			t.Fatalf("got %s want %s", got, want)
 		}
 	}
 }
