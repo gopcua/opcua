@@ -105,7 +105,7 @@ func (s *SecureChannel) verifyAndDecrypt(m *MessageChunk, b []byte) ([]byte, err
 
 	var paddingLength int
 	if s.cfg.SecurityMode == ua.MessageSecurityModeSignAndEncrypt || isAsymmetric {
-		paddingLength = int(messageToVerify[len(messageToVerify)-1])
+		paddingLength = int(messageToVerify[len(messageToVerify)-1]) + 1
 	}
 
 	b = messageToVerify[headerLength : len(messageToVerify)-paddingLength]
