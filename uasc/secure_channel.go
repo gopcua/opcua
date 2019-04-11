@@ -257,6 +257,9 @@ func (s *SecureChannel) readchunk() (*MessageChunk, error) {
 	if err == io.EOF || s.hasState(secureChannelClosed) {
 		return nil, io.EOF
 	}
+	if errf, ok := err.(*uacp.Error); ok {
+		return nil, errf
+	}
 	if err != nil {
 		return nil, fmt.Errorf("sechan: read header failed: %s %#v", err, err)
 	}
@@ -317,6 +320,11 @@ func (s *SecureChannel) recv() {
 		default:
 			chunk, err := s.readchunk()
 			if err == io.EOF {
+				return
+			}
+			if errf, ok := err.(*uacp.Error); ok {
+				s.notifyCallers(errf)
+				s.Close()
 				return
 			}
 			if err != nil {
@@ -387,7 +395,25 @@ func (s *SecureChannel) recv() {
 	}
 }
 
+func (s *SecureChannel) notifyCallers(err error) {
+	s.mu.Lock()
+	var reqids []uint32
+	for id := range s.handler {
+		reqids = append(reqids, id)
+	}
+	for _, id := range reqids {
+		s.notifyCallerLock(id, nil, err)
+	}
+	s.mu.Unlock()
+}
+
 func (s *SecureChannel) notifyCaller(reqid uint32, svc interface{}, err error) {
+	s.mu.Lock()
+	s.notifyCallerLock(reqid, svc, err)
+	s.mu.Unlock()
+}
+
+func (s *SecureChannel) notifyCallerLock(reqid uint32, svc interface{}, err error) {
 	if err != nil {
 		debug.Printf("conn %d/%d: %v", s.c.ID(), reqid, err)
 	} else {
@@ -395,10 +421,8 @@ func (s *SecureChannel) notifyCaller(reqid uint32, svc interface{}, err error) {
 	}
 
 	// check if we have a pending request handler for this response.
-	s.mu.Lock()
 	ch := s.handler[reqid]
 	delete(s.handler, reqid)
-	s.mu.Unlock()
 
 	// no handler -> next response
 	if ch == nil {

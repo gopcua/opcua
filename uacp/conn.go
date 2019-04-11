@@ -323,7 +323,9 @@ func (c *Conn) Receive() ([]byte, error) {
 	b := make([]byte, c.ack.ReceiveBufSize)
 
 	if _, err := io.ReadFull(c.c, b[:hdrlen]); err != nil {
-		return nil, fmt.Errorf("uacp: header read failed: %s", err)
+		// todo(fs): do not wrap this error since it hides io.EOF
+		// todo(fs): use golang.org/x/xerrors
+		return nil, err
 	}
 
 	var h Header
@@ -336,10 +338,20 @@ func (c *Conn) Receive() ([]byte, error) {
 	}
 
 	if _, err := io.ReadFull(c.c, b[hdrlen:h.MessageSize]); err != nil {
-		return nil, fmt.Errorf("uacp: read msg failed: %s", err)
+		// todo(fs): do not wrap this error since it hides io.EOF
+		// todo(fs): use golang.org/x/xerrors
+		return nil, err
 	}
 
 	debug.Printf("conn %d: recv %s%c with %d bytes", c.id, h.MessageType, h.ChunkType, h.MessageSize)
+
+	if h.MessageType == "ERR" {
+		errf := new(Error)
+		if _, err := errf.Decode(b[hdrlen:h.MessageSize]); err != nil {
+			return nil, fmt.Errorf("uacp: failed to decode ERRF message: %s", err)
+		}
+		return nil, errf
+	}
 	return b[:h.MessageSize], nil
 }
 
