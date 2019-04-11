@@ -49,6 +49,10 @@ func Asymmetric(policyURI string, localKey *rsa.PrivateKey, remoteKey *rsa.Publi
 		return newNoneAsymmetric(localKey, remoteKey)
 	}
 
+	if policyURI != "http://opcfoundation.org/UA/SecurityPolicy#None" && (localKey == nil || remoteKey == nil) {
+		return nil, errors.New("invalid asymmetric security policy config: both keys required")
+	}
+
 	return policy.asymmetricInitFunc(localKey, remoteKey)
 }
 
@@ -64,6 +68,10 @@ func Symmetric(policyURI string, localNonce []byte, remoteNonce []byte) (*Encryp
 
 	if policy.symmetricInitFunc == nil {
 		return newNoneSymmetric(localNonce, remoteNonce)
+	}
+
+	if policyURI != "http://opcfoundation.org/UA/SecurityPolicy#None" && (localNonce == nil || remoteNonce == nil) {
+		return nil, errors.New("invalid symmetric security policy config: both nonces required")
 	}
 
 	return policy.symmetricInitFunc(localNonce, remoteNonce)

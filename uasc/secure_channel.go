@@ -319,6 +319,10 @@ func (s *SecureChannel) recv() {
 			if err == io.EOF {
 				return
 			}
+			if err != nil {
+				debug.Printf("error received while receiving chunk: %s", err)
+				continue
+			}
 
 			hdr := chunk.Header
 			reqid := chunk.SequenceHeader.RequestID
