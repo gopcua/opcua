@@ -4,7 +4,6 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/binary"
-	"sync/atomic"
 
 	"github.com/gopcua/opcua/securitypolicy"
 	"github.com/gopcua/opcua/ua"
@@ -20,7 +19,7 @@ func (s *SecureChannel) signAndEncrypt(m *Message, b []byte) ([]byte, error) {
 	}
 
 	var isAsymmetric bool
-	if atomic.LoadInt32(&s.state) != secureChannelOpen {
+	if s.hasState(secureChannelCreated) {
 		isAsymmetric = true
 	}
 
@@ -72,7 +71,7 @@ func (s *SecureChannel) verifyAndDecrypt(m *MessageChunk, b []byte) ([]byte, err
 	var err error
 
 	var isAsymmetric bool
-	if atomic.LoadInt32(&s.state) != secureChannelOpen {
+	if s.hasState(secureChannelCreated) {
 		isAsymmetric = true
 	}
 

@@ -192,6 +192,10 @@ func (s *SecureChannel) closeSecureChannel() error {
 	req := &ua.CloseSecureChannelRequest{}
 
 	defer s.setState(secureChannelClosed)
+	// Don't send the CloseSecureChannel message if it was never fully opened (due to ERR, etc)
+	if !s.hasState(secureChannelOpen) {
+		return nil
+	}
 	return s.Send(req, nil, nil)
 }
 
