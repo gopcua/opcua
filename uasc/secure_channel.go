@@ -69,6 +69,20 @@ func NewSecureChannel(endpoint string, c *uacp.Conn, cfg *Config) (*SecureChanne
 		return nil, fmt.Errorf("no secure channel config")
 	}
 
+	if cfg.SecurityPolicyURI != SecurityPolicyNone {
+		if cfg.SecurityMode == ua.MessageSecurityModeNone {
+			return nil, fmt.Errorf("invalid channel config: Security policy '%s' cannot be used with '%s'", cfg.SecurityPolicyURI, cfg.SecurityMode)
+		}
+		if cfg.LocalKey == nil {
+			return nil, fmt.Errorf("invalid channel config: Security policy '%s' requires a private key", cfg.SecurityPolicyURI)
+		}
+	}
+
+	// Force the security mode to None if the policy is also None
+	if cfg.SecurityPolicyURI == SecurityPolicyNone {
+		cfg.SecurityMode = ua.MessageSecurityModeNone
+	}
+
 	// always reset the secure channel id
 	cfg.SecureChannelID = 0
 

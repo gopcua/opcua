@@ -27,6 +27,7 @@ func main() {
 		policy   = flag.String("sec-policy", "", "Security Policy URL or one of None, Basic128Rsa15, Basic256, Basic256Sha256")
 		mode     = flag.String("sec-mode", "", "Security Mode: one of None, Sign, SignAndEncrypt")
 		appuri   = flag.String("app-uri", "urn:gopcua:client", "Application URI")
+		list     = flag.Bool("list", false, "List the policies supported by the endpoint and exit")
 	)
 	flag.BoolVar(&debug.Enable, "debug", false, "enable debug logging")
 	flag.Parse()
@@ -36,6 +37,11 @@ func main() {
 	endpoints, err := opcua.GetEndpoints(*endpoint)
 	if err != nil {
 		log.Fatal(err)
+	}
+
+	if *list {
+		printEndpointOptions(*endpoint, endpoints)
+		return
 	}
 
 	// Find the endpoint recommended by the server (highest SecurityMode+SecurityLevel)
@@ -68,18 +74,33 @@ func main() {
 		secMode = serverEndpoint.SecurityMode
 	}
 
+	// Check that the selected endpoint is a valid combo
+	var valid bool
+	for _, e := range endpoints {
+		if e.SecurityMode == secMode && e.SecurityPolicyURI == secPolicy {
+			valid = true
+			break
+		}
+	}
+	if !valid {
+		fmt.Printf("server does not support an endpoint with security : %s , %s\n", *policy, *mode)
+		printEndpointOptions(*endpoint, endpoints)
+		return
+	}
+
 	opts := []opcua.Option{
 		opcua.SecurityFromEndpoint(serverEndpoint),
 		opcua.SecurityPolicy(secPolicy),
 		opcua.SecurityMode(secMode),
-		opcua.ApplicationURI(*appuri),
+	}
+
+	// ApplicationURI is automatically read from the cert so is not required if a cert if provided
+	if *certfile == "" && !*gencert {
+		opts = append(opts, opcua.ApplicationURI(*appuri))
 	}
 
 	switch secPolicy {
 	case uasc.SecurityPolicyNone:
-		if *certfile != "" || *gencert {
-			log.Fatal("Cannot use certificate with security policy ", secPolicy)
-		}
 	default:
 		if *gencert {
 			generate_cert(*appuri, 2048, *certfile, *keyfile)
@@ -142,5 +163,15 @@ func main() {
 		fmt.Printf("Conn 2: %s\n", v.Value)
 	} else {
 		log.Print("v == nil")
+	}
+}
+
+func printEndpointOptions(endpoint string, endpoints []*ua.EndpointDescription) {
+	log.Printf("Valid options for %s are:", endpoint)
+	log.Printf("%22s , %-15s\n", "sec-policy", "sec-mode")
+	for _, e := range endpoints {
+		p := strings.TrimPrefix(e.SecurityPolicyURI, "http://opcfoundation.org/UA/SecurityPolicy#")
+		m := strings.TrimPrefix(e.SecurityMode.String(), "MessageSecurityMode")
+		log.Printf("%22s , %-15s", p, m)
 	}
 }
