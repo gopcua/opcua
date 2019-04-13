@@ -7,7 +7,9 @@ package opcua
 import (
 	"crypto/rsa"
 	"crypto/x509"
+	"log"
 	"math/rand"
+	"reflect"
 	"time"
 
 	"github.com/gopcua/opcua/securitypolicy"
@@ -132,27 +134,138 @@ func Certificate(cert []byte) Option {
 
 // SecurityFromEndpoint sets the server-related security parameters from
 // a chosen endpoint (received from GetEndpoints())
-func SecurityFromEndpoint(ep *ua.EndpointDescription) Option {
+func SecurityFromEndpoint(ep *ua.EndpointDescription, authType ua.UserTokenType) Option {
 	return func(c *uasc.Config, sc *uasc.SessionConfig) {
 		c.SecurityPolicyURI = ep.SecurityPolicyURI
 		c.SecurityMode = ep.SecurityMode
 		c.RemoteCertificate = ep.ServerCertificate
 		c.Thumbprint = securitypolicy.Thumbprint(ep.ServerCertificate)
 
-		// Find the PolicyID from the endpoint
-		var userToken *ua.AnonymousIdentityToken
+		// todo: remove once more auth types are supported
+		if authType != ua.UserTokenTypeAnonymous {
+			log.Print("only anonymous token policies supported at this time, reverting to anonymous")
+			authType = ua.UserTokenTypeAnonymous
+		}
+
 		for _, t := range ep.UserIdentityTokens {
-			// todo(dh): Allow more than anonymous authentication
-			if t.TokenType == ua.UserTokenTypeAnonymous {
-				userToken = &ua.AnonymousIdentityToken{PolicyID: t.PolicyID}
-				break
+			if t.TokenType == authType {
+				if sc.UserIdentityToken == nil {
+
+					switch authType {
+					case ua.UserTokenTypeAnonymous:
+						sc.UserIdentityToken = &ua.AnonymousIdentityToken{}
+					case ua.UserTokenTypeUserName:
+						sc.UserIdentityToken = &ua.UserNameIdentityToken{}
+					case ua.UserTokenTypeCertificate:
+						sc.UserIdentityToken = &ua.X509IdentityToken{}
+					case ua.UserTokenTypeIssuedToken:
+						sc.UserIdentityToken = &ua.IssuedIdentityToken{}
+					}
+
+					break
+				}
+				reflect.ValueOf(sc.UserIdentityToken).Elem().FieldByName("PolicyID").SetString(t.PolicyID)
 			}
+
+			if sc.UserIdentityToken == nil {
+				sc.UserIdentityToken = &ua.AnonymousIdentityToken{PolicyID: "Anonymous"}
+			}
+
+		}
+	}
+}
+
+// AuthPolicyID sets the policy ID of the user identity token
+// Note: This should only be called if you know the exact policy ID the server is expecting.
+// Most callers should use SecurityFromEndpoint as it automatically finds the policyID
+func AuthPolicyID(policy string) Option {
+	return func(c *uasc.Config, sc *uasc.SessionConfig) {
+		if sc.UserIdentityToken == nil {
+			log.Printf("policy ID needs to be set after the policy type is chosen, no changes made.  Call SecurityFromEndpoint() or an AuthXXX() option first")
+			return
 		}
 
-		if userToken == nil {
-			userToken = &ua.AnonymousIdentityToken{PolicyID: "Anonymous"}
+		reflect.ValueOf(sc.UserIdentityToken).Elem().FieldByName("PolicyID").SetString(policy)
+	}
+}
+
+// AuthAnonymous sets the client's authentication X509 certificate
+// Note: PolicyID still needs to be set outside of this method, typically through
+// the SecurityFromEndpoint() Option
+func AuthAnonymous() Option {
+	return func(c *uasc.Config, sc *uasc.SessionConfig) {
+		if sc.UserIdentityToken == nil {
+			sc.UserIdentityToken = &ua.AnonymousIdentityToken{}
 		}
 
-		sc.UserIdentityToken = userToken
+		_, ok := sc.UserIdentityToken.(*ua.AnonymousIdentityToken)
+		if !ok {
+			log.Printf("non-anonymous authentication already configured, ignoring")
+			return
+		}
+
+	}
+}
+
+// AuthUsername sets the client's authentication username and password
+// Note: PolicyID still needs to be set outside of this method, typically through
+// the SecurityFromEndpoint() Option
+func AuthUsername(user, pass string) Option {
+	return func(c *uasc.Config, sc *uasc.SessionConfig) {
+		if sc.UserIdentityToken == nil {
+			sc.UserIdentityToken = &ua.UserNameIdentityToken{}
+		}
+
+		t, ok := sc.UserIdentityToken.(*ua.UserNameIdentityToken)
+		if !ok {
+			log.Printf("non-username authentication already configured, ignoring")
+			return
+		}
+
+		// todo: not correct; need to read spec
+		t.UserName = user
+		t.Password = []byte(pass)
+		t.EncryptionAlgorithm = ""
+	}
+}
+
+// AuthCertificate sets the client's authentication X509 certificate
+// Note: PolicyID still needs to be set outside of this method, typically through
+// the SecurityFromEndpoint() Option
+func AuthCertificate(cert []byte) Option {
+	return func(c *uasc.Config, sc *uasc.SessionConfig) {
+		if sc.UserIdentityToken == nil {
+			sc.UserIdentityToken = &ua.X509IdentityToken{}
+		}
+
+		t, ok := sc.UserIdentityToken.(*ua.X509IdentityToken)
+		if !ok {
+			log.Printf("non-certificate authentication already configured, ignoring")
+			return
+		}
+
+		// todo: probably not correct; need to read spec
+		t.CertificateData = cert
+	}
+}
+
+// AuthIssuedToken sets the client's authentication data based on an externally-issued token
+// Note: PolicyID still needs to be set outside of this method, typically through
+// the SecurityFromEndpoint() Option
+func AuthIssuedToken(tokenData []byte) Option {
+	return func(c *uasc.Config, sc *uasc.SessionConfig) {
+		if sc.UserIdentityToken == nil {
+			sc.UserIdentityToken = &ua.IssuedIdentityToken{}
+		}
+
+		t, ok := sc.UserIdentityToken.(*ua.IssuedIdentityToken)
+		if !ok {
+			log.Printf("non-issued token authentication already configured, ignoring")
+			return
+		}
+
+		// todo : not correct; need to read spec
+		t.TokenData = tokenData
+		t.EncryptionAlgorithm = ""
 	}
 }

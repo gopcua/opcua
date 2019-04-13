@@ -26,6 +26,7 @@ func main() {
 		gencert  = flag.Bool("gen-cert", false, "Generate a new certificate")
 		policy   = flag.String("sec-policy", "", "Security Policy URL or one of None, Basic128Rsa15, Basic256, Basic256Sha256")
 		mode     = flag.String("sec-mode", "", "Security Mode: one of None, Sign, SignAndEncrypt")
+		auth     = flag.String("auth-mode", "Anonymous", "Authentication Mode: one of Anonymous, UserName, Certificate")
 		appuri   = flag.String("app-uri", "urn:gopcua:client", "Application URI")
 		list     = flag.Bool("list", false, "List the policies supported by the endpoint and exit")
 	)
@@ -74,12 +75,44 @@ func main() {
 		secMode = serverEndpoint.SecurityMode
 	}
 
+	// Allow input of only one of sec-mode,sec-policy when choosing 'None'
+	if secMode == ua.MessageSecurityModeNone || secPolicy == "http://opcfoundation.org/UA/SecurityPolicy#None" {
+		secMode = ua.MessageSecurityModeNone
+		secPolicy = "http://opcfoundation.org/UA/SecurityPolicy#None"
+	}
+
+	var authMode ua.UserTokenType
+	var authOption opcua.Option
+	switch *auth {
+	case "Anonymous":
+		authMode = ua.UserTokenTypeAnonymous
+		authOption = opcua.AuthAnonymous()
+	case "UserName":
+		authMode = ua.UserTokenTypeUserName
+		authOption = opcua.AuthUsername("", "") // todo
+	case "Certificate":
+		authMode = ua.UserTokenTypeCertificate
+		authOption = opcua.AuthCertificate([]byte(nil)) // todo
+	case "IssuedToken":
+		authMode = ua.UserTokenTypeIssuedToken
+		authOption = opcua.AuthIssuedToken([]byte(nil)) // todo
+	default:
+		log.Printf("unknown auth-mode, defaulting to Anonymous")
+		authMode = ua.UserTokenTypeAnonymous
+		authOption = opcua.AuthAnonymous()
+	}
+
 	// Check that the selected endpoint is a valid combo
 	var valid bool
+outer:
 	for _, e := range endpoints {
 		if e.SecurityMode == secMode && e.SecurityPolicyURI == secPolicy {
-			valid = true
-			break
+			for _, t := range e.UserIdentityTokens {
+				if t.TokenType == authMode {
+					valid = true
+					break outer
+				}
+			}
 		}
 	}
 	if !valid {
@@ -89,9 +122,10 @@ func main() {
 	}
 
 	opts := []opcua.Option{
-		opcua.SecurityFromEndpoint(serverEndpoint),
+		opcua.SecurityFromEndpoint(serverEndpoint, authMode),
 		opcua.SecurityPolicy(secPolicy),
 		opcua.SecurityMode(secMode),
+		authOption,
 	}
 
 	// ApplicationURI is automatically read from the cert so is not required if a cert if provided
@@ -168,10 +202,16 @@ func main() {
 
 func printEndpointOptions(endpoint string, endpoints []*ua.EndpointDescription) {
 	log.Printf("Valid options for %s are:", endpoint)
-	log.Printf("%22s , %-15s\n", "sec-policy", "sec-mode")
+	log.Printf("%22s , %-15s , (%s)\n", "sec-policy", "sec-mode", "auth-modes")
 	for _, e := range endpoints {
 		p := strings.TrimPrefix(e.SecurityPolicyURI, "http://opcfoundation.org/UA/SecurityPolicy#")
 		m := strings.TrimPrefix(e.SecurityMode.String(), "MessageSecurityMode")
-		log.Printf("%22s , %-15s", p, m)
+		var tt []string
+		for _, t := range e.UserIdentityTokens {
+			tok := strings.TrimPrefix(t.TokenType.String(), "UserTokenType")
+			tt = append(tt, tok)
+		}
+		log.Printf("%22s , %-15s , (%s)", p, m, strings.Join(tt, ","))
+
 	}
 }
