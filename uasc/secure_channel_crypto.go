@@ -163,3 +163,67 @@ func (s *SecureChannel) VerifySessionSignature(cert, nonce, signature []byte) er
 
 	return nil
 }
+
+// EncryptUserPassword issues a new signature for the client to send in ActivateSessionRequest
+func (s *SecureChannel) EncryptUserPassword(policyURI, password string, cert, nonce []byte) ([]byte, string, error) {
+
+	if policyURI == SecurityPolicyNone {
+		return []byte(password), SecurityPolicyNone, nil
+	}
+
+	// If the User ID Token's policy was null, then default to the secure channel's policy
+	if policyURI == "" {
+		policyURI = s.cfg.SecurityPolicyURI
+	}
+
+	remoteX509Cert, err := x509.ParseCertificate(cert)
+	if err != nil {
+		return nil, "", err
+	}
+	remoteKey := remoteX509Cert.PublicKey.(*rsa.PublicKey)
+
+	enc, err := securitypolicy.Asymmetric(policyURI, s.cfg.LocalKey, remoteKey)
+	if err != nil {
+		return nil, "", err
+	}
+
+	l := len(password) + len(nonce)
+	secret := make([]byte, 4)
+	binary.LittleEndian.PutUint32(secret, uint32(l))
+	secret = append(secret, []byte(password)...)
+	secret = append(secret, nonce...)
+	pass, err := enc.Encrypt(secret)
+	if err != nil {
+		return nil, "", err
+	}
+	passAlg := enc.EncryptionURI()
+
+	return pass, passAlg, nil
+}
+
+// NewUserTokenSignature issues a new signature for the client to send in ActivateSessionRequest
+func (s *SecureChannel) NewUserTokenSignature(policyURI string, cert, nonce []byte) ([]byte, string, error) {
+
+	if policyURI == SecurityPolicyNone {
+		return nil, "", nil
+	}
+
+	remoteX509Cert, err := x509.ParseCertificate(cert)
+	if err != nil {
+		return nil, "", err
+	}
+	remoteKey := remoteX509Cert.PublicKey.(*rsa.PublicKey)
+
+	enc, err := securitypolicy.Asymmetric(policyURI, s.cfg.LocalKey, remoteKey)
+	if err != nil {
+		return nil, "", err
+	}
+
+	sig, err := enc.Signature(append(cert, nonce...))
+	if err != nil {
+		return nil, "", err
+	}
+	sigAlg := enc.SignatureURI()
+
+	return sig, sigAlg, nil
+}

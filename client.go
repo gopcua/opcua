@@ -8,6 +8,7 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"log"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -61,6 +62,14 @@ func NewClient(endpoint string, opts ...Option) *Client {
 		sessionCfg:  DefaultSessionConfig(),
 	}
 	for _, opt := range opts {
+		opt(c.cfg, c.sessionCfg)
+	}
+
+	// UserIdentityToken was removed from DefaultSessionConfig() so ensure a default still is set
+	if c.sessionCfg.UserIdentityToken == nil {
+		opt := AuthAnonymous()
+		opt(c.cfg, c.sessionCfg)
+		opt = AuthPolicyID("Anonymous")
 		opt(c.cfg, c.sessionCfg)
 	}
 	return c
@@ -200,6 +209,33 @@ func (c *Client) ActivateSession(s *Session) error {
 	if err != nil {
 		debug.Printf("error creating session signature: %s", err)
 		return nil
+	}
+
+	switch s.cfg.UserIdentityToken.(type) {
+	case *ua.AnonymousIdentityToken:
+
+	case *ua.UserNameIdentityToken:
+		pass, passAlg, err := c.sechan.EncryptUserPassword(s.cfg.AuthPolicyURI, s.cfg.AuthPassword, s.serverCertificate, s.serverNonce)
+		if err != nil {
+			log.Printf("error encrypting user password: %s", err)
+			return err
+		}
+		s.cfg.UserIdentityToken.(*ua.UserNameIdentityToken).Password = pass
+		s.cfg.UserIdentityToken.(*ua.UserNameIdentityToken).EncryptionAlgorithm = passAlg
+
+	case *ua.X509IdentityToken:
+		tokSig, tokSigAlg, err := c.sechan.NewUserTokenSignature(s.cfg.AuthPolicyURI, s.serverCertificate, s.serverNonce)
+		if err != nil {
+			log.Printf("error creating session signature: %s", err)
+			return err
+		}
+		s.cfg.UserTokenSignature = &ua.SignatureData{
+			Algorithm: tokSigAlg,
+			Signature: tokSig,
+		}
+
+	case *ua.IssuedIdentityToken:
+		s.cfg.UserIdentityToken.(*ua.IssuedIdentityToken).EncryptionAlgorithm = ""
 	}
 
 	req := &ua.ActivateSessionRequest{

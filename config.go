@@ -36,8 +36,8 @@ func DefaultSessionConfig() *uasc.SessionConfig {
 			ApplicationName: &ua.LocalizedText{Text: "gopcua - OPC UA implementation in Go"},
 			ApplicationType: ua.ApplicationTypeClient,
 		},
-		LocaleIDs:          []string{"en-us"},
-		UserIdentityToken:  &ua.AnonymousIdentityToken{PolicyID: "open62541-anonymous-policy"},
+		LocaleIDs: []string{"en-us"},
+		//UserIdentityToken:  &ua.AnonymousIdentityToken{PolicyID: "open62541-anonymous-policy"},
 		UserTokenSignature: &ua.SignatureData{},
 	}
 }
@@ -141,13 +141,8 @@ func SecurityFromEndpoint(ep *ua.EndpointDescription, authType ua.UserTokenType)
 		c.RemoteCertificate = ep.ServerCertificate
 		c.Thumbprint = securitypolicy.Thumbprint(ep.ServerCertificate)
 
-		// todo: remove once more auth types are supported
-		if authType != ua.UserTokenTypeAnonymous {
-			log.Print("only anonymous token policies supported at this time, reverting to anonymous")
-			authType = ua.UserTokenTypeAnonymous
-		}
-
 		for _, t := range ep.UserIdentityTokens {
+
 			if t.TokenType == authType {
 				if sc.UserIdentityToken == nil {
 
@@ -161,17 +156,20 @@ func SecurityFromEndpoint(ep *ua.EndpointDescription, authType ua.UserTokenType)
 					case ua.UserTokenTypeIssuedToken:
 						sc.UserIdentityToken = &ua.IssuedIdentityToken{}
 					}
-
-					break
 				}
+				// todo: this feels wrong; should this be an interface with a .SetPolicyID() method?
 				reflect.ValueOf(sc.UserIdentityToken).Elem().FieldByName("PolicyID").SetString(t.PolicyID)
-			}
+				sc.AuthPolicyURI = t.SecurityPolicyURI
 
-			if sc.UserIdentityToken == nil {
-				sc.UserIdentityToken = &ua.AnonymousIdentityToken{PolicyID: "Anonymous"}
+				break
 			}
-
 		}
+
+		if sc.UserIdentityToken == nil {
+			sc.UserIdentityToken = &ua.AnonymousIdentityToken{PolicyID: "Anonymous"}
+			sc.AuthPolicyURI = uasc.SecurityPolicyNone
+		}
+
 	}
 }
 
@@ -222,10 +220,8 @@ func AuthUsername(user, pass string) Option {
 			return
 		}
 
-		// todo: not correct; need to read spec
 		t.UserName = user
-		t.Password = []byte(pass)
-		t.EncryptionAlgorithm = ""
+		sc.AuthPassword = pass
 	}
 }
 
@@ -244,7 +240,6 @@ func AuthCertificate(cert []byte) Option {
 			return
 		}
 
-		// todo: probably not correct; need to read spec
 		t.CertificateData = cert
 	}
 }
@@ -266,6 +261,5 @@ func AuthIssuedToken(tokenData []byte) Option {
 
 		// todo : not correct; need to read spec
 		t.TokenData = tokenData
-		t.EncryptionAlgorithm = ""
 	}
 }

@@ -148,6 +148,14 @@ type SessionConfig struct {
 	// that a Session shall remain open without activity. The Server should attempt to honour the
 	// Client request for this parameter,but may negotiate this value up or down to meet its own constraints.
 	SessionTimeout float64
+
+	// Stored version of the password to authenticate against a server
+	// todo: storing passwords in memory seems wrong
+	AuthPassword string
+
+	// PolicyURI to use when encrypting secrets for the User Identity Token
+	// Could be different from the secure channel's policy
+	AuthPolicyURI string
 }
 
 // // NewServerSessionConfig creates a new SessionConfigServer for server.

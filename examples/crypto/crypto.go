@@ -5,12 +5,17 @@
 package main
 
 import (
+	"bufio"
 	"crypto/rsa"
 	"crypto/tls"
 	"flag"
 	"fmt"
 	"log"
+	"os"
 	"strings"
+	"syscall"
+
+	"golang.org/x/crypto/ssh/terminal"
 
 	"github.com/gopcua/opcua"
 	"github.com/gopcua/opcua/debug"
@@ -29,6 +34,8 @@ func main() {
 		auth     = flag.String("auth-mode", "Anonymous", "Authentication Mode: one of Anonymous, UserName, Certificate")
 		appuri   = flag.String("app-uri", "urn:gopcua:client", "Application URI")
 		list     = flag.Bool("list", false, "List the policies supported by the endpoint and exit")
+		username = flag.String("user", "", "Username to use in auth-mode UserName")
+		password = flag.String("pass", "", "Password to use in auth-mode UserName; will prompt for input if omitted")
 	)
 	flag.BoolVar(&debug.Enable, "debug", false, "enable debug logging")
 	flag.Parse()
@@ -53,6 +60,8 @@ func main() {
 		}
 	}
 
+	opts := []opcua.Option{}
+
 	var secPolicy string
 	switch {
 	case *policy != "" && !strings.HasPrefix(*policy, "http://"):
@@ -62,45 +71,107 @@ func main() {
 	default:
 		secPolicy = serverEndpoint.SecurityPolicyURI
 	}
+	opts = append(opts, opcua.SecurityPolicy(secPolicy))
+
+	// ApplicationURI is automatically read from the cert so is not required if a cert if provided
+	if *certfile == "" && !*gencert {
+		opts = append(opts, opcua.ApplicationURI(*appuri))
+	}
+
+	var cert []byte
+	switch secPolicy {
+	case uasc.SecurityPolicyNone:
+	default:
+		if *gencert {
+			generate_cert(*appuri, 2048, *certfile, *keyfile)
+		}
+		log.Printf("Loading cert/key from %s/%s", *certfile, *keyfile)
+		c, err := tls.LoadX509KeyPair(*certfile, *keyfile)
+		if err != nil {
+			log.Fatalf("Failed to load certificate: %s", err)
+		}
+		pk, ok := c.PrivateKey.(*rsa.PrivateKey)
+		if !ok {
+			log.Fatalf("Invalid private key")
+		}
+		cert = c.Certificate[0]
+		opts = append(opts, opcua.PrivateKey(pk), opcua.Certificate(cert))
+	}
 
 	var secMode ua.MessageSecurityMode
-	switch *mode {
-	case "None":
+	switch strings.ToLower(*mode) {
+	case "none":
 		secMode = ua.MessageSecurityModeNone
-	case "Sign":
+	case "sign":
 		secMode = ua.MessageSecurityModeSign
-	case "SignAndEncrypt":
+	case "signandencrypt":
 		secMode = ua.MessageSecurityModeSignAndEncrypt
 	default:
 		secMode = serverEndpoint.SecurityMode
 	}
 
 	// Allow input of only one of sec-mode,sec-policy when choosing 'None'
-	if secMode == ua.MessageSecurityModeNone || secPolicy == "http://opcfoundation.org/UA/SecurityPolicy#None" {
+	if secMode == ua.MessageSecurityModeNone || secPolicy == uasc.SecurityPolicyNone {
 		secMode = ua.MessageSecurityModeNone
-		secPolicy = "http://opcfoundation.org/UA/SecurityPolicy#None"
+		secPolicy = uasc.SecurityPolicyNone
 	}
 
 	var authMode ua.UserTokenType
 	var authOption opcua.Option
-	switch *auth {
-	case "Anonymous":
+	switch strings.ToLower(*auth) {
+	case "anonymous":
 		authMode = ua.UserTokenTypeAnonymous
 		authOption = opcua.AuthAnonymous()
-	case "UserName":
+
+	case "username":
 		authMode = ua.UserTokenTypeUserName
-		authOption = opcua.AuthUsername("", "") // todo
-	case "Certificate":
+
+		if *username == "" {
+			fmt.Print("Enter username: ")
+			*username, err = bufio.NewReader(os.Stdin).ReadString('\n')
+			*username = strings.TrimSuffix(*username, "\n")
+			if err != nil {
+				log.Fatalf("error reading username input: %s", err)
+			}
+		}
+
+		passPrompt := true
+		flag.Visit(func(f *flag.Flag) {
+			if f.Name == "pass" {
+				passPrompt = false
+			}
+		})
+
+		if passPrompt {
+			fmt.Print("Enter password: ")
+			passInput, err := terminal.ReadPassword(int(syscall.Stdin))
+			if err != nil {
+				log.Fatalf("Error reading password: %s", err)
+			}
+			*password = string(passInput)
+			fmt.Print("\n")
+		}
+		authOption = opcua.AuthUsername(*username, *password)
+
+	case "certificate":
 		authMode = ua.UserTokenTypeCertificate
-		authOption = opcua.AuthCertificate([]byte(nil)) // todo
-	case "IssuedToken":
+		authOption = opcua.AuthCertificate(cert)
+
+	case "issuedtoken":
 		authMode = ua.UserTokenTypeIssuedToken
 		authOption = opcua.AuthIssuedToken([]byte(nil)) // todo
+
 	default:
 		log.Printf("unknown auth-mode, defaulting to Anonymous")
 		authMode = ua.UserTokenTypeAnonymous
 		authOption = opcua.AuthAnonymous()
+
 	}
+	opts = append(opts,
+		opcua.SecurityFromEndpoint(serverEndpoint, authMode),
+		opcua.SecurityMode(secMode),
+		authOption,
+	)
 
 	// Check that the selected endpoint is a valid combo
 	var valid bool
@@ -119,36 +190,6 @@ outer:
 		fmt.Printf("server does not support an endpoint with security : %s , %s\n", *policy, *mode)
 		printEndpointOptions(*endpoint, endpoints)
 		return
-	}
-
-	opts := []opcua.Option{
-		opcua.SecurityFromEndpoint(serverEndpoint, authMode),
-		opcua.SecurityPolicy(secPolicy),
-		opcua.SecurityMode(secMode),
-		authOption,
-	}
-
-	// ApplicationURI is automatically read from the cert so is not required if a cert if provided
-	if *certfile == "" && !*gencert {
-		opts = append(opts, opcua.ApplicationURI(*appuri))
-	}
-
-	switch secPolicy {
-	case uasc.SecurityPolicyNone:
-	default:
-		if *gencert {
-			generate_cert(*appuri, 2048, *certfile, *keyfile)
-		}
-		log.Printf("Loading cert/key from %s/%s", *certfile, *keyfile)
-		cert, err := tls.LoadX509KeyPair(*certfile, *keyfile)
-		if err != nil {
-			log.Fatalf("Failed to load certificate: %s", err)
-		}
-		pk, ok := cert.PrivateKey.(*rsa.PrivateKey)
-		if !ok {
-			log.Fatalf("Invalid private key")
-		}
-		opts = append(opts, opcua.PrivateKey(pk), opcua.Certificate(cert.Certificate[0]))
 	}
 
 	// Finally, create our Client object
@@ -202,16 +243,28 @@ outer:
 
 func printEndpointOptions(endpoint string, endpoints []*ua.EndpointDescription) {
 	log.Printf("Valid options for %s are:", endpoint)
-	log.Printf("%22s , %-15s , (%s)\n", "sec-policy", "sec-mode", "auth-modes")
+	log.Print("         sec-policy    |    sec-mode     |      auth-modes\n")
+	log.Print("-----------------------|-----------------|---------------------------\n")
 	for _, e := range endpoints {
 		p := strings.TrimPrefix(e.SecurityPolicyURI, "http://opcfoundation.org/UA/SecurityPolicy#")
 		m := strings.TrimPrefix(e.SecurityMode.String(), "MessageSecurityMode")
 		var tt []string
 		for _, t := range e.UserIdentityTokens {
 			tok := strings.TrimPrefix(t.TokenType.String(), "UserTokenType")
-			tt = append(tt, tok)
+
+			// Just show one entry if a server has multiple varieties of one TokenType (eg. different algorithms)
+			dup := false
+			for _, v := range tt {
+				if tok == v {
+					dup = true
+					break
+				}
+			}
+			if !dup {
+				tt = append(tt, tok)
+			}
 		}
-		log.Printf("%22s , %-15s , (%s)", p, m, strings.Join(tt, ","))
+		log.Printf("%22s | %-15s | (%s)", p, m, strings.Join(tt, ","))
 
 	}
 }
