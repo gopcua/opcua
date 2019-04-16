@@ -121,7 +121,7 @@ func NewNodeID(s string) (*NodeID, error) {
 	// parse identifier
 	switch {
 	case strings.HasPrefix(idval, "i="):
-		id, err := strconv.Atoi(idval[2:])
+		id, err := strconv.ParseUint(idval[2:], 10, 64)
 		if err != nil {
 			return nil, fmt.Errorf("invalid numeric id: %s", s)
 		}
@@ -191,13 +191,13 @@ func (n *NodeID) SetIndexFlag() {
 
 // Namespace returns the namespace id. For two byte node ids
 // this will always be zero.
-func (n *NodeID) Namespace() int {
-	return int(n.ns)
+func (n *NodeID) Namespace() uint16 {
+	return n.ns
 }
 
 // SetNamespace sets the namespace id. It returns an error
 // if the id is not within the range of the node id type.
-func (n *NodeID) SetNamespace(v int) error {
+func (n *NodeID) SetNamespace(v uint16) error {
 	switch n.Type() {
 	case NodeIDTypeTwoByte:
 		if v != 0 {
@@ -206,14 +206,14 @@ func (n *NodeID) SetNamespace(v int) error {
 		return nil
 
 	case NodeIDTypeFourByte:
-		if max := math.MaxUint8; v < 0 || v > max {
+		if max := uint16(math.MaxUint8); v > max {
 			return fmt.Errorf("out of range [0..%d]: %d", max, v)
 		}
 		n.ns = uint16(v)
 		return nil
 
 	default:
-		if max := math.MaxUint16; v < 0 || v > max {
+		if max := uint16(math.MaxUint16); v > max {
 			return fmt.Errorf("out of range [0..%d]: %d", max, v)
 		}
 		n.ns = uint16(v)
@@ -224,30 +224,30 @@ func (n *NodeID) SetNamespace(v int) error {
 // IntID returns the identifier value if the type is
 // TwoByte, FourByte or Numeric. For all other types IntID
 // returns 0.
-func (n *NodeID) IntID() int {
-	return int(n.nid)
+func (n *NodeID) IntID() uint32 {
+	return n.nid
 }
 
 // SetIntID sets the identifier value for two byte, four byte and
 // numeric node ids. It returns an error for other types.
-func (n *NodeID) SetIntID(v int) error {
+func (n *NodeID) SetIntID(v uint32) error {
 	switch n.Type() {
 	case NodeIDTypeTwoByte:
-		if max := math.MaxUint8; v < 0 || v > max {
+		if max := uint32(math.MaxUint8); v > max {
 			return fmt.Errorf("out of range [0..%d]: %d", max, v)
 		}
 		n.nid = uint32(v)
 		return nil
 
 	case NodeIDTypeFourByte:
-		if max := math.MaxUint16; v < 0 || v > max {
+		if max := uint32(math.MaxUint16); v > max {
 			return fmt.Errorf("out of range [0..%d]: %d", max, v)
 		}
 		n.nid = uint32(v)
 		return nil
 
 	case NodeIDTypeNumeric:
-		if max := math.MaxUint32; v < 0 || v > max {
+		if max := uint32(math.MaxUint32); v > max {
 			return fmt.Errorf("out of range [0..%d]: %d", max, v)
 		}
 		n.nid = uint32(v)

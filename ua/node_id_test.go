@@ -158,7 +158,7 @@ func TestSetIntID(t *testing.T) {
 	tests := []struct {
 		name string
 		n    *NodeID
-		v    int
+		v    uint32
 		err  error
 	}{
 		// happy flows
@@ -180,40 +180,16 @@ func TestSetIntID(t *testing.T) {
 
 		// error flows
 		{
-			name: "TwoByte.tooSmall",
-			n:    NewTwoByteNodeID(1),
-			v:    -1,
-			err:  errors.New("out of range [0..255]: -1"),
-		},
-		{
 			name: "TwoByte.tooBig",
 			n:    NewTwoByteNodeID(1),
 			v:    256,
 			err:  errors.New("out of range [0..255]: 256"),
 		},
 		{
-			name: "FourByte.tooSmall",
-			n:    NewFourByteNodeID(0, 1),
-			v:    -1,
-			err:  errors.New("out of range [0..65535]: -1"),
-		},
-		{
 			name: "FourByte.tooBig",
 			n:    NewFourByteNodeID(0, 1),
 			v:    65536,
 			err:  errors.New("out of range [0..65535]: 65536"),
-		},
-		{
-			name: "Numeric.tooSmall",
-			n:    NewNumericNodeID(0, 1),
-			v:    -1,
-			err:  errors.New("out of range [0..4294967295]: -1"),
-		},
-		{
-			name: "Numeric.toobBig",
-			n:    NewNumericNodeID(0, 1),
-			v:    4294967296,
-			err:  errors.New("out of range [0..4294967295]: 4294967296"),
 		},
 		{
 			name: "String.incompatible",
@@ -340,7 +316,7 @@ func TestSetNamespace(t *testing.T) {
 	tests := []struct {
 		name string
 		n    *NodeID
-		v    int
+		v    uint16
 		err  error
 	}{
 		// happy flows
@@ -368,64 +344,10 @@ func TestSetNamespace(t *testing.T) {
 			err:  errors.New("out of range [0..0]: 1"),
 		},
 		{
-			name: "FourByte.tooSmall",
-			n:    NewFourByteNodeID(0, 1),
-			v:    -1,
-			err:  errors.New("out of range [0..255]: -1"),
-		},
-		{
 			name: "FourByte.tooBig",
 			n:    NewFourByteNodeID(0, 1),
 			v:    256,
 			err:  errors.New("out of range [0..255]: 256"),
-		},
-		{
-			name: "Numeric.tooSmall",
-			n:    NewNumericNodeID(0, 1),
-			v:    -1,
-			err:  errors.New("out of range [0..65535]: -1"),
-		},
-		{
-			name: "Numeric.toobBig",
-			n:    NewNumericNodeID(0, 1),
-			v:    65536,
-			err:  errors.New("out of range [0..65535]: 65536"),
-		},
-		{
-			name: "String.tooSmall",
-			n:    NewStringNodeID(0, "a"),
-			v:    -1,
-			err:  errors.New("out of range [0..65535]: -1"),
-		},
-		{
-			name: "String.tooBig",
-			n:    NewStringNodeID(0, "a"),
-			v:    65536,
-			err:  errors.New("out of range [0..65535]: 65536"),
-		},
-		{
-			name: "GUID.tooSmall",
-			n:    NewGUIDNodeID(0, "a"),
-			v:    -1,
-			err:  errors.New("out of range [0..65535]: -1"),
-		},
-		{
-			name: "GUID.tooBig",
-			n:    NewGUIDNodeID(0, "a"),
-			v:    65536,
-			err:  errors.New("out of range [0..65535]: 65536"),
-		},
-		{
-			name: "Opaque.tooSmall",
-			n:    NewByteStringNodeID(0, []byte{'a'}),
-			v:    -1,
-			err:  errors.New("out of range [0..65535]: -1"),
-		},
-		{
-			name: "Opaque.tooBig",
-			n:    NewByteStringNodeID(0, []byte{'a'}),
-			v:    65536,
-			err:  errors.New("out of range [0..65535]: 65536"),
 		},
 	}
 

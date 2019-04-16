@@ -1,10 +1,14 @@
 version: 2
+
 workflows:
   version: 2
   test:
     jobs:
       - test-1.11
+      - test-1.11-32bit
       - test-1.12
+      - test-1.12-32bit
+
 jobs:
   test-1.11:
     docker:
@@ -20,7 +24,19 @@ jobs:
           key: go-mod-{{ checksum "go.sum" }}
           paths:
             - "/go/pkg/mod"
+  test-1.11-32bit:
+    docker:
+      - image: 'circleci/golang:1.11'
+    environment:
+      GOARCH=386
+    steps: *ref_0
   test-1.12:
     docker:
       - image: 'circleci/golang:1.12'
+    steps: *ref_0
+  test-1.12-32bit:
+    docker:
+      - image: 'circleci/golang:1.12'
+    environment:
+      GOARCH=386
     steps: *ref_0
