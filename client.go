@@ -13,7 +13,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/gopcua/opcua/debug"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uacp"
 	"github.com/gopcua/opcua/uasc"
@@ -183,7 +182,7 @@ func (c *Client) CreateSession(cfg *uasc.SessionConfig) (*Session, error) {
 
 		err := c.sechan.VerifySessionSignature(resp.ServerCertificate, nonce, resp.ServerSignature.Signature)
 		if err != nil {
-			debug.Printf("error verifying session signature: %s", err)
+			log.Printf("error verifying session signature: %s", err)
 			return nil
 		}
 
@@ -207,7 +206,7 @@ func (c *Client) CreateSession(cfg *uasc.SessionConfig) (*Session, error) {
 func (c *Client) ActivateSession(s *Session) error {
 	sig, sigAlg, err := c.sechan.NewSessionSignature(s.serverCertificate, s.serverNonce)
 	if err != nil {
-		debug.Printf("error creating session signature: %s", err)
+		log.Printf("error creating session signature: %s", err)
 		return nil
 	}
 
