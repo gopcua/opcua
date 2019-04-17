@@ -9,22 +9,22 @@ import (
 	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
+	"sort"
 	"testing"
+
+	"github.com/gopcua/opcua/securitypolicy/sign"
+
+	"github.com/pascaldekloe/goe/verify"
 )
 
 func TestSupportedPolicies(t *testing.T) {
-	s := SupportedPolicies()
-
-	if len(s) != len(supportedPolicies) {
-		t.Errorf("SupportedPolicies() has extra or missing entries")
+	got := SupportedPolicies()
+	var want []string
+	for k := range policies {
+		want = append(want, k)
 	}
-
-	for _, policy := range s {
-		if _, ok := supportedPolicies[policy]; !ok {
-			t.Errorf("SupportedPolicy returned \"%s\" but cannot fetch details\n", policy)
-		}
-	}
-
+	sort.Strings(want)
+	verify.Values(t, "", got, want)
 }
 
 func TestGenerateKeysLength(t *testing.T) {
@@ -40,7 +40,8 @@ func TestGenerateKeysLength(t *testing.T) {
 		t.Fatalf("Could not generate remote nonce")
 	}
 
-	keys := generateKeys(computeHmac(crypto.SHA256, remoteNonce), localNonce, 32, 32, 16)
+	hmac := &sign.HMAC{Hash: crypto.SHA256, Secret: remoteNonce}
+	keys := generateKeys(hmac, localNonce, 32, 32, 16)
 	if len(keys.signing) != 32 {
 		t.Errorf("Signing Key Invalid Length\n")
 	}
@@ -50,11 +51,9 @@ func TestGenerateKeysLength(t *testing.T) {
 	if len(keys.iv) != 16 {
 		t.Errorf("Encryption IV Invalid Length\n")
 	}
-
 }
 
 func TestGenerateKeys(t *testing.T) {
-
 	localNonce := []byte("\xEE\x51\x68\x84\x0E\x07\xF3\x94\x5B\x6D\xB7\x3A\x41\x3E\xC2\x5C")
 	remoteNonce := []byte("\x9B\x0F\x5B\xF8\x5E\x32\xFB\x37\x01\x43\x69\xB3\x14\xDE\x7A\xE7")
 
@@ -70,7 +69,8 @@ func TestGenerateKeys(t *testing.T) {
 		iv:         []byte("\x09\xAA\x4F\x50\x15\x4D\x69\xC5\x0B\x3B\x78\x7F\xD8\x54\x36\x45"),
 	}
 
-	keys := generateKeys(computeHmac(crypto.SHA1, localNonce), remoteNonce, 16, 16, 16)
+	localHmac := &sign.HMAC{Hash: crypto.SHA1, Secret: localNonce}
+	keys := generateKeys(localHmac, remoteNonce, 16, 16, 16)
 	if got, want := keys.signing, localKeys.signing; !bytes.Equal(got, want) {
 		t.Errorf("local signing key generation failed:\ngot %#v want %#v\n", got, want)
 	}
@@ -81,7 +81,8 @@ func TestGenerateKeys(t *testing.T) {
 		t.Errorf("local iv key generation failed:\ngot %#v want %#v\n", got, want)
 	}
 
-	keys = generateKeys(computeHmac(crypto.SHA1, remoteNonce), localNonce, 16, 16, 16)
+	remoteHmac := &sign.HMAC{Hash: crypto.SHA1, Secret: remoteNonce}
+	keys = generateKeys(remoteHmac, localNonce, 16, 16, 16)
 	if got, want := keys.signing, remoteKeys.signing; !bytes.Equal(got, want) {
 		t.Errorf("remote signing key generation failed:\ngot %#v want %#v\n", got, want)
 	}
@@ -120,125 +121,118 @@ func TestEncryptionAlgorithms(t *testing.T) {
 		t.Fatalf("Unable to generate remote private key\n")
 	}
 
-	cases := SupportedPolicies()
-
-	for _, c := range cases {
-		localAsymmetric, err := Asymmetric(c, localKey, &remoteKey.PublicKey)
-		if err != nil {
-			t.Fatalf("failed local Asymmetric New(%s) : %s", c, err)
-		}
-
-		nonceLength := localAsymmetric.NonceLength()
-		var localNonce []byte
-		var remoteNonce []byte
-
-		if nonceLength > 0 {
-			localNonce = make([]byte, nonceLength)
-			remoteNonce = make([]byte, nonceLength)
-
-			_, err = rand.Read(localNonce)
+	for uri, p := range policies {
+		t.Run(uri, func(t *testing.T) {
+			localAsymmetric, err := p.asymmetric(localKey, &remoteKey.PublicKey)
 			if err != nil {
-				t.Fatalf("could not generate local nonce for %s", c)
+				t.Fatal(err)
 			}
 
-			_, err = rand.Read(remoteNonce)
-			if err != nil {
-				t.Fatalf("could not generate remote nonce for %s", c)
+			makeNonce := func(n int) []byte {
+				t.Helper()
+				if n == 0 {
+					return nil
+				}
+				b := make([]byte, n)
+				if _, err = rand.Read(b); err != nil {
+					t.Fatalf("could not generate nonce")
+				}
+				return b
 			}
-		}
 
-		if nonceLength == 0 && c != "http://opcfoundation.org/UA/SecurityPolicy#None" {
-			t.Fatalf("client nonce length zero for %s", c)
-		}
+			nonceLength := localAsymmetric.NonceLength()
+			localNonce, remoteNonce := makeNonce(nonceLength), makeNonce(nonceLength)
+			if nonceLength == 0 && uri != SecurityPolicyNone {
+				t.Fatalf("client nonce length zero")
+			}
 
-		localSymmetric, err := Symmetric(c, localNonce, remoteNonce)
-		if err != nil {
-			t.Fatalf("failed local Symmetric New(%s) : %s", c, err)
-		}
+			localSymmetric, err := p.symmetric(localNonce, remoteNonce)
+			if err != nil {
+				t.Fatalf("failed local Symmetric: %s", err)
+			}
 
-		remoteSymmetric, err := Symmetric(c, remoteNonce, localNonce)
-		if err != nil {
-			t.Fatalf("failed remote Symmetric New(%s) : %s", c, err)
-		}
+			remoteSymmetric, err := p.symmetric(remoteNonce, localNonce)
+			if err != nil {
+				t.Fatalf("failed remote Symmetric: %s", err)
+			}
 
-		remoteAsymmetric, err := Asymmetric(c, remoteKey, &localKey.PublicKey)
-		if err != nil {
-			t.Fatalf("failed remote Asymmetric New(%s) : %s", c, err)
-		}
+			remoteAsymmetric, err := p.asymmetric(remoteKey, &localKey.PublicKey)
+			if err != nil {
+				t.Fatalf("failed remote Asymmetric: %s", err)
+			}
 
-		// Symmetric Algorithm
-		plaintext := make([]byte, len(payload))
-		copy(plaintext, payload)
+			// Symmetric Algorithm
+			plaintext := make([]byte, len(payload))
+			copy(plaintext, payload)
 
-		padSize := len(plaintext) % localSymmetric.BlockSize()
-		if padSize > 0 {
-			padSize = localSymmetric.BlockSize() - padSize
-		}
-		paddedPlaintext := make([]byte, len(plaintext)+padSize)
-		copy(paddedPlaintext, plaintext)
+			padSize := len(plaintext) % localSymmetric.BlockSize()
+			if padSize > 0 {
+				padSize = localSymmetric.BlockSize() - padSize
+			}
+			paddedPlaintext := make([]byte, len(plaintext)+padSize)
+			copy(paddedPlaintext, plaintext)
 
-		symCiphertext, err := localSymmetric.Encrypt(paddedPlaintext)
-		if err != nil {
-			t.Fatalf("failed to encrypt Symmetric (%s) : %s", c, err)
-		}
+			symCiphertext, err := localSymmetric.Encrypt(paddedPlaintext)
+			if err != nil {
+				t.Fatalf("failed to encrypt Symmetric: %s", err)
+			}
 
-		symDeciphered, err := remoteSymmetric.Decrypt(symCiphertext)
-		if err != nil {
-			t.Fatalf("failed to decrypt Symmetric (%s) : %s", c, err)
-		}
-		symDeciphered = symDeciphered[:len(symDeciphered)-padSize] // Trim off padding
-		if got, want := symDeciphered, plaintext; !bytes.Equal(got, want) {
-			t.Errorf("Policy: %s\nsymmetric encryption failed:\ngot %#v want %#v\n", c, got, want)
-		}
+			symDeciphered, err := remoteSymmetric.Decrypt(symCiphertext)
+			if err != nil {
+				t.Fatalf("failed to decrypt Symmetric: %s", err)
+			}
+			symDeciphered = symDeciphered[:len(symDeciphered)-padSize] // Trim off padding
+			if got, want := symDeciphered, plaintext; !bytes.Equal(got, want) {
+				t.Errorf("symmetric encryption failed:\ngot %#v want %#v\n", got, want)
+			}
 
-		// Modify the plaintext and detect if the decrypted message changes; if it does,
-		// our byte slices are referencing the same data and the previous test may have
-		// been a false positive
-		paddedPlaintext[4] = 0xff ^ paddedPlaintext[4]
-		if got, want := symDeciphered, payloadRef; !bytes.Equal(got, want) {
-			t.Errorf("Policy: %s\nsymmetric input corruption detected:\ngot %#v want %#v\n", c, got, want)
-		}
+			// Modify the plaintext and detect if the decrypted message changes; if it does,
+			// our byte slices are referencing the same data and the previous test may have
+			// been a false positive
+			paddedPlaintext[4] = 0xff ^ paddedPlaintext[4]
+			if got, want := symDeciphered, payloadRef; !bytes.Equal(got, want) {
+				t.Errorf("symmetric input corruption detected:\ngot %#v want %#v\n", got, want)
+			}
 
-		symSignature, err := localSymmetric.Signature(paddedPlaintext)
-		if err != nil {
-			t.Errorf("Policy: %s\nsymmetric signature generation failed\n", c)
-		}
+			symSignature, err := localSymmetric.Signature(paddedPlaintext)
+			if err != nil {
+				t.Errorf("symmetric signature generation failed")
+			}
 
-		err = remoteSymmetric.VerifySignature(paddedPlaintext, symSignature)
-		if err != nil {
-			t.Errorf("Policy: %s\nsymmetric signature validation failed\n", c)
-		}
+			err = remoteSymmetric.VerifySignature(paddedPlaintext, symSignature)
+			if err != nil {
+				t.Errorf("symmetric signature validation failed")
+			}
 
-		// Asymmetric Algorithm
-		asymCiphertext, err := localAsymmetric.Encrypt(plaintext)
-		if err != nil {
-			t.Fatalf("failed to encrypt Asymmetric (%s) : %s", c, err)
-		}
-		asymDeciphered, err := remoteAsymmetric.Decrypt(asymCiphertext)
-		if err != nil {
-			t.Fatalf("failed to decrypt Asymmetric (%s) : %s", c, err)
-		}
-		if got, want := asymDeciphered, plaintext; !bytes.Equal(got, want) {
-			t.Errorf("Policy: %s\nasymmetric encryption failed:\ngot %#v want %#v\n", c, got, want)
-		}
+			// Asymmetric Algorithm
+			asymCiphertext, err := localAsymmetric.Encrypt(plaintext)
+			if err != nil {
+				t.Fatalf("failed to encrypt Asymmetric: %s", err)
+			}
+			asymDeciphered, err := remoteAsymmetric.Decrypt(asymCiphertext)
+			if err != nil {
+				t.Fatalf("failed to decrypt Asymmetric: %s", err)
+			}
+			if got, want := asymDeciphered, plaintext; !bytes.Equal(got, want) {
+				t.Errorf("asymmetric encryption failed:\ngot %#v want %#v\n", got, want)
+			}
 
-		paddedPlaintext[4] = 0xff ^ paddedPlaintext[4]
-		if got, want := asymDeciphered, payloadRef; !bytes.Equal(got, want) {
-			t.Errorf("Policy: %s\nasymmetric input corruption detected:\ngot %#v want %#v\n", c, got, want)
-		}
+			paddedPlaintext[4] = 0xff ^ paddedPlaintext[4]
+			if got, want := asymDeciphered, payloadRef; !bytes.Equal(got, want) {
+				t.Errorf("asymmetric input corruption detected:\ngot %#v want %#v\n", got, want)
+			}
 
-		asymSignature, err := localAsymmetric.Signature(plaintext)
-		if err != nil {
-			t.Errorf("Policy: %s\nasymmetric signature generation failed\n", c)
-		}
+			asymSignature, err := localAsymmetric.Signature(plaintext)
+			if err != nil {
+				t.Errorf("asymmetric signature generation failed\n")
+			}
 
-		err = remoteAsymmetric.VerifySignature(plaintext, asymSignature)
-		if err != nil {
-			t.Errorf("Policy: %s\nasymmetric signature validation failed\n", c)
-		}
-
+			err = remoteAsymmetric.VerifySignature(plaintext, asymSignature)
+			if err != nil {
+				t.Errorf("asymmetric signature validation failed\n")
+			}
+		})
 	}
-
 }
 
 func TestZeroStruct(t *testing.T) {
@@ -264,7 +258,6 @@ func TestZeroStruct(t *testing.T) {
 	_ = ze.SignatureLength()
 	_ = ze.EncryptionURI()
 	_ = ze.SignatureURI()
-
 }
 
 func generatePrivateKey(bitSize int) (*rsa.PrivateKey, error) {

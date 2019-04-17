@@ -4,6 +4,8 @@
 
 package securitypolicy
 
+import "github.com/gopcua/opcua/securitypolicy/sign"
+
 /*
 Byte[] PRF(
 	Byte[] secret,
@@ -42,14 +44,14 @@ type derivedKeys struct {
 	signing, encryption, iv []byte
 }
 
-func generateKeys(hmacFunc func(input []byte) ([]byte, error), seed []byte, signingLength, encryptingLength, encryptingBlockSize int) *derivedKeys {
+func generateKeys(hmac *sign.HMAC, seed []byte, signingLength, encryptingLength, encryptingBlockSize int) *derivedKeys {
 	var p []byte
-	a, _ := hmacFunc(seed)
+	a, _ := hmac.Signature(seed)
 	for len(p) < signingLength+encryptingLength+encryptingBlockSize {
 		input := append(a, seed...)
-		h, _ := hmacFunc(input)
+		h, _ := hmac.Signature(input)
 		p = append(p, h...)
-		a, _ = hmacFunc(a)
+		a, _ = hmac.Signature(a)
 	}
 
 	return &derivedKeys{
