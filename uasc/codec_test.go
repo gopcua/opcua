@@ -2,10 +2,9 @@
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
-package uasc
+// This file is copied to packages ua, uacp and uasc to break an import cycle.
 
-// NOTE: this is a copy of ua/codec_test.go to break an import cycle.
-// NOTE: see also uacp/codec_test.go
+package uasc
 
 import (
 	"reflect"

@@ -2,6 +2,8 @@
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
+// This file is copied to packages ua, uacp and uasc to break an import cycle.
+
 package ua
 
 import (
