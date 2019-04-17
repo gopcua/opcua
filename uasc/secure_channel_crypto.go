@@ -5,8 +5,8 @@ import (
 	"crypto/x509"
 	"encoding/binary"
 
-	"github.com/gopcua/opcua/securitypolicy"
 	"github.com/gopcua/opcua/ua"
+	"github.com/gopcua/opcua/uapolicy"
 )
 
 // signAndEncrypt encrypts the message bytes stored in b and returns the
@@ -125,7 +125,7 @@ func (s *SecureChannel) NewSessionSignature(cert, nonce []byte) ([]byte, string,
 	}
 	remoteKey := remoteX509Cert.PublicKey.(*rsa.PublicKey)
 
-	enc, err := securitypolicy.Asymmetric(s.cfg.SecurityPolicyURI, s.cfg.LocalKey, remoteKey)
+	enc, err := uapolicy.Asymmetric(s.cfg.SecurityPolicyURI, s.cfg.LocalKey, remoteKey)
 	if err != nil {
 		return nil, "", err
 	}
@@ -152,7 +152,7 @@ func (s *SecureChannel) VerifySessionSignature(cert, nonce, signature []byte) er
 	}
 	remoteKey := remoteX509Cert.PublicKey.(*rsa.PublicKey)
 
-	enc, err := securitypolicy.Asymmetric(s.cfg.SecurityPolicyURI, s.cfg.LocalKey, remoteKey)
+	enc, err := uapolicy.Asymmetric(s.cfg.SecurityPolicyURI, s.cfg.LocalKey, remoteKey)
 	if err != nil {
 		return err
 	}
@@ -167,8 +167,8 @@ func (s *SecureChannel) VerifySessionSignature(cert, nonce, signature []byte) er
 // EncryptUserPassword issues a new signature for the client to send in ActivateSessionRequest
 func (s *SecureChannel) EncryptUserPassword(policyURI, password string, cert, nonce []byte) ([]byte, string, error) {
 
-	if policyURI == securitypolicy.SecurityPolicyNone {
-		return []byte(password), securitypolicy.SecurityPolicyNone, nil
+	if policyURI == uapolicy.SecurityPolicyNone {
+		return []byte(password), uapolicy.SecurityPolicyNone, nil
 	}
 
 	// If the User ID Token's policy was null, then default to the secure channel's policy
@@ -182,7 +182,7 @@ func (s *SecureChannel) EncryptUserPassword(policyURI, password string, cert, no
 	}
 	remoteKey := remoteX509Cert.PublicKey.(*rsa.PublicKey)
 
-	enc, err := securitypolicy.Asymmetric(policyURI, s.cfg.LocalKey, remoteKey)
+	enc, err := uapolicy.Asymmetric(policyURI, s.cfg.LocalKey, remoteKey)
 	if err != nil {
 		return nil, "", err
 	}
@@ -204,7 +204,7 @@ func (s *SecureChannel) EncryptUserPassword(policyURI, password string, cert, no
 // NewUserTokenSignature issues a new signature for the client to send in ActivateSessionRequest
 func (s *SecureChannel) NewUserTokenSignature(policyURI string, cert, nonce []byte) ([]byte, string, error) {
 
-	if policyURI == securitypolicy.SecurityPolicyNone {
+	if policyURI == uapolicy.SecurityPolicyNone {
 		return nil, "", nil
 	}
 
@@ -214,7 +214,7 @@ func (s *SecureChannel) NewUserTokenSignature(policyURI string, cert, nonce []by
 	}
 	remoteKey := remoteX509Cert.PublicKey.(*rsa.PublicKey)
 
-	enc, err := securitypolicy.Asymmetric(policyURI, s.cfg.LocalKey, remoteKey)
+	enc, err := uapolicy.Asymmetric(policyURI, s.cfg.LocalKey, remoteKey)
 	if err != nil {
 		return nil, "", err
 	}

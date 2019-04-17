@@ -12,8 +12,8 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/gopcua/opcua/securitypolicy"
 	"github.com/gopcua/opcua/ua"
+	"github.com/gopcua/opcua/uapolicy"
 	"github.com/gopcua/opcua/uasc"
 )
 
@@ -21,7 +21,7 @@ import (
 // to establish a secure channel and a session.
 func DefaultClientConfig() *uasc.Config {
 	return &uasc.Config{
-		SecurityPolicyURI: securitypolicy.SecurityPolicyNone,
+		SecurityPolicyURI: uapolicy.SecurityPolicyNone,
 		SecurityMode:      ua.MessageSecurityModeNone,
 		Lifetime:          uint32(time.Hour / time.Millisecond),
 	}
@@ -139,7 +139,7 @@ func SecurityFromEndpoint(ep *ua.EndpointDescription, authType ua.UserTokenType)
 		c.SecurityPolicyURI = ep.SecurityPolicyURI
 		c.SecurityMode = ep.SecurityMode
 		c.RemoteCertificate = ep.ServerCertificate
-		c.Thumbprint = securitypolicy.Thumbprint(ep.ServerCertificate)
+		c.Thumbprint = uapolicy.Thumbprint(ep.ServerCertificate)
 
 		for _, t := range ep.UserIdentityTokens {
 
@@ -167,7 +167,7 @@ func SecurityFromEndpoint(ep *ua.EndpointDescription, authType ua.UserTokenType)
 
 		if sc.UserIdentityToken == nil {
 			sc.UserIdentityToken = &ua.AnonymousIdentityToken{PolicyID: "Anonymous"}
-			sc.AuthPolicyURI = securitypolicy.SecurityPolicyNone
+			sc.AuthPolicyURI = uapolicy.SecurityPolicyNone
 		}
 
 	}

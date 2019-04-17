@@ -19,8 +19,8 @@ import (
 
 	"github.com/gopcua/opcua"
 	"github.com/gopcua/opcua/debug"
-	"github.com/gopcua/opcua/securitypolicy"
 	"github.com/gopcua/opcua/ua"
+	"github.com/gopcua/opcua/uapolicy"
 )
 
 var (
@@ -135,9 +135,9 @@ func clientOptsFromFlags(endpoints []*ua.EndpointDescription) []opcua.Option {
 	var secPolicy string
 	switch {
 	case *policy == "auto":
-	case *policy != "" && !strings.HasPrefix(*policy, securitypolicy.SecurityPolicyURL):
-		secPolicy = securitypolicy.SecurityPolicyURL + *policy
-	case strings.HasPrefix(*policy, securitypolicy.SecurityPolicyURL):
+	case *policy != "" && !strings.HasPrefix(*policy, uapolicy.SecurityPolicyURL):
+		secPolicy = uapolicy.SecurityPolicyURL + *policy
+	case strings.HasPrefix(*policy, uapolicy.SecurityPolicyURL):
 		secPolicy = *policy
 	}
 
@@ -157,9 +157,9 @@ func clientOptsFromFlags(endpoints []*ua.EndpointDescription) []opcua.Option {
 	}
 
 	// Allow input of only one of sec-mode,sec-policy when choosing 'None'
-	if secMode == ua.MessageSecurityModeNone || secPolicy == securitypolicy.SecurityPolicyNone {
+	if secMode == ua.MessageSecurityModeNone || secPolicy == uapolicy.SecurityPolicyNone {
 		secMode = ua.MessageSecurityModeNone
-		secPolicy = securitypolicy.SecurityPolicyNone
+		secPolicy = uapolicy.SecurityPolicyNone
 	}
 
 	// Find the best endpoint based on our input and server recommendation (highest SecurityMode+SecurityLevel)

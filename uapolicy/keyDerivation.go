@@ -2,9 +2,9 @@
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
-package securitypolicy
+package uapolicy
 
-import "github.com/gopcua/opcua/securitypolicy/sign"
+import "github.com/gopcua/opcua/uapolicy/sign"
 
 /*
 Byte[] PRF(

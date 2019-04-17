@@ -2,7 +2,7 @@
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
-package securitypolicy
+package uapolicy
 
 import (
 	"crypto"
@@ -10,44 +10,42 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/gopcua/opcua/securitypolicy/cipher"
-	"github.com/gopcua/opcua/securitypolicy/sign"
+	"github.com/gopcua/opcua/uapolicy/cipher"
+	"github.com/gopcua/opcua/uapolicy/sign"
 
 	// Force compilation of required hashing algorithms, although we don't directly use the packages
 	_ "crypto/sha1"
 	_ "crypto/sha256"
-
 )
 
 /*
-OLD SecurityPolicy – Basic128Rsa15" Profile (DEPRECATED IN 1.04)
-http://opcfoundation.org/UA/SecurityPolicy#Basic128Rsa15
+"OLD SecurityPolicy – Basic256" Profile
+http://opcfoundation.org/UA/SecurityPolicy#Basic256
 
 Name 	Opt. 	 Description 	 From Profile
 	Security Certificate Validation 		A certificate will be validated as specified in Part 4. This includes among others structure and signature examination. Allowing for some validation errors to be suppressed by administration directive.
-	Security Basic 128Rsa15 		A suite of algorithms that uses RSA15 as Key-Wrap-algorithm and 128-Bit for encryption algorithms.
+	Security Basic 256 		A suite of algorithms that are for 256-Bit encryption, algorithms include:
 -> SymmetricSignatureAlgorithm – HmacSha1 – (http://www.w3.org/2000/09/xmldsig#hmac-sha1).
--> SymmetricEncryptionAlgorithm – Aes128 – (http://www.w3.org/2001/04/xmlenc#aes128-cbc).
+-> SymmetricEncryptionAlgorithm – Aes256_CBC – (http://www.w3.org/2001/04/xmlenc#aes256-cbc).
 -> AsymmetricSignatureAlgorithm – RsaSha1 – (http://www.w3.org/2000/09/xmldsig#rsa-sha1).
--> AsymmetricKeyWrapAlgorithm – KwRsa15 – (http://www.w3.org/2001/04/xmlenc#rsa-1_5).
--> AsymmetricEncryptionAlgorithm – Rsa15 – (http://www.w3.org/2001/04/xmlenc#rsa-1_5).
+-> AsymmetricKeyWrapAlgorithm – KwRsaOaep – (http://www.w3.org/2001/04/xmlenc#rsa-oaep-mgf1p).
+-> AsymmetricEncryptionAlgorithm – RsaOaep – (http://www.w3.org/2001/04/xmlenc#rsa-oaep).
 -> KeyDerivationAlgorithm – PSha1 – (http://docs.oasis-open.org/ws-sx/ws-secureconversation/200512/dk/p_sha1).
--> DerivedSignatureKeyLength – 128.
+-> DerivedSignatureKeyLength – 192.
 -> MinAsymmetricKeyLength – 1024
 -> MaxAsymmetricKeyLength – 2048
--> CertificateSignatureAlgorithm – Sha1
+-> CertificateSignatureAlgorithm – Sha1 [deprecated] or Sha256 [recommended]
 
 If a certificate or any certificate in the chain is not signed with a hash that is Sha1 or stronger then the certificate shall be rejected.
+Both Sha1 and Sha256 shall be supported. However, it is recommended to use Sha256 since Sha1 is considered not secure anymore.
 	Security Encryption Required 		Encryption is required using the algorithms provided in the security algorithm suite.
-	Security Signing Required 			Signing is required using the algorithms provided in the security algorithm suite.
-
-
+	Security Signing Required 		Signing is required using the algorithms provided in the security algorithm suite.
 */
 
-func newBasic128Rsa15Symmetric(localNonce []byte, remoteNonce []byte) (*EncryptionAlgorithm, error) {
+func newBasic256Symmetric(localNonce []byte, remoteNonce []byte) (*EncryptionAlgorithm, error) {
 	const (
-		signatureKeyLength  = 16
-		encryptionKeyLength = 16
+		signatureKeyLength  = 24
+		encryptionKeyLength = 32
 		encryptionBlockSize = cipher.AESBlockSize
 	)
 
@@ -60,21 +58,21 @@ func newBasic128Rsa15Symmetric(localNonce []byte, remoteNonce []byte) (*Encrypti
 	return &EncryptionAlgorithm{
 		blockSize:           cipher.AESBlockSize,
 		plainttextBlockSize: cipher.AESBlockSize - cipher.AESMinPadding,
-		encrypt:             &cipher.AES{KeyLength: 128, IV: remoteKeys.iv, Secret: remoteKeys.encryption}, // AES128-CBC
-		decrypt:             &cipher.AES{KeyLength: 128, IV: localKeys.iv, Secret: localKeys.encryption},   // AES128-CBC
+		encrypt:             &cipher.AES{KeyLength: 256, IV: remoteKeys.iv, Secret: remoteKeys.encryption}, // AES256-CBC
+		decrypt:             &cipher.AES{KeyLength: 256, IV: localKeys.iv, Secret: localKeys.encryption},   // AES256-CBC
 		signature:           &sign.HMAC{Hash: crypto.SHA1, Secret: remoteKeys.signing},                     // HMAC-SHA1
 		verifySignature:     &sign.HMAC{Hash: crypto.SHA1, Secret: localKeys.signing},                      // HMAC-SHA1
 		signatureLength:     160 / 8,
-		encryptionURI:       "http://www.w3.org/2001/04/xmlenc#aes128-cbc",
+		encryptionURI:       "http://www.w3.org/2001/04/xmlenc#aes256-cbc",
 		signatureURI:        "http://www.w3.org/2000/09/xmldsig#hmac-sha1",
 	}, nil
 }
 
-func newBasic128Rsa15Asymmetric(localKey *rsa.PrivateKey, remoteKey *rsa.PublicKey) (*EncryptionAlgorithm, error) {
+func newBasic256Asymmetric(localKey *rsa.PrivateKey, remoteKey *rsa.PublicKey) (*EncryptionAlgorithm, error) {
 	const (
 		minAsymmetricKeyLength = 128 // 1024 bits
 		maxAsymmetricKeyLength = 256 // 2048 bits
-		nonceLength            = 16
+		nonceLength            = 32
 	)
 
 	if localKey != nil && (localKey.PublicKey.Size() < minAsymmetricKeyLength || localKey.PublicKey.Size() > maxAsymmetricKeyLength) {
@@ -89,14 +87,14 @@ func newBasic128Rsa15Asymmetric(localKey *rsa.PrivateKey, remoteKey *rsa.PublicK
 
 	return &EncryptionAlgorithm{
 		blockSize:           remoteKey.Size(),
-		plainttextBlockSize: remoteKey.Size() - cipher.PKCS1v15MinPadding,
-		encrypt:             &cipher.PKCS1v15{PublicKey: remoteKey},                  // RSA-SHA15+KWRSA15
-		decrypt:             &cipher.PKCS1v15{PrivateKey: localKey},                  // RSA-SHA15+KWRSA15
-		signature:           &sign.PKCS1v15{Hash: crypto.SHA1, PrivateKey: localKey}, // RSA-SHA1
-		verifySignature:     &sign.PKCS1v15{Hash: crypto.SHA1, PublicKey: remoteKey}, // RSA-SHA1
+		plainttextBlockSize: remoteKey.Size() - cipher.RSAOAEPMinPaddingSHA1,
+		encrypt:             &cipher.RSAOAEP{Hash: crypto.SHA1, PublicKey: remoteKey}, // RSA-OAEP
+		decrypt:             &cipher.RSAOAEP{Hash: crypto.SHA1, PrivateKey: localKey}, // RSA-OAEP
+		signature:           &sign.PKCS1v15{Hash: crypto.SHA1, PrivateKey: localKey},  // RSA-SHA1
+		verifySignature:     &sign.PKCS1v15{Hash: crypto.SHA1, PublicKey: remoteKey},  // RSA-SHA1
 		nonceLength:         nonceLength,
 		signatureLength:     localKey.PublicKey.Size(),
-		encryptionURI:       "http://www.w3.org/2001/04/xmlenc#rsa-1_5",
+		encryptionURI:       "http://www.w3.org/2001/04/xmlenc#rsa-oaep",
 		signatureURI:        "http://www.w3.org/2000/09/xmldsig#rsa-sha1",
 	}, nil
 }

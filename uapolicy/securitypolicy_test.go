@@ -2,7 +2,7 @@
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
-package securitypolicy
+package uapolicy
 
 import (
 	"bytes"
@@ -12,7 +12,7 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/gopcua/opcua/securitypolicy/sign"
+	"github.com/gopcua/opcua/uapolicy/sign"
 
 	"github.com/pascaldekloe/goe/verify"
 )

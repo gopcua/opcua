@@ -17,9 +17,9 @@ import (
 	"time"
 
 	"github.com/gopcua/opcua/debug"
-	"github.com/gopcua/opcua/securitypolicy"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uacp"
+	"github.com/gopcua/opcua/uapolicy"
 )
 
 const (
@@ -58,7 +58,7 @@ type SecureChannel struct {
 	mu      sync.Mutex
 	handler map[uint32]chan Response
 
-	enc *securitypolicy.EncryptionAlgorithm
+	enc *uapolicy.EncryptionAlgorithm
 }
 
 func NewSecureChannel(endpoint string, c *uacp.Conn, cfg *Config) (*SecureChannel, error) {
@@ -69,7 +69,7 @@ func NewSecureChannel(endpoint string, c *uacp.Conn, cfg *Config) (*SecureChanne
 		return nil, fmt.Errorf("no secure channel config")
 	}
 
-	if cfg.SecurityPolicyURI != securitypolicy.SecurityPolicyNone {
+	if cfg.SecurityPolicyURI != uapolicy.SecurityPolicyNone {
 		if cfg.SecurityMode == ua.MessageSecurityModeNone {
 			return nil, fmt.Errorf("invalid channel config: Security policy '%s' cannot be used with '%s'", cfg.SecurityPolicyURI, cfg.SecurityMode)
 		}
@@ -79,7 +79,7 @@ func NewSecureChannel(endpoint string, c *uacp.Conn, cfg *Config) (*SecureChanne
 	}
 
 	// Force the security mode to None if the policy is also None
-	if cfg.SecurityPolicyURI == securitypolicy.SecurityPolicyNone {
+	if cfg.SecurityPolicyURI == uapolicy.SecurityPolicyNone {
 		cfg.SecurityMode = ua.MessageSecurityModeNone
 	}
 
@@ -139,7 +139,7 @@ func (s *SecureChannel) openSecureChannel() error {
 	// SecurityModeNone so no additional work is required for that case
 	if s.cfg.SecurityMode != ua.MessageSecurityModeNone {
 		localKey = s.cfg.LocalKey
-		// todo(dh): move this into the securitypolicy package proper or
+		// todo(dh): move this into the uapolicy package proper or
 		// adjust the Asymmetric method to receive a certificate instead
 		remoteCert, err := x509.ParseCertificate(s.cfg.RemoteCertificate)
 		if err != nil {
@@ -152,7 +152,7 @@ func (s *SecureChannel) openSecureChannel() error {
 		}
 	}
 
-	s.enc, err = securitypolicy.Asymmetric(s.cfg.SecurityPolicyURI, localKey, remoteKey)
+	s.enc, err = uapolicy.Asymmetric(s.cfg.SecurityPolicyURI, localKey, remoteKey)
 	if err != nil {
 		return err
 	}
@@ -177,7 +177,7 @@ func (s *SecureChannel) openSecureChannel() error {
 		}
 		s.cfg.SecurityTokenID = resp.SecurityToken.TokenID
 
-		s.enc, err = securitypolicy.Symmetric(s.cfg.SecurityPolicyURI, nonce, resp.ServerNonce)
+		s.enc, err = uapolicy.Symmetric(s.cfg.SecurityPolicyURI, nonce, resp.ServerNonce)
 		if err != nil {
 			return err
 		}

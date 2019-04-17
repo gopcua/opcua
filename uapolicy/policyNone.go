@@ -2,13 +2,13 @@
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
-package securitypolicy
+package uapolicy
 
 import (
 	"crypto/rsa"
 
-	"github.com/gopcua/opcua/securitypolicy/cipher"
-	"github.com/gopcua/opcua/securitypolicy/sign"
+	"github.com/gopcua/opcua/uapolicy/cipher"
+	"github.com/gopcua/opcua/uapolicy/sign"
 )
 
 /*

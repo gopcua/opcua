@@ -2,10 +2,10 @@
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
-// Package securitypolicy implements the encryption, decryption, signing,
+// Package uapolicy implements the encryption, decryption, signing,
 // and signature verifying algorithms for Security Policy profiles as
 // defined in Part 7 of the OPC-UA specifications (version 1.04)
-package securitypolicy
+package uapolicy
 
 import (
 	"crypto/rsa"
@@ -13,8 +13,8 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/gopcua/opcua/securitypolicy/cipher"
-	"github.com/gopcua/opcua/securitypolicy/sign"
+	"github.com/gopcua/opcua/uapolicy/cipher"
+	"github.com/gopcua/opcua/uapolicy/sign"
 )
 
 const (
