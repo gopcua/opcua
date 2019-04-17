@@ -11,7 +11,7 @@ import (
 	"github.com/pascaldekloe/goe/verify"
 )
 
-// Case describes a test case for a encoding and decoding an
+// CodecTestCase describes a test case for a encoding and decoding an
 // object from bytes.
 type CodecTestCase struct {
 	Name   string
@@ -19,7 +19,7 @@ type CodecTestCase struct {
 	Bytes  []byte
 }
 
-// Run tests encoding, decoding and length calclulation for the given
+// RunCodecTest tests encoding, decoding and length calclulation for the given
 // object.
 func RunCodecTest(t *testing.T, cases []CodecTestCase) {
 	t.Helper()

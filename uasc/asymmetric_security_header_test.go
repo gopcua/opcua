@@ -6,12 +6,10 @@ package uasc
 
 import (
 	"testing"
-
-	"github.com/gopcua/opcua/ua"
 )
 
 func TestAsymmetricSecurityHeader(t *testing.T) {
-	cases := []ua.CodecTestCase{
+	cases := []CodecTestCase{
 		{
 			Name: "normal",
 			Struct: NewAsymmetricSecurityHeader(
@@ -151,5 +149,5 @@ func TestAsymmetricSecurityHeader(t *testing.T) {
 			},
 		},
 	}
-	ua.RunCodecTest(t, cases)
+	RunCodecTest(t, cases)
 }

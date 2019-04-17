@@ -11,7 +11,7 @@ import (
 )
 
 func TestHello(t *testing.T) {
-	cases := []ua.CodecTestCase{
+	cases := []CodecTestCase{
 		{
 			Struct: &Hello{
 				Version:        0,
@@ -42,11 +42,11 @@ func TestHello(t *testing.T) {
 			},
 		},
 	}
-	ua.RunCodecTest(t, cases)
+	RunCodecTest(t, cases)
 }
 
 func TestAcknowledge(t *testing.T) {
-	cases := []ua.CodecTestCase{
+	cases := []CodecTestCase{
 		{
 			Struct: &Acknowledge{
 				Version:        0,
@@ -69,11 +69,11 @@ func TestAcknowledge(t *testing.T) {
 			},
 		},
 	}
-	ua.RunCodecTest(t, cases)
+	RunCodecTest(t, cases)
 }
 
 func TestReverseHello(t *testing.T) {
-	cases := []ua.CodecTestCase{
+	cases := []CodecTestCase{
 		{
 			Name: "Normal",
 			Struct: &ReverseHello{
@@ -98,11 +98,11 @@ func TestReverseHello(t *testing.T) {
 			},
 		},
 	}
-	ua.RunCodecTest(t, cases)
+	RunCodecTest(t, cases)
 }
 
 func TestError(t *testing.T) {
-	cases := []ua.CodecTestCase{
+	cases := []CodecTestCase{
 		{
 			Struct: &Error{
 				ErrorCode: uint32(ua.StatusBadSecureChannelClosed),
@@ -116,5 +116,5 @@ func TestError(t *testing.T) {
 			},
 		},
 	}
-	ua.RunCodecTest(t, cases)
+	RunCodecTest(t, cases)
 }

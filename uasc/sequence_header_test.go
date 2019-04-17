@@ -6,12 +6,10 @@ package uasc
 
 import (
 	"testing"
-
-	"github.com/gopcua/opcua/ua"
 )
 
 func TestSequenceHeader(t *testing.T) {
-	cases := []ua.CodecTestCase{
+	cases := []CodecTestCase{
 		{
 			Name: "normal",
 			Struct: NewSequenceHeader(
@@ -39,5 +37,5 @@ func TestSequenceHeader(t *testing.T) {
 			},
 		},
 	}
-	ua.RunCodecTest(t, cases)
+	RunCodecTest(t, cases)
 }

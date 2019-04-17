@@ -14,7 +14,7 @@ import (
 )
 
 func TestMessage(t *testing.T) {
-	cases := []ua.CodecTestCase{
+	cases := []CodecTestCase{
 		{
 			Name: "OPN",
 			Struct: func() interface{} {
@@ -233,5 +233,5 @@ func TestMessage(t *testing.T) {
 			},
 		},
 	}
-	ua.RunCodecTest(t, cases)
+	RunCodecTest(t, cases)
 }
