@@ -18,6 +18,7 @@ import (
 )
 
 const (
+	SecurityPolicyURL                 = "http://opcfoundation.org/UA/SecurityPolicy#"
 	SecurityPolicyNone                = "http://opcfoundation.org/UA/SecurityPolicy#None"
 	SecurityPolicyBasic128Rsa15       = "http://opcfoundation.org/UA/SecurityPolicy#Basic128Rsa15"
 	SecurityPolicyBasic256            = "http://opcfoundation.org/UA/SecurityPolicy#Basic256"

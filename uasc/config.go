@@ -10,18 +10,6 @@ import (
 	"github.com/gopcua/opcua/ua"
 )
 
-// SecurityPolicy URIs
-const (
-	SecurityPolicyNone                = "http://opcfoundation.org/UA/SecurityPolicy#None"
-	SecurityPolicyBasic128Rsa15       = "http://opcfoundation.org/UA/SecurityPolicy#Basic128Rsa15"
-	SecurityPolicyBasic256            = "http://opcfoundation.org/UA/SecurityPolicy#Basic256"
-	SecurityPolicyBasic256Sha256      = "http://opcfoundation.org/UA/SecurityPolicy#Basic256Sha256"
-	SecurityPolicyAes128Sha256RsaOaep = "http://opcfoundation.org/UA/SecurityPolicy#Aes128_Sha256_RsaOaep"
-	SecurityPolicyAes256Sha256RsaPss  = "http://opcfoundation.org/UA/SecurityPolicy#Aes256_Sha256_RsaPss"
-	SecurityPolicyPubSubAes128CTR     = "http://opcfoundation.org/UA/SecurityPolicy#PubSub_Aes128_CTR"
-	SecurityPolicyPubSubAes256CTR     = "http://opcfoundation.org/UA/SecurityPolicy#PubSub_Aes256_CTR"
-)
-
 // Config represents a configuration which UASC client/server has in common.
 type Config struct {
 	// SecureChannelID is a unique identifier for the SecureChannel assigned by the Server.

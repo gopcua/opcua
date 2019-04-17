@@ -167,8 +167,8 @@ func (s *SecureChannel) VerifySessionSignature(cert, nonce, signature []byte) er
 // EncryptUserPassword issues a new signature for the client to send in ActivateSessionRequest
 func (s *SecureChannel) EncryptUserPassword(policyURI, password string, cert, nonce []byte) ([]byte, string, error) {
 
-	if policyURI == SecurityPolicyNone {
-		return []byte(password), SecurityPolicyNone, nil
+	if policyURI == securitypolicy.SecurityPolicyNone {
+		return []byte(password), securitypolicy.SecurityPolicyNone, nil
 	}
 
 	// If the User ID Token's policy was null, then default to the secure channel's policy
@@ -204,7 +204,7 @@ func (s *SecureChannel) EncryptUserPassword(policyURI, password string, cert, no
 // NewUserTokenSignature issues a new signature for the client to send in ActivateSessionRequest
 func (s *SecureChannel) NewUserTokenSignature(policyURI string, cert, nonce []byte) ([]byte, string, error) {
 
-	if policyURI == SecurityPolicyNone {
+	if policyURI == securitypolicy.SecurityPolicyNone {
 		return nil, "", nil
 	}
 
