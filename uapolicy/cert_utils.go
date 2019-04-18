@@ -4,9 +4,7 @@
 
 package uapolicy
 
-import (
-	"crypto/sha1"
-)
+import "crypto/sha1"
 
 // Thumbprint returns the thumbprint of a DER-encoded certificate
 func Thumbprint(c []byte) []byte {
