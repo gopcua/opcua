@@ -12,8 +12,6 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/gopcua/opcua/uapolicy/sign"
-
 	"github.com/pascaldekloe/goe/verify"
 )
 
@@ -40,7 +38,7 @@ func TestGenerateKeysLength(t *testing.T) {
 		t.Fatalf("Could not generate remote nonce")
 	}
 
-	hmac := &sign.HMAC{Hash: crypto.SHA256, Secret: remoteNonce}
+	hmac := &HMAC{Hash: crypto.SHA256, Secret: remoteNonce}
 	keys := generateKeys(hmac, localNonce, 32, 32, 16)
 	if len(keys.signing) != 32 {
 		t.Errorf("Signing Key Invalid Length\n")
@@ -69,7 +67,7 @@ func TestGenerateKeys(t *testing.T) {
 		iv:         []byte("\x09\xAA\x4F\x50\x15\x4D\x69\xC5\x0B\x3B\x78\x7F\xD8\x54\x36\x45"),
 	}
 
-	localHmac := &sign.HMAC{Hash: crypto.SHA1, Secret: localNonce}
+	localHmac := &HMAC{Hash: crypto.SHA1, Secret: localNonce}
 	keys := generateKeys(localHmac, remoteNonce, 16, 16, 16)
 	if got, want := keys.signing, localKeys.signing; !bytes.Equal(got, want) {
 		t.Errorf("local signing key generation failed:\ngot %#v want %#v\n", got, want)
@@ -81,7 +79,7 @@ func TestGenerateKeys(t *testing.T) {
 		t.Errorf("local iv key generation failed:\ngot %#v want %#v\n", got, want)
 	}
 
-	remoteHmac := &sign.HMAC{Hash: crypto.SHA1, Secret: remoteNonce}
+	remoteHmac := &HMAC{Hash: crypto.SHA1, Secret: remoteNonce}
 	keys = generateKeys(remoteHmac, localNonce, 16, 16, 16)
 	if got, want := keys.signing, remoteKeys.signing; !bytes.Equal(got, want) {
 		t.Errorf("remote signing key generation failed:\ngot %#v want %#v\n", got, want)

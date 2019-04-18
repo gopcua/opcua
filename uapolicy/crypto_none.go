@@ -1,4 +1,4 @@
-package cipher
+package uapolicy
 
 const (
 	NoneBlockSize  = 1
@@ -15,4 +15,12 @@ func (c *None) Decrypt(src []byte) ([]byte, error) {
 func (c *None) Encrypt(src []byte) ([]byte, error) {
 	var b []byte
 	return append(b, src...), nil
+}
+
+func (s *None) Signature(msg []byte) ([]byte, error) {
+	return make([]byte, 0), nil
+}
+
+func (s *None) Verify(msg, signature []byte) error {
+	return nil
 }

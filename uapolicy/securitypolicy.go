@@ -12,9 +12,6 @@ import (
 	"errors"
 	"fmt"
 	"sort"
-
-	"github.com/gopcua/opcua/uapolicy/cipher"
-	"github.com/gopcua/opcua/uapolicy/sign"
 )
 
 const (
@@ -108,7 +105,7 @@ func (e *EncryptionAlgorithm) PlaintextBlockSize() int {
 // Encrypt encrypts the input cleartext based on the algorithms and keys passed in
 func (e *EncryptionAlgorithm) Encrypt(cleartext []byte) (ciphertext []byte, err error) {
 	if e.encrypt == nil {
-		e.encrypt = &cipher.None{}
+		e.encrypt = &None{}
 	}
 
 	return e.encrypt.Encrypt(cleartext)
@@ -117,7 +114,7 @@ func (e *EncryptionAlgorithm) Encrypt(cleartext []byte) (ciphertext []byte, err 
 // Decrypt decrypts the input ciphertext based on the algorithms and keys passed in
 func (e *EncryptionAlgorithm) Decrypt(ciphertext []byte) (cleartext []byte, err error) {
 	if e.decrypt == nil {
-		e.decrypt = &cipher.None{}
+		e.decrypt = &None{}
 	}
 
 	return e.decrypt.Decrypt(ciphertext)
@@ -126,7 +123,7 @@ func (e *EncryptionAlgorithm) Decrypt(ciphertext []byte) (cleartext []byte, err 
 // Signature returns the cryptographic signature of message
 func (e *EncryptionAlgorithm) Signature(message []byte) (signature []byte, err error) {
 	if e.signature == nil {
-		e.signature = &sign.None{}
+		e.signature = &None{}
 	}
 
 	return e.signature.Signature(message)
@@ -137,7 +134,7 @@ func (e *EncryptionAlgorithm) Signature(message []byte) (signature []byte, err e
 // A return value of nil means the signature is valid
 func (e *EncryptionAlgorithm) VerifySignature(message, signature []byte) error {
 	if e.verifySignature == nil {
-		e.verifySignature = &sign.None{}
+		e.verifySignature = &None{}
 	}
 
 	return e.verifySignature.Verify(message, signature)

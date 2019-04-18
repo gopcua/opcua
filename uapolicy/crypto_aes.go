@@ -1,4 +1,4 @@
-package cipher
+package uapolicy
 
 import (
 	"crypto/aes"

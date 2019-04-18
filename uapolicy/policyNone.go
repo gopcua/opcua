@@ -6,9 +6,6 @@ package uapolicy
 
 import (
 	"crypto/rsa"
-
-	"github.com/gopcua/opcua/uapolicy/cipher"
-	"github.com/gopcua/opcua/uapolicy/sign"
 )
 
 /*
@@ -30,24 +27,24 @@ SecurityPolicy_None_Limits 		DerivedSignatureKeyLength: 0
 */
 func newNoneAsymmetric(*rsa.PrivateKey, *rsa.PublicKey) (*EncryptionAlgorithm, error) {
 	return &EncryptionAlgorithm{
-		blockSize:           cipher.NoneBlockSize,
-		plainttextBlockSize: cipher.NoneBlockSize - cipher.NoneMinPadding,
-		encrypt:             &cipher.None{},
-		decrypt:             &cipher.None{},
-		signature:           &sign.None{},
-		verifySignature:     &sign.None{},
+		blockSize:           NoneBlockSize,
+		plainttextBlockSize: NoneBlockSize - NoneMinPadding,
+		encrypt:             &None{},
+		decrypt:             &None{},
+		signature:           &None{},
+		verifySignature:     &None{},
 		signatureLength:     0,
 	}, nil
 }
 
 func newNoneSymmetric([]byte, []byte) (*EncryptionAlgorithm, error) {
 	return &EncryptionAlgorithm{
-		blockSize:           cipher.NoneBlockSize,
-		plainttextBlockSize: cipher.NoneBlockSize - cipher.NoneMinPadding,
-		encrypt:             &cipher.None{},
-		decrypt:             &cipher.None{},
-		signature:           &sign.None{},
-		verifySignature:     &sign.None{},
+		blockSize:           NoneBlockSize,
+		plainttextBlockSize: NoneBlockSize - NoneMinPadding,
+		encrypt:             &None{},
+		decrypt:             &None{},
+		signature:           &None{},
+		verifySignature:     &None{},
 		signatureLength:     0,
 	}, nil
 }

@@ -10,9 +10,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/gopcua/opcua/uapolicy/cipher"
-	"github.com/gopcua/opcua/uapolicy/sign"
-
 	// Force compilation of required hashing algorithms, although we don't directly use the packages
 	_ "crypto/sha1"
 	_ "crypto/sha256"
@@ -62,22 +59,22 @@ func newAes256Sha256RsaPssSymmetric(localNonce []byte, remoteNonce []byte) (*Enc
 	const (
 		signatureKeyLength  = 32
 		encryptionKeyLength = 32
-		encryptionBlockSize = cipher.AESBlockSize
+		encryptionBlockSize = AESBlockSize
 	)
 
-	localHmac := &sign.HMAC{Hash: crypto.SHA256, Secret: localNonce}
-	remoteHmac := &sign.HMAC{Hash: crypto.SHA256, Secret: remoteNonce}
+	localHmac := &HMAC{Hash: crypto.SHA256, Secret: localNonce}
+	remoteHmac := &HMAC{Hash: crypto.SHA256, Secret: remoteNonce}
 
 	localKeys := generateKeys(localHmac, remoteNonce, signatureKeyLength, encryptionKeyLength, encryptionBlockSize)
 	remoteKeys := generateKeys(remoteHmac, localNonce, signatureKeyLength, encryptionKeyLength, encryptionBlockSize)
 
 	return &EncryptionAlgorithm{
-		blockSize:           cipher.AESBlockSize,
-		plainttextBlockSize: cipher.AESBlockSize - cipher.AESMinPadding,
-		encrypt:             &cipher.AES{KeyLength: 256, IV: remoteKeys.iv, Secret: remoteKeys.encryption}, // AES256-CBC
-		decrypt:             &cipher.AES{KeyLength: 256, IV: localKeys.iv, Secret: localKeys.encryption},   // AES256-CBC
-		signature:           &sign.HMAC{Hash: crypto.SHA256, Secret: remoteKeys.signing},                   // HMAC-SHA2-256
-		verifySignature:     &sign.HMAC{Hash: crypto.SHA256, Secret: localKeys.signing},                    // HMAC-SHA2-256
+		blockSize:           AESBlockSize,
+		plainttextBlockSize: AESBlockSize - AESMinPadding,
+		encrypt:             &AES{KeyLength: 256, IV: remoteKeys.iv, Secret: remoteKeys.encryption}, // AES256-CBC
+		decrypt:             &AES{KeyLength: 256, IV: localKeys.iv, Secret: localKeys.encryption},   // AES256-CBC
+		signature:           &HMAC{Hash: crypto.SHA256, Secret: remoteKeys.signing},                 // HMAC-SHA2-256
+		verifySignature:     &HMAC{Hash: crypto.SHA256, Secret: localKeys.signing},                  // HMAC-SHA2-256
 		signatureLength:     256 / 8,
 		encryptionURI:       "http://opcfoundation.org/UA/security/rsa-oaep-sha2-256",
 		signatureURI:        "http://www.w3.org/2000/09/xmldsig#hmac-sha256",
@@ -103,11 +100,11 @@ func newAes256Sha256RsaPssAsymmetric(localKey *rsa.PrivateKey, remoteKey *rsa.Pu
 
 	return &EncryptionAlgorithm{
 		blockSize:           remoteKey.Size(),
-		plainttextBlockSize: remoteKey.Size() - cipher.RSAOAEPMinPaddingSHA256,
-		encrypt:             &cipher.RSAOAEP{Hash: crypto.SHA256, PublicKey: remoteKey}, // RSA-OAEP-SHA256
-		decrypt:             &cipher.RSAOAEP{Hash: crypto.SHA256, PrivateKey: localKey}, // RSA-OAEP-SHA256
-		signature:           &sign.RSAPSS{Hash: crypto.SHA256, PrivateKey: localKey},    // RSA-PSS-SHA2-256
-		verifySignature:     &sign.RSAPSS{Hash: crypto.SHA256, PublicKey: remoteKey},    // RSA-PSS-SHA2-256
+		plainttextBlockSize: remoteKey.Size() - RSAOAEPMinPaddingSHA256,
+		encrypt:             &RSAOAEP{Hash: crypto.SHA256, PublicKey: remoteKey}, // RSA-OAEP-SHA256
+		decrypt:             &RSAOAEP{Hash: crypto.SHA256, PrivateKey: localKey}, // RSA-OAEP-SHA256
+		signature:           &RSAPSS{Hash: crypto.SHA256, PrivateKey: localKey},  // RSA-PSS-SHA2-256
+		verifySignature:     &RSAPSS{Hash: crypto.SHA256, PublicKey: remoteKey},  // RSA-PSS-SHA2-256
 		nonceLength:         nonceLength,
 		signatureLength:     localKey.PublicKey.Size(),
 		encryptionURI:       "http://opcfoundation.org/UA/security/rsa-oaep-sha2-256",

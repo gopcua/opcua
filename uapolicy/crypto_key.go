@@ -4,8 +4,6 @@
 
 package uapolicy
 
-import "github.com/gopcua/opcua/uapolicy/sign"
-
 /*
 Byte[] PRF(
 	Byte[] secret,
@@ -44,7 +42,7 @@ type derivedKeys struct {
 	signing, encryption, iv []byte
 }
 
-func generateKeys(hmac *sign.HMAC, seed []byte, signingLength, encryptingLength, encryptingBlockSize int) *derivedKeys {
+func generateKeys(hmac *HMAC, seed []byte, signingLength, encryptingLength, encryptingBlockSize int) *derivedKeys {
 	var p []byte
 	a, _ := hmac.Signature(seed)
 	for len(p) < signingLength+encryptingLength+encryptingBlockSize {

@@ -1,6 +1,7 @@
-package cipher
+package uapolicy
 
 import (
+	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
 
@@ -12,6 +13,7 @@ import (
 const PKCS1v15MinPadding = 11
 
 type PKCS1v15 struct {
+	Hash       crypto.Hash
 	PublicKey  *rsa.PublicKey
 	PrivateKey *rsa.PrivateKey
 }
@@ -69,4 +71,21 @@ func (c *PKCS1v15) Encrypt(src []byte) ([]byte, error) {
 	}
 
 	return ciphertext, nil
+}
+
+func (s *PKCS1v15) Signature(msg []byte) ([]byte, error) {
+	rng := rand.Reader
+
+	h := s.Hash.New()
+	h.Write(msg)
+	hashed := h.Sum(nil)
+
+	return rsa.SignPKCS1v15(rng, s.PrivateKey, s.Hash, hashed[:])
+}
+
+func (s *PKCS1v15) Verify(msg, signature []byte) error {
+	h := s.Hash.New()
+	h.Write(msg)
+	hashed := h.Sum(nil)
+	return rsa.VerifyPKCS1v15(s.PublicKey, s.Hash, hashed[:], signature)
 }
