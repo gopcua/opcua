@@ -20,7 +20,9 @@ func (s *RSAPSS) Signature(msg []byte) ([]byte, error) {
 	rng := rand.Reader
 
 	h := s.Hash.New()
-	h.Write(msg)
+	if _, err := h.Write(msg); err != nil {
+		return nil, err
+	}
 	hashed := h.Sum(nil)
 
 	return rsa.SignPSS(rng, s.PrivateKey, s.Hash, hashed[:], &rsa.PSSOptions{SaltLength: rsa.PSSSaltLengthEqualsHash})
@@ -28,7 +30,9 @@ func (s *RSAPSS) Signature(msg []byte) ([]byte, error) {
 
 func (s *RSAPSS) Verify(msg, signature []byte) error {
 	h := s.Hash.New()
-	h.Write(msg)
+	if _, err := h.Write(msg); err != nil {
+		return err
+	}
 	hashed := h.Sum(nil)
 	return rsa.VerifyPSS(s.PublicKey, s.Hash, hashed[:], signature, nil)
 }
