@@ -77,7 +77,9 @@ func (s *PKCS1v15) Signature(msg []byte) ([]byte, error) {
 	rng := rand.Reader
 
 	h := s.Hash.New()
-	h.Write(msg)
+	if _, err := h.Write(msg); err != nil {
+		return nil, err
+	}
 	hashed := h.Sum(nil)
 
 	return rsa.SignPKCS1v15(rng, s.PrivateKey, s.Hash, hashed[:])
@@ -85,7 +87,9 @@ func (s *PKCS1v15) Signature(msg []byte) ([]byte, error) {
 
 func (s *PKCS1v15) Verify(msg, signature []byte) error {
 	h := s.Hash.New()
-	h.Write(msg)
+	if _, err := h.Write(msg); err != nil {
+		return err
+	}
 	hashed := h.Sum(nil)
 	return rsa.VerifyPKCS1v15(s.PublicKey, s.Hash, hashed[:], signature)
 }

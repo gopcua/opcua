@@ -13,7 +13,9 @@ type HMAC struct {
 
 func (s *HMAC) Signature(msg []byte) ([]byte, error) {
 	h := hmac.New(s.Hash.New, s.Secret)
-	h.Write(msg)
+	if _, err := h.Write(msg); err != nil {
+		return nil, err
+	}
 	return h.Sum(nil), nil
 }
 
