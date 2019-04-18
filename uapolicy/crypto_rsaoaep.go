@@ -57,7 +57,15 @@ func (a *RSAOAEP) Encrypt(src []byte) ([]byte, error) {
 
 	var ciphertext []byte
 
-	maxBlock := a.PublicKey.Size() - RSAOAEPMinPadding(a.Hash)
+	minPadding := 0
+	switch a.Hash {
+	case crypto.SHA1:
+		minPadding = RSAOAEPMinPaddingSHA1
+	case crypto.SHA256:
+		minPadding = RSAOAEPMinPaddingSHA256
+	}
+
+	maxBlock := a.PublicKey.Size() - minPadding
 	srcRemaining := len(src)
 	start := 0
 	for srcRemaining > 0 {
@@ -77,19 +85,4 @@ func (a *RSAOAEP) Encrypt(src []byte) ([]byte, error) {
 	}
 
 	return ciphertext, nil
-}
-
-func RSAOAEPMinPadding(hash crypto.Hash) int {
-	// messageLen = (keyLenBits / 8) - 2*(hashLenBits / 8) - 2
-	// paddingLen = keyLen - messageLen
-	//            = 2*hashLenBytes + 2
-	var hLen int
-	switch hash {
-	case crypto.SHA1:
-		hLen = 20
-	case crypto.SHA256:
-		hLen = 64
-	}
-
-	return (2 * hLen) + 2
 }
