@@ -2,6 +2,12 @@
    <img width="50%" src="https://raw.githubusercontent.com/gopcua/opcua/master/gopher.png">
 </p>
 
+<p align="center">
+  Artwork by [Ashley McNamara](https://twitter.com/ashleymcnamara) -
+  Inspired by [Renee French](http://reneefrench.blogspot.co.uk/) -
+  Taken from https://gopherize.me by [Mat Ryer](https://twitter.com/matryer)
+</p>
+
 <h1 align="center">OPCUA</h1>
 
 A native Go implementation of the OPC/UA Binary Protocol.
@@ -16,11 +22,32 @@ A native Go implementation of the OPC/UA Binary Protocol.
 ```sh
 go get -u github.com/gopcua/opcua
 go run examples/datetime/datetime.go -endpoint opc.tcp://localhost:4840
+go run examples/read/read.go -endpoint opc.tcp://192.168.118.30:4840 -node 'ns=0;i=2261'
+go run examples/crypto/*.go -endpoint opc.tcp://localhost:4840 -cert path/to/cert.pem -key path/to/key.pem -sec-policy Basic256 -sec-mode SignAndEncrypt
 ```
+
+## Disclaimer
+
+We are still actively working on this project and the APIs will change.
+
+However, you can safely assume that we are aiming to make the APIs as
+stable as possible. :)
+
+### Current State (19 Apr 2019)
+
+ * `ERR` messages are bubbled up to the caller
+ * security protocol support. See https://github.com/gopcua/opcua/wiki/Supported-Devices
+   to get a list of devices/applications we have tested various crypto and authentication
+   methods. Please add your own. See `examples/crypto` for an example.
+ * Debug messages are now disabled by default.
+
+We are getting closer to use this for our first production use cases. Subscription support
+is certainly high on the list for the client as is a Server implementation. Let us know what
+is missing right now to make this library useful for you and we can focus on this first.
 
 ### Current State (20 Mar 2019)
 
-Our goal is to make this the native Go library for OPC/UA. 
+Our goal is to make this the native Go library for OPC/UA.
 
 This code is not ready for production but we intend to get it there.
 
@@ -28,7 +55,7 @@ We are testing the code against real-world PLCs and other OPC/UA
 implementations but this needs to be more formalized. The goal is to have the
 examples working with real PLCs. Please let us know if they don't.
 
-We are working on the library and some things are working but others are not. 
+We are working on the library and some things are working but others are not.
 
 Here is what currently works:
 
@@ -37,7 +64,7 @@ Here is what currently works:
  * support for chunking when receiving (not sending)
  * all structures and enums are generated from official OPC Foundation defintions
  * basic `uasc` listener available but no server implementation
- * start of a high-level Client implementation. See `client.go` and 
+ * start of a high-level Client implementation. See `client.go` and
    `examples/datetime` for a usage example.
  * decent tests of the binary protocol codec
 
@@ -46,7 +73,7 @@ Here is what is not yet working:
  * `ERR` messages are not yet bubbled up to the caller (not hard but need to do it)
  * service calls need to check `ServiceStatus` and bubble that error up (also not hard)
  * no security protocol support. @dwhutchinson provided the crypto code but it needs to be
-   integrated into the network layer. 
+   integrated into the network layer.
  * no high-level server implementation, address space, etc.
 
 ## Your Help is Appreciated
@@ -64,25 +91,23 @@ Also, if the library is already useful please spread the word as a motivation.
 
 The current focus is on the OPC UA Binary protocol over TCP. No other protocols are supported at this point.
 
-### Protocol Stack
-
 | Categories     | Features                         | Supported | Notes |
 |----------------|----------------------------------|-----------|-------|
 | Encoding       | OPC UA Binary                    | Yes       |       |
-|                | OPC UA JSON                      |           |       |
-|                | OPC UA XML                       |           |       |
+|                | OPC UA JSON                      |           | not planned |
+|                | OPC UA XML                       |           | not planned |
 | Transport      | UA-TCP UA-SC UA Binary           | Yes       |       |
-|                | OPC UA HTTPS                     |           |       |
-|                | SOAP-HTTP WS-SC UA Binary        |           |       |
-|                | SOAP-HTTP WS-SC UA XML           |           |       |
-|                | SOAP-HTTP WS-SC UA XML-UA Binary |           |       |
+|                | OPC UA HTTPS                     |           | not planned |
+|                | SOAP-HTTP WS-SC UA Binary        |           | not planned |
+|                | SOAP-HTTP WS-SC UA XML           |           | not planned |
+|                | SOAP-HTTP WS-SC UA XML-UA Binary |           | not planned |
 | Encryption     | None                             | Yes       |       |
-|                | Basic128Rsa15                    |           |       |
-|                | Basic256                         |           |       |
-|                | Basic256Sha256                   |           |       |
-| Authentication | Anonymous                        |           |       |
-|                | User Name Password               |           |       |
-|                | X509 Certificate                 |           |       |
+|                | Basic128Rsa15                    | Yes       |       |
+|                | Basic256                         | Yes       |       |
+|                | Basic256Sha256                   | Yes       |       |
+| Authentication | Anonymous                        | Yes       |       |
+|                | User Name Password               | Yes       |       |
+|                | X509 Certificate                 | Yes       |       |
 
 ### Services
 
@@ -92,7 +117,7 @@ The current set of supported services is only for the high-level client.
 |-----------------------------|-------------------------------|-----------|--------------|
 | Discovery Service Set       | FindServers                   |           |              |
 |                             | FindServersOnNetwork          |           |              |
-|                             | GetEndpoints                  |           |              |
+|                             | GetEndpoints                  | Yes       |              |
 |                             | RegisterServer                |           |              |
 |                             | RegisterServer2               |           |              |
 | Secure Channel Service Set  | OpenSecureChannel             | Yes       |              |
@@ -106,7 +131,7 @@ The current set of supported services is only for the high-level client.
 |                             | DeleteNodes                   |           |              |
 |                             | DeleteReferences              |           |              |
 | View Service Set            | Browse                        | Started   |              |
-|                             | BrowseNext                    |           |              |
+|                             | BrowseNext                    | Started   |              |
 |                             | TranslateBrowsePathsToNodeIds |           |              |
 |                             | RegisterNodes                 |           |              |
 |                             | UnregisterNodes               |           |              |
@@ -130,13 +155,7 @@ The current set of supported services is only for the high-level client.
 |                             | DeleteSubscriptions           |           |              |
 |                             | TransferSubscriptions         |           |              |
 
-_Tables here are generated by [Markdown Tables Generator](https://www.tablesgenerator.com/markdown_tables)_
-
-## Disclaimer
-
-This is still experimental project. Any part of the exported API may be changed before first release.
-
-## Author
+## Authors
 
 The [gopcua](https://github.com/gopcua) team.
 
