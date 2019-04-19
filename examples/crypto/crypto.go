@@ -15,12 +15,12 @@ import (
 	"strings"
 	"syscall"
 
-	"golang.org/x/crypto/ssh/terminal"
-
 	"github.com/gopcua/opcua"
 	"github.com/gopcua/opcua/debug"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uapolicy"
+
+	"golang.org/x/crypto/ssh/terminal"
 )
 
 var (
@@ -135,10 +135,15 @@ func clientOptsFromFlags(endpoints []*ua.EndpointDescription) []opcua.Option {
 	var secPolicy string
 	switch {
 	case *policy == "auto":
-	case *policy != "" && !strings.HasPrefix(*policy, uapolicy.SecurityPolicyURL):
-		secPolicy = uapolicy.SecurityPolicyURL + *policy
+		// set it later
 	case strings.HasPrefix(*policy, uapolicy.SecurityPolicyURL):
 		secPolicy = *policy
+		*policy = ""
+	case *policy == "Basic128Rsa15" || *policy == "Basic256" || *policy == "Basic256Sha256":
+		secPolicy = uapolicy.SecurityPolicyURL + *policy
+		*policy = ""
+	default:
+		log.Fatalf("Invalid security policy: %s", *policy)
 	}
 
 	// Select the most appropriate authentication mode from server capabilities and user input
@@ -150,10 +155,15 @@ func clientOptsFromFlags(endpoints []*ua.EndpointDescription) []opcua.Option {
 	case "auto":
 	case "none":
 		secMode = ua.MessageSecurityModeNone
+		*mode = ""
 	case "sign":
 		secMode = ua.MessageSecurityModeSign
+		*mode = ""
 	case "signandencrypt":
 		secMode = ua.MessageSecurityModeSignAndEncrypt
+		*mode = ""
+	default:
+		log.Fatalf("Invalid security mode: %s", *mode)
 	}
 
 	// Allow input of only one of sec-mode,sec-policy when choosing 'None'
@@ -187,6 +197,7 @@ func clientOptsFromFlags(endpoints []*ua.EndpointDescription) []opcua.Option {
 		}
 
 	default: // User cares about both
+		fmt.Println("secMode: ", secMode, "secPolicy:", secPolicy)
 		for _, e := range endpoints {
 			if e.SecurityPolicyURI == secPolicy && e.SecurityMode == secMode && (serverEndpoint == nil || e.SecurityLevel >= serverEndpoint.SecurityLevel) {
 				serverEndpoint = e
