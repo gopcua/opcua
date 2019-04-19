@@ -2,7 +2,7 @@
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
-package securitypolicy
+package uapolicy
 
 /*
 Byte[] PRF(
@@ -42,14 +42,14 @@ type derivedKeys struct {
 	signing, encryption, iv []byte
 }
 
-func generateKeys(hmacFunc func(input []byte) ([]byte, error), seed []byte, signingLength, encryptingLength, encryptingBlockSize int) *derivedKeys {
+func generateKeys(hmac *HMAC, seed []byte, signingLength, encryptingLength, encryptingBlockSize int) *derivedKeys {
 	var p []byte
-	a, _ := hmacFunc(seed)
+	a, _ := hmac.Signature(seed)
 	for len(p) < signingLength+encryptingLength+encryptingBlockSize {
 		input := append(a, seed...)
-		h, _ := hmacFunc(input)
+		h, _ := hmac.Signature(input)
 		p = append(p, h...)
-		a, _ = hmacFunc(a)
+		a, _ = hmac.Signature(a)
 	}
 
 	return &derivedKeys{

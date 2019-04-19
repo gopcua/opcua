@@ -39,9 +39,9 @@ func Decode(b []byte, v interface{}) (int, error) {
 
 func decode(b []byte, val reflect.Value, name string) (n int, err error) {
 	if debugCodec {
-		fmt.Printf("decode: %s has type %v and is a %s, %d bytes %x\n", name, val.Type(), val.Type().Kind(), len(b), b)
+		fmt.Printf("decode: %s has type %v and is a %s, %d bytes\n", name, val.Type(), val.Type().Kind(), len(b))
 		defer func() {
-			fmt.Printf("decode: decoded %d bytes (%x) into %s\n", n, b[:n], name)
+			fmt.Printf("decode: decoded %d bytes into %s\n", n, name)
 		}()
 	}
 

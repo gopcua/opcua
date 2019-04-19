@@ -9,6 +9,7 @@ package ua
 import "github.com/gopcua/opcua/id"
 
 func init() {
+	register(id.ServiceFault_Encoding_DefaultBinary, new(ServiceFault))
 	register(id.FindServersRequest_Encoding_DefaultBinary, new(FindServersRequest))
 	register(id.FindServersResponse_Encoding_DefaultBinary, new(FindServersResponse))
 	register(id.FindServersOnNetworkRequest_Encoding_DefaultBinary, new(FindServersOnNetworkRequest))

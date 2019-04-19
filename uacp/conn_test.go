@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/go-cmp/cmp"
+	"github.com/pascaldekloe/goe/verify"
 )
 
 func TestConn(t *testing.T) {
@@ -39,7 +39,7 @@ func TestConn(t *testing.T) {
 
 	select {
 	case <-done:
-	case <-time.After(10 * time.Second):
+	case <-time.After(time.Second):
 		t.Fatalf("timed out")
 	}
 }
@@ -71,8 +71,6 @@ func TestClientWrite(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	buf := make([]byte, 1024)
-	expected := []byte{0xde, 0xad, 0xbe, 0xef}
 	for {
 		select {
 		case _, ok := <-done:
@@ -80,23 +78,28 @@ func TestClientWrite(t *testing.T) {
 				t.Fatal("failed to setup secure channel")
 			}
 			goto NEXT
-		case <-time.After(10 * time.Second):
+		case <-time.After(time.Second):
 			t.Fatalf("timed out")
 		}
 	}
 
 NEXT:
-	if _, err := cliConn.Write(expected); err != nil {
-		t.Fatal(err)
-	}
-	n, err := srvConn.Read(buf)
-	if err != nil {
+	msg := &Message{Data: []byte{0xde, 0xad, 0xbe, 0xef}}
+	if err := cliConn.Send("MSGF", msg); err != nil {
 		t.Fatal(err)
 	}
 
-	if diff := cmp.Diff(buf[:n], expected); diff != "" {
-		t.Error(diff)
+	got, err := srvConn.Receive()
+	if err != nil {
+		t.Fatal(err)
 	}
+	got = got[hdrlen:]
+
+	want, err := msg.Encode()
+	if err != nil {
+		t.Fatal(err)
+	}
+	verify.Values(t, "", got, want)
 }
 
 func TestServerWrite(t *testing.T) {
@@ -126,8 +129,6 @@ func TestServerWrite(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	buf := make([]byte, 1024)
-	expected := []byte{0xde, 0xad, 0xbe, 0xef}
 	for {
 		select {
 		case _, ok := <-done:
@@ -135,21 +136,22 @@ func TestServerWrite(t *testing.T) {
 				t.Fatal("failed to setup secure channel")
 			}
 			goto NEXT
-		case <-time.After(10 * time.Second):
+		case <-time.After(time.Second):
 			t.Fatalf("timed out")
 		}
 	}
 
 NEXT:
-	if _, err := srvConn.Write(expected); err != nil {
-		t.Fatal(err)
-	}
-	n, err := cliConn.Read(buf)
-	if err != nil {
+	want := []byte{0xde, 0xad, 0xbe, 0xef}
+	if _, err := srvConn.Write(want); err != nil {
 		t.Fatal(err)
 	}
 
-	if diff := cmp.Diff(buf[:n], expected); diff != "" {
-		t.Error(diff)
+	got := make([]byte, cliConn.ReceiveBufSize())
+	n, err := cliConn.Read(got)
+	if err != nil {
+		t.Fatal(err)
 	}
+	got = got[:n]
+	verify.Values(t, "", got, want)
 }

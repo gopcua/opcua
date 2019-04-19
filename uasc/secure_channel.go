@@ -6,6 +6,8 @@ package uasc
 
 import (
 	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
 	"fmt"
 	"io"
 	"log"
@@ -17,6 +19,7 @@ import (
 	"github.com/gopcua/opcua/debug"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uacp"
+	"github.com/gopcua/opcua/uapolicy"
 )
 
 const (
@@ -54,6 +57,8 @@ type SecureChannel struct {
 	// handle which is part of the Request and Response headers.
 	mu      sync.Mutex
 	handler map[uint32]chan Response
+
+	enc *uapolicy.EncryptionAlgorithm
 }
 
 func NewSecureChannel(endpoint string, c *uacp.Conn, cfg *Config) (*SecureChannel, error) {
@@ -62,6 +67,20 @@ func NewSecureChannel(endpoint string, c *uacp.Conn, cfg *Config) (*SecureChanne
 	}
 	if cfg == nil {
 		return nil, fmt.Errorf("no secure channel config")
+	}
+
+	if cfg.SecurityPolicyURI != uapolicy.SecurityPolicyNone {
+		if cfg.SecurityMode == ua.MessageSecurityModeNone {
+			return nil, fmt.Errorf("invalid channel config: Security policy '%s' cannot be used with '%s'", cfg.SecurityPolicyURI, cfg.SecurityMode)
+		}
+		if cfg.LocalKey == nil {
+			return nil, fmt.Errorf("invalid channel config: Security policy '%s' requires a private key", cfg.SecurityPolicyURI)
+		}
+	}
+
+	// Force the security mode to None if the policy is also None
+	if cfg.SecurityPolicyURI == uapolicy.SecurityPolicyNone {
+		cfg.SecurityMode = ua.MessageSecurityModeNone
 	}
 
 	// always reset the secure channel id
@@ -100,9 +119,45 @@ func (s *SecureChannel) LocalEndpoint() string {
 	return s.EndpointURL
 }
 
+func (s *SecureChannel) setState(n int32) {
+	atomic.StoreInt32(&s.state, n)
+}
+
+func (s *SecureChannel) hasState(n int32) bool {
+	return atomic.LoadInt32(&s.state) == n
+}
+
 func (s *SecureChannel) openSecureChannel() error {
-	// todo(fs): do we need to set the nonce if the security policy is None?
-	nonce := make([]byte, 32)
+	var err error
+	var localKey *rsa.PrivateKey
+	var remoteKey *rsa.PublicKey
+
+	// Set the encryption methods to Asymmetric with the appropriate
+	// public keys.  OpenSecureChannel is always encrypted with the
+	// asymmetric algorithms.
+	// The default value of the encryption algorithm method is the
+	// SecurityModeNone so no additional work is required for that case
+	if s.cfg.SecurityMode != ua.MessageSecurityModeNone {
+		localKey = s.cfg.LocalKey
+		// todo(dh): move this into the uapolicy package proper or
+		// adjust the Asymmetric method to receive a certificate instead
+		remoteCert, err := x509.ParseCertificate(s.cfg.RemoteCertificate)
+		if err != nil {
+			return err
+		}
+		var ok bool
+		remoteKey, ok = remoteCert.PublicKey.(*rsa.PublicKey)
+		if !ok {
+			return ua.StatusBadCertificateInvalid
+		}
+	}
+
+	s.enc, err = uapolicy.Asymmetric(s.cfg.SecurityPolicyURI, localKey, remoteKey)
+	if err != nil {
+		return err
+	}
+
+	nonce := make([]byte, s.enc.NonceLength())
 	if _, err := rand.Read(nonce); err != nil {
 		return err
 	}
@@ -121,7 +176,13 @@ func (s *SecureChannel) openSecureChannel() error {
 			return fmt.Errorf("got %T, want OpenSecureChannelResponse", req)
 		}
 		s.cfg.SecurityTokenID = resp.SecurityToken.TokenID
-		atomic.StoreInt32(&s.state, secureChannelOpen)
+
+		s.enc, err = uapolicy.Symmetric(s.cfg.SecurityPolicyURI, nonce, resp.ServerNonce)
+		if err != nil {
+			return err
+		}
+
+		s.setState(secureChannelOpen)
 		return nil
 	})
 }
@@ -130,7 +191,11 @@ func (s *SecureChannel) openSecureChannel() error {
 func (s *SecureChannel) closeSecureChannel() error {
 	req := &ua.CloseSecureChannelRequest{}
 
-	defer atomic.StoreInt32(&s.state, secureChannelClosed)
+	defer s.setState(secureChannelClosed)
+	// Don't send the CloseSecureChannel message if it was never fully opened (due to ERR, etc)
+	if !s.hasState(secureChannelOpen) {
+		return nil
+	}
 	return s.Send(req, nil, nil)
 }
 
@@ -163,11 +228,9 @@ func (s *SecureChannel) SendAsync(svc interface{}, authToken *ua.NodeID) (resp c
 	if authToken == nil {
 		authToken = ua.NewTwoByteNodeID(0)
 	}
-
 	// the request header is always the first field
 	val := reflect.ValueOf(svc)
 	val.Elem().Field(0).Set(reflect.ValueOf(s.reqhdr))
-
 	// update counters and reset them on error
 	s.cfg.SequenceNumber++
 	s.reqhdr.AuthenticationToken = authToken
@@ -188,6 +251,10 @@ func (s *SecureChannel) SendAsync(svc interface{}, authToken *ua.NodeID) (resp c
 	}
 	reqid := m.SequenceHeader.RequestID
 
+	// encrypt the message prior to sending it
+	// if SecurityMode == None, this returns the byte stream untouched
+	b, err = s.signAndEncrypt(m, b)
+
 	// send the message
 	if _, err := s.c.Write(b); err != nil {
 		return nil, err
@@ -203,44 +270,50 @@ func (s *SecureChannel) SendAsync(svc interface{}, authToken *ua.NodeID) (resp c
 }
 
 func (s *SecureChannel) readchunk() (*MessageChunk, error) {
-	// read and decode the header to get the message size
-	const hdrlen = 12
-	b := make([]byte, s.c.ReceiveBufSize())
-	_, err := io.ReadFull(s.c, b[:hdrlen])
-	if err == io.EOF {
-		return nil, err
-	}
-	if atomic.LoadInt32(&s.state) == secureChannelClosed {
+	// read a full message from the underlying conn.
+	b, err := s.c.Receive()
+	if err == io.EOF || s.hasState(secureChannelClosed) {
 		return nil, io.EOF
+	}
+	if errf, ok := err.(*uacp.Error); ok {
+		return nil, errf
 	}
 	if err != nil {
 		return nil, fmt.Errorf("sechan: read header failed: %s %#v", err, err)
 	}
 
+	const hdrlen = 12
 	h := new(Header)
 	if _, err := h.Decode(b[:hdrlen]); err != nil {
 		return nil, fmt.Errorf("sechan: decode header failed: %s", err)
 	}
-	b = b[:h.MessageSize]
 
 	// drop if the channel id does not match
 	if s.cfg.SecureChannelID > 0 && s.cfg.SecureChannelID != h.SecureChannelID {
 		return nil, fmt.Errorf("sechan: secure channel id mismatch: got 0x%04x, want 0x%04x", h.SecureChannelID, s.cfg.SecureChannelID)
 	}
 
-	// read the rest of the message
-	if _, err := io.ReadFull(s.c, b[hdrlen:]); err != nil {
-		return nil, fmt.Errorf("sechan: read message failed")
-	}
+	// todo(fs): check for ERRF here
 
 	// decode the other headers
 	m := new(MessageChunk)
 	if _, err := m.Decode(b); err != nil {
-		return nil, fmt.Errorf("sechan: decode message failed: %s", err)
+		return nil, fmt.Errorf("sechan: decode chunk failed: %s", err)
 	}
 
-	// todo(fs): handle ERR messages
-	// todo(fs): handle crypto
+	// todo(fs): check for MSGA here
+
+	// decrypt the block
+	m.Data, err = s.verifyAndDecrypt(m, b)
+	if err != nil {
+		return nil, err
+	}
+
+	n, err := m.SequenceHeader.Decode(m.Data)
+	if err != nil {
+		return nil, fmt.Errorf("sechan: decode sequence header failed: %s", err)
+	}
+	m.Data = m.Data[n:]
 
 	if s.cfg.SecureChannelID == 0 {
 		s.cfg.SecureChannelID = h.SecureChannelID
@@ -266,6 +339,15 @@ func (s *SecureChannel) recv() {
 			chunk, err := s.readchunk()
 			if err == io.EOF {
 				return
+			}
+			if errf, ok := err.(*uacp.Error); ok {
+				s.notifyCallers(errf)
+				s.Close()
+				return
+			}
+			if err != nil {
+				debug.Printf("error received while receiving chunk: %s", err)
+				continue
 			}
 
 			hdr := chunk.Header
@@ -331,7 +413,25 @@ func (s *SecureChannel) recv() {
 	}
 }
 
+func (s *SecureChannel) notifyCallers(err error) {
+	s.mu.Lock()
+	var reqids []uint32
+	for id := range s.handler {
+		reqids = append(reqids, id)
+	}
+	for _, id := range reqids {
+		s.notifyCallerLock(id, nil, err)
+	}
+	s.mu.Unlock()
+}
+
 func (s *SecureChannel) notifyCaller(reqid uint32, svc interface{}, err error) {
+	s.mu.Lock()
+	s.notifyCallerLock(reqid, svc, err)
+	s.mu.Unlock()
+}
+
+func (s *SecureChannel) notifyCallerLock(reqid uint32, svc interface{}, err error) {
 	if err != nil {
 		debug.Printf("conn %d/%d: %v", s.c.ID(), reqid, err)
 	} else {
@@ -339,10 +439,8 @@ func (s *SecureChannel) notifyCaller(reqid uint32, svc interface{}, err error) {
 	}
 
 	// check if we have a pending request handler for this response.
-	s.mu.Lock()
 	ch := s.handler[reqid]
 	delete(s.handler, reqid)
-	s.mu.Unlock()
 
 	// no handler -> next response
 	if ch == nil {

@@ -8,6 +8,7 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"log"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -20,7 +21,7 @@ import (
 // GetEndpoints returns the available endpoint descriptions for the server.
 func GetEndpoints(endpoint string) ([]*ua.EndpointDescription, error) {
 	c := NewClient(endpoint)
-	if err := c.Connect(); err != nil {
+	if err := c.Dial(); err != nil {
 		return nil, err
 	}
 	defer c.Close()
@@ -60,6 +61,14 @@ func NewClient(endpoint string, opts ...Option) *Client {
 		sessionCfg:  DefaultSessionConfig(),
 	}
 	for _, opt := range opts {
+		opt(c.cfg, c.sessionCfg)
+	}
+
+	// UserIdentityToken was removed from DefaultSessionConfig() so ensure a default still is set
+	if c.sessionCfg.UserIdentityToken == nil {
+		opt := AuthAnonymous()
+		opt(c.cfg, c.sessionCfg)
+		opt = AuthPolicyID("Anonymous")
 		opt(c.cfg, c.sessionCfg)
 	}
 	return c
@@ -129,15 +138,14 @@ type Session struct {
 	// necessary parameters to activate the session.
 	resp *ua.CreateSessionResponse
 
-	// mySignature is is the client/serverSignature expected to receive from
-	// the other endpoint. This parameter is automatically calculated and kept
-	// temporarily until being used to verify received client/serverSignature.
-	mySignature *ua.SignatureData
+	// serverCertificate is the certificate used to generate the signatures for
+	// the ActivateSessionRequest methods
+	serverCertificate []byte
 
-	// signatureToSend is the client/serverSignature defined in Part4, Table 15
-	// and Table 17. This parameter is automatically calculated and kept
-	// temporarily until it is sent in next message.
-	signatureToSend *ua.SignatureData
+	// serverNonce is the secret nonce received from the server during Create and Activate
+	// Session respones. Used to generate the signatures for the ActivateSessionRequest
+	// and User Authorization
+	serverNonce []byte
 }
 
 // CreateSession creates a new session which is not yet activated and not
@@ -172,15 +180,19 @@ func (c *Client) CreateSession(cfg *uasc.SessionConfig) (*Session, error) {
 			return fmt.Errorf("invalid response. Got %T, want CreateSessionResponse", v)
 		}
 
-		s = &Session{
-			cfg:             cfg,
-			resp:            resp,
-			mySignature:     &ua.SignatureData{},
-			signatureToSend: &ua.SignatureData{},
+		err := c.sechan.VerifySessionSignature(resp.ServerCertificate, nonce, resp.ServerSignature.Signature)
+		if err != nil {
+			log.Printf("error verifying session signature: %s", err)
+			return nil
 		}
-		// todo(dw): fix crypto: calculate signature data
-		// s.signatureToSend = ua.NewSignatureDataFrom(resp.ServerCertificate, resp.ServerNonce)
-		// s.mySignature = ua.NewSignatureDataFrom(s.sechan.cfg.Certificate, nonce)
+
+		s = &Session{
+			cfg:               cfg,
+			resp:              resp,
+			serverNonce:       resp.ServerNonce,
+			serverCertificate: resp.ServerCertificate,
+		}
+
 		return nil
 	})
 	return s, err
@@ -192,20 +204,58 @@ func (c *Client) CreateSession(cfg *uasc.SessionConfig) (*Session, error) {
 //
 // See Part 4, 5.6.3
 func (c *Client) ActivateSession(s *Session) error {
+	sig, sigAlg, err := c.sechan.NewSessionSignature(s.serverCertificate, s.serverNonce)
+	if err != nil {
+		log.Printf("error creating session signature: %s", err)
+		return nil
+	}
+
+	switch s.cfg.UserIdentityToken.(type) {
+	case *ua.AnonymousIdentityToken:
+
+	case *ua.UserNameIdentityToken:
+		pass, passAlg, err := c.sechan.EncryptUserPassword(s.cfg.AuthPolicyURI, s.cfg.AuthPassword, s.serverCertificate, s.serverNonce)
+		if err != nil {
+			log.Printf("error encrypting user password: %s", err)
+			return err
+		}
+		s.cfg.UserIdentityToken.(*ua.UserNameIdentityToken).Password = pass
+		s.cfg.UserIdentityToken.(*ua.UserNameIdentityToken).EncryptionAlgorithm = passAlg
+
+	case *ua.X509IdentityToken:
+		tokSig, tokSigAlg, err := c.sechan.NewUserTokenSignature(s.cfg.AuthPolicyURI, s.serverCertificate, s.serverNonce)
+		if err != nil {
+			log.Printf("error creating session signature: %s", err)
+			return err
+		}
+		s.cfg.UserTokenSignature = &ua.SignatureData{
+			Algorithm: tokSigAlg,
+			Signature: tokSig,
+		}
+
+	case *ua.IssuedIdentityToken:
+		s.cfg.UserIdentityToken.(*ua.IssuedIdentityToken).EncryptionAlgorithm = ""
+	}
+
 	req := &ua.ActivateSessionRequest{
-		ClientSignature:            s.signatureToSend,
+		ClientSignature: &ua.SignatureData{
+			Algorithm: sigAlg,
+			Signature: sig,
+		},
 		ClientSoftwareCertificates: nil,
 		LocaleIDs:                  s.cfg.LocaleIDs,
 		UserIdentityToken:          ua.NewExtensionObject(s.cfg.UserIdentityToken),
 		UserTokenSignature:         s.cfg.UserTokenSignature,
 	}
 	return c.sechan.Send(req, s.resp.AuthenticationToken, func(v interface{}) error {
-		_, ok := v.(*ua.ActivateSessionResponse)
+		resp, ok := v.(*ua.ActivateSessionResponse)
 		if !ok {
 			return fmt.Errorf("invalid response. Got %T, want ActivateSessionResponse", v)
 		}
-		// todo(dw): retain resp.ServerNonce for next ActivateSession call
-		// e.g. s.serverNonce = resp.ServerNonce
+
+		// Save the nonce for the next request
+		s.serverNonce = resp.ServerNonce
+
 		if err := c.CloseSession(); err != nil {
 			// try to close the newly created session but report
 			// only the initial error.
@@ -248,7 +298,7 @@ func (c *Client) closeSession(s *Session) error {
 // does not have an active session the function returns no error.
 func (c *Client) DetachSession() (*Session, error) {
 	s := c.Session()
-	c.session.Store(nil)
+	c.session.Store((*Session)(nil))
 	return s, nil
 }
 

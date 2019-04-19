@@ -5,16 +5,9 @@
 package uasc
 
 import (
-	"github.com/gopcua/opcua/ua"
-)
+	"crypto/rsa"
 
-// SecurityPolicy URIs
-const (
-	SecurityPolicyNone                = "http://opcfoundation.org/UA/SecurityPolicy#None"
-	SecurityPolicyBasic256Sha256      = "http://opcfoundation.org/UA/SecurityPolicy#Basic256Sha256"
-	SecurityPolicyAes128Sha256RsaOaep = "http://opcfoundation.org/UA/SecurityPolicy#Aes128_Sha256_RsaOaep"
-	SecurityPolicyPubSubAes128CTR     = "http://opcfoundation.org/UA/SecurityPolicy#PubSub_Aes128_CTR"
-	SecurityPolicyPubSubAes256CTR     = "http://opcfoundation.org/UA/SecurityPolicy#PubSub_Aes256_CTR"
+	"github.com/gopcua/opcua/ua"
 )
 
 // Config represents a configuration which UASC client/server has in common.
@@ -44,6 +37,10 @@ type Config struct {
 	// This field shall be null if the Message is not signed.
 	Certificate []byte
 
+	// LocalKey is a RSA Private Key which will be used to encrypt the OpenSecureChannel
+	// messages.  It is the key associated with Certificate
+	LocalKey *rsa.PrivateKey
+
 	// Thumbprint is the thumbprint of the X.509 v3 Certificate assigned to the receiving
 	// application Instance.
 	// The thumbprint is the CertificateDigest of the DER encoded form of the
@@ -51,6 +48,10 @@ type Config struct {
 	// This indicates what public key was used to encrypt the MessageChunk.
 	// This field shall be null if the Message is not encrypted.
 	Thumbprint []byte
+
+	// RemoteCertificate is the X.509 Certificate for the receiving instance.
+	// Used to encrypt the message chunks in the OpenSecureChannel phase.
+	RemoteCertificate []byte
 
 	// SequenceNumber is a monotonically increasing sequence number assigned by the sender to each
 	// MessageChunk sent over the SecureChannel.
@@ -135,6 +136,14 @@ type SessionConfig struct {
 	// that a Session shall remain open without activity. The Server should attempt to honour the
 	// Client request for this parameter,but may negotiate this value up or down to meet its own constraints.
 	SessionTimeout float64
+
+	// Stored version of the password to authenticate against a server
+	// todo: storing passwords in memory seems wrong
+	AuthPassword string
+
+	// PolicyURI to use when encrypting secrets for the User Identity Token
+	// Could be different from the secure channel's policy
+	AuthPolicyURI string
 }
 
 // // NewServerSessionConfig creates a new SessionConfigServer for server.

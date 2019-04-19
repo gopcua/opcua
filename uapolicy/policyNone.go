@@ -2,9 +2,11 @@
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
-package securitypolicy
+package uapolicy
 
-import "crypto/rsa"
+import (
+	"crypto/rsa"
+)
 
 /*
 "SecurityPolicy – None" Profile
@@ -24,29 +26,25 @@ SecurityPolicy_None_Limits 		DerivedSignatureKeyLength: 0
 
 */
 func newNoneAsymmetric(*rsa.PrivateKey, *rsa.PublicKey) (*EncryptionAlgorithm, error) {
-	e := new(EncryptionAlgorithm)
-
-	e.blockSize = blockSizeNone()
-	e.minPadding = minPaddingNone()
-	e.encrypt = encryptNone
-	e.decrypt = decryptNone
-	e.signature = signatureNone
-	e.verifySignature = verifySignatureNone
-	e.signatureLength = 0
-
-	return e, nil
+	return &EncryptionAlgorithm{
+		blockSize:           NoneBlockSize,
+		plainttextBlockSize: NoneBlockSize - NoneMinPadding,
+		encrypt:             &None{},
+		decrypt:             &None{},
+		signature:           &None{},
+		verifySignature:     &None{},
+		signatureLength:     0,
+	}, nil
 }
 
 func newNoneSymmetric([]byte, []byte) (*EncryptionAlgorithm, error) {
-	e := new(EncryptionAlgorithm)
-
-	e.blockSize = blockSizeNone()
-	e.minPadding = minPaddingNone()
-	e.encrypt = encryptNone
-	e.decrypt = decryptNone
-	e.signature = signatureNone
-	e.verifySignature = verifySignatureNone
-	e.signatureLength = 0
-
-	return e, nil
+	return &EncryptionAlgorithm{
+		blockSize:           NoneBlockSize,
+		plainttextBlockSize: NoneBlockSize - NoneMinPadding,
+		encrypt:             &None{},
+		decrypt:             &None{},
+		signature:           &None{},
+		verifySignature:     &None{},
+		signatureLength:     0,
+	}, nil
 }

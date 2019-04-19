@@ -35,9 +35,14 @@ func (h *SymmetricSecurityHeader) Encode() ([]byte, error) {
 }
 
 // String returns Header in string.
-func (s *SymmetricSecurityHeader) String() string {
+func (h *SymmetricSecurityHeader) String() string {
 	return fmt.Sprintf(
 		"TokenID: %d",
-		s.TokenID,
+		h.TokenID,
 	)
+}
+
+// Len returns the Header Length in bytes.
+func (h *SymmetricSecurityHeader) Len() int {
+	return 4
 }

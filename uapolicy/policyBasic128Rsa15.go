@@ -2,11 +2,10 @@
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
-package securitypolicy
+package uapolicy
 
 import (
 	"crypto"
-	"crypto/aes"
 	"crypto/rsa"
 	"errors"
 	"fmt"
@@ -42,33 +41,36 @@ If a certificate or any certificate in the chain is not signed with a hash that 
 */
 
 func newBasic128Rsa15Symmetric(localNonce []byte, remoteNonce []byte) (*EncryptionAlgorithm, error) {
-	e := new(EncryptionAlgorithm)
-
-	var (
+	const (
 		signatureKeyLength  = 16
 		encryptionKeyLength = 16
-		encryptionBlockSize = blockSizeAES()
+		encryptionBlockSize = AESBlockSize
 	)
-	localKeys := generateKeys(computeHmac(crypto.SHA1, localNonce), remoteNonce, signatureKeyLength, encryptionKeyLength, encryptionBlockSize)
-	remoteKeys := generateKeys(computeHmac(crypto.SHA1, remoteNonce), localNonce, signatureKeyLength, encryptionKeyLength, encryptionBlockSize)
 
-	e.blockSize = aes.BlockSize
-	e.minPadding = minPaddingAES()
-	e.encrypt = encryptAES(128, remoteKeys.iv, remoteKeys.encryption) // AES128
-	e.decrypt = decryptAES(128, localKeys.iv, localKeys.encryption)   // AES128
-	e.signature = computeHmac(crypto.SHA1, remoteKeys.signing)        // HMAC-SHA1
-	e.verifySignature = verifyHmac(crypto.SHA1, localKeys.signing)    // HMAC-SHA1
-	e.signatureLength = 160 / 8
-	e.encryptionURI = "http://www.w3.org/2001/04/xmlenc#aes128-cbc"
-	e.signatureURI = "http://www.w3.org/2000/09/xmldsig#hmac-sha1"
+	localHmac := &HMAC{Hash: crypto.SHA1, Secret: localNonce}
+	remoteHmac := &HMAC{Hash: crypto.SHA1, Secret: remoteNonce}
 
-	return e, nil
+	localKeys := generateKeys(localHmac, remoteNonce, signatureKeyLength, encryptionKeyLength, encryptionBlockSize)
+	remoteKeys := generateKeys(remoteHmac, localNonce, signatureKeyLength, encryptionKeyLength, encryptionBlockSize)
+
+	return &EncryptionAlgorithm{
+		blockSize:           AESBlockSize,
+		plainttextBlockSize: AESBlockSize - AESMinPadding,
+		encrypt:             &AES{KeyLength: 128, IV: remoteKeys.iv, Secret: remoteKeys.encryption}, // AES128-CBC
+		decrypt:             &AES{KeyLength: 128, IV: localKeys.iv, Secret: localKeys.encryption},   // AES128-CBC
+		signature:           &HMAC{Hash: crypto.SHA1, Secret: remoteKeys.signing},                   // HMAC-SHA1
+		verifySignature:     &HMAC{Hash: crypto.SHA1, Secret: localKeys.signing},                    // HMAC-SHA1
+		signatureLength:     160 / 8,
+		encryptionURI:       "http://www.w3.org/2001/04/xmlenc#aes128-cbc",
+		signatureURI:        "http://www.w3.org/2000/09/xmldsig#hmac-sha1",
+	}, nil
 }
 
 func newBasic128Rsa15Asymmetric(localKey *rsa.PrivateKey, remoteKey *rsa.PublicKey) (*EncryptionAlgorithm, error) {
 	const (
 		minAsymmetricKeyLength = 128 // 1024 bits
 		maxAsymmetricKeyLength = 256 // 2048 bits
+		nonceLength            = 16
 	)
 
 	if localKey != nil && (localKey.PublicKey.Size() < minAsymmetricKeyLength || localKey.PublicKey.Size() > maxAsymmetricKeyLength) {
@@ -81,17 +83,16 @@ func newBasic128Rsa15Asymmetric(localKey *rsa.PrivateKey, remoteKey *rsa.PublicK
 		return nil, errors.New(msg)
 	}
 
-	e := new(EncryptionAlgorithm)
-
-	e.blockSize = remoteKey.Size()
-	e.minPadding = minPaddingRsaPKCS1v15()
-	e.encrypt = encryptPKCS1v15(remoteKey)                     // RSA-SHA15+KWRSA15
-	e.decrypt = decryptPKCS1v15(localKey)                      // RSA-SHA15+KWRSA15
-	e.signature = signPKCS1v15(crypto.SHA1, localKey)          // RSA-SHA1
-	e.verifySignature = verifyPKCS1v15(crypto.SHA1, remoteKey) // RSA-SHA1
-	e.signatureLength = localKey.PublicKey.Size()
-	e.encryptionURI = "http://www.w3.org/2001/04/xmlenc#rsa-1_5"
-	e.signatureURI = "http://www.w3.org/2000/09/xmldsig#rsa-sha1"
-
-	return e, nil
+	return &EncryptionAlgorithm{
+		blockSize:           remoteKey.Size(),
+		plainttextBlockSize: remoteKey.Size() - PKCS1v15MinPadding,
+		encrypt:             &PKCS1v15{PublicKey: remoteKey},                    // RSA-SHA15+KWRSA15
+		decrypt:             &PKCS1v15{PrivateKey: localKey},                    // RSA-SHA15+KWRSA15
+		signature:           &PKCS1v15{Hash: crypto.SHA1, PrivateKey: localKey}, // RSA-SHA1
+		verifySignature:     &PKCS1v15{Hash: crypto.SHA1, PublicKey: remoteKey}, // RSA-SHA1
+		nonceLength:         nonceLength,
+		signatureLength:     localKey.PublicKey.Size(),
+		encryptionURI:       "http://www.w3.org/2001/04/xmlenc#rsa-1_5",
+		signatureURI:        "http://www.w3.org/2000/09/xmldsig#rsa-sha1",
+	}, nil
 }

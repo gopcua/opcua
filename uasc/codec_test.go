@@ -2,16 +2,19 @@
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
-package ua
+// This file is copied to packages ua, uacp and uasc to break an import cycle.
+
+package uasc
 
 import (
 	"reflect"
 	"testing"
 
+	"github.com/gopcua/opcua/ua"
 	"github.com/pascaldekloe/goe/verify"
 )
 
-// Case describes a test case for a encoding and decoding an
+// CodecTestCase describes a test case for a encoding and decoding an
 // object from bytes.
 type CodecTestCase struct {
 	Name   string
@@ -19,7 +22,7 @@ type CodecTestCase struct {
 	Bytes  []byte
 }
 
-// Run tests encoding, decoding and length calclulation for the given
+// RunCodecTest tests encoding, decoding and length calclulation for the given
 // object.
 func RunCodecTest(t *testing.T, cases []CodecTestCase) {
 	t.Helper()
@@ -39,7 +42,7 @@ func RunCodecTest(t *testing.T, cases []CodecTestCase) {
 					t.Fatalf("%T is not a pointer or a slice", c.Struct)
 				}
 
-				if _, err := Decode(c.Bytes, v.Interface()); err != nil {
+				if _, err := ua.Decode(c.Bytes, v.Interface()); err != nil {
 					t.Fatal(err)
 				}
 
@@ -51,7 +54,7 @@ func RunCodecTest(t *testing.T, cases []CodecTestCase) {
 			})
 
 			t.Run("encode", func(t *testing.T) {
-				b, err := Encode(c.Struct)
+				b, err := ua.Encode(c.Struct)
 				if err != nil {
 					t.Fatal(err)
 				}

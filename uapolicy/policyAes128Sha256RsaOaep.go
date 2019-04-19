@@ -2,11 +2,10 @@
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
-package securitypolicy
+package uapolicy
 
 import (
 	"crypto"
-	"crypto/aes"
 	"crypto/rsa"
 	"errors"
 	"fmt"
@@ -17,20 +16,18 @@ import (
 )
 
 /*
-* "SecurityPolicy [B] – Basic256Sha256" Profile
-http://opcfoundation.org/UA/SecurityPolicy#Basic256Sha256
+ * 	"SecurityPolicy [A] - Aes128-Sha256-RsaOaep" Profile
+ 	http://opcfoundation.org/UA/SecurityPolicy#Aes128_Sha256_RsaOaep
 
-Include 	 Name 	Opt. 	 Description 	 From Profile
+  	Name	Opt.	Description		From Profile
 	Security Certificate Validation 		A certificate will be validated as specified in Part 4. This includes among others structure and signature examination. Allowing for some validation errors to be suppressed by administration directive.
 	Security Encryption Required 		Encryption is required using the algorithms provided in the security algorithm suite.
 	Security Signing Required 		Signing is required using the algorithms provided in the security algorithm suite.
-	SymmetricSignatureAlgorithm_HMAC-SHA2-256 		A keyed hash used for message authentication which is defined in https://tools.ietf.org/html/rfc2104.
-The hash algorithm is SHA2 with 256 bits and described in https://tools.ietf.org/html/rfc4634
-
-	SymmetricEncryptionAlgorithm_AES256-CBC 		The AES encryption algorithm which is defined in http://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.197.pdf.
+	SymmetricSignatureAlgorithm_HMAC-SHA2-256 		A keyed hash used for message authentication which is defined in https://tools.ietf.org/html/rfc2104. The hash algorithm is SHA2 with 256 bits and described in https://tools.ietf.org/html/rfc4634
+	SymmetricEncryptionAlgorithm_AES128-CBC 		The AES encryption algorithm which is defined in http://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.197.pdf.
 Multiple blocks encrypted using the CBC mode described in http://nvlpubs.nist.gov/nistpubs/Legacy/SP/nistspecialpublication800-38a.pdf.
-The key size is 256 bits. The block size is 16 bytes.
-The URI is http://www.w3.org/2001/04/xmlenc#aes256-cbc.
+The key size is 128 bits. The block size is 16 bytes.
+The URI is http://www.w3.org/2001/04/xmlenc#aes128-cbc.
 	AsymmetricSignatureAlgorithm_RSA-PKCS15-SHA2-256 		The RSA signature algorithm which is defined in https://tools.ietf.org/html/rfc3447.
 The RSASSA-PKCS1-v1_5 scheme is used.
 The hash algorithm is SHA2 with 256bits and is described in https://tools.ietf.org/html/rfc6234.
@@ -48,40 +45,43 @@ The RSASSA-PKCS1-v1_5 scheme is used.
 The hash algorithm is SHA2 with 256bits and is described in https://tools.ietf.org/html/rfc6234.
 The SHA2 algorithm with 384 or 512 bits may be used instead of SHA2 with 256 bits.
 The URI is http://www.w3.org/2001/04/xmldsig-more#rsa-sha256.
-	Basic256Sha256_Limits 		-> DerivedSignatureKeyLength: 256 bits
+	Aes128-Sha256-RsaOaep_Limits 		-> DerivedSignatureKeyLength: 256 bits
 -> MinAsymmetricKeyLength: 2048 bits
 -> MaxAsymmetricKeyLength: 4096 bits
 -> SecureChannelNonceLength: 32 bytes
 */
 
-func newBasic256Rsa256Symmetric(localNonce []byte, remoteNonce []byte) (*EncryptionAlgorithm, error) {
-	e := new(EncryptionAlgorithm)
-
-	var (
+func newAes128Sha256RsaOaepSymmetric(localNonce []byte, remoteNonce []byte) (*EncryptionAlgorithm, error) {
+	const (
 		signatureKeyLength  = 32
-		encryptionKeyLength = 32
-		encryptionBlockSize = blockSizeAES()
+		encryptionKeyLength = 16
+		encryptionBlockSize = AESBlockSize
 	)
 
-	localKeys := generateKeys(computeHmac(crypto.SHA256, localNonce), remoteNonce, signatureKeyLength, encryptionKeyLength, encryptionBlockSize)
-	remoteKeys := generateKeys(computeHmac(crypto.SHA256, remoteNonce), localNonce, signatureKeyLength, encryptionKeyLength, encryptionBlockSize)
+	localHmac := &HMAC{Hash: crypto.SHA256, Secret: localNonce}
+	remoteHmac := &HMAC{Hash: crypto.SHA256, Secret: remoteNonce}
 
-	e.blockSize = aes.BlockSize
-	e.minPadding = minPaddingAES()
-	e.encrypt = encryptAES(256, remoteKeys.iv, remoteKeys.encryption) // AES256-CBC
-	e.decrypt = decryptAES(256, localKeys.iv, localKeys.encryption)   // AES256-CBC
-	e.signature = computeHmac(crypto.SHA256, remoteKeys.signing)      // HMAC-SHA2-256
-	e.verifySignature = verifyHmac(crypto.SHA256, localKeys.signing)  // HMAC-SHA2-256
-	e.encryptionURI = "http://www.w3.org/2001/04/xmlenc#aes256-cbc"
-	e.signatureURI = "http://www.w3.org/2000/09/xmldsig#hmac-sha256"
+	localKeys := generateKeys(localHmac, remoteNonce, signatureKeyLength, encryptionKeyLength, encryptionBlockSize)
+	remoteKeys := generateKeys(remoteHmac, localNonce, signatureKeyLength, encryptionKeyLength, encryptionBlockSize)
 
-	return e, nil
+	return &EncryptionAlgorithm{
+		blockSize:           AESBlockSize,
+		plainttextBlockSize: AESBlockSize - AESMinPadding,
+		encrypt:             &AES{KeyLength: 128, IV: remoteKeys.iv, Secret: remoteKeys.encryption}, // AES128-CBC
+		decrypt:             &AES{KeyLength: 128, IV: localKeys.iv, Secret: localKeys.encryption},   // AES128-CBC
+		signature:           &HMAC{Hash: crypto.SHA256, Secret: remoteKeys.signing},                 // HMAC-SHA2-256
+		verifySignature:     &HMAC{Hash: crypto.SHA256, Secret: localKeys.signing},                  // HMAC-SHA2-256
+		signatureLength:     256 / 8,
+		encryptionURI:       "http://www.w3.org/2001/04/xmlenc#aes128-cbc",
+		signatureURI:        "http://www.w3.org/2000/09/xmldsig#hmac-sha256",
+	}, nil
 }
 
-func newBasic256Rsa256Asymmetric(localKey *rsa.PrivateKey, remoteKey *rsa.PublicKey) (*EncryptionAlgorithm, error) {
+func newAes128Sha256RsaOaepAsymmetric(localKey *rsa.PrivateKey, remoteKey *rsa.PublicKey) (*EncryptionAlgorithm, error) {
 	const (
 		minAsymmetricKeyLength = 256 // 2048 bits
 		maxAsymmetricKeyLength = 512 // 4096 bits
+		nonceLength            = 32
 	)
 
 	if localKey != nil && (localKey.PublicKey.Size() < minAsymmetricKeyLength || localKey.PublicKey.Size() > maxAsymmetricKeyLength) {
@@ -94,17 +94,16 @@ func newBasic256Rsa256Asymmetric(localKey *rsa.PrivateKey, remoteKey *rsa.Public
 		return nil, errors.New(msg)
 	}
 
-	e := new(EncryptionAlgorithm)
-
-	e.blockSize = remoteKey.Size()
-	e.minPadding = minPaddingRsaOAEP(crypto.SHA1)
-	e.encrypt = encryptRsaOAEP(crypto.SHA1, remoteKey)           // RSA-OAEP-SHA1
-	e.decrypt = decryptRsaOAEP(crypto.SHA1, localKey)            // RSA-OAEP-SHA1
-	e.signature = signPKCS1v15(crypto.SHA256, localKey)          // RSA-PKCS15-SHA2-256
-	e.verifySignature = verifyPKCS1v15(crypto.SHA256, remoteKey) // RSA-PKCS15-SHA2-256
-	e.signatureLength = localKey.PublicKey.Size()
-	e.encryptionURI = "http://www.w3.org/2001/04/xmlenc#rsa-oaep"
-	e.signatureURI = "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"
-
-	return e, nil
+	return &EncryptionAlgorithm{
+		blockSize:           remoteKey.Size(),
+		plainttextBlockSize: remoteKey.Size() - RSAOAEPMinPaddingSHA1,
+		encrypt:             &RSAOAEP{Hash: crypto.SHA1, PublicKey: remoteKey},    // RSA-OAEP-SHA1
+		decrypt:             &RSAOAEP{Hash: crypto.SHA1, PrivateKey: localKey},    // RSA-OAEP-SHA1
+		signature:           &PKCS1v15{Hash: crypto.SHA256, PrivateKey: localKey}, // RSA-PKCS15-SHA2-256
+		verifySignature:     &PKCS1v15{Hash: crypto.SHA256, PublicKey: remoteKey}, // RSA-PKCS15-SHA2-256
+		nonceLength:         nonceLength,
+		signatureLength:     localKey.PublicKey.Size(),
+		encryptionURI:       "http://opcfoundation.org/ua/security/rsa-oaep-sha1",
+		signatureURI:        "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256",
+	}, nil
 }

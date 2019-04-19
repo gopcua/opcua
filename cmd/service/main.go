@@ -253,7 +253,7 @@ type {{.Name}} struct {
 
 var funcs = template.FuncMap{
 	"isService": func(s string) bool {
-		return strings.HasSuffix(s, "Request") || strings.HasSuffix(s, "Response")
+		return strings.HasSuffix(s, "Request") || strings.HasSuffix(s, "Response") || s == "ServiceFault"
 	},
 }
 
