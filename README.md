@@ -3,9 +3,9 @@
 </p>
 
 <p align="center">
-  Artwork by [Ashley McNamara](https://twitter.com/ashleymcnamara) -
-  Inspired by [Renee French](http://reneefrench.blogspot.co.uk/) -
-  Taken from https://gopherize.me by [Mat Ryer](https://twitter.com/matryer)
+  Artwork by <a href="https://twitter.com/ashleymcnamara">Ashley McNamara</a> -
+  Inspired by <a href="http://reneefrench.blogspot.co.uk/">Renee French</a> -
+  Taken from <a href="https://gopherize.me">https://gopherize.me</a> by <a href="https://twitter.com/matryer">Mat Ryer</a>
 </p>
 
 <h1 align="center">OPCUA</h1>
