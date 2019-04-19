@@ -6,6 +6,7 @@ package uasc
 
 import (
 	"crypto/rsa"
+	"time"
 
 	"github.com/gopcua/opcua/ua"
 )
@@ -135,7 +136,7 @@ type SessionConfig struct {
 	// If Session works as a server, SessionTimeout is an actual maximum number of milliseconds
 	// that a Session shall remain open without activity. The Server should attempt to honour the
 	// Client request for this parameter,but may negotiate this value up or down to meet its own constraints.
-	SessionTimeout float64
+	SessionTimeout time.Duration
 
 	// Stored version of the password to authenticate against a server
 	// todo: storing passwords in memory seems wrong

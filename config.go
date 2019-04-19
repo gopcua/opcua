@@ -29,7 +29,7 @@ func DefaultClientConfig() *uasc.Config {
 
 func DefaultSessionConfig() *uasc.SessionConfig {
 	return &uasc.SessionConfig{
-		SessionTimeout: 0xffff,
+		SessionTimeout: 30 * time.Second,
 		ClientDescription: &ua.ApplicationDescription{
 			ApplicationURI:  "urn:gopcua:client",
 			ProductURI:      "urn:gopcua",
@@ -102,9 +102,9 @@ func SecurityPolicy(s string) Option {
 }
 
 // SessionTimeout sets the timeout in the session configuration.
-func SessionTimeout(seconds float64) Option {
+func SessionTimeout(d time.Duration) Option {
 	return func(c *uasc.Config, sc *uasc.SessionConfig) {
-		sc.SessionTimeout = seconds
+		sc.SessionTimeout = d
 	}
 }
 
