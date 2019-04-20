@@ -20,10 +20,19 @@ A native Go implementation of the OPC/UA Binary Protocol.
 ## Quickstart
 
 ```sh
+# install library
 go get -u github.com/gopcua/opcua
+
+# get current date and time 'ns=0;i=2258'
 go run examples/datetime/datetime.go -endpoint opc.tcp://localhost:4840
-go run examples/read/read.go -endpoint opc.tcp://192.168.118.30:4840 -node 'ns=0;i=2261'
+
+# read the server version
+go run examples/read/read.go -endpoint opc.tcp://localhost:4840 -node 'ns=0;i=2261'
+
+# get the current date time using different security and authentication modes
 go run examples/crypto/*.go -endpoint opc.tcp://localhost:4840 -cert path/to/cert.pem -key path/to/key.pem -sec-policy Basic256 -sec-mode SignAndEncrypt
+
+# checkout examples/ for more examples...
 ```
 
 ## Disclaimer
@@ -86,6 +95,10 @@ If you are looking for ways to contribute you can
  * and last but not least, file issues, review code and write/update documentation
 
 Also, if the library is already useful please spread the word as a motivation.
+
+## Authors
+
+The [Gopcua Team](https://github.com/gopcua/opcua/graphs/contributors).
 
 ## Supported Features
 
@@ -154,10 +167,6 @@ The current set of supported services is only for the high-level client.
 |                             | Republish                     |           |              |
 |                             | DeleteSubscriptions           |           |              |
 |                             | TransferSubscriptions         |           |              |
-
-## Authors
-
-The [gopcua](https://github.com/gopcua) team.
 
 ## License
 
