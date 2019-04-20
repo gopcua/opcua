@@ -6,6 +6,7 @@ package uasc
 
 import (
 	"crypto/rsa"
+	"time"
 
 	"github.com/gopcua/opcua/ua"
 )
@@ -135,7 +136,7 @@ type SessionConfig struct {
 	// If Session works as a server, SessionTimeout is an actual maximum number of milliseconds
 	// that a Session shall remain open without activity. The Server should attempt to honour the
 	// Client request for this parameter,but may negotiate this value up or down to meet its own constraints.
-	SessionTimeout float64
+	SessionTimeout time.Duration
 
 	// Stored version of the password to authenticate against a server
 	// todo: storing passwords in memory seems wrong
@@ -145,30 +146,3 @@ type SessionConfig struct {
 	// Could be different from the secure channel's policy
 	AuthPolicyURI string
 }
-
-// // NewServerSessionConfig creates a new SessionConfigServer for server.
-// func NewServerSessionConfig(secChan *SecureChannel) SessionConfig {
-// 	rawToken := make([]byte, 2)
-// 	if _, err := rand.Read(rawToken); err != nil {
-// 		binary.LittleEndian.PutUint16(rawToken, uint16(time.Now().UnixNano()))
-// 	}
-// 	return SessionConfig{
-// 		AuthenticationToken: ua.NewFourByteNodeID(0, binary.LittleEndian.Uint16(rawToken)),
-// 		SessionTimeout:      0xffff,
-// 		ServerEndpoints: []*ua.EndpointDescription{
-// 			&ua.EndpointDescription{
-// 				EndpointURL: secChan.LocalEndpoint(),
-// 				Server: &ua.ApplicationDescription{
-// 					ApplicationURI:  "urn:gopcua:client",
-// 					ProductURI:      "urn:gopcua",
-// 					ApplicationName: &ua.LocalizedText{Text: "gopcua - OPC UA implementation in Go"},
-// 					ApplicationType: ua.ApplicationTypeServer,
-// 				},
-// 				ServerCertificate: secChan.cfg.Certificate,
-// 				SecurityMode:      secChan.cfg.SecurityMode,
-// 				SecurityPolicyURI: secChan.cfg.SecurityPolicyURI,
-// 				// UserIdentityTokens: []*ua.UserTokenPolicy{&ua.UserTokenPolicy{}},
-// 			},
-// 		},
-// 	}
-// }

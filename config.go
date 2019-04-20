@@ -29,15 +29,14 @@ func DefaultClientConfig() *uasc.Config {
 
 func DefaultSessionConfig() *uasc.SessionConfig {
 	return &uasc.SessionConfig{
-		SessionTimeout: 0xffff,
+		SessionTimeout: time.Minute,
 		ClientDescription: &ua.ApplicationDescription{
 			ApplicationURI:  "urn:gopcua:client",
 			ProductURI:      "urn:gopcua",
 			ApplicationName: &ua.LocalizedText{Text: "gopcua - OPC UA implementation in Go"},
 			ApplicationType: ua.ApplicationTypeClient,
 		},
-		LocaleIDs: []string{"en-us"},
-		//UserIdentityToken:  &ua.AnonymousIdentityToken{PolicyID: "open62541-anonymous-policy"},
+		LocaleIDs:          []string{"en-us"},
 		UserTokenSignature: &ua.SignatureData{},
 	}
 }
@@ -102,9 +101,9 @@ func SecurityPolicy(s string) Option {
 }
 
 // SessionTimeout sets the timeout in the session configuration.
-func SessionTimeout(seconds float64) Option {
+func SessionTimeout(d time.Duration) Option {
 	return func(c *uasc.Config, sc *uasc.SessionConfig) {
-		sc.SessionTimeout = seconds
+		sc.SessionTimeout = d
 	}
 }
 
