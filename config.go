@@ -29,7 +29,7 @@ func DefaultClientConfig() *uasc.Config {
 
 func DefaultSessionConfig() *uasc.SessionConfig {
 	return &uasc.SessionConfig{
-		SessionTimeout: 30 * time.Second,
+		SessionTimeout: time.Minute,
 		ClientDescription: &ua.ApplicationDescription{
 			ApplicationURI:  "urn:gopcua:client",
 			ProductURI:      "urn:gopcua",
