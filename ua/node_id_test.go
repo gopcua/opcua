@@ -112,7 +112,7 @@ func BenchmarkReflectDecode(b *testing.B) {
 	}
 }
 
-func TestNewNodeID(t *testing.T) {
+func TestParseNodeID(t *testing.T) {
 	cases := []struct {
 		s   string
 		n   *NodeID
@@ -143,7 +143,7 @@ func TestNewNodeID(t *testing.T) {
 
 	for _, c := range cases {
 		t.Run(c.s, func(t *testing.T) {
-			n, err := NewNodeID(c.s)
+			n, err := ParseNodeID(c.s)
 			if got, want := err, c.err; !reflect.DeepEqual(got, want) {
 				t.Fatalf("got error %v want %v", got, want)
 			}
