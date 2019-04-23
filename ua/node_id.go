@@ -77,7 +77,7 @@ func NewByteStringNodeID(ns uint16, id []byte) *NodeID {
 	}
 }
 
-// NewNodeID returns a node id from a string definition of the format
+// ParseNodeID returns a node id from a string definition of the format
 // 'ns=<namespace>;{s,i,b,g}=<identifier>'.
 //
 // For string node ids the 's=' prefix can be omitted.
@@ -87,7 +87,7 @@ func NewByteStringNodeID(ns uint16, id []byte) *NodeID {
 //
 // Namespace URLs 'nsu=' are not supported since they require a lookup.
 //
-func NewNodeID(s string) (*NodeID, error) {
+func ParseNodeID(s string) (*NodeID, error) {
 	if s == "" {
 		return NewTwoByteNodeID(0), nil
 	}
@@ -304,7 +304,7 @@ func (n *NodeID) SetStringID(v string) error {
 }
 
 // String returns the string representation of the NodeID
-// in the format described by NewNodeID.
+// in the format described by ParseNodeID.
 func (n *NodeID) String() string {
 	switch n.Type() {
 	case NodeIDTypeTwoByte:

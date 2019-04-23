@@ -28,7 +28,7 @@ func main() {
 	}
 	defer c.Close()
 
-	id, err := ua.NewNodeID(*nodeID)
+	id, err := ua.ParseNodeID(*nodeID)
 	if err != nil {
 		log.Fatalf("invalid node id: %v", err)
 	}
