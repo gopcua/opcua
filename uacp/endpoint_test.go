@@ -2,7 +2,7 @@
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
-package utils
+package uacp
 
 import (
 	"net"
@@ -71,49 +71,6 @@ func TestResolveEndpoint(t *testing.T) {
 		}
 		if got, want := errStr, c.errStr; got != want {
 			t.Fatalf("got error %q want %q", got, want)
-		}
-	}
-}
-
-func TestGetPath(t *testing.T) {
-	cases := []struct {
-		input  string
-		path   string
-		errStr string
-	}{
-		{ // Valid, full EndpointURL
-			"opc.tcp://10.0.0.1:4840/foo/bar",
-			"/foo/bar",
-			"",
-		},
-		{ // Valid, schema is not checked in GetPath()
-			"tcp://10.0.0.1:4840/foo/bar",
-			"/foo/bar",
-			"",
-		},
-		{ // Valid, no path following the address
-			"tcp://10.0.0.1:4840",
-			"/",
-			"",
-		},
-		{ // Invalid, empty string
-			"",
-			"",
-			"invalid input: ",
-		},
-	}
-
-	for _, c := range cases {
-		var errStr string
-		path, err := GetPath(c.input)
-		if err != nil {
-			errStr = err.Error()
-		}
-		if got, want := path, c.path; got != want {
-			t.Fatalf("got %s want %s", got, want)
-		}
-		if got, want := errStr, c.errStr; got != want {
-			t.Fatalf("got %s want %s", got, want)
 		}
 	}
 }

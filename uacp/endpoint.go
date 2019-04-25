@@ -2,7 +2,7 @@
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
-package utils
+package uacp
 
 import (
 	"fmt"
@@ -31,16 +31,4 @@ func ResolveEndpoint(endpoint string) (network string, addr *net.TCPAddr, err er
 		return "", nil, fmt.Errorf("could not resolve address %s", addrString)
 	}
 	return
-}
-
-// GetPath returns the path that follows after address[:port] in EndpointURL.
-//
-// Expected format of input is "opc.tcp://<addr[:port]/path/to/somewhere"
-func GetPath(endpoint string) (path string, err error) {
-	elems := strings.Split(endpoint, "/")
-	if len(elems) < 3 {
-		return "", fmt.Errorf("invalid input: %s", endpoint)
-	}
-
-	return "/" + strings.Join(elems[3:], "/"), nil
 }
