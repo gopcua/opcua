@@ -14,7 +14,6 @@ import (
 
 	"github.com/gopcua/opcua/debug"
 	"github.com/gopcua/opcua/ua"
-	"github.com/gopcua/opcua/utils"
 )
 
 const (
@@ -37,7 +36,7 @@ func nextid() uint32 {
 
 func Dial(ctx context.Context, endpoint string) (*Conn, error) {
 	debug.Printf("Connect to %s", endpoint)
-	network, raddr, err := utils.ResolveEndpoint(endpoint)
+	network, raddr, err := ResolveEndpoint(endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -90,7 +89,7 @@ func Listen(endpoint string, ack *Acknowledge) (*Listener, error) {
 		}
 	}
 
-	network, laddr, err := utils.ResolveEndpoint(endpoint)
+	network, laddr, err := ResolveEndpoint(endpoint)
 	if err != nil {
 		return nil, err
 	}
