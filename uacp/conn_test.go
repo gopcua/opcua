@@ -55,10 +55,11 @@ func TestClientWrite(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	var cliConn, srvConn *Conn
+	var srvConn *Conn
 	done := make(chan int)
 	go func() {
 		defer ln.Close()
+		var err error
 		srvConn, err = ln.Accept(ctx)
 		if err != nil {
 			t.Fatal(err)
@@ -66,7 +67,7 @@ func TestClientWrite(t *testing.T) {
 		done <- 0
 	}()
 
-	cliConn, err = Dial(ctx, ep)
+	cliConn, err := Dial(ctx, ep)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -113,10 +114,11 @@ func TestServerWrite(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	var cliConn, srvConn *Conn
+	var srvConn *Conn
 	done := make(chan int)
 	go func() {
 		defer ln.Close()
+		var err error
 		srvConn, err = ln.Accept(ctx)
 		if err != nil {
 			t.Fatal(err)
@@ -124,7 +126,7 @@ func TestServerWrite(t *testing.T) {
 		done <- 0
 	}()
 
-	cliConn, err = Dial(ctx, ep)
+	cliConn, err := Dial(ctx, ep)
 	if err != nil {
 		t.Fatal(err)
 	}
