@@ -59,6 +59,32 @@ func (m *MessageChunk) Decode(b []byte) (int, error) {
 	return len(b), nil
 }
 
+// MessageAbort represents a non-terminal OPC UA Secure Channel error.
+//
+// Specification: Part6, 7.3
+type MessageAbort struct {
+	ErrorCode uint32
+	Reason    string
+}
+
+func (m *MessageAbort) Decode(b []byte) (int, error) {
+	buf := ua.NewBuffer(b)
+	m.ErrorCode = buf.ReadUint32()
+	m.Reason = buf.ReadString()
+	return buf.Pos(), buf.Error()
+}
+
+func (m *MessageAbort) Encode() ([]byte, error) {
+	buf := ua.NewBuffer(nil)
+	buf.WriteUint32(m.ErrorCode)
+	buf.WriteString(m.Reason)
+	return buf.Bytes(), buf.Error()
+}
+
+func (m *MessageAbort) MessageAbort() string {
+	return ua.StatusCode(m.ErrorCode).Error()
+}
+
 // Message represents a OPC UA Secure Conversation message.
 type Message struct {
 	*MessageHeader
