@@ -23,7 +23,7 @@ func main() {
 	if err := c.Connect(); err != nil {
 		log.Fatal(err)
 	}
-	c.Close()
+	defer c.Close()
 
 	ch := make(chan opcua.PublishNotificationData)
 	go c.Publish(ch)
