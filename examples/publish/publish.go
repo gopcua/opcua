@@ -29,9 +29,9 @@ func main() {
 	go c.Publish(ch)
 
 	for {
-		var resp = <-ch
+		resp := <-ch
 
-		var t = time.Now().Format(time.RFC3339)
+		t := time.Now().Format(time.RFC3339)
 		if resp.Error != nil {
 			log.Printf("%s - %v", t, resp.Error)
 			continue
@@ -39,7 +39,7 @@ func main() {
 
 		if resp.DataChangeNotification != nil {
 			for _, item := range resp.DataChangeNotification.MonitoredItems {
-				var data, ok = item.Value.Value.Value.(float64)
+				data, ok := item.Value.Value.Value.(float64)
 				if ok {
 					log.Printf("%s - %g", t, data)
 				}
