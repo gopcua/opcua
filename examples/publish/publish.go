@@ -23,11 +23,9 @@ func main() {
 	if err := c.Connect(); err != nil {
 		log.Fatal(err)
 	}
-	defer func() {
-		_ = c.Close()
-	}()
+	c.Close()
 
-	var ch = make(chan opcua.PublishNotificationData)
+	ch := make(chan opcua.PublishNotificationData)
 	go c.Publish(ch)
 
 	for {
