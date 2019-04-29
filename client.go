@@ -428,14 +428,14 @@ func (c *Client) Subscribe(intv time.Duration) (*Subscription, error) {
 	return &Subscription{res}, err
 }
 
-type PublishResponse struct {
+type PublishNotificationData struct {
 	Error                    error
 	DataChangeNotification   *ua.DataChangeNotification
 	EventNotificationList    *ua.EventNotificationList
 	StatusChangeNotification *ua.StatusChangeNotification
 }
 
-func (c *Client) Publish(dataChan chan<- PublishResponse) {
+func (c *Client) Publish(dataChan chan<- PublishNotificationData) {
 	var (
 		subAck        = make([]*ua.SubscriptionAcknowledgement, 0)
 		pubRequest    = &ua.PublishRequest{}
@@ -457,7 +457,7 @@ func (c *Client) Publish(dataChan chan<- PublishResponse) {
 			return nil
 		})
 		if err != nil {
-			dataChan <- PublishResponse{
+			dataChan <- PublishNotificationData{
 				Error: err,
 			}
 			continue
@@ -472,7 +472,7 @@ func (c *Client) Publish(dataChan chan<- PublishResponse) {
 			}
 		}
 		if responseError != ua.StatusOK {
-			dataChan <- PublishResponse{
+			dataChan <- PublishNotificationData{
 				Error: fmt.Errorf("publish response error: %v", responseError),
 			}
 			continue
@@ -488,7 +488,7 @@ func (c *Client) Publish(dataChan chan<- PublishResponse) {
 		}
 
 		if pubResponse.NotificationMessage == nil {
-			dataChan <- PublishResponse{
+			dataChan <- PublishNotificationData{
 				Error: errors.New("empty NotificationMessage"),
 			}
 			continue
@@ -498,7 +498,7 @@ func (c *Client) Publish(dataChan chan<- PublishResponse) {
 		for _, data := range pubResponse.NotificationMessage.NotificationData {
 			// Part 4, 7.20 NotificationData parameters
 			if data == nil {
-				dataChan <- PublishResponse{
+				dataChan <- PublishNotificationData{
 					Error: fmt.Errorf("NotificationData parameter is nil"),
 				}
 				continue
@@ -507,25 +507,25 @@ func (c *Client) Publish(dataChan chan<- PublishResponse) {
 			switch data.Value.(type) {
 			// Part 4, 7.20.2 DataChangeNotification parameter
 			case *ua.DataChangeNotification:
-				dataChan <- PublishResponse{
+				dataChan <- PublishNotificationData{
 					DataChangeNotification: data.Value.(*ua.DataChangeNotification),
 				}
 
 			// Part 4, 7.20.3 EventNotificationList parameter
 			case *ua.EventNotificationList:
-				dataChan <- PublishResponse{
+				dataChan <- PublishNotificationData{
 					EventNotificationList: data.Value.(*ua.EventNotificationList),
 				}
 
 			// Part 4, 7.20.4 StatusChangeNotification parameter
 			case *ua.StatusChangeNotification:
-				dataChan <- PublishResponse{
+				dataChan <- PublishNotificationData{
 					StatusChangeNotification: data.Value.(*ua.StatusChangeNotification),
 				}
 
 			// Error
 			default:
-				dataChan <- PublishResponse{
+				dataChan <- PublishNotificationData{
 					Error: fmt.Errorf("unknown NotificationData parameter: %v", data.Value),
 				}
 			}
