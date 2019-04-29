@@ -10,6 +10,7 @@ import (
 
 	"github.com/gopcua/opcua"
 	"github.com/gopcua/opcua/debug"
+	"github.com/gopcua/opcua/ua"
 )
 
 func main() {
@@ -28,14 +29,15 @@ func main() {
 	go c.Publish(ch)
 
 	for {
-		resp := <-ch
-		if resp.Error != nil {
-			log.Printf("%v", resp.Error)
+		res := <-ch
+		if res.Error != nil {
+			log.Print(res.Error)
 			continue
 		}
 
-		if resp.DataChangeNotification != nil {
-			for _, item := range resp.DataChangeNotification.MonitoredItems {
+		switch x := res.Value.(type) {
+		case *ua.DataChangeNotification:
+			for _, item := range x.MonitoredItems {
 				data, ok := item.Value.Value.Value.(float64)
 				if ok {
 					log.Printf("%g", data)
