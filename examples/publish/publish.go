@@ -29,19 +29,19 @@ func main() {
 	go c.Publish(ch)
 
 	for {
-		var response = <-ch
+		var resp = <-ch
 
 		var t = time.Now().Format(time.RFC3339)
-		if response.Error != nil {
-			log.Printf("%s - %v \n", t, response.Error)
+		if resp.Error != nil {
+			log.Printf("%s - %v", t, resp.Error)
 			continue
 		}
 
-		if response.DataChangeNotification != nil {
-			for _, item := range response.DataChangeNotification.MonitoredItems {
+		if resp.DataChangeNotification != nil {
+			for _, item := range resp.DataChangeNotification.MonitoredItems {
 				var data, ok = item.Value.Value.Value.(float64)
 				if ok {
-					log.Printf("%s - %g \n", t, data)
+					log.Printf("%s - %g", t, data)
 				}
 			}
 		}
