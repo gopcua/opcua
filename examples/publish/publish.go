@@ -7,7 +7,6 @@ package main
 import (
 	"flag"
 	"log"
-	"time"
 
 	"github.com/gopcua/opcua"
 	"github.com/gopcua/opcua/debug"
@@ -30,10 +29,8 @@ func main() {
 
 	for {
 		resp := <-ch
-
-		t := time.Now().Format(time.RFC3339)
 		if resp.Error != nil {
-			log.Printf("%s - %v", t, resp.Error)
+			log.Printf("%v", resp.Error)
 			continue
 		}
 
@@ -41,7 +38,7 @@ func main() {
 			for _, item := range resp.DataChangeNotification.MonitoredItems {
 				data, ok := item.Value.Value.Value.(float64)
 				if ok {
-					log.Printf("%s - %g", t, data)
+					log.Printf("%g", data)
 				}
 			}
 		}
