@@ -434,10 +434,12 @@ type PublishNotificationData struct {
 }
 
 func (c *Client) Publish(notif chan<- PublishNotificationData) {
+	// Empty SubscriptionAcknowledgements for first PublishRequest
+	var acks = make([]*ua.SubscriptionAcknowledgement, 0)
+
 	for {
-		// Empty SubscriptionAcknowledgements for first PublishRequest
 		req := &ua.PublishRequest{
-			SubscriptionAcknowledgements: []*ua.SubscriptionAcknowledgement{},
+			SubscriptionAcknowledgements: acks,
 		}
 
 		var res *ua.PublishResponse
@@ -472,7 +474,7 @@ func (c *Client) Publish(notif chan<- PublishNotificationData) {
 		}
 
 		// Prepare SubscriptionAcknowledgement for next PublishRequest
-		var acks []*ua.SubscriptionAcknowledgement
+		acks = make([]*ua.SubscriptionAcknowledgement, 0)
 		for _, i := range res.AvailableSequenceNumbers {
 			ack := &ua.SubscriptionAcknowledgement{
 				SubscriptionID: res.SubscriptionID,
