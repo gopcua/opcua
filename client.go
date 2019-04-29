@@ -7,6 +7,7 @@ package opcua
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"log"
 	"sync"
@@ -425,4 +426,109 @@ func (c *Client) Subscribe(intv time.Duration) (*Subscription, error) {
 		return nil
 	})
 	return &Subscription{res}, err
+}
+
+type PublishResponse struct {
+	Error                    error
+	DataChangeNotification   *ua.DataChangeNotification
+	EventNotificationList    *ua.EventNotificationList
+	StatusChangeNotification *ua.StatusChangeNotification
+}
+
+func (c *Client) Publish(dataChan chan<- PublishResponse) {
+	var (
+		subAck        = make([]*ua.SubscriptionAcknowledgement, 0)
+		pubRequest    = &ua.PublishRequest{}
+		pubResponse   *ua.PublishResponse
+		responseError ua.StatusCode
+		err           error
+	)
+	for {
+		// Empty SubscriptionAcknowledgements for first PublishRequest
+		pubRequest.SubscriptionAcknowledgements = subAck
+
+		// PublishRequest
+		err = c.Send(pubRequest, func(v interface{}) error {
+			r, ok := v.(*ua.PublishResponse)
+			if !ok {
+				return fmt.Errorf("invalid response: %T", v)
+			}
+			pubResponse = r
+			return nil
+		})
+		if err != nil {
+			dataChan <- PublishResponse{
+				Error: err,
+			}
+			continue
+		}
+
+		// Check for errors
+		responseError = ua.StatusOK
+		for _, result := range pubResponse.Results {
+			if result != ua.StatusOK {
+				responseError = result
+				break
+			}
+		}
+		if responseError != ua.StatusOK {
+			dataChan <- PublishResponse{
+				Error: fmt.Errorf("publish response error: %v", responseError),
+			}
+			continue
+		}
+
+		// Prepare SubscriptionAcknowledgement for next PublishRequest
+		subAck = make([]*ua.SubscriptionAcknowledgement, 0)
+		for _, number := range pubResponse.AvailableSequenceNumbers {
+			subAck = append(subAck, &ua.SubscriptionAcknowledgement{
+				SubscriptionID: pubResponse.SubscriptionID,
+				SequenceNumber: number,
+			})
+		}
+
+		if pubResponse.NotificationMessage == nil {
+			dataChan <- PublishResponse{
+				Error: errors.New("empty NotificationMessage"),
+			}
+			continue
+		}
+
+		// Part 4, 7.21 NotificationMessage
+		for _, data := range pubResponse.NotificationMessage.NotificationData {
+			// Part 4, 7.20 NotificationData parameters
+			if data == nil {
+				dataChan <- PublishResponse{
+					Error: fmt.Errorf("NotificationData parameter is nil"),
+				}
+				continue
+			}
+
+			switch data.Value.(type) {
+			// Part 4, 7.20.2 DataChangeNotification parameter
+			case *ua.DataChangeNotification:
+				dataChan <- PublishResponse{
+					DataChangeNotification: data.Value.(*ua.DataChangeNotification),
+				}
+
+			// Part 4, 7.20.3 EventNotificationList parameter
+			case *ua.EventNotificationList:
+				dataChan <- PublishResponse{
+					EventNotificationList: data.Value.(*ua.EventNotificationList),
+				}
+
+			// Part 4, 7.20.4 StatusChangeNotification parameter
+			case *ua.StatusChangeNotification:
+				dataChan <- PublishResponse{
+					StatusChangeNotification: data.Value.(*ua.StatusChangeNotification),
+				}
+
+			// Error
+			default:
+				dataChan <- PublishResponse{
+					Error: fmt.Errorf("unknown NotificationData parameter: %v", data.Value),
+				}
+			}
+		}
+	}
 }
