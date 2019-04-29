@@ -33,7 +33,7 @@ func main() {
 
 		var t = time.Now().Format(time.RFC3339)
 		if response.Error != nil {
-			log.Printf("%s - %s \n", t, response.Error.Error())
+			log.Printf("%s - %v \n", t, response.Error)
 			continue
 		}
 
