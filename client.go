@@ -426,3 +426,101 @@ func (c *Client) Subscribe(intv time.Duration) (*Subscription, error) {
 	})
 	return &Subscription{res}, err
 }
+
+type PublishNotificationData struct {
+	SubscriptionID uint32
+	Error          error
+	Value          interface{}
+}
+
+func (c *Client) Publish(notif chan<- PublishNotificationData) {
+	// Empty SubscriptionAcknowledgements for first PublishRequest
+	var acks = make([]*ua.SubscriptionAcknowledgement, 0)
+
+	for {
+		req := &ua.PublishRequest{
+			SubscriptionAcknowledgements: acks,
+		}
+
+		var res *ua.PublishResponse
+		err := c.Send(req, func(v interface{}) error {
+			r, ok := v.(*ua.PublishResponse)
+			if !ok {
+				return fmt.Errorf("invalid response: %T", v)
+			}
+			res = r
+			return nil
+		})
+		if err != nil {
+			notif <- PublishNotificationData{Error: err}
+			continue
+		}
+
+		// Check for errors
+		status := ua.StatusOK
+		for _, res := range res.Results {
+			if res != ua.StatusOK {
+				status = res
+				break
+			}
+		}
+
+		if status != ua.StatusOK {
+			notif <- PublishNotificationData{
+				SubscriptionID: res.SubscriptionID,
+				Error:          status,
+			}
+			continue
+		}
+
+		// Prepare SubscriptionAcknowledgement for next PublishRequest
+		acks = make([]*ua.SubscriptionAcknowledgement, 0)
+		for _, i := range res.AvailableSequenceNumbers {
+			ack := &ua.SubscriptionAcknowledgement{
+				SubscriptionID: res.SubscriptionID,
+				SequenceNumber: i,
+			}
+			acks = append(acks, ack)
+		}
+
+		if res.NotificationMessage == nil {
+			notif <- PublishNotificationData{
+				SubscriptionID: res.SubscriptionID,
+				Error:          fmt.Errorf("empty NotificationMessage"),
+			}
+			continue
+		}
+
+		// Part 4, 7.21 NotificationMessage
+		for _, data := range res.NotificationMessage.NotificationData {
+			// Part 4, 7.20 NotificationData parameters
+			if data == nil || data.Value == nil {
+				notif <- PublishNotificationData{
+					SubscriptionID: res.SubscriptionID,
+					Error:          fmt.Errorf("missing NotificationData parameter"),
+				}
+				continue
+			}
+
+			switch data.Value.(type) {
+			// Part 4, 7.20.2 DataChangeNotification parameter
+			// Part 4, 7.20.3 EventNotificationList parameter
+			// Part 4, 7.20.4 StatusChangeNotification parameter
+			case *ua.DataChangeNotification,
+				*ua.EventNotificationList,
+				*ua.StatusChangeNotification:
+				notif <- PublishNotificationData{
+					SubscriptionID: res.SubscriptionID,
+					Value:          data.Value,
+				}
+
+			// Error
+			default:
+				notif <- PublishNotificationData{
+					SubscriptionID: res.SubscriptionID,
+					Error:          fmt.Errorf("unknown NotificationData parameter: %T", data.Value),
+				}
+			}
+		}
+	}
+}
