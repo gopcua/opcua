@@ -54,6 +54,17 @@ type Client struct {
 	once sync.Once
 }
 
+// NewClient creates a new Client.
+//
+// With no opts given, it uses default configuration(=parameters inside packets) that is defined
+// in DefaultClientConfig() and DefaultSessionConfig() functions, except for UserIdentityToken.
+// For UserIdentityToken, anonymous authentication with PolicyID="Anonymous" is hard-coded in
+// NewClient.
+//
+// To modify configuration(including UserIdentityToken), give any number of Option as opts.
+// The opts follows the "functional options" way. For pre-defined options, see #Option section.
+//
+// https://godoc.org/github.com/gopcua/opcua#Option
 func NewClient(endpoint string, opts ...Option) *Client {
 	c := &Client{
 		endpointURL: endpoint,
