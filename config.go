@@ -18,7 +18,7 @@ import (
 )
 
 // DefaultClientConfig returns the default configuration for a client
-// to establish a secure channel and a session.
+// to establish a secure channel.
 func DefaultClientConfig() *uasc.Config {
 	return &uasc.Config{
 		SecurityPolicyURI: ua.SecurityPolicyURINone,
@@ -27,6 +27,8 @@ func DefaultClientConfig() *uasc.Config {
 	}
 }
 
+// DefaultSessionConfig returns the default configuration for a client
+// to establish a session.
 func DefaultSessionConfig() *uasc.SessionConfig {
 	return &uasc.SessionConfig{
 		SessionTimeout: time.Minute,
