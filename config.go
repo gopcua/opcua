@@ -21,7 +21,7 @@ import (
 // to establish a secure channel and a session.
 func DefaultClientConfig() *uasc.Config {
 	return &uasc.Config{
-		SecurityPolicyURI: uapolicy.SecurityPolicyNone,
+		SecurityPolicyURI: ua.SecurityPolicyURINone,
 		SecurityMode:      ua.MessageSecurityModeNone,
 		Lifetime:          uint32(time.Hour / time.Millisecond),
 	}
@@ -166,7 +166,7 @@ func SecurityFromEndpoint(ep *ua.EndpointDescription, authType ua.UserTokenType)
 
 		if sc.UserIdentityToken == nil {
 			sc.UserIdentityToken = &ua.AnonymousIdentityToken{PolicyID: "Anonymous"}
-			sc.AuthPolicyURI = uapolicy.SecurityPolicyNone
+			sc.AuthPolicyURI = ua.SecurityPolicyURINone
 		}
 
 	}
