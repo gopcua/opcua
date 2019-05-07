@@ -228,6 +228,10 @@ func (s *SecureChannel) SendAsync(svc interface{}, authToken *ua.NodeID) (resp c
 	if authToken == nil {
 		authToken = ua.NewTwoByteNodeID(0)
 	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	// the request header is always the first field
 	val := reflect.ValueOf(svc)
 	val.Elem().Field(0).Set(reflect.ValueOf(s.reqhdr))
@@ -263,9 +267,9 @@ func (s *SecureChannel) SendAsync(svc interface{}, authToken *ua.NodeID) (resp c
 
 	// register the handler
 	resp = make(chan Response)
-	s.mu.Lock()
+	// s.mu.Lock()
 	s.handler[reqid] = resp
-	s.mu.Unlock()
+	//s.mu.Unlock()
 	return resp, nil
 }
 
