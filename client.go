@@ -180,12 +180,12 @@ func (c *Client) CreateSession(cfg *uasc.SessionConfig) (*Session, error) {
 			return nil
 		}
 
-	// Ensure we have a valid identity token that the server will accept before trying to activate a session
+		// Ensure we have a valid identity token that the server will accept before trying to activate a session
 		if c.sessionCfg.UserIdentityToken == nil {
 			opt := AuthAnonymous()
 			opt(c.cfg, c.sessionCfg)
 
-			p := anonPolicyID(resp.ServerEndpoints)
+			p := anonymousPolicyID(resp.ServerEndpoints)
 			opt = AuthPolicyID(p)
 			opt(c.cfg, c.sessionCfg)
 		}
@@ -204,13 +204,15 @@ func (c *Client) CreateSession(cfg *uasc.SessionConfig) (*Session, error) {
 
 const defaultAnonymousPolicyID = "Anonymous"
 
-func anonPolicyID(endpoints []*ua.EndpointDescription) string {
+func anonymousPolicyID(endpoints []*ua.EndpointDescription) string {
 	for _, e := range endpoints {
-		if e.SecurityMode == ua.MessageSecurityModeNone && e.SecurityPolicyURI == ua.SecurityPolicyURINone {
-			for _, t := range e.UserIdentityTokens {
-				if t.TokenType == ua.UserTokenTypeAnonymous {
-					return t.PolicyID
-				}
+		if e.SecurityMode != ua.MessageSecurityModeNone || e.SecurityPolicyURI != ua.SecurityPolicyURINone {
+			continue
+		}
+
+		for _, t := range e.UserIdentityTokens {
+			if t.TokenType == ua.UserTokenTypeAnonymous {
+				return t.PolicyID
 			}
 		}
 	}
