@@ -82,3 +82,16 @@ const (
 	TypeIDVariant         TypeID = 24
 	TypeIDDiagnosticInfo  TypeID = 25
 )
+
+// SecurityPolicyURI is a listing of UA security policy URIs
+// Specification: Part 7, 6.6.161-166
+
+const (
+	SecurityPolicyURIPrefix              = "http://opcfoundation.org/UA/SecurityPolicy#"
+	SecurityPolicyURINone                = "http://opcfoundation.org/UA/SecurityPolicy#None"
+	SecurityPolicyURIBasic128Rsa15       = "http://opcfoundation.org/UA/SecurityPolicy#Basic128Rsa15"
+	SecurityPolicyURIBasic256            = "http://opcfoundation.org/UA/SecurityPolicy#Basic256"
+	SecurityPolicyURIBasic256Sha256      = "http://opcfoundation.org/UA/SecurityPolicy#Basic256Sha256"
+	SecurityPolicyURIAes128Sha256RsaOaep = "http://opcfoundation.org/UA/SecurityPolicy#Aes128_Sha256_RsaOaep"
+	SecurityPolicyURIAes256Sha256RsaPss  = "http://opcfoundation.org/UA/SecurityPolicy#Aes256_Sha256_RsaPss"
+)

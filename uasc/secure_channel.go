@@ -69,7 +69,7 @@ func NewSecureChannel(endpoint string, c *uacp.Conn, cfg *Config) (*SecureChanne
 		return nil, fmt.Errorf("no secure channel config")
 	}
 
-	if cfg.SecurityPolicyURI != uapolicy.SecurityPolicyNone {
+	if cfg.SecurityPolicyURI != ua.SecurityPolicyURINone {
 		if cfg.SecurityMode == ua.MessageSecurityModeNone {
 			return nil, fmt.Errorf("invalid channel config: Security policy '%s' cannot be used with '%s'", cfg.SecurityPolicyURI, cfg.SecurityMode)
 		}
@@ -79,7 +79,7 @@ func NewSecureChannel(endpoint string, c *uacp.Conn, cfg *Config) (*SecureChanne
 	}
 
 	// Force the security mode to None if the policy is also None
-	if cfg.SecurityPolicyURI == uapolicy.SecurityPolicyNone {
+	if cfg.SecurityPolicyURI == ua.SecurityPolicyURINone {
 		cfg.SecurityMode = ua.MessageSecurityModeNone
 	}
 

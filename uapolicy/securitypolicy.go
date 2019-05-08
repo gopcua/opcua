@@ -12,16 +12,8 @@ import (
 	"errors"
 	"fmt"
 	"sort"
-)
 
-const (
-	SecurityPolicyURL                 = "http://opcfoundation.org/UA/SecurityPolicy#"
-	SecurityPolicyNone                = "http://opcfoundation.org/UA/SecurityPolicy#None"
-	SecurityPolicyBasic128Rsa15       = "http://opcfoundation.org/UA/SecurityPolicy#Basic128Rsa15"
-	SecurityPolicyBasic256            = "http://opcfoundation.org/UA/SecurityPolicy#Basic256"
-	SecurityPolicyBasic256Sha256      = "http://opcfoundation.org/UA/SecurityPolicy#Basic256Sha256"
-	SecurityPolicyAes128Sha256RsaOaep = "http://opcfoundation.org/UA/SecurityPolicy#Aes128_Sha256_RsaOaep"
-	SecurityPolicyAes256Sha256RsaPss  = "http://opcfoundation.org/UA/SecurityPolicy#Aes256_Sha256_RsaPss"
+	"github.com/gopcua/opcua/ua"
 )
 
 // SupportedPolicies returns all supported Security Policies
@@ -42,21 +34,21 @@ func Asymmetric(uri string, localKey *rsa.PrivateKey, remoteKey *rsa.PublicKey) 
 		return nil, fmt.Errorf("unsupported security policy %s", uri)
 	}
 
-	if uri != SecurityPolicyNone && (localKey == nil || remoteKey == nil) {
+	if uri != ua.SecurityPolicyURINone && (localKey == nil || remoteKey == nil) {
 		return nil, errors.New("invalid asymmetric security policy config: both keys required")
 	}
 
 	return p.asymmetric(localKey, remoteKey)
 }
 
-// Symmetrics returns the symmetric encryption algorithm for the given security policy.
+// Symmetric returns the symmetric encryption algorithm for the given security policy.
 func Symmetric(uri string, localNonce, remoteNonce []byte) (*EncryptionAlgorithm, error) {
 	p, ok := policies[uri]
 	if !ok {
 		return nil, fmt.Errorf("unsupported security policy %s", uri)
 	}
 
-	if uri != SecurityPolicyNone && (localNonce == nil || remoteNonce == nil) {
+	if uri != ua.SecurityPolicyURINone && (localNonce == nil || remoteNonce == nil) {
 		return nil, errors.New("invalid symmetric security policy config: both nonces required")
 	}
 
@@ -165,12 +157,12 @@ func (e *EncryptionAlgorithm) SignatureURI() string {
 }
 
 var policies = map[string]policy{
-	SecurityPolicyNone:                {newNoneAsymmetric, newNoneSymmetric},
-	SecurityPolicyBasic128Rsa15:       {newBasic128Rsa15Asymmetric, newBasic128Rsa15Symmetric},
-	SecurityPolicyBasic256:            {newBasic256Asymmetric, newBasic256Symmetric},
-	SecurityPolicyBasic256Sha256:      {newBasic256Rsa256Asymmetric, newBasic256Rsa256Symmetric},
-	SecurityPolicyAes128Sha256RsaOaep: {newAes128Sha256RsaOaepAsymmetric, newAes128Sha256RsaOaepSymmetric},
-	SecurityPolicyAes256Sha256RsaPss:  {newAes256Sha256RsaPssAsymmetric, newAes256Sha256RsaPssSymmetric},
+	ua.SecurityPolicyURINone:                {newNoneAsymmetric, newNoneSymmetric},
+	ua.SecurityPolicyURIBasic128Rsa15:       {newBasic128Rsa15Asymmetric, newBasic128Rsa15Symmetric},
+	ua.SecurityPolicyURIBasic256:            {newBasic256Asymmetric, newBasic256Symmetric},
+	ua.SecurityPolicyURIBasic256Sha256:      {newBasic256Rsa256Asymmetric, newBasic256Rsa256Symmetric},
+	ua.SecurityPolicyURIAes128Sha256RsaOaep: {newAes128Sha256RsaOaepAsymmetric, newAes128Sha256RsaOaepSymmetric},
+	ua.SecurityPolicyURIAes256Sha256RsaPss:  {newAes256Sha256RsaPssAsymmetric, newAes256Sha256RsaPssSymmetric},
 }
 
 type policy struct {

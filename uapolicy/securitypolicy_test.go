@@ -13,6 +13,8 @@ import (
 	"testing"
 
 	"github.com/pascaldekloe/goe/verify"
+
+	"github.com/gopcua/opcua/ua"
 )
 
 func TestSupportedPolicies(t *testing.T) {
@@ -140,7 +142,7 @@ func TestEncryptionAlgorithms(t *testing.T) {
 
 			nonceLength := localAsymmetric.NonceLength()
 			localNonce, remoteNonce := makeNonce(nonceLength), makeNonce(nonceLength)
-			if nonceLength == 0 && uri != SecurityPolicyNone {
+			if nonceLength == 0 && uri != ua.SecurityPolicyURINone {
 				t.Fatalf("client nonce length zero")
 			}
 
