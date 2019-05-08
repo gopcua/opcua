@@ -165,7 +165,7 @@ func SecurityFromEndpoint(ep *ua.EndpointDescription, authType ua.UserTokenType)
 		}
 
 		if sc.UserIdentityToken == nil {
-			sc.UserIdentityToken = &ua.AnonymousIdentityToken{PolicyID: "Anonymous"}
+			sc.UserIdentityToken = &ua.AnonymousIdentityToken{PolicyID: defaultAnonymousPolicyID}
 			sc.AuthPolicyURI = ua.SecurityPolicyURINone
 		}
 
