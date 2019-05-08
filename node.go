@@ -65,9 +65,15 @@ func (n *Node) Attribute(attrID ua.AttributeID) (*ua.Variant, error) {
 		return nil, err
 	}
 	if len(res.Results) == 0 {
-		return nil, nil
+		// #188: we return StatusBadUnexpectedError because it is unclear, under what
+		// circumstances the server would return no error and no results in the response
+		return nil, ua.StatusBadUnexpectedError
 	}
-	return res.Results[0].Value, nil
+	value := res.Results[0].Value
+	if res.Results[0].Status != ua.StatusOK {
+		return value, res.Results[0].Status
+	}
+	return value, nil
 }
 
 // References retrns all references for the node.
