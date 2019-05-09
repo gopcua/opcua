@@ -18,7 +18,6 @@ import (
 	"github.com/gopcua/opcua"
 	"github.com/gopcua/opcua/debug"
 	"github.com/gopcua/opcua/ua"
-	"github.com/gopcua/opcua/uapolicy"
 
 	"golang.org/x/crypto/ssh/terminal"
 )
@@ -136,11 +135,11 @@ func clientOptsFromFlags(endpoints []*ua.EndpointDescription) []opcua.Option {
 	switch {
 	case *policy == "auto":
 		// set it later
-	case strings.HasPrefix(*policy, uapolicy.SecurityPolicyURL):
+	case strings.HasPrefix(*policy, ua.SecurityPolicyURIPrefix):
 		secPolicy = *policy
 		*policy = ""
 	case *policy == "Basic128Rsa15" || *policy == "Basic256" || *policy == "Basic256Sha256":
-		secPolicy = uapolicy.SecurityPolicyURL + *policy
+		secPolicy = ua.SecurityPolicyURIPrefix + *policy
 		*policy = ""
 	default:
 		log.Fatalf("Invalid security policy: %s", *policy)
@@ -167,9 +166,9 @@ func clientOptsFromFlags(endpoints []*ua.EndpointDescription) []opcua.Option {
 	}
 
 	// Allow input of only one of sec-mode,sec-policy when choosing 'None'
-	if secMode == ua.MessageSecurityModeNone || secPolicy == uapolicy.SecurityPolicyNone {
+	if secMode == ua.MessageSecurityModeNone || secPolicy == ua.SecurityPolicyURINone {
 		secMode = ua.MessageSecurityModeNone
-		secPolicy = uapolicy.SecurityPolicyNone
+		secPolicy = ua.SecurityPolicyURINone
 	}
 
 	// Find the best endpoint based on our input and server recommendation (highest SecurityMode+SecurityLevel)

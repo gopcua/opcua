@@ -69,7 +69,7 @@ func NewSecureChannel(endpoint string, c *uacp.Conn, cfg *Config) (*SecureChanne
 		return nil, fmt.Errorf("no secure channel config")
 	}
 
-	if cfg.SecurityPolicyURI != uapolicy.SecurityPolicyNone {
+	if cfg.SecurityPolicyURI != ua.SecurityPolicyURINone {
 		if cfg.SecurityMode == ua.MessageSecurityModeNone {
 			return nil, fmt.Errorf("invalid channel config: Security policy '%s' cannot be used with '%s'", cfg.SecurityPolicyURI, cfg.SecurityMode)
 		}
@@ -79,7 +79,7 @@ func NewSecureChannel(endpoint string, c *uacp.Conn, cfg *Config) (*SecureChanne
 	}
 
 	// Force the security mode to None if the policy is also None
-	if cfg.SecurityPolicyURI == uapolicy.SecurityPolicyNone {
+	if cfg.SecurityPolicyURI == ua.SecurityPolicyURINone {
 		cfg.SecurityMode = ua.MessageSecurityModeNone
 	}
 
@@ -228,6 +228,10 @@ func (s *SecureChannel) SendAsync(svc interface{}, authToken *ua.NodeID) (resp c
 	if authToken == nil {
 		authToken = ua.NewTwoByteNodeID(0)
 	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	// the request header is always the first field
 	val := reflect.ValueOf(svc)
 	val.Elem().Field(0).Set(reflect.ValueOf(s.reqhdr))
@@ -263,9 +267,9 @@ func (s *SecureChannel) SendAsync(svc interface{}, authToken *ua.NodeID) (resp c
 
 	// register the handler
 	resp = make(chan Response)
-	s.mu.Lock()
+	// s.mu.Lock()
 	s.handler[reqid] = resp
-	s.mu.Unlock()
+	//s.mu.Unlock()
 	return resp, nil
 }
 
