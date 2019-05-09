@@ -58,8 +58,10 @@ type Client struct {
 //
 // With no opts given, it uses default configuration(=parameters inside packets) that is defined
 // in DefaultClientConfig() and DefaultSessionConfig() functions, except for UserIdentityToken.
-// For UserIdentityToken, anonymous authentication with PolicyID="Anonymous" is hard-coded in
-// NewClient.
+//
+// UserIdentityToken with anonymous authentication will automatically be set if it is not
+// provided explicitly as opts in NewClient before creating session. See #Client.CreateSession
+// for detailed default behavior.
 //
 // To modify configuration(including UserIdentityToken), give any number of Option as opts.
 // The opts follows the "functional options" way. For pre-defined options, see #Option section.
@@ -154,7 +156,12 @@ type Session struct {
 
 // CreateSession creates a new session which is not yet activated and not
 // associated with the client. Call ActivateSession to both activate and
-// associate the session with the client
+// associate the session with the client.
+//
+// If no UserIdentityToken is given explicitly before calling CreateSesion,
+// it automatically sets anonymous identity token with the same PolicyID
+// that the server sent in Create Session Response. The default PolicyID
+// "Anonymous" wii be set if it's missing in response.
 //
 // See Part 4, 5.6.2
 func (c *Client) CreateSession(cfg *uasc.SessionConfig) (*Session, error) {
