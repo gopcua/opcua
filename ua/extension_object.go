@@ -76,6 +76,10 @@ func (e *ExtensionObject) Decode(b []byte) (int, error) {
 		e.Value = new(ServerStatusDataType)
 	case id.DataChangeNotification_Encoding_DefaultBinary:
 		e.Value = new(DataChangeNotification)
+	case id.ReadRawModifiedDetails_Encoding_DefaultBinary:
+		e.Value = new(ReadRawModifiedDetails)
+	case id.HistoryData_Encoding_DefaultBinary:
+		e.Value = new(HistoryData)
 	default:
 		return buf.Pos(), fmt.Errorf("invalid extension object 0x%x", e.TypeID.NodeID.IntID())
 	}
