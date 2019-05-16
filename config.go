@@ -117,7 +117,7 @@ func PrivateKey(key *rsa.PrivateKey) Option {
 }
 
 // Certificate sets the client X509 certificate in the secure channel configuration
-// and also detects and sets the ApplicationURI from the URI within the certificate
+// and also detects and sets the ApplicationURI from the URI within the certificate.
 func Certificate(cert []byte) Option {
 	return func(c *uasc.Config, sc *uasc.SessionConfig) {
 		c.Certificate = cert
@@ -143,7 +143,6 @@ func SecurityFromEndpoint(ep *ua.EndpointDescription, authType ua.UserTokenType)
 		c.Thumbprint = uapolicy.Thumbprint(ep.ServerCertificate)
 
 		for _, t := range ep.UserIdentityTokens {
-
 			if t.TokenType == authType {
 				if sc.UserIdentityToken == nil {
 
@@ -158,7 +157,8 @@ func SecurityFromEndpoint(ep *ua.EndpointDescription, authType ua.UserTokenType)
 						sc.UserIdentityToken = &ua.IssuedIdentityToken{}
 					}
 				}
-				// todo: this feels wrong; should this be an interface with a .SetPolicyID() method?
+
+				// todo(dw): this feels wrong; should this be an interface with a .SetPolicyID() method?
 				reflect.ValueOf(sc.UserIdentityToken).Elem().FieldByName("PolicyID").SetString(t.PolicyID)
 				sc.AuthPolicyURI = t.SecurityPolicyURI
 
@@ -170,7 +170,6 @@ func SecurityFromEndpoint(ep *ua.EndpointDescription, authType ua.UserTokenType)
 			sc.UserIdentityToken = &ua.AnonymousIdentityToken{PolicyID: defaultAnonymousPolicyID}
 			sc.AuthPolicyURI = ua.SecurityPolicyURINone
 		}
-
 	}
 }
 
@@ -184,6 +183,7 @@ func AuthPolicyID(policy string) Option {
 			return
 		}
 
+		// todo(dw): this feels wrong; should this be an interface with a .SetPolicyID() method?
 		reflect.ValueOf(sc.UserIdentityToken).Elem().FieldByName("PolicyID").SetString(policy)
 	}
 }
@@ -202,7 +202,6 @@ func AuthAnonymous() Option {
 			log.Printf("non-anonymous authentication already configured, ignoring")
 			return
 		}
-
 	}
 }
 
@@ -260,7 +259,7 @@ func AuthIssuedToken(tokenData []byte) Option {
 			return
 		}
 
-		// todo : not correct; need to read spec
+		// todo(dw): not correct; need to read spec
 		t.TokenData = tokenData
 	}
 }

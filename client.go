@@ -56,15 +56,13 @@ type Client struct {
 
 // NewClient creates a new Client.
 //
-// With no opts given, it uses default configuration(=parameters inside packets) that is defined
-// in DefaultClientConfig() and DefaultSessionConfig() functions, except for UserIdentityToken.
+// When no options are provided the new client is created from
+// DefaultClientConfig() and DefaultSessionConfig(). If no authentication method
+// is confiugred a UserIdentityToken for anonymous authentication will be set.
+// See #Client.CreateSession for details.
 //
-// UserIdentityToken with anonymous authentication will automatically be set if it is not
-// provided explicitly as opts in NewClient before creating session. See #Client.CreateSession
-// for detailed default behavior.
-//
-// To modify configuration(including UserIdentityToken), give any number of Option as opts.
-// The opts follows the "functional options" way. For pre-defined options, see #Option section.
+// To modify configuration you can provide any number of Options as opts. See
+// #Option for details.
 //
 // https://godoc.org/github.com/gopcua/opcua#Option
 func NewClient(endpoint string, opts ...Option) *Client {
