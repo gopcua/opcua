@@ -54,6 +54,17 @@ type Client struct {
 	once sync.Once
 }
 
+// NewClient creates a new Client.
+//
+// When no options are provided the new client is created from
+// DefaultClientConfig() and DefaultSessionConfig(). If no authentication method
+// is confiugred a UserIdentityToken for anonymous authentication will be set.
+// See #Client.CreateSession for details.
+//
+// To modify configuration you can provide any number of Options as opts. See
+// #Option for details.
+//
+// https://godoc.org/github.com/gopcua/opcua#Option
 func NewClient(endpoint string, opts ...Option) *Client {
 	c := &Client{
 		endpointURL: endpoint,
@@ -143,7 +154,12 @@ type Session struct {
 
 // CreateSession creates a new session which is not yet activated and not
 // associated with the client. Call ActivateSession to both activate and
-// associate the session with the client
+// associate the session with the client.
+//
+// If no UserIdentityToken is given explicitly before calling CreateSesion,
+// it automatically sets anonymous identity token with the same PolicyID
+// that the server sent in Create Session Response. The default PolicyID
+// "Anonymous" wii be set if it's missing in response.
 //
 // See Part 4, 5.6.2
 func (c *Client) CreateSession(cfg *uasc.SessionConfig) (*Session, error) {
