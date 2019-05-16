@@ -26,12 +26,12 @@ func main() {
 	defer c.Close()
 
 	v, err := c.Node(ua.NewNumericNodeID(0, 2258)).Value()
-	if err != nil {
+	switch {
+	case err != nil:
 		log.Fatal(err)
-	}
-	if v != nil {
-		log.Print(v.Value)
-	} else {
+	case v == nil:
 		log.Print("v == nil")
+	default:
+		log.Print(v.Value)
 	}
 }
