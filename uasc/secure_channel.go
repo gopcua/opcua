@@ -297,15 +297,11 @@ func (s *SecureChannel) readchunk() (*MessageChunk, error) {
 		return nil, fmt.Errorf("sechan: secure channel id mismatch: got 0x%04x, want 0x%04x", h.SecureChannelID, s.cfg.SecureChannelID)
 	}
 
-	// todo(fs): check for ERRF here
-
 	// decode the other headers
 	m := new(MessageChunk)
 	if _, err := m.Decode(b); err != nil {
 		return nil, fmt.Errorf("sechan: decode chunk failed: %s", err)
 	}
-
-	// todo(fs): check for MSGA here
 
 	// decrypt the block
 	m.Data, err = s.verifyAndDecrypt(m, b)
@@ -358,10 +354,23 @@ func (s *SecureChannel) recv() {
 			reqid := chunk.SequenceHeader.RequestID
 			debug.Printf("conn %d/%d: recv %s%c with %d bytes", s.c.ID(), reqid, hdr.MessageType, hdr.ChunkType, hdr.MessageSize)
 
-			if hdr.ChunkType != 'F' {
+			switch hdr.ChunkType {
+			case 'A':
+				delete(chunks, reqid)
+
+				msga := new(MessageAbort)
+				if _, err := msga.Decode(chunk.Data); err != nil {
+					debug.Printf("conn %d/%d: invalid MSGA chunk. %s", s.c.ID(), reqid, err)
+					s.notifyCaller(reqid, nil, ua.StatusBadDecodingError)
+					continue
+				}
+
+				s.notifyCaller(reqid, nil, ua.StatusCode(msga.ErrorCode))
+				continue
+
+			case 'C':
 				chunks[reqid] = append(chunks[reqid], chunk)
 				if n := len(chunks[reqid]); uint32(n) > s.c.MaxChunkCount() {
-					// todo(fs): send error
 					delete(chunks, reqid)
 					s.notifyCaller(reqid, nil, fmt.Errorf("too many chunks: %d > %d", n, s.c.MaxChunkCount()))
 				}
@@ -373,13 +382,11 @@ func (s *SecureChannel) recv() {
 			delete(chunks, reqid)
 			b, err := mergeChunks(all)
 			if err != nil {
-				// todo(fs): send error
 				s.notifyCaller(reqid, nil, fmt.Errorf("chunk merge error: %v", err))
 				continue
 			}
 
 			if uint32(len(b)) > s.c.MaxMessageSize() {
-				// todo(fs): send error
 				s.notifyCaller(reqid, nil, fmt.Errorf("message too large: %d > %d", uint32(len(b)), s.c.MaxMessageSize()))
 				continue
 			}
