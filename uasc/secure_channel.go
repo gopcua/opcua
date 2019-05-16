@@ -230,34 +230,31 @@ func (s *SecureChannel) SendAsync(svc interface{}, authToken *ua.NodeID) (resp c
 	}
 
 	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	// the request header is always the first field
 	val := reflect.ValueOf(svc)
 	val.Elem().Field(0).Set(reflect.ValueOf(s.reqhdr))
-	// update counters and reset them on error
+	// update counters
 	s.cfg.SequenceNumber++
+	s.cfg.RequestID++
 	s.reqhdr.AuthenticationToken = authToken
 	s.reqhdr.RequestHandle++
 	s.reqhdr.Timestamp = time.Now()
-	defer func() {
-		if err != nil {
-			s.cfg.SequenceNumber--
-			s.reqhdr.RequestHandle--
-		}
-	}()
 
 	// encode the message
 	m := NewMessage(svc, typeID, s.cfg)
+	reqid := m.SequenceHeader.RequestID
+	s.mu.Unlock()
 	b, err := m.Encode()
 	if err != nil {
 		return nil, err
 	}
-	reqid := m.SequenceHeader.RequestID
 
 	// encrypt the message prior to sending it
 	// if SecurityMode == None, this returns the byte stream untouched
 	b, err = s.signAndEncrypt(m, b)
+	if err != nil {
+		return nil, err
+	}
 
 	// send the message
 	if _, err := s.c.Write(b); err != nil {
@@ -267,9 +264,12 @@ func (s *SecureChannel) SendAsync(svc interface{}, authToken *ua.NodeID) (resp c
 
 	// register the handler
 	resp = make(chan Response)
-	// s.mu.Lock()
+	s.mu.Lock()
+	if s.handler[reqid] != nil {
+		return nil, fmt.Errorf("error: duplicate handler registration for request id %d", reqid)
+	}
 	s.handler[reqid] = resp
-	//s.mu.Unlock()
+	s.mu.Unlock()
 	return resp, nil
 }
 
