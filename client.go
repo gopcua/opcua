@@ -248,8 +248,9 @@ func (c *Client) ActivateSession(s *Session) error {
 		return nil
 	}
 
-	switch s.cfg.UserIdentityToken.(type) {
+	switch tok := s.cfg.UserIdentityToken.(type) {
 	case *ua.AnonymousIdentityToken:
+		// nothing to do
 
 	case *ua.UserNameIdentityToken:
 		pass, passAlg, err := c.sechan.EncryptUserPassword(s.cfg.AuthPolicyURI, s.cfg.AuthPassword, s.serverCertificate, s.serverNonce)
@@ -257,8 +258,8 @@ func (c *Client) ActivateSession(s *Session) error {
 			log.Printf("error encrypting user password: %s", err)
 			return err
 		}
-		s.cfg.UserIdentityToken.(*ua.UserNameIdentityToken).Password = pass
-		s.cfg.UserIdentityToken.(*ua.UserNameIdentityToken).EncryptionAlgorithm = passAlg
+		tok.Password = pass
+		tok.EncryptionAlgorithm = passAlg
 
 	case *ua.X509IdentityToken:
 		tokSig, tokSigAlg, err := c.sechan.NewUserTokenSignature(s.cfg.AuthPolicyURI, s.serverCertificate, s.serverNonce)
@@ -272,7 +273,7 @@ func (c *Client) ActivateSession(s *Session) error {
 		}
 
 	case *ua.IssuedIdentityToken:
-		s.cfg.UserIdentityToken.(*ua.IssuedIdentityToken).EncryptionAlgorithm = ""
+		tok.EncryptionAlgorithm = ""
 	}
 
 	req := &ua.ActivateSessionRequest{
