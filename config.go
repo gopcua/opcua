@@ -9,7 +9,6 @@ import (
 	"crypto/x509"
 	"log"
 	"math/rand"
-	"reflect"
 	"time"
 
 	"github.com/gopcua/opcua/ua"
@@ -143,33 +142,45 @@ func SecurityFromEndpoint(ep *ua.EndpointDescription, authType ua.UserTokenType)
 		c.Thumbprint = uapolicy.Thumbprint(ep.ServerCertificate)
 
 		for _, t := range ep.UserIdentityTokens {
-			if t.TokenType == authType {
-				if sc.UserIdentityToken == nil {
-
-					switch authType {
-					case ua.UserTokenTypeAnonymous:
-						sc.UserIdentityToken = &ua.AnonymousIdentityToken{}
-					case ua.UserTokenTypeUserName:
-						sc.UserIdentityToken = &ua.UserNameIdentityToken{}
-					case ua.UserTokenTypeCertificate:
-						sc.UserIdentityToken = &ua.X509IdentityToken{}
-					case ua.UserTokenTypeIssuedToken:
-						sc.UserIdentityToken = &ua.IssuedIdentityToken{}
-					}
-				}
-
-				// todo(dw): this feels wrong; should this be an interface with a .SetPolicyID() method?
-				reflect.ValueOf(sc.UserIdentityToken).Elem().FieldByName("PolicyID").SetString(t.PolicyID)
-				sc.AuthPolicyURI = t.SecurityPolicyURI
-
-				break
+			if t.TokenType != authType {
+				continue
 			}
+
+			if sc.UserIdentityToken == nil {
+				switch authType {
+				case ua.UserTokenTypeAnonymous:
+					sc.UserIdentityToken = &ua.AnonymousIdentityToken{}
+				case ua.UserTokenTypeUserName:
+					sc.UserIdentityToken = &ua.UserNameIdentityToken{}
+				case ua.UserTokenTypeCertificate:
+					sc.UserIdentityToken = &ua.X509IdentityToken{}
+				case ua.UserTokenTypeIssuedToken:
+					sc.UserIdentityToken = &ua.IssuedIdentityToken{}
+				}
+			}
+
+			setPolicyID(sc.UserIdentityToken, t.PolicyID)
+			sc.AuthPolicyURI = t.SecurityPolicyURI
+			return
 		}
 
 		if sc.UserIdentityToken == nil {
 			sc.UserIdentityToken = &ua.AnonymousIdentityToken{PolicyID: defaultAnonymousPolicyID}
 			sc.AuthPolicyURI = ua.SecurityPolicyURINone
 		}
+	}
+}
+
+func setPolicyID(t interface{}, policy string) {
+	switch tok := t.(type) {
+	case *ua.AnonymousIdentityToken:
+		tok.PolicyID = policy
+	case *ua.UserNameIdentityToken:
+		tok.PolicyID = policy
+	case *ua.X509IdentityToken:
+		tok.PolicyID = policy
+	case *ua.IssuedIdentityToken:
+		tok.PolicyID = policy
 	}
 }
 
@@ -182,9 +193,7 @@ func AuthPolicyID(policy string) Option {
 			log.Printf("policy ID needs to be set after the policy type is chosen, no changes made.  Call SecurityFromEndpoint() or an AuthXXX() option first")
 			return
 		}
-
-		// todo(dw): this feels wrong; should this be an interface with a .SetPolicyID() method?
-		reflect.ValueOf(sc.UserIdentityToken).Elem().FieldByName("PolicyID").SetString(policy)
+		setPolicyID(sc.UserIdentityToken, policy)
 	}
 }
 
