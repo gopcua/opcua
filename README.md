@@ -12,6 +12,8 @@
 
 A native Go implementation of the OPC/UA Binary Protocol.
 
+We test with the current and previous Go version, e.g. go1.12 and go1.11.
+
 [![CircleCI](https://circleci.com/gh/gopcua/opcua.svg?style=shield)](https://circleci.com/gh/gopcua/opcua)
 [![GoDoc](https://godoc.org/github.com/gopcua/opcua?status.svg)](https://godoc.org/github.com/gopcua/opcua)
 [![GolangCI](https://golangci.com/badges/github.com/gopcua/opcua.svg)](https://golangci.com/r/github.com/gopcua/opcua)
@@ -20,6 +22,8 @@ A native Go implementation of the OPC/UA Binary Protocol.
 ## Quickstart
 
 ```sh
+# make sure you have go1.11 or higher
+
 # install library
 go get -u github.com/gopcua/opcua
 
