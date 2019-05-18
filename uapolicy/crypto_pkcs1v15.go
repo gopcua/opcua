@@ -8,6 +8,8 @@ import (
 	// Force compilation of required hashing algorithms, although we don't directly use the packages
 	_ "crypto/sha1"
 	_ "crypto/sha256"
+
+	"github.com/gopcua/opcua/ua"
 )
 
 const PKCS1v15MinPadding = 11
@@ -19,6 +21,10 @@ type PKCS1v15 struct {
 }
 
 func (c *PKCS1v15) Decrypt(src []byte) ([]byte, error) {
+	if c.PrivateKey == nil {
+		return nil, ua.StatusBadSecurityChecksFailed
+	}
+
 	rng := rand.Reader
 
 	var plaintext []byte
@@ -47,6 +53,10 @@ func (c *PKCS1v15) Decrypt(src []byte) ([]byte, error) {
 }
 
 func (c *PKCS1v15) Encrypt(src []byte) ([]byte, error) {
+	if c.PublicKey == nil {
+		return nil, ua.StatusBadSecurityChecksFailed
+	}
+
 	rng := rand.Reader
 
 	var ciphertext []byte
@@ -74,6 +84,10 @@ func (c *PKCS1v15) Encrypt(src []byte) ([]byte, error) {
 }
 
 func (s *PKCS1v15) Signature(msg []byte) ([]byte, error) {
+	if s.PrivateKey == nil {
+		return nil, ua.StatusBadSecurityChecksFailed
+	}
+
 	rng := rand.Reader
 
 	h := s.Hash.New()
@@ -86,6 +100,10 @@ func (s *PKCS1v15) Signature(msg []byte) ([]byte, error) {
 }
 
 func (s *PKCS1v15) Verify(msg, signature []byte) error {
+	if s.PublicKey == nil {
+		return ua.StatusBadSecurityChecksFailed
+	}
+
 	h := s.Hash.New()
 	if _, err := h.Write(msg); err != nil {
 		return err
