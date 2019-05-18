@@ -235,6 +235,86 @@ func TestEncryptionAlgorithms(t *testing.T) {
 	}
 }
 
+func TestMissingKey(t *testing.T) {
+	payload := make([]byte, 5000)
+	_, err := rand.Read(payload)
+	if err != nil {
+		t.Fatalf("could not generate random payload")
+	}
+
+	payloadRef := make([]byte, len(payload))
+	copy(payloadRef, payload)
+
+	key, err := generatePrivateKey(2048)
+	if err != nil {
+		t.Fatalf("Unable to generate private key\n")
+	}
+
+	for uri, p := range policies {
+		if uri == ua.SecurityPolicyURINone {
+			continue
+		}
+
+		t.Run(uri, func(t *testing.T) {
+			encryptOnly, err := p.asymmetric(nil, &key.PublicKey)
+			if err != nil {
+				t.Fatalf("failed to create encrypt-only asymmetric algorithms: %s", err)
+			}
+
+			decryptOnly, err := p.asymmetric(key, nil)
+			if err != nil {
+				t.Fatalf("failed to create decrypt-only asymmetric algorithms: %s", err)
+			}
+
+			ciphertext, err := encryptOnly.Encrypt(payload)
+			if err != nil {
+				t.Fatalf("failed to encrypt with encrypt-only policy: %s", err)
+			}
+
+			signature, err := decryptOnly.Signature(payload)
+			if err != nil {
+				t.Fatalf("decrypt-only algorithm failed to generate signature: %s", err)
+			}
+
+			err = encryptOnly.VerifySignature(payload, signature)
+			if err != nil {
+				t.Fatalf("failed to verify signature with encrypt-only algorithm: %s", err)
+			}
+
+			plaintext, err := decryptOnly.Decrypt(ciphertext)
+			if err != nil {
+				t.Fatalf("failed to decrypt with decrypt-only algorithm: %s", err)
+			}
+
+			if got, want := plaintext, payloadRef; !bytes.Equal(got, want) {
+				t.Errorf("decryption failed:\ngot %#v want %#v\n", got, want)
+			}
+
+			_, err = encryptOnly.Decrypt(ciphertext)
+			if err == nil {
+				t.Fatal("encrypt-only algorithm decrypted block without error - should be impossible")
+			}
+
+			_, err = encryptOnly.Signature(payload)
+			if err == nil {
+				t.Fatalf("encrypt-only algorithm generated a signature without error - should be impossible")
+			}
+
+			_, err = decryptOnly.Encrypt(payload)
+			if err == nil {
+				t.Fatal("decrypt-only algorithm encrypted block without error - should be impossible")
+			}
+
+			err = decryptOnly.VerifySignature(payload, signature)
+			if err == nil {
+				t.Fatalf("decrypt-only algorithm verified a signature without error - should be impossible")
+			}
+
+		})
+
+	}
+}
+
 func TestZeroStruct(t *testing.T) {
 	defer func() {
 		if r := recover(); r != nil {

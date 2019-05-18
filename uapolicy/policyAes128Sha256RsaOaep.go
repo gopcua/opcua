@@ -94,15 +94,24 @@ func newAes128Sha256RsaOaepAsymmetric(localKey *rsa.PrivateKey, remoteKey *rsa.P
 		return nil, errors.New(msg)
 	}
 
+	var localKeySize, remoteKeySize int
+	if localKey != nil {
+		localKeySize = localKey.PublicKey.Size()
+	}
+
+	if remoteKey != nil {
+		remoteKeySize = remoteKey.Size()
+	}
+
 	return &EncryptionAlgorithm{
-		blockSize:           remoteKey.Size(),
-		plainttextBlockSize: remoteKey.Size() - RSAOAEPMinPaddingSHA1,
+		blockSize:           remoteKeySize,
+		plainttextBlockSize: remoteKeySize - RSAOAEPMinPaddingSHA1,
 		encrypt:             &RSAOAEP{Hash: crypto.SHA1, PublicKey: remoteKey},    // RSA-OAEP-SHA1
 		decrypt:             &RSAOAEP{Hash: crypto.SHA1, PrivateKey: localKey},    // RSA-OAEP-SHA1
 		signature:           &PKCS1v15{Hash: crypto.SHA256, PrivateKey: localKey}, // RSA-PKCS15-SHA2-256
 		verifySignature:     &PKCS1v15{Hash: crypto.SHA256, PublicKey: remoteKey}, // RSA-PKCS15-SHA2-256
 		nonceLength:         nonceLength,
-		signatureLength:     localKey.PublicKey.Size(),
+		signatureLength:     localKeySize,
 		encryptionURI:       "http://opcfoundation.org/ua/security/rsa-oaep-sha1",
 		signatureURI:        "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256",
 	}, nil

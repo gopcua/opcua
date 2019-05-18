@@ -34,10 +34,6 @@ func Asymmetric(uri string, localKey *rsa.PrivateKey, remoteKey *rsa.PublicKey) 
 		return nil, fmt.Errorf("unsupported security policy %s", uri)
 	}
 
-	if uri != ua.SecurityPolicyURINone && (localKey == nil || remoteKey == nil) {
-		return nil, errors.New("invalid asymmetric security policy config: both keys required")
-	}
-
 	return p.asymmetric(localKey, remoteKey)
 }
 

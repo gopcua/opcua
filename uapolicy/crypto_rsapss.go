@@ -8,6 +8,8 @@ import (
 	// Force compilation of required hashing algorithms, although we don't directly use the packages
 	_ "crypto/sha1"
 	_ "crypto/sha256"
+
+	"github.com/gopcua/opcua/ua"
 )
 
 type RSAPSS struct {
@@ -17,6 +19,10 @@ type RSAPSS struct {
 }
 
 func (s *RSAPSS) Signature(msg []byte) ([]byte, error) {
+	if s.PrivateKey == nil {
+		return nil, ua.StatusBadSecurityChecksFailed
+	}
+
 	rng := rand.Reader
 
 	h := s.Hash.New()
@@ -29,6 +35,10 @@ func (s *RSAPSS) Signature(msg []byte) ([]byte, error) {
 }
 
 func (s *RSAPSS) Verify(msg, signature []byte) error {
+	if s.PublicKey == nil {
+		return ua.StatusBadSecurityChecksFailed
+	}
+
 	h := s.Hash.New()
 	if _, err := h.Write(msg); err != nil {
 		return err
