@@ -594,20 +594,16 @@ func (c *Client) CreateMonitoredItems(subID uint32, ts ua.TimestampsToReturn, it
 
 }
 
-func (c *Client) HistoryReadRawModified(nodes []*ua.HistoryReadValueID, isReadModified bool) (*ua.HistoryReadResponse, error) {
+func (c *Client) HistoryReadRawModified(nodes []*ua.HistoryReadValueID, details *ua.ReadRawModifiedDetails) (*ua.HistoryReadResponse, error) {
 	// Part 4, 5.10.3 HistoryRead
 	req := &ua.HistoryReadRequest{
-		TimestampsToReturn: ua.TimestampsToReturnSource,
+		TimestampsToReturn: ua.TimestampsToReturnBoth,
 		NodesToRead:        nodes,
 		// Part 11, 6.4 HistoryReadDetails parameters
 		HistoryReadDetails: &ua.ExtensionObject{
 			TypeID:       ua.NewFourByteExpandedNodeID(0, id.ReadRawModifiedDetails_Encoding_DefaultBinary),
 			EncodingMask: ua.ExtensionObjectBinary,
-			Value: &ua.ReadRawModifiedDetails{
-				IsReadModified: isReadModified,
-				StartTime:      time.Now().UTC().AddDate(0, -1, 0),
-				EndTime:        time.Now().UTC().AddDate(0, 1, 0),
-			},
+			Value:        details,
 		},
 	}
 
