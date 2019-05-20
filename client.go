@@ -13,6 +13,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/gopcua/opcua/id"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uacp"
 	"github.com/gopcua/opcua/uasc"
@@ -590,4 +591,32 @@ func (c *Client) CreateMonitoredItems(subID uint32, ts ua.TimestampsToReturn, it
 	}
 
 	return respItems, nil
+
+}
+
+func (c *Client) HistoryReadRawModified(nodes []*ua.HistoryReadValueID, details *ua.ReadRawModifiedDetails) (*ua.HistoryReadResponse, error) {
+	// Part 4, 5.10.3 HistoryRead
+	req := &ua.HistoryReadRequest{
+		TimestampsToReturn: ua.TimestampsToReturnBoth,
+		NodesToRead:        nodes,
+		// Part 11, 6.4 HistoryReadDetails parameters
+		HistoryReadDetails: &ua.ExtensionObject{
+			TypeID:       ua.NewFourByteExpandedNodeID(0, id.ReadRawModifiedDetails_Encoding_DefaultBinary),
+			EncodingMask: ua.ExtensionObjectBinary,
+			Value:        details,
+		},
+	}
+
+	data := &ua.HistoryReadResponse{}
+	err := c.Send(req, func(v interface{}) error {
+		res, ok := v.(*ua.HistoryReadResponse)
+		if !ok {
+			return fmt.Errorf("cant parse response")
+		}
+
+		data = res
+		return nil
+	})
+
+	return data, err
 }
