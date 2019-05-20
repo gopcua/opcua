@@ -51,7 +51,11 @@ func main() {
 		// Reset old nodes
 		nodesToRequest = make([]*ua.HistoryReadValueID, 0)
 
-		data, err := c.HistoryReadRawModified(nodes, false)
+		data, err := c.HistoryReadRawModified(nodes, &ua.ReadRawModifiedDetails{
+			IsReadModified: false,
+			StartTime:      time.Now().UTC().AddDate(0, -1, 0),
+			EndTime:        time.Now().UTC().AddDate(0, 1, 0),
+		})
 		if err != nil {
 			log.Printf("HistoryReadRequest error: %s", err)
 			break
