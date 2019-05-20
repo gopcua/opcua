@@ -6,13 +6,11 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"log"
 	"time"
 
 	"github.com/gopcua/opcua"
 	"github.com/gopcua/opcua/debug"
-	"github.com/gopcua/opcua/id"
 	"github.com/gopcua/opcua/ua"
 )
 
@@ -29,20 +27,21 @@ func main() {
 	}
 	defer c.Close()
 
-	node, err := ua.ParseNodeID(*nodeID)
+	id, err := ua.ParseNodeID(*nodeID)
 	if err != nil {
 		log.Fatalf("invalid node id: %v", err)
 	}
 
 	// HistoryRead with ContinuationPoint use
-	nodesToRequest := make([]*ua.HistoryReadValueID, 1)
-	nodesToRequest[0] = &ua.HistoryReadValueID{
-		NodeID:       node,
-		DataEncoding: &ua.QualifiedName{},
+	nodesToRequest := []*ua.HistoryReadValueID{
+		&ua.HistoryReadValueID{
+			NodeID:       id,
+			DataEncoding: &ua.QualifiedName{},
+		},
 	}
 
 	for {
-		if len(nodesToRequest) < 1 {
+		if len(nodesToRequest) == 0 {
 			break
 		}
 
@@ -52,41 +51,13 @@ func main() {
 		// Reset old nodes
 		nodesToRequest = make([]*ua.HistoryReadValueID, 0)
 
-		// Part 4, 5.10.3 HistoryRead
-		req := &ua.HistoryReadRequest{
-			TimestampsToReturn:        ua.TimestampsToReturnSource,
-			ReleaseContinuationPoints: false,
-			NodesToRead:               nodes,
-			// Part 11, 6.4 HistoryReadDetails parameters
-			HistoryReadDetails: &ua.ExtensionObject{
-				TypeID:       ua.NewFourByteExpandedNodeID(0, id.ReadRawModifiedDetails_Encoding_DefaultBinary),
-				EncodingMask: ua.ExtensionObjectBinary,
-				Value: &ua.ReadRawModifiedDetails{
-					IsReadModified:   false,
-					StartTime:        time.Now().UTC().AddDate(0, -1, 0),
-					EndTime:          time.Now().UTC().AddDate(0, 1, 0),
-					NumValuesPerNode: 0,
-					ReturnBounds:     false,
-				},
-			},
-		}
-
-		data := &ua.HistoryReadResponse{}
-		err := c.Send(req, func(v interface{}) error {
-			ok := false
-			if data, ok = v.(*ua.HistoryReadResponse); ok {
-				return nil
-			}
-
-			return fmt.Errorf("cant parse response")
-		})
-
+		data, err := c.HistoryReadRawModified(nodes, false)
 		if err != nil {
 			log.Printf("HistoryReadRequest error: %s", err)
 			break
 		}
 
-		if data == nil || len(data.Results) < 1 {
+		if data == nil || len(data.Results) == 0 {
 			break
 		}
 
@@ -108,7 +79,7 @@ func main() {
 			}
 
 			historyData, ok := result.HistoryData.Value.(*ua.HistoryData)
-			if !ok || historyData == nil || len(historyData.DataValues) < 1 {
+			if !ok || historyData == nil || len(historyData.DataValues) == 0 {
 				continue
 			}
 

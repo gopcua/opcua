@@ -13,6 +13,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/gopcua/opcua/id"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uacp"
 	"github.com/gopcua/opcua/uasc"
@@ -561,4 +562,34 @@ func (c *Client) Publish(notif chan<- PublishNotificationData) {
 			}
 		}
 	}
+}
+
+func (c *Client) HistoryReadRawModified(nodes []*ua.HistoryReadValueID, isReadModified bool) (*ua.HistoryReadResponse, error) {
+	// Part 4, 5.10.3 HistoryRead
+	req := &ua.HistoryReadRequest{
+		TimestampsToReturn: ua.TimestampsToReturnSource,
+		NodesToRead:        nodes,
+		// Part 11, 6.4 HistoryReadDetails parameters
+		HistoryReadDetails: &ua.ExtensionObject{
+			TypeID:       ua.NewFourByteExpandedNodeID(0, id.ReadRawModifiedDetails_Encoding_DefaultBinary),
+			EncodingMask: ua.ExtensionObjectBinary,
+			Value: &ua.ReadRawModifiedDetails{
+				IsReadModified: isReadModified,
+				StartTime:      time.Now().UTC().AddDate(0, -1, 0),
+				EndTime:        time.Now().UTC().AddDate(0, 1, 0),
+			},
+		},
+	}
+
+	data := &ua.HistoryReadResponse{}
+	err := c.Send(req, func(v interface{}) error {
+		ok := false
+		if data, ok = v.(*ua.HistoryReadResponse); ok {
+			return nil
+		}
+
+		return fmt.Errorf("cant parse response")
+	})
+
+	return data, err
 }
