@@ -564,6 +564,36 @@ func (c *Client) Publish(notif chan<- PublishNotificationData) {
 	}
 }
 
+func (c *Client) CreateMonitoredItems(subID uint32, ts ua.TimestampsToReturn, items ...*ua.MonitoredItemCreateRequest) (*ua.CreateMonitoredItemsResponse, error) {
+	if subID == 0 {
+		return nil, fmt.Errorf("subscriptionID is 0")
+	}
+
+	// Part 4, 5.12.2.2 CreateMonitoredItems Service Parameters
+	reqItems := &ua.CreateMonitoredItemsRequest{
+		SubscriptionID:     subID,
+		TimestampsToReturn: ts,
+		ItemsToCreate:      items,
+	}
+
+	respItems := &ua.CreateMonitoredItemsResponse{}
+	err := c.Send(reqItems, func(v interface{}) error {
+		r, ok := v.(*ua.CreateMonitoredItemsResponse)
+		if !ok {
+			return fmt.Errorf("invalid response: %T", v)
+		}
+		respItems = r
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return respItems, nil
+
+}
+
 func (c *Client) HistoryReadRawModified(nodes []*ua.HistoryReadValueID, isReadModified bool) (*ua.HistoryReadResponse, error) {
 	// Part 4, 5.10.3 HistoryRead
 	req := &ua.HistoryReadRequest{

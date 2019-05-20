@@ -83,15 +83,24 @@ func newBasic128Rsa15Asymmetric(localKey *rsa.PrivateKey, remoteKey *rsa.PublicK
 		return nil, errors.New(msg)
 	}
 
+	var localKeySize, remoteKeySize int
+	if localKey != nil {
+		localKeySize = localKey.PublicKey.Size()
+	}
+
+	if remoteKey != nil {
+		remoteKeySize = remoteKey.Size()
+	}
+
 	return &EncryptionAlgorithm{
-		blockSize:           remoteKey.Size(),
-		plainttextBlockSize: remoteKey.Size() - PKCS1v15MinPadding,
+		blockSize:           remoteKeySize,
+		plainttextBlockSize: remoteKeySize - PKCS1v15MinPadding,
 		encrypt:             &PKCS1v15{PublicKey: remoteKey},                    // RSA-SHA15+KWRSA15
 		decrypt:             &PKCS1v15{PrivateKey: localKey},                    // RSA-SHA15+KWRSA15
 		signature:           &PKCS1v15{Hash: crypto.SHA1, PrivateKey: localKey}, // RSA-SHA1
 		verifySignature:     &PKCS1v15{Hash: crypto.SHA1, PublicKey: remoteKey}, // RSA-SHA1
 		nonceLength:         nonceLength,
-		signatureLength:     localKey.PublicKey.Size(),
+		signatureLength:     localKeySize,
 		encryptionURI:       "http://www.w3.org/2001/04/xmlenc#rsa-1_5",
 		signatureURI:        "http://www.w3.org/2000/09/xmldsig#rsa-sha1",
 	}, nil

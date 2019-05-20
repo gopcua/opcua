@@ -8,6 +8,8 @@ import (
 	// Force compilation of required hashing algorithms, although we don't directly use the packages
 	_ "crypto/sha1"
 	_ "crypto/sha256"
+
+	"github.com/gopcua/opcua/ua"
 )
 
 // messageLen = (keyLenBits / 8) - 2*(hashLenBits / 8) - 2
@@ -25,6 +27,10 @@ type RSAOAEP struct {
 }
 
 func (a *RSAOAEP) Decrypt(src []byte) ([]byte, error) {
+	if a.PrivateKey == nil {
+		return nil, ua.StatusBadSecurityChecksFailed
+	}
+
 	rng := rand.Reader
 
 	var plaintext []byte
@@ -53,6 +59,10 @@ func (a *RSAOAEP) Decrypt(src []byte) ([]byte, error) {
 }
 
 func (a *RSAOAEP) Encrypt(src []byte) ([]byte, error) {
+	if a.PublicKey == nil {
+		return nil, ua.StatusBadSecurityChecksFailed
+	}
+
 	rng := rand.Reader
 
 	var ciphertext []byte

@@ -95,16 +95,24 @@ func newBasic256Rsa256Asymmetric(localKey *rsa.PrivateKey, remoteKey *rsa.Public
 		msg := fmt.Sprintf("remote key size should be %d-%d bytes, got %d bytes", minAsymmetricKeyLength, maxAsymmetricKeyLength, remoteKey.Size())
 		return nil, errors.New(msg)
 	}
+	var localKeySize, remoteKeySize int
+	if localKey != nil {
+		localKeySize = localKey.PublicKey.Size()
+	}
+
+	if remoteKey != nil {
+		remoteKeySize = remoteKey.Size()
+	}
 
 	return &EncryptionAlgorithm{
-		blockSize:           remoteKey.Size(),
-		plainttextBlockSize: remoteKey.Size() - RSAOAEPMinPaddingSHA1,
+		blockSize:           remoteKeySize,
+		plainttextBlockSize: remoteKeySize - RSAOAEPMinPaddingSHA1,
 		encrypt:             &RSAOAEP{Hash: crypto.SHA1, PublicKey: remoteKey},    // RSA-OAEP
 		decrypt:             &RSAOAEP{Hash: crypto.SHA1, PrivateKey: localKey},    // RSA-OAEP
 		signature:           &PKCS1v15{Hash: crypto.SHA256, PrivateKey: localKey}, // RSA-PKCS15-SHA2-256
 		verifySignature:     &PKCS1v15{Hash: crypto.SHA256, PublicKey: remoteKey}, // RSA-PKCS15-SHA2-256
 		nonceLength:         nonceLength,
-		signatureLength:     localKey.PublicKey.Size(),
+		signatureLength:     localKeySize,
 		encryptionURI:       "http://www.w3.org/2001/04/xmlenc#rsa-oaep",
 		signatureURI:        "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256",
 	}, nil
