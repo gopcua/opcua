@@ -583,12 +583,13 @@ func (c *Client) HistoryReadRawModified(nodes []*ua.HistoryReadValueID, isReadMo
 
 	data := &ua.HistoryReadResponse{}
 	err := c.Send(req, func(v interface{}) error {
-		ok := false
-		if data, ok = v.(*ua.HistoryReadResponse); ok {
-			return nil
+		res, ok := v.(*ua.HistoryReadResponse)
+		if !ok {
+			return fmt.Errorf("cant parse response")
 		}
 
-		return fmt.Errorf("cant parse response")
+		data = res
+		return nil
 	})
 
 	return data, err
