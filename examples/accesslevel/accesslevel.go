@@ -14,7 +14,10 @@ import (
 )
 
 func main() {
-	endpoint := flag.String("endpoint", "opc.tcp://localhost:4840", "OPC UA Endpoint URL")
+	var (
+		endpoint = flag.String("endpoint", "opc.tcp://localhost:4840", "OPC UA Endpoint URL")
+		nodeID   = flag.String("node", "", "NodeID to read")
+	)
 	flag.BoolVar(&debug.Enable, "debug", false, "enable debug logging")
 	flag.Parse()
 	log.SetFlags(0)
@@ -25,7 +28,25 @@ func main() {
 	}
 	defer c.Close()
 
-	v, err := c.Node(ua.NewNumericNodeID(0, 2258)).Value()
+	id, err := ua.ParseNodeID(*nodeID)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	n := c.Node(id)
+	accessLevel, err := n.AccessLevel()
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Print("AccessLevel: ", accessLevel)
+
+	userAccessLevel, err := n.UserAccessLevel()
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Print("UserAccessLevel: ", userAccessLevel)
+
+	v, err := n.Value()
 	switch {
 	case err != nil:
 		log.Fatal(err)
