@@ -93,7 +93,7 @@ func NewSecureChannel(endpoint string, c *uacp.Conn, cfg *Config) (*SecureChanne
 		reqhdr: &ua.RequestHeader{
 			AuthenticationToken: ua.NewTwoByteNodeID(0),
 			Timestamp:           time.Now(),
-			TimeoutHint:         0xffff,
+			TimeoutHint:         uint32(cfg.RequestTimeout / time.Millisecond),
 			AdditionalHeader:    ua.NewExtensionObject(nil),
 		},
 		state:   secureChannelCreated,
@@ -210,12 +210,15 @@ func (s *SecureChannel) Send(svc interface{}, authToken *ua.NodeID, h func(inter
 		return nil
 	}
 
-	// todo(fs): handle timeout
-	resp := <-ch
-	if resp.Err != nil {
-		return resp.Err
+	select {
+	case resp := <-ch:
+		if resp.Err != nil {
+			return resp.Err
+		}
+		return h(resp.V)
+	case <-time.After(s.cfg.RequestTimeout):
+		return ua.StatusBadTimeout
 	}
-	return h(resp.V)
 }
 
 // SendAsync sends the service request and returns a channel which will receive the

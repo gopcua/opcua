@@ -81,6 +81,10 @@ type Config struct {
 	// Lifetime can also be the revised lifetime, the lifetime of the SecurityToken in milliseconds.
 	// The UTC expiration time for the token may be calculated by adding the lifetime to the createdAt time.
 	Lifetime uint32
+
+	// RequestTimeout is timeout duration for all synchronous requests over SecureChannel.
+	// If the Server doesn't respond within RequestTimeout time, Client returns StatusBadTimeout
+	RequestTimeout time.Duration
 }
 
 // SessionConfig is a set of common configurations used in Session.

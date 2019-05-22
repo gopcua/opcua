@@ -23,6 +23,7 @@ func DefaultClientConfig() *uasc.Config {
 		SecurityPolicyURI: ua.SecurityPolicyURINone,
 		SecurityMode:      ua.MessageSecurityModeNone,
 		Lifetime:          uint32(time.Hour / time.Millisecond),
+		RequestTimeout:    10 * time.Second,
 	}
 }
 
@@ -270,5 +271,12 @@ func AuthIssuedToken(tokenData []byte) Option {
 
 		// todo(dw): not correct; need to read spec
 		t.TokenData = tokenData
+	}
+}
+
+// RequestTimeout sets the timeout for all requests over SecureChannel
+func RequestTimeout(t time.Duration) Option {
+	return func(c *uasc.Config, sc *uasc.SessionConfig) {
+		c.RequestTimeout = t
 	}
 }
