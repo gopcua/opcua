@@ -14,6 +14,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/gopcua/opcua/debug"
 	"github.com/gopcua/opcua/id"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uacp"
@@ -54,13 +55,16 @@ type Client struct {
 
 	// once initializes session
 	once sync.Once
+
+	// map of active subscriptions managed by this client
+	subscriptions map[uint32]Subscription
 }
 
 // NewClient creates a new Client.
 //
 // When no options are provided the new client is created from
 // DefaultClientConfig() and DefaultSessionConfig(). If no authentication method
-// is confiugred a UserIdentityToken for anonymous authentication will be set.
+// is configured, a UserIdentityToken for anonymous authentication will be set.
 // See #Client.CreateSession for details.
 //
 // To modify configuration you can provide any number of Options as opts. See
@@ -69,9 +73,10 @@ type Client struct {
 // https://godoc.org/github.com/gopcua/opcua#Option
 func NewClient(endpoint string, opts ...Option) *Client {
 	c := &Client{
-		endpointURL: endpoint,
-		cfg:         DefaultClientConfig(),
-		sessionCfg:  DefaultSessionConfig(),
+		endpointURL:   endpoint,
+		cfg:           DefaultClientConfig(),
+		sessionCfg:    DefaultSessionConfig(),
+		subscriptions: make(map[uint32]Subscription),
 	}
 	for _, opt := range opts {
 		opt(c.cfg, c.sessionCfg)
@@ -418,26 +423,130 @@ func (c *Client) Browse(req *ua.BrowseRequest) (*ua.BrowseResponse, error) {
 	return res, err
 }
 
-// todo(fs): this is not done yet since we need to be able to register
-// todo(fs): monitored items.
 type Subscription struct {
-	res *ua.CreateSubscriptionResponse
+	SubscriptionID            uint32
+	RevisedPublishingInterval float64
+	RevisedLifetimeCount      uint32
+	RevisedMaxKeepAliveCount  uint32
+	Channel                   chan PublishNotificationData
+	stopPublishLoop           chan<- struct{}
 }
 
-// todo(fs): return subscription object with channel
-func (c *Client) Subscribe(intv time.Duration) (*Subscription, error) {
+type SubscriptionParameters struct {
+	Interval                   time.Duration
+	LifetimeCount              uint32
+	MaxKeepAliveCount          uint32
+	MaxNotificationsPerPublish uint32
+	Priority                   uint8
+	ChannelBufferSize          int
+}
+
+func NewDefaultSubscriptionParameters() *SubscriptionParameters {
+	return &SubscriptionParameters{
+		MaxNotificationsPerPublish: 10000,
+		LifetimeCount:              10000,
+		MaxKeepAliveCount:          3000,
+		Interval:                   100 * time.Millisecond,
+		Priority:                   0,
+		ChannelBufferSize:          0,
+	}
+}
+
+// Subscribe creates a Subscription with given parameters and starts one Publish loop to ensure
+// there is at least one PublishLoop loop per Subscription. Additional Publish loops may be started
+// and managed by clients by calling PublishLoop()
+// see also NewDefaultSubscriptionParameters()
+func (c *Client) Subscribe(params SubscriptionParameters) (*Subscription, error) {
 	req := &ua.CreateSubscriptionRequest{
-		RequestedPublishingInterval: float64(intv / time.Millisecond),
-		RequestedLifetimeCount:      60,
-		RequestedMaxKeepAliveCount:  20,
+		RequestedPublishingInterval: float64(params.Interval / time.Millisecond),
+		RequestedLifetimeCount:      params.LifetimeCount,
+		RequestedMaxKeepAliveCount:  params.MaxKeepAliveCount,
 		PublishingEnabled:           true,
+		MaxNotificationsPerPublish:  params.MaxNotificationsPerPublish,
+		Priority:                    params.Priority,
 	}
 
+	res, err := c.CreateSubscription(req)
+	if err != nil {
+		return nil, err
+	}
+	if res.ResponseHeader.ServiceResult != ua.StatusOK {
+		return nil, res.ResponseHeader.ServiceResult
+	}
+
+	sub := Subscription{
+		res.SubscriptionID,
+		res.RevisedPublishingInterval,
+		res.RevisedLifetimeCount,
+		res.RevisedMaxKeepAliveCount,
+		make(chan PublishNotificationData, params.ChannelBufferSize),
+		c.PublishLoop(),
+	}
+	c.subscriptions[sub.SubscriptionID] = sub
+
+	return &sub, nil
+}
+
+func (c *Client) CreateSubscription(req *ua.CreateSubscriptionRequest) (*ua.CreateSubscriptionResponse, error) {
 	var res *ua.CreateSubscriptionResponse
 	err := c.Send(req, func(v interface{}) error {
 		return safeAssign(v, &res)
 	})
-	return &Subscription{res}, err
+	return res, err
+}
+
+// Unsubscribe() deletes the given Subscription from server and stops the Publish loop that was
+// started by Subscribe()
+func (c *Client) Unsubscribe(sub *Subscription) error {
+	if registeredSub, ok := c.subscriptions[sub.SubscriptionID]; ok {
+		close(registeredSub.stopPublishLoop)
+		delete(c.subscriptions, sub.SubscriptionID)
+	}
+
+	res, err := c.DeleteSubscriptions([]uint32{sub.SubscriptionID})
+	if err != nil {
+		return err
+	}
+	if res.ResponseHeader.ServiceResult != ua.StatusOK {
+		return res.ResponseHeader.ServiceResult
+	}
+
+	return nil
+}
+
+func (c *Client) DeleteSubscriptions(subIds []uint32) (*ua.DeleteSubscriptionsResponse, error) {
+	req := &ua.DeleteSubscriptionsRequest{
+		SubscriptionIDs: subIds,
+	}
+	var res *ua.DeleteSubscriptionsResponse
+	err := c.Send(req, func(v interface{}) error {
+		return safeAssign(v, &res)
+	})
+	return res, err
+}
+
+func NewMonitoredItemCreateRequestWithDefaults(nodeID *ua.NodeID, attributeID ua.AttributeID, clientHandle uint32) *ua.MonitoredItemCreateRequest {
+	if attributeID == 0 {
+		attributeID = ua.AttributeIDValue
+	}
+	readValueID := &ua.ReadValueID{
+		NodeID:       nodeID,
+		AttributeID:  attributeID,
+		DataEncoding: &ua.QualifiedName{},
+	}
+	params := ua.MonitoringParameters{
+		ClientHandle:     clientHandle,
+		DiscardOldest:    true,
+		Filter:           nil,
+		QueueSize:        10,
+		SamplingInterval: 0.0,
+	}
+	createReq := ua.MonitoredItemCreateRequest{
+		ItemToMonitor:       readValueID,
+		MonitoringMode:      ua.MonitoringModeReporting,
+		RequestedParameters: &params,
+	}
+	return &createReq
 }
 
 type PublishNotificationData struct {
@@ -446,88 +555,128 @@ type PublishNotificationData struct {
 	Value          interface{}
 }
 
-func (c *Client) Publish(notif chan<- PublishNotificationData) {
-	// Empty SubscriptionAcknowledgements for first PublishRequest
-	var acks = make([]*ua.SubscriptionAcknowledgement, 0)
+// Publish() sends a single Publish request with given acknowledgements
+func (c *Client) Publish(acks []*ua.SubscriptionAcknowledgement) (*ua.PublishResponse, error) {
+	req := &ua.PublishRequest{
+		SubscriptionAcknowledgements: acks,
+	}
 
-	for {
-		req := &ua.PublishRequest{
-			SubscriptionAcknowledgements: acks,
-		}
+	var res *ua.PublishResponse
+	err := c.Send(req, func(v interface{}) error {
+		return safeAssign(v, &res)
+	})
+	return res, err
 
-		var res *ua.PublishResponse
-		err := c.Send(req, func(v interface{}) error {
-			return safeAssign(v, &res)
-		})
-		if err != nil {
-			notif <- PublishNotificationData{Error: err}
-			continue
-		}
+}
 
-		// Check for errors
-		status := ua.StatusOK
-		for _, res := range res.Results {
-			if res != ua.StatusOK {
-				status = res
-				break
-			}
-		}
+// PublishLoop() starts an infinite loop that sends PublishRequests and delivers received
+// notifications to registered Subscriptions.
+// Returns a channel which can be used to stop the loop
+func (c *Client) PublishLoop() chan<- struct{} {
+	quit := make(chan struct{})
+	go func() {
 
-		if status != ua.StatusOK {
-			notif <- PublishNotificationData{
-				SubscriptionID: res.SubscriptionID,
-				Error:          status,
-			}
-			continue
-		}
+		// Empty SubscriptionAcknowledgements for first PublishRequest
+		var acks = make([]*ua.SubscriptionAcknowledgement, 0)
 
-		// Prepare SubscriptionAcknowledgement for next PublishRequest
-		acks = make([]*ua.SubscriptionAcknowledgement, 0)
-		for _, i := range res.AvailableSequenceNumbers {
-			ack := &ua.SubscriptionAcknowledgement{
-				SubscriptionID: res.SubscriptionID,
-				SequenceNumber: i,
-			}
-			acks = append(acks, ack)
-		}
-
-		if res.NotificationMessage == nil {
-			notif <- PublishNotificationData{
-				SubscriptionID: res.SubscriptionID,
-				Error:          fmt.Errorf("empty NotificationMessage"),
-			}
-			continue
-		}
-
-		// Part 4, 7.21 NotificationMessage
-		for _, data := range res.NotificationMessage.NotificationData {
-			// Part 4, 7.20 NotificationData parameters
-			if data == nil || data.Value == nil {
-				notif <- PublishNotificationData{
-					SubscriptionID: res.SubscriptionID,
-					Error:          fmt.Errorf("missing NotificationData parameter"),
-				}
-				continue
-			}
-
-			switch data.Value.(type) {
-			// Part 4, 7.20.2 DataChangeNotification parameter
-			// Part 4, 7.20.3 EventNotificationList parameter
-			// Part 4, 7.20.4 StatusChangeNotification parameter
-			case *ua.DataChangeNotification,
-				*ua.EventNotificationList,
-				*ua.StatusChangeNotification:
-				notif <- PublishNotificationData{
-					SubscriptionID: res.SubscriptionID,
-					Value:          data.Value,
-				}
-
-			// Error
+		for {
+			select {
+			case <-quit:
+				return
 			default:
-				notif <- PublishNotificationData{
-					SubscriptionID: res.SubscriptionID,
-					Error:          fmt.Errorf("unknown NotificationData parameter: %T", data.Value),
+				res, err := c.Publish(acks)
+				if err != nil {
+					if err == ua.StatusBadTimeout {
+						continue
+					} else if err == ua.StatusBadNoSubscription {
+						// ignore it as probably the cause is that all subscriptions are already deleted,
+						// but the publishing loop is still running and will be stopped shortly
+						continue
+					}
+					errorData := PublishNotificationData{Error: err}
+					// notify all subscriptions of error
+					for _, sub := range c.subscriptions {
+						go func(s Subscription) { s.Channel <- errorData }(sub)
+					}
+					continue
 				}
+				// Prepare SubscriptionAcknowledgement for next PublishRequest
+				acks = make([]*ua.SubscriptionAcknowledgement, 0)
+				for _, i := range res.AvailableSequenceNumbers {
+					ack := &ua.SubscriptionAcknowledgement{
+						SubscriptionID: res.SubscriptionID,
+						SequenceNumber: i,
+					}
+					acks = append(acks, ack)
+				}
+
+				c.notifySubscription(res)
+			}
+		}
+	}()
+	return quit
+}
+
+func (c *Client) notifySubscription(response *ua.PublishResponse) {
+	sub, ok := c.subscriptions[response.SubscriptionID]
+	if !ok {
+		debug.Printf("Unknown subscription: %v", response.SubscriptionID)
+		return
+	}
+
+	// Check for errors
+	status := ua.StatusOK
+	for _, res := range response.Results {
+		if res != ua.StatusOK {
+			status = res
+			break
+		}
+	}
+
+	if status != ua.StatusOK {
+		sub.Channel <- PublishNotificationData{
+			SubscriptionID: response.SubscriptionID,
+			Error:          status,
+		}
+		return
+	}
+
+	if response.NotificationMessage == nil {
+		sub.Channel <- PublishNotificationData{
+			SubscriptionID: response.SubscriptionID,
+			Error:          fmt.Errorf("empty NotificationMessage"),
+		}
+		return
+	}
+
+	// Part 4, 7.21 NotificationMessage
+	for _, data := range response.NotificationMessage.NotificationData {
+		// Part 4, 7.20 NotificationData parameters
+		if data == nil || data.Value == nil {
+			sub.Channel <- PublishNotificationData{
+				SubscriptionID: response.SubscriptionID,
+				Error:          fmt.Errorf("missing NotificationData parameter"),
+			}
+			continue
+		}
+
+		switch data.Value.(type) {
+		// Part 4, 7.20.2 DataChangeNotification parameter
+		// Part 4, 7.20.3 EventNotificationList parameter
+		// Part 4, 7.20.4 StatusChangeNotification parameter
+		case *ua.DataChangeNotification,
+			*ua.EventNotificationList,
+			*ua.StatusChangeNotification:
+			sub.Channel <- PublishNotificationData{
+				SubscriptionID: response.SubscriptionID,
+				Value:          data.Value,
+			}
+
+		// Error
+		default:
+			sub.Channel <- PublishNotificationData{
+				SubscriptionID: response.SubscriptionID,
+				Error:          fmt.Errorf("unknown NotificationData parameter: %T", data.Value),
 			}
 		}
 	}
@@ -535,7 +684,7 @@ func (c *Client) Publish(notif chan<- PublishNotificationData) {
 
 func (c *Client) CreateMonitoredItems(subID uint32, ts ua.TimestampsToReturn, items ...*ua.MonitoredItemCreateRequest) (*ua.CreateMonitoredItemsResponse, error) {
 	if subID == 0 {
-		return nil, fmt.Errorf("invalid subscription id")
+		return nil, ua.StatusBadSubscriptionIDInvalid
 	}
 
 	// Part 4, 5.12.2.2 CreateMonitoredItems Service Parameters
@@ -546,6 +695,18 @@ func (c *Client) CreateMonitoredItems(subID uint32, ts ua.TimestampsToReturn, it
 	}
 
 	var res *ua.CreateMonitoredItemsResponse
+	err := c.Send(req, func(v interface{}) error {
+		return safeAssign(v, &res)
+	})
+	return res, err
+}
+
+func (c *Client) DeleteMonitoredItems(subID uint32, monitoredItemIDs ...uint32) (*ua.DeleteMonitoredItemsResponse, error) {
+	req := &ua.DeleteMonitoredItemsRequest{
+		MonitoredItemIDs: monitoredItemIDs,
+		SubscriptionID:   subID,
+	}
+	var res *ua.DeleteMonitoredItemsResponse
 	err := c.Send(req, func(v interface{}) error {
 		return safeAssign(v, &res)
 	})

@@ -7,10 +7,10 @@ package main
 import (
 	"flag"
 	"log"
+	"time"
 
 	"github.com/gopcua/opcua"
 	"github.com/gopcua/opcua/debug"
-	"github.com/gopcua/opcua/ua"
 )
 
 func main() {
@@ -25,24 +25,7 @@ func main() {
 	}
 	defer c.Close()
 
-	ch := make(chan opcua.PublishNotificationData)
-	go c.Publish(ch)
-
-	for {
-		res := <-ch
-		if res.Error != nil {
-			log.Print(res.Error)
-			continue
-		}
-
-		switch x := res.Value.(type) {
-		case *ua.DataChangeNotification:
-			for _, item := range x.MonitoredItems {
-				data, ok := item.Value.Value.Value.(float64)
-				if ok {
-					log.Printf("%g", data)
-				}
-			}
-		}
-	}
+	ch := c.PublishLoop()
+	<-time.After(5 * time.Second)
+	close(ch)
 }
