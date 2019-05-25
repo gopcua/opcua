@@ -201,7 +201,7 @@ func (s *SecureChannel) closeSecureChannel() error {
 
 // Send sends the service request and calls h with the response.
 func (s *SecureChannel) Send(svc interface{}, authToken *ua.NodeID, h func(interface{}) error) error {
-	ch, err := s.SendAsync(svc, authToken)
+	ch, reqid, err := s.SendAsync(svc, authToken)
 	if err != nil {
 		return err
 	}
@@ -217,16 +217,19 @@ func (s *SecureChannel) Send(svc interface{}, authToken *ua.NodeID, h func(inter
 		}
 		return h(resp.V)
 	case <-time.After(s.cfg.RequestTimeout):
+		s.mu.Lock()
+		s.popHandlerLock(reqid)
+		s.mu.Unlock()
 		return ua.StatusBadTimeout
 	}
 }
 
 // SendAsync sends the service request and returns a channel which will receive the
 // response when it arrives.
-func (s *SecureChannel) SendAsync(svc interface{}, authToken *ua.NodeID) (resp chan Response, err error) {
+func (s *SecureChannel) SendAsync(svc interface{}, authToken *ua.NodeID) (resp chan Response, reqID uint32, err error) {
 	typeID := ua.ServiceTypeID(svc)
 	if typeID == 0 {
-		return nil, fmt.Errorf("unknown service %T. Did you call register?", svc)
+		return nil, 0, fmt.Errorf("unknown service %T. Did you call register?", svc)
 	}
 	if authToken == nil {
 		authToken = ua.NewTwoByteNodeID(0)
@@ -249,19 +252,19 @@ func (s *SecureChannel) SendAsync(svc interface{}, authToken *ua.NodeID) (resp c
 	s.mu.Unlock()
 	b, err := m.Encode()
 	if err != nil {
-		return nil, err
+		return nil, reqid, err
 	}
 
 	// encrypt the message prior to sending it
 	// if SecurityMode == None, this returns the byte stream untouched
 	b, err = s.signAndEncrypt(m, b)
 	if err != nil {
-		return nil, err
+		return nil, reqid, err
 	}
 
 	// send the message
 	if _, err := s.c.Write(b); err != nil {
-		return nil, err
+		return nil, reqid, err
 	}
 	debug.Printf("conn %d/%d: send %T with %d bytes", s.c.ID(), reqid, svc, len(b))
 
@@ -269,11 +272,11 @@ func (s *SecureChannel) SendAsync(svc interface{}, authToken *ua.NodeID) (resp c
 	resp = make(chan Response)
 	s.mu.Lock()
 	if s.handler[reqid] != nil {
-		return nil, fmt.Errorf("error: duplicate handler registration for request id %d", reqid)
+		return nil, reqid, fmt.Errorf("error: duplicate handler registration for request id %d", reqid)
 	}
 	s.handler[reqid] = resp
 	s.mu.Unlock()
-	return resp, nil
+	return resp, reqid, nil
 }
 
 func (s *SecureChannel) readchunk() (*MessageChunk, error) {
@@ -346,7 +349,7 @@ func (s *SecureChannel) recv() {
 			if errf, ok := err.(*uacp.Error); ok {
 				s.notifyCallers(errf)
 				s.Close()
-				return
+				continue
 			}
 			if err != nil {
 				debug.Printf("error received while receiving chunk: %s", err)
@@ -419,7 +422,7 @@ func (s *SecureChannel) recv() {
 				debug.Printf("conn %d/%d: res:%v", s.c.ID(), reqid, hdr.ServiceResult)
 				if hdr.ServiceResult != ua.StatusOK {
 					s.notifyCaller(reqid, svc, hdr.ServiceResult)
-					return
+					continue
 				}
 			}
 			s.notifyCaller(reqid, svc, err)
@@ -453,8 +456,7 @@ func (s *SecureChannel) notifyCallerLock(reqid uint32, svc interface{}, err erro
 	}
 
 	// check if we have a pending request handler for this response.
-	ch := s.handler[reqid]
-	delete(s.handler, reqid)
+	ch := s.popHandlerLock(reqid)
 
 	// no handler -> next response
 	if ch == nil {
@@ -467,6 +469,12 @@ func (s *SecureChannel) notifyCallerLock(reqid uint32, svc interface{}, err erro
 		ch <- Response{svc, err}
 		close(ch)
 	}()
+}
+
+func (s *SecureChannel) popHandlerLock(reqid uint32) chan Response {
+	ch := s.handler[reqid]
+	delete(s.handler, reqid)
+	return ch
 }
 
 func mergeChunks(chunks []*MessageChunk) ([]byte, error) {
