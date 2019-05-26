@@ -13,6 +13,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/gopcua/opcua/debug"
 	"github.com/gopcua/opcua/id"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uacp"
@@ -22,7 +23,7 @@ import (
 // GetEndpoints returns the available endpoint descriptions for the server.
 func GetEndpoints(endpoint string) ([]*ua.EndpointDescription, error) {
 	c := NewClient(endpoint)
-	if err := c.Dial(); err != nil {
+	if err := c.Dial(context.Background()); err != nil {
 		return nil, err
 	}
 	defer c.Close()
@@ -80,11 +81,15 @@ func NewClient(endpoint string, opts ...Option) *Client {
 }
 
 // Connect establishes a secure channel and creates a new session.
-func (c *Client) Connect() (err error) {
+func (c *Client) Connect(ctx context.Context) (err error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
 	if c.sechan != nil {
 		return fmt.Errorf("already connected")
 	}
-	if err := c.Dial(); err != nil {
+	if err := c.Dial(ctx); err != nil {
 		return err
 	}
 	s, err := c.CreateSession(c.sessionCfg)
@@ -100,12 +105,16 @@ func (c *Client) Connect() (err error) {
 }
 
 // Dial establishes a secure channel.
-func (c *Client) Dial() error {
+func (c *Client) Dial(ctx context.Context) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
 	c.once.Do(func() { c.session.Store((*Session)(nil)) })
 	if c.sechan != nil {
 		return fmt.Errorf("secure channel already connected")
 	}
-	conn, err := uacp.Dial(context.Background(), c.endpointURL)
+	conn, err := uacp.Dial(ctx, c.endpointURL)
 	if err != nil {
 		return err
 	}
@@ -114,12 +123,32 @@ func (c *Client) Dial() error {
 		_ = conn.Close()
 		return err
 	}
+	c.sechan = sechan
+	go c.monitorChannel(ctx)
+
 	if err := sechan.Open(); err != nil {
 		_ = conn.Close()
+		c.sechan = nil
 		return err
 	}
-	c.sechan = sechan
+
 	return nil
+}
+
+func (c *Client) monitorChannel(ctx context.Context) error {
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+			msg := c.sechan.Receive(ctx)
+			debug.Printf("Received unsolicited message from server: %T", msg.V)
+			if msg.Err != nil {
+				debug.Printf("Received error: %s", msg.Err)
+				return msg.Err
+			}
+		}
+	}
 }
 
 // Close closes the session and the secure channel.

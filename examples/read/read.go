@@ -5,6 +5,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"log"
 
@@ -23,7 +24,7 @@ func main() {
 	log.SetFlags(0)
 
 	c := opcua.NewClient(*endpoint, opcua.SecurityMode(ua.MessageSecurityModeNone))
-	if err := c.Connect(); err != nil {
+	if err := c.Connect(context.Background()); err != nil {
 		log.Fatal(err)
 	}
 	defer c.Close()
