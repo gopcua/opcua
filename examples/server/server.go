@@ -5,95 +5,93 @@
 package main
 
 import (
+	"bufio"
 	"context"
+	"crypto/rsa"
+	"crypto/tls"
 	"flag"
 	"log"
+	"os"
 
-	"github.com/gopcua/opcua/uacp"
+	"github.com/gopcua/opcua/debug"
+	"github.com/gopcua/opcua/server"
+	"github.com/gopcua/opcua/ua"
+)
+
+var (
+	endpoint = flag.String("endpoint", "opc.tcp://localhost:4840", "OPC UA Endpoint URL")
+	certfile = flag.String("cert", "cert.pem", "Path to certificate file")
+	keyfile  = flag.String("key", "key.pem", "Path to PEM Private Key file")
+	gencert  = flag.Bool("gen-cert", false, "Generate a new certificate")
 )
 
 func main() {
-	var (
-		endpoint = flag.String("endpoint", "opc.tcp://example.com/foo/bar", "OPC UA Endpoint URL")
-	)
+	flag.BoolVar(&debug.Enable, "debug", false, "enable debug logging")
 	flag.Parse()
+	log.SetFlags(0)
 
-	log.Printf("Listening on %s", *endpoint)
-	l, err := uacp.Listen(*endpoint, nil)
-	if err != nil {
-		log.Fatal(err)
+	var opts []server.Option
+
+	opts = append(opts,
+		server.EnableSecurity("None", ua.MessageSecurityModeNone),
+		server.EnableSecurity("Basic128Rsa15", ua.MessageSecurityModeSign),
+		server.EnableSecurity("Basic128Rsa15", ua.MessageSecurityModeSignAndEncrypt),
+		server.EnableSecurity("Basic256", ua.MessageSecurityModeSign),
+		server.EnableSecurity("Basic256", ua.MessageSecurityModeSignAndEncrypt),
+		server.EnableSecurity("Basic256Sha256", ua.MessageSecurityModeSignAndEncrypt),
+		server.EnableSecurity("Basic256Sha256", ua.MessageSecurityModeSign),
+		server.EnableSecurity("Aes128_Sha256_RsaOaep", ua.MessageSecurityModeSign),
+		server.EnableSecurity("Aes128_Sha256_RsaOaep", ua.MessageSecurityModeSignAndEncrypt),
+		server.EnableSecurity("Aes256_Sha256_RsaPss", ua.MessageSecurityModeSign),
+		server.EnableSecurity("Aes256_Sha256_RsaPss", ua.MessageSecurityModeSignAndEncrypt),
+	)
+
+	opts = append(opts,
+		server.EnableAuthMode(ua.UserTokenTypeAnonymous),
+		server.EnableAuthMode(ua.UserTokenTypeUserName),
+		server.EnableAuthMode(ua.UserTokenTypeCertificate),
+		//		server.EnableAuthWithoutEncryption(), // Dangerous and not recommended, shown for illustration only
+	)
+
+	var cert []byte
+	if *gencert || (*certfile != "" && *keyfile != "") {
+		debug.Printf("Loading cert/key from %s/%s", *certfile, *keyfile)
+		c, err := tls.LoadX509KeyPair(*certfile, *keyfile)
+		if err != nil {
+			log.Printf("Failed to load certificate: %s", err)
+		} else {
+			pk, ok := c.PrivateKey.(*rsa.PrivateKey)
+			if !ok {
+				log.Fatalf("Invalid private key")
+			}
+			cert = c.Certificate[0]
+			opts = append(opts, server.PrivateKey(pk), server.Certificate(cert))
+		}
 	}
-	c, err := l.Accept(context.Background())
-	if err != nil {
-		log.Fatal(err)
+
+	s := server.New(*endpoint, opts...)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	if err := s.Start(ctx); err != nil {
+		log.Printf("Error starting server, exiting: %s", err)
 	}
-	defer c.Close()
-	log.Printf("conn %d: connection from %s", c.ID(), c.RemoteAddr())
 
-	// listener, err := uacp.Listen(*endpoint, uint32(*bufsize))
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-	// log.Printf("Started listening on %s.", listener.Endpoint())
+	done := make(chan bool)
+	go func() {
+		reader := bufio.NewReader(os.Stdin)
+		log.Printf("Press 'Enter' to exit...")
+		for {
+			reader.ReadString('\n')
+			done <- true
+			return
+		}
+	}()
 
-	// cfg := uasc.NewServerConfig(
-	// 	"http://opcfoundation.org/UA/SecurityPolicy#None",
-	// 	nil, nil, 1111, services.SecModeNone, 2222, 3600000,
-	// )
-	// for {
-	// 	func() {
-	// 		ctx := context.Background()
-	// 		ctx, cancel := context.WithCancel(ctx)
-	// 		defer cancel()
+	select {
+	case <-done:
+		cancel()
+	}
 
-	// 		conn, err := listener.Accept(ctx)
-	// 		if err != nil {
-	// 			log.Print(err)
-	// 			return
-	// 		}
-	// 		defer func() {
-	// 			conn.Close()
-	// 			log.Println("Successfully closed connection")
-	// 		}()
-	// 		log.Printf("Successfully established connection with %v", conn.RemoteAddr())
-
-	// 		secChan, err := uasc.ListenAndAcceptSecureChannel(ctx, conn, cfg)
-	// 		if err != nil {
-	// 			log.Fatal(err)
-	// 		}
-	// 		defer func() {
-	// 			secChan.Close()
-	// 			log.Printf("Successfully closed secure channel with %v", conn.RemoteAddr())
-	// 		}()
-	// 		log.Printf("Successfully opened secure channel with %v", conn.RemoteAddr())
-
-	// 		sessCfg := uasc.NewServerSessionConfig(secChan)
-	// 		session, err := uasc.ListenAndAcceptSession(ctx, secChan, sessCfg)
-	// 		if err != nil {
-	// 			log.Fatal(err)
-	// 		}
-	// 		defer func() {
-	// 			session.Close()
-	// 			log.Printf("Successfully closed session with %v", conn.RemoteAddr())
-	// 		}()
-	// 		log.Printf("Successfully activated session with %v", conn.RemoteAddr())
-
-	// 		buf := make([]byte, 1024)
-	// 		for {
-	// 			n, err := session.ReadService(buf)
-	// 			if err != nil {
-	// 				log.Printf("Couldn't read UASC: %s", err)
-	// 				continue
-	// 			}
-	// 			log.Printf("Successfully received message: %x\n%s", buf[:n], utils.Wireshark(0, buf[:n]))
-
-	// 			srv, err := services.Decode(buf[:n])
-	// 			if err != nil {
-	// 				log.Printf("Couldn't decode received bytes as Service: %s", err)
-	// 				continue
-	// 			}
-	// 			log.Printf("Successfully decoded as Service: %v", srv)
-	// 		}
-	// 	}()
-	// }
+	log.Printf("Shutting down the server...")
+	s.Shutdown()
 }
