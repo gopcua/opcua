@@ -6,6 +6,7 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"crypto/rsa"
 	"crypto/tls"
 	"flag"
@@ -58,7 +59,7 @@ func main() {
 
 	// Create a Client with the selected options
 	c := opcua.NewClient(*endpoint, opts...)
-	if err := c.Connect(); err != nil {
+	if err := c.Connect(context.Background()); err != nil {
 		log.Fatal(err)
 	}
 	defer c.Close()
@@ -83,7 +84,7 @@ func main() {
 	d := opcua.NewClient(*endpoint, opts...)
 
 	// Create a channel only and do not activate it automatically
-	d.Dial()
+	d.Dial(context.Background())
 	defer d.Close()
 
 	// Activate the previous session on the new channel

@@ -4,11 +4,25 @@
 
 package uapolicy
 
-import "crypto/sha1"
+import (
+	"crypto/rsa"
+	"crypto/sha1"
+	"crypto/x509"
+)
 
 // Thumbprint returns the thumbprint of a DER-encoded certificate
 func Thumbprint(c []byte) []byte {
 	thumbprint := sha1.Sum(c)
 
 	return thumbprint[:]
+}
+
+// PublicKey returns the RSA PublicKey from a DER-encoded certificate
+func PublicKey(c []byte) (*rsa.PublicKey, error) {
+	cert, err := x509.ParseCertificate(c)
+	if err != nil {
+		return nil, err
+	}
+
+	return cert.PublicKey.(*rsa.PublicKey), nil
 }
