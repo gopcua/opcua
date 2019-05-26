@@ -9,6 +9,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"log"
+	"reflect"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -186,12 +187,12 @@ func (c *Client) CreateSession(cfg *uasc.SessionConfig) (*Session, error) {
 	// for the CreateSessionRequest the authToken is always nil.
 	// use c.sechan.Send() to enforce this.
 	err := c.sechan.Send(req, nil, func(v interface{}) error {
-		resp, ok := v.(*ua.CreateSessionResponse)
-		if !ok {
-			return fmt.Errorf("invalid response. Got %T, want CreateSessionResponse", v)
+		var res *ua.CreateSessionResponse
+		if err := safeAssign(v, &res); err != nil {
+			return err
 		}
 
-		err := c.sechan.VerifySessionSignature(resp.ServerCertificate, nonce, resp.ServerSignature.Signature)
+		err := c.sechan.VerifySessionSignature(res.ServerCertificate, nonce, res.ServerSignature.Signature)
 		if err != nil {
 			log.Printf("error verifying session signature: %s", err)
 			return nil
@@ -202,16 +203,16 @@ func (c *Client) CreateSession(cfg *uasc.SessionConfig) (*Session, error) {
 			opt := AuthAnonymous()
 			opt(c.cfg, c.sessionCfg)
 
-			p := anonymousPolicyID(resp.ServerEndpoints)
+			p := anonymousPolicyID(res.ServerEndpoints)
 			opt = AuthPolicyID(p)
 			opt(c.cfg, c.sessionCfg)
 		}
 
 		s = &Session{
 			cfg:               cfg,
-			resp:              resp,
-			serverNonce:       resp.ServerNonce,
-			serverCertificate: resp.ServerCertificate,
+			resp:              res,
+			serverNonce:       res.ServerNonce,
+			serverCertificate: res.ServerCertificate,
 		}
 
 		return nil
@@ -288,13 +289,13 @@ func (c *Client) ActivateSession(s *Session) error {
 		UserTokenSignature:         s.cfg.UserTokenSignature,
 	}
 	return c.sechan.Send(req, s.resp.AuthenticationToken, func(v interface{}) error {
-		resp, ok := v.(*ua.ActivateSessionResponse)
-		if !ok {
-			return fmt.Errorf("invalid response. Got %T, want ActivateSessionResponse", v)
+		var res *ua.ActivateSessionResponse
+		if err := safeAssign(v, &res); err != nil {
+			return err
 		}
 
-		// Save the nonce for the next request
-		s.serverNonce = resp.ServerNonce
+		// save the nonce for the next request
+		s.serverNonce = res.ServerNonce
 
 		if err := c.CloseSession(); err != nil {
 			// try to close the newly created session but report
@@ -324,12 +325,9 @@ func (c *Client) closeSession(s *Session) error {
 		return nil
 	}
 	req := &ua.CloseSessionRequest{DeleteSubscriptions: true}
+	var res *ua.CloseSessionResponse
 	return c.Send(req, func(v interface{}) error {
-		_, ok := v.(*ua.CloseSessionResponse)
-		if !ok {
-			return fmt.Errorf("invalid response. Got %T, want ActivateSessionResponse", v)
-		}
-		return nil
+		return safeAssign(v, &res)
 	})
 }
 
@@ -365,12 +363,7 @@ func (c *Client) GetEndpoints() (*ua.GetEndpointsResponse, error) {
 	}
 	var res *ua.GetEndpointsResponse
 	err := c.Send(req, func(v interface{}) error {
-		r, ok := v.(*ua.GetEndpointsResponse)
-		if !ok {
-			return fmt.Errorf("invalid response: %T", v)
-		}
-		res = r
-		return nil
+		return safeAssign(v, &res)
 	})
 	return res, err
 }
@@ -402,39 +395,25 @@ func (c *Client) Read(req *ua.ReadRequest) (*ua.ReadResponse, error) {
 
 	var res *ua.ReadResponse
 	err := c.Send(req, func(v interface{}) error {
-		r, ok := v.(*ua.ReadResponse)
-		if !ok {
-			return fmt.Errorf("invalid response: %T", v)
-		}
-		res = r
-		return nil
+		return safeAssign(v, &res)
 	})
 	return res, err
 }
 
 // Write executes a synchronous write request.
-func (c *Client) Write(req *ua.WriteRequest) (res *ua.WriteResponse, err error) {
-	err = c.Send(req, func(v interface{}) error {
-		r, ok := v.(*ua.WriteResponse)
-		if !ok {
-			return fmt.Errorf("invalid response: %T", v)
-		}
-		res = r
-		return nil
+func (c *Client) Write(req *ua.WriteRequest) (*ua.WriteResponse, error) {
+	var res *ua.WriteResponse
+	err := c.Send(req, func(v interface{}) error {
+		return safeAssign(v, &res)
 	})
-	return
+	return res, err
 }
 
 // Browse executes a synchronous browse request.
 func (c *Client) Browse(req *ua.BrowseRequest) (*ua.BrowseResponse, error) {
 	var res *ua.BrowseResponse
 	err := c.Send(req, func(v interface{}) error {
-		r, ok := v.(*ua.BrowseResponse)
-		if !ok {
-			return fmt.Errorf("invalid response: %T", v)
-		}
-		res = r
-		return nil
+		return safeAssign(v, &res)
 	})
 	return res, err
 }
@@ -456,12 +435,7 @@ func (c *Client) Subscribe(intv time.Duration) (*Subscription, error) {
 
 	var res *ua.CreateSubscriptionResponse
 	err := c.Send(req, func(v interface{}) error {
-		r, ok := v.(*ua.CreateSubscriptionResponse)
-		if !ok {
-			return fmt.Errorf("invalid response: %T", v)
-		}
-		res = r
-		return nil
+		return safeAssign(v, &res)
 	})
 	return &Subscription{res}, err
 }
@@ -483,12 +457,7 @@ func (c *Client) Publish(notif chan<- PublishNotificationData) {
 
 		var res *ua.PublishResponse
 		err := c.Send(req, func(v interface{}) error {
-			r, ok := v.(*ua.PublishResponse)
-			if !ok {
-				return fmt.Errorf("invalid response: %T", v)
-			}
-			res = r
-			return nil
+			return safeAssign(v, &res)
 		})
 		if err != nil {
 			notif <- PublishNotificationData{Error: err}
@@ -566,32 +535,21 @@ func (c *Client) Publish(notif chan<- PublishNotificationData) {
 
 func (c *Client) CreateMonitoredItems(subID uint32, ts ua.TimestampsToReturn, items ...*ua.MonitoredItemCreateRequest) (*ua.CreateMonitoredItemsResponse, error) {
 	if subID == 0 {
-		return nil, fmt.Errorf("subscriptionID is 0")
+		return nil, fmt.Errorf("invalid subscription id")
 	}
 
 	// Part 4, 5.12.2.2 CreateMonitoredItems Service Parameters
-	reqItems := &ua.CreateMonitoredItemsRequest{
+	req := &ua.CreateMonitoredItemsRequest{
 		SubscriptionID:     subID,
 		TimestampsToReturn: ts,
 		ItemsToCreate:      items,
 	}
 
-	respItems := &ua.CreateMonitoredItemsResponse{}
-	err := c.Send(reqItems, func(v interface{}) error {
-		r, ok := v.(*ua.CreateMonitoredItemsResponse)
-		if !ok {
-			return fmt.Errorf("invalid response: %T", v)
-		}
-		respItems = r
-		return nil
+	var res *ua.CreateMonitoredItemsResponse
+	err := c.Send(req, func(v interface{}) error {
+		return safeAssign(v, &res)
 	})
-
-	if err != nil {
-		return nil, err
-	}
-
-	return respItems, nil
-
+	return res, err
 }
 
 func (c *Client) HistoryReadRawModified(nodes []*ua.HistoryReadValueID, details *ua.ReadRawModifiedDetails) (*ua.HistoryReadResponse, error) {
@@ -607,16 +565,28 @@ func (c *Client) HistoryReadRawModified(nodes []*ua.HistoryReadValueID, details 
 		},
 	}
 
-	data := &ua.HistoryReadResponse{}
+	var res *ua.HistoryReadResponse
 	err := c.Send(req, func(v interface{}) error {
-		res, ok := v.(*ua.HistoryReadResponse)
-		if !ok {
-			return fmt.Errorf("cant parse response")
-		}
-
-		data = res
-		return nil
+		return safeAssign(v, &res)
 	})
+	return res, err
+}
 
-	return data, err
+// safeAssign implements a type-safe assign from T to *T.
+func safeAssign(t, ptrT interface{}) error {
+	if reflect.TypeOf(t) != reflect.TypeOf(ptrT).Elem() {
+		return InvalidResponseTypeError{t, ptrT}
+	}
+
+	// this is *ptrT = t
+	reflect.ValueOf(ptrT).Elem().Set(reflect.ValueOf(t))
+	return nil
+}
+
+type InvalidResponseTypeError struct {
+	got, want interface{}
+}
+
+func (e InvalidResponseTypeError) Error() string {
+	return fmt.Sprintf("invalid response: got %T want %T", e.got, e.want)
 }
