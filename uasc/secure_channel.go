@@ -632,7 +632,11 @@ func (s *SecureChannel) handleOpenSecureChannelRequest(svc interface{}) error {
 		ServerNonce: nonce,
 	}
 
-	s.Send(resp, nil, nil)
+	err = s.Send(resp, nil, nil)
+	if err != nil {
+		return err
+	}
+
 	s.enc, err = uapolicy.Symmetric(s.cfg.SecurityPolicyURI, nonce, req.ClientNonce)
 	if err != nil {
 		return err
