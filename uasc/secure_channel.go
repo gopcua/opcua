@@ -496,12 +496,6 @@ func (s *SecureChannel) notifyCallers(ctx context.Context, err error) {
 	s.mu.Unlock()
 }
 
-func (s *SecureChannel) notifyCaller(ctx context.Context, reqid uint32, svc interface{}, err error) {
-	s.mu.Lock()
-	s.notifyCallerLock(ctx, reqid, svc, err)
-	s.mu.Unlock()
-}
-
 func (s *SecureChannel) notifyCallerLock(ctx context.Context, reqid uint32, svc interface{}, err error) {
 	if err != nil {
 		debug.Printf("uasc %d/%d: %v", s.c.ID(), reqid, err)
