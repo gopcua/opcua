@@ -78,9 +78,8 @@ func (c *channelBroker) RegisterConn(ctx context.Context, conn *uacp.Conn, local
 
 	c.mu.Lock()
 	c.s[secureChannelID] = sc
-	c.mu.Unlock()
-
 	debug.Printf("Registered new channel (id %d) now at %d channels", secureChannelID, len(c.s))
+	c.mu.Unlock()
 	c.wg.Add(1)
 outer:
 	for {
