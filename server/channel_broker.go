@@ -71,9 +71,9 @@ func (c *channelBroker) RegisterConn(ctx context.Context, conn *uacp.Conn, local
 
 	c.mu.Lock()
 	c.s[cfg.SecureChannelID] = sc
+	debug.Printf("Registered new channel (id %d) now at %d channels", c.secureChannelID, len(c.s))
 	c.mu.Unlock()
 
-	debug.Printf("Registered new channel (id %d) now at %d channels", c.secureChannelID, len(c.s))
 	c.wg.Add(1)
 outer:
 	for {
@@ -107,7 +107,7 @@ func (c *channelBroker) CloseAll() error {
 		s.Close()
 	}
 	c.mu.Unlock()
-	
+
 	// Wait for all goroutines to finish or timeout
 	done := make(chan struct{})
 	go func() {
