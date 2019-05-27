@@ -124,7 +124,7 @@ func (s *SecureChannel) Send(svc interface{}, authToken *ua.NodeID, h func(inter
 // SendWithTimeout sends the service request and calls h with the response with a specific timeout.
 func (s *SecureChannel) SendWithTimeout(svc interface{}, authToken *ua.NodeID, timeout time.Duration, h func(interface{}) error) error {
 	ch, reqid, err := s.sendAsyncWithTimeout(svc, authToken, timeout)
-	respRequired := !(h == nil)
+	respRequired := h != nil
 
 	ch, reqid, err := s.SendAsync(svc, authToken, respRequired)
 	if err != nil {
@@ -175,7 +175,7 @@ func (s *SecureChannel) sendAsyncWithTimeout(svc interface{}, authToken *ua.Node
 	rHdr := val.Elem().Field(0)
 	s.cfg.SequenceNumber++
 	if _, ok := rHdr.Interface().(*ua.RequestHeader); ok {
-		val.Elem().Field(0).Set(reflect.ValueOf(s.reqhdr))
+		rHdr.Set(reflect.ValueOf(s.reqhdr))
 
 		s.reqhdr.AuthenticationToken = authToken
 		s.cfg.RequestID++
@@ -330,7 +330,7 @@ func (s *SecureChannel) Receive(ctx context.Context) Response {
 			reqid, svc, err := s.receive(ctx)
 			if _, ok := err.(*uacp.Error); ok || err == io.EOF {
 				// todo: notifyCaller has been deprecated, but how else to purge all pending callbacks?
-				s.notifyCallers(err)
+				s.notifyCallers(ctx, err)
 				s.Close()
 				return Response{
 					ReqID: reqid,
@@ -377,11 +377,15 @@ func (s *SecureChannel) Receive(ctx context.Context) Response {
 			// send response to caller
 			go func() {
 				debug.Printf("sending %T to handler\n", svc)
-				ch <- Response{
+				r := Response{
 					ReqID: reqid,
 					SCID:  s.cfg.SecureChannelID,
 					V:     svc,
 					Err:   err,
+				}
+				select {
+				case <-ctx.Done():
+				case ch <- r:
 				}
 			}()
 		}
@@ -480,25 +484,25 @@ func (s *SecureChannel) receive(ctx context.Context) (uint32, interface{}, error
 	}
 }
 
-func (s *SecureChannel) notifyCallers(err error) {
+func (s *SecureChannel) notifyCallers(ctx context.Context, err error) {
 	s.mu.Lock()
 	var reqids []uint32
 	for id := range s.handler {
 		reqids = append(reqids, id)
 	}
 	for _, id := range reqids {
-		s.notifyCallerLock(id, nil, err)
+		s.notifyCallerLock(ctx, id, nil, err)
 	}
 	s.mu.Unlock()
 }
 
-func (s *SecureChannel) notifyCaller(reqid uint32, svc interface{}, err error) {
+func (s *SecureChannel) notifyCaller(ctx context.Context, reqid uint32, svc interface{}, err error) {
 	s.mu.Lock()
-	s.notifyCallerLock(reqid, svc, err)
+	s.notifyCallerLock(ctx, reqid, svc, err)
 	s.mu.Unlock()
 }
 
-func (s *SecureChannel) notifyCallerLock(reqid uint32, svc interface{}, err error) {
+func (s *SecureChannel) notifyCallerLock(ctx context.Context, reqid uint32, svc interface{}, err error) {
 	if err != nil {
 		debug.Printf("uasc %d/%d: %v", s.c.ID(), reqid, err)
 	} else {
@@ -516,11 +520,15 @@ func (s *SecureChannel) notifyCallerLock(reqid uint32, svc interface{}, err erro
 
 	// send response to caller
 	go func() {
-		ch <- Response{
+		r := Response{
 			ReqID: reqid,
 			SCID:  s.cfg.SecureChannelID,
 			V:     svc,
 			Err:   err,
+		}
+		select {
+		case <-ctx.Done():
+		case ch <- r:
 		}
 		close(ch)
 	}()
