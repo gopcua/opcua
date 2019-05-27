@@ -8,6 +8,7 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"io"
 	"log"
 	"sync"
 	"sync/atomic"
@@ -135,18 +136,24 @@ func (c *Client) Dial(ctx context.Context) error {
 	return nil
 }
 
-func (c *Client) monitorChannel(ctx context.Context) error {
+func (c *Client) monitorChannel(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			return nil
+			return
 		default:
 			msg := c.sechan.Receive(ctx)
-			debug.Printf("Received unsolicited message from server: %T", msg.V)
 			if msg.Err != nil {
-				debug.Printf("Received error: %s", msg.Err)
-				return msg.Err
+				if msg.Err == io.EOF {
+					debug.Printf("Connection closed")
+				} else {
+					debug.Printf("Received error: %s", msg.Err)
+				}
+				// todo (dh): apart from the above message, we're ignoring this error because there is nothing watching it
+				// I'd prefer to have a way to return the error to the upper application.
+				return
 			}
+			debug.Printf("Received unsolicited message from server: %T", msg.V)
 		}
 	}
 }
