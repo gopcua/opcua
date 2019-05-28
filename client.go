@@ -477,23 +477,6 @@ func setDefaultSubscriptionParameters(params *SubscriptionParameters) {
 	}
 }
 
-// Publish() sends a single Publish request with given acknowledgements
-func (c *Client) Publish(acks []*ua.SubscriptionAcknowledgement) (*ua.PublishResponse, error) {
-	if acks == nil {
-		acks = []*ua.SubscriptionAcknowledgement{}
-	}
-	req := &ua.PublishRequest{
-		SubscriptionAcknowledgements: acks,
-	}
-
-	var res *ua.PublishResponse
-	err := c.Send(req, func(v interface{}) error {
-		return safeAssign(v, &res)
-	})
-	return res, err
-
-}
-
 func (c *Client) notifySubscriptions(ctx context.Context, err error) {
 	errorData := PublishNotificationData{Error: err}
 	for _, sub := range c.subscriptions {

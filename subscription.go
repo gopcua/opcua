@@ -101,6 +101,21 @@ func (s *Subscription) Unmonitor(monitoredItemIDs ...uint32) (*ua.DeleteMonitore
 	return res, err
 }
 
+func publishOnce(c *Client, acks []*ua.SubscriptionAcknowledgement) (*ua.PublishResponse, error) {
+	if acks == nil {
+		acks = []*ua.SubscriptionAcknowledgement{}
+	}
+	req := &ua.PublishRequest{
+		SubscriptionAcknowledgements: acks,
+	}
+
+	var res *ua.PublishResponse
+	err := c.Send(req, func(v interface{}) error {
+		return safeAssign(v, &res)
+	})
+	return res, err
+}
+
 // Run() starts an infinite loop that sends PublishRequests and delivers received
 // notifications to registered Subscriptions.
 func (s *Subscription) Run(ctx context.Context) {
@@ -112,7 +127,7 @@ func (s *Subscription) Run(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		default:
-			res, err := s.c.Publish(acks)
+			res, err := publishOnce(s.c, acks)
 			if err != nil {
 				if err == ua.StatusBadTimeout {
 					continue
