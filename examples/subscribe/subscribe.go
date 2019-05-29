@@ -30,7 +30,6 @@ func main() {
 
 	sub, err := c.Subscribe(&opcua.SubscriptionParameters{
 		Interval: 500 * time.Millisecond,
-		Notifs:   make(chan opcua.PublishNotificationData, 37),
 	})
 	if err != nil {
 		log.Fatal(err)
@@ -44,7 +43,8 @@ func main() {
 		log.Fatal(err)
 	}
 
-	ctx, _ := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 
 	go sub.Run(ctx) // start Publish loop
 

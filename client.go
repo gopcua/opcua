@@ -423,9 +423,14 @@ func (c *Client) Browse(req *ua.BrowseRequest) (*ua.BrowseResponse, error) {
 	return res, err
 }
 
-// Subscribe creates a Subscription with given parameters
+// Subscribe creates a Subscription with given parameters. Parameters that have not been set
+// (have zero values) are overwritten with default values.
+// See opcua.DefaultSubscription* constants
 func (c *Client) Subscribe(params *SubscriptionParameters) (*Subscription, error) {
-	setDefaultSubscriptionParameters(params)
+	if params == nil {
+		params = &SubscriptionParameters{}
+	}
+	params.setDefaults()
 	req := &ua.CreateSubscriptionRequest{
 		RequestedPublishingInterval: float64(params.Interval / time.Millisecond),
 		RequestedLifetimeCount:      params.LifetimeCount,
@@ -459,38 +464,15 @@ func (c *Client) Subscribe(params *SubscriptionParameters) (*Subscription, error
 	return &sub, nil
 }
 
-func setDefaultSubscriptionParameters(params *SubscriptionParameters) {
-	if params.MaxNotificationsPerPublish == 0 {
-		params.MaxNotificationsPerPublish = 10000
-	}
-	if params.LifetimeCount == 0 {
-		params.LifetimeCount = 10000
-	}
-	if params.MaxKeepAliveCount == 0 {
-		params.MaxKeepAliveCount = 3000
-	}
-	if params.Interval == 0 {
-		params.Interval = 100 * time.Millisecond
-	}
-	if params.Notifs == nil {
-		params.Notifs = make(chan PublishNotificationData)
-	}
-}
-
 func (c *Client) notifySubscriptions(ctx context.Context, err error) {
-	errorData := PublishNotificationData{Error: err}
 	for _, sub := range c.subscriptions {
 		go func(s Subscription) {
-			select {
-			case <-ctx.Done():
-				return
-			case s.Notifs <- errorData:
-			}
+			s.sendNotification(ctx, &PublishNotificationData{Error: err})
 		}(sub)
 	}
 }
 
-func (c *Client) notifySubscription(response *ua.PublishResponse) {
+func (c *Client) notifySubscription(ctx context.Context, response *ua.PublishResponse) {
 	sub, ok := c.subscriptions[response.SubscriptionID]
 	if !ok {
 		debug.Printf("Unknown subscription: %v", response.SubscriptionID)
@@ -507,18 +489,18 @@ func (c *Client) notifySubscription(response *ua.PublishResponse) {
 	}
 
 	if status != ua.StatusOK {
-		sub.Notifs <- PublishNotificationData{
+		sub.sendNotification(ctx, &PublishNotificationData{
 			SubscriptionID: response.SubscriptionID,
 			Error:          status,
-		}
+		})
 		return
 	}
 
 	if response.NotificationMessage == nil {
-		sub.Notifs <- PublishNotificationData{
+		sub.sendNotification(ctx, &PublishNotificationData{
 			SubscriptionID: response.SubscriptionID,
 			Error:          fmt.Errorf("empty NotificationMessage"),
-		}
+		})
 		return
 	}
 
@@ -526,10 +508,10 @@ func (c *Client) notifySubscription(response *ua.PublishResponse) {
 	for _, data := range response.NotificationMessage.NotificationData {
 		// Part 4, 7.20 NotificationData parameters
 		if data == nil || data.Value == nil {
-			sub.Notifs <- PublishNotificationData{
+			sub.sendNotification(ctx, &PublishNotificationData{
 				SubscriptionID: response.SubscriptionID,
 				Error:          fmt.Errorf("missing NotificationData parameter"),
-			}
+			})
 			continue
 		}
 
@@ -540,17 +522,17 @@ func (c *Client) notifySubscription(response *ua.PublishResponse) {
 		case *ua.DataChangeNotification,
 			*ua.EventNotificationList,
 			*ua.StatusChangeNotification:
-			sub.Notifs <- PublishNotificationData{
+			sub.sendNotification(ctx, &PublishNotificationData{
 				SubscriptionID: response.SubscriptionID,
 				Value:          data.Value,
-			}
+			})
 
 		// Error
 		default:
-			sub.Notifs <- PublishNotificationData{
+			sub.sendNotification(ctx, &PublishNotificationData{
 				SubscriptionID: response.SubscriptionID,
 				Error:          fmt.Errorf("unknown NotificationData parameter: %T", data.Value),
-			}
+			})
 		}
 	}
 }
