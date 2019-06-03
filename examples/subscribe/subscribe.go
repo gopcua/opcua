@@ -7,17 +7,17 @@ package main
 import (
 	"context"
 	"flag"
+	"log"
+	"time"
+
 	"github.com/gopcua/opcua"
 	"github.com/gopcua/opcua/debug"
 	"github.com/gopcua/opcua/ua"
-	"log"
-	"time"
 )
 
 func main() {
 	endpoint := flag.String("endpoint", "opc.tcp://localhost:4840", "OPC UA Endpoint URL")
-	namespace := flag.Uint("namespace", 0, "Namespace id of the node to subscribe to")
-	stringId := flag.String("id", "", "String id of the node to subscribe to")
+	nodeID := flag.String("node", "", "NodeID to subscribe to")
 	flag.BoolVar(&debug.Enable, "debug", false, "enable debug logging")
 	flag.Parse()
 	log.SetFlags(0)
@@ -37,7 +37,12 @@ func main() {
 	defer sub.Cancel()
 	log.Printf("created Subscription with id %v", sub.SubscriptionID)
 
-	miCreateRequest := opcua.NewMonitoredItemCreateRequestWithDefaults(ua.NewStringNodeID(uint16(*namespace), *stringId), ua.AttributeIDValue, 42)
+	id, err := ua.ParseNodeID(*nodeID)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	miCreateRequest := opcua.NewMonitoredItemCreateRequestWithDefaults(id, ua.AttributeIDValue, 42)
 	res, err := sub.Monitor(ua.TimestampsToReturnBoth, miCreateRequest)
 	if err != nil || res.Results[0].StatusCode != ua.StatusOK {
 		log.Fatal(err)

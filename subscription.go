@@ -2,6 +2,7 @@ package opcua
 
 import (
 	"context"
+	"math"
 	"time"
 
 	"github.com/gopcua/opcua/ua"
@@ -109,7 +110,7 @@ func (s *Subscription) Unmonitor(monitoredItemIDs ...uint32) (*ua.DeleteMonitore
 	return res, err
 }
 
-func publishOnce(c *Client, acks []*ua.SubscriptionAcknowledgement) (*ua.PublishResponse, error) {
+func publishOnceForSubscription(s *Subscription, acks []*ua.SubscriptionAcknowledgement) (*ua.PublishResponse, error) {
 	if acks == nil {
 		acks = []*ua.SubscriptionAcknowledgement{}
 	}
@@ -118,45 +119,67 @@ func publishOnce(c *Client, acks []*ua.SubscriptionAcknowledgement) (*ua.Publish
 	}
 
 	var res *ua.PublishResponse
-	err := c.Send(req, func(v interface{}) error {
+	err := s.c.sendWithTimeout(req, s.getPublishTimeout(), func(v interface{}) error {
 		return safeAssign(v, &res)
 	})
 	return res, err
 }
 
+func (s *Subscription) getPublishTimeout() time.Duration {
+	keepaliveIntervalMs := uint64(s.RevisedPublishingInterval) *
+		uint64(s.RevisedMaxKeepAliveCount)
+	if keepaliveIntervalMs > math.MaxUint32 {
+		keepaliveIntervalMs = math.MaxUint32
+	}
+	requestedTimeout := time.Duration(keepaliveIntervalMs) * time.Millisecond
+	if requestedTimeout < s.c.cfg.RequestTimeout {
+		return s.c.cfg.RequestTimeout
+	}
+	return requestedTimeout
+}
+
 // Run() starts an infinite loop that sends PublishRequests and delivers received
 // notifications to registered Subscriptions.
 func (s *Subscription) Run(ctx context.Context) {
-	// Empty SubscriptionAcknowledgements for first PublishRequest
-	var acks = make([]*ua.SubscriptionAcknowledgement, 0)
+	var acks []*ua.SubscriptionAcknowledgement
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		default:
-			res, err := publishOnce(s.c, acks)
+			res, err := publishOnceForSubscription(s, acks)
 			if err != nil {
-				if err == ua.StatusBadTimeout {
-					continue
-				} else if err == ua.StatusBadNoSubscription {
-					// ignore it as probably the cause is that all subscriptions are already deleted,
-					// but the publishing loop is still running and will be stopped shortly
-					continue
+				// StatusBadSequenceNumberUnknown means at least one ack has been submitted repeatedly
+				// Ignore the error. Acks will be cleared below
+				if err == ua.StatusBadSequenceNumberUnknown ||
+					// Ignore StatusBadTimeout. No need to do anything except continue the loop
+					err == ua.StatusBadTimeout ||
+					// Ignore StatusBadNoSubscription as probably the cause is that all subscriptions
+					// are already deleted, but the publishing loop is still running and will be stopped shortly
+					err == ua.StatusBadNoSubscription {
+				} else {
+					s.c.notifySubscriptions(ctx, err)
 				}
-				s.c.notifySubscriptions(ctx, err)
-				continue
 			}
-			// Prepare SubscriptionAcknowledgement for next PublishRequest
-			acks = make([]*ua.SubscriptionAcknowledgement, 0)
-			for _, i := range res.AvailableSequenceNumbers {
-				ack := &ua.SubscriptionAcknowledgement{
-					SubscriptionID: res.SubscriptionID,
-					SequenceNumber: i,
+
+			if res != nil {
+				// Prepare SubscriptionAcknowledgement for next PublishRequest
+				acks = make([]*ua.SubscriptionAcknowledgement, 0)
+				if res.AvailableSequenceNumbers != nil {
+					for _, i := range res.AvailableSequenceNumbers {
+						ack := &ua.SubscriptionAcknowledgement{
+							SubscriptionID: res.SubscriptionID,
+							SequenceNumber: i,
+						}
+						acks = append(acks, ack)
+					}
 				}
-				acks = append(acks, ack)
 			}
-			s.c.notifySubscription(ctx, res)
+
+			if err == nil {
+				s.c.notifySubscription(ctx, res)
+			}
 		}
 	}
 }
