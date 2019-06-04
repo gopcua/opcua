@@ -35,20 +35,25 @@ func main() {
 		log.Fatal(err)
 	}
 	defer sub.Cancel()
-	log.Printf("created Subscription with id %v", sub.SubscriptionID)
+	log.Printf("Created subscription with id %v", sub.SubscriptionID)
 
 	id, err := ua.ParseNodeID(*nodeID)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	miCreateRequest := opcua.NewMonitoredItemCreateRequestWithDefaults(id, ua.AttributeIDValue, 42)
+	// arbitrary client handle for the monitoring item
+	handle := uint32(42)
+	miCreateRequest := opcua.NewMonitoredItemCreateRequestWithDefaults(id, ua.AttributeIDValue, handle)
 	res, err := sub.Monitor(ua.TimestampsToReturnBoth, miCreateRequest)
 	if err != nil || res.Results[0].StatusCode != ua.StatusOK {
 		log.Fatal(err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	// add an arbitrary timeout to demonstrate how to stop a subscription
+	// with a context.
+	d := 30 * time.Second
+	ctx, cancel := context.WithTimeout(context.Background(), d)
 	defer cancel()
 
 	go sub.Run(ctx) // start Publish loop

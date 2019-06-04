@@ -53,11 +53,13 @@ type Client struct {
 	// session is the active session.
 	session atomic.Value // *Session
 
+	// map of active subscriptions managed by this client. key is SubscriptionID
+	// access guarded by subMux
+	subscriptions map[uint32]*Subscription
+	subMux        sync.RWMutex
+
 	// once initializes session
 	once sync.Once
-
-	// map of active subscriptions managed by this client
-	subscriptions map[uint32]Subscription
 }
 
 // NewClient creates a new Client.
@@ -76,7 +78,7 @@ func NewClient(endpoint string, opts ...Option) *Client {
 		endpointURL:   endpoint,
 		cfg:           DefaultClientConfig(),
 		sessionCfg:    DefaultSessionConfig(),
-		subscriptions: make(map[uint32]Subscription),
+		subscriptions: make(map[uint32]*Subscription),
 	}
 	for _, opt := range opts {
 		opt(c.cfg, c.sessionCfg)
@@ -458,29 +460,47 @@ func (c *Client) Subscribe(params *SubscriptionParameters) (*Subscription, error
 		return nil, res.ResponseHeader.ServiceResult
 	}
 
-	sub := Subscription{
+	sub := &Subscription{
 		res.SubscriptionID,
-		res.RevisedPublishingInterval,
+		time.Duration(res.RevisedPublishingInterval) * time.Millisecond,
 		res.RevisedLifetimeCount,
 		res.RevisedMaxKeepAliveCount,
 		params.Notifs,
 		c,
 	}
+	c.subMux.Lock()
 	c.subscriptions[sub.SubscriptionID] = sub
+	c.subMux.Unlock()
 
-	return &sub, nil
+	return sub, nil
 }
 
-func (c *Client) notifySubscriptions(ctx context.Context, err error) {
-	for _, sub := range c.subscriptions {
-		go func(s Subscription) {
+func (c *Client) forgetSubscription(subID uint32) {
+	c.subMux.Lock()
+	delete(c.subscriptions, subID)
+	c.subMux.Unlock()
+}
+
+func (c *Client) notifySubscriptionsOfError(ctx context.Context, res *ua.PublishResponse, err error) {
+	c.subMux.RLock()
+	defer c.subMux.RUnlock()
+	var subsToNotify map[uint32]*Subscription
+	if res != nil && res.SubscriptionID != 0 {
+		subsToNotify = map[uint32]*Subscription{res.SubscriptionID: c.subscriptions[res.SubscriptionID]}
+	} else {
+		subsToNotify = c.subscriptions
+	}
+	for _, sub := range subsToNotify {
+		go func(s *Subscription) {
 			s.sendNotification(ctx, &PublishNotificationData{Error: err})
 		}(sub)
 	}
 }
 
 func (c *Client) notifySubscription(ctx context.Context, response *ua.PublishResponse) {
+	c.subMux.RLock()
 	sub, ok := c.subscriptions[response.SubscriptionID]
+	c.subMux.RUnlock()
 	if !ok {
 		debug.Printf("Unknown subscription: %v", response.SubscriptionID)
 		return

@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"reflect"
 	"sync"
 	"sync/atomic"
@@ -27,6 +28,7 @@ const (
 	secureChannelOpen
 	secureChannelClosed
 	timeoutLeniency = 250 * time.Millisecond
+	MaxTimeout      = math.MaxUint32 * time.Millisecond
 )
 
 type Response struct {
@@ -260,6 +262,9 @@ func (s *SecureChannel) sendAsyncWithTimeout(svc interface{}, authToken *ua.Node
 	s.reqhdr.AuthenticationToken = authToken
 	s.reqhdr.RequestHandle++
 	s.reqhdr.Timestamp = time.Now()
+	if timeout > 0 && timeout < s.cfg.RequestTimeout {
+		timeout = s.cfg.RequestTimeout
+	}
 	s.reqhdr.TimeoutHint = uint32(timeout / time.Millisecond)
 
 	// encode the message

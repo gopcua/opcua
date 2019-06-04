@@ -2,10 +2,10 @@ package opcua
 
 import (
 	"context"
-	"math"
 	"time"
 
 	"github.com/gopcua/opcua/ua"
+	"github.com/gopcua/opcua/uasc"
 )
 
 const (
@@ -18,7 +18,7 @@ const (
 
 type Subscription struct {
 	SubscriptionID            uint32
-	RevisedPublishingInterval float64
+	RevisedPublishingInterval time.Duration
 	RevisedLifetimeCount      uint32
 	RevisedMaxKeepAliveCount  uint32
 	Notifs                    chan *PublishNotificationData
@@ -64,7 +64,7 @@ type PublishNotificationData struct {
 // Cancel() deletes the Subscription from Server and makes the Client forget it so that publishing
 // loops cannot deliver notifications to it anymore
 func (s *Subscription) Cancel() error {
-	delete(s.c.subscriptions, s.SubscriptionID)
+	s.c.forgetSubscription(s.SubscriptionID)
 
 	req := &ua.DeleteSubscriptionsRequest{
 		SubscriptionIDs: []uint32{s.SubscriptionID},
@@ -110,7 +110,7 @@ func (s *Subscription) Unmonitor(monitoredItemIDs ...uint32) (*ua.DeleteMonitore
 	return res, err
 }
 
-func publishOnceForSubscription(s *Subscription, acks []*ua.SubscriptionAcknowledgement) (*ua.PublishResponse, error) {
+func (s *Subscription) publish(acks []*ua.SubscriptionAcknowledgement) (*ua.PublishResponse, error) {
 	if acks == nil {
 		acks = []*ua.SubscriptionAcknowledgement{}
 	}
@@ -119,27 +119,27 @@ func publishOnceForSubscription(s *Subscription, acks []*ua.SubscriptionAcknowle
 	}
 
 	var res *ua.PublishResponse
-	err := s.c.sendWithTimeout(req, s.getPublishTimeout(), func(v interface{}) error {
+	err := s.c.sendWithTimeout(req, s.publishTimeout(), func(v interface{}) error {
 		return safeAssign(v, &res)
 	})
 	return res, err
 }
 
-func (s *Subscription) getPublishTimeout() time.Duration {
-	keepaliveIntervalMs := uint64(s.RevisedPublishingInterval) *
-		uint64(s.RevisedMaxKeepAliveCount)
-	if keepaliveIntervalMs > math.MaxUint32 {
-		keepaliveIntervalMs = math.MaxUint32
+func (s *Subscription) publishTimeout() time.Duration {
+	timeout := time.Duration(s.RevisedMaxKeepAliveCount) * s.RevisedPublishingInterval // expected keepalive interval
+	if timeout > uasc.MaxTimeout {
+		return uasc.MaxTimeout
 	}
-	requestedTimeout := time.Duration(keepaliveIntervalMs) * time.Millisecond
-	if requestedTimeout < s.c.cfg.RequestTimeout {
+	if timeout < s.c.cfg.RequestTimeout {
 		return s.c.cfg.RequestTimeout
 	}
-	return requestedTimeout
+	return timeout
 }
 
 // Run() starts an infinite loop that sends PublishRequests and delivers received
 // notifications to registered Subscriptions.
+// It is the responsibility of the user to stop no longer needed Run() loops by cancelling ctx
+// Note that Run() may return before ctx is cancelled in case of an irrecoverable communication error
 func (s *Subscription) Run(ctx context.Context) {
 	var acks []*ua.SubscriptionAcknowledgement
 
@@ -148,19 +148,22 @@ func (s *Subscription) Run(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		default:
-			res, err := publishOnceForSubscription(s, acks)
-			if err != nil {
-				// StatusBadSequenceNumberUnknown means at least one ack has been submitted repeatedly
+			// send the next publish request
+			// note that res contains data even if an error was returned
+			res, err := s.publish(acks)
+			switch {
+			case err == ua.StatusBadSequenceNumberUnknown:
+				// At least one ack has been submitted repeatedly
 				// Ignore the error. Acks will be cleared below
-				if err == ua.StatusBadSequenceNumberUnknown ||
-					// Ignore StatusBadTimeout. No need to do anything except continue the loop
-					err == ua.StatusBadTimeout ||
-					// Ignore StatusBadNoSubscription as probably the cause is that all subscriptions
-					// are already deleted, but the publishing loop is still running and will be stopped shortly
-					err == ua.StatusBadNoSubscription {
-				} else {
-					s.c.notifySubscriptions(ctx, err)
-				}
+			case err == ua.StatusBadTimeout:
+				// ignore and continue the loop
+			case err == ua.StatusBadNoSubscription:
+				// All subscriptions have been deleted, but the publishing loop is still running
+				// The user will stop the loop or create subscriptions at his discretion
+			case err != nil:
+				// irrecoverable error
+				s.c.notifySubscriptionsOfError(ctx, res, err)
+				return
 			}
 
 			if res != nil {
