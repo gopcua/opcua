@@ -19,7 +19,10 @@ func (n StatusCode) Error() string {
 }
 
 var (
-	StatusOK                                      StatusCode = 0x0
+	StatusOK        StatusCode = 0x0
+	StatusUncertain StatusCode = 0x40000000
+	StatusBad       StatusCode = 0x80000000
+
 	StatusBadUnexpectedError                      StatusCode = 0x80010000
 	StatusBadInternalError                        StatusCode = 0x80020000
 	StatusBadOutOfMemory                          StatusCode = 0x80030000
@@ -265,6 +268,8 @@ type StatusCodeDesc struct {
 // StatusCodes maps status codes to the status code error types.
 var StatusCodes = map[StatusCode]StatusCodeDesc{
 	StatusOK:                                      StatusCodeDesc{Name: "OK", Text: ""},
+	StatusUncertain:                               StatusCodeDesc{Name: "Uncertain", Text: ""},
+	StatusBad:                                     StatusCodeDesc{Name: "Bad", Text: ""},
 	StatusBadUnexpectedError:                      StatusCodeDesc{Name: "StatusBadUnexpectedError", Text: "An unexpected error occurred."},
 	StatusBadInternalError:                        StatusCodeDesc{Name: "StatusBadInternalError", Text: "An internal error occurred as a result of a programming or configuration error."},
 	StatusBadOutOfMemory:                          StatusCodeDesc{Name: "StatusBadOutOfMemory", Text: "Not enough memory to complete the operation."},
