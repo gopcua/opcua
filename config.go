@@ -6,9 +6,13 @@ package opcua
 
 import (
 	"crypto/rsa"
+	"crypto/tls"
 	"crypto/x509"
+	"encoding/pem"
+	"io/ioutil"
 	"log"
 	"math/rand"
+	"strings"
 	"time"
 
 	"github.com/gopcua/opcua/ua"
@@ -95,10 +99,33 @@ func SecurityMode(m ua.MessageSecurityMode) Option {
 	}
 }
 
+// SecurityModeString sets the security mode for the secure channel.
+// Valid values are "None", "Sign", and "SignAndEncrypt".
+func SecurityModeString(s string) Option {
+	return func(c *uasc.Config, sc *uasc.SessionConfig) {
+		switch strings.ToLower(s) {
+		case "", "none":
+			c.SecurityMode = ua.MessageSecurityModeNone
+		case "sign":
+			c.SecurityMode = ua.MessageSecurityModeSign
+		case "signandencrypt":
+			c.SecurityMode = ua.MessageSecurityModeSignAndEncrypt
+		default:
+			c.SecurityMode = ua.MessageSecurityModeInvalid
+		}
+	}
+}
+
 // SecurityPolicy sets the security policy uri for the secure channel.
 func SecurityPolicy(s string) Option {
 	return func(c *uasc.Config, sc *uasc.SessionConfig) {
-		c.SecurityPolicyURI = s
+		switch s {
+		case "None", "Basic128Rsa15", "Basic256", "Basic256Sha256",
+			"Aes128_Sha256_RsaOaep", "Aes256_Sha256_RsaPss":
+			c.SecurityPolicyURI = ua.SecurityPolicyURIPrefix + s
+		default:
+			c.SecurityPolicyURI = s
+		}
 	}
 }
 
@@ -116,20 +143,78 @@ func PrivateKey(key *rsa.PrivateKey) Option {
 	}
 }
 
+// PrivateKeyFile sets the RSA private key in the secure channel configuration
+// from a PEM or DER encoded file.
+func PrivateKeyFile(keyFile string) Option {
+	return func(c *uasc.Config, sc *uasc.SessionConfig) {
+		if keyFile == "" {
+			return
+		}
+
+		b, err := ioutil.ReadFile(keyFile)
+		if err != nil {
+			log.Fatalf("Failed to load private key: %s", err)
+		}
+
+		derBytes := b
+		if strings.HasSuffix(keyFile, ".pem") {
+			block, _ := pem.Decode(b)
+			if block == nil || block.Type != "RSA PRIVATE KEY" {
+				log.Fatalf("Failed to decode PEM block with private key")
+			}
+			derBytes = block.Bytes
+		}
+
+		pk, err := x509.ParsePKCS1PrivateKey(derBytes)
+		if err != nil {
+			log.Fatalf("Failed to parse private key: %s", err)
+		}
+
+		c.LocalKey = pk
+	}
+}
+
 // Certificate sets the client X509 certificate in the secure channel configuration
 // and also detects and sets the ApplicationURI from the URI within the certificate.
 func Certificate(cert []byte) Option {
 	return func(c *uasc.Config, sc *uasc.SessionConfig) {
-		c.Certificate = cert
+		setCertificate(cert, c, sc)
+	}
+}
 
-		// Extract the application URI from the certificate.
-		var appURI string
-		x509cert, err := x509.ParseCertificate(cert)
-		if err == nil && len(x509cert.URIs) > 0 {
-			appURI = x509cert.URIs[0].String()
+func setCertificate(cert []byte, c *uasc.Config, sc *uasc.SessionConfig) {
+	c.Certificate = cert
+
+	// Extract the application URI from the certificate.
+	var appURI string
+	x509cert, err := x509.ParseCertificate(cert)
+	if err == nil && len(x509cert.URIs) > 0 {
+		appURI = x509cert.URIs[0].String()
+	}
+	sc.ClientDescription.ApplicationURI = appURI
+}
+
+// X509KeyPair sets the client X509 certificate and private key in the secure
+// channel configuration from a pair of files and also detects and sets the
+// ApplicationURI from the URI within the certificate.
+func X509KeyPair(certFile, keyFile string) Option {
+	return func(c *uasc.Config, sc *uasc.SessionConfig) {
+		if certFile == "" {
+			return
 		}
 
-		sc.ClientDescription.ApplicationURI = appURI
+		tlscert, err := tls.LoadX509KeyPair(certFile, keyFile)
+		if err != nil {
+			log.Fatalf("Failed to load certificate: %s", err)
+		}
+
+		pk, ok := tlscert.PrivateKey.(*rsa.PrivateKey)
+		if !ok {
+			log.Fatalf("Invalid private key")
+		}
+
+		c.LocalKey = pk
+		setCertificate(tlscert.Certificate[0], c, sc)
 	}
 }
 

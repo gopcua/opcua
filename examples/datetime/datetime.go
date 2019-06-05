@@ -15,11 +15,23 @@ import (
 
 func main() {
 	endpoint := flag.String("endpoint", "opc.tcp://localhost:4840", "OPC UA Endpoint URL")
+	policy := flag.String("policy", "None", "Security policy")
+	mode := flag.String("mode", "None", "Security mode")
+	// certFile := flag.String("cert", "", "Path to cert.pem")
+	keyFile := flag.String("key", "", "Path to private key.pem")
 	flag.BoolVar(&debug.Enable, "debug", false, "enable debug logging")
 	flag.Parse()
 	log.SetFlags(0)
 
-	c := opcua.NewClient(*endpoint)
+	opts := []opcua.Option{
+		opcua.SecurityPolicy(*policy),
+		opcua.SecurityModeString(*mode),
+		// opcua.X509KeyPair(*certFile, *keyFile),
+		opcua.PrivateKeyFile(*keyFile),
+		opcua.AuthAnonymous(),
+	}
+
+	c := opcua.NewClient(*endpoint, opts...)
 	if err := c.Connect(); err != nil {
 		log.Fatal(err)
 	}
