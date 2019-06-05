@@ -222,7 +222,7 @@ func loadCertificate(filename string) ([]byte, error) {
 		return nil, fmt.Errorf("Failed to load certificate: %s", err)
 	}
 
-	if strings.HasSuffix(filename, ".pem") {
+	if !strings.HasSuffix(filename, ".pem") {
 		return b, nil
 	}
 
