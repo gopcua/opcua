@@ -156,32 +156,16 @@ func PrivateKey(key *rsa.PrivateKey) Option {
 
 // PrivateKeyFile sets the RSA private key in the secure channel configuration
 // from a PEM or DER encoded file.
-func PrivateKeyFile(keyFile string) Option {
+func PrivateKeyFile(filename string) Option {
 	return func(c *uasc.Config, sc *uasc.SessionConfig) {
-		if keyFile == "" {
+		if filename == "" {
 			return
 		}
-
-		b, err := ioutil.ReadFile(keyFile)
+		key, err := loadPrivateKey(filename)
 		if err != nil {
-			log.Fatalf("Failed to load private key: %s", err)
+			log.Fatal(err)
 		}
-
-		derBytes := b
-		if strings.HasSuffix(keyFile, ".pem") {
-			block, _ := pem.Decode(b)
-			if block == nil || block.Type != "RSA PRIVATE KEY" {
-				log.Fatalf("Failed to decode PEM block with private key")
-			}
-			derBytes = block.Bytes
-		}
-
-		pk, err := x509.ParsePKCS1PrivateKey(derBytes)
-		if err != nil {
-			log.Fatalf("Failed to parse private key: %s", err)
-		}
-
-		c.LocalKey = pk
+		c.LocalKey = key
 	}
 }
 
