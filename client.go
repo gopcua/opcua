@@ -36,7 +36,9 @@ func GetEndpoints(endpoint string) ([]*ua.EndpointDescription, error) {
 }
 
 // SelectEndpoint returns the endpoint with the highest security level which matches
-// security policy and security mode. policy and mode can be
+// security policy and security mode. policy and mode can be omitted so that
+// only one of them has to match.
+// todo(fs): should this function return an error?
 func SelectEndpoint(endpoints []*ua.EndpointDescription, policy string, mode ua.MessageSecurityMode) *ua.EndpointDescription {
 	if len(endpoints) == 0 {
 		return nil
