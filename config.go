@@ -6,9 +6,9 @@ package opcua
 
 import (
 	"crypto/rsa"
-	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"math/rand"
@@ -185,12 +185,68 @@ func PrivateKeyFile(keyFile string) Option {
 	}
 }
 
-// Certificate sets the client X509 certificate in the secure channel configuration
-// and also detects and sets the ApplicationURI from the URI within the certificate.
+func loadPrivateKey(filename string) (*rsa.PrivateKey, error) {
+	b, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to load private key: %s", err)
+	}
+
+	derBytes := b
+	if strings.HasSuffix(filename, ".pem") {
+		block, _ := pem.Decode(b)
+		if block == nil || block.Type != "RSA PRIVATE KEY" {
+			return nil, fmt.Errorf("Failed to decode PEM block with private key")
+		}
+		derBytes = block.Bytes
+	}
+
+	pk, err := x509.ParsePKCS1PrivateKey(derBytes)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to parse private key: %s", err)
+	}
+	return pk, nil
+}
+
+// Certificate sets the client X509 certificate in the secure channel configuration.
+// It also detects and sets the ApplicationURI from the URI within the certificate.
 func Certificate(cert []byte) Option {
 	return func(c *uasc.Config, sc *uasc.SessionConfig) {
 		setCertificate(cert, c, sc)
 	}
+}
+
+// Certificate sets the client X509 certificate in the secure channel configuration
+// from the PEM or DER encoded file. It also detects and sets the ApplicationURI
+// from the URI within the certificate.
+func CertificateFile(filename string) Option {
+	return func(c *uasc.Config, sc *uasc.SessionConfig) {
+		if filename == "" {
+			return
+		}
+
+		cert, err := loadCertificate(filename)
+		if err != nil {
+			log.Fatal(err)
+		}
+		setCertificate(cert, c, sc)
+	}
+}
+
+func loadCertificate(filename string) ([]byte, error) {
+	b, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to load certificate: %s", err)
+	}
+
+	if strings.HasSuffix(filename, ".pem") {
+		return b, nil
+	}
+
+	block, _ := pem.Decode(b)
+	if block == nil || block.Type != "CERTIFICATE" {
+		return nil, fmt.Errorf("Failed to decode PEM block with certificate")
+	}
+	return block.Bytes, nil
 }
 
 func setCertificate(cert []byte, c *uasc.Config, sc *uasc.SessionConfig) {
@@ -203,30 +259,6 @@ func setCertificate(cert []byte, c *uasc.Config, sc *uasc.SessionConfig) {
 		appURI = x509cert.URIs[0].String()
 	}
 	sc.ClientDescription.ApplicationURI = appURI
-}
-
-// X509KeyPair sets the client X509 certificate and private key in the secure
-// channel configuration from a pair of files and also detects and sets the
-// ApplicationURI from the URI within the certificate.
-func X509KeyPair(certFile, keyFile string) Option {
-	return func(c *uasc.Config, sc *uasc.SessionConfig) {
-		if certFile == "" {
-			return
-		}
-
-		tlscert, err := tls.LoadX509KeyPair(certFile, keyFile)
-		if err != nil {
-			log.Fatalf("Failed to load certificate: %s", err)
-		}
-
-		pk, ok := tlscert.PrivateKey.(*rsa.PrivateKey)
-		if !ok {
-			log.Fatalf("Invalid private key")
-		}
-
-		c.LocalKey = pk
-		setCertificate(tlscert.Certificate[0], c, sc)
-	}
 }
 
 // SecurityFromEndpoint sets the server-related security parameters from
