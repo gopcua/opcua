@@ -348,7 +348,6 @@ func (s *SecureChannel) recv() {
 			}
 			if errf, ok := err.(*uacp.Error); ok {
 				s.notifyCallers(errf)
-				s.Close()
 				continue
 			}
 			if err != nil {
