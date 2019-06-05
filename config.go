@@ -47,20 +47,31 @@ func DefaultSessionConfig() *uasc.SessionConfig {
 	}
 }
 
+// ApplyConfig applies the config options to the default configuration.
+// todo(fs): Can we find a better name?
+func ApplyConfig(opts ...Option) (*uasc.Config, *uasc.SessionConfig) {
+	c := DefaultClientConfig()
+	sc := DefaultSessionConfig()
+	for _, opt := range opts {
+		opt(c, sc)
+	}
+	return c, sc
+}
+
 // Option is an option function type to modify the configuration.
 type Option func(*uasc.Config, *uasc.SessionConfig)
-
-// ApplicationURI sets the application uri in the session configuration.
-func ApplicationURI(s string) Option {
-	return func(c *uasc.Config, sc *uasc.SessionConfig) {
-		sc.ClientDescription.ApplicationURI = s
-	}
-}
 
 // ApplicationName sets the application name in the session configuration.
 func ApplicationName(s string) Option {
 	return func(c *uasc.Config, sc *uasc.SessionConfig) {
 		sc.ClientDescription.ApplicationName = &ua.LocalizedText{Text: s}
+	}
+}
+
+// ApplicationURI sets the application uri in the session configuration.
+func ApplicationURI(s string) Option {
+	return func(c *uasc.Config, sc *uasc.SessionConfig) {
+		sc.ClientDescription.ApplicationURI = s
 	}
 }
 

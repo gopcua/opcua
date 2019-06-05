@@ -68,16 +68,12 @@ type Client struct {
 //
 // https://godoc.org/github.com/gopcua/opcua#Option
 func NewClient(endpoint string, opts ...Option) *Client {
-	c := &Client{
+	cfg, sessionCfg := ApplyConfig(opts...)
+	return &Client{
 		endpointURL: endpoint,
-		cfg:         DefaultClientConfig(),
-		sessionCfg:  DefaultSessionConfig(),
+		cfg:         cfg,
+		sessionCfg:  sessionCfg,
 	}
-	for _, opt := range opts {
-		opt(c.cfg, c.sessionCfg)
-	}
-
-	return c
 }
 
 // Connect establishes a secure channel and creates a new session.
