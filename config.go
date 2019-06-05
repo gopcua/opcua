@@ -103,6 +103,25 @@ func ProductURI(s string) Option {
 	}
 }
 
+// RemoteCertificate sets the server certificate.
+func RemoteCertificate(cert []byte) Option {
+	return func(c *uasc.Config, sc *uasc.SessionConfig) {
+		c.RemoteCertificate = cert
+	}
+}
+
+// RemoteCertificateFile sets the server certificate from the file
+// in PEM or DER encoding.
+func RemoteCertificateFile(filename string) Option {
+	return func(c *uasc.Config, sc *uasc.SessionConfig) {
+		cert, err := loadCertificate(filename)
+		if err != nil {
+			log.Fatal(err)
+		}
+		c.RemoteCertificate = cert
+	}
+}
+
 // SecurityMode sets the security mode for the secure channel.
 func SecurityMode(m ua.MessageSecurityMode) Option {
 	return func(c *uasc.Config, sc *uasc.SessionConfig) {
