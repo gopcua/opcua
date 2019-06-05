@@ -121,13 +121,7 @@ func SecurityModeString(s string) Option {
 // SecurityPolicy sets the security policy uri for the secure channel.
 func SecurityPolicy(s string) Option {
 	return func(c *uasc.Config, sc *uasc.SessionConfig) {
-		switch s {
-		case "None", "Basic128Rsa15", "Basic256", "Basic256Sha256",
-			"Aes128_Sha256_RsaOaep", "Aes256_Sha256_RsaPss":
-			c.SecurityPolicyURI = ua.SecurityPolicyURIPrefix + s
-		default:
-			c.SecurityPolicyURI = s
-		}
+		c.SecurityPolicyURI = ua.FormatSecurityPolicyURI(s)
 	}
 }
 

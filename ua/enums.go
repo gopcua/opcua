@@ -4,6 +4,8 @@
 
 package ua
 
+import "strings"
+
 // additional enum values which are not generated.
 
 const (
@@ -95,3 +97,27 @@ const (
 	SecurityPolicyURIAes128Sha256RsaOaep = "http://opcfoundation.org/UA/SecurityPolicy#Aes128_Sha256_RsaOaep"
 	SecurityPolicyURIAes256Sha256RsaPss  = "http://opcfoundation.org/UA/SecurityPolicy#Aes256_Sha256_RsaPss"
 )
+
+var SecurityPolicyURIs = map[string]string{
+	"None":                SecurityPolicyURINone,
+	"Basic128Rsa15":       SecurityPolicyURIBasic128Rsa15,
+	"Basic256":            SecurityPolicyURIBasic256,
+	"Basic256Sha256":      SecurityPolicyURIBasic256Sha256,
+	"Aes128Sha256RsaOaep": SecurityPolicyURIAes128Sha256RsaOaep,
+	"Aes256Sha256RsaPss":  SecurityPolicyURIAes256Sha256RsaPss,
+}
+
+// FormatSecurityPolicy converts a short name for a security policy into a
+// canonical policy URI.
+func FormatSecurityPolicyURI(policy string) string {
+	if policy == "" {
+		return ""
+	}
+	if p, ok := SecurityPolicyURIs[policy]; ok {
+		return p
+	}
+	if !strings.HasPrefix(policy, SecurityPolicyURIPrefix) {
+		return SecurityPolicyURIPrefix + policy
+	}
+	return policy
+}
