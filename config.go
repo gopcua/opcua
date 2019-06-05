@@ -114,16 +114,7 @@ func SecurityMode(m ua.MessageSecurityMode) Option {
 // Valid values are "None", "Sign", and "SignAndEncrypt".
 func SecurityModeString(s string) Option {
 	return func(c *uasc.Config, sc *uasc.SessionConfig) {
-		switch strings.ToLower(s) {
-		case "", "none":
-			c.SecurityMode = ua.MessageSecurityModeNone
-		case "sign":
-			c.SecurityMode = ua.MessageSecurityModeSign
-		case "signandencrypt":
-			c.SecurityMode = ua.MessageSecurityModeSignAndEncrypt
-		default:
-			c.SecurityMode = ua.MessageSecurityModeInvalid
-		}
+		c.SecurityMode = ua.MessageSecurityModeFromString(s)
 	}
 }
 

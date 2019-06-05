@@ -113,8 +113,9 @@ func Enums(dict *TypeDictionary) []Type {
 
 		for _, val := range t.Values {
 			v := Value{
-				Name:  goname.Format(e.Name + val.Name),
-				Value: val.Value,
+				Name:      goname.Format(e.Name + val.Name),
+				ShortName: val.Name,
+				Value:     val.Value,
 			}
 			e.Values = append(e.Values, v)
 		}
@@ -203,8 +204,9 @@ type Type struct {
 }
 
 type Value struct {
-	Name  string
-	Value int
+	Name      string
+	ShortName string
+	Value     int
 }
 
 type Field struct {
@@ -234,6 +236,14 @@ func FormatType(w io.Writer, t Type) error {
 
 var tmplEnum = template.Must(template.New("").Parse(`
 type {{.Name}} {{.Type}}
+
+func {{.Name}}FromString(s string) {{.Name}} {
+	switch s {
+		{{range $i, $v := .Values}}case "{{.ShortName}}": return {{$v.Value}}
+		{{end}}default:
+		return 0
+	}
+}
 
 const (
 	{{$Name := .Name}}
