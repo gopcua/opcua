@@ -89,17 +89,17 @@ func Locales(locale ...string) Option {
 	}
 }
 
-// RandomRequestID assigns a random initial request id.
-func RandomRequestID() Option {
-	return func(c *uasc.Config, sc *uasc.SessionConfig) {
-		c.RequestID = uint32(rand.Int31())
-	}
-}
-
 // ProductURI sets the product uri in the session configuration.
 func ProductURI(s string) Option {
 	return func(c *uasc.Config, sc *uasc.SessionConfig) {
 		sc.ClientDescription.ProductURI = s
+	}
+}
+
+// RandomRequestID assigns a random initial request id.
+func RandomRequestID() Option {
+	return func(c *uasc.Config, sc *uasc.SessionConfig) {
+		c.RequestID = uint32(rand.Int31())
 	}
 }
 
@@ -241,10 +241,17 @@ func setCertificate(cert []byte, c *uasc.Config, sc *uasc.SessionConfig) {
 	c.Certificate = cert
 
 	// Extract the application URI from the certificate.
-	var appURI string
 	x509cert, err := x509.ParseCertificate(cert)
-	if err == nil && len(x509cert.URIs) > 0 {
-		appURI = x509cert.URIs[0].String()
+	if err != nil {
+		log.Fatalf("Failed to parse certificate: %s", err)
+		return
+	}
+	if len(x509cert.URIs) == 0 {
+		return
+	}
+	appURI := x509cert.URIs[0].String()
+	if appURI == "" {
+		return
 	}
 	sc.ClientDescription.ApplicationURI = appURI
 }
