@@ -272,6 +272,7 @@ func (s *SecureChannel) SendAsync(svc interface{}, authToken *ua.NodeID) (resp c
 	resp = make(chan Response)
 	s.mu.Lock()
 	if s.handler[reqid] != nil {
+		s.mu.Unlock()
 		return nil, reqid, fmt.Errorf("error: duplicate handler registration for request id %d", reqid)
 	}
 	s.handler[reqid] = resp
