@@ -67,48 +67,48 @@ YqvGJP7ubbsR1YoQxQ8CQQCyCrltDYji5+KdxMOsDt0v7bCQWkQ3+pik09faK51Y
 		// anonymous auth
 		&ua.EndpointDescription{
 			SecurityPolicyURI: "a", // random value for testing
-			SecurityMode: 5, // random value for testing
+			SecurityMode:      5,   // random value for testing
 			ServerCertificate: certDER,
 			UserIdentityTokens: []*ua.UserTokenPolicy{
 				&ua.UserTokenPolicy{
-					TokenType: ua.UserTokenTypeAnonymous,
-					SecurityPolicyURI : "b", // random value for testing
+					TokenType:         ua.UserTokenTypeAnonymous,
+					SecurityPolicyURI: "b", // random value for testing
 				},
 			},
 		},
 		// username auth
 		&ua.EndpointDescription{
 			SecurityPolicyURI: "a", // random value for testing
-			SecurityMode: 5, // random value for testing
+			SecurityMode:      5,   // random value for testing
 			ServerCertificate: certDER,
 			UserIdentityTokens: []*ua.UserTokenPolicy{
 				&ua.UserTokenPolicy{
-					TokenType: ua.UserTokenTypeUserName,
-					SecurityPolicyURI : "b", // random value for testing
+					TokenType:         ua.UserTokenTypeUserName,
+					SecurityPolicyURI: "b", // random value for testing
 				},
 			},
 		},
 		// x509 cert auth
 		&ua.EndpointDescription{
 			SecurityPolicyURI: "a", // random value for testing
-			SecurityMode: 5, // random value for testing
+			SecurityMode:      5,   // random value for testing
 			ServerCertificate: certDER,
 			UserIdentityTokens: []*ua.UserTokenPolicy{
 				&ua.UserTokenPolicy{
-					TokenType: ua.UserTokenTypeCertificate,
-					SecurityPolicyURI : "b", // random value for testing
+					TokenType:         ua.UserTokenTypeCertificate,
+					SecurityPolicyURI: "b", // random value for testing
 				},
 			},
 		},
 		// issued token auth
 		&ua.EndpointDescription{
 			SecurityPolicyURI: "a", // random value for testing
-			SecurityMode: 5, // random value for testing
+			SecurityMode:      5,   // random value for testing
 			ServerCertificate: certDER,
 			UserIdentityTokens: []*ua.UserTokenPolicy{
 				&ua.UserTokenPolicy{
-					TokenType: ua.UserTokenTypeIssuedToken,
-					SecurityPolicyURI : "b", // random value for testing
+					TokenType:         ua.UserTokenTypeIssuedToken,
+					SecurityPolicyURI: "b", // random value for testing
 				},
 			},
 		},
@@ -295,9 +295,9 @@ func TestOptions(t *testing.T) {
 		},
 		{
 			name: `SecurityFromEndpoint(no-match)`,
-			opt:  SecurityFromEndpoint(&ua.EndpointDescription{
+			opt: SecurityFromEndpoint(&ua.EndpointDescription{
 				SecurityPolicyURI: "a",
-				SecurityMode: 5,
+				SecurityMode:      5,
 				ServerCertificate: certDER,
 			}, 0),
 			c: func() *uasc.Config {
@@ -308,7 +308,7 @@ func TestOptions(t *testing.T) {
 				c.Thumbprint = uapolicy.Thumbprint(certDER)
 				return c
 			}(),
-			sc : func() *uasc.SessionConfig {
+			sc: func() *uasc.SessionConfig {
 				sc := DefaultSessionConfig()
 				sc.UserIdentityToken = &ua.AnonymousIdentityToken{
 					PolicyID: defaultAnonymousPolicyID,
@@ -328,7 +328,7 @@ func TestOptions(t *testing.T) {
 				c.Thumbprint = uapolicy.Thumbprint(certDER)
 				return c
 			}(),
-			sc : func() *uasc.SessionConfig {
+			sc: func() *uasc.SessionConfig {
 				sc := DefaultSessionConfig()
 				sc.UserIdentityToken = &ua.AnonymousIdentityToken{}
 				sc.AuthPolicyURI = "b"
@@ -346,7 +346,7 @@ func TestOptions(t *testing.T) {
 				c.Thumbprint = uapolicy.Thumbprint(certDER)
 				return c
 			}(),
-			sc : func() *uasc.SessionConfig {
+			sc: func() *uasc.SessionConfig {
 				sc := DefaultSessionConfig()
 				sc.UserIdentityToken = &ua.UserNameIdentityToken{}
 				sc.AuthPolicyURI = "b"
@@ -364,7 +364,7 @@ func TestOptions(t *testing.T) {
 				c.Thumbprint = uapolicy.Thumbprint(certDER)
 				return c
 			}(),
-			sc : func() *uasc.SessionConfig {
+			sc: func() *uasc.SessionConfig {
 				sc := DefaultSessionConfig()
 				sc.UserIdentityToken = &ua.X509IdentityToken{}
 				sc.AuthPolicyURI = "b"
@@ -382,7 +382,7 @@ func TestOptions(t *testing.T) {
 				c.Thumbprint = uapolicy.Thumbprint(certDER)
 				return c
 			}(),
-			sc : func() *uasc.SessionConfig {
+			sc: func() *uasc.SessionConfig {
 				sc := DefaultSessionConfig()
 				sc.UserIdentityToken = &ua.IssuedIdentityToken{}
 				sc.AuthPolicyURI = "b"
