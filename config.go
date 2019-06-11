@@ -311,6 +311,9 @@ func setPolicyID(t interface{}, policy string) {
 // AuthPolicyID sets the policy ID of the user identity token
 // Note: This should only be called if you know the exact policy ID the server is expecting.
 // Most callers should use SecurityFromEndpoint as it automatically finds the policyID
+// todo(fs): Should we make 'policy' an option to the other
+// todo(fs): AuthXXX methods since this approach requires context
+// todo(fs): and ordering?
 func AuthPolicyID(policy string) Option {
 	return func(c *uasc.Config, sc *uasc.SessionConfig) {
 		if sc.UserIdentityToken == nil {
@@ -332,6 +335,7 @@ func AuthAnonymous() Option {
 
 		_, ok := sc.UserIdentityToken.(*ua.AnonymousIdentityToken)
 		if !ok {
+			// todo(fs): should we Fatal here?
 			log.Printf("non-anonymous authentication already configured, ignoring")
 			return
 		}
@@ -349,6 +353,7 @@ func AuthUsername(user, pass string) Option {
 
 		t, ok := sc.UserIdentityToken.(*ua.UserNameIdentityToken)
 		if !ok {
+			// todo(fs): should we Fatal here?
 			log.Printf("non-username authentication already configured, ignoring")
 			return
 		}
@@ -369,6 +374,7 @@ func AuthCertificate(cert []byte) Option {
 
 		t, ok := sc.UserIdentityToken.(*ua.X509IdentityToken)
 		if !ok {
+			// todo(fs): should we Fatal here?
 			log.Printf("non-certificate authentication already configured, ignoring")
 			return
 		}

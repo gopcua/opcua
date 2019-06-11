@@ -171,6 +171,49 @@ func TestOptions(t *testing.T) {
 			}(),
 		},
 		{
+			name: `AuthAnonymous()`,
+			opt:  AuthAnonymous(),
+			sc: func() *uasc.SessionConfig {
+				sc := DefaultSessionConfig()
+				sc.UserIdentityToken = &ua.AnonymousIdentityToken{}
+				return sc
+			}(),
+		},
+		{
+			name: `AuthCertificate()`,
+			opt:  AuthCertificate(certDER),
+			sc: func() *uasc.SessionConfig {
+				sc := DefaultSessionConfig()
+				sc.UserIdentityToken = &ua.X509IdentityToken{
+					CertificateData: certDER,
+				}
+				return sc
+			}(),
+		},
+		{
+			name: `AuthIssuedToken()`,
+			opt:  AuthIssuedToken([]byte("a")),
+			sc: func() *uasc.SessionConfig {
+				sc := DefaultSessionConfig()
+				sc.UserIdentityToken = &ua.IssuedIdentityToken{
+					TokenData: []byte("a"),
+				}
+				return sc
+			}(),
+		},
+		{
+			name: `AuthUsername()`,
+			opt:  AuthUsername("user", "pass"),
+			sc: func() *uasc.SessionConfig {
+				sc := DefaultSessionConfig()
+				sc.UserIdentityToken = &ua.UserNameIdentityToken{
+					UserName: "user",
+				}
+				sc.AuthPassword = "pass"
+				return sc
+			}(),
+		},
+		{
 			name: `Certificate`,
 			opt:  Certificate(certDER),
 			c: func() *uasc.Config {
