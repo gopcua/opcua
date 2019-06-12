@@ -204,7 +204,6 @@ func (p *SubscriptionParameters) setDefaults() {
 		p.LifetimeCount = DefaultSubscriptionLifetimeCount
 	}
 	if p.MaxKeepAliveCount == 0 {
-
 		p.MaxKeepAliveCount = DefaultSubscriptionMaxKeepAliveCount
 	}
 	if p.Interval == 0 {

@@ -119,9 +119,9 @@ type Client struct {
 func NewClient(endpoint string, opts ...Option) *Client {
 	cfg, sessionCfg := ApplyConfig(opts...)
 	return &Client{
-		endpointURL: endpoint,
-		cfg:         cfg,
-		sessionCfg:  sessionCfg,
+		endpointURL:   endpoint,
+		cfg:           cfg,
+		sessionCfg:    sessionCfg,
 		subscriptions: make(map[uint32]*Subscription),
 	}
 }
