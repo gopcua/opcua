@@ -44,51 +44,14 @@ go run examples/crypto/*.go -endpoint opc.tcp://localhost:4840 -cert path/to/cer
 
 We are still actively working on this project and the APIs will change.
 
+We have started to tag the code to support go modules and reproducible builds
+but there is still no guarantee of API stability.
+
 However, you can safely assume that we are aiming to make the APIs as
 stable as possible. :)
 
-### Current State (19 Apr 2019)
-
- * `ERR` messages are bubbled up to the caller
- * security protocol support. See https://github.com/gopcua/opcua/wiki/Supported-Devices
-   to get a list of devices/applications we have tested various crypto and authentication
-   methods. Please add your own. See `examples/crypto` for an example.
- * Debug messages are now disabled by default.
-
-We are getting closer to use this for our first production use cases. Subscription support
-is certainly high on the list for the client as is a Server implementation. Let us know what
-is missing right now to make this library useful for you and we can focus on this first.
-
-### Current State (20 Mar 2019)
-
-Our goal is to make this the native Go library for OPC/UA.
-
-This code is not ready for production but we intend to get it there.
-
-We are testing the code against real-world PLCs and other OPC/UA
-implementations but this needs to be more formalized. The goal is to have the
-examples working with real PLCs. Please let us know if they don't.
-
-We are working on the library and some things are working but others are not.
-
-Here is what currently works:
-
- * client connection handshake, create secure channel and session
- * async request/response dispatching on the secure channel
- * support for chunking when receiving (not sending)
- * all structures and enums are generated from official OPC Foundation defintions
- * basic `uasc` listener available but no server implementation
- * start of a high-level Client implementation. See `client.go` and
-   `examples/datetime` for a usage example.
- * decent tests of the binary protocol codec
-
-Here is what is not yet working:
-
- * `ERR` messages are not yet bubbled up to the caller (not hard but need to do it)
- * service calls need to check `ServiceStatus` and bubble that error up (also not hard)
- * no security protocol support. @dwhutchinson provided the crypto code but it needs to be
-   integrated into the network layer.
- * no high-level server implementation, address space, etc.
+The [Current State](https://github.com/gopcua/opcua/wiki/Current-State) was moved
+to the [Wiki](https://github.com/gopcua/opcua/wiki).
 
 ## Your Help is Appreciated
 
