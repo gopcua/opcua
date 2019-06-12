@@ -68,6 +68,9 @@ Also, if the library is already useful please spread the word as a motivation.
 
 The [Gopcua Team](https://github.com/gopcua/opcua/graphs/contributors).
 
+If you need to get in touch with us directly you may find us on [Keybase.io](https://keybase.io)
+but try to create an issue first.
+
 ## Supported Features
 
 The current focus is on the OPC UA Binary protocol over TCP. No other protocols are supported at this point.
