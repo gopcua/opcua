@@ -15,6 +15,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/gopcua/opcua/debug"
 	"github.com/gopcua/opcua/id"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uacp"
@@ -95,6 +96,11 @@ type Client struct {
 	// session is the active session.
 	session atomic.Value // *Session
 
+	// map of active subscriptions managed by this client. key is SubscriptionID
+	// access guarded by subMux
+	subscriptions map[uint32]*Subscription
+	subMux        sync.RWMutex
+
 	// once initializes session
 	once sync.Once
 }
@@ -103,7 +109,7 @@ type Client struct {
 //
 // When no options are provided the new client is created from
 // DefaultClientConfig() and DefaultSessionConfig(). If no authentication method
-// is confiugred a UserIdentityToken for anonymous authentication will be set.
+// is configured, a UserIdentityToken for anonymous authentication will be set.
 // See #Client.CreateSession for details.
 //
 // To modify configuration you can provide any number of Options as opts. See
@@ -113,9 +119,10 @@ type Client struct {
 func NewClient(endpoint string, opts ...Option) *Client {
 	cfg, sessionCfg := ApplyConfig(opts...)
 	return &Client{
-		endpointURL: endpoint,
-		cfg:         cfg,
-		sessionCfg:  sessionCfg,
+		endpointURL:   endpoint,
+		cfg:           cfg,
+		sessionCfg:    sessionCfg,
+		subscriptions: make(map[uint32]*Subscription),
 	}
 }
 
@@ -381,13 +388,20 @@ func (c *Client) DetachSession() (*Session, error) {
 
 // Send sends the request via the secure channel and registers a handler for
 // the response. If the client has an active session it injects the
-// authenticaton token.
+// authentication token.
 func (c *Client) Send(req interface{}, h func(interface{}) error) error {
+	return c.sendWithTimeout(req, c.cfg.RequestTimeout, h)
+}
+
+// sendWithTimeout sends the request via the secure channel with a custom timeout and registers a handler for
+// the response. If the client has an active session it injects the
+// authenticaton token.
+func (c *Client) sendWithTimeout(req interface{}, timeout time.Duration, h func(interface{}) error) error {
 	var authToken *ua.NodeID
 	if s := c.Session(); s != nil {
 		authToken = s.resp.AuthenticationToken
 	}
-	return c.sechan.Send(req, authToken, h)
+	return c.sechan.SendWithTimeout(req, authToken, timeout, h)
 }
 
 // Node returns a node object which accesses its attributes
@@ -457,138 +471,136 @@ func (c *Client) Browse(req *ua.BrowseRequest) (*ua.BrowseResponse, error) {
 	return res, err
 }
 
-// todo(fs): this is not done yet since we need to be able to register
-// todo(fs): monitored items.
-type Subscription struct {
-	res *ua.CreateSubscriptionResponse
-}
-
-// todo(fs): return subscription object with channel
-func (c *Client) Subscribe(intv time.Duration) (*Subscription, error) {
+// Subscribe creates a Subscription with given parameters. Parameters that have not been set
+// (have zero values) are overwritten with default values.
+// See opcua.DefaultSubscription* constants
+func (c *Client) Subscribe(params *SubscriptionParameters) (*Subscription, error) {
+	if params == nil {
+		params = &SubscriptionParameters{}
+	}
+	params.setDefaults()
 	req := &ua.CreateSubscriptionRequest{
-		RequestedPublishingInterval: float64(intv / time.Millisecond),
-		RequestedLifetimeCount:      60,
-		RequestedMaxKeepAliveCount:  20,
+		RequestedPublishingInterval: float64(params.Interval / time.Millisecond),
+		RequestedLifetimeCount:      params.LifetimeCount,
+		RequestedMaxKeepAliveCount:  params.MaxKeepAliveCount,
 		PublishingEnabled:           true,
+		MaxNotificationsPerPublish:  params.MaxNotificationsPerPublish,
+		Priority:                    params.Priority,
 	}
 
 	var res *ua.CreateSubscriptionResponse
 	err := c.Send(req, func(v interface{}) error {
 		return safeAssign(v, &res)
 	})
-	return &Subscription{res}, err
+	if err != nil {
+		return nil, err
+	}
+	if res.ResponseHeader.ServiceResult != ua.StatusOK {
+		return nil, res.ResponseHeader.ServiceResult
+	}
+
+	sub := &Subscription{
+		res.SubscriptionID,
+		time.Duration(res.RevisedPublishingInterval) * time.Millisecond,
+		res.RevisedLifetimeCount,
+		res.RevisedMaxKeepAliveCount,
+		params.Notifs,
+		c,
+	}
+	c.subMux.Lock()
+	c.subscriptions[sub.SubscriptionID] = sub
+	c.subMux.Unlock()
+
+	return sub, nil
 }
 
-type PublishNotificationData struct {
-	SubscriptionID uint32
-	Error          error
-	Value          interface{}
+func (c *Client) forgetSubscription(subID uint32) {
+	c.subMux.Lock()
+	delete(c.subscriptions, subID)
+	c.subMux.Unlock()
 }
 
-func (c *Client) Publish(notif chan<- PublishNotificationData) {
-	// Empty SubscriptionAcknowledgements for first PublishRequest
-	var acks = make([]*ua.SubscriptionAcknowledgement, 0)
+func (c *Client) notifySubscriptionsOfError(ctx context.Context, res *ua.PublishResponse, err error) {
+	c.subMux.RLock()
+	defer c.subMux.RUnlock()
+	var subsToNotify map[uint32]*Subscription
+	if res != nil && res.SubscriptionID != 0 {
+		subsToNotify = map[uint32]*Subscription{res.SubscriptionID: c.subscriptions[res.SubscriptionID]}
+	} else {
+		subsToNotify = c.subscriptions
+	}
+	for _, sub := range subsToNotify {
+		go func(s *Subscription) {
+			s.sendNotification(ctx, &PublishNotificationData{Error: err})
+		}(sub)
+	}
+}
 
-	for {
-		req := &ua.PublishRequest{
-			SubscriptionAcknowledgements: acks,
+func (c *Client) notifySubscription(ctx context.Context, response *ua.PublishResponse) {
+	c.subMux.RLock()
+	sub, ok := c.subscriptions[response.SubscriptionID]
+	c.subMux.RUnlock()
+	if !ok {
+		debug.Printf("Unknown subscription: %v", response.SubscriptionID)
+		return
+	}
+
+	// Check for errors
+	status := ua.StatusOK
+	for _, res := range response.Results {
+		if res != ua.StatusOK {
+			status = res
+			break
 		}
+	}
 
-		var res *ua.PublishResponse
-		err := c.Send(req, func(v interface{}) error {
-			return safeAssign(v, &res)
+	if status != ua.StatusOK {
+		sub.sendNotification(ctx, &PublishNotificationData{
+			SubscriptionID: response.SubscriptionID,
+			Error:          status,
 		})
-		if err != nil {
-			notif <- PublishNotificationData{Error: err}
+		return
+	}
+
+	if response.NotificationMessage == nil {
+		sub.sendNotification(ctx, &PublishNotificationData{
+			SubscriptionID: response.SubscriptionID,
+			Error:          fmt.Errorf("empty NotificationMessage"),
+		})
+		return
+	}
+
+	// Part 4, 7.21 NotificationMessage
+	for _, data := range response.NotificationMessage.NotificationData {
+		// Part 4, 7.20 NotificationData parameters
+		if data == nil || data.Value == nil {
+			sub.sendNotification(ctx, &PublishNotificationData{
+				SubscriptionID: response.SubscriptionID,
+				Error:          fmt.Errorf("missing NotificationData parameter"),
+			})
 			continue
 		}
 
-		// Check for errors
-		status := ua.StatusOK
-		for _, res := range res.Results {
-			if res != ua.StatusOK {
-				status = res
-				break
-			}
-		}
+		switch data.Value.(type) {
+		// Part 4, 7.20.2 DataChangeNotification parameter
+		// Part 4, 7.20.3 EventNotificationList parameter
+		// Part 4, 7.20.4 StatusChangeNotification parameter
+		case *ua.DataChangeNotification,
+			*ua.EventNotificationList,
+			*ua.StatusChangeNotification:
+			sub.sendNotification(ctx, &PublishNotificationData{
+				SubscriptionID: response.SubscriptionID,
+				Value:          data.Value,
+			})
 
-		if status != ua.StatusOK {
-			notif <- PublishNotificationData{
-				SubscriptionID: res.SubscriptionID,
-				Error:          status,
-			}
-			continue
-		}
-
-		// Prepare SubscriptionAcknowledgement for next PublishRequest
-		acks = make([]*ua.SubscriptionAcknowledgement, 0)
-		for _, i := range res.AvailableSequenceNumbers {
-			ack := &ua.SubscriptionAcknowledgement{
-				SubscriptionID: res.SubscriptionID,
-				SequenceNumber: i,
-			}
-			acks = append(acks, ack)
-		}
-
-		if res.NotificationMessage == nil {
-			notif <- PublishNotificationData{
-				SubscriptionID: res.SubscriptionID,
-				Error:          fmt.Errorf("empty NotificationMessage"),
-			}
-			continue
-		}
-
-		// Part 4, 7.21 NotificationMessage
-		for _, data := range res.NotificationMessage.NotificationData {
-			// Part 4, 7.20 NotificationData parameters
-			if data == nil || data.Value == nil {
-				notif <- PublishNotificationData{
-					SubscriptionID: res.SubscriptionID,
-					Error:          fmt.Errorf("missing NotificationData parameter"),
-				}
-				continue
-			}
-
-			switch data.Value.(type) {
-			// Part 4, 7.20.2 DataChangeNotification parameter
-			// Part 4, 7.20.3 EventNotificationList parameter
-			// Part 4, 7.20.4 StatusChangeNotification parameter
-			case *ua.DataChangeNotification,
-				*ua.EventNotificationList,
-				*ua.StatusChangeNotification:
-				notif <- PublishNotificationData{
-					SubscriptionID: res.SubscriptionID,
-					Value:          data.Value,
-				}
-
-			// Error
-			default:
-				notif <- PublishNotificationData{
-					SubscriptionID: res.SubscriptionID,
-					Error:          fmt.Errorf("unknown NotificationData parameter: %T", data.Value),
-				}
-			}
+		// Error
+		default:
+			sub.sendNotification(ctx, &PublishNotificationData{
+				SubscriptionID: response.SubscriptionID,
+				Error:          fmt.Errorf("unknown NotificationData parameter: %T", data.Value),
+			})
 		}
 	}
-}
-
-func (c *Client) CreateMonitoredItems(subID uint32, ts ua.TimestampsToReturn, items ...*ua.MonitoredItemCreateRequest) (*ua.CreateMonitoredItemsResponse, error) {
-	if subID == 0 {
-		return nil, fmt.Errorf("invalid subscription id")
-	}
-
-	// Part 4, 5.12.2.2 CreateMonitoredItems Service Parameters
-	req := &ua.CreateMonitoredItemsRequest{
-		SubscriptionID:     subID,
-		TimestampsToReturn: ts,
-		ItemsToCreate:      items,
-	}
-
-	var res *ua.CreateMonitoredItemsResponse
-	err := c.Send(req, func(v interface{}) error {
-		return safeAssign(v, &res)
-	})
-	return res, err
 }
 
 func (c *Client) HistoryReadRawModified(nodes []*ua.HistoryReadValueID, details *ua.ReadRawModifiedDetails) (*ua.HistoryReadResponse, error) {
