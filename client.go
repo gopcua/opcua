@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log"
 	"reflect"
+	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -33,6 +34,48 @@ func GetEndpoints(endpoint string) ([]*ua.EndpointDescription, error) {
 	}
 	return res.Endpoints, nil
 }
+
+// SelectEndpoint returns the endpoint with the highest security level which matches
+// security policy and security mode. policy and mode can be omitted so that
+// only one of them has to match.
+// todo(fs): should this function return an error?
+func SelectEndpoint(endpoints []*ua.EndpointDescription, policy string, mode ua.MessageSecurityMode) *ua.EndpointDescription {
+	if len(endpoints) == 0 {
+		return nil
+	}
+
+	sort.Sort(bySecurityLevel(endpoints))
+	policy = ua.FormatSecurityPolicyURI(policy)
+
+	// don't care -> return highest security level
+	if policy == "" && mode == ua.MessageSecurityModeInvalid {
+		return endpoints[0]
+	}
+
+	for _, p := range endpoints {
+		// match only security mode
+		if policy == "" && p.SecurityMode == mode {
+			return p
+		}
+
+		// match only security policy
+		if p.SecurityPolicyURI == policy && mode == ua.MessageSecurityModeInvalid {
+			return p
+		}
+
+		// match both
+		if p.SecurityPolicyURI == policy && p.SecurityMode == mode {
+			return p
+		}
+	}
+	return nil
+}
+
+type bySecurityLevel []*ua.EndpointDescription
+
+func (a bySecurityLevel) Len() int           { return len(a) }
+func (a bySecurityLevel) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a bySecurityLevel) Less(i, j int) bool { return a[i].SecurityLevel < a[j].SecurityLevel }
 
 // Client is a high-level client for an OPC/UA server.
 // It establishes a secure channel and a session.
@@ -68,16 +111,12 @@ type Client struct {
 //
 // https://godoc.org/github.com/gopcua/opcua#Option
 func NewClient(endpoint string, opts ...Option) *Client {
-	c := &Client{
+	cfg, sessionCfg := ApplyConfig(opts...)
+	return &Client{
 		endpointURL: endpoint,
-		cfg:         DefaultClientConfig(),
-		sessionCfg:  DefaultSessionConfig(),
+		cfg:         cfg,
+		sessionCfg:  sessionCfg,
 	}
-	for _, opt := range opts {
-		opt(c.cfg, c.sessionCfg)
-	}
-
-	return c
 }
 
 // Connect establishes a secure channel and creates a new session.

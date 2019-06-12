@@ -6,6 +6,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
 
 	"github.com/gopcua/opcua"
@@ -15,11 +16,35 @@ import (
 
 func main() {
 	endpoint := flag.String("endpoint", "opc.tcp://localhost:4840", "OPC UA Endpoint URL")
+	policy := flag.String("policy", "", "Security policy: None, Basic128Rsa15, Basic256, Basic256Sha256. Default: auto")
+	mode := flag.String("mode", "", "Security mode: None, Sign, SignAndEncrypt. Default: auto")
+	certFile := flag.String("cert", "", "Path to cert.pem. Required for security mode/policy != None")
+	keyFile := flag.String("key", "", "Path to private key.pem. Required for security mode/policy != None")
 	flag.BoolVar(&debug.Enable, "debug", false, "enable debug logging")
 	flag.Parse()
 	log.SetFlags(0)
 
-	c := opcua.NewClient(*endpoint)
+	endpoints, err := opcua.GetEndpoints(*endpoint)
+	if err != nil {
+		log.Fatal(err)
+	}
+	ep := opcua.SelectEndpoint(endpoints, *policy, ua.MessageSecurityModeFromString(*mode))
+	if ep == nil {
+		log.Fatal("Failed to find suitable endpoint")
+	}
+
+	fmt.Println("*", ep.SecurityPolicyURI, ep.SecurityMode)
+
+	opts := []opcua.Option{
+		opcua.SecurityPolicy(*policy),
+		opcua.SecurityModeString(*mode),
+		opcua.CertificateFile(*certFile),
+		opcua.PrivateKeyFile(*keyFile),
+		opcua.AuthAnonymous(),
+		opcua.SecurityFromEndpoint(ep, ua.UserTokenTypeAnonymous),
+	}
+
+	c := opcua.NewClient(ep.EndpointURL, opts...)
 	if err := c.Connect(); err != nil {
 		log.Fatal(err)
 	}

@@ -7,8 +7,12 @@ package opcua
 import (
 	"crypto/rsa"
 	"crypto/x509"
+	"encoding/pem"
+	"fmt"
+	"io/ioutil"
 	"log"
 	"math/rand"
+	"strings"
 	"time"
 
 	"github.com/gopcua/opcua/ua"
@@ -43,20 +47,31 @@ func DefaultSessionConfig() *uasc.SessionConfig {
 	}
 }
 
+// ApplyConfig applies the config options to the default configuration.
+// todo(fs): Can we find a better name?
+func ApplyConfig(opts ...Option) (*uasc.Config, *uasc.SessionConfig) {
+	c := DefaultClientConfig()
+	sc := DefaultSessionConfig()
+	for _, opt := range opts {
+		opt(c, sc)
+	}
+	return c, sc
+}
+
 // Option is an option function type to modify the configuration.
 type Option func(*uasc.Config, *uasc.SessionConfig)
-
-// ApplicationURI sets the application uri in the session configuration.
-func ApplicationURI(s string) Option {
-	return func(c *uasc.Config, sc *uasc.SessionConfig) {
-		sc.ClientDescription.ApplicationURI = s
-	}
-}
 
 // ApplicationName sets the application name in the session configuration.
 func ApplicationName(s string) Option {
 	return func(c *uasc.Config, sc *uasc.SessionConfig) {
 		sc.ClientDescription.ApplicationName = &ua.LocalizedText{Text: s}
+	}
+}
+
+// ApplicationURI sets the application uri in the session configuration.
+func ApplicationURI(s string) Option {
+	return func(c *uasc.Config, sc *uasc.SessionConfig) {
+		sc.ClientDescription.ApplicationURI = s
 	}
 }
 
@@ -74,6 +89,13 @@ func Locales(locale ...string) Option {
 	}
 }
 
+// ProductURI sets the product uri in the session configuration.
+func ProductURI(s string) Option {
+	return func(c *uasc.Config, sc *uasc.SessionConfig) {
+		sc.ClientDescription.ProductURI = s
+	}
+}
+
 // RandomRequestID assigns a random initial request id.
 func RandomRequestID() Option {
 	return func(c *uasc.Config, sc *uasc.SessionConfig) {
@@ -81,10 +103,22 @@ func RandomRequestID() Option {
 	}
 }
 
-// ProductURI sets the product uri in the session configuration.
-func ProductURI(s string) Option {
+// RemoteCertificate sets the server certificate.
+func RemoteCertificate(cert []byte) Option {
 	return func(c *uasc.Config, sc *uasc.SessionConfig) {
-		sc.ClientDescription.ProductURI = s
+		c.RemoteCertificate = cert
+	}
+}
+
+// RemoteCertificateFile sets the server certificate from the file
+// in PEM or DER encoding.
+func RemoteCertificateFile(filename string) Option {
+	return func(c *uasc.Config, sc *uasc.SessionConfig) {
+		cert, err := loadCertificate(filename)
+		if err != nil {
+			log.Fatal(err)
+		}
+		c.RemoteCertificate = cert
 	}
 }
 
@@ -95,10 +129,18 @@ func SecurityMode(m ua.MessageSecurityMode) Option {
 	}
 }
 
+// SecurityModeString sets the security mode for the secure channel.
+// Valid values are "None", "Sign", and "SignAndEncrypt".
+func SecurityModeString(s string) Option {
+	return func(c *uasc.Config, sc *uasc.SessionConfig) {
+		c.SecurityMode = ua.MessageSecurityModeFromString(s)
+	}
+}
+
 // SecurityPolicy sets the security policy uri for the secure channel.
 func SecurityPolicy(s string) Option {
 	return func(c *uasc.Config, sc *uasc.SessionConfig) {
-		c.SecurityPolicyURI = s
+		c.SecurityPolicyURI = ua.FormatSecurityPolicyURI(s)
 	}
 }
 
@@ -116,21 +158,102 @@ func PrivateKey(key *rsa.PrivateKey) Option {
 	}
 }
 
-// Certificate sets the client X509 certificate in the secure channel configuration
-// and also detects and sets the ApplicationURI from the URI within the certificate.
+// PrivateKeyFile sets the RSA private key in the secure channel configuration
+// from a PEM or DER encoded file.
+func PrivateKeyFile(filename string) Option {
+	return func(c *uasc.Config, sc *uasc.SessionConfig) {
+		if filename == "" {
+			return
+		}
+		key, err := loadPrivateKey(filename)
+		if err != nil {
+			log.Fatal(err)
+		}
+		c.LocalKey = key
+	}
+}
+
+func loadPrivateKey(filename string) (*rsa.PrivateKey, error) {
+	b, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to load private key: %s", err)
+	}
+
+	derBytes := b
+	if strings.HasSuffix(filename, ".pem") {
+		block, _ := pem.Decode(b)
+		if block == nil || block.Type != "RSA PRIVATE KEY" {
+			return nil, fmt.Errorf("Failed to decode PEM block with private key")
+		}
+		derBytes = block.Bytes
+	}
+
+	pk, err := x509.ParsePKCS1PrivateKey(derBytes)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to parse private key: %s", err)
+	}
+	return pk, nil
+}
+
+// Certificate sets the client X509 certificate in the secure channel configuration.
+// It also detects and sets the ApplicationURI from the URI within the certificate.
 func Certificate(cert []byte) Option {
 	return func(c *uasc.Config, sc *uasc.SessionConfig) {
-		c.Certificate = cert
+		setCertificate(cert, c, sc)
+	}
+}
 
-		// Extract the application URI from the certificate.
-		var appURI string
-		x509cert, err := x509.ParseCertificate(cert)
-		if err == nil && len(x509cert.URIs) > 0 {
-			appURI = x509cert.URIs[0].String()
+// Certificate sets the client X509 certificate in the secure channel configuration
+// from the PEM or DER encoded file. It also detects and sets the ApplicationURI
+// from the URI within the certificate.
+func CertificateFile(filename string) Option {
+	return func(c *uasc.Config, sc *uasc.SessionConfig) {
+		if filename == "" {
+			return
 		}
 
-		sc.ClientDescription.ApplicationURI = appURI
+		cert, err := loadCertificate(filename)
+		if err != nil {
+			log.Fatal(err)
+		}
+		setCertificate(cert, c, sc)
 	}
+}
+
+func loadCertificate(filename string) ([]byte, error) {
+	b, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to load certificate: %s", err)
+	}
+
+	if !strings.HasSuffix(filename, ".pem") {
+		return b, nil
+	}
+
+	block, _ := pem.Decode(b)
+	if block == nil || block.Type != "CERTIFICATE" {
+		return nil, fmt.Errorf("Failed to decode PEM block with certificate")
+	}
+	return block.Bytes, nil
+}
+
+func setCertificate(cert []byte, c *uasc.Config, sc *uasc.SessionConfig) {
+	c.Certificate = cert
+
+	// Extract the application URI from the certificate.
+	x509cert, err := x509.ParseCertificate(cert)
+	if err != nil {
+		log.Fatalf("Failed to parse certificate: %s", err)
+		return
+	}
+	if len(x509cert.URIs) == 0 {
+		return
+	}
+	appURI := x509cert.URIs[0].String()
+	if appURI == "" {
+		return
+	}
+	sc.ClientDescription.ApplicationURI = appURI
 }
 
 // SecurityFromEndpoint sets the server-related security parameters from
@@ -188,6 +311,9 @@ func setPolicyID(t interface{}, policy string) {
 // AuthPolicyID sets the policy ID of the user identity token
 // Note: This should only be called if you know the exact policy ID the server is expecting.
 // Most callers should use SecurityFromEndpoint as it automatically finds the policyID
+// todo(fs): Should we make 'policy' an option to the other
+// todo(fs): AuthXXX methods since this approach requires context
+// todo(fs): and ordering?
 func AuthPolicyID(policy string) Option {
 	return func(c *uasc.Config, sc *uasc.SessionConfig) {
 		if sc.UserIdentityToken == nil {
@@ -209,6 +335,7 @@ func AuthAnonymous() Option {
 
 		_, ok := sc.UserIdentityToken.(*ua.AnonymousIdentityToken)
 		if !ok {
+			// todo(fs): should we Fatal here?
 			log.Printf("non-anonymous authentication already configured, ignoring")
 			return
 		}
@@ -226,6 +353,7 @@ func AuthUsername(user, pass string) Option {
 
 		t, ok := sc.UserIdentityToken.(*ua.UserNameIdentityToken)
 		if !ok {
+			// todo(fs): should we Fatal here?
 			log.Printf("non-username authentication already configured, ignoring")
 			return
 		}
@@ -246,6 +374,7 @@ func AuthCertificate(cert []byte) Option {
 
 		t, ok := sc.UserIdentityToken.(*ua.X509IdentityToken)
 		if !ok {
+			// todo(fs): should we Fatal here?
 			log.Printf("non-certificate authentication already configured, ignoring")
 			return
 		}

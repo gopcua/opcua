@@ -95,6 +95,9 @@ func (n StatusCode) Error() string {
 
 var (
 	StatusOK StatusCode = 0x0
+    StatusUncertain StatusCode = 0x40000000
+    StatusBad StatusCode = 0x80000000
+
 	{{range .}}{{index . 0}} StatusCode = {{index . 1}}
 	{{end}}
 )
@@ -107,6 +110,8 @@ type StatusCodeDesc struct {
 // StatusCodes maps status codes to the status code error types.
 var StatusCodes = map[StatusCode]StatusCodeDesc{
 	StatusOK: StatusCodeDesc{Name: "OK", Text: ""},
+	StatusUncertain: StatusCodeDesc{Name: "Uncertain", Text: ""},
+	StatusBad: StatusCodeDesc{Name: "Bad", Text: ""},
 	{{range .}}{{index . 0}}: StatusCodeDesc{ Name: "{{index . 0}}", Text: "{{index . 2}}" },
 	{{end}}
 }
