@@ -159,17 +159,17 @@ The current set of supported services is only for the high-level client.
 |                             | HistoryRead                   |           |              |
 |                             | HistoryUpdate                 |           |              |
 | Method Service Set          | Call                          |           |              |
-| MonitoredItems Service Set  | CreateMonitoredItems          |           |              |
-|                             | DeleteMonitoredItems          |           |              |
+| MonitoredItems Service Set  | CreateMonitoredItems          | Yes       |              |
+|                             | DeleteMonitoredItems          | Yes       |              |
 |                             | ModifyMonitoredItems          |           |              |
 |                             | SetMonitoringMode             |           |              |
 |                             | SetTriggering                 |           |              |
-| Subscription Service Set    | CreateSubscription            |           |              |
+| Subscription Service Set    | CreateSubscription            | Yes       |              |
 |                             | ModifySubscription            |           |              |
 |                             | SetPublishingMode             |           |              |
-|                             | Publish                       |           |              |
+|                             | Publish                       | Yes       |              |
 |                             | Republish                     |           |              |
-|                             | DeleteSubscriptions           |           |              |
+|                             | DeleteSubscriptions           | Yes       |              |
 |                             | TransferSubscriptions         |           |              |
 
 ## License

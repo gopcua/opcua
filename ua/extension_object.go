@@ -89,6 +89,9 @@ func (e *ExtensionObject) Decode(b []byte) (int, error) {
 
 func (e *ExtensionObject) Encode() ([]byte, error) {
 	buf := NewBuffer(nil)
+	if e == nil {
+		e = &ExtensionObject{TypeID: NewTwoByteExpandedNodeID(0), EncodingMask: ExtensionObjectEmpty}
+	}
 	buf.WriteStruct(e.TypeID)
 	buf.WriteByte(e.EncodingMask)
 	if e.EncodingMask == ExtensionObjectEmpty {

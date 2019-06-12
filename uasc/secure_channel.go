@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"reflect"
 	"sync"
 	"sync/atomic"
@@ -26,6 +27,8 @@ const (
 	secureChannelCreated int32 = iota
 	secureChannelOpen
 	secureChannelClosed
+	timeoutLeniency = 250 * time.Millisecond
+	MaxTimeout      = math.MaxUint32 * time.Millisecond
 )
 
 type Response struct {
@@ -201,7 +204,12 @@ func (s *SecureChannel) closeSecureChannel() error {
 
 // Send sends the service request and calls h with the response.
 func (s *SecureChannel) Send(svc interface{}, authToken *ua.NodeID, h func(interface{}) error) error {
-	ch, reqid, err := s.SendAsync(svc, authToken)
+	return s.SendWithTimeout(svc, authToken, s.cfg.RequestTimeout, h)
+}
+
+// SendWithTimeout sends the service request and calls h with the response with a specific timeout.
+func (s *SecureChannel) SendWithTimeout(svc interface{}, authToken *ua.NodeID, timeout time.Duration, h func(interface{}) error) error {
+	ch, reqid, err := s.sendAsyncWithTimeout(svc, authToken, timeout)
 	if err != nil {
 		return err
 	}
@@ -213,10 +221,13 @@ func (s *SecureChannel) Send(svc interface{}, authToken *ua.NodeID, h func(inter
 	select {
 	case resp := <-ch:
 		if resp.Err != nil {
+			if resp.V != nil {
+				_ = h(resp.V) // ignore result because resp.Err takes precedence
+			}
 			return resp.Err
 		}
 		return h(resp.V)
-	case <-time.After(s.cfg.RequestTimeout):
+	case <-time.After(timeout + timeoutLeniency): // `+ timeoutLeniency` to give the server a chance to respond to TimeoutHint
 		s.mu.Lock()
 		s.popHandlerLock(reqid)
 		s.mu.Unlock()
@@ -227,6 +238,12 @@ func (s *SecureChannel) Send(svc interface{}, authToken *ua.NodeID, h func(inter
 // SendAsync sends the service request and returns a channel which will receive the
 // response when it arrives.
 func (s *SecureChannel) SendAsync(svc interface{}, authToken *ua.NodeID) (resp chan Response, reqID uint32, err error) {
+	return s.sendAsyncWithTimeout(svc, authToken, s.cfg.RequestTimeout)
+}
+
+// sendAsyncWithTimeout sends the service request with a specific timeout and returns a channel which will receive the
+// response when it arrives.
+func (s *SecureChannel) sendAsyncWithTimeout(svc interface{}, authToken *ua.NodeID, timeout time.Duration) (resp chan Response, reqID uint32, err error) {
 	typeID := ua.ServiceTypeID(svc)
 	if typeID == 0 {
 		return nil, 0, fmt.Errorf("unknown service %T. Did you call register?", svc)
@@ -245,6 +262,10 @@ func (s *SecureChannel) SendAsync(svc interface{}, authToken *ua.NodeID) (resp c
 	s.reqhdr.AuthenticationToken = authToken
 	s.reqhdr.RequestHandle++
 	s.reqhdr.Timestamp = time.Now()
+	if timeout > 0 && timeout < s.cfg.RequestTimeout {
+		timeout = s.cfg.RequestTimeout
+	}
+	s.reqhdr.TimeoutHint = uint32(timeout / time.Millisecond)
 
 	// encode the message
 	m := NewMessage(svc, typeID, s.cfg)
