@@ -25,6 +25,8 @@ func main() {
 	flag.Parse()
 	log.SetFlags(0)
 
+	ctx := context.Background()
+
 	endpoints, err := opcua.GetEndpoints(*endpoint)
 	if err != nil {
 		log.Fatal(err)
@@ -46,7 +48,7 @@ func main() {
 	}
 
 	c := opcua.NewClient(ep.EndpointURL, opts...)
-	if err := c.Connect(); err != nil {
+	if err := c.Connect(ctx); err != nil {
 		log.Fatal(err)
 	}
 	defer c.Close()

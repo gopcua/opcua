@@ -11,7 +11,6 @@ import (
 	"crypto/x509"
 	"fmt"
 	"io"
-	"log"
 	"math"
 	"reflect"
 	"sync"
@@ -123,7 +122,6 @@ func (s *SecureChannel) Send(svc interface{}, authToken *ua.NodeID, h func(inter
 
 // SendWithTimeout sends the service request and calls h with the response with a specific timeout.
 func (s *SecureChannel) SendWithTimeout(svc interface{}, authToken *ua.NodeID, timeout time.Duration, h func(interface{}) error) error {
-	ch, reqid, err := s.sendAsyncWithTimeout(svc, authToken, timeout)
 	respRequired := h != nil
 
 	ch, reqid, err := s.SendAsync(svc, authToken, respRequired)
@@ -329,7 +327,6 @@ func (s *SecureChannel) Receive(ctx context.Context) Response {
 		default:
 			reqid, svc, err := s.receive(ctx)
 			if _, ok := err.(*uacp.Error); ok || err == io.EOF {
-				// todo: notifyCaller has been deprecated, but how else to purge all pending callbacks?
 				s.notifyCallers(ctx, err)
 				s.Close()
 				return Response{
@@ -408,7 +405,7 @@ func (s *SecureChannel) receive(ctx context.Context) (uint32, interface{}, error
 				return 0, nil, err
 			}
 			if errf, ok := err.(*uacp.Error); ok {
-				s.notifyCallers(errf)
+				s.notifyCallers(ctx, errf)
 				return 0, nil, errf
 			}
 			if err != nil {
