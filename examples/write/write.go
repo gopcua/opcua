@@ -5,6 +5,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"log"
 
@@ -23,8 +24,10 @@ func main() {
 	flag.Parse()
 	log.SetFlags(0)
 
+	ctx := context.Background()
+
 	c := opcua.NewClient(*endpoint)
-	if err := c.Connect(); err != nil {
+	if err := c.Connect(ctx); err != nil {
 		log.Fatal(err)
 	}
 	defer c.Close()

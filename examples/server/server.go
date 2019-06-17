@@ -18,12 +18,14 @@ func main() {
 	)
 	flag.Parse()
 
+	ctx := context.Background()
+
 	log.Printf("Listening on %s", *endpoint)
 	l, err := uacp.Listen(*endpoint, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
-	c, err := l.Accept(context.Background())
+	c, err := l.Accept(ctx)
 	if err != nil {
 		log.Fatal(err)
 	}
