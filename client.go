@@ -230,7 +230,7 @@ type Session struct {
 	serverCertificate []byte
 
 	// serverNonce is the secret nonce received from the server during Create and Activate
-	// Session respones. Used to generate the signatures for the ActivateSessionRequest
+	// Session response. Used to generate the signatures for the ActivateSessionRequest
 	// and User Authorization
 	serverNonce []byte
 }
@@ -430,7 +430,7 @@ func (c *Client) Send(req interface{}, h func(interface{}) error) error {
 
 // sendWithTimeout sends the request via the secure channel with a custom timeout and registers a handler for
 // the response. If the client has an active session it injects the
-// authenticaton token.
+// authentication token.
 func (c *Client) sendWithTimeout(req interface{}, timeout time.Duration, h func(interface{}) error) error {
 	var authToken *ua.NodeID
 	if s := c.Session(); s != nil {
