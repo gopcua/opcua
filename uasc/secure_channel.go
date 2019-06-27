@@ -47,8 +47,8 @@ type SecureChannel struct {
 	// cfg is the configuration for the secure channel.
 	cfg *Config
 
-	// reqhdr is the header for the next request.
-	reqhdr *ua.RequestHeader
+	// reqhdrproto is the prototype for the header for the next request.
+	reqhdrproto *ua.RequestHeader
 
 	// state is the state of the secure channel.
 	// Must be accessed with atomic.LoadInt32/StoreInt32
@@ -91,11 +91,9 @@ func NewSecureChannel(endpoint string, c *uacp.Conn, cfg *Config) (*SecureChanne
 		EndpointURL: endpoint,
 		c:           c,
 		cfg:         cfg,
-		reqhdr: &ua.RequestHeader{
-			AuthenticationToken: ua.NewTwoByteNodeID(0),
-			Timestamp:           time.Now(),
-			TimeoutHint:         uint32(cfg.RequestTimeout / time.Millisecond),
-			AdditionalHeader:    ua.NewExtensionObject(nil),
+		reqhdrproto: &ua.RequestHeader{
+			TimeoutHint:      uint32(cfg.RequestTimeout / time.Millisecond),
+			AdditionalHeader: ua.NewExtensionObject(nil),
 		},
 		state:   secureChannelCreated,
 		handler: make(map[uint32]chan Response),
@@ -163,28 +161,19 @@ func (s *SecureChannel) sendAsyncWithTimeout(svc interface{}, authToken *ua.Node
 	if typeID == 0 {
 		return nil, 0, fmt.Errorf("unknown service %T. Did you call register?", svc)
 	}
-	if authToken == nil {
-		authToken = ua.NewTwoByteNodeID(0)
-	}
 
 	s.mu.Lock()
+	// prepare the header value for the next request
+	reqhdr := s.newRequestHeaderLock(authToken, timeout)
 	// the request header is always the first field
 	val := reflect.ValueOf(svc)
 	rHdr := val.Elem().Field(0)
-	s.cfg.SequenceNumber++
 	if _, ok := rHdr.Interface().(*ua.RequestHeader); ok {
-		rHdr.Set(reflect.ValueOf(s.reqhdr))
-
-		s.reqhdr.AuthenticationToken = authToken
-		s.cfg.RequestID++
-		s.reqhdr.RequestHandle++
-		s.reqhdr.Timestamp = time.Now()
-		if timeout > 0 && timeout < s.cfg.RequestTimeout {
-			timeout = s.cfg.RequestTimeout
-		}
-		s.reqhdr.TimeoutHint = uint32(timeout / time.Millisecond)
+		rHdr.Set(reflect.ValueOf(reqhdr))
 	}
 
+	s.cfg.SequenceNumber++
+	s.cfg.RequestID++
 	// encode the message
 	m := NewMessage(svc, typeID, s.cfg)
 	reqid := m.SequenceHeader.RequestID
@@ -220,6 +209,26 @@ func (s *SecureChannel) sendAsyncWithTimeout(svc interface{}, authToken *ua.Node
 	s.handler[reqid] = resp
 	s.mu.Unlock()
 	return resp, reqid, nil
+}
+
+func (s *SecureChannel) newRequestHeaderLock(authToken *ua.NodeID, timeout time.Duration) *ua.RequestHeader {
+	hdr := &ua.RequestHeader{}
+	s.reqhdrproto.RequestHandle++
+	*hdr = *s.reqhdrproto
+
+	if authToken == nil {
+		authToken = ua.NewTwoByteNodeID(0)
+	}
+	hdr.AuthenticationToken = authToken
+	if hdr.AdditionalHeader == nil {
+		hdr.AdditionalHeader = ua.NewExtensionObject(nil)
+	}
+	hdr.Timestamp = time.Now()
+	if timeout > 0 && timeout < s.cfg.RequestTimeout {
+		timeout = s.cfg.RequestTimeout
+	}
+	hdr.TimeoutHint = uint32(timeout / time.Millisecond)
+	return hdr
 }
 
 func (s *SecureChannel) readChunk() (*MessageChunk, error) {
