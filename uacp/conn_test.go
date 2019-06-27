@@ -44,7 +44,7 @@ func TestConn(t *testing.T) {
 	case err := <-acceptErr:
 		t.Fatalf("accept fail: %v", err)
 	case <-time.After(time.Second):
-		t.Fatalf("timed out")
+		t.Fatal("timed out")
 	}
 }
 
@@ -61,12 +61,14 @@ func TestClientWrite(t *testing.T) {
 
 	var srvConn *Conn
 	done := make(chan int)
+	acceptErr := make(chan error, 1)
 	go func() {
 		defer ln.Close()
 		var err error
 		srvConn, err = ln.Accept(ctx)
 		if err != nil {
-			t.Fatal(err)
+			acceptErr <- err
+			return
 		}
 		done <- 0
 	}()
@@ -83,8 +85,10 @@ func TestClientWrite(t *testing.T) {
 				t.Fatal("failed to setup secure channel")
 			}
 			goto NEXT
+		case err := <-acceptErr:
+			t.Fatalf("accept fail: %v", err)
 		case <-time.After(time.Second):
-			t.Fatalf("timed out")
+			t.Fatal("timed out")
 		}
 	}
 
