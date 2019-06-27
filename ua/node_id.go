@@ -128,9 +128,9 @@ func ParseNodeID(s string) (*NodeID, error) {
 		switch {
 		case ns == 0 && id < 256:
 			return NewTwoByteNodeID(byte(id)), nil
-		case ns < 256 && id >= 0 && id < math.MaxUint16:
+		case ns < 256 && id < math.MaxUint16:
 			return NewFourByteNodeID(byte(ns), uint16(id)), nil
-		case id >= 0 && id < math.MaxUint32:
+		case id < math.MaxUint32:
 			return NewNumericNodeID(ns, uint32(id)), nil
 		default:
 			return nil, fmt.Errorf("numeric id out of range (0..2^32-1): %s", s)
