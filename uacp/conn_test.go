@@ -24,10 +24,12 @@ func TestConn(t *testing.T) {
 	defer cancel()
 
 	done := make(chan struct{})
+	acceptErr := make(chan error, 1)
 	go func() {
 		c, err := ln.Accept(ctx)
 		if err != nil {
-			t.Fatal(err)
+			acceptErr <- err
+			return
 		}
 		defer c.Close()
 		close(done)
@@ -39,6 +41,8 @@ func TestConn(t *testing.T) {
 
 	select {
 	case <-done:
+	case err := <-acceptErr:
+		t.Fatalf("accept fail: %v", err)
 	case <-time.After(time.Second):
 		t.Fatalf("timed out")
 	}
