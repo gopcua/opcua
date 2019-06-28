@@ -51,5 +51,5 @@ func main() {
 	if resp.Results[0].Status != ua.StatusOK {
 		log.Fatalf("Status not OK: %v", resp.Results[0].Status)
 	}
-	log.Print(resp.Results[0].Value)
+	log.Print(resp.Results[0].Value.Value)
 }
