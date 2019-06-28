@@ -328,7 +328,6 @@ func (s *SecureChannel) Receive(ctx context.Context) Response {
 			reqid, svc, err := s.receive(ctx)
 			if _, ok := err.(*uacp.Error); ok || err == io.EOF {
 				s.notifyCallers(ctx, err)
-				s.Close()
 				return Response{
 					ReqID: reqid,
 					SCID:  s.cfg.SecureChannelID,
