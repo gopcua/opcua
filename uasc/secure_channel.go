@@ -168,6 +168,7 @@ func (s *SecureChannel) sendAsyncWithTimeout(svc interface{}, authToken *ua.Node
 	}
 
 	s.mu.Lock()
+	defer s.mu.Unlock()
 	// the request header is always the first field
 	val := reflect.ValueOf(svc)
 	rHdr := val.Elem().Field(0)
@@ -188,7 +189,6 @@ func (s *SecureChannel) sendAsyncWithTimeout(svc interface{}, authToken *ua.Node
 	// encode the message
 	m := NewMessage(svc, typeID, s.cfg)
 	reqid := m.SequenceHeader.RequestID
-	s.mu.Unlock()
 	b, err := m.Encode()
 	if err != nil {
 		return nil, reqid, err
@@ -212,13 +212,10 @@ func (s *SecureChannel) sendAsyncWithTimeout(svc interface{}, authToken *ua.Node
 		return nil, 0, nil
 	}
 	resp = make(chan Response)
-	s.mu.Lock()
 	if s.handler[reqid] != nil {
-		s.mu.Unlock()
 		return nil, reqid, fmt.Errorf("error: duplicate handler registration for request id %d", reqid)
 	}
 	s.handler[reqid] = resp
-	s.mu.Unlock()
 	return resp, reqid, nil
 }
 
