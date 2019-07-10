@@ -102,6 +102,9 @@ type Client struct {
 	subscriptions map[uint32]*Subscription
 	subMux        sync.RWMutex
 
+	//cancelMonitor cancels the monitorChannel goroutine
+	cancelMonitor context.CancelFunc
+
 	// once initializes session
 	once sync.Once
 }
@@ -171,9 +174,12 @@ func (c *Client) Dial(ctx context.Context) error {
 		return err
 	}
 	c.sechan = sechan
+	ctx, c.cancelMonitor = context.WithCancel(ctx)
 	go c.monitorChannel(ctx)
 
 	if err := sechan.Open(); err != nil {
+		c.cancelMonitor()
+
 		_ = conn.Close()
 		c.sechan = nil
 		return err
@@ -209,6 +215,10 @@ func (c *Client) Close() error {
 	// try to close the session but ignore any error
 	// so that we close the underlying channel and connection.
 	_ = c.CloseSession()
+	if c.cancelMonitor != nil {
+		c.cancelMonitor()
+	}
+
 	return c.sechan.Close()
 }
 
