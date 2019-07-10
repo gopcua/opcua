@@ -338,9 +338,6 @@ func (s *SecureChannel) Receive(ctx context.Context) Response {
 				debug.Printf("uasc %d/%d: recv %T", s.c.ID(), reqid, svc)
 			}
 
-			// todo: validate request ID / check that it is increasing correctly
-			s.cfg.RequestID = reqid
-
 			switch svc.(type) {
 			case *ua.OpenSecureChannelRequest:
 				err := s.handleOpenSecureChannelRequest(svc)
