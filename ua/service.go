@@ -6,32 +6,26 @@ package ua
 
 import (
 	"fmt"
-	"reflect"
 
 	"github.com/gopcua/opcua/debug"
 )
 
-var (
-	serviceType   = map[uint16]reflect.Type{}
-	serviceTypeID = map[reflect.Type]uint16{}
-)
+// svcreg contains all known service request/response objects.
+var svcreg = NewTypeRegistry()
 
-func register(typeID uint16, v interface{}) {
-	typ := reflect.TypeOf(v) // *ServiceObject
-
-	if serviceType[typeID] != nil {
-		panic(fmt.Sprintf("Service %d is already registered", typeID))
+// RegisterService registers a new service object type.
+// It panics if the type or the id is already registered.
+func RegisterService(typeID uint16, v interface{}) {
+	if err := svcreg.Register(uint32(typeID), v); err != nil {
+		panic("Service " + err.Error())
 	}
-	serviceType[typeID] = typ
-
-	if _, ok := serviceTypeID[typ]; ok {
-		panic(fmt.Sprintf("Service %T is already registered", v))
-	}
-	serviceTypeID[typ] = typeID
 }
 
+// ServiceTypeID returns the id of the service object type as
+// registered with RegisterService. If the service object is not
+// known the function returns 0.
 func ServiceTypeID(v interface{}) uint16 {
-	return serviceTypeID[reflect.TypeOf(v)]
+	return uint16(svcreg.Lookup(v))
 }
 
 func DecodeService(b []byte) (*ExpandedNodeID, interface{}, error) {
@@ -42,17 +36,15 @@ func DecodeService(b []byte) (*ExpandedNodeID, interface{}, error) {
 	}
 	b = b[n:]
 
-	id := uint16(typeID.NodeID.IntID())
-	typ := serviceType[id]
-	if typ == nil {
+	v := svcreg.New(uint32(typeID.NodeID.IntID()))
+	if v == nil {
 		return nil, nil, StatusBadServiceUnsupported
 	}
-
-	v := reflect.New(typ.Elem()).Interface()
 
 	if debug.FlagSet("packet") {
 		fmt.Printf("%T: %#v\n", v, b)
 	}
+
 	_, err = Decode(b, v)
 	return typeID, v, err
 }

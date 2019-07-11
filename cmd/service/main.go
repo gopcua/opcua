@@ -274,7 +274,7 @@ import "github.com/gopcua/opcua/id"
 func init() {
 	{{- range $i, $v := . -}}
 		{{- if isService $v.Name -}}
-			register(id.{{$v.Name}}_Encoding_DefaultBinary, new({{$v.Name}}))
+			RegisterService(id.{{$v.Name}}_Encoding_DefaultBinary, new({{$v.Name}}))
 		{{end -}}
 	{{end -}}
 }
