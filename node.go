@@ -5,7 +5,6 @@
 package opcua
 
 import (
-	"errors"
 	"github.com/gopcua/opcua/id"
 	"github.com/gopcua/opcua/ua"
 	"strings"
@@ -170,11 +169,11 @@ func (n *Node) TranslateBrowsePathInMultiNamespaceToNodeId(pathNames []*ua.Quali
 						return nil
 					}
 				} else {
-					return errors.New(resp.Results[0].StatusCode.Error())
+					return resp.Results[0].StatusCode
 				}
 			}
 		}
-		return errors.New("unknown error")
+		return ua.StatusBadUnexpectedError
 	})
 	return
 }

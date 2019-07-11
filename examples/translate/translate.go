@@ -19,6 +19,8 @@ import (
 func main() {
 	endpoint := flag.String("endpoint", "opc.tcp://localhost:4840", "OPC UA Endpoint URL")
 	flag.BoolVar(&debug.Enable, "debug", false, "enable debug logging")
+	ns := flag.Int("namespace", 0, "namespace of node")
+	nodePath := flag.String("path", "", "path of a node's browse name")
 	flag.Parse()
 	log.SetFlags(0)
 
@@ -31,7 +33,7 @@ func main() {
 	defer c.Close()
 
 	root := c.Node(ua.NewTwoByteNodeID(id.ObjectsFolder))
-	nodeId, err := root.TranslateBrowsePathInSameNamespaceToNodeId(2, "demo_led.temperature")
+	nodeId, err := root.TranslateBrowsePathInSameNamespaceToNodeId(uint8(*ns), *nodePath)
 	if err != nil {
 		log.Fatal(err)
 		return
