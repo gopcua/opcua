@@ -5,9 +5,11 @@
 package opcua
 
 import (
-	"time"
-
+	"errors"
+	"github.com/gopcua/opcua/id"
 	"github.com/gopcua/opcua/ua"
+	"strings"
+	"time"
 )
 
 // Node is a high-level object to interact with a node in the
@@ -116,7 +118,7 @@ func (n *Node) Attribute(attrID ua.AttributeID) (*ua.Variant, error) {
 	return value, nil
 }
 
-// References retrns all references for the node.
+// References returns all references for the node.
 // todo(fs): this is not complete since it only returns the
 // todo(fs): top-level reference at this point.
 func (n *Node) References(refs *ua.NodeID) (*ua.BrowseResponse, error) {
@@ -140,4 +142,50 @@ func (n *Node) References(refs *ua.NodeID) (*ua.BrowseResponse, error) {
 
 	return n.c.Browse(req)
 	// implement browse_next
+}
+
+//translate an array of browseName segment to NodeID
+func (n *Node) TranslateBrowsePathInMultiNamespaceToNodeId(pathNames []*ua.QualifiedName) (nodeId *ua.NodeID, err error) {
+	req := ua.TranslateBrowsePathsToNodeIDsRequest{
+		RequestHeader: &ua.RequestHeader{AuthenticationToken: ua.NewFourByteNodeID(0, id.TranslateBrowsePathsToNodeIDsRequest_Encoding_DefaultBinary)},
+		BrowsePaths: []*ua.BrowsePath{
+			{StartingNode: n.ID, RelativePath: &ua.RelativePath{Elements: []*ua.RelativePathElement{}}},
+		}}
+
+	for _, pathSegment := range pathNames {
+		req.BrowsePaths[0].RelativePath.Elements = append(req.BrowsePaths[0].RelativePath.Elements,
+			&ua.RelativePathElement{ReferenceTypeID: ua.NewTwoByteNodeID(id.HierarchicalReferences),
+				IsInverse:       false,
+				IncludeSubtypes: true,
+				TargetName:      pathSegment},
+		)
+	}
+
+	err = n.c.Send(&req, func(i interface{}) error {
+		if resp, ok := i.(*ua.TranslateBrowsePathsToNodeIDsResponse); ok {
+			if len(resp.Results) > 0 {
+				if resp.Results[0].StatusCode == ua.StatusOK {
+					if len(resp.Results[0].Targets) > 0 {
+						nodeId = resp.Results[0].Targets[0].TargetID.NodeID
+						return nil
+					}
+				} else {
+					return errors.New(resp.Results[0].StatusCode.Error())
+				}
+			}
+		}
+		return errors.New("unknown error")
+	})
+	return
+}
+
+//translate a browseName relative path to NodeID
+//here we assume that all parts of path are in the same namespace
+func (n *Node) TranslateBrowsePathInSameNamespaceToNodeId(ns uint8, browseNamePath string) (nodeId *ua.NodeID, err error) {
+	browseNamePathSegments := strings.Split(browseNamePath, ".")
+	var pathNames []*ua.QualifiedName
+	for _, pathSegment := range browseNamePathSegments {
+		pathNames = append(pathNames, &ua.QualifiedName{NamespaceIndex: uint16(ns), Name: pathSegment})
+	}
+	return n.TranslateBrowsePathInMultiNamespaceToNodeId(pathNames)
 }
