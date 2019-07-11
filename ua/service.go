@@ -6,6 +6,7 @@ package ua
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/gopcua/opcua/debug"
 )
@@ -16,7 +17,8 @@ var svcreg = NewTypeRegistry()
 // RegisterService registers a new service object type.
 // It panics if the type or the id is already registered.
 func RegisterService(typeID uint16, v interface{}) {
-	if err := svcreg.Register(uint32(typeID), v); err != nil {
+	id := strconv.Itoa(int(typeID))
+	if err := svcreg.Register(id, v); err != nil {
 		panic("Service " + err.Error())
 	}
 }
@@ -25,7 +27,8 @@ func RegisterService(typeID uint16, v interface{}) {
 // registered with RegisterService. If the service object is not
 // known the function returns 0.
 func ServiceTypeID(v interface{}) uint16 {
-	return uint16(svcreg.Lookup(v))
+	n, _ := strconv.Atoi(svcreg.Lookup(v))
+	return uint16(n)
 }
 
 func DecodeService(b []byte) (*ExpandedNodeID, interface{}, error) {
@@ -36,7 +39,7 @@ func DecodeService(b []byte) (*ExpandedNodeID, interface{}, error) {
 	}
 	b = b[n:]
 
-	v := svcreg.New(uint32(typeID.NodeID.IntID()))
+	v := svcreg.New(strconv.Itoa(int(typeID.NodeID.IntID())))
 	if v == nil {
 		return nil, nil, StatusBadServiceUnsupported
 	}

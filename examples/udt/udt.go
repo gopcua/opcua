@@ -53,7 +53,8 @@ func main() {
 	}
 	defer c.Close()
 
-	v, err := c.Node(ua.NewNumericNodeID(4, 2134)).Value()
+	// v, err := c.Node(ua.NewNumericNodeID(4, 2134)).Value()
+	v, err := c.Node(ua.NewStringNodeID(3, `"Unit"."Components"."PIT001"."Cmd"`)).Value()
 	switch {
 	case err != nil:
 		log.Fatal(err)
@@ -80,21 +81,7 @@ type MyUDT struct {
 	ManOut     float32
 }
 
-// Only add these methods if you need custom logic for encoding and decoding.
-// func (u *MyUDT) Decode(b []byte) (int, error) {
-// 	buf := NewBuffer(b)
-// 	u.AlarmAck = buf.ReadInt32()
-// 	...
-// 	return buf.Pos(), body.Error()
-// }
-
-// func (u *MyUDT) Encode() ([]byte, error) {
-// 	buf := NewBuffer(nil)
-// 	buf.WriteInt32(u.AlarmAck)
-// 	...
-// 	return buf.Bytes(), buf.Error()
-// }
-
 func init() {
-	ua.RegisterExtensionObject(2038, new(MyUDT))
+	ua.RegisterExtensionObject(ua.NewStringNodeID(3, `TE_"udtAnaIn_Cmd"`), new(MyUDT))
+	ua.RegisterExtensionObject(ua.NewNumericNodeID(4, 2038), new(MyUDT))
 }

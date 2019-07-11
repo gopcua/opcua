@@ -10,25 +10,25 @@ import (
 	"sync"
 )
 
-// TypeRegistry maps numeric ids to Go types.
+// TypeRegistry provides a map of identifiers to Go types.
 // The implementation is safe for concurrent use.
 type TypeRegistry struct {
 	mu    sync.RWMutex
-	types map[uint32]reflect.Type
-	ids   map[reflect.Type]uint32
+	types map[string]reflect.Type
+	ids   map[reflect.Type]string
 }
 
 // NewTypeRegistry returns a new type registry.
 func NewTypeRegistry() *TypeRegistry {
 	return &TypeRegistry{
-		types: make(map[uint32]reflect.Type),
-		ids:   make(map[reflect.Type]uint32),
+		types: make(map[string]reflect.Type),
+		ids:   make(map[reflect.Type]string),
 	}
 }
 
 // New returns a new instance of the type with the given id.
 // If the id is not known the function returns nil.
-func (r *TypeRegistry) New(id uint32) interface{} {
+func (r *TypeRegistry) New(id string) interface{} {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -39,31 +39,30 @@ func (r *TypeRegistry) New(id uint32) interface{} {
 	return reflect.New(typ.Elem()).Interface()
 }
 
-// Lookup returns the id of the type of v or zero if the
-// type is not registered.
-func (r *TypeRegistry) Lookup(v interface{}) uint32 {
+// Lookup returns the id of the type of v or an empty string if the type is not
+// registered. If the type was registered multiple times the first
+// registered id for this type is returned.
+func (r *TypeRegistry) Lookup(v interface{}) string {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-
 	return r.ids[reflect.TypeOf(v)]
 }
 
-// Register adds a new type to the registry. If either the type
-// or the id is already registered the function returns an error.
-func (r *TypeRegistry) Register(id uint32, v interface{}) error {
+// Register adds a new type to the registry.
+// If the id is already registered the function returns an error.
+func (r *TypeRegistry) Register(id string, v interface{}) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	typ := reflect.TypeOf(v)
 
 	if r.types[id] != nil {
-		return fmt.Errorf("%d is already registered", id)
+		return fmt.Errorf("%s is already registered", id)
 	}
 	r.types[id] = typ
 
-	if _, ok := r.ids[typ]; ok {
-		return fmt.Errorf("%T is already registered", v)
+	if _, exists := r.ids[typ]; !exists {
+		r.ids[typ] = id
 	}
-	r.ids[typ] = id
 	return nil
 }
