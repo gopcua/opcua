@@ -10,7 +10,14 @@ import (
 	"sync"
 )
 
-// TypeRegistry provides a map of identifiers to Go types.
+// TypeRegistry provides a registry for Go types.
+//
+// Each type is registered with a unique identifier
+// which cannot be changed for the lifetime of the component.
+//
+// Types can be registered multiple times under different
+// identifiers.
+//
 // The implementation is safe for concurrent use.
 type TypeRegistry struct {
 	mu    sync.RWMutex
@@ -27,6 +34,7 @@ func NewTypeRegistry() *TypeRegistry {
 }
 
 // New returns a new instance of the type with the given id.
+//
 // If the id is not known the function returns nil.
 func (r *TypeRegistry) New(id string) interface{} {
 	r.mu.RLock()
@@ -39,8 +47,10 @@ func (r *TypeRegistry) New(id string) interface{} {
 	return reflect.New(typ.Elem()).Interface()
 }
 
-// Lookup returns the id of the type of v or an empty string if the type is not
-// registered. If the type was registered multiple times the first
+// Lookup returns the id of the type of v or an empty string if
+// the type is not registered.
+//
+// If the type was registered multiple times the first
 // registered id for this type is returned.
 func (r *TypeRegistry) Lookup(v interface{}) string {
 	r.mu.RLock()
@@ -49,6 +59,7 @@ func (r *TypeRegistry) Lookup(v interface{}) string {
 }
 
 // Register adds a new type to the registry.
+//
 // If the id is already registered the function returns an error.
 func (r *TypeRegistry) Register(id string, v interface{}) error {
 	r.mu.Lock()
