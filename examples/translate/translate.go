@@ -20,6 +20,8 @@ func main() {
 	endpoint := flag.String("endpoint", "opc.tcp://localhost:4840", "OPC UA Endpoint URL")
 	flag.BoolVar(&debug.Enable, "debug", false, "enable debug logging")
 	ns := flag.Int("namespace", 0, "namespace of node")
+
+	// example: "device_led.temperature"
 	nodePath := flag.String("path", "", "path of a node's browse name")
 	flag.Parse()
 	log.SetFlags(0)
