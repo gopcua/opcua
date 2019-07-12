@@ -16,14 +16,22 @@ import (
 )
 
 func main() {
-	endpoint := flag.String("endpoint", "opc.tcp://localhost:4840", "OPC UA Endpoint URL")
-	policy := flag.String("policy", "", "Security policy: None, Basic128Rsa15, Basic256, Basic256Sha256. Default: auto")
-	mode := flag.String("mode", "", "Security mode: None, Sign, SignAndEncrypt. Default: auto")
-	certFile := flag.String("cert", "", "Path to cert.pem. Required for security mode/policy != None")
-	keyFile := flag.String("key", "", "Path to private key.pem. Required for security mode/policy != None")
+	var (
+		endpoint = flag.String("endpoint", "opc.tcp://localhost:4840", "OPC UA Endpoint URL")
+		policy   = flag.String("policy", "", "Security policy: None, Basic128Rsa15, Basic256, Basic256Sha256. Default: auto")
+		mode     = flag.String("mode", "", "Security mode: None, Sign, SignAndEncrypt. Default: auto")
+		certFile = flag.String("cert", "", "Path to cert.pem. Required for security mode/policy != None")
+		keyFile  = flag.String("key", "", "Path to private key.pem. Required for security mode/policy != None")
+		nodeID   = flag.String("node", "", "NodeID to read")
+	)
 	flag.BoolVar(&debug.Enable, "debug", false, "enable debug logging")
 	flag.Parse()
 	log.SetFlags(0)
+
+	id, err := ua.ParseNodeID(*nodeID)
+	if err != nil {
+		log.Fatalf("invalid node id: %v", err)
+	}
 
 	ctx := context.Background()
 
@@ -53,8 +61,7 @@ func main() {
 	}
 	defer c.Close()
 
-	// v, err := c.Node(ua.NewNumericNodeID(4, 2134)).Value()
-	v, err := c.Node(ua.NewStringNodeID(3, `"Unit"."Components"."PIT001"."Cmd"`)).Value()
+	v, err := c.Node(id).Value()
 	switch {
 	case err != nil:
 		log.Fatal(err)
