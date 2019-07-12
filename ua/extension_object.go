@@ -15,14 +15,6 @@ var eotypes = NewTypeRegistry()
 
 // init registers known built-in extension objects.
 func init() {
-	// RegisterExtensionObject(id.AnonymousIdentityToken_Encoding_DefaultBinary, new(AnonymousIdentityToken))
-	// RegisterExtensionObject(id.UserNameIdentityToken_Encoding_DefaultBinary, new(UserNameIdentityToken))
-	// RegisterExtensionObject(id.X509IdentityToken_Encoding_DefaultBinary, new(X509IdentityToken))
-	// RegisterExtensionObject(id.IssuedIdentityToken_Encoding_DefaultBinary, new(IssuedIdentityToken))
-	// RegisterExtensionObject(id.ServerStatusDataType_Encoding_DefaultBinary, new(ServerStatusDataType))
-	// RegisterExtensionObject(id.DataChangeNotification_Encoding_DefaultBinary, new(DataChangeNotification))
-	// RegisterExtensionObject(id.ReadRawModifiedDetails_Encoding_DefaultBinary, new(ReadRawModifiedDetails))
-	// RegisterExtensionObject(id.HistoryData_Encoding_DefaultBinary, new(HistoryData))
 	RegisterExtensionObject(NewNumericNodeID(0, id.AnonymousIdentityToken_Encoding_DefaultBinary), new(AnonymousIdentityToken))
 	RegisterExtensionObject(NewNumericNodeID(0, id.UserNameIdentityToken_Encoding_DefaultBinary), new(UserNameIdentityToken))
 	RegisterExtensionObject(NewNumericNodeID(0, id.X509IdentityToken_Encoding_DefaultBinary), new(X509IdentityToken))
@@ -31,7 +23,6 @@ func init() {
 	RegisterExtensionObject(NewNumericNodeID(0, id.DataChangeNotification_Encoding_DefaultBinary), new(DataChangeNotification))
 	RegisterExtensionObject(NewNumericNodeID(0, id.ReadRawModifiedDetails_Encoding_DefaultBinary), new(ReadRawModifiedDetails))
 	RegisterExtensionObject(NewNumericNodeID(0, id.HistoryData_Encoding_DefaultBinary), new(HistoryData))
-
 }
 
 // RegisterExtensionObject registers a new extension object type.
