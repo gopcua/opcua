@@ -10,6 +10,29 @@ import (
 	"github.com/gopcua/opcua/id"
 )
 
+// eotypes contains all known extension objects.
+var eotypes = NewTypeRegistry()
+
+// init registers known built-in extension objects.
+func init() {
+	RegisterExtensionObject(NewNumericNodeID(0, id.AnonymousIdentityToken_Encoding_DefaultBinary), new(AnonymousIdentityToken))
+	RegisterExtensionObject(NewNumericNodeID(0, id.UserNameIdentityToken_Encoding_DefaultBinary), new(UserNameIdentityToken))
+	RegisterExtensionObject(NewNumericNodeID(0, id.X509IdentityToken_Encoding_DefaultBinary), new(X509IdentityToken))
+	RegisterExtensionObject(NewNumericNodeID(0, id.IssuedIdentityToken_Encoding_DefaultBinary), new(IssuedIdentityToken))
+	RegisterExtensionObject(NewNumericNodeID(0, id.ServerStatusDataType_Encoding_DefaultBinary), new(ServerStatusDataType))
+	RegisterExtensionObject(NewNumericNodeID(0, id.DataChangeNotification_Encoding_DefaultBinary), new(DataChangeNotification))
+	RegisterExtensionObject(NewNumericNodeID(0, id.ReadRawModifiedDetails_Encoding_DefaultBinary), new(ReadRawModifiedDetails))
+	RegisterExtensionObject(NewNumericNodeID(0, id.HistoryData_Encoding_DefaultBinary), new(HistoryData))
+}
+
+// RegisterExtensionObject registers a new extension object type.
+// It panics if the type or the id is already registered.
+func RegisterExtensionObject(typeID *NodeID, v interface{}) {
+	if err := eotypes.Register(typeID.String(), v); err != nil {
+		panic("Extension object " + err.Error())
+	}
+}
+
 // These flags define the value type of an ExtensionObject.
 // They cannot be combined.
 const (
@@ -63,26 +86,12 @@ func (e *ExtensionObject) Decode(b []byte) (int, error) {
 		return buf.Pos(), body.Error()
 	}
 
-	switch e.TypeID.NodeID.IntID() {
-	case id.AnonymousIdentityToken_Encoding_DefaultBinary:
-		e.Value = new(AnonymousIdentityToken)
-	case id.UserNameIdentityToken_Encoding_DefaultBinary:
-		e.Value = new(UserNameIdentityToken)
-	case id.X509IdentityToken_Encoding_DefaultBinary:
-		e.Value = new(X509IdentityToken)
-	case id.IssuedIdentityToken_Encoding_DefaultBinary:
-		e.Value = new(IssuedIdentityToken)
-	case id.ServerStatusDataType_Encoding_DefaultBinary:
-		e.Value = new(ServerStatusDataType)
-	case id.DataChangeNotification_Encoding_DefaultBinary:
-		e.Value = new(DataChangeNotification)
-	case id.ReadRawModifiedDetails_Encoding_DefaultBinary:
-		e.Value = new(ReadRawModifiedDetails)
-	case id.HistoryData_Encoding_DefaultBinary:
-		e.Value = new(HistoryData)
-	default:
-		return buf.Pos(), fmt.Errorf("invalid extension object with id %d", e.TypeID.NodeID.IntID())
+	typeID := e.TypeID.NodeID.String()
+	e.Value = eotypes.New(typeID)
+	if e.Value == nil {
+		return buf.Pos(), fmt.Errorf("invalid extension object with id %s", typeID)
 	}
+
 	body.ReadStruct(e.Value)
 	return buf.Pos(), body.Error()
 }
