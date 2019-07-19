@@ -18,8 +18,8 @@ import (
 
 func main() {
 	endpoint := flag.String("endpoint", "opc.tcp://localhost:4840", "OPC UA Endpoint URL")
-	ns := flag.Int("namespace", 0, "namespace of node")
 	nodePath := flag.String("path", "device_led.temperature", "path of a node's browse name")
+	ns := flag.Int("namespace", 0, "namespace of the node")
 	flag.BoolVar(&debug.Enable, "debug", false, "enable debug logging")
 
 	flag.Parse()
@@ -34,9 +34,9 @@ func main() {
 	defer c.Close()
 
 	root := c.Node(ua.NewTwoByteNodeID(id.ObjectsFolder))
-	nodeId, err := root.TranslateBrowsePathInSameNamespaceToNodeId(uint8(*ns), *nodePath)
+	nodeID, err := root.TranslateBrowsePathInNamespaceToNodeID(uint16(*ns), *nodePath)
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println(nodeId)
+	fmt.Println(nodeID)
 }
