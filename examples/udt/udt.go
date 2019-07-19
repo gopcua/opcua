@@ -68,7 +68,7 @@ func main() {
 	case v == nil:
 		log.Print("v == nil")
 	default:
-		log.Printf("val: %#v", v.Value.(*ua.ExtensionObject).Value)
+		log.Printf("val: %#v", v.Value().(*ua.ExtensionObject).Value)
 	}
 }
 

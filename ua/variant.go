@@ -23,13 +23,13 @@ const (
 //
 // Specification: Part 6, 5.2.2.16
 type Variant struct {
-	// EncodingMask contains the type and the array flags
+	// mask contains the type and the array flags
 	// bits 0:5: built-in type id 1-25
 	// bit 6: array dimensions
 	// bit 7: array values
-	EncodingMask byte
+	mask byte
 
-	// ArrayLength is the number of elements in the array.
+	// arrayLength is the number of elements in the array.
 	// This field is only present if the 'array values'
 	// flag is set.
 	//
@@ -37,24 +37,24 @@ type Variant struct {
 	// field specifies the total number of elements. The original array can be
 	// reconstructed from the dimensions that are encoded after the value
 	// field.
-	ArrayLength int32
+	arrayLength int32
 
-	// ArrayDimensionsLength is the numer of dimensions.
+	// arrayDimensionsLength is the numer of dimensions.
 	// This field is only present if the 'array dimensions' flag
 	// is set.
-	ArrayDimensionsLength int32
+	arrayDimensionsLength int32
 
-	// ArrayDimensions is the size for each dimension.
+	// arrayDimensions is the size for each dimension.
 	// This field is only present if the 'array dimensions' flag
 	// is set.
-	ArrayDimensions []int32
+	arrayDimensions []int32
 
-	Value interface{}
+	value interface{}
 }
 
 func NewVariant(v interface{}) (*Variant, error) {
 	va := &Variant{}
-	if err := va.Set(v); err != nil {
+	if err := va.set(v); err != nil {
 		return nil, err
 	}
 	return va, nil
@@ -68,23 +68,44 @@ func MustVariant(v interface{}) *Variant {
 	return va
 }
 
+func (m *Variant) EncodingMask() byte {
+	return m.mask
+}
+
 // Type returns the type id of the value.
 func (m *Variant) Type() TypeID {
-	return TypeID(m.EncodingMask & 0x3f)
+	return TypeID(m.mask & 0x3f)
 }
 
 func (m *Variant) setType(t TypeID) {
-	m.EncodingMask |= byte(t & 0x3f)
+	m.mask |= byte(t & 0x3f)
 }
 
+// Has returns whether given encoding mask bits are set.
 func (m *Variant) Has(mask byte) bool {
-	return m.EncodingMask&mask == mask
+	return m.mask&mask == mask
+}
+
+// ArrayLength returns the total number of elements for one and multi-dimensional
+// array values.
+func (m *Variant) ArrayLength() int32 {
+	return m.arrayLength
+}
+
+// ArrayDimensions returns the dimensions of multi-dimensional arrays.
+func (m *Variant) ArrayDimensions() []int32 {
+	return m.arrayDimensions
+}
+
+// Value returns the value.
+func (m *Variant) Value() interface{} {
+	return m.Value
 }
 
 // Decode implements the codec interface.
 func (m *Variant) Decode(b []byte) (int, error) {
 	buf := NewBuffer(b)
-	m.EncodingMask = buf.ReadByte()
+	m.mask = buf.ReadByte()
 
 	// check the type
 	typ, ok := variantTypeIDToType[m.Type()]
@@ -94,15 +115,15 @@ func (m *Variant) Decode(b []byte) (int, error) {
 
 	// read single value and return
 	if !m.Has(VariantArrayValues) {
-		m.Value = m.decodeValue(buf)
+		m.value = m.decodeValue(buf)
 		return buf.Pos(), buf.Error()
 	}
 
 	// get total array length (flattened for multi-dimensional arrays)
-	m.ArrayLength = buf.ReadInt32()
+	m.arrayLength = buf.ReadInt32()
 
 	// read flattened array elements
-	n := int(m.ArrayLength)
+	n := int(m.arrayLength)
 	vals := reflect.MakeSlice(reflect.SliceOf(typ), n, n)
 	for i := 0; i < n; i++ {
 		vals.Index(i).Set(reflect.ValueOf(m.decodeValue(buf)))
@@ -110,10 +131,10 @@ func (m *Variant) Decode(b []byte) (int, error) {
 
 	// check for dimensions of multi-dimensional array
 	if m.Has(VariantArrayDimensions) {
-		m.ArrayDimensionsLength = buf.ReadInt32()
-		m.ArrayDimensions = make([]int32, m.ArrayDimensionsLength)
-		for i := 0; i < int(m.ArrayDimensionsLength); i++ {
-			m.ArrayDimensions[i] = buf.ReadInt32()
+		m.arrayDimensionsLength = buf.ReadInt32()
+		m.arrayDimensions = make([]int32, m.arrayDimensionsLength)
+		for i := 0; i < int(m.arrayDimensionsLength); i++ {
+			m.arrayDimensions[i] = buf.ReadInt32()
 		}
 	}
 
@@ -126,29 +147,29 @@ func (m *Variant) Decode(b []byte) (int, error) {
 
 	// validate that the total number of elements
 	// matches the product of the array dimensions
-	if m.ArrayDimensionsLength > 0 {
+	if m.arrayDimensionsLength > 0 {
 		count := int32(1)
-		for i := range m.ArrayDimensions {
-			count *= m.ArrayDimensions[i]
+		for i := range m.arrayDimensions {
+			count *= m.arrayDimensions[i]
 		}
-		if count != m.ArrayLength {
+		if count != m.arrayLength {
 			return buf.Pos(), errUnbalancedSlice
 		}
 	}
 
 	// handle one-dimensional arrays
-	if m.ArrayDimensionsLength < 2 {
-		m.Value = vals.Interface()
+	if m.arrayDimensionsLength < 2 {
+		m.value = vals.Interface()
 		return buf.Pos(), buf.Error()
 	}
 
 	// handle multi-dimensional arrays
 	// convert dimensions to []int to avoid lots of type casts
-	dims := make([]int, len(m.ArrayDimensions))
-	for i := range m.ArrayDimensions {
-		dims[i] = int(m.ArrayDimensions[i])
+	dims := make([]int, len(m.arrayDimensions))
+	for i := range m.arrayDimensions {
+		dims[i] = int(m.arrayDimensions[i])
 	}
-	m.Value = split(0, 0, vals.Len(), dims, vals).Interface()
+	m.value = split(0, 0, vals.Len(), dims, vals).Interface()
 
 	return buf.Pos(), buf.Error()
 }
@@ -267,18 +288,18 @@ func (m *Variant) decodeValue(buf *Buffer) interface{} {
 func (m *Variant) Encode() ([]byte, error) {
 	buf := NewBuffer(nil)
 
-	buf.WriteByte(m.EncodingMask)
+	buf.WriteByte(m.mask)
 
 	if m.Has(VariantArrayValues) {
-		buf.WriteInt32(m.ArrayLength)
+		buf.WriteInt32(m.arrayLength)
 	}
 
-	m.encode(buf, reflect.ValueOf(m.Value))
+	m.encode(buf, reflect.ValueOf(m.value))
 
 	if m.Has(VariantArrayDimensions) {
-		buf.WriteInt32(m.ArrayDimensionsLength)
-		for i := 0; i < int(m.ArrayDimensionsLength); i++ {
-			buf.WriteInt32(m.ArrayDimensions[i])
+		buf.WriteInt32(m.arrayDimensionsLength)
+		for i := 0; i < int(m.arrayDimensionsLength); i++ {
+			buf.WriteInt32(m.arrayDimensions[i])
 		}
 	}
 
@@ -391,8 +412,8 @@ func sliceDim(v reflect.Value) (typ reflect.Type, dim []int32, count int32, err 
 	return typ, append([]int32{int32(v.Len())}, dim...), count * int32(v.Len()), nil
 }
 
-// Set sets the value and updates the flags according to the type.
-func (m *Variant) Set(v interface{}) error {
+// set sets the value and updates the flags according to the type.
+func (m *Variant) set(v interface{}) error {
 	// set array length and dimensions if value is a slice
 	et, dim, count, err := sliceDim(reflect.ValueOf(v))
 	if err != nil {
@@ -400,14 +421,14 @@ func (m *Variant) Set(v interface{}) error {
 	}
 
 	if len(dim) > 0 {
-		m.EncodingMask |= VariantArrayValues
-		m.ArrayLength = count
+		m.mask |= VariantArrayValues
+		m.arrayLength = count
 	}
 
 	if len(dim) > 1 {
-		m.EncodingMask |= VariantArrayDimensions
-		m.ArrayDimensionsLength = int32(len(dim))
-		m.ArrayDimensions = dim
+		m.mask |= VariantArrayDimensions
+		m.arrayDimensionsLength = int32(len(dim))
+		m.arrayDimensions = dim
 	}
 
 	typeid, ok := variantTypeToTypeID[et]
@@ -415,7 +436,7 @@ func (m *Variant) Set(v interface{}) error {
 		return fmt.Errorf("opcua: cannot set variant to %T", v)
 	}
 	m.setType(typeid)
-	m.Value = v
+	m.value = v
 	return nil
 }
 
@@ -424,14 +445,14 @@ func (m *Variant) Set(v interface{}) error {
 func (m *Variant) String() string {
 	switch m.Type() {
 	case TypeIDString:
-		return m.Value.(string)
+		return m.value.(string)
 	case TypeIDLocalizedText:
-		return m.Value.(*LocalizedText).Text
+		return m.value.(*LocalizedText).Text
 	case TypeIDQualifiedName:
-		return m.Value.(*QualifiedName).Name
+		return m.value.(*QualifiedName).Name
 	default:
 		return ""
-		//return fmt.Sprintf("%v", m.Value)
+		//return fmt.Sprintf("%v", m.value)
 	}
 }
 
@@ -439,7 +460,7 @@ func (m *Variant) String() string {
 func (m *Variant) Bool() bool {
 	switch m.Type() {
 	case TypeIDBoolean:
-		return m.Value.(bool)
+		return m.value.(bool)
 	default:
 		return false
 	}
@@ -449,9 +470,9 @@ func (m *Variant) Bool() bool {
 func (m *Variant) Float() float64 {
 	switch m.Type() {
 	case TypeIDFloat:
-		return float64(m.Value.(float32))
+		return float64(m.value.(float32))
 	case TypeIDDouble:
-		return m.Value.(float64)
+		return m.value.(float64)
 	default:
 		return 0
 	}
@@ -461,13 +482,13 @@ func (m *Variant) Float() float64 {
 func (m *Variant) Int() int64 {
 	switch m.Type() {
 	case TypeIDSByte:
-		return int64(m.Value.(int8))
+		return int64(m.value.(int8))
 	case TypeIDInt16:
-		return int64(m.Value.(int16))
+		return int64(m.value.(int16))
 	case TypeIDInt32:
-		return int64(m.Value.(int32))
+		return int64(m.value.(int32))
 	case TypeIDInt64:
-		return m.Value.(int64)
+		return m.value.(int64)
 	default:
 		return 0
 	}
@@ -477,13 +498,13 @@ func (m *Variant) Int() int64 {
 func (m *Variant) Uint() uint64 {
 	switch m.Type() {
 	case TypeIDByte:
-		return uint64(m.Value.(byte))
+		return uint64(m.value.(byte))
 	case TypeIDUint16:
-		return uint64(m.Value.(uint16))
+		return uint64(m.value.(uint16))
 	case TypeIDUint32:
-		return uint64(m.Value.(uint32))
+		return uint64(m.value.(uint32))
 	case TypeIDUint64:
-		return m.Value.(uint64)
+		return m.value.(uint64)
 	default:
 		return 0
 	}
@@ -493,7 +514,7 @@ func (m *Variant) Uint() uint64 {
 func (m *Variant) Time() time.Time {
 	switch m.Type() {
 	case TypeIDDateTime:
-		return m.Value.(time.Time)
+		return m.value.(time.Time)
 	default:
 		return time.Time{}
 	}

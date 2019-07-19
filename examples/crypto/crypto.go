@@ -72,7 +72,7 @@ func main() {
 		log.Fatal(err)
 	}
 	if v != nil {
-		fmt.Printf("Server's Time | Conn 1 %s | ", v.Value)
+		fmt.Printf("Server's Time | Conn 1 %s | ", v.Value())
 	} else {
 		log.Print("v == nil")
 	}
@@ -101,7 +101,7 @@ func main() {
 		log.Fatal(err)
 	}
 	if v != nil {
-		fmt.Printf("Conn 2: %s\n", v.Value)
+		fmt.Printf("Conn 2: %s\n", v.Value())
 	} else {
 		log.Print("v == nil")
 	}

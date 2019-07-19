@@ -261,7 +261,7 @@ func TestVariant(t *testing.T) {
 				0x16,
 				// TypeID
 				0x01, 0x00, 0x41, 0x01,
-				// EncodingMask
+				// mask
 				0x01,
 				// Length
 				0x0d, 0x00, 0x00, 0x00,
@@ -293,7 +293,7 @@ func TestVariant(t *testing.T) {
 				0x16,
 				// TypeID
 				0x01, 0x00, 0x60, 0x03,
-				// EncodingMask
+				// mask
 				0x01,
 				// Length
 				0x86, 0x00, 0x00, 0x00,
@@ -348,9 +348,9 @@ func TestVariant(t *testing.T) {
 			Bytes: []byte{
 				// variant encoding mask
 				0x17,
-				// EncodingMask
+				// mask
 				0x01,
-				// Value
+				// value
 				0x0a,                   // type
 				0x19, 0x04, 0x20, 0x40, // value
 			},
@@ -477,41 +477,41 @@ func TestSet(t *testing.T) {
 		{
 			v: []byte{0xca, 0xfe},
 			va: &Variant{
-				EncodingMask: byte(TypeIDByteString),
-				Value:        []byte{0xca, 0xfe},
+				mask:  byte(TypeIDByteString),
+				value: []byte{0xca, 0xfe},
 			},
 		},
 		{
 			v: [][]byte{{0xca, 0xfe}, {0xaf, 0xfe}},
 			va: &Variant{
-				EncodingMask: byte(VariantArrayValues | TypeIDByteString),
-				ArrayLength:  2,
-				Value:        [][]byte{{0xca, 0xfe}, {0xaf, 0xfe}},
+				mask:        byte(VariantArrayValues | TypeIDByteString),
+				arrayLength: 2,
+				value:       [][]byte{{0xca, 0xfe}, {0xaf, 0xfe}},
 			},
 		},
 		{
 			v: int32(5),
 			va: &Variant{
-				EncodingMask: byte(TypeIDInt32),
-				Value:        int32(5),
+				mask:  byte(TypeIDInt32),
+				value: int32(5),
 			},
 		},
 		{
 			v: []int32{5},
 			va: &Variant{
-				EncodingMask: byte(VariantArrayValues | TypeIDInt32),
-				ArrayLength:  1,
-				Value:        []int32{5},
+				mask:        byte(VariantArrayValues | TypeIDInt32),
+				arrayLength: 1,
+				value:       []int32{5},
 			},
 		},
 		{
 			v: [][]int32{{5}, {5}, {5}},
 			va: &Variant{
-				EncodingMask:          byte(VariantArrayDimensions | VariantArrayValues | TypeIDInt32),
-				ArrayLength:           3,
-				ArrayDimensionsLength: 2,
-				ArrayDimensions:       []int32{3, 1},
-				Value:                 [][]int32{{5}, {5}, {5}},
+				mask:                  byte(VariantArrayDimensions | VariantArrayValues | TypeIDInt32),
+				arrayLength:           3,
+				arrayDimensionsLength: 2,
+				arrayDimensions:       []int32{3, 1},
+				value:                 [][]int32{{5}, {5}, {5}},
 			},
 		},
 		{
@@ -521,11 +521,11 @@ func TestSet(t *testing.T) {
 				{{}, {}},
 			},
 			va: &Variant{
-				EncodingMask:          byte(VariantArrayDimensions | VariantArrayValues | TypeIDInt32),
-				ArrayLength:           0,
-				ArrayDimensionsLength: 3,
-				ArrayDimensions:       []int32{3, 2, 0},
-				Value: [][][]int32{
+				mask:                  byte(VariantArrayDimensions | VariantArrayValues | TypeIDInt32),
+				arrayLength:           0,
+				arrayDimensionsLength: 3,
+				arrayDimensions:       []int32{3, 2, 0},
+				value: [][][]int32{
 					{{}, {}},
 					{{}, {}},
 					{{}, {}},
