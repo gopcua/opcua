@@ -143,12 +143,17 @@ func (n *Node) References(refs *ua.NodeID) (*ua.BrowseResponse, error) {
 	// implement browse_next
 }
 
-//translate an array of browseName segment to NodeID
-func (n *Node) TranslateBrowsePathInMultiNamespaceToNodeId(pathNames []*ua.QualifiedName) (nodeId *ua.NodeID, err error) {
+//TranslateBrowsePathToNodeId translate an array of browseName segment to NodeID
+func (n *Node) TranslateBrowsePathToNodeId(pathNames []*ua.QualifiedName) (*ua.NodeID, error) {
 	req := ua.TranslateBrowsePathsToNodeIDsRequest{
 		RequestHeader: &ua.RequestHeader{AuthenticationToken: ua.NewFourByteNodeID(0, id.TranslateBrowsePathsToNodeIDsRequest_Encoding_DefaultBinary)},
 		BrowsePaths: []*ua.BrowsePath{
-			{StartingNode: n.ID, RelativePath: &ua.RelativePath{Elements: []*ua.RelativePathElement{}}},
+			{
+				StartingNode: n.ID,
+				RelativePath: &ua.RelativePath{
+					Elements: []*ua.RelativePathElement{},
+				},
+			},
 		}}
 
 	for _, pathSegment := range pathNames {
@@ -156,35 +161,40 @@ func (n *Node) TranslateBrowsePathInMultiNamespaceToNodeId(pathNames []*ua.Quali
 			&ua.RelativePathElement{ReferenceTypeID: ua.NewTwoByteNodeID(id.HierarchicalReferences),
 				IsInverse:       false,
 				IncludeSubtypes: true,
-				TargetName:      pathSegment},
+				TargetName:      pathSegment,
+			},
 		)
 	}
 
-	err = n.c.Send(&req, func(i interface{}) error {
+	var nodeID *ua.NodeID
+	err := n.c.Send(&req, func(i interface{}) error {
 		if resp, ok := i.(*ua.TranslateBrowsePathsToNodeIDsResponse); ok {
-			if len(resp.Results) > 0 {
-				if resp.Results[0].StatusCode == ua.StatusOK {
-					if len(resp.Results[0].Targets) > 0 {
-						nodeId = resp.Results[0].Targets[0].TargetID.NodeID
-						return nil
-					}
-				} else {
-					return resp.Results[0].StatusCode
-				}
+			if len(resp.Results) == 0 {
+				return ua.StatusBadUnexpectedError
 			}
+
+			if resp.Results[0].StatusCode != ua.StatusOK {
+				return resp.Results[0].StatusCode
+			}
+
+			if len(resp.Results[0].Targets) == 0 {
+				return ua.StatusBadUnexpectedError
+			}
+			nodeID = resp.Results[0].Targets[0].TargetID.NodeID
+			return nil
 		}
 		return ua.StatusBadUnexpectedError
 	})
-	return
+	return nodeID, err
 }
 
-//translate a browseName relative path to NodeID
+//TranslateBrowsePathInSameNamespaceToNodeId translate a browseName to NodeID
 //here we assume that all parts of path are in the same namespace
-func (n *Node) TranslateBrowsePathInSameNamespaceToNodeId(ns uint8, browseNamePath string) (nodeId *ua.NodeID, err error) {
-	browseNamePathSegments := strings.Split(browseNamePath, ".")
+func (n *Node) TranslateBrowsePathInSameNamespaceToNodeId(ns uint8, browseNamePath string) (*ua.NodeID, error) {
+	segments := strings.Split(browseNamePath, ".")
 	var pathNames []*ua.QualifiedName
-	for _, pathSegment := range browseNamePathSegments {
-		pathNames = append(pathNames, &ua.QualifiedName{NamespaceIndex: uint16(ns), Name: pathSegment})
+	for _, segment := range segments {
+		pathNames = append(pathNames, &ua.QualifiedName{NamespaceIndex: uint16(ns), Name: segment})
 	}
-	return n.TranslateBrowsePathInMultiNamespaceToNodeId(pathNames)
+	return n.TranslateBrowsePathToNodeId(pathNames)
 }
