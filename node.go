@@ -5,10 +5,11 @@
 package opcua
 
 import (
-	"github.com/gopcua/opcua/id"
-	"github.com/gopcua/opcua/ua"
 	"strings"
 	"time"
+
+	"github.com/gopcua/opcua/id"
+	"github.com/gopcua/opcua/ua"
 )
 
 // Node is a high-level object to interact with a node in the
@@ -143,10 +144,9 @@ func (n *Node) References(refs *ua.NodeID) (*ua.BrowseResponse, error) {
 	// implement browse_next
 }
 
-//TranslateBrowsePathToNodeId translate an array of browseName segment to NodeID
-func (n *Node) TranslateBrowsePathToNodeId(pathNames []*ua.QualifiedName) (*ua.NodeID, error) {
+// TranslateBrowsePathsToNodeIDs translates an array of browseName segments to NodeIDs.
+func (n *Node) TranslateBrowsePathsToNodeIDs(pathNames []*ua.QualifiedName) (*ua.NodeID, error) {
 	req := ua.TranslateBrowsePathsToNodeIDsRequest{
-		RequestHeader: &ua.RequestHeader{AuthenticationToken: ua.NewFourByteNodeID(0, id.TranslateBrowsePathsToNodeIDsRequest_Encoding_DefaultBinary)},
 		BrowsePaths: []*ua.BrowsePath{
 			{
 				StartingNode: n.ID,
@@ -156,12 +156,12 @@ func (n *Node) TranslateBrowsePathToNodeId(pathNames []*ua.QualifiedName) (*ua.N
 			},
 		}}
 
-	for _, pathSegment := range pathNames {
+	for _, name := range pathNames {
 		req.BrowsePaths[0].RelativePath.Elements = append(req.BrowsePaths[0].RelativePath.Elements,
 			&ua.RelativePathElement{ReferenceTypeID: ua.NewTwoByteNodeID(id.HierarchicalReferences),
 				IsInverse:       false,
 				IncludeSubtypes: true,
-				TargetName:      pathSegment,
+				TargetName:      name,
 			},
 		)
 	}
@@ -188,13 +188,13 @@ func (n *Node) TranslateBrowsePathToNodeId(pathNames []*ua.QualifiedName) (*ua.N
 	return nodeID, err
 }
 
-//TranslateBrowsePathInSameNamespaceToNodeId translate a browseName to NodeID
-//here we assume that all parts of path are in the same namespace
-func (n *Node) TranslateBrowsePathInSameNamespaceToNodeId(ns uint8, browseNamePath string) (*ua.NodeID, error) {
-	segments := strings.Split(browseNamePath, ".")
-	var pathNames []*ua.QualifiedName
+// TranslateBrowsePathInNamespaceToNodeID translates a browseName to a NodeID within the same namespace.
+func (n *Node) TranslateBrowsePathInNamespaceToNodeID(ns uint16, browsePath string) (*ua.NodeID, error) {
+	segments := strings.Split(browsePath, ".")
+	var names []*ua.QualifiedName
 	for _, segment := range segments {
-		pathNames = append(pathNames, &ua.QualifiedName{NamespaceIndex: uint16(ns), Name: segment})
+		qn := &ua.QualifiedName{NamespaceIndex: ns, Name: segment}
+		names = append(names, qn)
 	}
-	return n.TranslateBrowsePathToNodeId(pathNames)
+	return n.TranslateBrowsePathsToNodeIDs(names)
 }
