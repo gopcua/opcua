@@ -5,14 +5,18 @@
 package ua
 
 import (
+	"errors"
 	"fmt"
+	"reflect"
 	"time"
 )
 
-// These flags define the size and dimension of a Variant value.
 const (
+	// VariantArrayDimensions flags whether the array has more than one dimension
 	VariantArrayDimensions = 0x40
-	VariantArrayValues     = 0x80
+
+	// VariantArrayValues flags whether the value is an array.
+	VariantArrayValues = 0x80
 )
 
 // Variant is a union of the built-in types.
@@ -70,100 +74,41 @@ func (m *Variant) Type() TypeID {
 }
 
 func (m *Variant) setType(t TypeID) {
-	m.EncodingMask = byte(t & 0x3f)
+	m.EncodingMask |= byte(t & 0x3f)
 }
 
 func (m *Variant) Has(mask byte) bool {
 	return m.EncodingMask&mask == mask
 }
 
+// Decode implements the codec interface.
 func (m *Variant) Decode(b []byte) (int, error) {
 	buf := NewBuffer(b)
-
 	m.EncodingMask = buf.ReadByte()
 
-	elems := 1
-	if m.Has(VariantArrayValues) {
-		m.ArrayLength = buf.ReadInt32()
-		elems = int(m.ArrayLength)
+	// check the type
+	typ, ok := variantTypeIDToType[m.Type()]
+	if !ok {
+		return buf.Pos(), fmt.Errorf("invalid type id: %d", m.Type())
 	}
 
-	values := make([]interface{}, elems)
-	for i := 0; i < elems; i++ {
-		switch m.Type() {
-		case TypeIDBoolean:
-			values[i] = buf.ReadBool()
-		case TypeIDSByte:
-			values[i] = buf.ReadInt8()
-		case TypeIDByte:
-			values[i] = buf.ReadByte()
-		case TypeIDInt16:
-			values[i] = buf.ReadInt16()
-		case TypeIDUint16:
-			values[i] = buf.ReadUint16()
-		case TypeIDInt32:
-			values[i] = buf.ReadInt32()
-		case TypeIDUint32:
-			values[i] = buf.ReadUint32()
-		case TypeIDInt64:
-			values[i] = buf.ReadInt64()
-		case TypeIDUint64:
-			values[i] = buf.ReadUint64()
-		case TypeIDFloat:
-			values[i] = buf.ReadFloat32()
-		case TypeIDDouble:
-			values[i] = buf.ReadFloat64()
-		case TypeIDString:
-			values[i] = buf.ReadString()
-		case TypeIDDateTime:
-			values[i] = buf.ReadTime()
-		case TypeIDGUID:
-			v := new(GUID)
-			buf.ReadStruct(v)
-			values[i] = v
-		case TypeIDByteString:
-			values[i] = buf.ReadBytes()
-		case TypeIDXMLElement:
-			values[i] = XmlElement(buf.ReadString())
-		case TypeIDNodeID:
-			v := new(NodeID)
-			buf.ReadStruct(v)
-			values[i] = v
-		case TypeIDExpandedNodeID:
-			v := new(ExpandedNodeID)
-			buf.ReadStruct(v)
-			values[i] = v
-		case TypeIDStatusCode:
-			values[i] = StatusCode(buf.ReadUint32())
-		case TypeIDQualifiedName:
-			v := new(QualifiedName)
-			buf.ReadStruct(v)
-			values[i] = v
-		case TypeIDLocalizedText:
-			v := new(LocalizedText)
-			buf.ReadStruct(v)
-			values[i] = v
-		case TypeIDExtensionObject:
-			v := new(ExtensionObject)
-			buf.ReadStruct(v)
-			values[i] = v
-		case TypeIDDataValue:
-			v := new(DataValue)
-			buf.ReadStruct(v)
-			values[i] = v
-		case TypeIDVariant:
-			// todo(fs): limit recursion depth to 100
-			v := new(Variant)
-			buf.ReadStruct(v)
-			values[i] = v
-		case TypeIDDiagnosticInfo:
-			// todo(fs): limit recursion depth to 100
-			v := new(DiagnosticInfo)
-			buf.ReadStruct(v)
-			values[i] = v
-		}
+	// read single value and return
+	if !m.Has(VariantArrayValues) {
+		m.Value = m.decodeValue(buf)
+		return buf.Pos(), buf.Error()
 	}
 
+	// get total array length (flattened for multi-dimensional arrays)
+	m.ArrayLength = buf.ReadInt32()
+
+	// read flattened array elements
+	n := int(m.ArrayLength)
+	vals := reflect.MakeSlice(reflect.SliceOf(typ), n, n)
+	for i := 0; i < n; i++ {
+		vals.Index(i).Set(reflect.ValueOf(m.decodeValue(buf)))
+	}
+
+	// check for dimensions of multi-dimensional array
 	if m.Has(VariantArrayDimensions) {
 		m.ArrayDimensionsLength = buf.ReadInt32()
 		m.ArrayDimensions = make([]int32, m.ArrayDimensionsLength)
@@ -172,14 +117,153 @@ func (m *Variant) Decode(b []byte) (int, error) {
 		}
 	}
 
-	m.Value = values
-	if elems == 1 {
-		m.Value = values[0]
+	// return early if there is an error since the rest of the code
+	// depends on the assumption that the array dimensions were read
+	// correctly.
+	if buf.Error() != nil {
+		return buf.Pos(), buf.Error()
 	}
+
+	// validate that the total number of elements
+	// matches the product of the array dimensions
+	if m.ArrayDimensionsLength > 0 {
+		count := int32(1)
+		for i := range m.ArrayDimensions {
+			count *= m.ArrayDimensions[i]
+		}
+		if count != m.ArrayLength {
+			return buf.Pos(), errUnbalancedSlice
+		}
+	}
+
+	// handle one-dimensional arrays
+	if m.ArrayDimensionsLength < 2 {
+		m.Value = vals.Interface()
+		return buf.Pos(), buf.Error()
+	}
+
+	// handle multi-dimensional arrays
+	// convert dimensions to []int to avoid lots of type casts
+	dims := make([]int, len(m.ArrayDimensions))
+	for i := range m.ArrayDimensions {
+		dims[i] = int(m.ArrayDimensions[i])
+	}
+	m.Value = split(0, 0, vals.Len(), dims, vals).Interface()
 
 	return buf.Pos(), buf.Error()
 }
 
+// split recursively creates a multi-dimensional array from a set of values
+// and some given dimensions.
+func split(level, i, j int, dims []int, vals reflect.Value) reflect.Value {
+	if level == len(dims)-1 {
+		a := vals.Slice(i, j)
+		// fmt.Printf("split: level:%d i:%d j:%d dims:%v a:%#v\n", level, i, j, dims, a.Interface())
+		return a
+	}
+
+	// split next level
+	var elems []reflect.Value
+	if vals.Len() > 0 {
+		step := (j - i) / dims[level]
+		for ; i < j; i += step {
+			elems = append(elems, split(level+1, i, i+step, dims, vals))
+		}
+	} else {
+		for k := 0; k < dims[level]; k++ {
+			elems = append(elems, split(level+1, 0, 0, dims, vals))
+		}
+	}
+
+	// now construct the typed slice, i.e. [](type of inner slice)
+	innerT := elems[0].Type()
+	a := reflect.MakeSlice(reflect.SliceOf(innerT), len(elems), len(elems))
+	for k := range elems {
+		a.Index(k).Set(elems[k])
+	}
+	// fmt.Printf("split: level:%d i:%d j:%d dims:%v a:%#v\n", level, i, j, dims, a.Interface())
+	return a
+}
+
+// decodeValue reads a single value of the base type from the buffer.
+func (m *Variant) decodeValue(buf *Buffer) interface{} {
+	switch m.Type() {
+	case TypeIDBoolean:
+		return buf.ReadBool()
+	case TypeIDSByte:
+		return buf.ReadInt8()
+	case TypeIDByte:
+		return buf.ReadByte()
+	case TypeIDInt16:
+		return buf.ReadInt16()
+	case TypeIDUint16:
+		return buf.ReadUint16()
+	case TypeIDInt32:
+		return buf.ReadInt32()
+	case TypeIDUint32:
+		return buf.ReadUint32()
+	case TypeIDInt64:
+		return buf.ReadInt64()
+	case TypeIDUint64:
+		return buf.ReadUint64()
+	case TypeIDFloat:
+		return buf.ReadFloat32()
+	case TypeIDDouble:
+		return buf.ReadFloat64()
+	case TypeIDString:
+		return buf.ReadString()
+	case TypeIDDateTime:
+		return buf.ReadTime()
+	case TypeIDGUID:
+		v := new(GUID)
+		buf.ReadStruct(v)
+		return v
+	case TypeIDByteString:
+		return buf.ReadBytes()
+	case TypeIDXMLElement:
+		return XmlElement(buf.ReadString())
+	case TypeIDNodeID:
+		v := new(NodeID)
+		buf.ReadStruct(v)
+		return v
+	case TypeIDExpandedNodeID:
+		v := new(ExpandedNodeID)
+		buf.ReadStruct(v)
+		return v
+	case TypeIDStatusCode:
+		return StatusCode(buf.ReadUint32())
+	case TypeIDQualifiedName:
+		v := new(QualifiedName)
+		buf.ReadStruct(v)
+		return v
+	case TypeIDLocalizedText:
+		v := new(LocalizedText)
+		buf.ReadStruct(v)
+		return v
+	case TypeIDExtensionObject:
+		v := new(ExtensionObject)
+		buf.ReadStruct(v)
+		return v
+	case TypeIDDataValue:
+		v := new(DataValue)
+		buf.ReadStruct(v)
+		return v
+	case TypeIDVariant:
+		// todo(fs): limit recursion depth to 100
+		v := new(Variant)
+		buf.ReadStruct(v)
+		return v
+	case TypeIDDiagnosticInfo:
+		// todo(fs): limit recursion depth to 100
+		v := new(DiagnosticInfo)
+		buf.ReadStruct(v)
+		return v
+	default:
+		return nil
+	}
+}
+
+// Encode implements the codec interface.
 func (m *Variant) Encode() ([]byte, error) {
 	buf := NewBuffer(nil)
 
@@ -189,58 +273,7 @@ func (m *Variant) Encode() ([]byte, error) {
 		buf.WriteInt32(m.ArrayLength)
 	}
 
-	switch v := m.Value.(type) {
-	case bool:
-		buf.WriteBool(v)
-	case int8:
-		buf.WriteInt8(v)
-	case byte:
-		buf.WriteByte(v)
-	case int16:
-		buf.WriteInt16(v)
-	case uint16:
-		buf.WriteUint16(v)
-	case int32:
-		buf.WriteInt32(v)
-	case uint32:
-		buf.WriteUint32(v)
-	case int64:
-		buf.WriteInt64(v)
-	case uint64:
-		buf.WriteUint64(v)
-	case float32:
-		buf.WriteFloat32(v)
-	case float64:
-		buf.WriteFloat64(v)
-	case string:
-		buf.WriteString(v)
-	case time.Time:
-		buf.WriteTime(v)
-	case *GUID:
-		buf.WriteStruct(v)
-	case []byte:
-		buf.WriteByteString(v)
-	case XmlElement:
-		buf.WriteString(string(v))
-	case *NodeID:
-		buf.WriteStruct(v)
-	case *ExpandedNodeID:
-		buf.WriteStruct(v)
-	case StatusCode:
-		buf.WriteUint32(uint32(v))
-	case *QualifiedName:
-		buf.WriteStruct(v)
-	case *LocalizedText:
-		buf.WriteStruct(v)
-	case *ExtensionObject:
-		buf.WriteStruct(v)
-	case *DataValue:
-		buf.WriteStruct(v)
-	case *Variant:
-		buf.WriteStruct(v)
-	case *DiagnosticInfo:
-		buf.WriteStruct(v)
-	}
+	m.encode(buf, reflect.ValueOf(m.Value))
 
 	if m.Has(VariantArrayDimensions) {
 		buf.WriteInt32(m.ArrayDimensionsLength)
@@ -252,61 +285,136 @@ func (m *Variant) Encode() ([]byte, error) {
 	return buf.Bytes(), buf.Error()
 }
 
-func (m *Variant) Set(v interface{}) error {
-	switch v.(type) {
+// encode recursively writes the values to the buffer.
+func (m *Variant) encode(buf *Buffer, val reflect.Value) {
+	if val.Kind() != reflect.Slice || m.Type() == TypeIDByteString {
+		m.encodeValue(buf, val.Interface())
+		return
+	}
+	for i := 0; i < val.Len(); i++ {
+		m.encode(buf, val.Index(i))
+	}
+}
+
+// encodeValue writes a single value of the base type to the buffer.
+func (m *Variant) encodeValue(buf *Buffer, v interface{}) {
+	switch x := v.(type) {
 	case bool:
-		m.setType(TypeIDBoolean)
+		buf.WriteBool(x)
 	case int8:
-		m.setType(TypeIDSByte)
+		buf.WriteInt8(x)
 	case byte:
-		m.setType(TypeIDByte)
+		buf.WriteByte(x)
 	case int16:
-		m.setType(TypeIDInt16)
+		buf.WriteInt16(x)
 	case uint16:
-		m.setType(TypeIDUint16)
+		buf.WriteUint16(x)
 	case int32:
-		m.setType(TypeIDInt32)
+		buf.WriteInt32(x)
 	case uint32:
-		m.setType(TypeIDUint32)
+		buf.WriteUint32(x)
 	case int64:
-		m.setType(TypeIDInt64)
+		buf.WriteInt64(x)
 	case uint64:
-		m.setType(TypeIDUint64)
+		buf.WriteUint64(x)
 	case float32:
-		m.setType(TypeIDFloat)
+		buf.WriteFloat32(x)
 	case float64:
-		m.setType(TypeIDDouble)
+		buf.WriteFloat64(x)
 	case string:
-		m.setType(TypeIDString)
+		buf.WriteString(x)
 	case time.Time:
-		m.setType(TypeIDDateTime)
+		buf.WriteTime(x)
 	case *GUID:
-		m.setType(TypeIDGUID)
+		buf.WriteStruct(x)
 	case []byte:
-		m.setType(TypeIDByteString)
+		buf.WriteByteString(x)
 	case XmlElement:
-		m.setType(TypeIDXMLElement)
+		buf.WriteString(string(x))
 	case *NodeID:
-		m.setType(TypeIDNodeID)
+		buf.WriteStruct(x)
 	case *ExpandedNodeID:
-		m.setType(TypeIDExpandedNodeID)
+		buf.WriteStruct(x)
 	case StatusCode:
-		m.setType(TypeIDStatusCode)
+		buf.WriteUint32(uint32(x))
 	case *QualifiedName:
-		m.setType(TypeIDQualifiedName)
+		buf.WriteStruct(x)
 	case *LocalizedText:
-		m.setType(TypeIDLocalizedText)
+		buf.WriteStruct(x)
 	case *ExtensionObject:
-		m.setType(TypeIDExtensionObject)
+		buf.WriteStruct(x)
 	case *DataValue:
-		m.setType(TypeIDDataValue)
+		buf.WriteStruct(x)
 	case *Variant:
-		m.setType(TypeIDVariant)
+		buf.WriteStruct(x)
 	case *DiagnosticInfo:
-		m.setType(TypeIDDiagnosticInfo)
-	default:
+		buf.WriteStruct(x)
+	}
+}
+
+// errUnbalancedSlice indicates a multi-dimensional array has different
+// number of elements on the same level.
+var errUnbalancedSlice = errors.New("unbalanced multi-dimensional array")
+
+// sliceDim determines the element type, dimensions and the total length
+// of a one or multi-dimensional slice.
+func sliceDim(v reflect.Value) (typ reflect.Type, dim []int32, count int32, err error) {
+	// ByteString is its own type
+	if v.Type() == reflect.TypeOf([]byte{}) {
+		return v.Type(), nil, 1, nil
+	}
+
+	// element type
+	if v.Kind() != reflect.Slice {
+		return v.Type(), nil, 1, nil
+	}
+
+	// empty array
+	if v.Len() == 0 {
+		return v.Type().Elem(), append([]int32{0}, dim...), 0, nil
+	}
+
+	// check that inner slices all have the same length
+	if v.Index(0).Kind() == reflect.Slice {
+		for i := 0; i < v.Len(); i++ {
+			if v.Index(i).Len() != v.Index(0).Len() {
+				return nil, nil, 0, errUnbalancedSlice
+			}
+		}
+	}
+
+	// recurse to inner slice or element type
+	typ, dim, count, err = sliceDim(v.Index(0))
+	if err != nil {
+		return nil, nil, 0, err
+	}
+	return typ, append([]int32{int32(v.Len())}, dim...), count * int32(v.Len()), nil
+}
+
+// Set sets the value and updates the flags according to the type.
+func (m *Variant) Set(v interface{}) error {
+	// set array length and dimensions if value is a slice
+	et, dim, count, err := sliceDim(reflect.ValueOf(v))
+	if err != nil {
+		return err
+	}
+
+	if len(dim) > 0 {
+		m.EncodingMask |= VariantArrayValues
+		m.ArrayLength = count
+	}
+
+	if len(dim) > 1 {
+		m.EncodingMask |= VariantArrayDimensions
+		m.ArrayDimensionsLength = int32(len(dim))
+		m.ArrayDimensions = dim
+	}
+
+	typeid, ok := variantTypeToTypeID[et]
+	if !ok {
 		return fmt.Errorf("opcua: cannot set variant to %T", v)
 	}
+	m.setType(typeid)
 	m.Value = v
 	return nil
 }
@@ -327,6 +435,7 @@ func (m *Variant) String() string {
 	}
 }
 
+// Bool returns the boolean value if the type is Boolean.
 func (m *Variant) Bool() bool {
 	switch m.Type() {
 	case TypeIDBoolean:
@@ -336,6 +445,7 @@ func (m *Variant) Bool() bool {
 	}
 }
 
+// Float returns the float value if the type is one of the float types.
 func (m *Variant) Float() float64 {
 	switch m.Type() {
 	case TypeIDFloat:
@@ -347,6 +457,7 @@ func (m *Variant) Float() float64 {
 	}
 }
 
+// Int returns the int value if the type is one of the int types.
 func (m *Variant) Int() int64 {
 	switch m.Type() {
 	case TypeIDSByte:
@@ -362,6 +473,7 @@ func (m *Variant) Int() int64 {
 	}
 }
 
+// Uint returns the uint value if the type is one of the uint types.
 func (m *Variant) Uint() uint64 {
 	switch m.Type() {
 	case TypeIDByte:
@@ -377,11 +489,47 @@ func (m *Variant) Uint() uint64 {
 	}
 }
 
+// Time returns the time value if the type is DateTime.
 func (m *Variant) Time() time.Time {
 	switch m.Type() {
 	case TypeIDDateTime:
 		return m.Value.(time.Time)
 	default:
 		return time.Time{}
+	}
+}
+
+var variantTypeToTypeID = map[reflect.Type]TypeID{}
+var variantTypeIDToType = map[TypeID]reflect.Type{
+	TypeIDBoolean:         reflect.TypeOf(false),
+	TypeIDSByte:           reflect.TypeOf(int8(0)),
+	TypeIDByte:            reflect.TypeOf(uint8(0)),
+	TypeIDInt16:           reflect.TypeOf(int16(0)),
+	TypeIDUint16:          reflect.TypeOf(uint16(0)),
+	TypeIDInt32:           reflect.TypeOf(int32(0)),
+	TypeIDUint32:          reflect.TypeOf(uint32(0)),
+	TypeIDInt64:           reflect.TypeOf(int64(0)),
+	TypeIDUint64:          reflect.TypeOf(uint64(0)),
+	TypeIDFloat:           reflect.TypeOf(float32(0)),
+	TypeIDDouble:          reflect.TypeOf(float64(0)),
+	TypeIDString:          reflect.TypeOf(string("")),
+	TypeIDDateTime:        reflect.TypeOf(time.Time{}),
+	TypeIDGUID:            reflect.TypeOf(new(GUID)),
+	TypeIDByteString:      reflect.TypeOf([]byte{}),
+	TypeIDXMLElement:      reflect.TypeOf(XmlElement("")),
+	TypeIDNodeID:          reflect.TypeOf(new(NodeID)),
+	TypeIDExpandedNodeID:  reflect.TypeOf(new(ExpandedNodeID)),
+	TypeIDStatusCode:      reflect.TypeOf(StatusCode(0)),
+	TypeIDQualifiedName:   reflect.TypeOf(new(QualifiedName)),
+	TypeIDLocalizedText:   reflect.TypeOf(new(LocalizedText)),
+	TypeIDExtensionObject: reflect.TypeOf(new(ExtensionObject)),
+	TypeIDDataValue:       reflect.TypeOf(new(DataValue)),
+	TypeIDVariant:         reflect.TypeOf(new(Variant)),
+	TypeIDDiagnosticInfo:  reflect.TypeOf(new(DiagnosticInfo)),
+}
+
+func init() {
+	for id, t := range variantTypeIDToType {
+		variantTypeToTypeID[t] = id
 	}
 }
