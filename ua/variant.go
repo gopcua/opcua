@@ -99,7 +99,7 @@ func (m *Variant) ArrayDimensions() []int32 {
 
 // Value returns the value.
 func (m *Variant) Value() interface{} {
-	return m.Value
+	return m.value
 }
 
 // Decode implements the codec interface.

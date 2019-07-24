@@ -624,6 +624,13 @@ func TestVariantUnsupportedType(t *testing.T) {
 	}
 }
 
+func TestVariantValueMethod(t *testing.T) {
+	v := MustVariant(int32(5))
+	if got, want := int32(5), v.Value().(int32); got != want {
+		t.Fatalf("got %d want %d", got, want)
+	}
+}
+
 func TestVariantBool(t *testing.T) {
 	tests := []struct {
 		v interface{}
