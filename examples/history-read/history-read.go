@@ -95,7 +95,7 @@ func main() {
 					"%s - %s - %v \n",
 					nodes[nodeNum].NodeID.String(),
 					value.SourceTimestamp.Format(time.RFC3339),
-					value.Value.Value,
+					value.Value.Value(),
 				)
 			}
 		}

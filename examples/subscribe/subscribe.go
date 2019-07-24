@@ -99,7 +99,7 @@ func main() {
 			switch x := res.Value.(type) {
 			case *ua.DataChangeNotification:
 				for _, item := range x.MonitoredItems {
-					data := item.Value.Value.Value
+					data := item.Value.Value.Value()
 					log.Printf("MonitoredItem with client handle %v = %v", item.ClientHandle, data)
 				}
 

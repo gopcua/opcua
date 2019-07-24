@@ -56,6 +56,6 @@ func main() {
 	case v == nil:
 		log.Print("v == nil")
 	default:
-		log.Print(v.Value)
+		log.Print(v.Value())
 	}
 }

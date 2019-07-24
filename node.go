@@ -41,7 +41,7 @@ func (n *Node) BrowseName() (*ua.QualifiedName, error) {
 	if err != nil {
 		return nil, err
 	}
-	return v.Value.(*ua.QualifiedName), nil
+	return v.Value().(*ua.QualifiedName), nil
 }
 
 // DisplayName returns the display name of the node.
@@ -50,7 +50,7 @@ func (n *Node) DisplayName() (*ua.LocalizedText, error) {
 	if err != nil {
 		return nil, err
 	}
-	return v.Value.(*ua.LocalizedText), nil
+	return v.Value().(*ua.LocalizedText), nil
 }
 
 // AccessLevel returns the access level of the node.
@@ -61,7 +61,7 @@ func (n *Node) AccessLevel() (ua.AccessLevelType, error) {
 	if err != nil {
 		return 0, err
 	}
-	return ua.AccessLevelType(v.Value.(uint8)), nil
+	return ua.AccessLevelType(v.Value().(uint8)), nil
 }
 
 // HasAccessLevel returns true if all bits from mask are
@@ -80,7 +80,7 @@ func (n *Node) UserAccessLevel() (ua.AccessLevelType, error) {
 	if err != nil {
 		return 0, err
 	}
-	return ua.AccessLevelType(v.Value.(uint8)), nil
+	return ua.AccessLevelType(v.Value().(uint8)), nil
 }
 
 // HasUserAccessLevel returns true if all bits from mask are

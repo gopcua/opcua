@@ -5,8 +5,12 @@
 package ua
 
 import (
+	"fmt"
+	"reflect"
 	"testing"
 	"time"
+
+	"github.com/pascaldekloe/goe/verify"
 )
 
 func TestVariant(t *testing.T) {
@@ -257,7 +261,7 @@ func TestVariant(t *testing.T) {
 				0x16,
 				// TypeID
 				0x01, 0x00, 0x41, 0x01,
-				// EncodingMask
+				// mask
 				0x01,
 				// Length
 				0x0d, 0x00, 0x00, 0x00,
@@ -289,7 +293,7 @@ func TestVariant(t *testing.T) {
 				0x16,
 				// TypeID
 				0x01, 0x00, 0x60, 0x03,
-				// EncodingMask
+				// mask
 				0x01,
 				// Length
 				0x86, 0x00, 0x00, 0x00,
@@ -344,9 +348,9 @@ func TestVariant(t *testing.T) {
 			Bytes: []byte{
 				// variant encoding mask
 				0x17,
-				// EncodingMask
+				// mask
 				0x01,
-				// Value
+				// value
 				0x0a,                   // type
 				0x19, 0x04, 0x20, 0x40, // value
 			},
@@ -376,8 +380,241 @@ func TestVariant(t *testing.T) {
 				0x01, 0x01, 0x00, 0x00, 0x00,
 			},
 		},
+		{
+			Name:   "[]uint32",
+			Struct: MustVariant([]uint32{1, 2, 3}),
+			Bytes: []byte{
+				// variant encoding mask
+				0x87,
+				// array length
+				0x03, 0x00, 0x00, 0x00,
+				// array values
+				0x01, 0x00, 0x00, 0x00,
+				0x02, 0x00, 0x00, 0x00,
+				0x03, 0x00, 0x00, 0x00,
+			},
+		},
+		{
+			Name:   "[3][2]uint32",
+			Struct: MustVariant([][]uint32{{1, 1}, {2, 2}, {3, 3}}),
+			Bytes: []byte{
+				// variant encoding mask
+				0xc7,
+				// array length
+				0x06, 0x00, 0x00, 0x00,
+				// array values
+				0x01, 0x00, 0x00, 0x00,
+				0x01, 0x00, 0x00, 0x00,
+				0x02, 0x00, 0x00, 0x00,
+				0x02, 0x00, 0x00, 0x00,
+				0x03, 0x00, 0x00, 0x00,
+				0x03, 0x00, 0x00, 0x00,
+				// array dimensions length
+				0x02, 0x00, 0x00, 0x00,
+				// array dimensions
+				0x03, 0x00, 0x00, 0x00,
+				0x02, 0x00, 0x00, 0x00,
+			},
+		},
+		{
+			Name: "[3][2][1]uint32",
+			Struct: MustVariant([][][]uint32{
+				{{1}, {1}},
+				{{2}, {2}},
+				{{3}, {3}},
+			}),
+			Bytes: []byte{
+				// variant encoding mask
+				0xc7,
+				// array length
+				0x06, 0x00, 0x00, 0x00,
+				// array values
+				0x01, 0x00, 0x00, 0x00,
+				0x01, 0x00, 0x00, 0x00,
+				0x02, 0x00, 0x00, 0x00,
+				0x02, 0x00, 0x00, 0x00,
+				0x03, 0x00, 0x00, 0x00,
+				0x03, 0x00, 0x00, 0x00,
+				// array dimensions length
+				0x03, 0x00, 0x00, 0x00,
+				// array dimensions
+				0x03, 0x00, 0x00, 0x00,
+				0x02, 0x00, 0x00, 0x00,
+				0x01, 0x00, 0x00, 0x00,
+			},
+		},
+		{
+			Name: "[0][0][0]uint32",
+			Struct: MustVariant([][][]uint32{
+				{{}, {}},
+				{{}, {}},
+				{{}, {}},
+			}),
+			Bytes: []byte{
+				// variant encoding mask
+				0xc7,
+				// array length
+				0x00, 0x00, 0x00, 0x00,
+				// array values
+				// array dimensions length
+				0x03, 0x00, 0x00, 0x00,
+				// array dimensions
+				0x03, 0x00, 0x00, 0x00,
+				0x02, 0x00, 0x00, 0x00,
+				0x00, 0x00, 0x00, 0x00,
+			},
+		},
 	}
 	RunCodecTest(t, cases)
+}
+
+func TestSet(t *testing.T) {
+	tests := []struct {
+		v   interface{}
+		va  *Variant
+		err error
+	}{
+		{
+			v: []byte{0xca, 0xfe},
+			va: &Variant{
+				mask:  byte(TypeIDByteString),
+				value: []byte{0xca, 0xfe},
+			},
+		},
+		{
+			v: [][]byte{{0xca, 0xfe}, {0xaf, 0xfe}},
+			va: &Variant{
+				mask:        byte(VariantArrayValues | TypeIDByteString),
+				arrayLength: 2,
+				value:       [][]byte{{0xca, 0xfe}, {0xaf, 0xfe}},
+			},
+		},
+		{
+			v: int32(5),
+			va: &Variant{
+				mask:  byte(TypeIDInt32),
+				value: int32(5),
+			},
+		},
+		{
+			v: []int32{5},
+			va: &Variant{
+				mask:        byte(VariantArrayValues | TypeIDInt32),
+				arrayLength: 1,
+				value:       []int32{5},
+			},
+		},
+		{
+			v: [][]int32{{5}, {5}, {5}},
+			va: &Variant{
+				mask:                  byte(VariantArrayDimensions | VariantArrayValues | TypeIDInt32),
+				arrayLength:           3,
+				arrayDimensionsLength: 2,
+				arrayDimensions:       []int32{3, 1},
+				value:                 [][]int32{{5}, {5}, {5}},
+			},
+		},
+		{
+			v: [][][]int32{
+				{{}, {}},
+				{{}, {}},
+				{{}, {}},
+			},
+			va: &Variant{
+				mask:                  byte(VariantArrayDimensions | VariantArrayValues | TypeIDInt32),
+				arrayLength:           0,
+				arrayDimensionsLength: 3,
+				arrayDimensions:       []int32{3, 2, 0},
+				value: [][][]int32{
+					{{}, {}},
+					{{}, {}},
+					{{}, {}},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("%T", tt.v), func(t *testing.T) {
+			va, err := NewVariant(tt.v)
+			if got, want := err, tt.err; got != want {
+				t.Fatalf("got error %v want %v", got, want)
+			}
+			verify.Values(t, "variant", va, tt.va)
+		})
+	}
+}
+
+func TestSliceDim(t *testing.T) {
+	tests := []struct {
+		v   interface{}
+		et  reflect.Type
+		dim []int32
+		len int32
+		err error
+	}{
+		// happy flows
+		{
+			v:   "a",
+			et:  reflect.TypeOf(""),
+			dim: nil,
+			len: 1,
+		},
+		{
+			v:   1,
+			et:  reflect.TypeOf(int(0)),
+			dim: nil,
+			len: 1,
+		},
+		{
+			v:   []int{},
+			et:  reflect.TypeOf(int(0)),
+			dim: []int32{0},
+			len: 0,
+		},
+		{
+			v:   []int{1, 2, 3},
+			et:  reflect.TypeOf(int(0)),
+			dim: []int32{3},
+			len: 3,
+		},
+		{
+			v:   [][]int{{1, 1}, {2, 2}, {3, 3}},
+			et:  reflect.TypeOf(int(0)),
+			dim: []int32{3, 2},
+			len: 6,
+		},
+		{
+			v:   [][]int{{}, {}, {}},
+			et:  reflect.TypeOf(int(0)),
+			dim: []int32{3, 0},
+			len: 0,
+		},
+
+		// error flows
+		{
+			v:   [][]int{{1, 1}, {2, 2, 2}, {3}},
+			err: errUnbalancedSlice,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(fmt.Sprintf("%T", tt.v), func(t *testing.T) {
+			et, dim, len, err := sliceDim(reflect.ValueOf(tt.v))
+			if got, want := err, tt.err; got != want {
+				t.Fatalf("got error %v want %v", got, want)
+			}
+			if got, want := et, tt.et; got != want {
+				t.Fatalf("got type %v want %v", got, want)
+			}
+			if got, want := dim, tt.dim; !reflect.DeepEqual(got, want) {
+				t.Fatalf("got dimensions %v want %v", got, want)
+			}
+			if got, want := len, tt.len; got != want {
+				t.Fatalf("got len %v want %v", got, want)
+			}
+		})
+	}
 }
 
 func TestVariantUnsupportedType(t *testing.T) {
