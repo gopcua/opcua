@@ -1,0 +1,12 @@
+# no binaries to build
+builds:
+  -
+    goos:
+      - none
+checksum:
+changelog:
+  sort: asc
+  filters:
+    exclude:
+    - '^docs:'
+    - '^test:'
