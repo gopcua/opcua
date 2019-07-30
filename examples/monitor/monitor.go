@@ -36,6 +36,7 @@ func main() {
 
 	go func() {
 		<-signalCh
+		println()
 		cancel()
 	}()
 

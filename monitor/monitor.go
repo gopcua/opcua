@@ -40,6 +40,12 @@ type NodeMonitor struct {
 	errHandlerCB     ErrHandler
 }
 
+// internal struct to manage various ids
+type itemIDs struct {
+	handle uint32 // client-provided
+	id     uint32 // from server
+}
+
 // Subscription is an instance of an active subscription.
 // Nodes can be added and removed concurrently.
 type Subscription struct {
@@ -52,7 +58,7 @@ type Subscription struct {
 	closed           chan struct{}
 	mu               sync.RWMutex
 	handles          map[uint32]*ua.NodeID
-	nodeLookup       map[string]uint32
+	nodeLookup       map[string]*itemIDs
 }
 
 // New creates a new NodeMonitor
@@ -71,7 +77,7 @@ func newSubscription(m *NodeMonitor) (*Subscription, error) {
 		closed:           make(chan struct{}),
 		internalNotifyCh: make(chan *opcua.PublishNotificationData),
 		handles:          make(map[uint32]*ua.NodeID),
-		nodeLookup:       make(map[string]uint32),
+		nodeLookup:       make(map[string]*itemIDs),
 	}, nil
 }
 
@@ -204,6 +210,14 @@ func (s *Subscription) Unsubscribe() error {
 	return s.sub.Cancel()
 }
 
+// Subscribed returns the number of currently subscribed to nodes
+func (s *Subscription) Subscribed() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	return len(s.handles)
+}
+
 // Delivered returns the number of DataChangeMessages delivered
 func (s *Subscription) Delivered() uint64 {
 	return atomic.LoadUint64(&s.delivered)
@@ -228,13 +242,19 @@ func (s *Subscription) AddNodeIDs(nodes ...*ua.NodeID) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	if len(nodes) == 0 {
+		return nil
+	}
+
 	toAdd := make([]*ua.MonitoredItemCreateRequest, 0)
 
 	for _, node := range nodes {
 		handle := atomic.AddUint32(&s.monitor.nextClientHandle, 1)
 
 		s.handles[handle] = node
-		s.nodeLookup[node.String()] = handle
+		s.nodeLookup[node.String()] = &itemIDs{
+			handle: handle,
+		}
 
 		toAdd = append(toAdd, opcua.NewMonitoredItemCreateRequestWithDefaults(node, ua.AttributeIDValue, handle))
 	}
@@ -246,6 +266,19 @@ func (s *Subscription) AddNodeIDs(nodes ...*ua.NodeID) error {
 
 	if resp.ResponseHeader.ServiceResult != ua.StatusOK {
 		return resp.ResponseHeader.ServiceResult
+	}
+
+	if len(resp.Results) != len(toAdd) {
+		return fmt.Errorf("monitor items response length mismatch")
+	}
+
+	for i, res := range resp.Results {
+		if res.StatusCode != ua.StatusOK {
+			return res.StatusCode
+		}
+		// note: this works _iff_ the order of the response is the same as the request
+		sid := toAdd[i].ItemToMonitor.NodeID.String()
+		s.nodeLookup[sid].id = res.MonitoredItemID
 	}
 
 	return nil
@@ -265,18 +298,22 @@ func (s *Subscription) RemoveNodeIDs(nodes ...*ua.NodeID) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	if len(nodes) == 0 {
+		return nil
+	}
+
 	toRemove := make([]uint32, len(nodes))
 
 	for i, node := range nodes {
 		sid := node.String()
-		handle, ok := s.nodeLookup[sid]
+		ids, ok := s.nodeLookup[sid]
 		if !ok {
 			return fmt.Errorf("node not found: %s", sid)
 		}
 		delete(s.nodeLookup, sid)
-		delete(s.handles, handle)
+		delete(s.handles, ids.handle)
 
-		toRemove[i] = handle
+		toRemove[i] = ids.id
 	}
 
 	resp, err := s.sub.Unmonitor(toRemove...)
@@ -286,6 +323,16 @@ func (s *Subscription) RemoveNodeIDs(nodes ...*ua.NodeID) error {
 
 	if resp.ResponseHeader.ServiceResult != ua.StatusOK {
 		return resp.ResponseHeader.ServiceResult
+	}
+
+	if len(resp.Results) != len(toRemove) {
+		return fmt.Errorf("unmonitor items response length mismatch")
+	}
+
+	for _, res := range resp.Results {
+		if res != ua.StatusOK {
+			return res
+		}
 	}
 
 	return nil
