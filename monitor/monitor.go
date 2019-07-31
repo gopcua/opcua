@@ -168,7 +168,7 @@ func (s *Subscription) pump(ctx context.Context) {
 			}
 
 			if msg.SubscriptionID != s.sub.SubscriptionID {
-				panic("wtf!?")
+				s.sendError(fmt.Errorf("opcua: message sub id %v does not match sub id %v", msg.SubscriptionID, s.sub.SubscriptionID))
 			}
 
 			switch v := msg.Value.(type) {
