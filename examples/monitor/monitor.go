@@ -77,18 +77,22 @@ func main() {
 		log.Printf(err.Error())
 	})
 
+	cleanup := func(sub *monitor.Subscription) {
+		log.Printf("stats: sub=%d delivered=%d dropped=%d", sub.SubscriptionID(), sub.Delivered(), sub.Dropped())
+		sub.Unsubscribe()
+	}
+
 	// start callback-based subscription
 	go func() {
-		sub, err := m.Subscribe(ctx, func(n *ua.NodeID, v *ua.DataValue) {
-			log.Printf("callback: node=%s value=%v", n, v.Value.Value())
+		sub, err := m.Subscribe(ctx, func(s *monitor.Subscription, n *ua.NodeID, v *ua.DataValue) {
+			log.Printf("callback: sub=%d node=%s value=%v", s.SubscriptionID(), n, v.Value.Value())
 		}, *nodeID)
 
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		defer sub.Unsubscribe()
-		defer printStats(sub)
+		defer cleanup(sub)
 
 		<-ctx.Done()
 	}()
@@ -102,8 +106,7 @@ func main() {
 			log.Fatal(err)
 		}
 
-		defer sub.Unsubscribe()
-		defer printStats(sub)
+		defer cleanup(sub)
 
 		for {
 			select {
@@ -114,14 +117,10 @@ func main() {
 					log.Printf(msg.Error.Error())
 					continue
 				}
-				log.Printf("chan: node=%s value=%v", msg.NodeID, msg.Value.Value())
+				log.Printf("chan: sub=%d node=%s value=%v", sub.SubscriptionID(), msg.NodeID, msg.Value.Value())
 			}
 		}
 	}()
 
 	<-ctx.Done()
-}
-
-func printStats(sub *monitor.Subscription) {
-	log.Printf("stats: delivered=%d dropped=%d", sub.Delivered(), sub.Dropped())
 }

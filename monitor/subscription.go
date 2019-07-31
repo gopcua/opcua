@@ -23,7 +23,7 @@ var (
 type ErrHandler func(*opcua.Client, *Subscription, error)
 
 // MsgHandler is a function that is called for each new DataValue
-type MsgHandler func(*ua.NodeID, *ua.DataValue)
+type MsgHandler func(*Subscription, *ua.NodeID, *ua.DataValue)
 
 // DataChangeMessage represents the changed DataValue from the server. It also includes a reference
 // to the sending NodeID and error (if any)
@@ -62,7 +62,7 @@ type Subscription struct {
 }
 
 // New creates a new NodeMonitor
-func New(client *opcua.Client) (*NodeMonitor, error) {
+func NewNodeMonitor(client *opcua.Client) (*NodeMonitor, error) {
 	m := &NodeMonitor{
 		client:           client,
 		nextClientHandle: 100,
@@ -108,7 +108,7 @@ func (m *NodeMonitor) Subscribe(ctx context.Context, cb MsgHandler, nodes ...str
 				if msg.Error != nil {
 					sub.sendError(msg.Error)
 				} else {
-					cb(msg.NodeID, msg.DataValue)
+					cb(sub, msg.NodeID, msg.DataValue)
 				}
 			}
 		}
@@ -216,6 +216,11 @@ func (s *Subscription) Subscribed() int {
 	defer s.mu.RUnlock()
 
 	return len(s.handles)
+}
+
+// SubscriptionID returns the underlying subscription id
+func (s *Subscription) SubscriptionID() uint32 {
+	return s.sub.SubscriptionID
 }
 
 // Delivered returns the number of DataChangeMessages delivered
