@@ -2,8 +2,10 @@ package opcua
 
 import (
 	"context"
+	"fmt"
 	"time"
 
+	"github.com/gopcua/opcua/id"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uasc"
 )
@@ -194,6 +196,29 @@ func (s *Subscription) sendNotification(ctx context.Context, data *PublishNotifi
 	case s.Notifs <- data:
 	}
 
+}
+
+// Stats returns a diagnostic struct with metadata about the current subscription
+func (s *Subscription) Stats() (*ua.SubscriptionDiagnosticsDataType, error) {
+	// TODO(kung-foo): once browsing feature is merged, attempt to get direct access to the
+	// diagnostics node. for example, Prosys lists them like:
+	// i=2290/ns=1;g=918ee6f4-2d25-4506-980d-e659441c166d
+	// maybe cache the nodeid to speed up future stats queries
+	node := s.c.Node(ua.NewNumericNodeID(0, id.Server_ServerDiagnostics_SubscriptionDiagnosticsArray))
+	v, err := node.Value()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, eo := range v.Value().([]*ua.ExtensionObject) {
+		stat := eo.Value.(*ua.SubscriptionDiagnosticsDataType)
+
+		if stat.SubscriptionID == s.SubscriptionID {
+			return stat, nil
+		}
+	}
+
+	return nil, fmt.Errorf("opcua: unable to find SubscriptionDiagnostics for sub=%d", s.SubscriptionID)
 }
 
 func (p *SubscriptionParameters) setDefaults() {
