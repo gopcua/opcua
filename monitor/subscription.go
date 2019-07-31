@@ -181,7 +181,7 @@ func (s *Subscription) pump(ctx context.Context) {
 					out := &DataChangeMessage{}
 
 					if !ok {
-						out.Error = fmt.Errorf("handle %d not found", item.ClientHandle)
+						out.Error = fmt.Errorf("opcua: handle %d not found", item.ClientHandle)
 						// TODO: should the error also propogate via the monitor callback?
 					} else {
 						out.NodeID = nid
@@ -197,7 +197,7 @@ func (s *Subscription) pump(ctx context.Context) {
 					}
 				}
 			default:
-				s.sendError(fmt.Errorf("unknown message type: %T", msg.Value))
+				s.sendError(fmt.Errorf("opcua: unknown message type: %T", msg.Value))
 			}
 		}
 	}
@@ -248,6 +248,8 @@ func (s *Subscription) AddNodeIDs(nodes ...*ua.NodeID) error {
 	defer s.mu.Unlock()
 
 	if len(nodes) == 0 {
+		// some server implementionations allow an empty monitoreditemrequest, some don't.
+		// beter to just return
 		return nil
 	}
 
@@ -274,7 +276,7 @@ func (s *Subscription) AddNodeIDs(nodes ...*ua.NodeID) error {
 	}
 
 	if len(resp.Results) != len(toAdd) {
-		return fmt.Errorf("monitor items response length mismatch")
+		return fmt.Errorf("opcua: monitor items response length mismatch")
 	}
 
 	for i, res := range resp.Results {
@@ -313,7 +315,7 @@ func (s *Subscription) RemoveNodeIDs(nodes ...*ua.NodeID) error {
 		sid := node.String()
 		ids, ok := s.nodeLookup[sid]
 		if !ok {
-			return fmt.Errorf("node not found: %s", sid)
+			return fmt.Errorf("opcua: node not found: %s", sid)
 		}
 		delete(s.nodeLookup, sid)
 		delete(s.handles, ids.handle)
@@ -331,7 +333,7 @@ func (s *Subscription) RemoveNodeIDs(nodes ...*ua.NodeID) error {
 	}
 
 	if len(resp.Results) != len(toRemove) {
-		return fmt.Errorf("unmonitor items response length mismatch")
+		return fmt.Errorf("opcua: unmonitor items response length mismatch")
 	}
 
 	for _, res := range resp.Results {
