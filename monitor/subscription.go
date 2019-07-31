@@ -61,7 +61,7 @@ type Subscription struct {
 	nodeLookup       map[string]*itemIDs
 }
 
-// New creates a new NodeMonitor
+// NewNodeMonitor creates a new NodeMonitor
 func NewNodeMonitor(client *opcua.Client) (*NodeMonitor, error) {
 	m := &NodeMonitor{
 		client:           client,
