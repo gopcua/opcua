@@ -345,6 +345,10 @@ func (s *Subscription) RemoveNodeIDs(nodes ...*ua.NodeID) error {
 	return nil
 }
 
+func (s *Subscription) Stats() (*ua.SubscriptionDiagnosticsDataType, error) {
+	return s.sub.Stats()
+}
+
 func parseNodeSlice(nodes ...string) ([]*ua.NodeID, error) {
 	var err error
 
