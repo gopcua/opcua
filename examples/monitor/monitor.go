@@ -68,7 +68,7 @@ func main() {
 
 	defer c.Close()
 
-	m, err := monitor.New(c)
+	m, err := monitor.NewNodeMonitor(c)
 	if err != nil {
 		log.Fatal(err)
 	}
