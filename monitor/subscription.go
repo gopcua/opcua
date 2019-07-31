@@ -12,8 +12,8 @@ import (
 )
 
 var (
-	// DefaultMaxChanLen is the size of the internal buffer when using a callback-based subscription
-	DefaultMaxChanLen = 8192
+	// DefaultCallbackBufferLen is the size of the internal buffer when using a callback-based subscription
+	DefaultCallbackBufferLen = 8192
 
 	// ErrSlowConsumer is returned when a subscriber does not keep up with the incoming messages
 	ErrSlowConsumer = errors.New("opcua: slow consumer. messages dropped")
@@ -90,7 +90,7 @@ func (m *NodeMonitor) SetErrorHandler(cb ErrHandler) {
 // The caller must call `Unsubscribe` to stop and clean up resources. Canceling the context
 // will also cause the subscription to stop, but `Unsubscribe` must still be called.
 func (m *NodeMonitor) Subscribe(ctx context.Context, cb MsgHandler, nodes ...string) (*Subscription, error) {
-	ch := make(chan *DataChangeMessage, DefaultMaxChanLen)
+	ch := make(chan *DataChangeMessage, DefaultCallbackBufferLen)
 
 	sub, err := m.ChanSubscribe(ctx, ch, nodes...)
 	if err != nil {
