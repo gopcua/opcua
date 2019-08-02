@@ -133,6 +133,10 @@ func (s *SecureChannel) SendWithTimeout(svc interface{}, authToken *ua.NodeID, t
 		return nil
 	}
 
+	// `+ timeoutLeniency` to give the server a chance to respond to TimeoutHint
+	timer := time.NewTimer(timeout + timeoutLeniency)
+	defer timer.Stop()
+
 	select {
 	case resp := <-ch:
 		if resp.Err != nil {
@@ -142,7 +146,7 @@ func (s *SecureChannel) SendWithTimeout(svc interface{}, authToken *ua.NodeID, t
 			return resp.Err
 		}
 		return h(resp.V)
-	case <-time.After(timeout + timeoutLeniency): // `+ timeoutLeniency` to give the server a chance to respond to TimeoutHint
+	case <-timer.C:
 		s.mu.Lock()
 		s.popHandlerLock(reqid)
 		s.mu.Unlock()
