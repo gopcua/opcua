@@ -3,10 +3,10 @@ package main
 import (
 	"context"
 	"flag"
-	"fmt"
 	"log"
 	"os"
 	"os/signal"
+	"time"
 
 	"github.com/gopcua/opcua"
 	"github.com/gopcua/opcua/debug"
@@ -50,7 +50,7 @@ func main() {
 		log.Fatal("Failed to find suitable endpoint")
 	}
 
-	fmt.Println("*", ep.SecurityPolicyURI, ep.SecurityMode)
+	log.Printf("*", ep.SecurityPolicyURI, ep.SecurityMode)
 
 	opts := []opcua.Option{
 		opcua.SecurityPolicy(*policy),
@@ -74,53 +74,66 @@ func main() {
 	}
 
 	m.SetErrorHandler(func(_ *opcua.Client, sub *monitor.Subscription, err error) {
-		log.Printf(err.Error())
+		log.Printf("error: sub=%d err=%s", sub.SubscriptionID(), err.Error())
 	})
 
-	cleanup := func(sub *monitor.Subscription) {
-		log.Printf("stats: sub=%d delivered=%d dropped=%d", sub.SubscriptionID(), sub.Delivered(), sub.Dropped())
-		sub.Unsubscribe()
-	}
-
 	// start callback-based subscription
-	go func() {
-		sub, err := m.Subscribe(ctx, func(s *monitor.Subscription, n *ua.NodeID, v *ua.DataValue) {
-			log.Printf("callback: sub=%d node=%s value=%v", s.SubscriptionID(), n, v.Value.Value())
-		}, *nodeID)
-
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		defer cleanup(sub)
-
-		<-ctx.Done()
-	}()
+	go startCallbackSub(ctx, m, 0, *nodeID)
 
 	// start channel-based subscription
-	go func() {
-		ch := make(chan *monitor.DataChangeMessage, 16)
-		sub, err := m.ChanSubscribe(ctx, ch, *nodeID)
-
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		defer cleanup(sub)
-
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case msg := <-ch:
-				if msg.Error != nil {
-					log.Printf(msg.Error.Error())
-					continue
-				}
-				log.Printf("chan: sub=%d node=%s value=%v", sub.SubscriptionID(), msg.NodeID, msg.Value.Value())
-			}
-		}
-	}()
+	go startChanSub(ctx, m, 0, *nodeID)
 
 	<-ctx.Done()
+}
+
+func startCallbackSub(ctx context.Context, m *monitor.NodeMonitor, lag time.Duration, nodes ...string) {
+	sub, err := m.Subscribe(
+		ctx,
+		func(s *monitor.Subscription, msg *monitor.DataChangeMessage) {
+			if msg.Error != nil {
+				log.Printf("[callback] sub=%d error=%s", s.SubscriptionID(), msg.Error)
+			} else {
+				log.Printf("[callback] sub=%d node=%s value=%v", s.SubscriptionID(), msg.NodeID, msg.Value.Value())
+			}
+			time.Sleep(lag)
+		},
+		nodes...)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	defer cleanup(sub)
+
+	<-ctx.Done()
+}
+
+func startChanSub(ctx context.Context, m *monitor.NodeMonitor, lag time.Duration, nodes ...string) {
+	ch := make(chan *monitor.DataChangeMessage, 16)
+	sub, err := m.ChanSubscribe(ctx, ch, nodes...)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	defer cleanup(sub)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case msg := <-ch:
+			if msg.Error != nil {
+				log.Printf("[channel ] sub=%d error=%s", sub.SubscriptionID(), msg.Error)
+			} else {
+				log.Printf("[channel ] sub=%d node=%s value=%v", sub.SubscriptionID(), msg.NodeID, msg.Value.Value())
+			}
+			time.Sleep(lag)
+		}
+	}
+}
+
+func cleanup(sub *monitor.Subscription) {
+	log.Printf("stats: sub=%d delivered=%d dropped=%d", sub.SubscriptionID(), sub.Delivered(), sub.Dropped())
+	sub.Unsubscribe()
 }

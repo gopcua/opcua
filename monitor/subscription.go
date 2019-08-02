@@ -16,14 +16,14 @@ var (
 	DefaultCallbackBufferLen = 8192
 
 	// ErrSlowConsumer is returned when a subscriber does not keep up with the incoming messages
-	ErrSlowConsumer = errors.New("opcua: slow consumer. messages dropped")
+	ErrSlowConsumer = errors.New("opcua: slow consumer. messages may be dropped")
 )
 
 // ErrHandler is a function that is called when there is an out of band issue with delivery
 type ErrHandler func(*opcua.Client, *Subscription, error)
 
 // MsgHandler is a function that is called for each new DataValue
-type MsgHandler func(*Subscription, *ua.NodeID, *ua.DataValue)
+type MsgHandler func(*Subscription, *DataChangeMessage)
 
 // DataChangeMessage represents the changed DataValue from the server. It also includes a reference
 // to the sending NodeID and error (if any)
@@ -51,7 +51,6 @@ type itemIDs struct {
 type Subscription struct {
 	monitor          *NodeMonitor
 	sub              *opcua.Subscription
-	notifyCh         chan *DataChangeMessage
 	internalNotifyCh chan *opcua.PublishNotificationData
 	delivered        uint64
 	dropped          uint64
@@ -71,14 +70,27 @@ func NewNodeMonitor(client *opcua.Client) (*NodeMonitor, error) {
 	return m, nil
 }
 
-func newSubscription(m *NodeMonitor) (*Subscription, error) {
-	return &Subscription{
+func newSubscription(m *NodeMonitor, notifyChanLength int, nodes ...string) (*Subscription, error) {
+	s := &Subscription{
 		monitor:          m,
 		closed:           make(chan struct{}),
-		internalNotifyCh: make(chan *opcua.PublishNotificationData),
+		internalNotifyCh: make(chan *opcua.PublishNotificationData, notifyChanLength),
 		handles:          make(map[uint32]*ua.NodeID),
 		nodeLookup:       make(map[string]*itemIDs),
-	}, nil
+	}
+
+	var err error
+	if s.sub, err = m.client.Subscribe(&opcua.SubscriptionParameters{
+		Notifs: s.internalNotifyCh,
+	}); err != nil {
+		return nil, err
+	}
+
+	if err = s.AddNodes(nodes...); err != nil {
+		return nil, err
+	}
+
+	return s, nil
 }
 
 // SetErrorHandler sets an optional callback for async errors
@@ -90,29 +102,13 @@ func (m *NodeMonitor) SetErrorHandler(cb ErrHandler) {
 // The caller must call `Unsubscribe` to stop and clean up resources. Canceling the context
 // will also cause the subscription to stop, but `Unsubscribe` must still be called.
 func (m *NodeMonitor) Subscribe(ctx context.Context, cb MsgHandler, nodes ...string) (*Subscription, error) {
-	ch := make(chan *DataChangeMessage, DefaultCallbackBufferLen)
-
-	sub, err := m.ChanSubscribe(ctx, ch, nodes...)
+	sub, err := newSubscription(m, DefaultCallbackBufferLen, nodes...)
 	if err != nil {
 		return nil, err
 	}
 
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-sub.closed:
-				return
-			case msg := <-ch:
-				if msg.Error != nil {
-					sub.sendError(msg.Error)
-				} else {
-					cb(sub, msg.NodeID, msg.DataValue)
-				}
-			}
-		}
-	}()
+	go sub.pump(ctx, nil, cb)
+	go sub.sub.Run(ctx)
 
 	return sub, nil
 }
@@ -122,38 +118,26 @@ func (m *NodeMonitor) Subscribe(ctx context.Context, cb MsgHandler, nodes ...str
 // via the monitor's `ErrHandler`.
 // The caller must call `Unsubscribe` to stop and clean up resources. Canceling the context
 // will also cause the subscription to stop, but `Unsubscribe` must still be called.
-func (m *NodeMonitor) ChanSubscribe(ctx context.Context, ch chan *DataChangeMessage, nodes ...string) (*Subscription, error) {
-	s, err := newSubscription(m)
+func (m *NodeMonitor) ChanSubscribe(ctx context.Context, ch chan<- *DataChangeMessage, nodes ...string) (*Subscription, error) {
+	sub, err := newSubscription(m, 16, nodes...)
 	if err != nil {
 		return nil, err
 	}
 
-	s.notifyCh = ch
+	go sub.pump(ctx, ch, nil)
+	go sub.sub.Run(ctx)
 
-	if s.sub, err = m.client.Subscribe(&opcua.SubscriptionParameters{
-		Notifs: s.internalNotifyCh,
-	}); err != nil {
-		return nil, err
-	}
-
-	if err = s.AddNodes(nodes...); err != nil {
-		return nil, err
-	}
-
-	go s.pump(ctx)
-	go s.sub.Run(ctx)
-
-	return s, nil
+	return sub, nil
 }
 
 func (s *Subscription) sendError(err error) {
 	if err != nil && s.monitor.errHandlerCB != nil {
-		s.monitor.errHandlerCB(s.monitor.client, s, err)
+		go s.monitor.errHandlerCB(s.monitor.client, s, err)
 	}
 }
 
 // internal func to read from internal channel and write to client provided channel
-func (s *Subscription) pump(ctx context.Context) {
+func (s *Subscription) pump(ctx context.Context, notifyCh chan<- *DataChangeMessage, cb MsgHandler) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -169,6 +153,17 @@ func (s *Subscription) pump(ctx context.Context) {
 
 			if msg.SubscriptionID != s.sub.SubscriptionID {
 				s.sendError(fmt.Errorf("opcua: message sub id %v does not match sub id %v", msg.SubscriptionID, s.sub.SubscriptionID))
+				continue
+			}
+
+			// this is sort of a hack to emulate an `ErrSlowConsumer` error from the underlying subscription
+			// we check to see if the channel is "full" from the outside, and bail if it is.
+			if cb != nil && cap(s.internalNotifyCh) > 0 {
+				if len(s.internalNotifyCh) == cap(s.internalNotifyCh) {
+					s.sendError(ErrSlowConsumer)
+					atomic.AddUint64(&s.dropped, 1)
+					continue
+				}
 			}
 
 			switch v := msg.Value.(type) {
@@ -188,12 +183,19 @@ func (s *Subscription) pump(ctx context.Context) {
 						out.DataValue = item.Value
 					}
 
-					select {
-					case s.notifyCh <- out:
+					if notifyCh != nil {
+						select {
+						case notifyCh <- out:
+							atomic.AddUint64(&s.delivered, 1)
+						default:
+							atomic.AddUint64(&s.dropped, 1)
+							s.sendError(ErrSlowConsumer)
+						}
+					} else if cb != nil {
+						cb(s, out)
 						atomic.AddUint64(&s.delivered, 1)
-					default:
-						atomic.AddUint64(&s.dropped, 1)
-						s.sendError(ErrSlowConsumer)
+					} else {
+						panic("notifyCh or cb must be set")
 					}
 				}
 			default:
@@ -262,6 +264,8 @@ func (s *Subscription) AddNodeIDs(nodes ...*ua.NodeID) error {
 		s.nodeLookup[node.String()] = &itemIDs{
 			handle: handle,
 		}
+
+		// log.Printf("node=%s handle=%d", node.String(), handle)
 
 		toAdd = append(toAdd, opcua.NewMonitoredItemCreateRequestWithDefaults(node, ua.AttributeIDValue, handle))
 	}
