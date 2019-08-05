@@ -177,7 +177,7 @@ func (s *Subscription) pump(ctx context.Context, notifyCh chan<- *DataChangeMess
 
 					if !ok {
 						out.Error = fmt.Errorf("opcua: handle %d not found", item.ClientHandle)
-						// TODO: should the error also propogate via the monitor callback?
+						// TODO: should the error also propagate via the monitor callback?
 					} else {
 						out.NodeID = nid
 						out.DataValue = item.Value
