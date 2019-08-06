@@ -553,6 +553,12 @@ func (c *Client) Subscribe(params *SubscriptionParameters) (*Subscription, error
 		c,
 	}
 	c.subMux.Lock()
+	if sub.SubscriptionID == 0 || c.subscriptions[sub.SubscriptionID] != nil {
+		// this should not happen
+		// see: Part 4 Section 5.13.2.2, Table 88 – CreateSubscription Service Parameters
+		c.subMux.Unlock()
+		return sub, ua.StatusBadSubscriptionIDInvalid
+	}
 	c.subscriptions[sub.SubscriptionID] = sub
 	c.subMux.Unlock()
 
