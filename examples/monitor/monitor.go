@@ -50,7 +50,7 @@ func main() {
 		log.Fatal("Failed to find suitable endpoint")
 	}
 
-	log.Printf("*", ep.SecurityPolicyURI, ep.SecurityMode)
+	log.Print("*", ep.SecurityPolicyURI, ep.SecurityMode)
 
 	opts := []opcua.Option{
 		opcua.SecurityPolicy(*policy),
