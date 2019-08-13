@@ -11,6 +11,11 @@ import (
 	"time"
 )
 
+var (
+	// MaxVariantArrayLength sets a limit on the number of elements in array
+	MaxVariantArrayLength = 0xffff
+)
+
 const (
 	// VariantArrayDimensions flags whether the array has more than one dimension
 	VariantArrayDimensions = 0x40
@@ -124,6 +129,12 @@ func (m *Variant) Decode(b []byte) (int, error) {
 
 	// read flattened array elements
 	n := int(m.arrayLength)
+
+	if n > MaxVariantArrayLength {
+		return buf.Pos(), StatusBadEncodingLimitsExceeded
+	}
+
+	// note: if n is negative (since we read a _signed_ int32) MakeSlice will panic
 	vals := reflect.MakeSlice(reflect.SliceOf(typ), n, n)
 	for i := 0; i < n; i++ {
 		vals.Index(i).Set(reflect.ValueOf(m.decodeValue(buf)))

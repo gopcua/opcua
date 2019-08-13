@@ -468,6 +468,23 @@ func TestVariant(t *testing.T) {
 	RunCodecTest(t, cases)
 }
 
+func TestBigArray(t *testing.T) {
+	b := []byte{
+		// variant encoding mask
+		0x87,
+		// array length
+		0xff, 0xff, 0x01, 0x00,
+		// array values
+		0x00, 0x00, 0x00, 0x00,
+	}
+
+	_, err := Decode(b, MustVariant([]uint32{0}))
+
+	if err != StatusBadEncodingLimitsExceeded {
+		t.Fatalf("got error %v want %v", err, StatusBadEncodingLimitsExceeded)
+	}
+}
+
 func TestSet(t *testing.T) {
 	tests := []struct {
 		v   interface{}
