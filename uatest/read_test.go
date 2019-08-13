@@ -11,7 +11,9 @@ import (
 	"github.com/pascaldekloe/goe/verify"
 )
 
-func TestReadWrite(t *testing.T) {
+// TestRead performs an integration test to read values
+// from an OPC/UA server.
+func TestRead(t *testing.T) {
 	tests := []struct {
 		id *ua.NodeID
 		v  interface{}
