@@ -574,11 +574,12 @@ func (c *Client) forgetSubscription(subID uint32) {
 func (c *Client) notifySubscriptionsOfError(ctx context.Context, res *ua.PublishResponse, err error) {
 	c.subMux.RLock()
 	defer c.subMux.RUnlock()
-	var subsToNotify map[uint32]*Subscription
+
+	subsToNotify := c.subscriptions
 	if res != nil && res.SubscriptionID != 0 {
-		subsToNotify = map[uint32]*Subscription{res.SubscriptionID: c.subscriptions[res.SubscriptionID]}
-	} else {
-		subsToNotify = c.subscriptions
+		subsToNotify = map[uint32]*Subscription{
+			res.SubscriptionID: c.subscriptions[res.SubscriptionID],
+		}
 	}
 	for _, sub := range subsToNotify {
 		go func(s *Subscription) {
