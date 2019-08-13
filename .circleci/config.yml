@@ -20,7 +20,10 @@ jobs:
       - restore_cache:
           keys:
             - go-mod-{{ checksum "go.sum" }}
+      - run: sudo apt-get install -y python3-pip
+      - run: pip3 install opcua
       - run: go test -v $GO_TEST_FLAGS ./...
+      - run: go test -v -tags=integration ./uatest
       - run: go install ./...
       - save_cache:
           key: go-mod-{{ checksum "go.sum" }}
