@@ -105,10 +105,19 @@ type Message struct {
 func NewMessage(srv interface{}, typeID uint16, cfg *Config) *Message {
 	switch typeID {
 	case id.OpenSecureChannelRequest_Encoding_DefaultBinary, id.OpenSecureChannelResponse_Encoding_DefaultBinary:
+		// Do not send the thumbprint for security mode None
+		// even if we have a certificate.
+		//
+		// See https://github.com/gopcua/opcua/issues/259
+		thumbprint := cfg.Thumbprint
+		if cfg.SecurityMode == ua.MessageSecurityModeNone {
+			thumbprint = nil
+		}
+
 		return &Message{
 			MessageHeader: &MessageHeader{
 				Header:                   NewHeader(MessageTypeOpenSecureChannel, ChunkTypeFinal, cfg.SecureChannelID),
-				AsymmetricSecurityHeader: NewAsymmetricSecurityHeader(cfg.SecurityPolicyURI, cfg.Certificate, cfg.Thumbprint),
+				AsymmetricSecurityHeader: NewAsymmetricSecurityHeader(cfg.SecurityPolicyURI, cfg.Certificate, thumbprint),
 				SequenceHeader:           NewSequenceHeader(cfg.SequenceNumber, cfg.RequestID),
 			},
 			TypeID:  ua.NewFourByteExpandedNodeID(0, typeID),
