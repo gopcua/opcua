@@ -125,7 +125,7 @@ The current set of supported services is only for the high-level client.
 |                             | Write                         | Yes       |              |
 |                             | HistoryRead                   | Yes       |              |
 |                             | HistoryUpdate                 |           |              |
-| Method Service Set          | Call                          |           |              |
+| Method Service Set          | Call                          | Yes       |              |
 | MonitoredItems Service Set  | CreateMonitoredItems          | Yes       |              |
 |                             | DeleteMonitoredItems          | Yes       |              |
 |                             | ModifyMonitoredItems          |           |              |

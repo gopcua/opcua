@@ -516,6 +516,24 @@ func (c *Client) Browse(req *ua.BrowseRequest) (*ua.BrowseResponse, error) {
 	return res, err
 }
 
+// Call executes a synchronous call request for a single method.
+func (c *Client) Call(req *ua.CallMethodRequest) (*ua.CallMethodResult, error) {
+	creq := &ua.CallRequest{
+		MethodsToCall: []*ua.CallMethodRequest{req},
+	}
+	var res *ua.CallResponse
+	err := c.Send(creq, func(v interface{}) error {
+		return safeAssign(v, &res)
+	})
+	if err != nil {
+		return nil, err
+	}
+	if len(res.Results) != 1 {
+		return nil, ua.StatusBadUnknownResponse
+	}
+	return res.Results[0], nil
+}
+
 // Subscribe creates a Subscription with given parameters. Parameters that have not been set
 // (have zero values) are overwritten with default values.
 // See opcua.DefaultSubscription* constants
