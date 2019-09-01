@@ -6,11 +6,11 @@ package main
 
 import (
 	"context"
+	"encoding/csv"
 	"flag"
-	"fmt"
 	"log"
 	"os"
-	"text/tabwriter"
+	"strconv"
 
 	"github.com/gopcua/opcua"
 	"github.com/gopcua/opcua/debug"
@@ -28,10 +28,14 @@ type NodeDef struct {
 	Path        string
 	DataType    string
 	Writable    bool
+	Unit        string
+	Scale       string
+	Min         string
+	Max         string
 }
 
-func (n NodeDef) String() string {
-	return fmt.Sprintf("%s\t%s\t%s\t%v\t%s", n.NodeID, n.Path, n.DataType, n.Writable, n.Description)
+func (n NodeDef) Records() []string {
+	return []string{n.BrowseName, n.DataType, n.NodeID.String(), n.Unit, n.Scale, n.Min, n.Max, strconv.FormatBool(n.Writable), n.Description}
 }
 
 func join(a, b string) string {
@@ -93,27 +97,29 @@ func browse(n *opcua.Node, path string, level int) ([]NodeDef, error) {
 	case ua.StatusOK:
 		switch v := attrs[4].Value.NodeID().IntID(); v {
 		case id.DateTime:
-			def.DataType = "DateTime"
+			def.DataType = "time.Time"
 		case id.Boolean:
-			def.DataType = "Boolean"
+			def.DataType = "bool"
 		case id.SByte:
-			def.DataType = "SByte"
+			def.DataType = "int8"
 		case id.Int16:
-			def.DataType = "Int16"
+			def.DataType = "int16"
 		case id.Int32:
-			def.DataType = "Int32"
+			def.DataType = "int32"
 		case id.Byte:
-			def.DataType = "Byte"
+			def.DataType = "byte"
 		case id.UInt16:
-			def.DataType = "UInt16"
+			def.DataType = "uint16"
 		case id.UInt32:
-			def.DataType = "UInt32"
+			def.DataType = "uint32"
 		case id.UtcTime:
-			def.DataType = "UtcTime"
+			def.DataType = "time.Time"
 		case id.String:
-			def.DataType = "String"
+			def.DataType = "string"
 		case id.Float:
-			def.DataType = "Float"
+			def.DataType = "float32"
+		case id.Double:
+			def.DataType = "float64"
 		default:
 			def.DataType = attrs[4].Value.NodeID().String()
 		}
@@ -180,10 +186,12 @@ func main() {
 		log.Fatal(err)
 	}
 
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "node_id\tpath\ttype\twritable\tdescription")
+	w := csv.NewWriter(os.Stdout)
+	w.Comma = ';'
+	hdr := []string{"Name", "Type", "Addr", "Unit (SI)", "Scale", "Min", "Max", "Writable", "Description"}
+	w.Write(hdr)
 	for _, s := range nodeList {
-		fmt.Fprintln(w, s)
+		w.Write(s.Records())
 	}
 	w.Flush()
 }
