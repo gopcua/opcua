@@ -8,6 +8,16 @@ package ua
 
 import "time"
 
+type Request interface {
+	Header() *RequestHeader
+	SetHeader(*RequestHeader)
+}
+
+type Response interface {
+	Header() *ResponseHeader
+	SetHeader(*ResponseHeader)
+}
+
 type KeyValuePair struct {
 	Key   *QualifiedName
 	Value *Variant
@@ -621,6 +631,14 @@ type ServiceFault struct {
 	ResponseHeader *ResponseHeader
 }
 
+func (t *ServiceFault) Header() *ResponseHeader {
+	return t.ResponseHeader
+}
+
+func (t *ServiceFault) SetHeader(h *ResponseHeader) {
+	t.ResponseHeader = h
+}
+
 type SessionlessInvokeRequestType struct {
 	URIsVersion   []uint32
 	NamespaceURIs []string
@@ -642,9 +660,25 @@ type FindServersRequest struct {
 	ServerURIs    []string
 }
 
+func (t *FindServersRequest) Header() *RequestHeader {
+	return t.RequestHeader
+}
+
+func (t *FindServersRequest) SetHeader(h *RequestHeader) {
+	t.RequestHeader = h
+}
+
 type FindServersResponse struct {
 	ResponseHeader *ResponseHeader
 	Servers        []*ApplicationDescription
+}
+
+func (t *FindServersResponse) Header() *ResponseHeader {
+	return t.ResponseHeader
+}
+
+func (t *FindServersResponse) SetHeader(h *ResponseHeader) {
+	t.ResponseHeader = h
 }
 
 type ServerOnNetwork struct {
@@ -661,10 +695,26 @@ type FindServersOnNetworkRequest struct {
 	ServerCapabilityFilter []string
 }
 
+func (t *FindServersOnNetworkRequest) Header() *RequestHeader {
+	return t.RequestHeader
+}
+
+func (t *FindServersOnNetworkRequest) SetHeader(h *RequestHeader) {
+	t.RequestHeader = h
+}
+
 type FindServersOnNetworkResponse struct {
 	ResponseHeader       *ResponseHeader
 	LastCounterResetTime time.Time
 	Servers              []*ServerOnNetwork
+}
+
+func (t *FindServersOnNetworkResponse) Header() *ResponseHeader {
+	return t.ResponseHeader
+}
+
+func (t *FindServersOnNetworkResponse) SetHeader(h *ResponseHeader) {
+	t.ResponseHeader = h
 }
 
 type UserTokenPolicy struct {
@@ -693,9 +743,25 @@ type GetEndpointsRequest struct {
 	ProfileURIs   []string
 }
 
+func (t *GetEndpointsRequest) Header() *RequestHeader {
+	return t.RequestHeader
+}
+
+func (t *GetEndpointsRequest) SetHeader(h *RequestHeader) {
+	t.RequestHeader = h
+}
+
 type GetEndpointsResponse struct {
 	ResponseHeader *ResponseHeader
 	Endpoints      []*EndpointDescription
+}
+
+func (t *GetEndpointsResponse) Header() *ResponseHeader {
+	return t.ResponseHeader
+}
+
+func (t *GetEndpointsResponse) SetHeader(h *ResponseHeader) {
+	t.ResponseHeader = h
 }
 
 type RegisteredServer struct {
@@ -714,8 +780,24 @@ type RegisterServerRequest struct {
 	Server        *RegisteredServer
 }
 
+func (t *RegisterServerRequest) Header() *RequestHeader {
+	return t.RequestHeader
+}
+
+func (t *RegisterServerRequest) SetHeader(h *RequestHeader) {
+	t.RequestHeader = h
+}
+
 type RegisterServerResponse struct {
 	ResponseHeader *ResponseHeader
+}
+
+func (t *RegisterServerResponse) Header() *ResponseHeader {
+	return t.ResponseHeader
+}
+
+func (t *RegisterServerResponse) SetHeader(h *ResponseHeader) {
+	t.ResponseHeader = h
 }
 
 type MdnsDiscoveryConfiguration struct {
@@ -729,10 +811,26 @@ type RegisterServer2Request struct {
 	DiscoveryConfiguration []*ExtensionObject
 }
 
+func (t *RegisterServer2Request) Header() *RequestHeader {
+	return t.RequestHeader
+}
+
+func (t *RegisterServer2Request) SetHeader(h *RequestHeader) {
+	t.RequestHeader = h
+}
+
 type RegisterServer2Response struct {
 	ResponseHeader       *ResponseHeader
 	ConfigurationResults []StatusCode
 	DiagnosticInfos      []*DiagnosticInfo
+}
+
+func (t *RegisterServer2Response) Header() *ResponseHeader {
+	return t.ResponseHeader
+}
+
+func (t *RegisterServer2Response) SetHeader(h *ResponseHeader) {
+	t.ResponseHeader = h
 }
 
 type ChannelSecurityToken struct {
@@ -751,6 +849,14 @@ type OpenSecureChannelRequest struct {
 	RequestedLifetime     uint32
 }
 
+func (t *OpenSecureChannelRequest) Header() *RequestHeader {
+	return t.RequestHeader
+}
+
+func (t *OpenSecureChannelRequest) SetHeader(h *RequestHeader) {
+	t.RequestHeader = h
+}
+
 type OpenSecureChannelResponse struct {
 	ResponseHeader        *ResponseHeader
 	ServerProtocolVersion uint32
@@ -758,12 +864,36 @@ type OpenSecureChannelResponse struct {
 	ServerNonce           []byte
 }
 
+func (t *OpenSecureChannelResponse) Header() *ResponseHeader {
+	return t.ResponseHeader
+}
+
+func (t *OpenSecureChannelResponse) SetHeader(h *ResponseHeader) {
+	t.ResponseHeader = h
+}
+
 type CloseSecureChannelRequest struct {
 	RequestHeader *RequestHeader
 }
 
+func (t *CloseSecureChannelRequest) Header() *RequestHeader {
+	return t.RequestHeader
+}
+
+func (t *CloseSecureChannelRequest) SetHeader(h *RequestHeader) {
+	t.RequestHeader = h
+}
+
 type CloseSecureChannelResponse struct {
 	ResponseHeader *ResponseHeader
+}
+
+func (t *CloseSecureChannelResponse) Header() *ResponseHeader {
+	return t.ResponseHeader
+}
+
+func (t *CloseSecureChannelResponse) SetHeader(h *ResponseHeader) {
+	t.ResponseHeader = h
 }
 
 type SignedSoftwareCertificate struct {
@@ -788,6 +918,14 @@ type CreateSessionRequest struct {
 	MaxResponseMessageSize  uint32
 }
 
+func (t *CreateSessionRequest) Header() *RequestHeader {
+	return t.RequestHeader
+}
+
+func (t *CreateSessionRequest) SetHeader(h *RequestHeader) {
+	t.RequestHeader = h
+}
+
 type CreateSessionResponse struct {
 	ResponseHeader             *ResponseHeader
 	SessionID                  *NodeID
@@ -799,6 +937,14 @@ type CreateSessionResponse struct {
 	ServerSoftwareCertificates []*SignedSoftwareCertificate
 	ServerSignature            *SignatureData
 	MaxRequestMessageSize      uint32
+}
+
+func (t *CreateSessionResponse) Header() *ResponseHeader {
+	return t.ResponseHeader
+}
+
+func (t *CreateSessionResponse) SetHeader(h *ResponseHeader) {
+	t.ResponseHeader = h
 }
 
 type UserIdentityToken struct {
@@ -836,6 +982,14 @@ type ActivateSessionRequest struct {
 	UserTokenSignature         *SignatureData
 }
 
+func (t *ActivateSessionRequest) Header() *RequestHeader {
+	return t.RequestHeader
+}
+
+func (t *ActivateSessionRequest) SetHeader(h *RequestHeader) {
+	t.RequestHeader = h
+}
+
 type ActivateSessionResponse struct {
 	ResponseHeader  *ResponseHeader
 	ServerNonce     []byte
@@ -843,13 +997,37 @@ type ActivateSessionResponse struct {
 	DiagnosticInfos []*DiagnosticInfo
 }
 
+func (t *ActivateSessionResponse) Header() *ResponseHeader {
+	return t.ResponseHeader
+}
+
+func (t *ActivateSessionResponse) SetHeader(h *ResponseHeader) {
+	t.ResponseHeader = h
+}
+
 type CloseSessionRequest struct {
 	RequestHeader       *RequestHeader
 	DeleteSubscriptions bool
 }
 
+func (t *CloseSessionRequest) Header() *RequestHeader {
+	return t.RequestHeader
+}
+
+func (t *CloseSessionRequest) SetHeader(h *RequestHeader) {
+	t.RequestHeader = h
+}
+
 type CloseSessionResponse struct {
 	ResponseHeader *ResponseHeader
+}
+
+func (t *CloseSessionResponse) Header() *ResponseHeader {
+	return t.ResponseHeader
+}
+
+func (t *CloseSessionResponse) SetHeader(h *ResponseHeader) {
+	t.ResponseHeader = h
 }
 
 type CancelRequest struct {
@@ -857,9 +1035,25 @@ type CancelRequest struct {
 	RequestHandle uint32
 }
 
+func (t *CancelRequest) Header() *RequestHeader {
+	return t.RequestHeader
+}
+
+func (t *CancelRequest) SetHeader(h *RequestHeader) {
+	t.RequestHeader = h
+}
+
 type CancelResponse struct {
 	ResponseHeader *ResponseHeader
 	CancelCount    uint32
+}
+
+func (t *CancelResponse) Header() *ResponseHeader {
+	return t.ResponseHeader
+}
+
+func (t *CancelResponse) SetHeader(h *ResponseHeader) {
+	t.ResponseHeader = h
 }
 
 type NodeAttributes struct {
@@ -991,10 +1185,26 @@ type AddNodesRequest struct {
 	NodesToAdd    []*AddNodesItem
 }
 
+func (t *AddNodesRequest) Header() *RequestHeader {
+	return t.RequestHeader
+}
+
+func (t *AddNodesRequest) SetHeader(h *RequestHeader) {
+	t.RequestHeader = h
+}
+
 type AddNodesResponse struct {
 	ResponseHeader  *ResponseHeader
 	Results         []*AddNodesResult
 	DiagnosticInfos []*DiagnosticInfo
+}
+
+func (t *AddNodesResponse) Header() *ResponseHeader {
+	return t.ResponseHeader
+}
+
+func (t *AddNodesResponse) SetHeader(h *ResponseHeader) {
+	t.ResponseHeader = h
 }
 
 type AddReferencesItem struct {
@@ -1011,10 +1221,26 @@ type AddReferencesRequest struct {
 	ReferencesToAdd []*AddReferencesItem
 }
 
+func (t *AddReferencesRequest) Header() *RequestHeader {
+	return t.RequestHeader
+}
+
+func (t *AddReferencesRequest) SetHeader(h *RequestHeader) {
+	t.RequestHeader = h
+}
+
 type AddReferencesResponse struct {
 	ResponseHeader  *ResponseHeader
 	Results         []StatusCode
 	DiagnosticInfos []*DiagnosticInfo
+}
+
+func (t *AddReferencesResponse) Header() *ResponseHeader {
+	return t.ResponseHeader
+}
+
+func (t *AddReferencesResponse) SetHeader(h *ResponseHeader) {
+	t.ResponseHeader = h
 }
 
 type DeleteNodesItem struct {
@@ -1027,10 +1253,26 @@ type DeleteNodesRequest struct {
 	NodesToDelete []*DeleteNodesItem
 }
 
+func (t *DeleteNodesRequest) Header() *RequestHeader {
+	return t.RequestHeader
+}
+
+func (t *DeleteNodesRequest) SetHeader(h *RequestHeader) {
+	t.RequestHeader = h
+}
+
 type DeleteNodesResponse struct {
 	ResponseHeader  *ResponseHeader
 	Results         []StatusCode
 	DiagnosticInfos []*DiagnosticInfo
+}
+
+func (t *DeleteNodesResponse) Header() *ResponseHeader {
+	return t.ResponseHeader
+}
+
+func (t *DeleteNodesResponse) SetHeader(h *ResponseHeader) {
+	t.ResponseHeader = h
 }
 
 type DeleteReferencesItem struct {
@@ -1046,10 +1288,26 @@ type DeleteReferencesRequest struct {
 	ReferencesToDelete []*DeleteReferencesItem
 }
 
+func (t *DeleteReferencesRequest) Header() *RequestHeader {
+	return t.RequestHeader
+}
+
+func (t *DeleteReferencesRequest) SetHeader(h *RequestHeader) {
+	t.RequestHeader = h
+}
+
 type DeleteReferencesResponse struct {
 	ResponseHeader  *ResponseHeader
 	Results         []StatusCode
 	DiagnosticInfos []*DiagnosticInfo
+}
+
+func (t *DeleteReferencesResponse) Header() *ResponseHeader {
+	return t.ResponseHeader
+}
+
+func (t *DeleteReferencesResponse) SetHeader(h *ResponseHeader) {
+	t.ResponseHeader = h
 }
 
 type ViewDescription struct {
@@ -1090,10 +1348,26 @@ type BrowseRequest struct {
 	NodesToBrowse                 []*BrowseDescription
 }
 
+func (t *BrowseRequest) Header() *RequestHeader {
+	return t.RequestHeader
+}
+
+func (t *BrowseRequest) SetHeader(h *RequestHeader) {
+	t.RequestHeader = h
+}
+
 type BrowseResponse struct {
 	ResponseHeader  *ResponseHeader
 	Results         []*BrowseResult
 	DiagnosticInfos []*DiagnosticInfo
+}
+
+func (t *BrowseResponse) Header() *ResponseHeader {
+	return t.ResponseHeader
+}
+
+func (t *BrowseResponse) SetHeader(h *ResponseHeader) {
+	t.ResponseHeader = h
 }
 
 type BrowseNextRequest struct {
@@ -1102,10 +1376,26 @@ type BrowseNextRequest struct {
 	ContinuationPoints        [][]byte
 }
 
+func (t *BrowseNextRequest) Header() *RequestHeader {
+	return t.RequestHeader
+}
+
+func (t *BrowseNextRequest) SetHeader(h *RequestHeader) {
+	t.RequestHeader = h
+}
+
 type BrowseNextResponse struct {
 	ResponseHeader  *ResponseHeader
 	Results         []*BrowseResult
 	DiagnosticInfos []*DiagnosticInfo
+}
+
+func (t *BrowseNextResponse) Header() *ResponseHeader {
+	return t.ResponseHeader
+}
+
+func (t *BrowseNextResponse) SetHeader(h *ResponseHeader) {
+	t.ResponseHeader = h
 }
 
 type RelativePathElement struct {
@@ -1139,10 +1429,26 @@ type TranslateBrowsePathsToNodeIDsRequest struct {
 	BrowsePaths   []*BrowsePath
 }
 
+func (t *TranslateBrowsePathsToNodeIDsRequest) Header() *RequestHeader {
+	return t.RequestHeader
+}
+
+func (t *TranslateBrowsePathsToNodeIDsRequest) SetHeader(h *RequestHeader) {
+	t.RequestHeader = h
+}
+
 type TranslateBrowsePathsToNodeIDsResponse struct {
 	ResponseHeader  *ResponseHeader
 	Results         []*BrowsePathResult
 	DiagnosticInfos []*DiagnosticInfo
+}
+
+func (t *TranslateBrowsePathsToNodeIDsResponse) Header() *ResponseHeader {
+	return t.ResponseHeader
+}
+
+func (t *TranslateBrowsePathsToNodeIDsResponse) SetHeader(h *ResponseHeader) {
+	t.ResponseHeader = h
 }
 
 type RegisterNodesRequest struct {
@@ -1150,9 +1456,25 @@ type RegisterNodesRequest struct {
 	NodesToRegister []*NodeID
 }
 
+func (t *RegisterNodesRequest) Header() *RequestHeader {
+	return t.RequestHeader
+}
+
+func (t *RegisterNodesRequest) SetHeader(h *RequestHeader) {
+	t.RequestHeader = h
+}
+
 type RegisterNodesResponse struct {
 	ResponseHeader    *ResponseHeader
 	RegisteredNodeIDs []*NodeID
+}
+
+func (t *RegisterNodesResponse) Header() *ResponseHeader {
+	return t.ResponseHeader
+}
+
+func (t *RegisterNodesResponse) SetHeader(h *ResponseHeader) {
+	t.ResponseHeader = h
 }
 
 type UnregisterNodesRequest struct {
@@ -1160,8 +1482,24 @@ type UnregisterNodesRequest struct {
 	NodesToUnregister []*NodeID
 }
 
+func (t *UnregisterNodesRequest) Header() *RequestHeader {
+	return t.RequestHeader
+}
+
+func (t *UnregisterNodesRequest) SetHeader(h *RequestHeader) {
+	t.RequestHeader = h
+}
+
 type UnregisterNodesResponse struct {
 	ResponseHeader *ResponseHeader
+}
+
+func (t *UnregisterNodesResponse) Header() *ResponseHeader {
+	return t.ResponseHeader
+}
+
+func (t *UnregisterNodesResponse) SetHeader(h *ResponseHeader) {
+	t.ResponseHeader = h
 }
 
 type EndpointConfiguration struct {
@@ -1259,6 +1597,14 @@ type QueryFirstRequest struct {
 	MaxReferencesToReturn uint32
 }
 
+func (t *QueryFirstRequest) Header() *RequestHeader {
+	return t.RequestHeader
+}
+
+func (t *QueryFirstRequest) SetHeader(h *RequestHeader) {
+	t.RequestHeader = h
+}
+
 type QueryFirstResponse struct {
 	ResponseHeader    *ResponseHeader
 	QueryDataSets     []*QueryDataSet
@@ -1268,16 +1614,40 @@ type QueryFirstResponse struct {
 	FilterResult      *ContentFilterResult
 }
 
+func (t *QueryFirstResponse) Header() *ResponseHeader {
+	return t.ResponseHeader
+}
+
+func (t *QueryFirstResponse) SetHeader(h *ResponseHeader) {
+	t.ResponseHeader = h
+}
+
 type QueryNextRequest struct {
 	RequestHeader            *RequestHeader
 	ReleaseContinuationPoint bool
 	ContinuationPoint        []byte
 }
 
+func (t *QueryNextRequest) Header() *RequestHeader {
+	return t.RequestHeader
+}
+
+func (t *QueryNextRequest) SetHeader(h *RequestHeader) {
+	t.RequestHeader = h
+}
+
 type QueryNextResponse struct {
 	ResponseHeader           *ResponseHeader
 	QueryDataSets            []*QueryDataSet
 	RevisedContinuationPoint []byte
+}
+
+func (t *QueryNextResponse) Header() *ResponseHeader {
+	return t.ResponseHeader
+}
+
+func (t *QueryNextResponse) SetHeader(h *ResponseHeader) {
+	t.ResponseHeader = h
 }
 
 type ReadValueID struct {
@@ -1294,10 +1664,26 @@ type ReadRequest struct {
 	NodesToRead        []*ReadValueID
 }
 
+func (t *ReadRequest) Header() *RequestHeader {
+	return t.RequestHeader
+}
+
+func (t *ReadRequest) SetHeader(h *RequestHeader) {
+	t.RequestHeader = h
+}
+
 type ReadResponse struct {
 	ResponseHeader  *ResponseHeader
 	Results         []*DataValue
 	DiagnosticInfos []*DiagnosticInfo
+}
+
+func (t *ReadResponse) Header() *ResponseHeader {
+	return t.ResponseHeader
+}
+
+func (t *ReadResponse) SetHeader(h *ResponseHeader) {
+	t.ResponseHeader = h
 }
 
 type HistoryReadValueID struct {
@@ -1368,10 +1754,26 @@ type HistoryReadRequest struct {
 	NodesToRead               []*HistoryReadValueID
 }
 
+func (t *HistoryReadRequest) Header() *RequestHeader {
+	return t.RequestHeader
+}
+
+func (t *HistoryReadRequest) SetHeader(h *RequestHeader) {
+	t.RequestHeader = h
+}
+
 type HistoryReadResponse struct {
 	ResponseHeader  *ResponseHeader
 	Results         []*HistoryReadResult
 	DiagnosticInfos []*DiagnosticInfo
+}
+
+func (t *HistoryReadResponse) Header() *ResponseHeader {
+	return t.ResponseHeader
+}
+
+func (t *HistoryReadResponse) SetHeader(h *ResponseHeader) {
+	t.ResponseHeader = h
 }
 
 type WriteValue struct {
@@ -1386,10 +1788,26 @@ type WriteRequest struct {
 	NodesToWrite  []*WriteValue
 }
 
+func (t *WriteRequest) Header() *RequestHeader {
+	return t.RequestHeader
+}
+
+func (t *WriteRequest) SetHeader(h *RequestHeader) {
+	t.RequestHeader = h
+}
+
 type WriteResponse struct {
 	ResponseHeader  *ResponseHeader
 	Results         []StatusCode
 	DiagnosticInfos []*DiagnosticInfo
+}
+
+func (t *WriteResponse) Header() *ResponseHeader {
+	return t.ResponseHeader
+}
+
+func (t *WriteResponse) SetHeader(h *ResponseHeader) {
+	t.ResponseHeader = h
 }
 
 type HistoryUpdateDetails struct {
@@ -1443,10 +1861,26 @@ type HistoryUpdateRequest struct {
 	HistoryUpdateDetails []*ExtensionObject
 }
 
+func (t *HistoryUpdateRequest) Header() *RequestHeader {
+	return t.RequestHeader
+}
+
+func (t *HistoryUpdateRequest) SetHeader(h *RequestHeader) {
+	t.RequestHeader = h
+}
+
 type HistoryUpdateResponse struct {
 	ResponseHeader  *ResponseHeader
 	Results         []*HistoryUpdateResult
 	DiagnosticInfos []*DiagnosticInfo
+}
+
+func (t *HistoryUpdateResponse) Header() *ResponseHeader {
+	return t.ResponseHeader
+}
+
+func (t *HistoryUpdateResponse) SetHeader(h *ResponseHeader) {
+	t.ResponseHeader = h
 }
 
 type CallMethodRequest struct {
@@ -1467,10 +1901,26 @@ type CallRequest struct {
 	MethodsToCall []*CallMethodRequest
 }
 
+func (t *CallRequest) Header() *RequestHeader {
+	return t.RequestHeader
+}
+
+func (t *CallRequest) SetHeader(h *RequestHeader) {
+	t.RequestHeader = h
+}
+
 type CallResponse struct {
 	ResponseHeader  *ResponseHeader
 	Results         []*CallMethodResult
 	DiagnosticInfos []*DiagnosticInfo
+}
+
+func (t *CallResponse) Header() *ResponseHeader {
+	return t.ResponseHeader
+}
+
+func (t *CallResponse) SetHeader(h *ResponseHeader) {
+	t.ResponseHeader = h
 }
 
 type DataChangeFilter struct {
@@ -1540,10 +1990,26 @@ type CreateMonitoredItemsRequest struct {
 	ItemsToCreate      []*MonitoredItemCreateRequest
 }
 
+func (t *CreateMonitoredItemsRequest) Header() *RequestHeader {
+	return t.RequestHeader
+}
+
+func (t *CreateMonitoredItemsRequest) SetHeader(h *RequestHeader) {
+	t.RequestHeader = h
+}
+
 type CreateMonitoredItemsResponse struct {
 	ResponseHeader  *ResponseHeader
 	Results         []*MonitoredItemCreateResult
 	DiagnosticInfos []*DiagnosticInfo
+}
+
+func (t *CreateMonitoredItemsResponse) Header() *ResponseHeader {
+	return t.ResponseHeader
+}
+
+func (t *CreateMonitoredItemsResponse) SetHeader(h *ResponseHeader) {
+	t.ResponseHeader = h
 }
 
 type MonitoredItemModifyRequest struct {
@@ -1565,10 +2031,26 @@ type ModifyMonitoredItemsRequest struct {
 	ItemsToModify      []*MonitoredItemModifyRequest
 }
 
+func (t *ModifyMonitoredItemsRequest) Header() *RequestHeader {
+	return t.RequestHeader
+}
+
+func (t *ModifyMonitoredItemsRequest) SetHeader(h *RequestHeader) {
+	t.RequestHeader = h
+}
+
 type ModifyMonitoredItemsResponse struct {
 	ResponseHeader  *ResponseHeader
 	Results         []*MonitoredItemModifyResult
 	DiagnosticInfos []*DiagnosticInfo
+}
+
+func (t *ModifyMonitoredItemsResponse) Header() *ResponseHeader {
+	return t.ResponseHeader
+}
+
+func (t *ModifyMonitoredItemsResponse) SetHeader(h *ResponseHeader) {
+	t.ResponseHeader = h
 }
 
 type SetMonitoringModeRequest struct {
@@ -1578,10 +2060,26 @@ type SetMonitoringModeRequest struct {
 	MonitoredItemIDs []uint32
 }
 
+func (t *SetMonitoringModeRequest) Header() *RequestHeader {
+	return t.RequestHeader
+}
+
+func (t *SetMonitoringModeRequest) SetHeader(h *RequestHeader) {
+	t.RequestHeader = h
+}
+
 type SetMonitoringModeResponse struct {
 	ResponseHeader  *ResponseHeader
 	Results         []StatusCode
 	DiagnosticInfos []*DiagnosticInfo
+}
+
+func (t *SetMonitoringModeResponse) Header() *ResponseHeader {
+	return t.ResponseHeader
+}
+
+func (t *SetMonitoringModeResponse) SetHeader(h *ResponseHeader) {
+	t.ResponseHeader = h
 }
 
 type SetTriggeringRequest struct {
@@ -1592,6 +2090,14 @@ type SetTriggeringRequest struct {
 	LinksToRemove    []uint32
 }
 
+func (t *SetTriggeringRequest) Header() *RequestHeader {
+	return t.RequestHeader
+}
+
+func (t *SetTriggeringRequest) SetHeader(h *RequestHeader) {
+	t.RequestHeader = h
+}
+
 type SetTriggeringResponse struct {
 	ResponseHeader        *ResponseHeader
 	AddResults            []StatusCode
@@ -1600,16 +2106,40 @@ type SetTriggeringResponse struct {
 	RemoveDiagnosticInfos []*DiagnosticInfo
 }
 
+func (t *SetTriggeringResponse) Header() *ResponseHeader {
+	return t.ResponseHeader
+}
+
+func (t *SetTriggeringResponse) SetHeader(h *ResponseHeader) {
+	t.ResponseHeader = h
+}
+
 type DeleteMonitoredItemsRequest struct {
 	RequestHeader    *RequestHeader
 	SubscriptionID   uint32
 	MonitoredItemIDs []uint32
 }
 
+func (t *DeleteMonitoredItemsRequest) Header() *RequestHeader {
+	return t.RequestHeader
+}
+
+func (t *DeleteMonitoredItemsRequest) SetHeader(h *RequestHeader) {
+	t.RequestHeader = h
+}
+
 type DeleteMonitoredItemsResponse struct {
 	ResponseHeader  *ResponseHeader
 	Results         []StatusCode
 	DiagnosticInfos []*DiagnosticInfo
+}
+
+func (t *DeleteMonitoredItemsResponse) Header() *ResponseHeader {
+	return t.ResponseHeader
+}
+
+func (t *DeleteMonitoredItemsResponse) SetHeader(h *ResponseHeader) {
+	t.ResponseHeader = h
 }
 
 type CreateSubscriptionRequest struct {
@@ -1622,12 +2152,28 @@ type CreateSubscriptionRequest struct {
 	Priority                    uint8
 }
 
+func (t *CreateSubscriptionRequest) Header() *RequestHeader {
+	return t.RequestHeader
+}
+
+func (t *CreateSubscriptionRequest) SetHeader(h *RequestHeader) {
+	t.RequestHeader = h
+}
+
 type CreateSubscriptionResponse struct {
 	ResponseHeader            *ResponseHeader
 	SubscriptionID            uint32
 	RevisedPublishingInterval float64
 	RevisedLifetimeCount      uint32
 	RevisedMaxKeepAliveCount  uint32
+}
+
+func (t *CreateSubscriptionResponse) Header() *ResponseHeader {
+	return t.ResponseHeader
+}
+
+func (t *CreateSubscriptionResponse) SetHeader(h *ResponseHeader) {
+	t.ResponseHeader = h
 }
 
 type ModifySubscriptionRequest struct {
@@ -1640,11 +2186,27 @@ type ModifySubscriptionRequest struct {
 	Priority                    uint8
 }
 
+func (t *ModifySubscriptionRequest) Header() *RequestHeader {
+	return t.RequestHeader
+}
+
+func (t *ModifySubscriptionRequest) SetHeader(h *RequestHeader) {
+	t.RequestHeader = h
+}
+
 type ModifySubscriptionResponse struct {
 	ResponseHeader            *ResponseHeader
 	RevisedPublishingInterval float64
 	RevisedLifetimeCount      uint32
 	RevisedMaxKeepAliveCount  uint32
+}
+
+func (t *ModifySubscriptionResponse) Header() *ResponseHeader {
+	return t.ResponseHeader
+}
+
+func (t *ModifySubscriptionResponse) SetHeader(h *ResponseHeader) {
+	t.ResponseHeader = h
 }
 
 type SetPublishingModeRequest struct {
@@ -1653,10 +2215,26 @@ type SetPublishingModeRequest struct {
 	SubscriptionIDs   []uint32
 }
 
+func (t *SetPublishingModeRequest) Header() *RequestHeader {
+	return t.RequestHeader
+}
+
+func (t *SetPublishingModeRequest) SetHeader(h *RequestHeader) {
+	t.RequestHeader = h
+}
+
 type SetPublishingModeResponse struct {
 	ResponseHeader  *ResponseHeader
 	Results         []StatusCode
 	DiagnosticInfos []*DiagnosticInfo
+}
+
+func (t *SetPublishingModeResponse) Header() *ResponseHeader {
+	return t.ResponseHeader
+}
+
+func (t *SetPublishingModeResponse) SetHeader(h *ResponseHeader) {
+	t.ResponseHeader = h
 }
 
 type NotificationMessage struct {
@@ -1703,6 +2281,14 @@ type PublishRequest struct {
 	SubscriptionAcknowledgements []*SubscriptionAcknowledgement
 }
 
+func (t *PublishRequest) Header() *RequestHeader {
+	return t.RequestHeader
+}
+
+func (t *PublishRequest) SetHeader(h *RequestHeader) {
+	t.RequestHeader = h
+}
+
 type PublishResponse struct {
 	ResponseHeader           *ResponseHeader
 	SubscriptionID           uint32
@@ -1713,15 +2299,39 @@ type PublishResponse struct {
 	DiagnosticInfos          []*DiagnosticInfo
 }
 
+func (t *PublishResponse) Header() *ResponseHeader {
+	return t.ResponseHeader
+}
+
+func (t *PublishResponse) SetHeader(h *ResponseHeader) {
+	t.ResponseHeader = h
+}
+
 type RepublishRequest struct {
 	RequestHeader            *RequestHeader
 	SubscriptionID           uint32
 	RetransmitSequenceNumber uint32
 }
 
+func (t *RepublishRequest) Header() *RequestHeader {
+	return t.RequestHeader
+}
+
+func (t *RepublishRequest) SetHeader(h *RequestHeader) {
+	t.RequestHeader = h
+}
+
 type RepublishResponse struct {
 	ResponseHeader      *ResponseHeader
 	NotificationMessage *NotificationMessage
+}
+
+func (t *RepublishResponse) Header() *ResponseHeader {
+	return t.ResponseHeader
+}
+
+func (t *RepublishResponse) SetHeader(h *ResponseHeader) {
+	t.ResponseHeader = h
 }
 
 type TransferResult struct {
@@ -1735,10 +2345,26 @@ type TransferSubscriptionsRequest struct {
 	SendInitialValues bool
 }
 
+func (t *TransferSubscriptionsRequest) Header() *RequestHeader {
+	return t.RequestHeader
+}
+
+func (t *TransferSubscriptionsRequest) SetHeader(h *RequestHeader) {
+	t.RequestHeader = h
+}
+
 type TransferSubscriptionsResponse struct {
 	ResponseHeader  *ResponseHeader
 	Results         []*TransferResult
 	DiagnosticInfos []*DiagnosticInfo
+}
+
+func (t *TransferSubscriptionsResponse) Header() *ResponseHeader {
+	return t.ResponseHeader
+}
+
+func (t *TransferSubscriptionsResponse) SetHeader(h *ResponseHeader) {
+	t.ResponseHeader = h
 }
 
 type DeleteSubscriptionsRequest struct {
@@ -1746,10 +2372,26 @@ type DeleteSubscriptionsRequest struct {
 	SubscriptionIDs []uint32
 }
 
+func (t *DeleteSubscriptionsRequest) Header() *RequestHeader {
+	return t.RequestHeader
+}
+
+func (t *DeleteSubscriptionsRequest) SetHeader(h *RequestHeader) {
+	t.RequestHeader = h
+}
+
 type DeleteSubscriptionsResponse struct {
 	ResponseHeader  *ResponseHeader
 	Results         []StatusCode
 	DiagnosticInfos []*DiagnosticInfo
+}
+
+func (t *DeleteSubscriptionsResponse) Header() *ResponseHeader {
+	return t.ResponseHeader
+}
+
+func (t *DeleteSubscriptionsResponse) SetHeader(h *ResponseHeader) {
+	t.ResponseHeader = h
 }
 
 type BuildInfo struct {

@@ -434,14 +434,14 @@ func (c *Client) DetachSession() (*Session, error) {
 // Send sends the request via the secure channel and registers a handler for
 // the response. If the client has an active session it injects the
 // authentication token.
-func (c *Client) Send(req interface{}, h func(interface{}) error) error {
+func (c *Client) Send(req ua.Request, h func(interface{}) error) error {
 	return c.sendWithTimeout(req, c.cfg.RequestTimeout, h)
 }
 
 // sendWithTimeout sends the request via the secure channel with a custom timeout and registers a handler for
 // the response. If the client has an active session it injects the
 // authentication token.
-func (c *Client) sendWithTimeout(req interface{}, timeout time.Duration, h func(interface{}) error) error {
+func (c *Client) sendWithTimeout(req ua.Request, timeout time.Duration, h func(interface{}) error) error {
 	var authToken *ua.NodeID
 	if s := c.Session(); s != nil {
 		authToken = s.resp.AuthenticationToken
