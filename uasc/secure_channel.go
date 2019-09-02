@@ -114,13 +114,13 @@ func (s *SecureChannel) hasState(n int32) bool {
 	return atomic.LoadInt32(&s.state) == n
 }
 
-// Send sends the service request and calls h with the response.
-func (s *SecureChannel) Send(svc ua.Request, authToken *ua.NodeID, h func(interface{}) error) error {
-	return s.SendWithTimeout(svc, authToken, s.cfg.RequestTimeout, h)
+// SendRequest sends the service request and calls h with the response.
+func (s *SecureChannel) SendRequest(svc ua.Request, authToken *ua.NodeID, h func(interface{}) error) error {
+	return s.SendRequestWithTimeout(svc, authToken, s.cfg.RequestTimeout, h)
 }
 
-// SendWithTimeout sends the service request and calls h with the response with a specific timeout.
-func (s *SecureChannel) SendWithTimeout(svc ua.Request, authToken *ua.NodeID, timeout time.Duration, h func(interface{}) error) error {
+// SendRequestWithTimeout sends the service request and calls h with the response with a specific timeout.
+func (s *SecureChannel) SendRequestWithTimeout(svc ua.Request, authToken *ua.NodeID, timeout time.Duration, h func(interface{}) error) error {
 	respRequired := h != nil
 
 	ch, reqid, err := s.SendAsync(svc, authToken, respRequired)
@@ -340,13 +340,14 @@ func (s *SecureChannel) readChunk() (*MessageChunk, error) {
 	return m, nil
 }
 
-// Receive waits for a complete message to be read from the channel and
-// sends it back to the caller.  If the caller was initiated from a
-// Send(), the message is directed to the registered callback function
-// and Receive() does not return. Otherwise, if no handler is detected,
-// the Receive returns with the message as a return value.
-// This behaviour means that anticipated results are automatically directed back to
-// their callers but unsolicited messages are sent to the caller of
+// Receive waits for a complete message to be read from the channel and sends
+// it back to the caller. If the caller was initiated from a SendRequest(), the
+// message is directed to the registered callback function and Receive() does
+// not return. Otherwise, if no handler is detected, the Receive returns with
+// the message as a return value.
+//
+// This behaviour means that anticipated results are automatically directed
+// back to their callers but unsolicited messages are sent to the caller of
 // Receive() to handle.
 func (s *SecureChannel) Receive(ctx context.Context) Response {
 	for {
@@ -610,7 +611,7 @@ func (s *SecureChannel) openSecureChannel() error {
 		RequestedLifetime:     s.cfg.Lifetime,
 	}
 
-	return s.Send(req, nil, func(v interface{}) error {
+	return s.SendRequest(req, nil, func(v interface{}) error {
 		resp, ok := v.(*ua.OpenSecureChannelResponse)
 		if !ok {
 			return fmt.Errorf("got %T, want OpenSecureChannelResponse", req)
@@ -637,7 +638,7 @@ func (s *SecureChannel) closeSecureChannel() error {
 		return io.EOF
 	}
 
-	err := s.Send(req, nil, nil)
+	err := s.SendRequest(req, nil, nil)
 	if err != nil {
 		return err
 	}

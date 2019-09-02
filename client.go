@@ -277,7 +277,7 @@ func (c *Client) CreateSession(cfg *uasc.SessionConfig) (*Session, error) {
 	var s *Session
 	// for the CreateSessionRequest the authToken is always nil.
 	// use c.sechan.Send() to enforce this.
-	err := c.sechan.Send(req, nil, func(v interface{}) error {
+	err := c.sechan.SendRequest(req, nil, func(v interface{}) error {
 		var res *ua.CreateSessionResponse
 		if err := safeAssign(v, &res); err != nil {
 			return err
@@ -379,7 +379,7 @@ func (c *Client) ActivateSession(s *Session) error {
 		UserIdentityToken:          ua.NewExtensionObject(s.cfg.UserIdentityToken),
 		UserTokenSignature:         s.cfg.UserTokenSignature,
 	}
-	return c.sechan.Send(req, s.resp.AuthenticationToken, func(v interface{}) error {
+	return c.sechan.SendRequest(req, s.resp.AuthenticationToken, func(v interface{}) error {
 		var res *ua.ActivateSessionResponse
 		if err := safeAssign(v, &res); err != nil {
 			return err
@@ -446,7 +446,7 @@ func (c *Client) sendWithTimeout(req ua.Request, timeout time.Duration, h func(i
 	if s := c.Session(); s != nil {
 		authToken = s.resp.AuthenticationToken
 	}
-	return c.sechan.SendWithTimeout(req, authToken, timeout, h)
+	return c.sechan.SendRequestWithTimeout(req, authToken, timeout, h)
 }
 
 // Node returns a node object which accesses its attributes
