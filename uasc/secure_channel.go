@@ -217,11 +217,11 @@ func (s *SecureChannel) sendAsyncWithTimeout(svc ua.Request, authToken *ua.NodeI
 	return resp, reqid, nil
 }
 
-// sendResponse sends a service response.
+// SendResponse sends a service response.
 // todo(fs): this method is most likely needed for the server and we haven't tested it yet.
 // todo(fs): it exists to implement the handleOpenSecureChannelRequest() method during the
 // todo(fs): refactor to remove the reflect code. It will likely change.
-func (s *SecureChannel) sendResponse(svc ua.Response) error {
+func (s *SecureChannel) SendResponse(svc ua.Response) error {
 	typeID := ua.ServiceTypeID(svc)
 	if typeID == 0 {
 		return fmt.Errorf("unknown service %T. Did you call register?", svc)
@@ -370,6 +370,11 @@ func (s *SecureChannel) Receive(ctx context.Context) Response {
 				debug.Printf("uasc %d/%d: recv %T", s.c.ID(), reqid, svc)
 			}
 
+			// Revert data race fix from #232 with an additional type check
+			if _, ok := svc.(ua.Request); ok {
+				s.cfg.RequestID = reqid
+			}
+
 			switch svc.(type) {
 			case *ua.OpenSecureChannelRequest:
 				err := s.handleOpenSecureChannelRequest(svc)
@@ -418,7 +423,6 @@ func (s *SecureChannel) Receive(ctx context.Context) Response {
 // them to the registered callback channel, if there is one. Otherwise,
 // the message is dropped.
 func (s *SecureChannel) receive(ctx context.Context) (uint32, interface{}, error) {
-
 	for {
 		select {
 		case <-ctx.Done():
@@ -489,14 +493,12 @@ func (s *SecureChannel) receive(ctx context.Context) (uint32, interface{}, error
 
 			// If the service status is not OK then bubble
 			// that error up to the caller.
-			resp, ok := svc.(ua.Response)
-			if !ok {
-				return reqid, nil, fmt.Errorf("not a service response: %T", svc)
-			}
-			status := resp.Header().ServiceResult
-			debug.Printf("uasc %d/%d: res:%v", s.c.ID(), reqid, status)
-			if status != ua.StatusOK {
-				return reqid, svc, status
+			if resp, ok := svc.(ua.Response); ok {
+				status := resp.Header().ServiceResult
+				debug.Printf("uasc %d/%d: res:%v", s.c.ID(), reqid, status)
+				if status != ua.StatusOK {
+					return reqid, svc, status
+				}
 			}
 			return reqid, svc, err
 		}
@@ -678,7 +680,7 @@ func (s *SecureChannel) handleOpenSecureChannelRequest(svc interface{}) error {
 		ServerNonce: nonce,
 	}
 
-	if err := s.sendResponse(resp); err != nil {
+	if err := s.SendResponse(resp); err != nil {
 		return err
 	}
 
