@@ -530,6 +530,97 @@ func (m *Variant) Uint() uint64 {
 	}
 }
 
+func (m *Variant) ByteString() []byte {
+	switch m.Type() {
+	case TypeIDByteString:
+		return m.value.([]byte)
+	default:
+		return nil
+	}
+}
+
+func (m *Variant) DataValue() *DataValue {
+	switch m.Type() {
+	case TypeIDDataValue:
+		return m.value.(*DataValue)
+	default:
+		return nil
+	}
+}
+
+func (m *Variant) DiagnosticInfo() *DiagnosticInfo {
+	switch m.Type() {
+	case TypeIDDiagnosticInfo:
+		return m.value.(*DiagnosticInfo)
+	default:
+		return nil
+	}
+}
+
+func (m *Variant) ExpandedNodeID() *ExpandedNodeID {
+	switch m.Type() {
+	case TypeIDExpandedNodeID:
+		return m.value.(*ExpandedNodeID)
+	default:
+		return nil
+	}
+}
+
+func (m *Variant) ExtensionObject() *ExtensionObject {
+	switch m.Type() {
+	case TypeIDExtensionObject:
+		return m.value.(*ExtensionObject)
+	default:
+		return nil
+	}
+}
+
+func (m *Variant) GUID() *GUID {
+	switch m.Type() {
+	case TypeIDGUID:
+		return m.value.(*GUID)
+	default:
+		return nil
+	}
+}
+
+func (m *Variant) LocalizedText() *LocalizedText {
+	switch m.Type() {
+	case TypeIDLocalizedText:
+		return m.value.(*LocalizedText)
+	default:
+		return nil
+	}
+}
+
+func (m *Variant) NodeID() *NodeID {
+	switch m.Type() {
+	case TypeIDNodeID:
+		return m.value.(*NodeID)
+	default:
+		return nil
+	}
+}
+
+func (m *Variant) QualifiedName() *QualifiedName {
+	switch m.Type() {
+	case TypeIDQualifiedName:
+		return m.value.(*QualifiedName)
+	default:
+		return nil
+	}
+}
+
+func (m *Variant) StatusCode() StatusCode {
+	switch m.Type() {
+	case TypeIDStatusCode:
+		return m.value.(StatusCode)
+	default:
+		// todo(fs): should this be 0 == StatusOK ??
+		return StatusBad
+	}
+}
+
 // Time returns the time value if the type is DateTime.
 func (m *Variant) Time() time.Time {
 	switch m.Type() {
@@ -537,6 +628,24 @@ func (m *Variant) Time() time.Time {
 		return m.value.(time.Time)
 	default:
 		return time.Time{}
+	}
+}
+
+func (m *Variant) Variant() *Variant {
+	switch m.Type() {
+	case TypeIDVariant:
+		return m.value.(*Variant)
+	default:
+		return nil
+	}
+}
+
+func (m *Variant) XMLElement() XMLElement {
+	switch m.Type() {
+	case TypeIDXMLElement:
+		return m.value.(XMLElement)
+	default:
+		return ""
 	}
 }
 
