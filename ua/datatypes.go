@@ -234,4 +234,4 @@ func (l *LocalizedText) UpdateMask() {
 	}
 }
 
-type XmlElement string
+type XMLElement string
