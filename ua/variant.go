@@ -253,7 +253,7 @@ func (m *Variant) decodeValue(buf *Buffer) interface{} {
 	case TypeIDByteString:
 		return buf.ReadBytes()
 	case TypeIDXMLElement:
-		return XmlElement(buf.ReadString())
+		return XMLElement(buf.ReadString())
 	case TypeIDNodeID:
 		v := new(NodeID)
 		buf.ReadStruct(v)
@@ -361,7 +361,7 @@ func (m *Variant) encodeValue(buf *Buffer, v interface{}) {
 		buf.WriteStruct(x)
 	case []byte:
 		buf.WriteByteString(x)
-	case XmlElement:
+	case XMLElement:
 		buf.WriteString(string(x))
 	case *NodeID:
 		buf.WriteStruct(x)
@@ -548,7 +548,7 @@ var variantTypeIDToType = map[TypeID]reflect.Type{
 	TypeIDDateTime:        reflect.TypeOf(time.Time{}),
 	TypeIDGUID:            reflect.TypeOf(new(GUID)),
 	TypeIDByteString:      reflect.TypeOf([]byte{}),
-	TypeIDXMLElement:      reflect.TypeOf(XmlElement("")),
+	TypeIDXMLElement:      reflect.TypeOf(XMLElement("")),
 	TypeIDNodeID:          reflect.TypeOf(new(NodeID)),
 	TypeIDExpandedNodeID:  reflect.TypeOf(new(ExpandedNodeID)),
 	TypeIDStatusCode:      reflect.TypeOf(StatusCode(0)),

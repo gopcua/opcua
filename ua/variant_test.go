@@ -169,8 +169,8 @@ func TestVariant(t *testing.T) {
 			},
 		},
 		{
-			Name:   "XmlElement",
-			Struct: MustVariant(XmlElement("abc")),
+			Name:   "XMLElement",
+			Struct: MustVariant(XMLElement("abc")),
 			Bytes: []byte{
 				// variant encoding mask
 				0x10,
