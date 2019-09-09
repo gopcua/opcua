@@ -635,138 +635,195 @@ func TestSliceDim(t *testing.T) {
 }
 
 func TestVariantUnsupportedType(t *testing.T) {
-	_, err := NewVariant(int(5))
-	if err == nil {
-		t.Fatal("got nil want err")
+	tests := []interface{}{int(5), uint(5)}
+	for _, v := range tests {
+		t.Run(fmt.Sprintf("%T", v), func(t *testing.T) {
+			if _, err := NewVariant(v); err == nil {
+				t.Fatal("got nil want err")
+			}
+		})
 	}
 }
 
 func TestVariantValueMethod(t *testing.T) {
-	v := MustVariant(int32(5))
-	if got, want := int32(5), v.Value().(int32); got != want {
+	if got, want := MustVariant(int32(5)).Value().(int32), int32(5); got != want {
 		t.Fatalf("got %d want %d", got, want)
 	}
 }
 
-func TestVariantBool(t *testing.T) {
+func TestVariantValueHelpers(t *testing.T) {
 	tests := []struct {
-		v interface{}
-		n bool
+		v    interface{}
+		want interface{}
+		fn   func(v *Variant) interface{}
 	}{
-		{true, true},
-		{"", false},
-	}
-	for _, tt := range tests {
-		v, err := NewVariant(tt.v)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if got, want := v.Bool(), tt.n; got != want {
-			t.Fatalf("got %v want %v", got, want)
-		}
-	}
-}
+		// bool
+		{
+			v:    int32(5),
+			want: false,
+			fn:   func(v *Variant) interface{} { return v.Bool() },
+		},
+		{
+			v:    false,
+			want: false,
+			fn:   func(v *Variant) interface{} { return v.Bool() },
+		},
+		{
+			v:    true,
+			want: true,
+			fn:   func(v *Variant) interface{} { return v.Bool() },
+		},
 
-func TestVariantString(t *testing.T) {
-	tests := []struct {
-		v interface{}
-		n string
-	}{
-		{"a", "a"},
-		{&LocalizedText{Text: "a"}, "a"},
-		{&QualifiedName{Name: "a"}, "a"},
-		{int32(5), ""},
-	}
-	for _, tt := range tests {
-		v, err := NewVariant(tt.v)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if got, want := v.String(), tt.n; got != want {
-			t.Fatalf("got %v want %v", got, want)
-		}
-	}
-}
+		// string
+		{
+			v:    false,
+			want: "",
+			fn:   func(v *Variant) interface{} { return v.String() },
+		},
+		{
+			v:    "a",
+			want: "a",
+			fn:   func(v *Variant) interface{} { return v.String() },
+		},
+		{
+			v:    XMLElement("a"),
+			want: "a",
+			fn:   func(v *Variant) interface{} { return v.String() },
+		},
+		{
+			v:    &LocalizedText{Text: "a"},
+			want: "a",
+			fn:   func(v *Variant) interface{} { return v.String() },
+		},
+		{
+			v:    &QualifiedName{Name: "a"},
+			want: "a",
+			fn:   func(v *Variant) interface{} { return v.String() },
+		},
 
-func TestVariantFloat(t *testing.T) {
-	tests := []struct {
-		v interface{}
-		n float64
-	}{
-		{float32(5), 5},
-		{float64(5), 5},
-		{int32(5), 0},
-	}
-	for _, tt := range tests {
-		v, err := NewVariant(tt.v)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if got, want := v.Float(), tt.n; got != want {
-			t.Fatalf("got %v want %v", got, want)
-		}
-	}
-}
+		// float
+		{
+			v:    false,
+			want: float64(0),
+			fn:   func(v *Variant) interface{} { return v.Float() },
+		},
+		{
+			v:    float32(5),
+			want: float64(5),
+			fn:   func(v *Variant) interface{} { return v.Float() },
+		},
+		{
+			v:    float64(5),
+			want: float64(5),
+			fn:   func(v *Variant) interface{} { return v.Float() },
+		},
 
-func TestVariantInt(t *testing.T) {
-	tests := []struct {
-		v interface{}
-		n int64
-	}{
-		{int8(5), 5},
-		{int16(5), 5},
-		{int32(5), 5},
-		{int64(5), 5},
-		{"", 0},
-	}
-	for _, tt := range tests {
-		v, err := NewVariant(tt.v)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if got, want := v.Int(), tt.n; got != want {
-			t.Fatalf("got %v want %v", got, want)
-		}
-	}
-}
+		// int
+		{
+			v:    false,
+			want: int64(0),
+			fn:   func(v *Variant) interface{} { return v.Int() },
+		},
+		{
+			v:    int8(5),
+			want: int64(5),
+			fn:   func(v *Variant) interface{} { return v.Int() },
+		},
+		{
+			v:    int16(5),
+			want: int64(5),
+			fn:   func(v *Variant) interface{} { return v.Int() },
+		},
+		{
+			v:    int32(5),
+			want: int64(5),
+			fn:   func(v *Variant) interface{} { return v.Int() },
+		},
+		{
+			v:    int64(5),
+			want: int64(5),
+			fn:   func(v *Variant) interface{} { return v.Int() },
+		},
 
-func TestVariantUint(t *testing.T) {
-	tests := []struct {
-		v interface{}
-		n uint64
-	}{
-		{uint8(5), 5},
-		{uint16(5), 5},
-		{uint32(5), 5},
-		{uint64(5), 5},
-		{"", 0},
-	}
-	for _, tt := range tests {
-		v, err := NewVariant(tt.v)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if got, want := v.Uint(), tt.n; got != want {
-			t.Fatalf("got %v want %v", got, want)
-		}
-	}
-}
+		// uint
+		{
+			v:    false,
+			want: uint64(0),
+			fn:   func(v *Variant) interface{} { return v.Uint() },
+		},
+		{
+			v:    uint8(5),
+			want: uint64(5),
+			fn:   func(v *Variant) interface{} { return v.Uint() },
+		},
+		{
+			v:    uint16(5),
+			want: uint64(5),
+			fn:   func(v *Variant) interface{} { return v.Uint() },
+		},
+		{
+			v:    uint32(5),
+			want: uint64(5),
+			fn:   func(v *Variant) interface{} { return v.Uint() },
+		},
+		{
+			v:    uint64(5),
+			want: uint64(5),
+			fn:   func(v *Variant) interface{} { return v.Uint() },
+		},
 
-func TestVariantTime(t *testing.T) {
-	tests := []struct {
-		v interface{}
-		n time.Time
-	}{
-		{time.Date(2019, 1, 1, 12, 13, 14, 0, time.UTC), time.Date(2019, 1, 1, 12, 13, 14, 0, time.UTC)},
-		{"", time.Time{}},
+		// GUID
+		{
+			v:    false,
+			want: (*GUID)(nil),
+			fn:   func(v *Variant) interface{} { return v.GUID() },
+		},
+		{
+			v:    NewGUID("abc"),
+			want: NewGUID("abc"),
+			fn:   func(v *Variant) interface{} { return v.GUID() },
+		},
+
+		// QualifiedName
+		{
+			v:    false,
+			want: (*QualifiedName)(nil),
+			fn:   func(v *Variant) interface{} { return v.QualifiedName() },
+		},
+		{
+			v:    &QualifiedName{Name: "a"},
+			want: &QualifiedName{Name: "a"},
+			fn:   func(v *Variant) interface{} { return v.QualifiedName() },
+		},
+
+		// time.Time
+		{
+			v:    false,
+			want: time.Time{},
+			fn:   func(v *Variant) interface{} { return v.Time() },
+		},
+		{
+			v:    time.Date(2019, 1, 1, 12, 13, 14, 0, time.UTC),
+			want: time.Date(2019, 1, 1, 12, 13, 14, 0, time.UTC),
+			fn:   func(v *Variant) interface{} { return v.Time() },
+		},
+
+		// XMLElement
+		{
+			v:    false,
+			want: XMLElement(""),
+			fn:   func(v *Variant) interface{} { return v.XMLElement() },
+		},
+		{
+			v:    XMLElement("a"),
+			want: XMLElement("a"),
+			fn:   func(v *Variant) interface{} { return v.XMLElement() },
+		},
 	}
 	for _, tt := range tests {
-		v, err := NewVariant(tt.v)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if got, want := v.Time(), tt.n; got != want {
-			t.Fatalf("got %v want %v", got, want)
-		}
+		name := fmt.Sprintf("%T -> %T", tt.v, tt.want)
+		t.Run(name, func(t *testing.T) {
+			verify.Values(t, "", tt.fn(MustVariant(tt.v)), tt.want)
+		})
 	}
 }

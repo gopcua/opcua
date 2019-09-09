@@ -466,13 +466,14 @@ func (m *Variant) String() string {
 	switch m.Type() {
 	case TypeIDString:
 		return m.value.(string)
+	case TypeIDXMLElement:
+		return string(m.XMLElement())
 	case TypeIDLocalizedText:
 		return m.value.(*LocalizedText).Text
 	case TypeIDQualifiedName:
 		return m.value.(*QualifiedName).Name
 	default:
 		return ""
-		//return fmt.Sprintf("%v", m.value)
 	}
 }
 
