@@ -12,7 +12,6 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"reflect"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -115,13 +114,13 @@ func (s *SecureChannel) hasState(n int32) bool {
 	return atomic.LoadInt32(&s.state) == n
 }
 
-// Send sends the service request and calls h with the response.
-func (s *SecureChannel) Send(svc interface{}, authToken *ua.NodeID, h func(interface{}) error) error {
-	return s.SendWithTimeout(svc, authToken, s.cfg.RequestTimeout, h)
+// SendRequest sends the service request and calls h with the response.
+func (s *SecureChannel) SendRequest(svc ua.Request, authToken *ua.NodeID, h func(interface{}) error) error {
+	return s.SendRequestWithTimeout(svc, authToken, s.cfg.RequestTimeout, h)
 }
 
-// SendWithTimeout sends the service request and calls h with the response with a specific timeout.
-func (s *SecureChannel) SendWithTimeout(svc interface{}, authToken *ua.NodeID, timeout time.Duration, h func(interface{}) error) error {
+// SendRequestWithTimeout sends the service request and calls h with the response with a specific timeout.
+func (s *SecureChannel) SendRequestWithTimeout(svc ua.Request, authToken *ua.NodeID, timeout time.Duration, h func(interface{}) error) error {
 	respRequired := h != nil
 
 	ch, reqid, err := s.SendAsync(svc, authToken, respRequired)
@@ -156,13 +155,13 @@ func (s *SecureChannel) SendWithTimeout(svc interface{}, authToken *ua.NodeID, t
 
 // SendAsync sends the service request and returns a channel which will receive the
 // response when it arrives.
-func (s *SecureChannel) SendAsync(svc interface{}, authToken *ua.NodeID, respReq bool) (resp chan Response, reqID uint32, err error) {
+func (s *SecureChannel) SendAsync(svc ua.Request, authToken *ua.NodeID, respReq bool) (resp chan Response, reqID uint32, err error) {
 	return s.sendAsyncWithTimeout(svc, authToken, respReq, s.cfg.RequestTimeout)
 }
 
 // sendAsyncWithTimeout sends the service request with a specific timeout and returns a channel which will receive the
 // response when it arrives.
-func (s *SecureChannel) sendAsyncWithTimeout(svc interface{}, authToken *ua.NodeID, respReq bool, timeout time.Duration) (resp chan Response, reqID uint32, err error) {
+func (s *SecureChannel) sendAsyncWithTimeout(svc ua.Request, authToken *ua.NodeID, respReq bool, timeout time.Duration) (resp chan Response, reqID uint32, err error) {
 	typeID := ua.ServiceTypeID(svc)
 	if typeID == 0 {
 		return nil, 0, fmt.Errorf("unknown service %T. Did you call register?", svc)
@@ -173,22 +172,17 @@ func (s *SecureChannel) sendAsyncWithTimeout(svc interface{}, authToken *ua.Node
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	// the request header is always the first field
-	val := reflect.ValueOf(svc)
-	rHdr := val.Elem().Field(0)
-	s.cfg.SequenceNumber++
-	if _, ok := rHdr.Interface().(*ua.RequestHeader); ok {
-		rHdr.Set(reflect.ValueOf(s.reqhdr))
 
-		s.reqhdr.AuthenticationToken = authToken
-		s.cfg.RequestID++
-		s.reqhdr.RequestHandle++
-		s.reqhdr.Timestamp = time.Now()
-		if timeout > 0 && timeout < s.cfg.RequestTimeout {
-			timeout = s.cfg.RequestTimeout
-		}
-		s.reqhdr.TimeoutHint = uint32(timeout / time.Millisecond)
+	s.cfg.SequenceNumber++
+	s.cfg.RequestID++
+	s.reqhdr.AuthenticationToken = authToken
+	s.reqhdr.RequestHandle++
+	s.reqhdr.Timestamp = time.Now()
+	if timeout > 0 && timeout < s.cfg.RequestTimeout {
+		timeout = s.cfg.RequestTimeout
 	}
+	s.reqhdr.TimeoutHint = uint32(timeout / time.Millisecond)
+	svc.SetHeader(s.reqhdr)
 
 	// encode the message
 	m := NewMessage(svc, typeID, s.cfg)
@@ -221,6 +215,40 @@ func (s *SecureChannel) sendAsyncWithTimeout(svc interface{}, authToken *ua.Node
 	}
 	s.handler[reqid] = resp
 	return resp, reqid, nil
+}
+
+// SendResponse sends a service response.
+// todo(fs): this method is most likely needed for the server and we haven't tested it yet.
+// todo(fs): it exists to implement the handleOpenSecureChannelRequest() method during the
+// todo(fs): refactor to remove the reflect code. It will likely change.
+func (s *SecureChannel) SendResponse(svc ua.Response) error {
+	typeID := ua.ServiceTypeID(svc)
+	if typeID == 0 {
+		return fmt.Errorf("unknown service %T. Did you call register?", svc)
+	}
+
+	// encode the message
+	m := NewMessage(svc, typeID, s.cfg)
+	reqid := m.SequenceHeader.RequestID
+	b, err := m.Encode()
+	if err != nil {
+		return err
+	}
+
+	// encrypt the message prior to sending it
+	// if SecurityMode == None, this returns the byte stream untouched
+	b, err = s.signAndEncrypt(m, b)
+	if err != nil {
+		return err
+	}
+
+	// send the message
+	if _, err := s.c.Write(b); err != nil {
+		return err
+	}
+	debug.Printf("uasc %d/%d: send %T with %d bytes", s.c.ID(), reqid, svc, len(b))
+
+	return nil
 }
 
 func (s *SecureChannel) readChunk() (*MessageChunk, error) {
@@ -312,13 +340,14 @@ func (s *SecureChannel) readChunk() (*MessageChunk, error) {
 	return m, nil
 }
 
-// Receive waits for a complete message to be read from the channel and
-// sends it back to the caller.  If the caller was initiated from a
-// Send(), the message is directed to the registered callback function
-// and Receive() does not return. Otherwise, if no handler is detected,
-// the Receive returns with the message as a return value.
-// This behaviour means that anticipated results are automatically directed back to
-// their callers but unsolicited messages are sent to the caller of
+// Receive waits for a complete message to be read from the channel and sends
+// it back to the caller. If the caller was initiated from a SendRequest(), the
+// message is directed to the registered callback function and Receive() does
+// not return. Otherwise, if no handler is detected, the Receive returns with
+// the message as a return value.
+//
+// This behaviour means that anticipated results are automatically directed
+// back to their callers but unsolicited messages are sent to the caller of
 // Receive() to handle.
 func (s *SecureChannel) Receive(ctx context.Context) Response {
 	for {
@@ -340,6 +369,11 @@ func (s *SecureChannel) Receive(ctx context.Context) Response {
 				debug.Printf("uasc %d/%d: err: %v", s.c.ID(), reqid, err)
 			} else {
 				debug.Printf("uasc %d/%d: recv %T", s.c.ID(), reqid, svc)
+			}
+
+			// Revert data race fix from #232 with an additional type check
+			if _, ok := svc.(ua.Request); ok {
+				s.cfg.RequestID = reqid
 			}
 
 			switch svc.(type) {
@@ -390,7 +424,6 @@ func (s *SecureChannel) Receive(ctx context.Context) Response {
 // them to the registered callback channel, if there is one. Otherwise,
 // the message is dropped.
 func (s *SecureChannel) receive(ctx context.Context) (uint32, interface{}, error) {
-
 	for {
 		select {
 		case <-ctx.Done():
@@ -459,18 +492,13 @@ func (s *SecureChannel) receive(ctx context.Context) (uint32, interface{}, error
 				return reqid, nil, err
 			}
 
-			// extract the ServiceStatus field from the
-			// ResponseHeader which is always the first
-			// field in the struct.
-			//
 			// If the service status is not OK then bubble
 			// that error up to the caller.
-			val := reflect.ValueOf(svc)
-			field0 := val.Elem().Field(0).Interface()
-			if hdr, ok := field0.(*ua.ResponseHeader); ok {
-				debug.Printf("uasc %d/%d: res:%v", s.c.ID(), reqid, hdr.ServiceResult)
-				if hdr.ServiceResult != ua.StatusOK {
-					return reqid, svc, hdr.ServiceResult
+			if resp, ok := svc.(ua.Response); ok {
+				status := resp.Header().ServiceResult
+				debug.Printf("uasc %d/%d: res:%v", s.c.ID(), reqid, status)
+				if status != ua.StatusOK {
+					return reqid, svc, status
 				}
 			}
 			return reqid, svc, err
@@ -583,7 +611,7 @@ func (s *SecureChannel) openSecureChannel() error {
 		RequestedLifetime:     s.cfg.Lifetime,
 	}
 
-	return s.Send(req, nil, func(v interface{}) error {
+	return s.SendRequest(req, nil, func(v interface{}) error {
 		resp, ok := v.(*ua.OpenSecureChannelResponse)
 		if !ok {
 			return fmt.Errorf("got %T, want OpenSecureChannelResponse", req)
@@ -610,7 +638,7 @@ func (s *SecureChannel) closeSecureChannel() error {
 		return io.EOF
 	}
 
-	err := s.Send(req, nil, nil)
+	err := s.SendRequest(req, nil, nil)
 	if err != nil {
 		return err
 	}
@@ -653,8 +681,7 @@ func (s *SecureChannel) handleOpenSecureChannelRequest(svc interface{}) error {
 		ServerNonce: nonce,
 	}
 
-	err = s.Send(resp, nil, nil)
-	if err != nil {
+	if err := s.SendResponse(resp); err != nil {
 		return err
 	}
 
