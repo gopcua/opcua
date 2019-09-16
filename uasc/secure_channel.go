@@ -62,6 +62,9 @@ type SecureChannel struct {
 	chunks map[uint32][]*MessageChunk
 
 	enc *uapolicy.EncryptionAlgorithm
+
+	// time returns the current time. When not set it defaults to time.Now().
+	time func() time.Time
 }
 
 func NewSecureChannel(endpoint string, c *uacp.Conn, cfg *Config) (*SecureChannel, error) {
@@ -91,10 +94,8 @@ func NewSecureChannel(endpoint string, c *uacp.Conn, cfg *Config) (*SecureChanne
 		c:           c,
 		cfg:         cfg,
 		reqhdr: &ua.RequestHeader{
-			AuthenticationToken: ua.NewTwoByteNodeID(0),
-			Timestamp:           time.Now(),
-			TimeoutHint:         uint32(cfg.RequestTimeout / time.Millisecond),
-			AdditionalHeader:    ua.NewExtensionObject(nil),
+			TimeoutHint:      uint32(cfg.RequestTimeout / time.Millisecond),
+			AdditionalHeader: ua.NewExtensionObject(nil),
 		},
 		state:   secureChannelCreated,
 		handler: make(map[uint32]chan Response),
@@ -214,7 +215,7 @@ func (s *SecureChannel) newRequestMessage(req ua.Request, authToken *ua.NodeID, 
 	s.cfg.RequestID++
 	s.reqhdr.AuthenticationToken = authToken
 	s.reqhdr.RequestHandle++
-	s.reqhdr.Timestamp = time.Now()
+	s.reqhdr.Timestamp = s.timeNow()
 	if timeout > 0 && timeout < s.cfg.RequestTimeout {
 		timeout = s.cfg.RequestTimeout
 	}
@@ -673,7 +674,7 @@ func (s *SecureChannel) handleOpenSecureChannelRequest(svc interface{}) error {
 	}
 	resp := &ua.OpenSecureChannelResponse{
 		ResponseHeader: &ua.ResponseHeader{
-			Timestamp:          time.Now(),
+			Timestamp:          s.timeNow(),
 			RequestHandle:      req.RequestHeader.RequestHandle,
 			ServiceDiagnostics: &ua.DiagnosticInfo{},
 			StringTable:        []string{},
@@ -683,7 +684,7 @@ func (s *SecureChannel) handleOpenSecureChannelRequest(svc interface{}) error {
 		SecurityToken: &ua.ChannelSecurityToken{
 			ChannelID:       s.cfg.SecureChannelID,
 			TokenID:         s.cfg.SecurityTokenID,
-			CreatedAt:       time.Now(),
+			CreatedAt:       s.timeNow(),
 			RevisedLifetime: req.RequestedLifetime,
 		},
 		ServerNonce: nonce,
@@ -706,6 +707,13 @@ func (s *SecureChannel) popHandlerLock(reqid uint32) chan Response {
 	ch := s.handler[reqid]
 	delete(s.handler, reqid)
 	return ch
+}
+
+func (s *SecureChannel) timeNow() time.Time {
+	if s.time != nil {
+		return s.time()
+	}
+	return time.Now()
 }
 
 func mergeChunks(chunks []*MessageChunk) ([]byte, error) {
