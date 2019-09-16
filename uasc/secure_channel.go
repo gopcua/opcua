@@ -212,9 +212,18 @@ func (s *SecureChannel) newRequestMessage(req ua.Request, authToken *ua.NodeID, 
 	}
 
 	s.cfg.SequenceNumber++
+	if s.cfg.SequenceNumber > math.MaxUint32-1023 {
+		s.cfg.SequenceNumber = 1
+	}
 	s.cfg.RequestID++
-	s.reqhdr.AuthenticationToken = authToken
+	if s.cfg.RequestID == 0 {
+		s.cfg.RequestID = 1
+	}
 	s.reqhdr.RequestHandle++
+	if s.reqhdr.RequestHandle == 0 {
+		s.reqhdr.RequestHandle = 1
+	}
+	s.reqhdr.AuthenticationToken = authToken
 	s.reqhdr.Timestamp = s.timeNow()
 	if timeout > 0 && timeout < s.cfg.RequestTimeout {
 		timeout = s.cfg.RequestTimeout

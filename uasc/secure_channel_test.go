@@ -90,7 +90,7 @@ func TestNewRequestMessage(t *testing.T) {
 			name: "counter-rollover",
 			sechan: &SecureChannel{
 				cfg: &Config{
-					SequenceNumber: math.MaxUint32,
+					SequenceNumber: math.MaxUint32 - 1023,
 					RequestID:      math.MaxUint32,
 				},
 				reqhdr: &ua.RequestHeader{
@@ -107,8 +107,8 @@ func TestNewRequestMessage(t *testing.T) {
 					},
 					SymmetricSecurityHeader: &SymmetricSecurityHeader{},
 					SequenceHeader: &SequenceHeader{
-						SequenceNumber: 0,
-						RequestID:      0,
+						SequenceNumber: 1,
+						RequestID:      1,
 					},
 				},
 				TypeID: ua.NewFourByteExpandedNodeID(0, id.ReadRequest_Encoding_DefaultBinary),
@@ -116,7 +116,7 @@ func TestNewRequestMessage(t *testing.T) {
 					RequestHeader: &ua.RequestHeader{
 						AuthenticationToken: ua.NewTwoByteNodeID(0),
 						Timestamp:           fixedTime(),
-						RequestHandle:       0,
+						RequestHandle:       1,
 					},
 				},
 			},
