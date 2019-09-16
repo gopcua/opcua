@@ -159,33 +159,17 @@ func (s *SecureChannel) SendAsync(req ua.Request, authToken *ua.NodeID, respReq 
 	return s.sendAsyncWithTimeout(req, authToken, respReq, s.cfg.RequestTimeout)
 }
 
-// sendAsyncWithTimeout sends the service request with a specific timeout and returns a channel which will receive the
-// response when it arrives.
+// sendAsyncWithTimeout sends the service request with a specific timeout and
+// returns a channel which will receive the response when it arrives.
 func (s *SecureChannel) sendAsyncWithTimeout(req ua.Request, authToken *ua.NodeID, respReq bool, timeout time.Duration) (resp chan Response, reqID uint32, err error) {
-	typeID := ua.ServiceTypeID(req)
-	if typeID == 0 {
-		return nil, 0, fmt.Errorf("unknown service %T. Did you call register?", req)
-	}
-	if authToken == nil {
-		authToken = ua.NewTwoByteNodeID(0)
-	}
-
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.cfg.SequenceNumber++
-	s.cfg.RequestID++
-	s.reqhdr.AuthenticationToken = authToken
-	s.reqhdr.RequestHandle++
-	s.reqhdr.Timestamp = time.Now()
-	if timeout > 0 && timeout < s.cfg.RequestTimeout {
-		timeout = s.cfg.RequestTimeout
-	}
-	s.reqhdr.TimeoutHint = uint32(timeout / time.Millisecond)
-	req.SetHeader(s.reqhdr)
-
 	// encode the message
-	m := NewMessage(req, typeID, s.cfg)
+	m, err := s.newRequestMessage(req, authToken, timeout)
+	if err != nil {
+		return nil, 0, err
+	}
 	reqid := m.SequenceHeader.RequestID
 	b, err := m.Encode()
 	if err != nil {
@@ -215,6 +199,30 @@ func (s *SecureChannel) sendAsyncWithTimeout(req ua.Request, authToken *ua.NodeI
 	}
 	s.handler[reqid] = resp
 	return resp, reqid, nil
+}
+
+func (s *SecureChannel) newRequestMessage(req ua.Request, authToken *ua.NodeID, timeout time.Duration) (*Message, error) {
+	typeID := ua.ServiceTypeID(req)
+	if typeID == 0 {
+		return nil, fmt.Errorf("unknown service %T. Did you call register?", req)
+	}
+	if authToken == nil {
+		authToken = ua.NewTwoByteNodeID(0)
+	}
+
+	s.cfg.SequenceNumber++
+	s.cfg.RequestID++
+	s.reqhdr.AuthenticationToken = authToken
+	s.reqhdr.RequestHandle++
+	s.reqhdr.Timestamp = time.Now()
+	if timeout > 0 && timeout < s.cfg.RequestTimeout {
+		timeout = s.cfg.RequestTimeout
+	}
+	s.reqhdr.TimeoutHint = uint32(timeout / time.Millisecond)
+	req.SetHeader(s.reqhdr)
+
+	// encode the message
+	return NewMessage(req, typeID, s.cfg), nil
 }
 
 // SendResponse sends a service response.
