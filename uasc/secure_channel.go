@@ -62,6 +62,9 @@ type SecureChannel struct {
 	chunks map[uint32][]*MessageChunk
 
 	enc *uapolicy.EncryptionAlgorithm
+
+	// time returns the current time. When not set it defaults to time.Now().
+	time func() time.Time
 }
 
 func NewSecureChannel(endpoint string, c *uacp.Conn, cfg *Config) (*SecureChannel, error) {
@@ -91,10 +94,8 @@ func NewSecureChannel(endpoint string, c *uacp.Conn, cfg *Config) (*SecureChanne
 		c:           c,
 		cfg:         cfg,
 		reqhdr: &ua.RequestHeader{
-			AuthenticationToken: ua.NewTwoByteNodeID(0),
-			Timestamp:           time.Now(),
-			TimeoutHint:         uint32(cfg.RequestTimeout / time.Millisecond),
-			AdditionalHeader:    ua.NewExtensionObject(nil),
+			TimeoutHint:      uint32(cfg.RequestTimeout / time.Millisecond),
+			AdditionalHeader: ua.NewExtensionObject(nil),
 		},
 		state:   secureChannelCreated,
 		handler: make(map[uint32]chan Response),
@@ -115,15 +116,15 @@ func (s *SecureChannel) hasState(n int32) bool {
 }
 
 // SendRequest sends the service request and calls h with the response.
-func (s *SecureChannel) SendRequest(svc ua.Request, authToken *ua.NodeID, h func(interface{}) error) error {
-	return s.SendRequestWithTimeout(svc, authToken, s.cfg.RequestTimeout, h)
+func (s *SecureChannel) SendRequest(req ua.Request, authToken *ua.NodeID, h func(interface{}) error) error {
+	return s.SendRequestWithTimeout(req, authToken, s.cfg.RequestTimeout, h)
 }
 
 // SendRequestWithTimeout sends the service request and calls h with the response with a specific timeout.
-func (s *SecureChannel) SendRequestWithTimeout(svc ua.Request, authToken *ua.NodeID, timeout time.Duration, h func(interface{}) error) error {
+func (s *SecureChannel) SendRequestWithTimeout(req ua.Request, authToken *ua.NodeID, timeout time.Duration, h func(interface{}) error) error {
 	respRequired := h != nil
 
-	ch, reqid, err := s.SendAsync(svc, authToken, respRequired)
+	ch, reqid, err := s.SendAsync(req, authToken, respRequired)
 	if err != nil {
 		return err
 	}
@@ -155,37 +156,21 @@ func (s *SecureChannel) SendRequestWithTimeout(svc ua.Request, authToken *ua.Nod
 
 // SendAsync sends the service request and returns a channel which will receive the
 // response when it arrives.
-func (s *SecureChannel) SendAsync(svc ua.Request, authToken *ua.NodeID, respReq bool) (resp chan Response, reqID uint32, err error) {
-	return s.sendAsyncWithTimeout(svc, authToken, respReq, s.cfg.RequestTimeout)
+func (s *SecureChannel) SendAsync(req ua.Request, authToken *ua.NodeID, respReq bool) (resp chan Response, reqID uint32, err error) {
+	return s.sendAsyncWithTimeout(req, authToken, respReq, s.cfg.RequestTimeout)
 }
 
-// sendAsyncWithTimeout sends the service request with a specific timeout and returns a channel which will receive the
-// response when it arrives.
-func (s *SecureChannel) sendAsyncWithTimeout(svc ua.Request, authToken *ua.NodeID, respReq bool, timeout time.Duration) (resp chan Response, reqID uint32, err error) {
-	typeID := ua.ServiceTypeID(svc)
-	if typeID == 0 {
-		return nil, 0, fmt.Errorf("unknown service %T. Did you call register?", svc)
-	}
-	if authToken == nil {
-		authToken = ua.NewTwoByteNodeID(0)
-	}
-
+// sendAsyncWithTimeout sends the service request with a specific timeout and
+// returns a channel which will receive the response when it arrives.
+func (s *SecureChannel) sendAsyncWithTimeout(req ua.Request, authToken *ua.NodeID, respReq bool, timeout time.Duration) (resp chan Response, reqID uint32, err error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.cfg.SequenceNumber++
-	s.cfg.RequestID++
-	s.reqhdr.AuthenticationToken = authToken
-	s.reqhdr.RequestHandle++
-	s.reqhdr.Timestamp = time.Now()
-	if timeout > 0 && timeout < s.cfg.RequestTimeout {
-		timeout = s.cfg.RequestTimeout
-	}
-	s.reqhdr.TimeoutHint = uint32(timeout / time.Millisecond)
-	svc.SetHeader(s.reqhdr)
-
 	// encode the message
-	m := NewMessage(svc, typeID, s.cfg)
+	m, err := s.newRequestMessage(req, authToken, timeout)
+	if err != nil {
+		return nil, 0, err
+	}
 	reqid := m.SequenceHeader.RequestID
 	b, err := m.Encode()
 	if err != nil {
@@ -203,7 +188,7 @@ func (s *SecureChannel) sendAsyncWithTimeout(svc ua.Request, authToken *ua.NodeI
 	if _, err := s.c.Write(b); err != nil {
 		return nil, reqid, err
 	}
-	debug.Printf("uasc %d/%d: send %T with %d bytes", s.c.ID(), reqid, svc, len(b))
+	debug.Printf("uasc %d/%d: send %T with %d bytes", s.c.ID(), reqid, req, len(b))
 
 	// register the handler if a callback was passed
 	if !respReq {
@@ -217,18 +202,51 @@ func (s *SecureChannel) sendAsyncWithTimeout(svc ua.Request, authToken *ua.NodeI
 	return resp, reqid, nil
 }
 
+func (s *SecureChannel) newRequestMessage(req ua.Request, authToken *ua.NodeID, timeout time.Duration) (*Message, error) {
+	typeID := ua.ServiceTypeID(req)
+	if typeID == 0 {
+		return nil, fmt.Errorf("unknown service %T. Did you call register?", req)
+	}
+	if authToken == nil {
+		authToken = ua.NewTwoByteNodeID(0)
+	}
+
+	s.cfg.SequenceNumber++
+	if s.cfg.SequenceNumber > math.MaxUint32-1023 {
+		s.cfg.SequenceNumber = 1
+	}
+	s.cfg.RequestID++
+	if s.cfg.RequestID == 0 {
+		s.cfg.RequestID = 1
+	}
+	s.reqhdr.RequestHandle++
+	if s.reqhdr.RequestHandle == 0 {
+		s.reqhdr.RequestHandle = 1
+	}
+	s.reqhdr.AuthenticationToken = authToken
+	s.reqhdr.Timestamp = s.timeNow()
+	if timeout > 0 && timeout < s.cfg.RequestTimeout {
+		timeout = s.cfg.RequestTimeout
+	}
+	s.reqhdr.TimeoutHint = uint32(timeout / time.Millisecond)
+	req.SetHeader(s.reqhdr)
+
+	// encode the message
+	return NewMessage(req, typeID, s.cfg), nil
+}
+
 // SendResponse sends a service response.
 // todo(fs): this method is most likely needed for the server and we haven't tested it yet.
 // todo(fs): it exists to implement the handleOpenSecureChannelRequest() method during the
 // todo(fs): refactor to remove the reflect code. It will likely change.
-func (s *SecureChannel) SendResponse(svc ua.Response) error {
-	typeID := ua.ServiceTypeID(svc)
+func (s *SecureChannel) SendResponse(req ua.Response) error {
+	typeID := ua.ServiceTypeID(req)
 	if typeID == 0 {
-		return fmt.Errorf("unknown service %T. Did you call register?", svc)
+		return fmt.Errorf("unknown service %T. Did you call register?", req)
 	}
 
 	// encode the message
-	m := NewMessage(svc, typeID, s.cfg)
+	m := NewMessage(req, typeID, s.cfg)
 	reqid := m.SequenceHeader.RequestID
 	b, err := m.Encode()
 	if err != nil {
@@ -246,7 +264,7 @@ func (s *SecureChannel) SendResponse(svc ua.Response) error {
 	if _, err := s.c.Write(b); err != nil {
 		return err
 	}
-	debug.Printf("uasc %d/%d: send %T with %d bytes", s.c.ID(), reqid, svc, len(b))
+	debug.Printf("uasc %d/%d: send %T with %d bytes", s.c.ID(), reqid, req, len(b))
 
 	return nil
 }
@@ -665,7 +683,7 @@ func (s *SecureChannel) handleOpenSecureChannelRequest(svc interface{}) error {
 	}
 	resp := &ua.OpenSecureChannelResponse{
 		ResponseHeader: &ua.ResponseHeader{
-			Timestamp:          time.Now(),
+			Timestamp:          s.timeNow(),
 			RequestHandle:      req.RequestHeader.RequestHandle,
 			ServiceDiagnostics: &ua.DiagnosticInfo{},
 			StringTable:        []string{},
@@ -675,7 +693,7 @@ func (s *SecureChannel) handleOpenSecureChannelRequest(svc interface{}) error {
 		SecurityToken: &ua.ChannelSecurityToken{
 			ChannelID:       s.cfg.SecureChannelID,
 			TokenID:         s.cfg.SecurityTokenID,
-			CreatedAt:       time.Now(),
+			CreatedAt:       s.timeNow(),
 			RevisedLifetime: req.RequestedLifetime,
 		},
 		ServerNonce: nonce,
@@ -698,6 +716,13 @@ func (s *SecureChannel) popHandlerLock(reqid uint32) chan Response {
 	ch := s.handler[reqid]
 	delete(s.handler, reqid)
 	return ch
+}
+
+func (s *SecureChannel) timeNow() time.Time {
+	if s.time != nil {
+		return s.time()
+	}
+	return time.Now()
 }
 
 func mergeChunks(chunks []*MessageChunk) ([]byte, error) {
