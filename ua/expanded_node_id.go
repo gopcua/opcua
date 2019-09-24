@@ -15,6 +15,10 @@ type ExpandedNodeID struct {
 	ServerIndex  uint32
 }
 
+func (a ExpandedNodeID) String() string {
+	return a.NodeID.String()
+}
+
 // NewExpandedNodeID creates a new ExpandedNodeID.
 func NewExpandedNodeID(hasURI, hasIndex bool, nodeID *NodeID, uri string, idx uint32) *ExpandedNodeID {
 	e := &ExpandedNodeID{
