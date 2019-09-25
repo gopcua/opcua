@@ -5,30 +5,47 @@
 package uacp
 
 import (
+	"context"
 	"fmt"
 	"net"
-	"strings"
+	"net/url"
 )
+
+const defaultPort = "4840"
 
 // ResolveEndpoint returns network type, address, and error splitted from EndpointURL.
 //
 // Expected format of input is "opc.tcp://<addr[:port]/path/to/somewhere"
-func ResolveEndpoint(endpoint string) (network string, addr *net.TCPAddr, err error) {
-	elems := strings.Split(endpoint, "/")
-	if elems[0] != "opc.tcp:" {
-		return "", nil, fmt.Errorf("invalid endpoint %s", endpoint)
+func ResolveEndpoint(ctx context.Context, endpoint string) (network string, url *url.URL, err error) {
+	url, err = url.Parse(endpoint)
+	if err != nil {
+		return
 	}
 
-	addrString := elems[2]
-	if !strings.Contains(addrString, ":") {
-		addrString += ":4840"
+	if url.Scheme != "opc.tcp" {
+		err = fmt.Errorf("unsupported scheme %s", url.Scheme)
+		return
 	}
 
 	network = "tcp"
-	addr, err = net.ResolveTCPAddr(network, addrString)
-	switch err.(type) {
-	case *net.DNSError:
-		return "", nil, fmt.Errorf("could not resolve address %s", addrString)
+
+	port := url.Port()
+	if port == "" {
+		port = defaultPort
 	}
+
+	resolver := net.Resolver{}
+	addrs, err := resolver.LookupIPAddr(ctx, url.Hostname())
+	if err != nil {
+		return
+	}
+
+	if len(addrs) == 0 {
+		err = fmt.Errorf("could not resolve address %s", url.Hostname())
+		return
+	}
+
+	url.Host = net.JoinHostPort(addrs[0].String(), port)
+
 	return
 }

@@ -14,7 +14,7 @@ import (
 
 func TestConn(t *testing.T) {
 	ep := "opc.tcp://127.0.0.1:4840/foo/bar"
-	ln, err := Listen(ep, nil)
+	ln, err := Listen(context.Background(), ep, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,7 +50,7 @@ func TestConn(t *testing.T) {
 
 func TestClientWrite(t *testing.T) {
 	ep := "opc.tcp://127.0.0.1:4840/foo/bar"
-	ln, err := Listen(ep, nil)
+	ln, err := Listen(context.Background(), ep, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -113,7 +113,7 @@ NEXT:
 
 func TestServerWrite(t *testing.T) {
 	ep := "opc.tcp://127.0.0.1:4840/foo/bar"
-	ln, err := Listen(ep, nil)
+	ln, err := Listen(context.Background(), ep, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

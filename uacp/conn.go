@@ -24,6 +24,8 @@ const (
 	DefaultSendBufSize    = 0xffff
 	DefaultMaxChunkCount  = 512
 	DefaultMaxMessageSize = 2 * MB
+
+	DefaultDialTimeout = time.Second * 10
 )
 
 // connid stores the current connection id. updated with atomic.AddUint32
@@ -36,11 +38,17 @@ func nextid() uint32 {
 
 func Dial(ctx context.Context, endpoint string) (*Conn, error) {
 	debug.Printf("Connect to %s", endpoint)
-	network, raddr, err := ResolveEndpoint(endpoint)
+
+	ctx, cancel := context.WithTimeout(ctx, DefaultDialTimeout)
+	defer cancel()
+
+	network, url, err := ResolveEndpoint(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
-	c, err := net.DialTCP(network, nil, raddr)
+
+	dialer := net.Dialer{}
+	c, err := dialer.DialContext(ctx, network, url.Host)
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +87,7 @@ type Listener struct {
 // If the IP field of laddr is nil or an unspecified IP address, Listen listens
 // on all available unicast and anycast IP addresses of the local system.
 // If the Port field of laddr is 0, a port number is automatically chosen.
-func Listen(endpoint string, ack *Acknowledge) (*Listener, error) {
+func Listen(ctx context.Context, endpoint string, ack *Acknowledge) (*Listener, error) {
 	if ack == nil {
 		ack = &Acknowledge{
 			ReceiveBufSize: DefaultReceiveBufSize,
@@ -89,11 +97,12 @@ func Listen(endpoint string, ack *Acknowledge) (*Listener, error) {
 		}
 	}
 
-	network, laddr, err := ResolveEndpoint(endpoint)
+	network, url, err := ResolveEndpoint(ctx, endpoint)
 	if err != nil {
 		return nil, err
 	}
-	l, err := net.Listen(network, laddr.String())
+	lc := &net.ListenConfig{}
+	l, err := lc.Listen(ctx, network, url.Host)
 	if err != nil {
 		return nil, err
 	}
