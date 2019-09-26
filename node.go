@@ -185,7 +185,15 @@ func (n *Node) References(refType uint32, dir ua.BrowseDirection, mask ua.NodeCl
 	req := &ua.BrowseRequest{
 		View: &ua.ViewDescription{
 			ViewID:    ua.NewTwoByteNodeID(0),
-			Timestamp: time.Now(),
+			// OPC UA Part 4
+			// 7.37 ViewDescription
+			// The components of this parameter are defined in Table 175.
+			//The time date desired. The corresponding version is the one with the closest
+			// previous creation timestamp. Either the Timestamp or the viewVersion
+			// parameter may be set by a Client, but not both. If ViewVersion is set this
+			// parameter shall be null.
+			//If you don't comment out the next line, browsing some OPCUA nodes fails.			
+			//Timestamp: time.Now(),
 		},
 		RequestedMaxReferencesPerNode: 0,
 		NodesToBrowse:                 []*ua.BrowseDescription{desc},
