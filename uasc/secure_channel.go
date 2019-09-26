@@ -124,7 +124,7 @@ func (s *SecureChannel) SendRequest(req ua.Request, authToken *ua.NodeID, h func
 func (s *SecureChannel) SendRequestWithTimeout(req ua.Request, authToken *ua.NodeID, timeout time.Duration, h func(interface{}) error) error {
 	respRequired := h != nil
 
-	ch, reqid, err := s.SendAsync(req, authToken, respRequired)
+	ch, reqid, err := s.sendAsyncWithTimeout(req, authToken, respRequired, timeout)
 	if err != nil {
 		return err
 	}
