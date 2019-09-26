@@ -58,6 +58,7 @@ const (
 type TypeID byte
 
 const (
+	TypeIDNull            TypeID = 0 // not part of specification but some servers (e.g. Prosys) return it anyway
 	TypeIDBoolean         TypeID = 1
 	TypeIDSByte           TypeID = 2
 	TypeIDByte            TypeID = 3
