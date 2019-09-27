@@ -121,6 +121,8 @@ func TestParseNodeID(t *testing.T) {
 		// happy flows
 		{s: "", n: NewTwoByteNodeID(0)},
 		{s: "ns=0;i=1", n: NewTwoByteNodeID(1)},
+		{s: "i=1", n: NewTwoByteNodeID(1)},
+		{s: "i=2253", n: NewFourByteNodeID(0, 2253)},
 		{s: "ns=1;i=2", n: NewFourByteNodeID(1, 2)},
 		{s: "ns=256;i=2", n: NewNumericNodeID(256, 2)},
 		{s: "ns=1;i=65536", n: NewNumericNodeID(1, 65536)},
@@ -131,7 +133,7 @@ func TestParseNodeID(t *testing.T) {
 		{s: "ns=1;a", n: NewStringNodeID(1, "a")},
 
 		// error flows
-		{s: "i=1", err: errors.New("invalid node id: i=1")},
+		{s: "ns=0", err: errors.New("invalid node id: ns=0")},
 		{s: "nsu=abc;i=1", err: errors.New("namespace urls are not supported: nsu=abc;i=1")},
 		{s: "ns=65536;i=1", err: errors.New("namespace id out of range (0..65535): ns=65536;i=1")},
 		{s: "ns=abc;i=1", err: errors.New("invalid namespace id: ns=abc;i=1")},
