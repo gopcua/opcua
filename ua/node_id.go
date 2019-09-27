@@ -92,11 +92,17 @@ func ParseNodeID(s string) (*NodeID, error) {
 		return NewTwoByteNodeID(0), nil
 	}
 
+	var nsval, idval string
+
 	p := strings.SplitN(s, ";", 2)
-	if len(p) < 2 {
+	switch len(p) {
+	case 1:
+		nsval, idval = "ns=0", p[0]
+	case 2:
+		nsval, idval = p[0], p[1]
+	default:
 		return nil, fmt.Errorf("invalid node id: %s", s)
 	}
-	nsval, idval := p[0], p[1]
 
 	// parse namespace
 	var ns uint16
@@ -152,6 +158,9 @@ func ParseNodeID(s string) (*NodeID, error) {
 			return nil, fmt.Errorf("invalid opaque node id: %s", s)
 		}
 		return NewByteStringNodeID(ns, b), nil
+
+	case strings.HasPrefix(idval, "ns="):
+		return nil, fmt.Errorf("invalid node id: %s", s)
 
 	default:
 		return NewStringNodeID(ns, idval), nil
