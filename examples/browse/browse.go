@@ -130,6 +130,7 @@ func browse(n *opcua.Node, path string, level int) ([]NodeDef, error) {
 	}
 
 	def.Path = join(path, def.BrowseName)
+	// fmt.Printf("%d: def.Path:%s def.NodeClass:%s\n", level, def.Path, def.NodeClass)
 
 	var nodes []NodeDef
 	if def.NodeClass == ua.NodeClassVariable {
@@ -156,6 +157,9 @@ func browse(n *opcua.Node, path string, level int) ([]NodeDef, error) {
 		return nil, err
 	}
 	if err := browseChildren(id.Organizes); err != nil {
+		return nil, err
+	}
+	if err := browseChildren(id.HasProperty); err != nil {
 		return nil, err
 	}
 	return nodes, nil
