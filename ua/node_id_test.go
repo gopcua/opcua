@@ -156,6 +156,27 @@ func TestParseNodeID(t *testing.T) {
 	}
 }
 
+func TestStringID(t *testing.T) {
+	cases := []struct {
+		name string
+		s    string
+		n    *NodeID
+	}{
+		{name: "basic", s: "i=1", n: NewTwoByteNodeID(1)},
+		{name: "basic guid", s: "ns=1;g=5EAC051C-C313-43D7-B790-24AA2C3CFD37", n: NewGUIDNodeID(1, "5EAC051C-C313-43D7-B790-24AA2C3CFD37")},
+		{name: "lower case guid", s: "ns=1;g=5EAC051C-C313-43D7-B790-24AA2C3CFD37", n: NewGUIDNodeID(1, "5eac051c-c313-43d7-b790-24aa2c3cfd37")},
+		{name: "zero guid", s: "ns=1;g=00000000-0000-0000-0000-000000000000", n: NewGUIDNodeID(1, "00000000-0000-0000-0000-000000000000")},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got, want := c.n.String(), c.s; got != want {
+				t.Fatalf("got %s want %s", got, want)
+			}
+		})
+	}
+}
+
 func TestSetIntID(t *testing.T) {
 	tests := []struct {
 		name string
