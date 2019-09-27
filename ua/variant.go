@@ -542,6 +542,7 @@ func (m *Variant) Time() time.Time {
 
 var variantTypeToTypeID = map[reflect.Type]TypeID{}
 var variantTypeIDToType = map[TypeID]reflect.Type{
+	TypeIDNull:            reflect.TypeOf(nil),
 	TypeIDBoolean:         reflect.TypeOf(false),
 	TypeIDSByte:           reflect.TypeOf(int8(0)),
 	TypeIDByte:            reflect.TypeOf(uint8(0)),
