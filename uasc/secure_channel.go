@@ -154,12 +154,6 @@ func (s *SecureChannel) SendRequestWithTimeout(req ua.Request, authToken *ua.Nod
 	}
 }
 
-// SendAsync sends the service request and returns a channel which will receive the
-// response when it arrives.
-func (s *SecureChannel) SendAsync(req ua.Request, authToken *ua.NodeID, respReq bool) (resp chan Response, reqID uint32, err error) {
-	return s.sendAsyncWithTimeout(req, authToken, respReq, s.cfg.RequestTimeout)
-}
-
 // sendAsyncWithTimeout sends the service request with a specific timeout and
 // returns a channel which will receive the response when it arrives.
 func (s *SecureChannel) sendAsyncWithTimeout(req ua.Request, authToken *ua.NodeID, respReq bool, timeout time.Duration) (resp chan Response, reqID uint32, err error) {
