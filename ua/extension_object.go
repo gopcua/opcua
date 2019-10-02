@@ -5,8 +5,7 @@
 package ua
 
 import (
-	"fmt"
-
+	"github.com/gopcua/opcua/errors"
 	"github.com/gopcua/opcua/id"
 )
 
@@ -82,7 +81,7 @@ func (e *ExtensionObject) Decode(b []byte) (int, error) {
 	}
 
 	if e.EncodingMask == ExtensionObjectXML {
-		e.Value = new(XmlElement)
+		e.Value = new(XMLElement)
 		body.ReadStruct(e.Value)
 		return buf.Pos(), body.Error()
 	}
@@ -90,7 +89,7 @@ func (e *ExtensionObject) Decode(b []byte) (int, error) {
 	typeID := e.TypeID.NodeID.String()
 	e.Value = eotypes.New(typeID)
 	if e.Value == nil {
-		return buf.Pos(), fmt.Errorf("invalid extension object with id %s", typeID)
+		return buf.Pos(), errors.Errorf("invalid extension object with id %s", typeID)
 	}
 
 	body.ReadStruct(e.Value)
@@ -121,7 +120,7 @@ func (e *ExtensionObject) Encode() ([]byte, error) {
 func (e *ExtensionObject) UpdateMask() {
 	if e.Value == nil {
 		e.EncodingMask = ExtensionObjectEmpty
-	} else if _, ok := e.Value.(*XmlElement); ok {
+	} else if _, ok := e.Value.(*XMLElement); ok {
 		e.EncodingMask = ExtensionObjectXML
 	} else {
 		e.EncodingMask = ExtensionObjectBinary

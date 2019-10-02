@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gopcua/opcua/debug"
+	"github.com/gopcua/opcua/errors"
 )
 
 // debugCodec enables printing of debug messages in the opcua codec.
@@ -83,7 +84,7 @@ func encode(val reflect.Value, name string) ([]byte, error) {
 		case reflect.Slice:
 			return writeSlice(val, name)
 		default:
-			return nil, fmt.Errorf("unsupported type: %s", val.Type())
+			return nil, errors.Errorf("unsupported type: %s", val.Type())
 		}
 	}
 	return buf.Bytes(), buf.Error()
@@ -112,7 +113,7 @@ func writeSlice(val reflect.Value, name string) ([]byte, error) {
 	}
 
 	if val.Len() > math.MaxInt32 {
-		return nil, fmt.Errorf("array too large")
+		return nil, errors.Errorf("array too large")
 	}
 
 	buf.WriteUint32(uint32(val.Len()))

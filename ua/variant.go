@@ -5,10 +5,10 @@
 package ua
 
 import (
-	"errors"
-	"fmt"
 	"reflect"
 	"time"
+
+	"github.com/gopcua/opcua/errors"
 )
 
 var (
@@ -115,7 +115,7 @@ func (m *Variant) Decode(b []byte) (int, error) {
 	// check the type
 	typ, ok := variantTypeIDToType[m.Type()]
 	if !ok {
-		return buf.Pos(), fmt.Errorf("invalid type id: %d", m.Type())
+		return buf.Pos(), errors.Errorf("invalid type id: %d", m.Type())
 	}
 
 	// read single value and return
@@ -253,7 +253,7 @@ func (m *Variant) decodeValue(buf *Buffer) interface{} {
 	case TypeIDByteString:
 		return buf.ReadBytes()
 	case TypeIDXMLElement:
-		return XmlElement(buf.ReadString())
+		return XMLElement(buf.ReadString())
 	case TypeIDNodeID:
 		v := new(NodeID)
 		buf.ReadStruct(v)
@@ -361,7 +361,7 @@ func (m *Variant) encodeValue(buf *Buffer, v interface{}) {
 		buf.WriteStruct(x)
 	case []byte:
 		buf.WriteByteString(x)
-	case XmlElement:
+	case XMLElement:
 		buf.WriteString(string(x))
 	case *NodeID:
 		buf.WriteStruct(x)
@@ -444,11 +444,20 @@ func (m *Variant) set(v interface{}) error {
 
 	typeid, ok := variantTypeToTypeID[et]
 	if !ok {
-		return fmt.Errorf("opcua: cannot set variant to %T", v)
+		return errors.Errorf("cannot set variant to %T", v)
 	}
 	m.setType(typeid)
 	m.value = v
 	return nil
+}
+
+func (m *Variant) NodeID() *NodeID {
+	switch m.Type() {
+	case TypeIDNodeID:
+		return m.value.(*NodeID)
+	default:
+		return nil
+	}
 }
 
 // todo(fs): this should probably be StringValue or we need to handle all types
@@ -533,6 +542,7 @@ func (m *Variant) Time() time.Time {
 
 var variantTypeToTypeID = map[reflect.Type]TypeID{}
 var variantTypeIDToType = map[TypeID]reflect.Type{
+	TypeIDNull:            reflect.TypeOf(nil),
 	TypeIDBoolean:         reflect.TypeOf(false),
 	TypeIDSByte:           reflect.TypeOf(int8(0)),
 	TypeIDByte:            reflect.TypeOf(uint8(0)),
@@ -548,7 +558,7 @@ var variantTypeIDToType = map[TypeID]reflect.Type{
 	TypeIDDateTime:        reflect.TypeOf(time.Time{}),
 	TypeIDGUID:            reflect.TypeOf(new(GUID)),
 	TypeIDByteString:      reflect.TypeOf([]byte{}),
-	TypeIDXMLElement:      reflect.TypeOf(XmlElement("")),
+	TypeIDXMLElement:      reflect.TypeOf(XMLElement("")),
 	TypeIDNodeID:          reflect.TypeOf(new(NodeID)),
 	TypeIDExpandedNodeID:  reflect.TypeOf(new(ExpandedNodeID)),
 	TypeIDStatusCode:      reflect.TypeOf(StatusCode(0)),

@@ -166,11 +166,16 @@ func (g *GUID) String() string {
 	d4 := make([]byte, 8)
 	binary.BigEndian.PutUint64(d4, g.Data4)
 
-	return fmt.Sprintf("%X-%X-%X-%X-%X",
+	return fmt.Sprintf("%0*X-%0*X-%0*X-%0*X-%0*X",
+		8,
 		g.Data1,
+		4,
 		g.Data2,
+		4,
 		g.Data3,
+		4,
 		d4[:2],
+		12,
 		d4[2:],
 	)
 }
@@ -234,4 +239,4 @@ func (l *LocalizedText) UpdateMask() {
 	}
 }
 
-type XmlElement string
+type XMLElement string

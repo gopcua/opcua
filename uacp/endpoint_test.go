@@ -47,13 +47,13 @@ func TestResolveEndpoint(t *testing.T) {
 			"tcp://10.0.0.1:4840/foo/bar",
 			"",
 			nil,
-			"invalid endpoint tcp://10.0.0.1:4840/foo/bar",
+			"opcua: invalid endpoint tcp://10.0.0.1:4840/foo/bar",
 		},
 		{ // Invalid, bad formatted schema
-			"opc.tcp:/10.0.0.1:4840/foo/bar",
+			"opc.tcp:/10.0.0.1:4840/foo1337bar/baz",
 			"",
 			nil,
-			"could not resolve address foo:4840",
+			"opcua: could not resolve address foo1337bar:4840",
 		},
 	}
 

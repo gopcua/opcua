@@ -13,6 +13,7 @@ import (
 	"text/template"
 
 	"github.com/gopcua/opcua/cmd/service/goname"
+	"github.com/gopcua/opcua/errors"
 )
 
 var in, out, pkg string
@@ -45,6 +46,9 @@ func writeEnums(enums []Type) {
 
 func writeExtObjects(objs []Type) {
 	var b bytes.Buffer
+	if err := tmplReqResp.Execute(&b, nil); err != nil {
+		log.Fatal(err)
+	}
 	if err := FormatTypes(&b, objs); err != nil {
 		log.Fatal(err)
 	}
@@ -203,6 +207,14 @@ type Type struct {
 	Values []Value
 }
 
+func (t Type) IsRequest() bool {
+	return len(t.Fields) > 0 && t.Fields[0].Type == "*RequestHeader"
+}
+
+func (t Type) IsResponse() bool {
+	return len(t.Fields) > 0 && t.Fields[0].Type == "*ResponseHeader"
+}
+
 type Value struct {
 	Name      string
 	ShortName string
@@ -230,7 +242,7 @@ func FormatType(w io.Writer, t Type) error {
 	case KindExtensionObject:
 		return tmplExtObject.Execute(w, t)
 	default:
-		return fmt.Errorf("invalid type: %d", t.Kind)
+		return errors.Errorf("invalid type: %d", t.Kind)
 	}
 }
 
@@ -252,12 +264,44 @@ const (
 )
 `))
 
+var tmplReqResp = template.Must(template.New("").Parse(`
+type Request interface {
+	Header() *RequestHeader
+	SetHeader(*RequestHeader)
+}
+
+type Response interface {
+	Header() *ResponseHeader
+	SetHeader(*ResponseHeader)
+}
+`))
+
 var tmplExtObject = template.Must(template.New("").Parse(`
 {{if .Fields}}
 type {{.Name}} struct {
 	{{range $i, $v := .Fields}}{{$v.Name}} {{$v.Type}}
 	{{end}}
 }
+{{- if .IsRequest}}
+
+func (t *{{.Name}}) Header() *RequestHeader {
+	return t.RequestHeader
+}
+
+func (t *{{.Name}}) SetHeader(h *RequestHeader) {
+	t.RequestHeader = h
+}
+{{- end}}
+{{- if .IsResponse}}
+
+func (t *{{.Name}}) Header() *ResponseHeader {
+	return t.ResponseHeader
+}
+
+func (t *{{.Name}}) SetHeader(h *ResponseHeader) {
+	t.ResponseHeader = h
+}
+{{- end}}
 {{end}}
 `))
 

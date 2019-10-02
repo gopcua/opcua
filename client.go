@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/gopcua/opcua/debug"
+	"github.com/gopcua/opcua/errors"
 	"github.com/gopcua/opcua/id"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uacp"
@@ -137,7 +138,7 @@ func (c *Client) Connect(ctx context.Context) (err error) {
 	}
 
 	if c.sechan != nil {
-		return fmt.Errorf("already connected")
+		return errors.Errorf("already connected")
 	}
 	if err := c.Dial(ctx); err != nil {
 		return err
@@ -162,7 +163,7 @@ func (c *Client) Dial(ctx context.Context) error {
 
 	c.once.Do(func() { c.session.Store((*Session)(nil)) })
 	if c.sechan != nil {
-		return fmt.Errorf("secure channel already connected")
+		return errors.Errorf("secure channel already connected")
 	}
 	conn, err := uacp.Dial(ctx, c.endpointURL)
 	if err != nil {
@@ -257,7 +258,7 @@ type Session struct {
 // See Part 4, 5.6.2
 func (c *Client) CreateSession(cfg *uasc.SessionConfig) (*Session, error) {
 	if c.sechan == nil {
-		return nil, fmt.Errorf("secure channel not connected")
+		return nil, errors.Errorf("secure channel not connected")
 	}
 
 	nonce := make([]byte, 32)
@@ -277,7 +278,7 @@ func (c *Client) CreateSession(cfg *uasc.SessionConfig) (*Session, error) {
 	var s *Session
 	// for the CreateSessionRequest the authToken is always nil.
 	// use c.sechan.Send() to enforce this.
-	err := c.sechan.Send(req, nil, func(v interface{}) error {
+	err := c.sechan.SendRequest(req, nil, func(v interface{}) error {
 		var res *ua.CreateSessionResponse
 		if err := safeAssign(v, &res); err != nil {
 			return err
@@ -379,7 +380,7 @@ func (c *Client) ActivateSession(s *Session) error {
 		UserIdentityToken:          ua.NewExtensionObject(s.cfg.UserIdentityToken),
 		UserTokenSignature:         s.cfg.UserTokenSignature,
 	}
-	return c.sechan.Send(req, s.resp.AuthenticationToken, func(v interface{}) error {
+	return c.sechan.SendRequest(req, s.resp.AuthenticationToken, func(v interface{}) error {
 		var res *ua.ActivateSessionResponse
 		if err := safeAssign(v, &res); err != nil {
 			return err
@@ -434,19 +435,19 @@ func (c *Client) DetachSession() (*Session, error) {
 // Send sends the request via the secure channel and registers a handler for
 // the response. If the client has an active session it injects the
 // authentication token.
-func (c *Client) Send(req interface{}, h func(interface{}) error) error {
+func (c *Client) Send(req ua.Request, h func(interface{}) error) error {
 	return c.sendWithTimeout(req, c.cfg.RequestTimeout, h)
 }
 
 // sendWithTimeout sends the request via the secure channel with a custom timeout and registers a handler for
 // the response. If the client has an active session it injects the
 // authentication token.
-func (c *Client) sendWithTimeout(req interface{}, timeout time.Duration, h func(interface{}) error) error {
+func (c *Client) sendWithTimeout(req ua.Request, timeout time.Duration, h func(interface{}) error) error {
 	var authToken *ua.NodeID
 	if s := c.Session(); s != nil {
 		authToken = s.resp.AuthenticationToken
 	}
-	return c.sechan.SendWithTimeout(req, authToken, timeout, h)
+	return c.sechan.SendRequestWithTimeout(req, authToken, timeout, h)
 }
 
 // Node returns a node object which accesses its attributes
@@ -512,6 +513,38 @@ func (c *Client) Browse(req *ua.BrowseRequest) (*ua.BrowseResponse, error) {
 	var res *ua.BrowseResponse
 	err := c.Send(req, func(v interface{}) error {
 		return safeAssign(v, &res)
+	})
+	return res, err
+}
+
+// Call executes a synchronous call request for a single method.
+func (c *Client) Call(req *ua.CallMethodRequest) (*ua.CallMethodResult, error) {
+	creq := &ua.CallRequest{
+		MethodsToCall: []*ua.CallMethodRequest{req},
+	}
+	var res *ua.CallResponse
+	err := c.Send(creq, func(v interface{}) error {
+		return safeAssign(v, &res)
+	})
+	if err != nil {
+		return nil, err
+	}
+	if len(res.Results) != 1 {
+		return nil, ua.StatusBadUnknownResponse
+	}
+	return res.Results[0], nil
+}
+
+// BrowseNext executes a synchronous browse request.
+func (c *Client) BrowseNext(req *ua.BrowseNextRequest) (*ua.BrowseNextResponse, error) {
+	var res *ua.BrowseNextResponse
+	err := c.Send(req, func(v interface{}) error {
+		r, ok := v.(*ua.BrowseNextResponse)
+		if !ok {
+			return errors.Errorf("invalid response: %T", v)
+		}
+		res = r
+		return nil
 	})
 	return res, err
 }
@@ -617,7 +650,7 @@ func (c *Client) notifySubscription(ctx context.Context, response *ua.PublishRes
 	if response.NotificationMessage == nil {
 		sub.sendNotification(ctx, &PublishNotificationData{
 			SubscriptionID: response.SubscriptionID,
-			Error:          fmt.Errorf("empty NotificationMessage"),
+			Error:          errors.Errorf("empty NotificationMessage"),
 		})
 		return
 	}
@@ -628,7 +661,7 @@ func (c *Client) notifySubscription(ctx context.Context, response *ua.PublishRes
 		if data == nil || data.Value == nil {
 			sub.sendNotification(ctx, &PublishNotificationData{
 				SubscriptionID: response.SubscriptionID,
-				Error:          fmt.Errorf("missing NotificationData parameter"),
+				Error:          errors.Errorf("missing NotificationData parameter"),
 			})
 			continue
 		}
@@ -649,7 +682,7 @@ func (c *Client) notifySubscription(ctx context.Context, response *ua.PublishRes
 		default:
 			sub.sendNotification(ctx, &PublishNotificationData{
 				SubscriptionID: response.SubscriptionID,
-				Error:          fmt.Errorf("unknown NotificationData parameter: %T", data.Value),
+				Error:          errors.Errorf("unknown NotificationData parameter: %T", data.Value),
 			})
 		}
 	}

@@ -2,12 +2,11 @@ package monitor
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"sync"
 	"sync/atomic"
 
 	"github.com/gopcua/opcua"
+	"github.com/gopcua/opcua/errors"
 	"github.com/gopcua/opcua/ua"
 )
 
@@ -16,7 +15,7 @@ var (
 	DefaultCallbackBufferLen = 8192
 
 	// ErrSlowConsumer is returned when a subscriber does not keep up with the incoming messages
-	ErrSlowConsumer = errors.New("opcua: slow consumer. messages may be dropped")
+	ErrSlowConsumer = errors.New("slow consumer. messages may be dropped")
 )
 
 // ErrHandler is a function that is called when there is an out of band issue with delivery
@@ -152,7 +151,7 @@ func (s *Subscription) pump(ctx context.Context, notifyCh chan<- *DataChangeMess
 			}
 
 			if msg.SubscriptionID != s.sub.SubscriptionID {
-				s.sendError(fmt.Errorf("opcua: message sub id %v does not match sub id %v", msg.SubscriptionID, s.sub.SubscriptionID))
+				s.sendError(errors.Errorf("message sub id %v does not match sub id %v", msg.SubscriptionID, s.sub.SubscriptionID))
 				continue
 			}
 
@@ -176,7 +175,7 @@ func (s *Subscription) pump(ctx context.Context, notifyCh chan<- *DataChangeMess
 					out := &DataChangeMessage{}
 
 					if !ok {
-						out.Error = fmt.Errorf("opcua: handle %d not found", item.ClientHandle)
+						out.Error = errors.Errorf("handle %d not found", item.ClientHandle)
 						// TODO: should the error also propagate via the monitor callback?
 					} else {
 						out.NodeID = nid
@@ -199,7 +198,7 @@ func (s *Subscription) pump(ctx context.Context, notifyCh chan<- *DataChangeMess
 					}
 				}
 			default:
-				s.sendError(fmt.Errorf("opcua: unknown message type: %T", msg.Value))
+				s.sendError(errors.Errorf("unknown message type: %T", msg.Value))
 			}
 		}
 	}
@@ -280,7 +279,7 @@ func (s *Subscription) AddNodeIDs(nodes ...*ua.NodeID) error {
 	}
 
 	if len(resp.Results) != len(toAdd) {
-		return fmt.Errorf("opcua: monitor items response length mismatch")
+		return errors.Errorf("monitor items response length mismatch")
 	}
 
 	for i, res := range resp.Results {
@@ -319,7 +318,7 @@ func (s *Subscription) RemoveNodeIDs(nodes ...*ua.NodeID) error {
 		sid := node.String()
 		ids, ok := s.nodeLookup[sid]
 		if !ok {
-			return fmt.Errorf("opcua: node not found: %s", sid)
+			return errors.Errorf("node not found: %s", sid)
 		}
 		delete(s.nodeLookup, sid)
 		delete(s.handles, ids.handle)
@@ -337,7 +336,7 @@ func (s *Subscription) RemoveNodeIDs(nodes ...*ua.NodeID) error {
 	}
 
 	if len(resp.Results) != len(toRemove) {
-		return fmt.Errorf("opcua: unmonitor items response length mismatch")
+		return errors.Errorf("unmonitor items response length mismatch")
 	}
 
 	for _, res := range resp.Results {

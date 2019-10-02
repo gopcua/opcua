@@ -6,9 +6,10 @@ package ua
 
 import (
 	"encoding/base64"
-	"errors"
 	"reflect"
 	"testing"
+
+	"github.com/gopcua/opcua/errors"
 )
 
 func TestNodeID(t *testing.T) {
@@ -121,6 +122,8 @@ func TestParseNodeID(t *testing.T) {
 		// happy flows
 		{s: "", n: NewTwoByteNodeID(0)},
 		{s: "ns=0;i=1", n: NewTwoByteNodeID(1)},
+		{s: "i=1", n: NewTwoByteNodeID(1)},
+		{s: "i=2253", n: NewFourByteNodeID(0, 2253)},
 		{s: "ns=1;i=2", n: NewFourByteNodeID(1, 2)},
 		{s: "ns=256;i=2", n: NewNumericNodeID(256, 2)},
 		{s: "ns=1;i=65536", n: NewNumericNodeID(1, 65536)},
@@ -131,7 +134,7 @@ func TestParseNodeID(t *testing.T) {
 		{s: "ns=1;a", n: NewStringNodeID(1, "a")},
 
 		// error flows
-		{s: "i=1", err: errors.New("invalid node id: i=1")},
+		{s: "ns=0", err: errors.New("invalid node id: ns=0")},
 		{s: "nsu=abc;i=1", err: errors.New("namespace urls are not supported: nsu=abc;i=1")},
 		{s: "ns=65536;i=1", err: errors.New("namespace id out of range (0..65535): ns=65536;i=1")},
 		{s: "ns=abc;i=1", err: errors.New("invalid namespace id: ns=abc;i=1")},
@@ -144,11 +147,32 @@ func TestParseNodeID(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.s, func(t *testing.T) {
 			n, err := ParseNodeID(c.s)
-			if got, want := err, c.err; !reflect.DeepEqual(got, want) {
+			if got, want := err, c.err; !compareErrors(got, want) {
 				t.Fatalf("got error %v want %v", got, want)
 			}
 			if got, want := n, c.n; !reflect.DeepEqual(got, want) {
 				t.Fatalf("\ngot  %#v\nwant %#v", got, want)
+			}
+		})
+	}
+}
+
+func TestStringID(t *testing.T) {
+	cases := []struct {
+		name string
+		s    string
+		n    *NodeID
+	}{
+		{name: "basic", s: "i=1", n: NewTwoByteNodeID(1)},
+		{name: "basic guid", s: "ns=1;g=5EAC051C-C313-43D7-B790-24AA2C3CFD37", n: NewGUIDNodeID(1, "5EAC051C-C313-43D7-B790-24AA2C3CFD37")},
+		{name: "lower case guid", s: "ns=1;g=5EAC051C-C313-43D7-B790-24AA2C3CFD37", n: NewGUIDNodeID(1, "5eac051c-c313-43d7-b790-24aa2c3cfd37")},
+		{name: "zero guid", s: "ns=1;g=00000000-0000-0000-0000-000000000000", n: NewGUIDNodeID(1, "00000000-0000-0000-0000-000000000000")},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got, want := c.n.String(), c.s; got != want {
+				t.Fatalf("got %s want %s", got, want)
 			}
 		})
 	}
@@ -221,7 +245,7 @@ func TestSetIntID(t *testing.T) {
 			}
 
 			err := tt.n.SetIntID(tt.v)
-			if got, want := err, tt.err; !reflect.DeepEqual(got, want) {
+			if got, want := err, tt.err; !compareErrors(got, want) {
 				t.Fatalf("got error %v want %v", got, want)
 			}
 			// if the test should fail and the error was correct
@@ -297,7 +321,7 @@ func TestSetStringID(t *testing.T) {
 			}
 
 			err := tt.n.SetStringID(tt.v)
-			if got, want := err, tt.err; !reflect.DeepEqual(got, want) {
+			if got, want := err, tt.err; !compareErrors(got, want) {
 				t.Fatalf("got error %q (%T) want %q (%T)", got, got, want, want)
 			}
 			// if the test should fail and the error was correct
@@ -354,7 +378,7 @@ func TestSetNamespace(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := tt.n.SetNamespace(tt.v)
-			if got, want := err, tt.err; !reflect.DeepEqual(got, want) {
+			if got, want := err, tt.err; !compareErrors(got, want) {
 				t.Fatalf("got error %v want %v", got, want)
 			}
 			// if the test should fail and the error was correct
@@ -367,4 +391,14 @@ func TestSetNamespace(t *testing.T) {
 			}
 		})
 	}
+}
+
+func compareErrors(err1, err2 error) bool {
+	if err1 == nil && err2 == nil {
+		return true
+	}
+	if err1 != nil && err2 != nil {
+		return err1.Error() == err2.Error()
+	}
+	return false
 }

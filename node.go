@@ -44,6 +44,15 @@ func (n *Node) BrowseName() (*ua.QualifiedName, error) {
 	return v.Value().(*ua.QualifiedName), nil
 }
 
+// Description returns the description of the node.
+func (n *Node) Description() (*ua.LocalizedText, error) {
+	v, err := n.Attribute(ua.AttributeIDDescription)
+	if err != nil {
+		return nil, err
+	}
+	return v.Value().(*ua.LocalizedText), nil
+}
+
 // DisplayName returns the display name of the node.
 func (n *Node) DisplayName() (*ua.LocalizedText, error) {
 	v, err := n.Attribute(ua.AttributeIDDisplayName)
@@ -118,16 +127,58 @@ func (n *Node) Attribute(attrID ua.AttributeID) (*ua.Variant, error) {
 	return value, nil
 }
 
+func (n *Node) Attributes(attrID ...ua.AttributeID) ([]*ua.DataValue, error) {
+	req := &ua.ReadRequest{}
+	for _, id := range attrID {
+		rv := &ua.ReadValueID{NodeID: n.ID, AttributeID: id}
+		req.NodesToRead = append(req.NodesToRead, rv)
+	}
+	res, err := n.c.Read(req)
+	if err != nil {
+		return nil, err
+	}
+	return res.Results, nil
+}
+
+func (n *Node) Children(refs uint32, mask ua.NodeClass) ([]*Node, error) {
+	if refs == 0 {
+		refs = id.HierarchicalReferences
+	}
+	return n.ReferencedNodes(refs, ua.BrowseDirectionForward, mask, true)
+}
+
+func (n *Node) ReferencedNodes(refs uint32, dir ua.BrowseDirection, mask ua.NodeClass, includeSubtypes bool) ([]*Node, error) {
+	if refs == 0 {
+		refs = id.References
+	}
+	var nodes []*Node
+	res, err := n.References(refs, dir, mask, includeSubtypes)
+	if err != nil {
+		return nil, err
+	}
+	for _, r := range res {
+		nodes = append(nodes, n.c.Node(r.NodeID.NodeID))
+	}
+	return nodes, nil
+}
+
 // References returns all references for the node.
 // todo(fs): this is not complete since it only returns the
 // todo(fs): top-level reference at this point.
-func (n *Node) References(refs *ua.NodeID) (*ua.BrowseResponse, error) {
+func (n *Node) References(refType uint32, dir ua.BrowseDirection, mask ua.NodeClass, includeSubtypes bool) ([]*ua.ReferenceDescription, error) {
+	if refType == 0 {
+		refType = id.References
+	}
+	if mask == 0 {
+		mask = ua.NodeClassAll
+	}
+
 	desc := &ua.BrowseDescription{
 		NodeID:          n.ID,
-		BrowseDirection: ua.BrowseDirectionBoth,
-		ReferenceTypeID: refs,
-		IncludeSubtypes: true,
-		NodeClassMask:   uint32(ua.NodeClassAll),
+		BrowseDirection: dir,
+		ReferenceTypeID: ua.NewNumericNodeID(0, refType),
+		IncludeSubtypes: includeSubtypes,
+		NodeClassMask:   uint32(mask),
 		ResultMask:      uint32(ua.BrowseResultMaskAll),
 	}
 
@@ -136,12 +187,32 @@ func (n *Node) References(refs *ua.NodeID) (*ua.BrowseResponse, error) {
 			ViewID:    ua.NewTwoByteNodeID(0),
 			Timestamp: time.Now(),
 		},
-		RequestedMaxReferencesPerNode: 1000,
+		RequestedMaxReferencesPerNode: 0,
 		NodesToBrowse:                 []*ua.BrowseDescription{desc},
 	}
 
-	return n.c.Browse(req)
-	// implement browse_next
+	resp, err := n.c.Browse(req)
+	if err != nil {
+		return nil, err
+	}
+	return n.browseNext(resp.Results)
+}
+
+func (n *Node) browseNext(results []*ua.BrowseResult) ([]*ua.ReferenceDescription, error) {
+	refs := results[0].References
+	for len(results[0].ContinuationPoint) > 0 {
+		req := &ua.BrowseNextRequest{
+			ContinuationPoints:        [][]byte{results[0].ContinuationPoint},
+			ReleaseContinuationPoints: false,
+		}
+		resp, err := n.c.BrowseNext(req)
+		if err != nil {
+			return nil, err
+		}
+		results = resp.Results
+		refs = append(refs, results[0].References...)
+	}
+	return refs, nil
 }
 
 // TranslateBrowsePathsToNodeIDs translates an array of browseName segments to NodeIDs.

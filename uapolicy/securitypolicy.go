@@ -9,9 +9,9 @@ package uapolicy
 
 import (
 	"crypto/rsa"
-	"errors"
-	"fmt"
 	"sort"
+
+	"github.com/gopcua/opcua/errors"
 
 	"github.com/gopcua/opcua/ua"
 )
@@ -31,7 +31,7 @@ func SupportedPolicies() []string {
 func Asymmetric(uri string, localKey *rsa.PrivateKey, remoteKey *rsa.PublicKey) (*EncryptionAlgorithm, error) {
 	p, ok := policies[uri]
 	if !ok {
-		return nil, fmt.Errorf("unsupported security policy %s", uri)
+		return nil, errors.Errorf("unsupported security policy %s", uri)
 	}
 
 	return p.asymmetric(localKey, remoteKey)
@@ -41,7 +41,7 @@ func Asymmetric(uri string, localKey *rsa.PrivateKey, remoteKey *rsa.PublicKey) 
 func Symmetric(uri string, localNonce, remoteNonce []byte) (*EncryptionAlgorithm, error) {
 	p, ok := policies[uri]
 	if !ok {
-		return nil, fmt.Errorf("unsupported security policy %s", uri)
+		return nil, errors.Errorf("unsupported security policy %s", uri)
 	}
 
 	if uri != ua.SecurityPolicyURINone && (localNonce == nil || remoteNonce == nil) {
