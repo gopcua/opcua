@@ -18,6 +18,7 @@ import (
 
 	"github.com/gopcua/opcua"
 	"github.com/gopcua/opcua/debug"
+	"github.com/gopcua/opcua/errors"
 	"github.com/gopcua/opcua/ua"
 
 	"golang.org/x/crypto/ssh/terminal"
@@ -298,7 +299,7 @@ func validateEndpointConfig(endpoints []*ua.EndpointDescription, secPolicy strin
 		}
 	}
 
-	err := fmt.Errorf("server does not support an endpoint with security : %s , %s", secPolicy, secMode)
+	err := errors.Errorf("server does not support an endpoint with security : %s , %s", secPolicy, secMode)
 	printEndpointOptions(endpoints)
 	return err
 }

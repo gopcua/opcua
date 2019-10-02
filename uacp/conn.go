@@ -6,13 +6,13 @@ package uacp
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"net"
 	"sync/atomic"
 	"time"
 
 	"github.com/gopcua/opcua/debug"
+	"github.com/gopcua/opcua/errors"
 	"github.com/gopcua/opcua/ua"
 )
 
@@ -219,10 +219,10 @@ func (c *Conn) handshake(endpoint string) error {
 	case "ACKF":
 		ack := new(Acknowledge)
 		if _, err := ack.Decode(b[hdrlen:]); err != nil {
-			return fmt.Errorf("uacp: decode ACK failed: %s", err)
+			return errors.Errorf("uacp: decode ACK failed: %s", err)
 		}
 		if ack.Version != 0 {
-			return fmt.Errorf("uacp: invalid version %d", ack.Version)
+			return errors.Errorf("uacp: invalid version %d", ack.Version)
 		}
 		if ack.MaxChunkCount == 0 {
 			ack.MaxChunkCount = DefaultMaxChunkCount
@@ -239,14 +239,14 @@ func (c *Conn) handshake(endpoint string) error {
 	case "ERRF":
 		errf := new(Error)
 		if _, err := errf.Decode(b[hdrlen:]); err != nil {
-			return fmt.Errorf("uacp: decode ERR failed: %s", err)
+			return errors.Errorf("uacp: decode ERR failed: %s", err)
 		}
 		debug.Printf("conn %d: recv %#v", c.id, errf)
 		return errf
 
 	default:
 		c.SendError(ua.StatusBadTCPInternalError)
-		return fmt.Errorf("invalid handshake packet %q", msgtyp)
+		return errors.Errorf("invalid handshake packet %q", msgtyp)
 	}
 }
 
@@ -269,7 +269,7 @@ func (c *Conn) srvhandshake(endpoint string) error {
 		}
 		if hel.EndpointURL != endpoint {
 			c.SendError(ua.StatusBadTCPEndpointURLInvalid)
-			return fmt.Errorf("uacp: invalid endpoint url %s", hel.EndpointURL)
+			return errors.Errorf("uacp: invalid endpoint url %s", hel.EndpointURL)
 		}
 		if err := c.Send("ACKF", c.ack); err != nil {
 			c.SendError(ua.StatusBadTCPInternalError)
@@ -286,7 +286,7 @@ func (c *Conn) srvhandshake(endpoint string) error {
 		}
 		if rhe.EndpointURL != endpoint {
 			c.SendError(ua.StatusBadTCPEndpointURLInvalid)
-			return fmt.Errorf("uacp: invalid endpoint url %s", rhe.EndpointURL)
+			return errors.Errorf("uacp: invalid endpoint url %s", rhe.EndpointURL)
 		}
 		debug.Printf("conn %d: connecting to %s", c.id, rhe.ServerURI)
 		c.c.Close()
@@ -301,14 +301,14 @@ func (c *Conn) srvhandshake(endpoint string) error {
 	case "ERRF":
 		errf := new(Error)
 		if _, err := errf.Decode(b[hdrlen:]); err != nil {
-			return fmt.Errorf("uacp: decode ERR failed: %s", err)
+			return errors.Errorf("uacp: decode ERR failed: %s", err)
 		}
 		debug.Printf("conn %d: recv %#v", c.id, errf)
 		return errf
 
 	default:
 		c.SendError(ua.StatusBadTCPInternalError)
-		return fmt.Errorf("invalid handshake packet %q", msgtyp)
+		return errors.Errorf("invalid handshake packet %q", msgtyp)
 	}
 }
 
@@ -329,11 +329,11 @@ func (c *Conn) Receive() ([]byte, error) {
 
 	var h Header
 	if _, err := h.Decode(b[:hdrlen]); err != nil {
-		return nil, fmt.Errorf("uacp: header decode failed: %s", err)
+		return nil, errors.Errorf("uacp: header decode failed: %s", err)
 	}
 
 	if h.MessageSize > c.ack.ReceiveBufSize {
-		return nil, fmt.Errorf("uacp: message too large: %d > %d bytes", h.MessageSize, c.ack.ReceiveBufSize)
+		return nil, errors.Errorf("uacp: message too large: %d > %d bytes", h.MessageSize, c.ack.ReceiveBufSize)
 	}
 
 	if _, err := io.ReadFull(c.c, b[hdrlen:h.MessageSize]); err != nil {
@@ -347,7 +347,7 @@ func (c *Conn) Receive() ([]byte, error) {
 	if h.MessageType == "ERR" {
 		errf := new(Error)
 		if _, err := errf.Decode(b[hdrlen:h.MessageSize]); err != nil {
-			return nil, fmt.Errorf("uacp: failed to decode ERRF message: %s", err)
+			return nil, errors.Errorf("uacp: failed to decode ERRF message: %s", err)
 		}
 		return nil, errf
 	}
@@ -356,12 +356,12 @@ func (c *Conn) Receive() ([]byte, error) {
 
 func (c *Conn) Send(typ string, msg interface{}) error {
 	if len(typ) != 4 {
-		return fmt.Errorf("invalid msg type: %s", typ)
+		return errors.Errorf("invalid msg type: %s", typ)
 	}
 
 	body, err := ua.Encode(msg)
 	if err != nil {
-		return fmt.Errorf("encode msg failed: %s", err)
+		return errors.Errorf("encode msg failed: %s", err)
 	}
 
 	h := Header{
@@ -371,17 +371,17 @@ func (c *Conn) Send(typ string, msg interface{}) error {
 	}
 
 	if h.MessageSize > c.ack.SendBufSize {
-		return fmt.Errorf("send packet too large: %d > %d bytes", h.MessageSize, c.ack.SendBufSize)
+		return errors.Errorf("send packet too large: %d > %d bytes", h.MessageSize, c.ack.SendBufSize)
 	}
 
 	hdr, err := h.Encode()
 	if err != nil {
-		return fmt.Errorf("encode hdr failed: %s", err)
+		return errors.Errorf("encode hdr failed: %s", err)
 	}
 
 	b := append(hdr, body...)
 	if _, err := c.c.Write(b); err != nil {
-		return fmt.Errorf("write failed: %s", err)
+		return errors.Errorf("write failed: %s", err)
 	}
 	debug.Printf("conn %d: sent %s with %d bytes", c.id, typ, len(b))
 

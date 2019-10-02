@@ -8,13 +8,13 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"math/rand"
 	"strings"
 	"time"
 
+	"github.com/gopcua/opcua/errors"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uapolicy"
 	"github.com/gopcua/opcua/uasc"
@@ -176,21 +176,21 @@ func PrivateKeyFile(filename string) Option {
 func loadPrivateKey(filename string) (*rsa.PrivateKey, error) {
 	b, err := ioutil.ReadFile(filename)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to load private key: %s", err)
+		return nil, errors.Errorf("Failed to load private key: %s", err)
 	}
 
 	derBytes := b
 	if strings.HasSuffix(filename, ".pem") {
 		block, _ := pem.Decode(b)
 		if block == nil || block.Type != "RSA PRIVATE KEY" {
-			return nil, fmt.Errorf("Failed to decode PEM block with private key")
+			return nil, errors.Errorf("Failed to decode PEM block with private key")
 		}
 		derBytes = block.Bytes
 	}
 
 	pk, err := x509.ParsePKCS1PrivateKey(derBytes)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to parse private key: %s", err)
+		return nil, errors.Errorf("Failed to parse private key: %s", err)
 	}
 	return pk, nil
 }
@@ -223,7 +223,7 @@ func CertificateFile(filename string) Option {
 func loadCertificate(filename string) ([]byte, error) {
 	b, err := ioutil.ReadFile(filename)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to load certificate: %s", err)
+		return nil, errors.Errorf("Failed to load certificate: %s", err)
 	}
 
 	if !strings.HasSuffix(filename, ".pem") {
@@ -232,7 +232,7 @@ func loadCertificate(filename string) ([]byte, error) {
 
 	block, _ := pem.Decode(b)
 	if block == nil || block.Type != "CERTIFICATE" {
-		return nil, fmt.Errorf("Failed to decode PEM block with certificate")
+		return nil, errors.Errorf("Failed to decode PEM block with certificate")
 	}
 	return block.Bytes, nil
 }

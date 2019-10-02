@@ -6,9 +6,10 @@ package ua
 
 import (
 	"encoding/base64"
-	"errors"
 	"reflect"
 	"testing"
+
+	"github.com/gopcua/opcua/errors"
 )
 
 func TestNodeID(t *testing.T) {
@@ -146,7 +147,7 @@ func TestParseNodeID(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.s, func(t *testing.T) {
 			n, err := ParseNodeID(c.s)
-			if got, want := err, c.err; !reflect.DeepEqual(got, want) {
+			if got, want := err, c.err; !compareErrors(got, want) {
 				t.Fatalf("got error %v want %v", got, want)
 			}
 			if got, want := n, c.n; !reflect.DeepEqual(got, want) {
@@ -244,7 +245,7 @@ func TestSetIntID(t *testing.T) {
 			}
 
 			err := tt.n.SetIntID(tt.v)
-			if got, want := err, tt.err; !reflect.DeepEqual(got, want) {
+			if got, want := err, tt.err; !compareErrors(got, want) {
 				t.Fatalf("got error %v want %v", got, want)
 			}
 			// if the test should fail and the error was correct
@@ -320,7 +321,7 @@ func TestSetStringID(t *testing.T) {
 			}
 
 			err := tt.n.SetStringID(tt.v)
-			if got, want := err, tt.err; !reflect.DeepEqual(got, want) {
+			if got, want := err, tt.err; !compareErrors(got, want) {
 				t.Fatalf("got error %q (%T) want %q (%T)", got, got, want, want)
 			}
 			// if the test should fail and the error was correct
@@ -377,7 +378,7 @@ func TestSetNamespace(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := tt.n.SetNamespace(tt.v)
-			if got, want := err, tt.err; !reflect.DeepEqual(got, want) {
+			if got, want := err, tt.err; !compareErrors(got, want) {
 				t.Fatalf("got error %v want %v", got, want)
 			}
 			// if the test should fail and the error was correct
@@ -390,4 +391,14 @@ func TestSetNamespace(t *testing.T) {
 			}
 		})
 	}
+}
+
+func compareErrors(err1, err2 error) bool {
+	if err1 == nil && err2 == nil {
+		return true
+	}
+	if err1 != nil && err2 != nil {
+		return err1.Error() == err2.Error()
+	}
+	return false
 }

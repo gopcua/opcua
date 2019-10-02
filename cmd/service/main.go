@@ -13,6 +13,7 @@ import (
 	"text/template"
 
 	"github.com/gopcua/opcua/cmd/service/goname"
+	"github.com/gopcua/opcua/errors"
 )
 
 var in, out, pkg string
@@ -241,7 +242,7 @@ func FormatType(w io.Writer, t Type) error {
 	case KindExtensionObject:
 		return tmplExtObject.Execute(w, t)
 	default:
-		return fmt.Errorf("invalid type: %d", t.Kind)
+		return errors.Errorf("invalid type: %d", t.Kind)
 	}
 }
 

@@ -9,6 +9,8 @@ import (
 	"math"
 	"reflect"
 	"time"
+
+	"github.com/gopcua/opcua/errors"
 )
 
 var (
@@ -86,7 +88,7 @@ func decode(b []byte, val reflect.Value, name string) (n int, err error) {
 		case reflect.Struct:
 			return decodeStruct(b, val, name)
 		default:
-			return 0, fmt.Errorf("unsupported type %s", val.Type())
+			return 0, errors.Errorf("unsupported type %s", val.Type())
 		}
 	}
 	return buf.Pos(), buf.Error()
@@ -128,7 +130,7 @@ func decodeSlice(b []byte, val reflect.Value, name string) (int, error) {
 	}
 
 	if n > math.MaxInt32 {
-		return buf.Pos(), fmt.Errorf("array too large: %d", n)
+		return buf.Pos(), errors.Errorf("array too large: %d", n)
 	}
 
 	// elemType is the type of the slice elements
