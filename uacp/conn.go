@@ -47,7 +47,8 @@ func Dial(ctx context.Context, endpoint string) (*Conn, error) {
 		return nil, err
 	}
 
-	dialer := net.Dialer{}
+	var dialer net.Dialer
+
 	c, err := dialer.DialContext(ctx, network, url.Host)
 	if err != nil {
 		return nil, err

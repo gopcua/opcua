@@ -34,7 +34,8 @@ func ResolveEndpoint(ctx context.Context, endpoint string) (network string, url 
 		port = defaultPort
 	}
 
-	resolver := net.Resolver{}
+	var resolver net.Resolver
+
 	addrs, err := resolver.LookupIPAddr(ctx, url.Hostname())
 	if err != nil {
 		return
