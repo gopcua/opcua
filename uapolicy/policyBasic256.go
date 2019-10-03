@@ -7,8 +7,8 @@ package uapolicy
 import (
 	"crypto"
 	"crypto/rsa"
-	"github.com/gopcua/opcua/errors"
 	"fmt"
+	"github.com/gopcua/opcua/errors"
 
 	// Force compilation of required hashing algorithms, although we don't directly use the packages
 	_ "crypto/sha1"
