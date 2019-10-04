@@ -9,7 +9,6 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
-	"fmt"
 	"io"
 	"math"
 	"sync"
@@ -17,6 +16,7 @@ import (
 	"time"
 
 	"github.com/gopcua/opcua/debug"
+	"github.com/gopcua/opcua/errors"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uacp"
 	"github.com/gopcua/opcua/uapolicy"
@@ -69,18 +69,18 @@ type SecureChannel struct {
 
 func NewSecureChannel(endpoint string, c *uacp.Conn, cfg *Config) (*SecureChannel, error) {
 	if c == nil {
-		return nil, fmt.Errorf("no connection")
+		return nil, errors.Errorf("no connection")
 	}
 	if cfg == nil {
-		return nil, fmt.Errorf("no secure channel config")
+		return nil, errors.Errorf("no secure channel config")
 	}
 
 	if cfg.SecurityPolicyURI != ua.SecurityPolicyURINone {
 		if cfg.SecurityMode == ua.MessageSecurityModeNone {
-			return nil, fmt.Errorf("invalid channel config: Security policy '%s' cannot be used with '%s'", cfg.SecurityPolicyURI, cfg.SecurityMode)
+			return nil, errors.Errorf("invalid channel config: Security policy '%s' cannot be used with '%s'", cfg.SecurityPolicyURI, cfg.SecurityMode)
 		}
 		if cfg.LocalKey == nil {
-			return nil, fmt.Errorf("invalid channel config: Security policy '%s' requires a private key", cfg.SecurityPolicyURI)
+			return nil, errors.Errorf("invalid channel config: Security policy '%s' requires a private key", cfg.SecurityPolicyURI)
 		}
 	}
 
@@ -190,7 +190,7 @@ func (s *SecureChannel) sendAsyncWithTimeout(req ua.Request, authToken *ua.NodeI
 	}
 	resp = make(chan Response)
 	if s.handler[reqid] != nil {
-		return nil, reqid, fmt.Errorf("error: duplicate handler registration for request id %d", reqid)
+		return nil, reqid, errors.Errorf("error: duplicate handler registration for request id %d", reqid)
 	}
 	s.handler[reqid] = resp
 	return resp, reqid, nil
@@ -199,7 +199,7 @@ func (s *SecureChannel) sendAsyncWithTimeout(req ua.Request, authToken *ua.NodeI
 func (s *SecureChannel) newRequestMessage(req ua.Request, authToken *ua.NodeID, timeout time.Duration) (*Message, error) {
 	typeID := ua.ServiceTypeID(req)
 	if typeID == 0 {
-		return nil, fmt.Errorf("unknown service %T. Did you call register?", req)
+		return nil, errors.Errorf("unknown service %T. Did you call register?", req)
 	}
 	if authToken == nil {
 		authToken = ua.NewTwoByteNodeID(0)
@@ -236,7 +236,7 @@ func (s *SecureChannel) newRequestMessage(req ua.Request, authToken *ua.NodeID, 
 func (s *SecureChannel) SendResponse(req ua.Response) error {
 	typeID := ua.ServiceTypeID(req)
 	if typeID == 0 {
-		return fmt.Errorf("unknown service %T. Did you call register?", req)
+		return errors.Errorf("unknown service %T. Did you call register?", req)
 	}
 
 	// encode the message
@@ -273,19 +273,19 @@ func (s *SecureChannel) readChunk() (*MessageChunk, error) {
 		return nil, errf
 	}
 	if err != nil {
-		return nil, fmt.Errorf("sechan: read header failed: %s %#v", err, err)
+		return nil, errors.Errorf("sechan: read header failed: %s %#v", err, err)
 	}
 
 	const hdrlen = 12
 	h := new(Header)
 	if _, err := h.Decode(b[:hdrlen]); err != nil {
-		return nil, fmt.Errorf("sechan: decode header failed: %s", err)
+		return nil, errors.Errorf("sechan: decode header failed: %s", err)
 	}
 
 	// decode the other headers
 	m := new(MessageChunk)
 	if _, err := m.Decode(b); err != nil {
-		return nil, fmt.Errorf("sechan: decode chunk failed: %s", err)
+		return nil, errors.Errorf("sechan: decode chunk failed: %s", err)
 	}
 
 	// OPN Request, initialize encryption
@@ -340,7 +340,7 @@ func (s *SecureChannel) readChunk() (*MessageChunk, error) {
 
 	n, err := m.SequenceHeader.Decode(m.Data)
 	if err != nil {
-		return nil, fmt.Errorf("sechan: decode sequence header failed: %s", err)
+		return nil, errors.Errorf("sechan: decode sequence header failed: %s", err)
 	}
 	m.Data = m.Data[n:]
 
@@ -475,7 +475,7 @@ func (s *SecureChannel) receive(ctx context.Context) (uint32, interface{}, error
 				s.chunks[reqid] = append(s.chunks[reqid], chunk)
 				if n := len(s.chunks[reqid]); uint32(n) > s.c.MaxChunkCount() {
 					delete(s.chunks, reqid)
-					return reqid, nil, fmt.Errorf("too many chunks: %d > %d", n, s.c.MaxChunkCount())
+					return reqid, nil, errors.Errorf("too many chunks: %d > %d", n, s.c.MaxChunkCount())
 				}
 				continue
 			}
@@ -485,11 +485,11 @@ func (s *SecureChannel) receive(ctx context.Context) (uint32, interface{}, error
 			delete(s.chunks, reqid)
 			b, err := mergeChunks(all)
 			if err != nil {
-				return reqid, nil, fmt.Errorf("chunk merge error: %v", err)
+				return reqid, nil, errors.Errorf("chunk merge error: %v", err)
 			}
 
 			if uint32(len(b)) > s.c.MaxMessageSize() {
-				return reqid, nil, fmt.Errorf("message too large: %d > %d", uint32(len(b)), s.c.MaxMessageSize())
+				return reqid, nil, errors.Errorf("message too large: %d > %d", uint32(len(b)), s.c.MaxMessageSize())
 			}
 
 			// since we are not decoding the ResponseHeader separately
@@ -626,7 +626,7 @@ func (s *SecureChannel) openSecureChannel() error {
 	return s.SendRequest(req, nil, func(v interface{}) error {
 		resp, ok := v.(*ua.OpenSecureChannelResponse)
 		if !ok {
-			return fmt.Errorf("got %T, want OpenSecureChannelResponse", req)
+			return errors.Errorf("got %T, want OpenSecureChannelResponse", req)
 		}
 		s.cfg.SecurityTokenID = resp.SecurityToken.TokenID
 

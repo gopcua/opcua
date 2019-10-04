@@ -5,10 +5,10 @@
 package ua
 
 import (
-	"errors"
-	"fmt"
 	"reflect"
 	"time"
+
+	"github.com/gopcua/opcua/errors"
 )
 
 var (
@@ -115,7 +115,7 @@ func (m *Variant) Decode(b []byte) (int, error) {
 	// check the type
 	typ, ok := variantTypeIDToType[m.Type()]
 	if !ok {
-		return buf.Pos(), fmt.Errorf("invalid type id: %d", m.Type())
+		return buf.Pos(), errors.Errorf("invalid type id: %d", m.Type())
 	}
 
 	// read single value and return
@@ -444,7 +444,7 @@ func (m *Variant) set(v interface{}) error {
 
 	typeid, ok := variantTypeToTypeID[et]
 	if !ok {
-		return fmt.Errorf("opcua: cannot set variant to %T", v)
+		return errors.Errorf("cannot set variant to %T", v)
 	}
 	m.setType(typeid)
 	m.value = v

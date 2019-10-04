@@ -5,8 +5,7 @@
 package uacp
 
 import (
-	"fmt"
-
+	"github.com/gopcua/opcua/errors"
 	"github.com/gopcua/opcua/ua"
 )
 
@@ -49,7 +48,7 @@ func (h *Header) Decode(b []byte) (int, error) {
 func (h *Header) Encode() ([]byte, error) {
 	buf := ua.NewBuffer(nil)
 	if len(h.MessageType) != 3 {
-		return nil, fmt.Errorf("invalid message type: %q", h.MessageType)
+		return nil, errors.Errorf("invalid message type: %q", h.MessageType)
 	}
 	buf.Write([]byte(h.MessageType))
 	buf.WriteByte(h.ChunkType)

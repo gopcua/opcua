@@ -3,7 +3,6 @@
 package uatest
 
 import (
-	"fmt"
 	"net"
 	"os"
 	"os/exec"
@@ -11,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gopcua/opcua"
+	"github.com/gopcua/opcua/errors"
 	"github.com/gopcua/opcua/ua"
 )
 
@@ -64,12 +64,12 @@ func (s *Server) Run() error {
 		c.Close()
 		return nil
 	}
-	return fmt.Errorf("timeout")
+	return errors.Errorf("timeout")
 }
 
 func (s *Server) Close() error {
 	if s.cmd == nil {
-		return fmt.Errorf("not running")
+		return errors.Errorf("not running")
 	}
 	go func() { s.cmd.Process.Kill() }()
 	return s.cmd.Wait()

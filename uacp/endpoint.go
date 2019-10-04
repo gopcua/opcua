@@ -5,9 +5,10 @@
 package uacp
 
 import (
-	"fmt"
 	"net"
 	"strings"
+
+	"github.com/gopcua/opcua/errors"
 )
 
 // ResolveEndpoint returns network type, address, and error splitted from EndpointURL.
@@ -16,7 +17,7 @@ import (
 func ResolveEndpoint(endpoint string) (network string, addr *net.TCPAddr, err error) {
 	elems := strings.Split(endpoint, "/")
 	if elems[0] != "opc.tcp:" {
-		return "", nil, fmt.Errorf("invalid endpoint %s", endpoint)
+		return "", nil, errors.Errorf("invalid endpoint %s", endpoint)
 	}
 
 	addrString := elems[2]
@@ -28,7 +29,7 @@ func ResolveEndpoint(endpoint string) (network string, addr *net.TCPAddr, err er
 	addr, err = net.ResolveTCPAddr(network, addrString)
 	switch err.(type) {
 	case *net.DNSError:
-		return "", nil, fmt.Errorf("could not resolve address %s", addrString)
+		return "", nil, errors.Errorf("could not resolve address %s", addrString)
 	}
 	return
 }

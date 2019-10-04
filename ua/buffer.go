@@ -6,10 +6,11 @@ package ua
 
 import (
 	"encoding/binary"
-	"fmt"
 	"io"
 	"math"
 	"time"
+
+	"github.com/gopcua/opcua/errors"
 )
 
 const (
@@ -282,7 +283,7 @@ func (b *Buffer) WriteByteString(d []byte) {
 		return
 	}
 	if len(d) > math.MaxInt32 {
-		b.err = fmt.Errorf("value too large")
+		b.err = errors.Errorf("value too large")
 		return
 	}
 	if d == nil {

@@ -8,13 +8,13 @@ import (
 	"context"
 	"encoding/csv"
 	"flag"
-	"fmt"
 	"log"
 	"os"
 	"strconv"
 
 	"github.com/gopcua/opcua"
 	"github.com/gopcua/opcua/debug"
+	"github.com/gopcua/opcua/errors"
 	"github.com/gopcua/opcua/id"
 	"github.com/gopcua/opcua/ua"
 )
@@ -140,13 +140,13 @@ func browse(n *opcua.Node, path string, level int) ([]NodeDef, error) {
 	browseChildren := func(refType uint32) error {
 		refs, err := n.ReferencedNodes(refType, ua.BrowseDirectionForward, ua.NodeClassAll, true)
 		if err != nil {
-			return fmt.Errorf("References: %d: %s", refType, err)
+			return errors.Errorf("References: %d: %s", refType, err)
 		}
 		// fmt.Printf("found %d child refs\n", len(refs))
 		for _, rn := range refs {
 			children, err := browse(rn, def.Path, level+1)
 			if err != nil {
-				return fmt.Errorf("browse children: %s", err)
+				return errors.Errorf("browse children: %s", err)
 			}
 			nodes = append(nodes, children...)
 		}

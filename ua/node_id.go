@@ -10,6 +10,8 @@ import (
 	"math"
 	"strconv"
 	"strings"
+
+	"github.com/gopcua/opcua/errors"
 )
 
 // todo(fs): fix mask
@@ -101,27 +103,27 @@ func ParseNodeID(s string) (*NodeID, error) {
 	case 2:
 		nsval, idval = p[0], p[1]
 	default:
-		return nil, fmt.Errorf("invalid node id: %s", s)
+		return nil, errors.Errorf("invalid node id: %s", s)
 	}
 
 	// parse namespace
 	var ns uint16
 	switch {
 	case strings.HasPrefix(nsval, "nsu="):
-		return nil, fmt.Errorf("namespace urls are not supported: %s", s)
+		return nil, errors.Errorf("namespace urls are not supported: %s", s)
 
 	case strings.HasPrefix(nsval, "ns="):
 		n, err := strconv.Atoi(nsval[3:])
 		if err != nil {
-			return nil, fmt.Errorf("invalid namespace id: %s", s)
+			return nil, errors.Errorf("invalid namespace id: %s", s)
 		}
 		if n < 0 || n > math.MaxUint16 {
-			return nil, fmt.Errorf("namespace id out of range (0..65535): %s", s)
+			return nil, errors.Errorf("namespace id out of range (0..65535): %s", s)
 		}
 		ns = uint16(n)
 
 	default:
-		return nil, fmt.Errorf("invalid node id: %s", s)
+		return nil, errors.Errorf("invalid node id: %s", s)
 	}
 
 	// parse identifier
@@ -129,7 +131,7 @@ func ParseNodeID(s string) (*NodeID, error) {
 	case strings.HasPrefix(idval, "i="):
 		id, err := strconv.ParseUint(idval[2:], 10, 64)
 		if err != nil {
-			return nil, fmt.Errorf("invalid numeric id: %s", s)
+			return nil, errors.Errorf("invalid numeric id: %s", s)
 		}
 		switch {
 		case ns == 0 && id < 256:
@@ -139,7 +141,7 @@ func ParseNodeID(s string) (*NodeID, error) {
 		case id < math.MaxUint32:
 			return NewNumericNodeID(ns, uint32(id)), nil
 		default:
-			return nil, fmt.Errorf("numeric id out of range (0..2^32-1): %s", s)
+			return nil, errors.Errorf("numeric id out of range (0..2^32-1): %s", s)
 		}
 
 	case strings.HasPrefix(idval, "s="):
@@ -148,19 +150,19 @@ func ParseNodeID(s string) (*NodeID, error) {
 	case strings.HasPrefix(idval, "g="):
 		n := NewGUIDNodeID(ns, idval[2:])
 		if n == nil || n.StringID() == "" {
-			return nil, fmt.Errorf("invalid guid node id: %s", s)
+			return nil, errors.Errorf("invalid guid node id: %s", s)
 		}
 		return n, nil
 
 	case strings.HasPrefix(idval, "b="):
 		b, err := base64.StdEncoding.DecodeString(idval[2:])
 		if err != nil {
-			return nil, fmt.Errorf("invalid opaque node id: %s", s)
+			return nil, errors.Errorf("invalid opaque node id: %s", s)
 		}
 		return NewByteStringNodeID(ns, b), nil
 
 	case strings.HasPrefix(idval, "ns="):
-		return nil, fmt.Errorf("invalid node id: %s", s)
+		return nil, errors.Errorf("invalid node id: %s", s)
 
 	default:
 		return NewStringNodeID(ns, idval), nil
@@ -210,20 +212,20 @@ func (n *NodeID) SetNamespace(v uint16) error {
 	switch n.Type() {
 	case NodeIDTypeTwoByte:
 		if v != 0 {
-			return fmt.Errorf("out of range [0..0]: %d", v)
+			return errors.Errorf("out of range [0..0]: %d", v)
 		}
 		return nil
 
 	case NodeIDTypeFourByte:
 		if max := uint16(math.MaxUint8); v > max {
-			return fmt.Errorf("out of range [0..%d]: %d", max, v)
+			return errors.Errorf("out of range [0..%d]: %d", max, v)
 		}
 		n.ns = uint16(v)
 		return nil
 
 	default:
 		if max := uint16(math.MaxUint16); v > max {
-			return fmt.Errorf("out of range [0..%d]: %d", max, v)
+			return errors.Errorf("out of range [0..%d]: %d", max, v)
 		}
 		n.ns = uint16(v)
 		return nil
@@ -243,27 +245,27 @@ func (n *NodeID) SetIntID(v uint32) error {
 	switch n.Type() {
 	case NodeIDTypeTwoByte:
 		if max := uint32(math.MaxUint8); v > max {
-			return fmt.Errorf("out of range [0..%d]: %d", max, v)
+			return errors.Errorf("out of range [0..%d]: %d", max, v)
 		}
 		n.nid = uint32(v)
 		return nil
 
 	case NodeIDTypeFourByte:
 		if max := uint32(math.MaxUint16); v > max {
-			return fmt.Errorf("out of range [0..%d]: %d", max, v)
+			return errors.Errorf("out of range [0..%d]: %d", max, v)
 		}
 		n.nid = uint32(v)
 		return nil
 
 	case NodeIDTypeNumeric:
 		if max := uint32(math.MaxUint32); v > max {
-			return fmt.Errorf("out of range [0..%d]: %d", max, v)
+			return errors.Errorf("out of range [0..%d]: %d", max, v)
 		}
 		n.nid = uint32(v)
 		return nil
 
 	default:
-		return fmt.Errorf("incompatible node id type")
+		return errors.Errorf("incompatible node id type")
 	}
 }
 
@@ -308,7 +310,7 @@ func (n *NodeID) SetStringID(v string) error {
 		return nil
 
 	default:
-		return fmt.Errorf("incompatible node id type")
+		return errors.Errorf("incompatible node id type")
 	}
 }
 
@@ -387,7 +389,7 @@ func (n *NodeID) Decode(b []byte) (int, error) {
 		return buf.Pos(), buf.Error()
 
 	default:
-		return 0, fmt.Errorf("invalid node id type %v", typ)
+		return 0, errors.Errorf("invalid node id type %v", typ)
 	}
 }
 
@@ -411,7 +413,7 @@ func (n *NodeID) Encode() ([]byte, error) {
 		buf.WriteUint16(n.ns)
 		buf.WriteByteString(n.bid)
 	default:
-		return nil, fmt.Errorf("invalid node id type %v", n.Type())
+		return nil, errors.Errorf("invalid node id type %v", n.Type())
 	}
 	return buf.Bytes(), buf.Error()
 }

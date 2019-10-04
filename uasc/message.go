@@ -5,8 +5,7 @@
 package uasc
 
 import (
-	"fmt"
-
+	"github.com/gopcua/opcua/errors"
 	"github.com/gopcua/opcua/id"
 	"github.com/gopcua/opcua/ua"
 )
@@ -34,7 +33,7 @@ func (m *MessageHeader) Decode(b []byte) (int, error) {
 		buf.ReadStruct(m.SymmetricSecurityHeader)
 
 	default:
-		return buf.Pos(), fmt.Errorf("invalid message type %q", m.Header.MessageType)
+		return buf.Pos(), errors.Errorf("invalid message type %q", m.Header.MessageType)
 	}
 
 	// Sequence header could be encrypted, defer decoding until after decryption
@@ -176,7 +175,7 @@ func (m *Message) Encode() ([]byte, error) {
 	case "CLO", "MSG":
 		body.WriteStruct(m.SymmetricSecurityHeader)
 	default:
-		return nil, fmt.Errorf("invalid message type %q", m.Header.MessageType)
+		return nil, errors.Errorf("invalid message type %q", m.Header.MessageType)
 	}
 	body.WriteStruct(m.SequenceHeader)
 	body.WriteStruct(m.TypeID)

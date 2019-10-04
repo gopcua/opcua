@@ -2,9 +2,9 @@ package opcua
 
 import (
 	"context"
-	"fmt"
 	"time"
 
+	"github.com/gopcua/opcua/errors"
 	"github.com/gopcua/opcua/id"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uasc"
@@ -218,7 +218,7 @@ func (s *Subscription) Stats() (*ua.SubscriptionDiagnosticsDataType, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("opcua: unable to find SubscriptionDiagnostics for sub=%d", s.SubscriptionID)
+	return nil, errors.Errorf("unable to find SubscriptionDiagnostics for sub=%d", s.SubscriptionID)
 }
 
 func (p *SubscriptionParameters) setDefaults() {

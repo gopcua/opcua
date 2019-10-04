@@ -5,8 +5,7 @@
 package ua
 
 import (
-	"fmt"
-
+	"github.com/gopcua/opcua/errors"
 	"github.com/gopcua/opcua/id"
 )
 
@@ -90,7 +89,7 @@ func (e *ExtensionObject) Decode(b []byte) (int, error) {
 	typeID := e.TypeID.NodeID.String()
 	e.Value = eotypes.New(typeID)
 	if e.Value == nil {
-		return buf.Pos(), fmt.Errorf("invalid extension object with id %s", typeID)
+		return buf.Pos(), errors.Errorf("invalid extension object with id %s", typeID)
 	}
 
 	body.ReadStruct(e.Value)

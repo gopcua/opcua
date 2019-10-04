@@ -5,9 +5,10 @@
 package ua
 
 import (
-	"fmt"
 	"reflect"
 	"sync"
+
+	"github.com/gopcua/opcua/errors"
 )
 
 // TypeRegistry provides a registry for Go types.
@@ -68,7 +69,7 @@ func (r *TypeRegistry) Register(id string, v interface{}) error {
 	typ := reflect.TypeOf(v)
 
 	if r.types[id] != nil {
-		return fmt.Errorf("%s is already registered", id)
+		return errors.Errorf("%s is already registered", id)
 	}
 	r.types[id] = typ
 
