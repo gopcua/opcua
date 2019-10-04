@@ -12,9 +12,9 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/pascaldekloe/goe/verify"
-
 	"github.com/gopcua/opcua/ua"
+
+	"github.com/pascaldekloe/goe/verify"
 )
 
 func TestSupportedPolicies(t *testing.T) {

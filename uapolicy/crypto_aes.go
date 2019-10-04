@@ -3,6 +3,7 @@ package uapolicy
 import (
 	"crypto/aes"
 	"crypto/cipher"
+
 	"github.com/gopcua/opcua/errors"
 )
 

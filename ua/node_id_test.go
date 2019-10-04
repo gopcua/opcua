@@ -393,6 +393,13 @@ func TestSetNamespace(t *testing.T) {
 	}
 }
 
+// todo(fs): the reason we need this function and cannot just use
+// todo(fs): reflect.DeepEqual(err1, err2) is that by using github.com/pkg/errors
+// todo(fs): the underlying stack traces change and because of this the errors
+// todo(fs): are no longer comparable. This is a downside of basing our errors
+// todo(fs): errors implementation on github.com/pkg/errors and we may want to
+// todo(fs): revisit this.
+// todo(fs): See https://play.golang.org/p/1WqB7u4BUf7 (by @kung-foo)
 func compareErrors(err1, err2 error) bool {
 	if err1 == nil && err2 == nil {
 		return true

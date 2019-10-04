@@ -3,6 +3,7 @@ package uapolicy
 import (
 	"crypto"
 	"crypto/hmac"
+
 	"github.com/gopcua/opcua/errors"
 )
 

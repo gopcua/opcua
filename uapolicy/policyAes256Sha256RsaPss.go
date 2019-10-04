@@ -8,11 +8,12 @@ import (
 	"crypto"
 	"crypto/rsa"
 	"fmt"
-	"github.com/gopcua/opcua/errors"
 
 	// Force compilation of required hashing algorithms, although we don't directly use the packages
 	_ "crypto/sha1"
 	_ "crypto/sha256"
+
+	"github.com/gopcua/opcua/errors"
 )
 
 /*
