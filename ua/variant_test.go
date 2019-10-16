@@ -488,21 +488,120 @@ func TestMustVariant(t *testing.T) {
 		MustVariant(uint(5))
 	})
 }
-func TestBigArray(t *testing.T) {
-	b := []byte{
-		// variant encoding mask
-		0x87,
-		// array length
-		0xff, 0xff, 0x01, 0x00,
-		// array values
-		0x00, 0x00, 0x00, 0x00,
-	}
 
-	_, err := Decode(b, MustVariant([]uint32{0}))
+func TestArray(t *testing.T) {
+	t.Run("one-dimension", func(t *testing.T) {
+		v := MustVariant([]uint32{1, 2, 3})
+		if got, want := v.ArrayLength(), int32(3); got != want {
+			t.Fatalf("got length %d want %d", got, want)
+		}
+		if got, want := v.EncodingMask(), byte(TypeIDUint32|VariantArrayValues); got != want {
+			t.Fatalf("got mask %d want %d", got, want)
+		}
+		verify.Values(t, "", v.ArrayDimensions(), []int32{})
+	})
+	t.Run("multi-dimension", func(t *testing.T) {
+		v := MustVariant([][]uint32{{1, 1}, {2, 2}, {3, 3}})
+		if got, want := v.ArrayLength(), int32(6); got != want {
+			t.Fatalf("got length %d want %d", got, want)
+		}
+		if got, want := v.EncodingMask(), byte(TypeIDUint32|VariantArrayValues|VariantArrayDimensions); got != want {
+			t.Fatalf("got mask %d want %d", got, want)
+		}
+		verify.Values(t, "", v.ArrayDimensions(), []int32{3, 2})
+	})
+	t.Run("unbalanced", func(t *testing.T) {
+		b := []byte{
+			// variant encoding mask
+			0xc7,
+			// array length
+			0x03, 0x00, 0x00, 0x00,
+			// array values
+			0x00, 0x00, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00,
+			// array dimensions length
+			0x02, 0x00, 0x00, 0x00,
+			// array dimensions
+			0x03, 0x00, 0x00, 0x00,
+			0x02, 0x00, 0x00, 0x00,
+		}
 
-	if err != StatusBadEncodingLimitsExceeded {
-		t.Fatalf("got error %v want %v", err, StatusBadEncodingLimitsExceeded)
-	}
+		_, err := Decode(b, MustVariant([]uint32{0}))
+		if got, want := err, errUnbalancedSlice; !errors.Equal(got, want) {
+			t.Fatalf("got error %#v want %#v", got, want)
+		}
+	})
+	t.Run("length negative", func(t *testing.T) {
+		b := []byte{
+			// variant encoding mask
+			0x87,
+			// array length
+			0xff, 0xff, 0xff, 0xff, // -1
+		}
+
+		_, err := Decode(b, MustVariant([]uint32{0}))
+		if got, want := err, StatusBadEncodingLimitsExceeded; !errors.Equal(got, want) {
+			t.Fatalf("got error %#v want %#v", got, want)
+		}
+	})
+	t.Run("length too big", func(t *testing.T) {
+		b := []byte{
+			// variant encoding mask
+			0x87,
+			// array length
+			0xff, 0xff, 0x01, 0x00,
+			// array values
+			0x00, 0x00, 0x00, 0x00,
+		}
+
+		_, err := Decode(b, MustVariant([]uint32{0}))
+		if got, want := err, StatusBadEncodingLimitsExceeded; !errors.Equal(got, want) {
+			t.Fatalf("got error %v want %v", err, StatusBadEncodingLimitsExceeded)
+		}
+	})
+	t.Run("dimensions length negative", func(t *testing.T) {
+		b := []byte{
+			// variant encoding mask
+			0xc7,
+			// array length
+			0x02, 0x00, 0x00, 0x00,
+			// array values
+			0x01, 0x00, 0x00, 0x00,
+			0x01, 0x00, 0x00, 0x00,
+			// array dimesions length
+			0xff, 0xff, 0xff, 0xff, // -1
+			// array dimesions
+			0x01, 0x00, 0x00, 0x00,
+			0x01, 0x00, 0x00, 0x00,
+		}
+
+		_, err := Decode(b, MustVariant([]uint32{0}))
+		if got, want := err, StatusBadEncodingLimitsExceeded; !errors.Equal(got, want) {
+			t.Fatalf("got error %#v want %#v", got, want)
+		}
+	})
+	t.Run("dimensions negative", func(t *testing.T) {
+		b := []byte{
+			// variant encoding mask
+			0xc7,
+			// array length
+			0x02, 0x00, 0x00, 0x00,
+			// array values
+			0x01, 0x00, 0x00, 0x00,
+			0x01, 0x00, 0x00, 0x00,
+			// array dimesions length
+			0x02, 0x00, 0x00, 0x00,
+			// array dimesions
+			0x01, 0x00, 0x00, 0x00,
+			0xff, 0xff, 0xff, 0xff, // -1
+		}
+
+		_, err := Decode(b, MustVariant([]uint32{0}))
+		if got, want := err, StatusBadEncodingLimitsExceeded; !errors.Equal(got, want) {
+			t.Fatalf("got error %#v want %#v", got, want)
+		}
+	})
 }
 
 func TestSet(t *testing.T) {

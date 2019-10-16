@@ -129,12 +129,10 @@ func (m *Variant) Decode(b []byte) (int, error) {
 
 	// read flattened array elements
 	n := int(m.arrayLength)
-
-	if n > MaxVariantArrayLength {
+	if n < 0 || n > MaxVariantArrayLength {
 		return buf.Pos(), StatusBadEncodingLimitsExceeded
 	}
 
-	// note: if n is negative (since we read a _signed_ int32) MakeSlice will panic
 	vals := reflect.MakeSlice(reflect.SliceOf(typ), n, n)
 	for i := 0; i < n; i++ {
 		vals.Index(i).Set(reflect.ValueOf(m.decodeValue(buf)))
@@ -143,9 +141,15 @@ func (m *Variant) Decode(b []byte) (int, error) {
 	// check for dimensions of multi-dimensional array
 	if m.Has(VariantArrayDimensions) {
 		m.arrayDimensionsLength = buf.ReadInt32()
+		if m.arrayDimensionsLength < 0 {
+			return buf.Pos(), StatusBadEncodingLimitsExceeded
+		}
 		m.arrayDimensions = make([]int32, m.arrayDimensionsLength)
 		for i := 0; i < int(m.arrayDimensionsLength); i++ {
 			m.arrayDimensions[i] = buf.ReadInt32()
+			if m.arrayDimensions[i] < 0 {
+				return buf.Pos(), StatusBadEncodingLimitsExceeded
+			}
 		}
 	}
 
