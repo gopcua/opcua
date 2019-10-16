@@ -772,6 +772,66 @@ func TestVariantValueHelpers(t *testing.T) {
 			fn:   func(v *Variant) interface{} { return v.Uint() },
 		},
 
+		// ByteString
+		{
+			v:    false,
+			want: ([]byte)(nil),
+			fn:   func(v *Variant) interface{} { return v.ByteString() },
+		},
+		{
+			v:    []byte("abc"),
+			want: []byte("abc"),
+			fn:   func(v *Variant) interface{} { return v.ByteString() },
+		},
+
+		// DataValue
+		{
+			v:    false,
+			want: (*DataValue)(nil),
+			fn:   func(v *Variant) interface{} { return v.DataValue() },
+		},
+		{
+			v:    &DataValue{Status: StatusBad},
+			want: &DataValue{Status: StatusBad},
+			fn:   func(v *Variant) interface{} { return v.DataValue() },
+		},
+
+		// DiagnosticInfo
+		{
+			v:    false,
+			want: (*DiagnosticInfo)(nil),
+			fn:   func(v *Variant) interface{} { return v.DiagnosticInfo() },
+		},
+		{
+			v:    &DiagnosticInfo{SymbolicID: 5},
+			want: &DiagnosticInfo{SymbolicID: 5},
+			fn:   func(v *Variant) interface{} { return v.DiagnosticInfo() },
+		},
+
+		// ExpandedNodeID
+		{
+			v:    false,
+			want: (*ExpandedNodeID)(nil),
+			fn:   func(v *Variant) interface{} { return v.ExpandedNodeID() },
+		},
+		{
+			v:    &ExpandedNodeID{NamespaceURI: "abc"},
+			want: &ExpandedNodeID{NamespaceURI: "abc"},
+			fn:   func(v *Variant) interface{} { return v.ExpandedNodeID() },
+		},
+
+		// ExtensionObject
+		{
+			v:    false,
+			want: (*ExtensionObject)(nil),
+			fn:   func(v *Variant) interface{} { return v.ExtensionObject() },
+		},
+		{
+			v:    &ExtensionObject{Value: "abc"},
+			want: &ExtensionObject{Value: "abc"},
+			fn:   func(v *Variant) interface{} { return v.ExtensionObject() },
+		},
+
 		// GUID
 		{
 			v:    false,
@@ -782,6 +842,30 @@ func TestVariantValueHelpers(t *testing.T) {
 			v:    NewGUID("abc"),
 			want: NewGUID("abc"),
 			fn:   func(v *Variant) interface{} { return v.GUID() },
+		},
+
+		// LocalizedText
+		{
+			v:    false,
+			want: (*LocalizedText)(nil),
+			fn:   func(v *Variant) interface{} { return v.LocalizedText() },
+		},
+		{
+			v:    &LocalizedText{Text: "abc"},
+			want: &LocalizedText{Text: "abc"},
+			fn:   func(v *Variant) interface{} { return v.LocalizedText() },
+		},
+
+		// NodeID
+		{
+			v:    false,
+			want: (*NodeID)(nil),
+			fn:   func(v *Variant) interface{} { return v.NodeID() },
+		},
+		{
+			v:    NewFourByteNodeID(1, 2),
+			want: NewFourByteNodeID(1, 2),
+			fn:   func(v *Variant) interface{} { return v.NodeID() },
 		},
 
 		// QualifiedName
@@ -796,6 +880,18 @@ func TestVariantValueHelpers(t *testing.T) {
 			fn:   func(v *Variant) interface{} { return v.QualifiedName() },
 		},
 
+		// StatusCode
+		{
+			v:    false,
+			want: StatusBadTypeMismatch,
+			fn:   func(v *Variant) interface{} { return v.StatusCode() },
+		},
+		{
+			v:    StatusBad,
+			want: StatusBad,
+			fn:   func(v *Variant) interface{} { return v.StatusCode() },
+		},
+
 		// time.Time
 		{
 			v:    false,
@@ -806,6 +902,18 @@ func TestVariantValueHelpers(t *testing.T) {
 			v:    time.Date(2019, 1, 1, 12, 13, 14, 0, time.UTC),
 			want: time.Date(2019, 1, 1, 12, 13, 14, 0, time.UTC),
 			fn:   func(v *Variant) interface{} { return v.Time() },
+		},
+
+		// Variant
+		{
+			v:    false,
+			want: (*Variant)(nil),
+			fn:   func(v *Variant) interface{} { return v.Variant() },
+		},
+		{
+			v:    MustVariant("abc"),
+			want: MustVariant("abc"),
+			fn:   func(v *Variant) interface{} { return v.Variant() },
 		},
 
 		// XMLElement
