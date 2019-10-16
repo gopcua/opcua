@@ -608,8 +608,7 @@ func (m *Variant) StatusCode() StatusCode {
 	case TypeIDStatusCode:
 		return m.value.(StatusCode)
 	default:
-		// todo(fs): should this be 0 == StatusOK ??
-		return StatusBad
+		return StatusBadTypeMismatch
 	}
 }
 
