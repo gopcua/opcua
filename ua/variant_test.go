@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gopcua/opcua/errors"
+
 	"github.com/pascaldekloe/goe/verify"
 )
 
@@ -933,5 +935,18 @@ func TestVariantValueHelpers(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			verify.Values(t, "", tt.fn(MustVariant(tt.v)), tt.want)
 		})
+	}
+}
+
+func TestDecodeInvalidType(t *testing.T) {
+	b := []byte{
+		// variant encoding mask
+		0x20, // invalid type id
+	}
+
+	v := &Variant{}
+	_, err := v.Decode(b)
+	if got, want := err, errors.New("invalid type id: 32"); !errors.Equal(got, want) {
+		t.Fatalf("got error %s want %s", got, want)
 	}
 }
