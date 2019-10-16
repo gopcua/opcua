@@ -470,6 +470,24 @@ func TestVariant(t *testing.T) {
 	RunCodecTest(t, cases)
 }
 
+func TestMustVariant(t *testing.T) {
+	t.Run("int", func(t *testing.T) {
+		defer func() {
+			if r := recover(); r == nil {
+				t.Fatalf("MustVariant(int) did not panic")
+			}
+		}()
+		MustVariant(int(5))
+	})
+	t.Run("uint", func(t *testing.T) {
+		defer func() {
+			if r := recover(); r == nil {
+				t.Fatalf("MustVariant(uint) did not panic")
+			}
+		}()
+		MustVariant(uint(5))
+	})
+}
 func TestBigArray(t *testing.T) {
 	b := []byte{
 		// variant encoding mask
