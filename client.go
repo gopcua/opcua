@@ -14,6 +14,7 @@ import (
 	"sort"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/gopcua/opcua/debug"
@@ -80,6 +81,18 @@ func (a bySecurityLevel) Len() int           { return len(a) }
 func (a bySecurityLevel) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a bySecurityLevel) Less(i, j int) bool { return a[i].SecurityLevel < a[j].SecurityLevel }
 
+type ClientNotification uint
+
+const (
+	ClientNotificationStartReconnection ClientNotification = iota
+	ClientNotificationReconnection
+	ClientNotificationReconnectionCancel
+	ClientNotificationReconnectionAttemptHasFailed
+	ClientNotificationAfterReconnection
+	ClientNotificationConnectionReestablished
+	ClientNotificationConnectionLost
+)
+
 // Client is a high-level client for an OPC/UA server.
 // It establishes a secure channel and a session.
 type Client struct {
@@ -98,16 +111,16 @@ type Client struct {
 	// session is the active session.
 	session atomic.Value // *Session
 
-	// map of active subscriptions managed by this client. key is SubscriptionID
-	// access guarded by subMux
-	subscriptions map[uint32]*Subscription
-	subMux        sync.RWMutex
+	sessions map[*Session]struct{}
 
-	//cancelMonitor cancels the monitorChannel goroutine
-	cancelMonitor context.CancelFunc
+	// cancelMonitor cancels the monitorChannel goroutine
+	cancelMonitor       context.CancelFunc
+	cancelSecureChannel context.CancelFunc
 
 	// once initializes session
 	once sync.Once
+
+	notifs map[ClientNotification]chan interface{}
 }
 
 // NewClient creates a new Client.
@@ -123,11 +136,13 @@ type Client struct {
 // https://godoc.org/github.com/gopcua/opcua#Option
 func NewClient(endpoint string, opts ...Option) *Client {
 	cfg, sessionCfg := ApplyConfig(opts...)
+
 	return &Client{
-		endpointURL:   endpoint,
-		cfg:           cfg,
-		sessionCfg:    sessionCfg,
-		subscriptions: make(map[uint32]*Subscription),
+		endpointURL: endpoint,
+		cfg:         cfg,
+		sessionCfg:  sessionCfg,
+		sessions:    make(map[*Session]struct{}),
+		notifs:      make(map[ClientNotification]chan interface{}),
 	}
 }
 
@@ -148,10 +163,15 @@ func (c *Client) Connect(ctx context.Context) (err error) {
 		_ = c.Close()
 		return err
 	}
+
 	if err := c.ActivateSession(s); err != nil {
 		_ = c.Close()
 		return err
 	}
+
+	ctx, s.cancelKeepAlive = context.WithCancel(ctx)
+	go s.keepAliveManager.Run(ctx)
+
 	return nil
 }
 
@@ -175,11 +195,16 @@ func (c *Client) Dial(ctx context.Context) error {
 		return err
 	}
 	c.sechan = sechan
+
 	ctx, c.cancelMonitor = context.WithCancel(ctx)
 	go c.monitorChannel(ctx)
+	// Create secure channel from monitor context
+	ctx, c.cancelSecureChannel = context.WithCancel(ctx)
+	go c.sechan.Run(ctx)
 
 	if err := sechan.Open(); err != nil {
 		c.cancelMonitor()
+		c.cancelSecureChannel()
 
 		_ = conn.Close()
 		c.sechan = nil
@@ -191,22 +216,37 @@ func (c *Client) Dial(ctx context.Context) error {
 
 func (c *Client) monitorChannel(ctx context.Context) {
 	for {
+		notif := c.sechan.Notif
 		select {
 		case <-ctx.Done():
 			return
-		default:
-			msg := c.sechan.Receive(ctx)
-			if msg.Err != nil {
-				if msg.Err == io.EOF {
-					debug.Printf("Connection closed")
-				} else {
-					debug.Printf("Received error: %s", msg.Err)
+		case <-notif(uasc.SecureChannelNotificationClose):
+			if c.cfg.AutoReconnect {
+
+				c.Session().keepAliveManager.Suspend()
+				c.notify(ClientNotificationConnectionLost, struct{}{})
+
+				if err := c.recreateSecureChannel(ctx); err != nil {
+					debug.Printf("opcua: recreate secure channel has failed")
+					continue
 				}
-				// todo (dh): apart from the above message, we're ignoring this error because there is nothing watching it
-				// I'd prefer to have a way to return the error to the upper application.
-				return
+				c.notify(ClientNotificationConnectionReestablished, struct{}{})
+				if err := c.notifyConnectionReestablished(); err != nil {
+					debug.Printf("opcua: reestablishing connection has failed")
+					if err := c.Close(); err != nil {
+						// callback err ??
+					}
+					continue
+				}
+				c.Session().keepAliveManager.Resume()
+			} else {
+				c.destroySecureChannel()
 			}
-			debug.Printf("Received unsolicited message from server: %T", msg.V)
+			// todo: add event handler
+			// case <-notif(uasc.SecureChannelNotificationLifetime75):
+			// case <-notif(uasc.SecureChannelNotificationSecurityTokenRenewed):
+			// case <-notif(uasc.SecureChannelNotificationReceiveResponse):
+			// case <-notif(uasc.SecureChannelNotificationError):
 		}
 	}
 }
@@ -219,6 +259,9 @@ func (c *Client) Close() error {
 	if c.cancelMonitor != nil {
 		c.cancelMonitor()
 	}
+	if c.cancelSecureChannel != nil {
+		c.cancelSecureChannel()
+	}
 
 	return c.sechan.Close()
 }
@@ -226,24 +269,6 @@ func (c *Client) Close() error {
 // Session returns the active session.
 func (c *Client) Session() *Session {
 	return c.session.Load().(*Session)
-}
-
-// Session is a OPC/UA session as described in Part 4, 5.6.
-type Session struct {
-	cfg *uasc.SessionConfig
-
-	// resp is the response to the CreateSession request which contains all
-	// necessary parameters to activate the session.
-	resp *ua.CreateSessionResponse
-
-	// serverCertificate is the certificate used to generate the signatures for
-	// the ActivateSessionRequest methods
-	serverCertificate []byte
-
-	// serverNonce is the secret nonce received from the server during Create and Activate
-	// Session response. Used to generate the signatures for the ActivateSessionRequest
-	// and User Authorization
-	serverNonce []byte
 }
 
 // CreateSession creates a new session which is not yet activated and not
@@ -301,15 +326,74 @@ func (c *Client) CreateSession(cfg *uasc.SessionConfig) (*Session, error) {
 		}
 
 		s = &Session{
+			c:                 c,
 			cfg:               cfg,
 			resp:              res,
 			serverNonce:       res.ServerNonce,
 			serverCertificate: res.ServerCertificate,
+			keepAliveManager:  c.createKeepAliveManager(),
 		}
+
+		s.publishEngine = newPublishEngine(s)
+
+		c.sessions[s] = struct{}{}
 
 		return nil
 	})
 	return s, err
+}
+
+func (c *Client) sessionIsClosed() bool {
+	if c.Session() != nil {
+		return false
+	}
+	return true
+}
+
+func (c *Client) createKeepAliveManager() *KeepAliveManager {
+	return NewKeepAliveManager(
+		c.sessionCfg.SessionTimeout,
+		func(state *KeepAliveState) error {
+
+			// Add test if reconnecting then callback
+			res, err := c.Read(
+				&ua.ReadRequest{
+					MaxAge: 2000,
+					NodesToRead: []*ua.ReadValueID{
+						&ua.ReadValueID{
+							NodeID:      ua.NewNumericNodeID(0, 2259),
+							AttributeID: ua.AttributeIDValue,
+						},
+					},
+					TimestampsToReturn: ua.TimestampsToReturnBoth,
+				},
+			)
+			if err != nil {
+				return err
+			}
+			if len(res.Results) != 1 {
+				return errors.Errorf("Unconsistant result")
+			}
+
+			dataValue := res.Results[0]
+			if dataValue.Status == ua.StatusOK {
+				switch value := dataValue.Value.Value().(type) {
+				case int32:
+					newState := ua.ServerState(value)
+					lastKnownState, ok := state.LastKnownState().(ua.ServerState)
+					if ok {
+						if newState != lastKnownState {
+							// Warning
+						}
+					}
+					state.SetLastKnownState(newState)
+				}
+			} else {
+				return dataValue.Status
+			}
+			return nil
+		},
+	)
 }
 
 const defaultAnonymousPolicyID = "Anonymous"
@@ -416,6 +500,17 @@ func (c *Client) closeSession(s *Session) error {
 	if s == nil {
 		return nil
 	}
+	delete(c.sessions, s)
+
+	if s.cancelKeepAlive != nil {
+		s.cancelKeepAlive()
+	}
+
+	if s.publishEngine != nil {
+		s.publishEngine.Terminate()
+		s.publishEngine = nil
+	}
+
 	req := &ua.CloseSessionRequest{DeleteSubscriptions: true}
 	var res *ua.CloseSessionResponse
 	return c.Send(req, func(v interface{}) error {
@@ -430,6 +525,15 @@ func (c *Client) DetachSession() (*Session, error) {
 	s := c.Session()
 	c.session.Store((*Session)(nil))
 	return s, nil
+}
+
+func (c *Client) repairSessions() error {
+	for s := range c.sessions {
+		if err := s.repairSession(); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Send sends the request via the secure channel and registers a handler for
@@ -578,114 +682,183 @@ func (c *Client) Subscribe(params *SubscriptionParameters) (*Subscription, error
 	}
 
 	sub := &Subscription{
-		res.SubscriptionID,
-		time.Duration(res.RevisedPublishingInterval) * time.Millisecond,
-		res.RevisedLifetimeCount,
-		res.RevisedMaxKeepAliveCount,
-		params.Notifs,
-		c,
+		SubscriptionID:            res.SubscriptionID,
+		params:                    params,
+		publishEngine:             c.Session().publishEngine,
+		RevisedPublishingInterval: time.Duration(res.RevisedPublishingInterval) * time.Millisecond,
+		RevisedLifetimeCount:      res.RevisedLifetimeCount,
+		RevisedMaxKeepAliveCount:  res.RevisedMaxKeepAliveCount,
+		monitoredItems:            []*MonitoredItem{},
+		lastSequenceNumber:        0,
+		Notifs:                    params.Notifs,
+		c:                         c,
 	}
-	c.subMux.Lock()
-	if sub.SubscriptionID == 0 || c.subscriptions[sub.SubscriptionID] != nil {
-		// this should not happen and is usually indicative of a server bug
-		// see: Part 4 Section 5.13.2.2, Table 88 – CreateSubscription Service Parameters
-		c.subMux.Unlock()
-		return nil, ua.StatusBadSubscriptionIDInvalid
+
+	if err := c.Session().publishEngine.RegisterSubscription(sub); err != nil {
+		return nil, err
 	}
-	c.subscriptions[sub.SubscriptionID] = sub
-	c.subMux.Unlock()
 
 	return sub, nil
 }
 
-func (c *Client) forgetSubscription(subID uint32) {
-	c.subMux.Lock()
-	delete(c.subscriptions, subID)
-	c.subMux.Unlock()
-}
-
-func (c *Client) notifySubscriptionsOfError(ctx context.Context, res *ua.PublishResponse, err error) {
-	c.subMux.RLock()
-	defer c.subMux.RUnlock()
-
-	subsToNotify := c.subscriptions
-	if res != nil && res.SubscriptionID != 0 {
-		subsToNotify = map[uint32]*Subscription{
-			res.SubscriptionID: c.subscriptions[res.SubscriptionID],
-		}
-	}
-	for _, sub := range subsToNotify {
-		go func(s *Subscription) {
-			s.sendNotification(ctx, &PublishNotificationData{Error: err})
-		}(sub)
+func (c *Client) StartPublishEngine(ctx context.Context) {
+	session, ok := c.session.Load().(*Session)
+	if ok && session != nil {
+		session.publishEngine.Run(ctx)
 	}
 }
 
-func (c *Client) notifySubscription(ctx context.Context, response *ua.PublishResponse) {
-	c.subMux.RLock()
-	sub, ok := c.subscriptions[response.SubscriptionID]
-	c.subMux.RUnlock()
+func (c *Client) SuspendPublishEngine() {
+	session, ok := c.session.Load().(*Session)
+	if ok && session != nil {
+		session.publishEngine.Suspend()
+	}
+}
+
+func (c *Client) ResumePublishEngine() {
+	session, ok := c.session.Load().(*Session)
+	if ok && session != nil {
+		session.publishEngine.Resume()
+	}
+}
+
+func (c *Client) Notif(key ClientNotification) chan interface{} {
+	notif, ok := c.notifs[key]
 	if !ok {
-		debug.Printf("Unknown subscription: %v", response.SubscriptionID)
-		return
+		notif = make(chan interface{}, 1)
+		c.notifs[key] = notif
 	}
+	return notif
+}
 
-	// Check for errors
-	status := ua.StatusOK
-	for _, res := range response.Results {
-		if res != ua.StatusOK {
-			status = res
-			break
+func (c *Client) notify(key ClientNotification, val interface{}) {
+	notif, ok := c.notifs[key]
+	if ok {
+		notif <- val
+	}
+}
+
+func (c *Client) recreateSecureChannel(ctx context.Context) error {
+	debug.Printf("opcua: recreate secure channel...")
+
+	// todo: add test, endpoint server is known ?
+	// Test if is already reconnecting
+
+	c.notify(ClientNotificationStartReconnection, struct{}{})
+
+	if err := c.destroySecureChannel(); err != nil {
+		return err
+	}
+	resultNotif := make(chan error, 1)
+
+	failAndRetry := func(err error, retryNotif chan struct{}) {
+		debug.Printf("opcua: %s", err.Error())
+
+		if false /*todo: c.reconnectionIsCanceled*/ {
+			c.notify(ClientNotificationReconnectionCancel, struct{}{})
+			resultNotif <- errors.Errorf("Secure channel reconnection has been canceled")
+			return
+		}
+		c.notify(ClientNotificationReconnectionAttemptHasFailed, err)
+
+		timer := time.NewTimer(100 * time.Millisecond)
+
+		select {
+		case <-ctx.Done():
+		case <-timer.C:
+			retryNotif <- struct{}{}
 		}
 	}
 
-	if status != ua.StatusOK {
-		sub.sendNotification(ctx, &PublishNotificationData{
-			SubscriptionID: response.SubscriptionID,
-			Error:          status,
-		})
-		return
-	}
+	attemptToRecreateSecureChannel := func(errNotif chan error) {
 
-	if response.NotificationMessage == nil {
-		sub.sendNotification(ctx, &PublishNotificationData{
-			SubscriptionID: response.SubscriptionID,
-			Error:          errors.Errorf("empty NotificationMessage"),
-		})
-		return
-	}
-
-	// Part 4, 7.21 NotificationMessage
-	for _, data := range response.NotificationMessage.NotificationData {
-		// Part 4, 7.20 NotificationData parameters
-		if data == nil || data.Value == nil {
-			sub.sendNotification(ctx, &PublishNotificationData{
-				SubscriptionID: response.SubscriptionID,
-				Error:          errors.Errorf("missing NotificationData parameter"),
-			})
-			continue
+		if c.cancelSecureChannel != nil {
+			c.cancelSecureChannel()
+			c.cancelSecureChannel = nil
 		}
 
-		switch data.Value.(type) {
-		// Part 4, 7.20.2 DataChangeNotification parameter
-		// Part 4, 7.20.3 EventNotificationList parameter
-		// Part 4, 7.20.4 StatusChangeNotification parameter
-		case *ua.DataChangeNotification,
-			*ua.EventNotificationList,
-			*ua.StatusChangeNotification:
-			sub.sendNotification(ctx, &PublishNotificationData{
-				SubscriptionID: response.SubscriptionID,
-				Value:          data.Value,
-			})
-
-		// Error
-		default:
-			sub.sendNotification(ctx, &PublishNotificationData{
-				SubscriptionID: response.SubscriptionID,
-				Error:          errors.Errorf("unknown NotificationData parameter: %T", data.Value),
-			})
+		conn, err := uacp.Dial(ctx, c.endpointURL)
+		if err != nil {
+			errNotif <- err
+			return
 		}
+		sechan, err := uasc.NewSecureChannel(c.endpointURL, conn, c.cfg)
+		if err != nil {
+			_ = conn.Close()
+			errNotif <- err
+			return
+		}
+		c.sechan = sechan
+
+		ctx, c.cancelSecureChannel = context.WithCancel(ctx)
+		go c.sechan.Run(ctx)
+
+		if err := sechan.Open(); err != nil {
+			c.cancelMonitor()
+
+			_ = conn.Close()
+			c.sechan = nil
+			errNotif <- err
+			return
+		}
+		errNotif <- nil
 	}
+
+	go func() {
+		errNotif := make(chan error, 1)
+		retryNotif := make(chan struct{}, 1)
+		go attemptToRecreateSecureChannel(errNotif)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-retryNotif:
+				go attemptToRecreateSecureChannel(errNotif)
+			case err := <-errNotif:
+				if err != nil {
+					if err == syscall.ECONNREFUSED {
+						resultNotif <- err
+						return
+					}
+					if false /*Backoff aborted*/ {
+						failAndRetry(err, retryNotif)
+						continue
+					}
+					if err == ua.StatusBadCertificateInvalid {
+						// todo: recreate server certificate
+						if err := c.sechan.Open(); err != nil {
+							failAndRetry(err, retryNotif)
+							continue
+						}
+						resultNotif <- nil
+						return
+					}
+					failAndRetry(err, retryNotif)
+					continue
+				}
+				debug.Printf("opcua: secure channel reconnected")
+				resultNotif <- nil
+				return
+			}
+		}
+	}()
+	return <-resultNotif
+}
+
+func (c *Client) notifyConnectionReestablished() error {
+	return c.repairSessions()
+}
+
+func (c *Client) destroySecureChannel() error {
+	if c.sechan != nil {
+		debug.Printf("opcua: destroying secure channel")
+
+		if err := c.sechan.Close(); err != nil && err != io.EOF {
+			return err
+		}
+		c.sechan = nil
+	}
+	return nil
 }
 
 func (c *Client) HistoryReadRawModified(nodes []*ua.HistoryReadValueID, details *ua.ReadRawModifiedDetails) (*ua.HistoryReadResponse, error) {
@@ -706,6 +879,100 @@ func (c *Client) HistoryReadRawModified(nodes []*ua.HistoryReadValueID, details 
 		return safeAssign(v, &res)
 	})
 	return res, err
+}
+
+type KeepAliveManager struct {
+	PingTimeout              time.Duration
+	checkInterval            time.Duration
+	lastResponseReceivedTime time.Time
+	KeepAliveState
+	sendPing    func(state *KeepAliveState) error
+	chanSuspend chan struct{}
+	chanResume  chan struct{}
+	checkTimer  *time.Timer
+}
+
+type KeepAliveState struct {
+	lastKnownState interface{}
+}
+
+func (k *KeepAliveState) LastKnownState() interface{} {
+	return k.lastKnownState
+}
+
+func (k *KeepAliveState) SetLastKnownState(state interface{}) {
+	k.lastKnownState = state
+}
+
+func NewKeepAliveManager(srvTimeout time.Duration, sendPing func(state *KeepAliveState) error) *KeepAliveManager {
+	pingTimeout := srvTimeout * 2 / 3
+	return &KeepAliveManager{
+		PingTimeout:   pingTimeout,
+		checkInterval: pingTimeout / 3,
+		sendPing:      sendPing,
+		chanSuspend:   make(chan struct{}, 1),
+		chanResume:    make(chan struct{}, 1),
+	}
+}
+
+func (k *KeepAliveManager) Run(ctx context.Context) {
+	afterCheck := make(chan error, 1)
+
+	k.checkTimer = time.NewTimer(k.checkInterval)
+
+	checkKeepAlive := func() {
+		now := time.Now()
+
+		timeSinceLastServerContact := now.Sub(k.lastResponseReceivedTime)
+		if timeSinceLastServerContact < k.PingTimeout {
+			afterCheck <- nil
+			return
+		}
+		if err := k.sendPing(&k.KeepAliveState); err != nil {
+			afterCheck <- err
+			return
+		}
+		afterCheck <- nil
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-k.checkTimer.C:
+			go checkKeepAlive()
+		case err := <-afterCheck:
+			k.checkTimer.Reset(k.checkInterval)
+			if err != nil {
+				k.Suspend()
+				k.checkTimer.Stop()
+			}
+
+		case <-k.chanSuspend:
+			select {
+			case <-ctx.Done():
+				return
+			case <-k.chanResume:
+				continue
+			}
+		}
+	}
+}
+
+func (k *KeepAliveManager) Suspend() {
+	if k.checkTimer != nil {
+		k.checkTimer.Stop()
+	}
+	k.chanSuspend <- struct{}{}
+}
+
+func (k *KeepAliveManager) Resume() {
+	k.chanResume <- struct{}{}
+}
+
+func (k *KeepAliveManager) Notify() {
+	k.checkTimer.Reset(k.checkInterval)
+	k.lastResponseReceivedTime = time.Now()
 }
 
 // safeAssign implements a type-safe assign from T to *T.

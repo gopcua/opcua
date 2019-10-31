@@ -78,12 +78,12 @@ func main() {
 	// arbitrary client handle for the monitoring item
 	handle := uint32(42)
 	miCreateRequest := opcua.NewMonitoredItemCreateRequestWithDefaults(id, ua.AttributeIDValue, handle)
-	res, err := sub.Monitor(ua.TimestampsToReturnBoth, miCreateRequest)
-	if err != nil || res.Results[0].StatusCode != ua.StatusOK {
+	_, err = sub.Monitor(ua.TimestampsToReturnBoth, miCreateRequest)
+	if err != nil {
 		log.Fatal(err)
 	}
 
-	go sub.Run(ctx) // start Publish loop
+	go c.StartPublishEngine(ctx)
 
 	// read from subscription's notification channel until ctx is cancelled
 	for {

@@ -30,6 +30,16 @@ const (
 	MaxTimeout      = math.MaxUint32 * time.Millisecond
 )
 
+type SecureChannelNotification int32
+
+const (
+	SecureChannelNotificationClose SecureChannelNotification = iota
+	SecureChannelNotificationSecurityTokenRenewed
+	SecureChannelNotificationLifetime75
+	SecureChannelNotificationReceiveResponse
+	SecureChannelNotificationError
+)
+
 type Response struct {
 	ReqID uint32
 	SCID  uint32
@@ -63,6 +73,7 @@ type SecureChannel struct {
 
 	enc *uapolicy.EncryptionAlgorithm
 
+	notifs map[SecureChannelNotification]chan interface{}
 	// time returns the current time. When not set it defaults to time.Now().
 	time func() time.Time
 }
@@ -89,18 +100,39 @@ func NewSecureChannel(endpoint string, c *uacp.Conn, cfg *Config) (*SecureChanne
 		cfg.SecurityMode = ua.MessageSecurityModeNone
 	}
 
+	newCfg := *cfg
+
 	return &SecureChannel{
 		EndpointURL: endpoint,
 		c:           c,
-		cfg:         cfg,
+		cfg:         &newCfg,
 		reqhdr: &ua.RequestHeader{
-			TimeoutHint:      uint32(cfg.RequestTimeout / time.Millisecond),
-			AdditionalHeader: ua.NewExtensionObject(nil),
+			AuthenticationToken: ua.NewTwoByteNodeID(0),
+			Timestamp:           time.Now(),
+			TimeoutHint:         uint32(cfg.RequestTimeout / time.Millisecond),
+			AdditionalHeader:    ua.NewExtensionObject(nil),
 		},
 		state:   secureChannelCreated,
 		handler: make(map[uint32]chan Response),
 		chunks:  make(map[uint32][]*MessageChunk),
+		notifs:  make(map[SecureChannelNotification]chan interface{}),
 	}, nil
+}
+
+func (s *SecureChannel) Notif(key SecureChannelNotification) chan interface{} {
+	notif, ok := s.notifs[key]
+	if !ok {
+		notif = make(chan interface{}, 1)
+		s.notifs[key] = notif
+	}
+	return notif
+}
+
+func (s *SecureChannel) notify(key SecureChannelNotification, val interface{}) {
+	notif, ok := s.notifs[key]
+	if ok {
+		notif <- val
+	}
 }
 
 func (s *SecureChannel) LocalEndpoint() string {
@@ -113,6 +145,46 @@ func (s *SecureChannel) setState(n int32) {
 
 func (s *SecureChannel) hasState(n int32) bool {
 	return atomic.LoadInt32(&s.state) == n
+}
+
+func (s *SecureChannel) Run(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			msg := s.Receive(ctx)
+			if msg.Err != nil {
+				if msg.Err == io.EOF {
+					debug.Printf("uasc: Connection closed")
+					// s.notify(SecureChannelNotificationClose, struct{}{})
+				} else {
+					debug.Printf("uasc: Received error: %s", msg.Err)
+					s.notify(SecureChannelNotificationError, msg.Err)
+				}
+				if true /*Is reconnecting*/ {
+
+					status := ua.StatusOK
+					if err, ok := msg.Err.(*uacp.Error); ok {
+						status = ua.StatusCode(err.ErrorCode)
+					} else if _, ok = msg.Err.(ua.StatusCode); ok {
+						status = msg.Err.(ua.StatusCode)
+					}
+					switch status {
+					case ua.StatusBadSessionIDInvalid, ua.StatusBadTimeout:
+						// If attempt to repair session, let ActivateSession fail if necessary
+						continue
+					}
+				}
+				// todo (dh): apart from the above message, we're ignoring this error because there is nothing watching it
+				// I'd prefer to have a way to return the error to the upper application.
+				s.notify(SecureChannelNotificationClose, struct{}{})
+				debug.Printf("uasc: Secure channel connection has stopped")
+				return
+			}
+			debug.Printf("uasc: Received unsolicited message from server: %T", msg.V)
+		}
+	}
 }
 
 // SendRequest sends the service request and calls h with the response.
@@ -508,7 +580,7 @@ func (s *SecureChannel) receive(ctx context.Context) (uint32, interface{}, error
 			// that error up to the caller.
 			if resp, ok := svc.(ua.Response); ok {
 				status := resp.Header().ServiceResult
-				debug.Printf("uasc %d/%d: res:%v", s.c.ID(), reqid, status)
+				debug.Printf("uasc %d/%d: res: %v", s.c.ID(), reqid, status)
 				if status != ua.StatusOK {
 					return reqid, svc, status
 				}
@@ -656,6 +728,18 @@ func (s *SecureChannel) closeSecureChannel() error {
 	}
 
 	return io.EOF
+}
+
+func (s *SecureChannel) IsCreated() bool {
+	return s.hasState(secureChannelCreated)
+}
+
+func (s *SecureChannel) IsOpen() bool {
+	return s.hasState(secureChannelOpen)
+}
+
+func (s *SecureChannel) IsClosed() bool {
+	return s.hasState(secureChannelClosed)
 }
 
 func (s *SecureChannel) handleOpenSecureChannelRequest(svc interface{}) error {
