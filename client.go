@@ -160,10 +160,7 @@ func (c *Client) Connect(ctx context.Context) (err error) {
 }
 
 func (c *Client) sessionIsClosed() bool {
-	if c.Session() != nil {
-		return false
-	}
-	return true
+	return c.Session() != nil
 }
 
 // Dial establishes a secure channel.
@@ -305,7 +302,7 @@ func (c *Client) monitorChannel(ctx context.Context) {
 										// todo: recreate server certificate
 										// state = reconnectStateSechanDisconnected
 
-										errors.Errorf("Recreating server certificate is not implemented yet, reconnection aborted")
+										debug.Printf("Recreating server certificate is not implemented yet, reconnection aborted")
 										state.Store(reconnectStateAborted)
 
 									case reconnectStateReconnected:
