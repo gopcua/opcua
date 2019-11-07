@@ -14,6 +14,7 @@ import (
 	"sort"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/gopcua/opcua/debug"
@@ -26,7 +27,7 @@ import (
 
 // GetEndpoints returns the available endpoint descriptions for the server.
 func GetEndpoints(endpoint string) ([]*ua.EndpointDescription, error) {
-	c := NewClient(endpoint)
+	c := NewClient(endpoint, AutoReconnect(false))
 	if err := c.Dial(context.Background()); err != nil {
 		return nil, err
 	}
@@ -103,6 +104,8 @@ type Client struct {
 	subscriptions map[uint32]*Subscription
 	subMux        sync.RWMutex
 
+	sessions map[*Session]struct{}
+
 	//cancelMonitor cancels the monitorChannel goroutine
 	cancelMonitor context.CancelFunc
 
@@ -127,6 +130,7 @@ func NewClient(endpoint string, opts ...Option) *Client {
 		endpointURL:   endpoint,
 		cfg:           cfg,
 		sessionCfg:    sessionCfg,
+		sessions:      make(map[*Session]struct{}),
 		subscriptions: make(map[uint32]*Subscription),
 	}
 }
@@ -153,6 +157,13 @@ func (c *Client) Connect(ctx context.Context) (err error) {
 		return err
 	}
 	return nil
+}
+
+func (c *Client) sessionIsClosed() bool {
+	if c.Session() != nil {
+		return false
+	}
+	return true
 }
 
 // Dial establishes a secure channel.
@@ -190,18 +201,156 @@ func (c *Client) Dial(ctx context.Context) error {
 }
 
 func (c *Client) monitorChannel(ctx context.Context) {
+
+	type reconnectState uint8
+
+	const (
+		reconnectStateIdle reconnectState = iota
+		reconnectStateAborted
+		reconnectStateSechanDisconnected
+		reconnectStateSechanRecreated
+		reconnectStateBadCertificate
+		reconnectStateWaitnRetry
+		reconnectStateReconnected
+	)
+
+	var (
+		state atomic.Value
+	)
+	state.Store(reconnectStateIdle)
+
+	var nextSechan, nextState sync.WaitGroup
+
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		default:
 			msg := c.sechan.Receive(ctx)
+			nextState.Add(1)
+
 			if msg.Err != nil {
 				if msg.Err == io.EOF {
 					debug.Printf("Connection closed")
 				} else {
 					debug.Printf("Received error: %s", msg.Err)
 				}
+
+				// fixme: This mechanism is a bit tidous,
+				// it's kind of a workaround to make the reconnection - session reactivation work,
+				// without cancelling monitorChannel and relaunching it.
+				// Even though it seems to work fine, I suspect that if the reconnection state machine
+				// change it current state before the sechan.Receive return a message,
+				// it could result in a deadlock !
+
+				if c.cfg.AutoReconnect {
+
+					switch state.Load() {
+					case reconnectStateIdle:
+						debug.Printf("Recreate secure channel...")
+						if err := c.sechan.Close(); err != nil && err != io.EOF {
+							debug.Printf("Closing secure channel has failed, %s", err.Error())
+							return
+						}
+						state.Store(reconnectStateSechanDisconnected)
+
+						nextSechan.Add(1)
+
+						// Launch the reconnection state machine
+						go func() {
+							nextState.Done()
+							for {
+								select {
+								case <-ctx.Done():
+									return
+								default:
+									switch state.Load().(reconnectState) {
+									case reconnectStateSechanDisconnected:
+										sechan, conn, err := c.renewSecureChannel(ctx)
+										if err != nil {
+											debug.Printf("Creating a new instance of secure channel has failed, %s", err.Error())
+											return
+										}
+										c.sechan = sechan
+										nextSechan.Done()
+
+										if err := c.sechan.Open(); err != nil {
+
+											_ = conn.Close()
+											c.sechan = nil
+
+											switch err {
+											case syscall.ECONNREFUSED:
+												state.Store(reconnectStateAborted)
+											case ua.StatusBadCertificateInvalid:
+												state.Store(reconnectStateBadCertificate)
+											default:
+												state.Store(reconnectStateWaitnRetry)
+											}
+											continue
+										}
+
+										state.Store(reconnectStateReconnected)
+
+									case reconnectStateWaitnRetry:
+										timer := time.NewTimer(100 * time.Millisecond)
+										state.Store(reconnectStateSechanDisconnected)
+
+										select {
+										case <-ctx.Done():
+											return
+										case <-timer.C:
+										}
+									case reconnectStateBadCertificate:
+										// todo: recreate server certificate
+										// state = reconnectStateSechanDisconnected
+
+										errors.Errorf("Recreating server certificate is not implemented yet, reconnection aborted")
+										state.Store(reconnectStateAborted)
+
+									case reconnectStateReconnected:
+										debug.Printf("Secure channel reconnected")
+										if err := c.repairSessions(); err != nil {
+											debug.Printf("Repair sessions has failed, %s", err.Error())
+											state.Store(reconnectStateAborted)
+											continue
+										}
+										debug.Printf("Session repaired")
+
+										// Resume all subscriptions
+										for _, sub := range c.subscriptions {
+											sub.Resume()
+										}
+
+										state.Store(reconnectStateIdle)
+										return
+									case reconnectStateAborted:
+										// TODO: Terminate all subscribtions
+										c.cancelMonitor()
+										return
+									}
+								}
+							}
+						}()
+
+						// Wait for a new instance of the secure channel
+						nextState.Wait()
+						nextSechan.Wait()
+
+					default:
+						nextState.Wait()
+						switch state.Load() {
+
+						case reconnectStateSechanDisconnected, reconnectStateWaitnRetry, reconnectStateBadCertificate:
+							nextSechan.Add(1)
+							nextSechan.Wait()
+						}
+					}
+
+					// Ignore all errors and restart receiving
+					continue
+				}
+
 				// todo (dh): apart from the above message, we're ignoring this error because there is nothing watching it
 				// I'd prefer to have a way to return the error to the upper application.
 				return
@@ -209,6 +358,140 @@ func (c *Client) monitorChannel(ctx context.Context) {
 			debug.Printf("Received unsolicited message from server: %T", msg.V)
 		}
 	}
+}
+
+func (c *Client) renewSecureChannel(ctx context.Context) (*uasc.SecureChannel, *uacp.Conn, error) {
+	// if err := c.sechan.Close(); err != nil && err != io.EOF {
+	// 	return nil, nil, err
+	// }
+	conn, err := uacp.Dial(ctx, c.endpointURL)
+	if err != nil {
+		return nil, nil, err
+	}
+	sechan, err := uasc.NewSecureChannel(c.endpointURL, conn, c.cfg)
+	if err != nil {
+		_ = conn.Close()
+		return nil, conn, err
+	}
+	return sechan, conn, nil
+}
+
+func (c *Client) repairSessions() error {
+	for s := range c.sessions {
+		if err := c.repairSession(s); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (c *Client) repairSession(s *Session) error {
+
+	if _, err := c.DetachSession(); err != nil {
+		return err
+	}
+
+	debug.Printf("Trying to reactivate existing session")
+
+	err := c.ActivateSession(s)
+	if err != nil {
+		return errors.Errorf("Session reactivation failed")
+	} else {
+		debug.Printf("Existing session reactivated trying to repair subscriptions")
+		if err := c.repairSubscriptions(); err != nil {
+			return err
+		}
+		debug.Printf("Subscriptions repaired")
+	}
+
+	return nil
+}
+
+func (c *Client) SubscriptionIDs() []uint32 {
+	subscriptionIDs := []uint32{}
+	c.subMux.Lock()
+	for key := range c.subscriptions {
+		subscriptionIDs = append(subscriptionIDs, key)
+	}
+	c.subMux.Unlock()
+	return subscriptionIDs
+}
+
+func (c *Client) repairSubscriptions(subscriptionIDs ...uint32) error {
+
+	if subscriptionIDs == nil {
+		subscriptionIDs = c.SubscriptionIDs()
+	}
+
+	c.subMux.RLock()
+	defer c.subMux.RUnlock()
+
+	for _, subID := range subscriptionIDs {
+		sub, ok := c.subscriptions[subID]
+		if !ok {
+			return errors.Errorf("Invalid SubscriptionID")
+		}
+		if err := c.repairSubscription(sub); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (c *Client) repairSubscription(sub *Subscription) error {
+	debug.Printf("RepairSubscription  for SubscriptionId %d", sub.SubscriptionID)
+	if status, err := c.subscriptionRepublish(sub); err != nil {
+		switch status {
+		case ua.StatusBadSessionIDInvalid:
+			return err
+		case ua.StatusBadSubscriptionIDInvalid:
+			debug.Printf("Republish failed, subscriptionId is not valid anymore on server side.")
+			// return sub.recreateSubscriptionAndMonitoredItem()
+			return errors.Errorf("Republish failed, subscriptionId is not valid anymore on server side.")
+		}
+	}
+	return nil
+}
+
+func (c *Client) subscriptionRepublish(sub *Subscription) (ua.StatusCode, error) {
+	isDone := false
+
+	for !isDone {
+		request := &ua.RepublishRequest{
+			SubscriptionID:           sub.SubscriptionID,
+			RetransmitSequenceNumber: sub.lastSequenceNumber + 1,
+		}
+
+		debug.Printf("Republish Request for subscription %d retransmitSequenceNumber=%d",
+			request.SubscriptionID,
+			request.RetransmitSequenceNumber,
+		)
+
+		if c.sessionIsClosed() {
+			debug.Printf("Publish engine republish aborted")
+			isDone = true
+			continue
+		}
+		var res *ua.RepublishResponse
+		var err error
+
+		res, err = sub.republish(request)
+		status := ua.StatusBad
+		if res != nil {
+			status = res.ResponseHeader.ServiceResult
+		}
+		if err != nil && status == ua.StatusOK {
+			// reprocess notification message and keep going
+		} else {
+			if err == nil {
+				err = errors.Errorf(res.ResponseHeader.ServiceResult.Error())
+			}
+			debug.Printf("Republish request ends with: %s", err.Error())
+			return status, err
+		}
+	}
+	return ua.StatusOK, nil
 }
 
 // Close closes the session and the secure channel.
@@ -306,6 +589,8 @@ func (c *Client) CreateSession(cfg *uasc.SessionConfig) (*Session, error) {
 			serverNonce:       res.ServerNonce,
 			serverCertificate: res.ServerCertificate,
 		}
+
+		c.sessions[s] = struct{}{}
 
 		return nil
 	})
@@ -416,6 +701,7 @@ func (c *Client) closeSession(s *Session) error {
 	if s == nil {
 		return nil
 	}
+	delete(c.sessions, s)
 	req := &ua.CloseSessionRequest{DeleteSubscriptions: true}
 	var res *ua.CloseSessionResponse
 	return c.Send(req, func(v interface{}) error {
@@ -582,7 +868,9 @@ func (c *Client) Subscribe(params *SubscriptionParameters) (*Subscription, error
 		time.Duration(res.RevisedPublishingInterval) * time.Millisecond,
 		res.RevisedLifetimeCount,
 		res.RevisedMaxKeepAliveCount,
+		0,
 		params.Notifs,
+		make(chan bool, 1),
 		c,
 	}
 	c.subMux.Lock()

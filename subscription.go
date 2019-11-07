@@ -23,7 +23,9 @@ type Subscription struct {
 	RevisedPublishingInterval time.Duration
 	RevisedLifetimeCount      uint32
 	RevisedMaxKeepAliveCount  uint32
+	lastSequenceNumber        uint32
 	Notifs                    chan *PublishNotificationData
+	running                   chan bool
 	c                         *Client
 }
 
@@ -112,6 +114,20 @@ func (s *Subscription) Unmonitor(monitoredItemIDs ...uint32) (*ua.DeleteMonitore
 	return res, err
 }
 
+func (s *Subscription) republish(req *ua.RepublishRequest) (*ua.RepublishResponse, error) {
+	var res *ua.RepublishResponse
+	err := s.c.sechan.SendRequest(req, s.c.Session().resp.AuthenticationToken, func(v interface{}) error {
+		if err := safeAssign(v, &res); err != nil {
+			return err
+		}
+		if res.ResponseHeader.ServiceResult != ua.StatusOK {
+			return errors.Errorf(res.ResponseHeader.ServiceResult.Error())
+		}
+		return nil
+	})
+	return res, err
+}
+
 func (s *Subscription) publish(acks []*ua.SubscriptionAcknowledgement) (*ua.PublishResponse, error) {
 	if acks == nil {
 		acks = []*ua.SubscriptionAcknowledgement{}
@@ -138,6 +154,14 @@ func (s *Subscription) publishTimeout() time.Duration {
 	return timeout
 }
 
+func (s *Subscription) Resume() {
+	s.running <- true
+}
+
+func (s *Subscription) Suspend() {
+	s.running <- false
+}
+
 // Run() starts an infinite loop that sends PublishRequests and delivers received
 // notifications to registered Subscriptions.
 // It is the responsibility of the user to stop no longer needed Run() loops by cancelling ctx
@@ -149,6 +173,19 @@ func (s *Subscription) Run(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			return
+		case run := <-s.running:
+			if run {
+				continue
+			}
+			// Suspended
+			for !run {
+				select {
+				case <-ctx.Done():
+					return
+				case run = <-s.running:
+				}
+			}
+
 		default:
 			// send the next publish request
 			// note that res contains data even if an error was returned
@@ -165,7 +202,12 @@ func (s *Subscription) Run(ctx context.Context) {
 			case err != nil:
 				// irrecoverable error
 				s.c.notifySubscriptionsOfError(ctx, res, err)
-				return
+
+				if s.c.cfg.AutoReconnect {
+					s.Suspend()
+				} else {
+					return
+				}
 			}
 
 			if res != nil {

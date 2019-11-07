@@ -89,10 +89,13 @@ func NewSecureChannel(endpoint string, c *uacp.Conn, cfg *Config) (*SecureChanne
 		cfg.SecurityMode = ua.MessageSecurityModeNone
 	}
 
+	// make a copy of the config to avoid altering the geniune one
+	newCfg := *cfg
+
 	return &SecureChannel{
 		EndpointURL: endpoint,
 		c:           c,
-		cfg:         cfg,
+		cfg:         &newCfg,
 		reqhdr: &ua.RequestHeader{
 			TimeoutHint:      uint32(cfg.RequestTimeout / time.Millisecond),
 			AdditionalHeader: ua.NewExtensionObject(nil),

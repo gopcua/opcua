@@ -135,7 +135,7 @@ The current set of supported services is only for the high-level client.
 |                             | ModifySubscription            |           |              |
 |                             | SetPublishingMode             |           |              |
 |                             | Publish                       | Yes       |              |
-|                             | Republish                     |           |              |
+|                             | Republish                     | Yes       |              |
 |                             | DeleteSubscriptions           | Yes       |              |
 |                             | TransferSubscriptions         |           |              |
 
