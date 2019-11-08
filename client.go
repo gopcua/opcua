@@ -243,9 +243,12 @@ func (c *Client) monitorChannel(ctx context.Context) {
 						case sechanRecreated:
 							// Restart sechan Receive
 							exit = true
-						case sechanDisconnected, waitnRetry, badCertificate, sechanReconnected:
-							// Loop until sechanRecreated or aborted
 						}
+						// Loop for the following state
+						// sechanDisconnected
+						// sechanReconnected
+						// badCertificate
+						// waitnRetry
 					}
 
 					// Ignore all errors and restart receiving
