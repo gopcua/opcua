@@ -390,6 +390,7 @@ func (c *Client) recreateSecureChannel(ctx context.Context) (*uasc.SecureChannel
 	return sechan, conn, nil
 }
 
+// repairSession repair the current session after being disconnected
 func (c *Client) repairSession() error {
 
 	s := c.Session()
@@ -403,17 +404,16 @@ func (c *Client) repairSession() error {
 	err := c.ActivateSession(s)
 	if err != nil {
 		return errors.Errorf("Session reactivation failed")
-	} else {
-		debug.Printf("Existing session reactivated trying to repair subscriptions")
-		if err := c.repairSubscriptions(); err != nil {
-			return err
-		}
-		debug.Printf("Subscriptions repaired")
 	}
-
+	debug.Printf("Existing session reactivated trying to repair subscriptions")
+	if err := c.repairSubscriptions(); err != nil {
+		return err
+	}
+	debug.Printf("Subscriptions repaired")
 	return nil
 }
 
+// SubscriptionIDs gets a list of subscriptionIDs
 func (c *Client) SubscriptionIDs() []uint32 {
 	subscriptionIDs := []uint32{}
 	c.subMux.Lock()
@@ -424,6 +424,8 @@ func (c *Client) SubscriptionIDs() []uint32 {
 	return subscriptionIDs
 }
 
+// repairSubscriptions repair all the subscriptions of subscriptionIDs given,
+// if no subscriptionIDs repair all subscriptions
 func (c *Client) repairSubscriptions(subscriptionIDs ...uint32) error {
 
 	if subscriptionIDs == nil {
@@ -461,44 +463,41 @@ func (c *Client) repairSubscription(sub *Subscription) error {
 	return nil
 }
 
+// subscriptionRepublish send republish request for the given subscription
+// republish should end with a StatusCode BadMessageNotAvailable
+// wich implies that there's no more message to restore
 func (c *Client) subscriptionRepublish(sub *Subscription) (ua.StatusCode, error) {
-	isDone := false
-
-	for !isDone {
-		request := &ua.RepublishRequest{
+	for {
+		req := &ua.RepublishRequest{
 			SubscriptionID:           sub.SubscriptionID,
 			RetransmitSequenceNumber: sub.lastSequenceNumber + 1,
 		}
 
 		debug.Printf("Republish Request for subscription %d retransmitSequenceNumber=%d",
-			request.SubscriptionID,
-			request.RetransmitSequenceNumber,
+			req.SubscriptionID,
+			req.RetransmitSequenceNumber,
 		)
 
 		if c.sessionClosed() {
 			debug.Printf("Republish aborted")
-			isDone = true
-			continue
+			return ua.StatusOK, nil
 		}
-		var res *ua.RepublishResponse
-		var err error
 
-		res, err = sub.republish(request)
+		res, err := sub.republish(req)
 		status := ua.StatusBad
 		if res != nil {
 			status = res.ResponseHeader.ServiceResult
 		}
 		if err != nil && status == ua.StatusOK {
 			// reprocess notification message and keep going
-		} else {
-			if err == nil {
-				err = errors.Errorf(res.ResponseHeader.ServiceResult.Error())
-			}
-			debug.Printf("Republish request ends with: %s", err.Error())
-			return status, err
+			continue
 		}
+		if err == nil {
+			err = errors.Errorf(res.ResponseHeader.ServiceResult.Error())
+		}
+		debug.Printf("Republish request ends with: %s", err.Error())
+		return status, err
 	}
-	return ua.StatusOK, nil
 }
 
 // Close closes the session and the secure channel.
