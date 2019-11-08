@@ -23,8 +23,8 @@ type Subscription struct {
 	RevisedPublishingInterval time.Duration
 	RevisedLifetimeCount      uint32
 	RevisedMaxKeepAliveCount  uint32
-	lastSequenceNumber        uint32
 	Notifs                    chan *PublishNotificationData
+	lastSequenceNumber        uint32
 	running                   chan bool
 	c                         *Client
 }
@@ -174,15 +174,18 @@ func (s *Subscription) Run(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case run := <-s.running:
+			// run indicate if the publishing should be interrupted
 			if run {
+				// If run is active then continue publishing
 				continue
 			}
-			// Suspended
+			// Suspended mode
 			for !run {
 				select {
 				case <-ctx.Done():
 					return
 				case run = <-s.running:
+					// Block until running has been triggered by Resume
 				}
 			}
 
@@ -203,11 +206,10 @@ func (s *Subscription) Run(ctx context.Context) {
 				// irrecoverable error
 				s.c.notifySubscriptionsOfError(ctx, res, err)
 
-				if s.c.cfg.AutoReconnect {
-					s.Suspend()
-				} else {
+				if !s.c.cfg.AutoReconnect {
 					return
 				}
+				s.Suspend()
 			}
 
 			if res != nil {

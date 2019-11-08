@@ -76,6 +76,7 @@ func ApplicationURI(s string) Option {
 	}
 }
 
+// AutoReconnect sets the auto reconnect state of the secure channel.
 func AutoReconnect(b bool) Option {
 	return func(c *uasc.Config, sc *uasc.SessionConfig) {
 		c.AutoReconnect = b
