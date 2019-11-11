@@ -1046,9 +1046,135 @@ func TestVariantValueHelpers(t *testing.T) {
 			want: XMLElement("a"),
 			fn:   func(v *Variant) interface{} { return v.XMLElement() },
 		},
+
+		// []string
+		{
+			v:    []string{"a", "b", "c"},
+			want: "",
+			fn:   func(v *Variant) interface{} { return v.String() },
+		},
+
+		// []bool
+		{
+			v:    []bool{true, true, true},
+			want: false,
+			fn:   func(v *Variant) interface{} { return v.Bool() },
+		},
+
+		// []float64
+		{
+			v:    []float64{1, 2, 3},
+			want: float64(0),
+			fn:   func(v *Variant) interface{} { return v.Float() },
+		},
+
+		// []int64
+		{
+			v:    []int64{1, 2, 3},
+			want: int64(0),
+			fn:   func(v *Variant) interface{} { return v.Int() },
+		},
+
+		// []uint64
+		{
+			v:    []uint64{1, 2, 3},
+			want: uint64(0),
+			fn:   func(v *Variant) interface{} { return v.Uint() },
+		},
+
+		// [][]byte
+		{
+			v:    [][]byte{{'x', 'y', 'z'}},
+			want: ([]byte)(nil),
+			fn:   func(v *Variant) interface{} { return v.ByteString() },
+		},
+
+		// []*DataValue
+		{
+			v:    []*DataValue{{Status: StatusBad}},
+			want: (*DataValue)(nil),
+			fn:   func(v *Variant) interface{} { return v.DataValue() },
+		},
+
+		// []*DiagnosticInfo
+		{
+			v:    []*DiagnosticInfo{{AdditionalInfo: "nop"}},
+			want: (*DiagnosticInfo)(nil),
+			fn:   func(v *Variant) interface{} { return v.DiagnosticInfo() },
+		},
+
+		// []*ExpandedNodeID
+		{
+			v:    []*ExpandedNodeID{{NamespaceURI: "abc"}},
+			want: (*ExpandedNodeID)(nil),
+			fn:   func(v *Variant) interface{} { return v.ExpandedNodeID() },
+		},
+
+		// []*ExtensionObject
+		{
+			v:    []*ExtensionObject{{Value: "abc"}},
+			want: (*ExtensionObject)(nil),
+			fn:   func(v *Variant) interface{} { return v.ExtensionObject() },
+		},
+
+		// []*GUID
+		{
+			v:    []*GUID{NewGUID("abcd")},
+			want: (*GUID)(nil),
+			fn:   func(v *Variant) interface{} { return v.GUID() },
+		},
+
+		// []*LocalizedText
+		{
+			v:    []*LocalizedText{{Text: "abc"}},
+			want: (*LocalizedText)(nil),
+			fn:   func(v *Variant) interface{} { return v.LocalizedText() },
+		},
+
+		// []*NodeID
+		{
+			v:    []*NodeID{NewFourByteNodeID(1, 2)},
+			want: (*NodeID)(nil),
+			fn:   func(v *Variant) interface{} { return v.NodeID() },
+		},
+
+		// []*QualifiedName
+		{
+			v:    []*QualifiedName{{Name: "a"}},
+			want: (*QualifiedName)(nil),
+			fn:   func(v *Variant) interface{} { return v.QualifiedName() },
+		},
+
+		// []*StatusCode
+		{
+			v:    []StatusCode{StatusOK, StatusBad},
+			want: StatusBadTypeMismatch,
+			fn:   func(v *Variant) interface{} { return v.StatusCode() },
+		},
+
+		// []time.Time
+		{
+			v:    []time.Time{time.Date(2019, 1, 1, 12, 13, 14, 0, time.UTC)},
+			want: time.Time{},
+			fn:   func(v *Variant) interface{} { return v.Time() },
+		},
+
+		// []*Variant
+		{
+			v:    []*Variant{MustVariant("abc")},
+			want: (*Variant)(nil),
+			fn:   func(v *Variant) interface{} { return v.Variant() },
+		},
+
+		// []XMLElement
+		{
+			v:    []XMLElement{XMLElement("a")},
+			want: XMLElement(""),
+			fn:   func(v *Variant) interface{} { return v.XMLElement() },
+		},
 	}
-	for _, tt := range tests {
-		name := fmt.Sprintf("%T -> %T", tt.v, tt.want)
+	for i, tt := range tests {
+		name := fmt.Sprintf("test-%d %T -> %T", i, tt.v, tt.want)
 		t.Run(name, func(t *testing.T) {
 			verify.Values(t, "", tt.fn(MustVariant(tt.v)), tt.want)
 		})
