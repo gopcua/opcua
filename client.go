@@ -417,10 +417,10 @@ func (c *Client) repairSession() error {
 func (c *Client) SubscriptionIDs() []uint32 {
 	subscriptionIDs := []uint32{}
 	c.subMux.Lock()
+	defer c.subMux.Unlock()
 	for key := range c.subscriptions {
 		subscriptionIDs = append(subscriptionIDs, key)
 	}
-	c.subMux.Unlock()
 	return subscriptionIDs
 }
 
@@ -877,22 +877,21 @@ func (c *Client) Subscribe(params *SubscriptionParameters) (*Subscription, error
 		c,
 	}
 	c.subMux.Lock()
+	defer c.subMux.Unlock()
 	if sub.SubscriptionID == 0 || c.subscriptions[sub.SubscriptionID] != nil {
 		// this should not happen and is usually indicative of a server bug
 		// see: Part 4 Section 5.13.2.2, Table 88 – CreateSubscription Service Parameters
-		c.subMux.Unlock()
 		return nil, ua.StatusBadSubscriptionIDInvalid
 	}
 	c.subscriptions[sub.SubscriptionID] = sub
-	c.subMux.Unlock()
 
 	return sub, nil
 }
 
 func (c *Client) forgetSubscription(subID uint32) {
 	c.subMux.Lock()
+	defer c.subMux.Unlock()
 	delete(c.subscriptions, subID)
-	c.subMux.Unlock()
 }
 
 func (c *Client) notifySubscriptionsOfError(ctx context.Context, res *ua.PublishResponse, err error) {
