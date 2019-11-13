@@ -387,7 +387,7 @@ func (c *Client) createSecureChannel(ctx context.Context) (*uasc.SecureChannel, 
 	return sechan, conn, nil
 }
 
-// repairSession repair the current session after being disconnected
+// repairSession repair or recreate the current session after being disconnected
 func (c *Client) repairSession() error {
 
 	s := c.Session()
@@ -398,16 +398,92 @@ func (c *Client) repairSession() error {
 
 	debug.Printf("Trying to reactivate existing session")
 
-	err := c.ActivateSession(s)
-	if err != nil {
-		return errors.Errorf("Session reactivation failed")
+	if err := c.ActivateSession(s); err == nil {
+
+		debug.Printf("Existing session reactivated trying to repair subscriptions")
+		if err := c.repairSubscriptions(); err != nil {
+			_ = c.Close()
+			return err
+		}
+		debug.Printf("Subscriptions repaired")
+		return nil
 	}
-	debug.Printf("Existing session reactivated trying to repair subscriptions")
-	if err := c.repairSubscriptions(); err != nil {
+
+	debug.Printf("Session reactivation failed, recreating new session")
+	if err := c.repairSessionByRecreatingNewSession(); err != nil {
+		return errors.Errorf("Session reactivation failed :", err.Error())
+	}
+
+	if err := c.ActivateSession(s); err != nil {
+		_ = c.Close()
 		return err
 	}
-	debug.Printf("Subscriptions repaired")
+
+	debug.Printf("Trying to transfert existing subscriptions")
+	subIDs := c.SubscriptionIDs()
+	debug.Printf("Session subscriptionCount = %d", len(subIDs))
+
+	res, err := c.transferSubscriptions(subIDs)
+	subsToRecreate := []uint32{}
+	subsToRepair := []uint32{}
+
+	if err != nil {
+		debug.Printf("Transfert subscriptions has failed, %s", err.Error())
+		subsToRecreate = subIDs
+	} else {
+		for id := range res.Results {
+			transferResult := res.Results[id]
+			if transferResult.StatusCode == ua.StatusBadSubscriptionIDInvalid {
+				debug.Printf("Warning suscription (id: %d), should be recreated", id)
+				subsToRecreate = append(subsToRecreate, subIDs[id])
+			} else {
+				debug.Printf(
+					"Subscription (id: %d) can be repaired and available",
+					transferResult.AvailableSequenceNumbers[id],
+				)
+				subsToRepair = append(subsToRepair, subIDs[id])
+			}
+		}
+	}
+
+	if len(subsToRecreate) > 0 {
+		if err := c.repairSubscriptionsByRecreatingNewSubscriptions(subIDs); err != nil {
+			return err
+		}
+	}
+	if len(subsToRepair) > 0 {
+		if err := c.repairSubscriptions(subsToRepair...); err != nil {
+			return err
+		}
+	}
+
+	debug.Printf("Transfer subscriptions done")
 	return nil
+}
+
+// repairSessionByRecreatingNewSession create a new session
+// with the same parameters to replace the previous one
+func (c *Client) repairSessionByRecreatingNewSession() error {
+	// todo: Implement
+	return nil
+}
+
+// transferSubscriptions ask the server to transfert given subscriptions
+// of the previous session to the current
+func (c *Client) transferSubscriptions(subIDs []uint32) (*ua.TransferSubscriptionsResponse, error) {
+	req := &ua.TransferSubscriptionsRequest{
+		SubscriptionIDs:   subIDs,
+		SendInitialValues: false,
+	}
+	var res *ua.TransferSubscriptionsResponse
+
+	err := c.Send(req, func(v interface{}) error {
+		if err := safeAssign(v, &res); err != nil {
+			return err
+		}
+		return nil
+	})
+	return res, err
 }
 
 // SubscriptionIDs gets a list of subscriptionIDs
@@ -442,6 +518,13 @@ func (c *Client) repairSubscriptions(subscriptionIDs ...uint32) error {
 		}
 	}
 
+	return nil
+}
+
+// repairSubscriptionsByRecreatingNewSubscriptions create a new subscription
+// with the same parameters to replace the previous one
+func (c *Client) repairSubscriptionsByRecreatingNewSubscriptions(subIDs []uint32) error {
+	// todo: implement
 	return nil
 }
 
