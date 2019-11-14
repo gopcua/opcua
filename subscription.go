@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gopcua/opcua/debug"
 	"github.com/gopcua/opcua/errors"
 	"github.com/gopcua/opcua/id"
 	"github.com/gopcua/opcua/ua"
@@ -19,6 +20,10 @@ const (
 	DefaultSubscriptionPriority                   = 0
 )
 
+const (
+	terminatedSubscriptionID uint32 = 0xC0CAC01B
+)
+
 type Subscription struct {
 	SubscriptionID            uint32
 	RevisedPublishingInterval time.Duration
@@ -26,6 +31,8 @@ type Subscription struct {
 	RevisedMaxKeepAliveCount  uint32
 	Notifs                    chan *PublishNotificationData
 	lastSequenceNumber        uint32
+	monitoredItems            []*MonitoredItem
+	params                    *SubscriptionParameters
 	suspend                   bool
 	mux                       sync.Mutex
 	cond                      *sync.Cond
@@ -39,6 +46,15 @@ type SubscriptionParameters struct {
 	MaxNotificationsPerPublish uint32
 	Priority                   uint8
 	Notifs                     chan *PublishNotificationData
+}
+
+type MonitoredItem struct {
+	MonitoredItemID           uint32
+	ItemToMonitor             *ua.ReadValueID
+	MonitoringParameters      *ua.MonitoringParameters
+	MonitoringMode            ua.MonitoringMode
+	TimestampsToReturn        ua.TimestampsToReturn
+	monitoredItemCreateResult *ua.MonitoredItemCreateResult
 }
 
 func NewMonitoredItemCreateRequestWithDefaults(nodeID *ua.NodeID, attributeID ua.AttributeID, clientHandle uint32) *ua.MonitoredItemCreateRequest {
@@ -71,7 +87,7 @@ type PublishNotificationData struct {
 // Cancel() deletes the Subscription from Server and makes the Client forget it so that publishing
 // loops cannot deliver notifications to it anymore
 func (s *Subscription) Cancel() error {
-	s.c.forgetSubscription(s.SubscriptionID)
+	s.c.removeSubscription(s.SubscriptionID)
 
 	req := &ua.DeleteSubscriptionsRequest{
 		SubscriptionIDs: []uint32{s.SubscriptionID},
@@ -92,16 +108,39 @@ func (s *Subscription) Cancel() error {
 
 func (s *Subscription) Monitor(ts ua.TimestampsToReturn, items ...*ua.MonitoredItemCreateRequest) (*ua.CreateMonitoredItemsResponse, error) {
 	// Part 4, 5.12.2.2 CreateMonitoredItems Service Parameters
-	req := &ua.CreateMonitoredItemsRequest{
+	res, err := s.c.createMonitoredItems(&ua.CreateMonitoredItemsRequest{
 		SubscriptionID:     s.SubscriptionID,
 		TimestampsToReturn: ts,
 		ItemsToCreate:      items,
+	})
+
+	if err != nil {
+		return nil, err
 	}
 
-	var res *ua.CreateMonitoredItemsResponse
-	err := s.c.Send(req, func(v interface{}) error {
-		return safeAssign(v, &res)
-	})
+	for _, result := range res.Results {
+		if status := result.StatusCode; status != ua.StatusOK {
+			return nil, status
+		}
+	}
+
+	// store Monitored items
+	size := len(items)
+	monitoredItems := make([]*MonitoredItem, size, size)
+	for i, item := range items {
+		result := res.Results[i]
+
+		monitoredItems[i] = &MonitoredItem{
+			MonitoredItemID:           result.MonitoredItemID,
+			ItemToMonitor:             item.ItemToMonitor,
+			MonitoringParameters:      item.RequestedParameters,
+			MonitoringMode:            item.MonitoringMode,
+			TimestampsToReturn:        ts,
+			monitoredItemCreateResult: result,
+		}
+	}
+
+	s.monitoredItems = append(s.monitoredItems, monitoredItems...)
 	return res, err
 }
 
@@ -184,6 +223,17 @@ func (s *Subscription) Run(ctx context.Context) {
 			case err == ua.StatusBadNoSubscription:
 				// All subscriptions have been deleted, but the publishing loop is still running
 				// The user will stop the loop or create subscriptions at his discretion
+			case err == ua.StatusBadSessionClosed || err == ua.StatusBadSessionIDInvalid:
+				// The session is no longer opened on the server side
+
+				if s.c.cfg.AutoReconnect {
+					if err := s.c.repairSession(); err != nil {
+						return
+					}
+					acks = make([]*ua.SubscriptionAcknowledgement, 0)
+					continue
+				}
+
 			case err != nil:
 				// irrecoverable error
 				s.c.notifySubscriptionsOfError(ctx, res, err)
@@ -269,4 +319,86 @@ func (p *SubscriptionParameters) setDefaults() {
 	if p.Notifs == nil {
 		p.Notifs = make(chan *PublishNotificationData)
 	}
+}
+
+// recreateSubscriptionAndMonitoredItem recreate a new subscription base of a previous subscription
+// parameters
+func (s *Subscription) recreateSubscriptionAndMonitoredItem() error {
+	if s.SubscriptionID == terminatedSubscriptionID {
+		debug.Printf("Subscription is not in a valid state")
+		return nil
+	}
+
+	params := s.params
+	s.c.removeSubscription(s.SubscriptionID)
+
+	res, err := s.c.createSubscription(&ua.CreateSubscriptionRequest{
+		RequestedPublishingInterval: float64(params.Interval / time.Millisecond),
+		RequestedLifetimeCount:      params.LifetimeCount,
+		RequestedMaxKeepAliveCount:  params.MaxKeepAliveCount,
+		PublishingEnabled:           true,
+		MaxNotificationsPerPublish:  params.MaxNotificationsPerPublish,
+		Priority:                    params.Priority,
+	})
+
+	if err != nil {
+		return err
+	}
+	if status := res.ResponseHeader.ServiceResult; status != ua.StatusOK {
+		return status
+	}
+
+	s.SubscriptionID = res.SubscriptionID
+	s.RevisedPublishingInterval = time.Duration(res.RevisedPublishingInterval) * time.Millisecond
+	s.RevisedLifetimeCount = res.RevisedLifetimeCount
+	s.RevisedMaxKeepAliveCount = res.RevisedMaxKeepAliveCount
+	s.lastSequenceNumber = 0
+
+	if err := s.c.registerSubscription(s); err != nil {
+		return err
+	}
+
+	// Sort by timestamp to return
+	itemsByTs := make(map[ua.TimestampsToReturn][]*ua.MonitoredItemCreateRequest)
+	for _, m := range s.monitoredItems {
+
+		if _, ok := itemsByTs[m.TimestampsToReturn]; !ok {
+			itemsByTs[m.TimestampsToReturn] = []*ua.MonitoredItemCreateRequest{}
+		}
+
+		itemsByTs[m.TimestampsToReturn] = append(
+			itemsByTs[m.TimestampsToReturn],
+			&ua.MonitoredItemCreateRequest{
+				ItemToMonitor:       m.ItemToMonitor,
+				MonitoringMode:      m.MonitoringMode,
+				RequestedParameters: m.MonitoringParameters,
+			},
+		)
+	}
+
+	for ts, items := range itemsByTs {
+
+		res, err := s.c.createMonitoredItems(&ua.CreateMonitoredItemsRequest{
+			SubscriptionID:     s.SubscriptionID,
+			TimestampsToReturn: ts,
+			ItemsToCreate:      items,
+		})
+
+		if err != nil {
+			return err
+		}
+		for _, result := range res.Results {
+			if status := result.StatusCode; status != ua.StatusOK {
+				return status
+			}
+		}
+
+		for i, m := range s.monitoredItems {
+			result := res.Results[i]
+			m.MonitoredItemID = result.MonitoredItemID
+			m.monitoredItemCreateResult = result
+		}
+	}
+
+	return nil
 }

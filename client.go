@@ -306,7 +306,7 @@ func (c *Client) reconnectProcess(ctx context.Context, currentState chan reconne
 			case sechanDisconnected:
 				sechan, conn, err := c.createSecureChannel(ctx)
 				if err != nil {
-					debug.Printf("Creating a new instance of secure channel has failed, %s", err.Error())
+					debug.Printf("Creating a new instance of secure channel has failed, %v", err)
 					state = aborted
 					continue
 				}
@@ -410,8 +410,9 @@ func (c *Client) repairSession() error {
 	}
 
 	debug.Printf("Session reactivation failed, recreating new session")
-	if err := c.repairSessionByRecreatingNewSession(); err != nil {
-		return errors.Errorf("Session reactivation failed :", err.Error())
+
+	if err := c.repairSessionByRecreatingNewSession(s); err != nil {
+		return errors.Errorf("Session reactivation failed: %v", err)
 	}
 
 	if err := c.ActivateSession(s); err != nil {
@@ -428,7 +429,7 @@ func (c *Client) repairSession() error {
 	subsToRepair := []uint32{}
 
 	if err != nil {
-		debug.Printf("Transfert subscriptions has failed, %s", err.Error())
+		debug.Printf("Transfert subscriptions has failed, %v", err)
 		subsToRecreate = subIDs
 	} else {
 		for id := range res.Results {
@@ -447,7 +448,7 @@ func (c *Client) repairSession() error {
 	}
 
 	if len(subsToRecreate) > 0 {
-		if err := c.repairSubscriptionsByRecreatingNewSubscriptions(subIDs); err != nil {
+		if err := c.repairSubscriptionsByRecreatingNewSubscriptions(subsToRecreate); err != nil {
 			return err
 		}
 	}
@@ -457,14 +458,22 @@ func (c *Client) repairSession() error {
 		}
 	}
 
-	debug.Printf("Transfer subscriptions done")
+	debug.Printf("Subscriptions repaired")
 	return nil
 }
 
 // repairSessionByRecreatingNewSession create a new session
 // with the same parameters to replace the previous one
-func (c *Client) repairSessionByRecreatingNewSession() error {
-	// todo: Implement
+func (c *Client) repairSessionByRecreatingNewSession(s *Session) error {
+
+	ns, err := c.CreateSession(c.sessionCfg)
+	if err != nil {
+		return err
+	}
+
+	s.resp = ns.resp
+	s.serverNonce = ns.serverNonce
+	s.serverCertificate = ns.serverCertificate
 	return nil
 }
 
@@ -524,7 +533,22 @@ func (c *Client) repairSubscriptions(subscriptionIDs ...uint32) error {
 // repairSubscriptionsByRecreatingNewSubscriptions create a new subscription
 // with the same parameters to replace the previous one
 func (c *Client) repairSubscriptionsByRecreatingNewSubscriptions(subIDs []uint32) error {
-	// todo: implement
+	for _, subID := range subIDs {
+		if _, exist := c.subscriptions[subID]; !exist {
+			debug.Printf("Cannot recreate subscription %d", subID)
+			continue
+		}
+
+		sub := c.subscriptions[subID]
+
+		debug.Printf("Recreating subscription id = %d", subID)
+		if err := sub.recreateSubscriptionAndMonitoredItem(); err != nil {
+			debug.Printf("Recreate subscription failed")
+			return err
+		}
+		debug.Printf("Recreating subscription and monitored item done")
+	}
+
 	return nil
 }
 
@@ -958,6 +982,24 @@ func (c *Client) BrowseNext(req *ua.BrowseNextRequest) (*ua.BrowseNextResponse, 
 	return res, err
 }
 
+// createMonitoredItems executes a synchronous create monitored items request.
+func (c *Client) createMonitoredItems(req *ua.CreateMonitoredItemsRequest) (*ua.CreateMonitoredItemsResponse, error) {
+	var res *ua.CreateMonitoredItemsResponse
+	err := c.Send(req, func(v interface{}) error {
+		return safeAssign(v, &res)
+	})
+	return res, err
+}
+
+// createSubscription executes a synchronous create subscription request.
+func (c *Client) createSubscription(req *ua.CreateSubscriptionRequest) (*ua.CreateSubscriptionResponse, error) {
+	var res *ua.CreateSubscriptionResponse
+	err := c.Send(req, func(v interface{}) error {
+		return safeAssign(v, &res)
+	})
+	return res, err
+}
+
 // Subscribe creates a Subscription with given parameters. Parameters that have not been set
 // (have zero values) are overwritten with default values.
 // See opcua.DefaultSubscription* constants
@@ -975,10 +1017,8 @@ func (c *Client) Subscribe(params *SubscriptionParameters) (*Subscription, error
 		Priority:                    params.Priority,
 	}
 
-	var res *ua.CreateSubscriptionResponse
-	err := c.Send(req, func(v interface{}) error {
-		return safeAssign(v, &res)
-	})
+	res, err := c.createSubscription(req)
+
 	if err != nil {
 		return nil, err
 	}
@@ -992,6 +1032,7 @@ func (c *Client) Subscribe(params *SubscriptionParameters) (*Subscription, error
 		RevisedLifetimeCount:      res.RevisedLifetimeCount,
 		RevisedMaxKeepAliveCount:  res.RevisedMaxKeepAliveCount,
 		Notifs:                    params.Notifs,
+		params:                    params,
 		lastSequenceNumber:        0,
 		c:                         c,
 	}
@@ -1009,7 +1050,23 @@ func (c *Client) Subscribe(params *SubscriptionParameters) (*Subscription, error
 	return sub, nil
 }
 
-func (c *Client) forgetSubscription(subID uint32) {
+// registerSubscription register a subscription
+func (c *Client) registerSubscription(sub *Subscription) error {
+	if sub.SubscriptionID == 0 {
+		return ua.StatusBadSubscriptionIDInvalid
+	}
+
+	c.subMux.Lock()
+	defer c.subMux.Unlock()
+	if _, ok := c.subscriptions[sub.SubscriptionID]; ok {
+		return errors.Errorf("SubscriptionID %d already registered", sub.SubscriptionID)
+	}
+
+	c.subscriptions[sub.SubscriptionID] = sub
+	return nil
+}
+
+func (c *Client) removeSubscription(subID uint32) {
 	c.subMux.Lock()
 	defer c.subMux.Unlock()
 	delete(c.subscriptions, subID)
