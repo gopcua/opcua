@@ -413,7 +413,8 @@ func (c *Client) repairSession() error {
 	}
 
 	debug.Printf("Session reactivation failed, recreating new session")
-	if err := c.repairSessionByRecreatingNewSession(); err != nil {
+
+	if err := c.repairSessionByRecreatingNewSession(s); err != nil {
 		return errors.Errorf("Session reactivation failed :", err.Error())
 	}
 
@@ -450,7 +451,7 @@ func (c *Client) repairSession() error {
 	}
 
 	if len(subsToRecreate) > 0 {
-		if err := c.repairSubscriptionsByRecreatingNewSubscriptions(subIDs); err != nil {
+		if err := c.repairSubscriptionsByRecreatingNewSubscriptions(subsToRecreate); err != nil {
 			return err
 		}
 	}
@@ -460,15 +461,63 @@ func (c *Client) repairSession() error {
 		}
 	}
 
-	debug.Printf("Transfer subscriptions done")
+	debug.Printf("Subscriptions repaired")
 	return nil
 }
 
 // repairSessionByRecreatingNewSession create a new session
 // with the same parameters to replace the previous one
-func (c *Client) repairSessionByRecreatingNewSession() error {
-	// todo: Implement
-	return nil
+func (c *Client) repairSessionByRecreatingNewSession(s *Session) error {
+	if c.sechan == nil {
+		return errors.Errorf("secure channel not connected")
+	}
+
+	nonce := make([]byte, 32)
+	if _, err := rand.Read(nonce); err != nil {
+		return err
+	}
+
+	cfg := c.sessionCfg
+
+	req := &ua.CreateSessionRequest{
+		ClientDescription:       cfg.ClientDescription,
+		EndpointURL:             c.endpointURL,
+		SessionName:             fmt.Sprintf("gopcua-%d", time.Now().UnixNano()),
+		ClientNonce:             nonce,
+		ClientCertificate:       c.cfg.Certificate,
+		RequestedSessionTimeout: float64(cfg.SessionTimeout / time.Millisecond),
+	}
+
+	// for the CreateSessionRequest the authToken is always nil.
+	// use c.sechan.Send() to enforce this.
+	return c.sechan.SendRequest(req, nil, func(v interface{}) error {
+		var res *ua.CreateSessionResponse
+		if err := safeAssign(v, &res); err != nil {
+			return err
+		}
+
+		err := c.sechan.VerifySessionSignature(res.ServerCertificate, nonce, res.ServerSignature.Signature)
+		if err != nil {
+			log.Printf("Error verifying session signature: %s", err)
+			return nil
+		}
+
+		// Ensure we have a valid identity token that the server will accept before trying to activate a session
+		if c.sessionCfg.UserIdentityToken == nil {
+			opt := AuthAnonymous()
+			opt(c.cfg, c.sessionCfg)
+
+			p := anonymousPolicyID(res.ServerEndpoints)
+			opt = AuthPolicyID(p)
+			opt(c.cfg, c.sessionCfg)
+		}
+
+		s.resp = res
+		s.serverNonce = res.ServerNonce
+		s.serverCertificate = res.ServerCertificate
+
+		return nil
+	})
 }
 
 // transferSubscriptions ask the server to transfert given subscriptions
@@ -527,7 +576,22 @@ func (c *Client) repairSubscriptions(subscriptionIDs ...uint32) error {
 // repairSubscriptionsByRecreatingNewSubscriptions create a new subscription
 // with the same parameters to replace the previous one
 func (c *Client) repairSubscriptionsByRecreatingNewSubscriptions(subIDs []uint32) error {
-	// todo: implement
+	for _, subID := range subIDs {
+		if _, exist := c.subscriptions[subID]; !exist {
+			debug.Printf("Cannot recreate subscription %d", subID)
+			continue
+		}
+
+		sub := c.subscriptions[subID]
+
+		debug.Printf("Recreating subscription id = %d", subID)
+		if err := sub.recreateSubscriptionAndMonitoredItem(); err != nil {
+			debug.Printf("Recreate subscription failed")
+			return err
+		}
+		debug.Printf("Recreating subscription and monitored item done")
+	}
+
 	return nil
 }
 
@@ -956,6 +1020,8 @@ func (c *Client) Subscribe(params *SubscriptionParameters) (*Subscription, error
 		res.RevisedMaxKeepAliveCount,
 		params.Notifs,
 		0,
+		[]*MonitoredItem{},
+		params,
 		make(chan bool, 1),
 		c,
 	}
@@ -969,6 +1035,22 @@ func (c *Client) Subscribe(params *SubscriptionParameters) (*Subscription, error
 	c.subscriptions[sub.SubscriptionID] = sub
 
 	return sub, nil
+}
+
+// registerSubscription register a subscription
+func (c *Client) registerSubscription(sub *Subscription) error {
+	if sub.SubscriptionID == 0 {
+		return ua.StatusBadSubscriptionIDInvalid
+	}
+
+	c.subMux.Lock()
+	defer c.subMux.Unlock()
+	if _, ok := c.subscriptions[sub.SubscriptionID]; ok {
+		return errors.Errorf("SubscriptionID %d already registered", sub.SubscriptionID)
+	}
+
+	c.subscriptions[sub.SubscriptionID] = sub
+	return nil
 }
 
 func (c *Client) forgetSubscription(subID uint32) {

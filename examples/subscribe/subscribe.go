@@ -31,7 +31,7 @@ func main() {
 
 	// add an arbitrary timeout to demonstrate how to stop a subscription
 	// with a context.
-	d := 30 * time.Second
+	d := 3000 * time.Second
 	ctx, cancel := context.WithTimeout(context.Background(), d)
 	defer cancel()
 
@@ -47,6 +47,7 @@ func main() {
 	fmt.Println("*", ep.SecurityPolicyURI, ep.SecurityMode)
 
 	opts := []opcua.Option{
+		opcua.Lifetime(time.Second * 60),
 		opcua.SecurityPolicy(*policy),
 		opcua.SecurityModeString(*mode),
 		opcua.CertificateFile(*certFile),
