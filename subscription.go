@@ -127,8 +127,7 @@ func (s *Subscription) Monitor(ts ua.TimestampsToReturn, items ...*ua.MonitoredI
 	}
 
 	// store Monitored items
-	size := len(items)
-	monitoredItems := make([]*MonitoredItem, size, size)
+	monitoredItems := make([]*MonitoredItem, len(items))
 	for i, item := range items {
 		result := res.Results[i]
 
