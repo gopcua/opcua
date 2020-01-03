@@ -718,7 +718,7 @@ func (c *Client) HistoryReadRawModified(nodes []*ua.HistoryReadValueID, details 
 }
 
 func (c *Client) scheduleRenewingToken(ctx context.Context) {
-	timer := time.NewTimer(time.Duration(0.75*float64(c.cfg.Lifetime)) * time.Millisecond) // 0.75 is from Part 4, Section 5.5.2.1
+	timer := time.NewTimer(time.Duration(0.75*float64(c.sechan.Lifetime())) * time.Millisecond) // 0.75 is from Part 4, Section 5.5.2.1
 
 	go func() {
 		select {

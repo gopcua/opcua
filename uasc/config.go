@@ -13,15 +13,6 @@ import (
 
 // Config represents a configuration which UASC client/server has in common.
 type Config struct {
-	// SecureChannelID is a unique identifier for the SecureChannel assigned by the Server.
-	// If a Server receives a SecureChannelId which it does not recognize it shall return an
-	// appropriate transport layer error.
-	//
-	// When a Server starts the first SecureChannelId used should be a value that is likely to
-	// be unique after each restart. This ensures that a Server restart does not cause
-	// previously connected Clients to accidentally ‘reuse’ SecureChannels that did not belong
-	// to them.
-	SecureChannelID uint32
 
 	// SecurityPolicyURI is the URI of the Security Policy used to secure the Message.
 	// This field is encoded as a UTF-8 string without a null terminator.
@@ -54,25 +45,14 @@ type Config struct {
 	// Used to encrypt the message chunks in the OpenSecureChannel phase.
 	RemoteCertificate []byte
 
-	// SequenceNumber is a monotonically increasing sequence number assigned by the sender to each
-	// MessageChunk sent over the SecureChannel.
-	SequenceNumber uint32
-
-	// RequestID is an identifier assigned by the Client to OPC UA request Message. All MessageChunks
-	// for the request and the associated response use the same identifier
-	RequestID uint32
+	// RequestIDSeed is the initial value for RequestID counter in each new SecureChannel
+	RequestIDSeed uint32
 
 	// SecurityMode is The type of security to apply to the messages. The type MessageSecurityMode
 	// is defined in 7.15.
 	// A SecureChannel may have to be created even if the securityMode is NONE. The exact behaviour
 	// depends on the mapping used and is described in the Part 6.
 	SecurityMode ua.MessageSecurityMode
-
-	// SecurityTokenID is a unique identifier for the SecureChannel SecurityToken used to secure the Message.
-	// This identifier is returned by the Server in an OpenSecureChannel response Message.
-	// If a Server receives a TokenId which it does not recognize it shall return an appropriate
-	// transport layer error.
-	SecurityTokenID uint32
 
 	// Lifetime is the requested lifetime, in milliseconds, for the new SecurityToken when the
 	// SecureChannel works as client. It specifies when the Client expects to renew the SecureChannel
