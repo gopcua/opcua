@@ -92,6 +92,9 @@ type Client struct {
 	// sessionCfg is the configuration for the session.
 	sessionCfg *uasc.SessionConfig
 
+	// conn is the open connection
+	conn *uacp.Conn
+
 	// sechan is the open secure channel.
 	sechan *uasc.SecureChannel
 
@@ -165,27 +168,33 @@ func (c *Client) Dial(ctx context.Context) error {
 	if c.sechan != nil {
 		return errors.Errorf("secure channel already connected")
 	}
-	conn, err := uacp.Dial(ctx, c.endpointURL)
+	var err error
+	c.conn, err = uacp.Dial(ctx, c.endpointURL)
 	if err != nil {
 		return err
 	}
-	sechan, err := uasc.NewSecureChannel(c.endpointURL, conn, c.cfg)
+	c.sechan, err = uasc.NewSecureChannel(c.endpointURL, c.conn, c.cfg)
 	if err != nil {
-		_ = conn.Close()
+		_ = c.conn.Close()
 		return err
 	}
-	c.sechan = sechan
 	ctx, c.cancelMonitor = context.WithCancel(ctx)
 	go c.monitorChannel(ctx)
+	err = c.openSecureChannel(ctx, c.sechan.Open)
+	if err != nil {
+		return err
+	}
+	return nil
+}
 
-	if err := sechan.Open(); err != nil {
+func (c *Client) openSecureChannel(ctx context.Context, open func() error) error {
+	if err := open(); err != nil {
 		c.cancelMonitor()
-
-		_ = conn.Close()
+		_ = c.conn.Close()
 		c.sechan = nil
 		return err
 	}
-
+	c.scheduleRenewingToken(ctx)
 	return nil
 }
 
@@ -706,6 +715,21 @@ func (c *Client) HistoryReadRawModified(nodes []*ua.HistoryReadValueID, details 
 		return safeAssign(v, &res)
 	})
 	return res, err
+}
+
+func (c *Client) scheduleRenewingToken(ctx context.Context) {
+	timer := time.NewTimer(time.Duration(0.75*float64(c.cfg.Lifetime)) * time.Millisecond) // 0.75 is from Part 4, Section 5.5.2.1
+
+	go func() {
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+		case <-timer.C:
+			debug.Printf("renewing security token...")
+			// Ignore the error. openSecureChannel will close the connection on error and the user will surely notice
+			_ = c.openSecureChannel(ctx, c.sechan.Renew)
+		}
+	}()
 }
 
 // safeAssign implements a type-safe assign from T to *T.
