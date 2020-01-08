@@ -564,7 +564,11 @@ func (s *SecureChannel) notifyCallerLock(ctx context.Context, reqid uint32, svc 
 
 // Open opens a new secure channel with a server
 func (s *SecureChannel) Open() error {
-	return s.openSecureChannel()
+	return s.openSecureChannel(ua.SecurityTokenRequestTypeIssue)
+}
+
+func (s *SecureChannel) Renew() error {
+	return s.openSecureChannel(ua.SecurityTokenRequestTypeRenew)
 }
 
 // Close closes an existing secure channel
@@ -580,7 +584,7 @@ func (s *SecureChannel) Close() error {
 	return io.EOF
 }
 
-func (s *SecureChannel) openSecureChannel() error {
+func (s *SecureChannel) openSecureChannel(requestType ua.SecurityTokenRequestType) error {
 	var err error
 	var localKey *rsa.PrivateKey
 	var remoteKey *rsa.PublicKey
@@ -617,7 +621,7 @@ func (s *SecureChannel) openSecureChannel() error {
 
 	req := &ua.OpenSecureChannelRequest{
 		ClientProtocolVersion: 0,
-		RequestType:           ua.SecurityTokenRequestTypeIssue,
+		RequestType:           requestType,
 		SecurityMode:          s.cfg.SecurityMode,
 		ClientNonce:           nonce,
 		RequestedLifetime:     s.cfg.Lifetime,
@@ -629,6 +633,8 @@ func (s *SecureChannel) openSecureChannel() error {
 			return errors.Errorf("got %T, want OpenSecureChannelResponse", req)
 		}
 		s.cfg.SecurityTokenID = resp.SecurityToken.TokenID
+		s.cfg.Lifetime = resp.SecurityToken.RevisedLifetime
+		debug.Printf("received security token tokenID: %v, createdAt: %v, lifetime %v", resp.SecurityToken.TokenID, resp.SecurityToken.CreatedAt, resp.SecurityToken.RevisedLifetime)
 
 		s.enc, err = uapolicy.Symmetric(s.cfg.SecurityPolicyURI, nonce, resp.ServerNonce)
 		if err != nil {
