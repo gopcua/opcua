@@ -6,7 +6,6 @@ package uasc
 
 import (
 	"github.com/gopcua/opcua/errors"
-	"github.com/gopcua/opcua/id"
 	"github.com/gopcua/opcua/ua"
 )
 
@@ -89,62 +88,6 @@ type Message struct {
 	*MessageHeader
 	TypeID  *ua.ExpandedNodeID
 	Service interface{}
-}
-
-// New creates a OPC UA Secure Conversation message.New
-// MessageType of UASC is determined depending on the type of service given as below.
-//
-// Service type: OpenSecureChannel => Message type: OPN.
-//
-// Service type: CloseSecureChannel => Message type: CLO.
-//
-// Service type: Others => Message type: MSG.
-//
-// todo(fs): this feels wrong and we should move this switching into the secure channel.
-func NewMessage(srv interface{}, typeID uint16, cfg *Config) *Message {
-	switch typeID {
-	case id.OpenSecureChannelRequest_Encoding_DefaultBinary, id.OpenSecureChannelResponse_Encoding_DefaultBinary:
-		// Do not send the thumbprint for security mode None
-		// even if we have a certificate.
-		//
-		// See https://github.com/gopcua/opcua/issues/259
-		thumbprint := cfg.Thumbprint
-		if cfg.SecurityMode == ua.MessageSecurityModeNone {
-			thumbprint = nil
-		}
-
-		return &Message{
-			MessageHeader: &MessageHeader{
-				Header:                   NewHeader(MessageTypeOpenSecureChannel, ChunkTypeFinal, cfg.SecureChannelID),
-				AsymmetricSecurityHeader: NewAsymmetricSecurityHeader(cfg.SecurityPolicyURI, cfg.Certificate, thumbprint),
-				SequenceHeader:           NewSequenceHeader(cfg.SequenceNumber, cfg.RequestID),
-			},
-			TypeID:  ua.NewFourByteExpandedNodeID(0, typeID),
-			Service: srv,
-		}
-
-	case id.CloseSecureChannelRequest_Encoding_DefaultBinary, id.CloseSecureChannelResponse_Encoding_DefaultBinary:
-		return &Message{
-			MessageHeader: &MessageHeader{
-				Header:                  NewHeader(MessageTypeCloseSecureChannel, ChunkTypeFinal, cfg.SecureChannelID),
-				SymmetricSecurityHeader: NewSymmetricSecurityHeader(cfg.SecurityTokenID),
-				SequenceHeader:          NewSequenceHeader(cfg.SequenceNumber, cfg.RequestID),
-			},
-			TypeID:  ua.NewFourByteExpandedNodeID(0, typeID),
-			Service: srv,
-		}
-
-	default:
-		return &Message{
-			MessageHeader: &MessageHeader{
-				Header:                  NewHeader(MessageTypeMessage, ChunkTypeFinal, cfg.SecureChannelID),
-				SymmetricSecurityHeader: NewSymmetricSecurityHeader(cfg.SecurityTokenID),
-				SequenceHeader:          NewSequenceHeader(cfg.SequenceNumber, cfg.RequestID),
-			},
-			TypeID:  ua.NewFourByteExpandedNodeID(0, typeID),
-			Service: srv,
-		}
-	}
 }
 
 func (m *Message) Decode(b []byte) (int, error) {

@@ -99,7 +99,7 @@ func ProductURI(s string) Option {
 // RandomRequestID assigns a random initial request id.
 func RandomRequestID() Option {
 	return func(c *uasc.Config, sc *uasc.SessionConfig) {
-		c.RequestID = uint32(rand.Int31())
+		c.RequestIDSeed = uint32(rand.Int31())
 	}
 }
 
