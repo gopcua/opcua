@@ -115,11 +115,11 @@ The current set of supported services is only for the high-level client.
 |                             | AddReferences                 |           |              |
 |                             | DeleteNodes                   |           |              |
 |                             | DeleteReferences              |           |              |
-| View Service Set            | Browse                        | Started   |              |
-|                             | BrowseNext                    | Started   |              |
+| View Service Set            | Browse                        | Yes       |              |
+|                             | BrowseNext                    | Yes       |              |
 |                             | TranslateBrowsePathsToNodeIds |           |              |
-|                             | RegisterNodes                 |           |              |
-|                             | UnregisterNodes               |           |              |
+|                             | RegisterNodes                 | Yes       |              |
+|                             | UnregisterNodes               | Yes       |              |
 | Query Service Set           | QueryFirst                    |           |              |
 |                             | QueryNext                     |           |              |
 | Attribute Service Set       | Read                          | Yes       |              |
