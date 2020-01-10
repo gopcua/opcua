@@ -118,8 +118,8 @@ The current set of supported services is only for the high-level client.
 | View Service Set            | Browse                        | Started   |              |
 |                             | BrowseNext                    | Started   |              |
 |                             | TranslateBrowsePathsToNodeIds |           |              |
-|                             | RegisterNodes                 |           |              |
-|                             | UnregisterNodes               |           |              |
+|                             | RegisterNodes                 | Yes       |              |
+|                             | UnregisterNodes               | Yes       |              |
 | Query Service Set           | QueryFirst                    |           |              |
 |                             | QueryNext                     |           |              |
 | Attribute Service Set       | Read                          | Yes       |              |

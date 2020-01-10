@@ -563,27 +563,17 @@ func (c *Client) BrowseNext(req *ua.BrowseNextRequest) (*ua.BrowseNextResponse, 
 func (c *Client) RegisterNodes(req *ua.RegisterNodesRequest) (*ua.RegisterNodesResponse, error) {
 	var res *ua.RegisterNodesResponse
 	err := c.Send(req, func(v interface{}) error {
-		r, ok := v.(*ua.RegisterNodesResponse)
-		if !ok {
-			return errors.Errorf("invalid response: %T", v)
-		}
-		res = r
-		return nil
+		return safeAssign(v, &res)
 	})
 	return res, err
 }
 
 // UnregisterNodes unregisters node ids previously registered with RegisterNodes.
-// Part 4, Section 5.8.5
+// Part 4, Section 5.8.6
 func (c *Client) UnregisterNodes(req *ua.UnregisterNodesRequest) (*ua.UnregisterNodesResponse, error) {
 	var res *ua.UnregisterNodesResponse
 	err := c.Send(req, func(v interface{}) error {
-		r, ok := v.(*ua.UnregisterNodesResponse)
-		if !ok {
-			return errors.Errorf("invalid response: %T", v)
-		}
-		res = r
-		return nil
+		return safeAssign(v, &res)
 	})
 	return res, err
 }
