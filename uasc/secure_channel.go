@@ -71,7 +71,7 @@ type SecureChannel struct {
 	// may be calculated by adding the lifetime to the createdAt time.
 	lifetime uint32
 
-	// SecureChannelID is a unique identifier for the SecureChannel assigned by the Server.
+	// secureChannelID is a unique identifier for the SecureChannel assigned by the Server.
 	// If a Server receives a SecureChannelId which it does not recognize it shall return an
 	// appropriate transport layer error.
 	//
@@ -81,15 +81,15 @@ type SecureChannel struct {
 	// to them.
 	secureChannelID uint32
 
-	// SequenceNumber is a monotonically increasing sequence number assigned by the sender to each
+	// sequenceNumber is a monotonically increasing sequence number assigned by the sender to each
 	// MessageChunk sent over the SecureChannel.
 	sequenceNumber uint32
 
-	// RequestID is an identifier assigned by the Client to OPC UA request Message. All MessageChunks
+	// requestID is an identifier assigned by the Client to OPC UA request Message. All MessageChunks
 	// for the request and the associated response use the same identifier
 	requestID uint32
 
-	// SecurityTokenID is a unique identifier for the SecureChannel SecurityToken used to secure the Message.
+	// securityTokenID is a unique identifier for the SecureChannel SecurityToken used to secure the Message.
 	// This identifier is returned by the Server in an OpenSecureChannel response Message.
 	// If a Server receives a TokenId which it does not recognize it shall return an appropriate
 	// transport layer error.
