@@ -18,14 +18,15 @@ func TestMessage(t *testing.T) {
 		{
 			Name: "OPN",
 			Struct: func() interface{} {
-				m := (&SecureChannel{
+				s := &SecureChannel{
 					cfg: &Config{
 						SecurityPolicyURI: "http://gopcua.example/OPCUA/SecurityPolicy#Foo",
 					},
 					requestID:       1,
 					sequenceNumber:  1,
 					securityTokenID: 0,
-				}).newMessage(
+				}
+				m := s.newMessage(
 					&ua.OpenSecureChannelRequest{
 						RequestHeader: &ua.RequestHeader{
 							AuthenticationToken: ua.NewTwoByteNodeID(0),
@@ -112,14 +113,15 @@ func TestMessage(t *testing.T) {
 		}, {
 			Name: "MSG",
 			Struct: func() interface{} {
-				m := (&SecureChannel{
+				s := &SecureChannel{
 					cfg: &Config{
 						SecurityPolicyURI: "http://gopcua.example/OPCUA/SecurityPolicy#Foo",
 					},
 					requestID:       1,
 					sequenceNumber:  1,
 					securityTokenID: 0,
-				}).newMessage(
+				}
+				m := s.newMessage(
 					&ua.GetEndpointsRequest{
 						RequestHeader: &ua.RequestHeader{
 							AuthenticationToken: ua.NewTwoByteNodeID(0),
@@ -179,14 +181,15 @@ func TestMessage(t *testing.T) {
 		}, {
 			Name: "CLO",
 			Struct: func() interface{} {
-				m := (&SecureChannel{
+				s := &SecureChannel{
 					cfg: &Config{
 						SecurityPolicyURI: "http://gopcua.example/OPCUA/SecurityPolicy#Foo",
 					},
 					requestID:       1,
 					sequenceNumber:  1,
 					securityTokenID: 0,
-				}).newMessage(
+				}
+				m := s.newMessage(
 					&ua.CloseSecureChannelRequest{
 						RequestHeader: &ua.RequestHeader{
 							AuthenticationToken: ua.NewTwoByteNodeID(0),

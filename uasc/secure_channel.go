@@ -39,16 +39,6 @@ type Response struct {
 }
 
 type SecureChannel struct {
-	// SecureChannelID is a unique identifier for the SecureChannel assigned by the Server.
-	// If a Server receives a SecureChannelId which it does not recognize it shall return an
-	// appropriate transport layer error.
-	//
-	// When a Server starts the first SecureChannelId used should be a value that is likely to
-	// be unique after each restart. This ensures that a Server restart does not cause
-	// previously connected Clients to accidentally ‘reuse’ SecureChannels that did not belong
-	// to them.
-	secureChannelID uint32
-
 	EndpointURL string
 
 	// c is the uacp connection.
@@ -80,6 +70,16 @@ type SecureChannel struct {
 	// The lifetime of the SecurityToken in milliseconds. The UTC expiration time for the token
 	// may be calculated by adding the lifetime to the createdAt time.
 	lifetime uint32
+
+	// SecureChannelID is a unique identifier for the SecureChannel assigned by the Server.
+	// If a Server receives a SecureChannelId which it does not recognize it shall return an
+	// appropriate transport layer error.
+	//
+	// When a Server starts the first SecureChannelId used should be a value that is likely to
+	// be unique after each restart. This ensures that a Server restart does not cause
+	// previously connected Clients to accidentally ‘reuse’ SecureChannels that did not belong
+	// to them.
+	secureChannelID uint32
 
 	// SequenceNumber is a monotonically increasing sequence number assigned by the sender to each
 	// MessageChunk sent over the SecureChannel.
