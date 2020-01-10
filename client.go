@@ -548,12 +548,7 @@ func (c *Client) Call(req *ua.CallMethodRequest) (*ua.CallMethodResult, error) {
 func (c *Client) BrowseNext(req *ua.BrowseNextRequest) (*ua.BrowseNextResponse, error) {
 	var res *ua.BrowseNextResponse
 	err := c.Send(req, func(v interface{}) error {
-		r, ok := v.(*ua.BrowseNextResponse)
-		if !ok {
-			return errors.Errorf("invalid response: %T", v)
-		}
-		res = r
-		return nil
+		return safeAssign(v, &res)
 	})
 	return res, err
 }
