@@ -35,20 +35,25 @@ func TestRead(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.id.String(), func(t *testing.T) {
-			testRead(t, c, tt.v, &ua.ReadRequest{
-				NodesToRead: []*ua.ReadValueID{
-					&ua.ReadValueID{NodeID: tt.id},
-				},
-				TimestampsToReturn: ua.TimestampsToReturnBoth,
+			t.Run("Read", func(t *testing.T) {
+				testRead(t, c, tt.v, tt.id)
+			})
+			t.Run("RegisteredRead", func(t *testing.T) {
+				testRegisteredRead(t, c, tt.v, tt.id)
 			})
 		})
 	}
 }
 
-func testRead(t *testing.T, c *opcua.Client, v interface{}, req *ua.ReadRequest) {
+func testRead(t *testing.T, c *opcua.Client, v interface{}, id *ua.NodeID) {
 	t.Helper()
 
-	resp, err := c.Read(req)
+	resp, err := c.Read(&ua.ReadRequest{
+		NodesToRead: []*ua.ReadValueID{
+			&ua.ReadValueID{NodeID: id},
+		},
+		TimestampsToReturn: ua.TimestampsToReturnBoth,
+	})
 	if err != nil {
 		t.Fatalf("Read failed: %s", err)
 	}
@@ -57,5 +62,29 @@ func testRead(t *testing.T, c *opcua.Client, v interface{}, req *ua.ReadRequest)
 	}
 	if got, want := resp.Results[0].Value.Value(), v; !verify.Values(t, "", got, want) {
 		t.Fail()
+	}
+}
+
+func testRegisteredRead(t *testing.T, c *opcua.Client, v interface{}, id *ua.NodeID) {
+	t.Helper()
+
+	resp, err := c.RegisterNodes(&ua.RegisterNodesRequest{
+		NodesToRegister: []*ua.NodeID{id},
+	})
+	if err != nil {
+		t.Fatalf("RegisterNodes failed: %s", err)
+	}
+
+	testRead(t, c, v, resp.RegisteredNodeIDs[0])
+	testRead(t, c, v, resp.RegisteredNodeIDs[0])
+	testRead(t, c, v, resp.RegisteredNodeIDs[0])
+	testRead(t, c, v, resp.RegisteredNodeIDs[0])
+	testRead(t, c, v, resp.RegisteredNodeIDs[0])
+
+	_, err = c.UnregisterNodes(&ua.UnregisterNodesRequest{
+		NodesToUnregister: []*ua.NodeID{id},
+	})
+	if err != nil {
+		t.Fatalf("UnregisterNodes failed: %s", err)
 	}
 }
