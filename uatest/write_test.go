@@ -55,12 +55,7 @@ func TestWrite(t *testing.T) {
 				return
 			}
 
-			testRead(t, c, tt.v, &ua.ReadRequest{
-				NodesToRead: []*ua.ReadValueID{
-					&ua.ReadValueID{NodeID: tt.id},
-				},
-				TimestampsToReturn: ua.TimestampsToReturnBoth,
-			})
+			testRead(t, c, tt.v, tt.id)
 		})
 	}
 }
