@@ -114,35 +114,6 @@ func (s *Subscription) Unmonitor(monitoredItemIDs ...uint32) (*ua.DeleteMonitore
 	return res, err
 }
 
-func (s *Subscription) republish(req *ua.RepublishRequest) (*ua.RepublishResponse, error) {
-	var res *ua.RepublishResponse
-	err := s.c.sechan.SendRequest(req, s.c.Session().resp.AuthenticationToken, func(v interface{}) error {
-		if err := safeAssign(v, &res); err != nil {
-			return err
-		}
-		if res.ResponseHeader.ServiceResult != ua.StatusOK {
-			return errors.Errorf(res.ResponseHeader.ServiceResult.Error())
-		}
-		return nil
-	})
-	return res, err
-}
-
-func (s *Subscription) publish(acks []*ua.SubscriptionAcknowledgement) (*ua.PublishResponse, error) {
-	if acks == nil {
-		acks = []*ua.SubscriptionAcknowledgement{}
-	}
-	req := &ua.PublishRequest{
-		SubscriptionAcknowledgements: acks,
-	}
-
-	var res *ua.PublishResponse
-	err := s.c.sendWithTimeout(req, s.publishTimeout(), func(v interface{}) error {
-		return safeAssign(v, &res)
-	})
-	return res, err
-}
-
 func (s *Subscription) publishTimeout() time.Duration {
 	timeout := time.Duration(s.RevisedMaxKeepAliveCount) * s.RevisedPublishingInterval // expected keepalive interval
 	if timeout > uasc.MaxTimeout {
@@ -192,7 +163,7 @@ func (s *Subscription) Run(ctx context.Context) {
 		default:
 			// send the next publish request
 			// note that res contains data even if an error was returned
-			res, err := s.publish(acks)
+			res, err := s.c.PublishWithTimeout(acks, s.publishTimeout())
 			switch {
 			case err == ua.StatusBadSequenceNumberUnknown:
 				// At least one ack has been submitted repeatedly

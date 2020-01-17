@@ -157,7 +157,7 @@ func (c *Client) Connect(ctx context.Context) (err error) {
 }
 
 func (c *Client) sessionClosed() bool {
-	return c.Session() != nil
+	return c.Session() == nil
 }
 
 // Dial establishes a secure channel.
@@ -170,15 +170,12 @@ func (c *Client) Dial(ctx context.Context) error {
 	if c.sechan != nil {
 		return errors.Errorf("secure channel already connected")
 	}
-	conn, err := uacp.Dial(ctx, c.endpointURL)
+
+	sechan, conn, err := c.createSecureChannel(ctx)
 	if err != nil {
 		return err
 	}
-	sechan, err := uasc.NewSecureChannel(c.endpointURL, conn, c.cfg)
-	if err != nil {
-		_ = conn.Close()
-		return err
-	}
+
 	c.sechan = sechan
 	ctx, c.cancelMonitor = context.WithCancel(ctx)
 	go c.monitorChannel(ctx)
@@ -307,7 +304,7 @@ func (c *Client) reconnectProcess(ctx context.Context, currentState chan reconne
 		default:
 			switch state {
 			case sechanDisconnected:
-				sechan, conn, err := c.recreateSecureChannel(ctx)
+				sechan, conn, err := c.createSecureChannel(ctx)
 				if err != nil {
 					debug.Printf("Creating a new instance of secure channel has failed, %s", err.Error())
 					state = aborted
@@ -376,8 +373,8 @@ func (c *Client) reconnectProcess(ctx context.Context, currentState chan reconne
 	}
 }
 
-// recreateSecureChannel create a new secure channel based on the configuration of the previous one
-func (c *Client) recreateSecureChannel(ctx context.Context) (*uasc.SecureChannel, *uacp.Conn, error) {
+// createSecureChannel create a new secure channel based on the configuration of the previous one
+func (c *Client) createSecureChannel(ctx context.Context) (*uasc.SecureChannel, *uacp.Conn, error) {
 	conn, err := uacp.Dial(ctx, c.endpointURL)
 	if err != nil {
 		return nil, nil, err
@@ -438,7 +435,7 @@ func (c *Client) repairSubscriptions(subscriptionIDs ...uint32) error {
 	for _, subID := range subscriptionIDs {
 		sub, ok := c.subscriptions[subID]
 		if !ok {
-			return errors.Errorf("Invalid SubscriptionID")
+			return errors.Errorf("Invalid SubscriptionID, id = %d\n", subID)
 		}
 		if err := c.repairSubscription(sub); err != nil {
 			return err
@@ -450,10 +447,14 @@ func (c *Client) repairSubscriptions(subscriptionIDs ...uint32) error {
 
 func (c *Client) repairSubscription(sub *Subscription) error {
 	debug.Printf("RepairSubscription  for SubscriptionId %d", sub.SubscriptionID)
-	if status, err := c.subscriptionRepublish(sub); err != nil {
+	if err := c.subscriptionRepublish(sub); err != nil {
+		status, ok := err.(ua.StatusCode)
+		if !ok {
+			return err
+		}
 		switch status {
 		case ua.StatusBadSessionIDInvalid:
-			return err
+			return nil
 		case ua.StatusBadSubscriptionIDInvalid:
 			debug.Printf("Republish failed, subscriptionId is not valid anymore on server side.")
 			// return sub.recreateSubscriptionAndMonitoredItem()
@@ -466,8 +467,9 @@ func (c *Client) repairSubscription(sub *Subscription) error {
 // subscriptionRepublish send republish request for the given subscription
 // republish should end with a StatusCode BadMessageNotAvailable
 // wich implies that there's no more message to restore
-func (c *Client) subscriptionRepublish(sub *Subscription) (ua.StatusCode, error) {
+func (c *Client) subscriptionRepublish(sub *Subscription) error {
 	for {
+
 		req := &ua.RepublishRequest{
 			SubscriptionID:           sub.SubscriptionID,
 			RetransmitSequenceNumber: sub.lastSequenceNumber + 1,
@@ -480,23 +482,28 @@ func (c *Client) subscriptionRepublish(sub *Subscription) (ua.StatusCode, error)
 
 		if c.sessionClosed() {
 			debug.Printf("Republish aborted")
-			return ua.StatusOK, nil
+			return ua.StatusBadSessionClosed
 		}
 
-		res, err := sub.republish(req)
+		res, err := c.Republish(req)
+		if err != nil {
+			if err == ua.StatusBadMessageNotAvailable {
+				// No more message to restore
+				return nil
+			}
+			debug.Printf("Republish request ends with: %v", err)
+			return err
+		}
+
 		status := ua.StatusBad
 		if res != nil {
 			status = res.ResponseHeader.ServiceResult
 		}
-		if err != nil && status == ua.StatusOK {
-			// reprocess notification message and keep going
-			continue
+
+		if status != ua.StatusOK {
+			debug.Printf("Republish request ends with: %v", status)
+			return status
 		}
-		if err == nil {
-			err = errors.Errorf(res.ResponseHeader.ServiceResult.Error())
-		}
-		debug.Printf("Republish request ends with: %s", err.Error())
-		return status, err
 	}
 }
 
@@ -792,6 +799,36 @@ func (c *Client) Read(req *ua.ReadRequest) (*ua.ReadResponse, error) {
 func (c *Client) Write(req *ua.WriteRequest) (*ua.WriteResponse, error) {
 	var res *ua.WriteResponse
 	err := c.Send(req, func(v interface{}) error {
+		return safeAssign(v, &res)
+	})
+	return res, err
+}
+
+// Republish executes a synchronous republish request.
+func (c *Client) Republish(req *ua.RepublishRequest) (*ua.RepublishResponse, error) {
+	var res *ua.RepublishResponse
+	err := c.sechan.SendRequest(req, c.Session().resp.AuthenticationToken, func(v interface{}) error {
+		return safeAssign(v, &res)
+	})
+	return res, err
+}
+
+// Publish executes a synchronous publish request.
+func (c *Client) Publish(acks []*ua.SubscriptionAcknowledgement) (*ua.PublishResponse, error) {
+	return c.PublishWithTimeout(acks, c.cfg.RequestTimeout)
+}
+
+// PublishWithTimeout executes a synchronous publish request with a timeout.
+func (c *Client) PublishWithTimeout(acks []*ua.SubscriptionAcknowledgement, timeout time.Duration) (*ua.PublishResponse, error) {
+	if acks == nil {
+		acks = []*ua.SubscriptionAcknowledgement{}
+	}
+	req := &ua.PublishRequest{
+		SubscriptionAcknowledgements: acks,
+	}
+
+	var res *ua.PublishResponse
+	err := c.sendWithTimeout(req, timeout, func(v interface{}) error {
 		return safeAssign(v, &res)
 	})
 	return res, err
