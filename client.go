@@ -904,15 +904,16 @@ func (c *Client) Subscribe(params *SubscriptionParameters) (*Subscription, error
 	}
 
 	sub := &Subscription{
-		res.SubscriptionID,
-		time.Duration(res.RevisedPublishingInterval) * time.Millisecond,
-		res.RevisedLifetimeCount,
-		res.RevisedMaxKeepAliveCount,
-		params.Notifs,
-		0,
-		make(chan bool, 1),
-		c,
+		SubscriptionID:            res.SubscriptionID,
+		RevisedPublishingInterval: time.Duration(res.RevisedPublishingInterval) * time.Millisecond,
+		RevisedLifetimeCount:      res.RevisedLifetimeCount,
+		RevisedMaxKeepAliveCount:  res.RevisedMaxKeepAliveCount,
+		Notifs:                    params.Notifs,
+		lastSequenceNumber:        0,
+		c:                         c,
 	}
+	sub.cond = sync.NewCond(&sub.mux)
+
 	c.subMux.Lock()
 	defer c.subMux.Unlock()
 	if sub.SubscriptionID == 0 || c.subscriptions[sub.SubscriptionID] != nil {

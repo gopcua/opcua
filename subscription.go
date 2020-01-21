@@ -2,6 +2,7 @@ package opcua
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/gopcua/opcua/errors"
@@ -25,7 +26,9 @@ type Subscription struct {
 	RevisedMaxKeepAliveCount  uint32
 	Notifs                    chan *PublishNotificationData
 	lastSequenceNumber        uint32
-	running                   chan bool
+	suspend                   bool
+	mux                       sync.Mutex
+	cond                      *sync.Cond
 	c                         *Client
 }
 
@@ -125,12 +128,34 @@ func (s *Subscription) publishTimeout() time.Duration {
 	return timeout
 }
 
+// Resume the subscription after being suspended
 func (s *Subscription) Resume() {
-	s.running <- true
+	if !s.suspend {
+		return
+	}
+	s.mux.Lock()
+	defer s.mux.Unlock()
+	s.suspend = false
+	s.cond.Broadcast()
 }
 
+// Suspend make the subscription wait until Resume
 func (s *Subscription) Suspend() {
-	s.running <- false
+	if s.suspend {
+		return
+	}
+	s.mux.Lock()
+	s.suspend = true
+	defer s.mux.Unlock()
+	s.cond.Broadcast()
+}
+
+func (s *Subscription) waitWhenSuspended() {
+	s.mux.Lock()
+	defer s.mux.Unlock()
+	for s.suspend {
+		s.cond.Wait()
+	}
 }
 
 // Run() starts an infinite loop that sends PublishRequests and delivers received
@@ -144,26 +169,12 @@ func (s *Subscription) Run(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			return
-		case run := <-s.running:
-			// run indicate if the publishing should be interrupted
-			if run {
-				// If run is active then continue publishing
-				continue
-			}
-			// Suspended mode
-			for !run {
-				select {
-				case <-ctx.Done():
-					return
-				case run = <-s.running:
-					// Block until running has been triggered by Resume
-				}
-			}
-
 		default:
 			// send the next publish request
 			// note that res contains data even if an error was returned
+			s.waitWhenSuspended()
 			res, err := s.c.PublishWithTimeout(acks, s.publishTimeout())
+			s.waitWhenSuspended()
 			switch {
 			case err == ua.StatusBadSequenceNumberUnknown:
 				// At least one ack has been submitted repeatedly
