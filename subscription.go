@@ -130,23 +130,23 @@ func (s *Subscription) publishTimeout() time.Duration {
 
 // Resume the subscription after being suspended
 func (s *Subscription) Resume() {
+	s.mux.Lock()
+	defer s.mux.Unlock()
 	if !s.suspend {
 		return
 	}
-	s.mux.Lock()
-	defer s.mux.Unlock()
 	s.suspend = false
 	s.cond.Broadcast()
 }
 
 // Suspend make the subscription wait until Resume
 func (s *Subscription) Suspend() {
+	s.mux.Lock()
+	defer s.mux.Unlock()
 	if s.suspend {
 		return
 	}
-	s.mux.Lock()
 	s.suspend = true
-	defer s.mux.Unlock()
 	s.cond.Broadcast()
 }
 
