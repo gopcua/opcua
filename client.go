@@ -178,13 +178,15 @@ func (c *Client) Dial(ctx context.Context) error {
 		_ = c.conn.Close()
 		return err
 	}
-	ctx, c.cancelMonitor = context.WithCancel(ctx)
-	go c.monitorChannel(ctx)
-	err = c.openSecureChannel(ctx, c.sechan.Open)
-	if err != nil {
-		return err
-	}
-	return nil
+
+	// Issue #313: decouple the dial context from the monitor context
+	// mctx must *not* be a child context of 'ctx'. Otherwise, the
+	// monitor go routine terminates whenever the dial context is done
+	// which may get triggered unexpectedly by a timer context.
+	var mctx context.Context
+	mctx, c.cancelMonitor = context.WithCancel(context.Background())
+	go c.monitorChannel(mctx)
+	return c.openSecureChannel(mctx, c.sechan.Open)
 }
 
 func (c *Client) openSecureChannel(ctx context.Context, open func() error) error {
