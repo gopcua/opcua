@@ -17,6 +17,7 @@ import (
 
 	"github.com/gopcua/opcua/debug"
 	"github.com/gopcua/opcua/errors"
+	"github.com/gopcua/opcua/id"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uacp"
 	"github.com/gopcua/opcua/uapolicy"
@@ -65,6 +66,34 @@ type SecureChannel struct {
 
 	// time returns the current time. When not set it defaults to time.Now().
 	time func() time.Time
+
+	// The lifetime of the SecurityToken in milliseconds. The UTC expiration time for the token
+	// may be calculated by adding the lifetime to the createdAt time.
+	lifetime uint32
+
+	// secureChannelID is a unique identifier for the SecureChannel assigned by the Server.
+	// If a Server receives a SecureChannelId which it does not recognize it shall return an
+	// appropriate transport layer error.
+	//
+	// When a Server starts the first SecureChannelId used should be a value that is likely to
+	// be unique after each restart. This ensures that a Server restart does not cause
+	// previously connected Clients to accidentally ‘reuse’ SecureChannels that did not belong
+	// to them.
+	secureChannelID uint32
+
+	// sequenceNumber is a monotonically increasing sequence number assigned by the sender to each
+	// MessageChunk sent over the SecureChannel.
+	sequenceNumber uint32
+
+	// requestID is an identifier assigned by the Client to OPC UA request Message. All MessageChunks
+	// for the request and the associated response use the same identifier
+	requestID uint32
+
+	// securityTokenID is a unique identifier for the SecureChannel SecurityToken used to secure the Message.
+	// This identifier is returned by the Server in an OpenSecureChannel response Message.
+	// If a Server receives a TokenId which it does not recognize it shall return an appropriate
+	// transport layer error.
+	securityTokenID uint32
 }
 
 func NewSecureChannel(endpoint string, c *uacp.Conn, cfg *Config) (*SecureChannel, error) {
@@ -100,14 +129,19 @@ func NewSecureChannel(endpoint string, c *uacp.Conn, cfg *Config) (*SecureChanne
 			TimeoutHint:      uint32(cfg.RequestTimeout / time.Millisecond),
 			AdditionalHeader: ua.NewExtensionObject(nil),
 		},
-		state:   secureChannelCreated,
-		handler: make(map[uint32]chan Response),
-		chunks:  make(map[uint32][]*MessageChunk),
+		state:     secureChannelCreated,
+		handler:   make(map[uint32]chan Response),
+		chunks:    make(map[uint32][]*MessageChunk),
+		requestID: cfg.RequestIDSeed,
 	}, nil
 }
 
 func (s *SecureChannel) LocalEndpoint() string {
 	return s.EndpointURL
+}
+
+func (s *SecureChannel) Lifetime() uint32 {
+	return s.lifetime
 }
 
 func (s *SecureChannel) setState(n int32) {
@@ -199,6 +233,61 @@ func (s *SecureChannel) sendAsyncWithTimeout(req ua.Request, authToken *ua.NodeI
 	return resp, reqid, nil
 }
 
+// New creates a OPC UA Secure Conversation message.New
+// MessageType of UASC is determined depending on the type of service given as below.
+//
+// Service type: OpenSecureChannel => Message type: OPN.
+//
+// Service type: CloseSecureChannel => Message type: CLO.
+//
+// Service type: Others => Message type: MSG.
+//
+func (s *SecureChannel) newMessage(srv interface{}, typeID uint16) *Message {
+	switch typeID {
+	case id.OpenSecureChannelRequest_Encoding_DefaultBinary, id.OpenSecureChannelResponse_Encoding_DefaultBinary:
+		// Do not send the thumbprint for security mode None
+		// even if we have a certificate.
+		//
+		// See https://github.com/gopcua/opcua/issues/259
+		thumbprint := s.cfg.Thumbprint
+		if s.cfg.SecurityMode == ua.MessageSecurityModeNone {
+			thumbprint = nil
+		}
+
+		return &Message{
+			MessageHeader: &MessageHeader{
+				Header:                   NewHeader(MessageTypeOpenSecureChannel, ChunkTypeFinal, s.secureChannelID),
+				AsymmetricSecurityHeader: NewAsymmetricSecurityHeader(s.cfg.SecurityPolicyURI, s.cfg.Certificate, thumbprint),
+				SequenceHeader:           NewSequenceHeader(s.sequenceNumber, s.requestID),
+			},
+			TypeID:  ua.NewFourByteExpandedNodeID(0, typeID),
+			Service: srv,
+		}
+
+	case id.CloseSecureChannelRequest_Encoding_DefaultBinary, id.CloseSecureChannelResponse_Encoding_DefaultBinary:
+		return &Message{
+			MessageHeader: &MessageHeader{
+				Header:                  NewHeader(MessageTypeCloseSecureChannel, ChunkTypeFinal, s.secureChannelID),
+				SymmetricSecurityHeader: NewSymmetricSecurityHeader(s.securityTokenID),
+				SequenceHeader:          NewSequenceHeader(s.sequenceNumber, s.requestID),
+			},
+			TypeID:  ua.NewFourByteExpandedNodeID(0, typeID),
+			Service: srv,
+		}
+
+	default:
+		return &Message{
+			MessageHeader: &MessageHeader{
+				Header:                  NewHeader(MessageTypeMessage, ChunkTypeFinal, s.secureChannelID),
+				SymmetricSecurityHeader: NewSymmetricSecurityHeader(s.securityTokenID),
+				SequenceHeader:          NewSequenceHeader(s.sequenceNumber, s.requestID),
+			},
+			TypeID:  ua.NewFourByteExpandedNodeID(0, typeID),
+			Service: srv,
+		}
+	}
+}
+
 func (s *SecureChannel) newRequestMessage(req ua.Request, authToken *ua.NodeID, timeout time.Duration) (*Message, error) {
 	typeID := ua.ServiceTypeID(req)
 	if typeID == 0 {
@@ -208,13 +297,13 @@ func (s *SecureChannel) newRequestMessage(req ua.Request, authToken *ua.NodeID, 
 		authToken = ua.NewTwoByteNodeID(0)
 	}
 
-	s.cfg.SequenceNumber++
-	if s.cfg.SequenceNumber > math.MaxUint32-1023 {
-		s.cfg.SequenceNumber = 1
+	s.sequenceNumber++
+	if s.sequenceNumber > math.MaxUint32-1023 {
+		s.sequenceNumber = 1
 	}
-	s.cfg.RequestID++
-	if s.cfg.RequestID == 0 {
-		s.cfg.RequestID = 1
+	s.requestID++
+	if s.requestID == 0 {
+		s.requestID = 1
 	}
 	s.reqhdr.RequestHandle++
 	if s.reqhdr.RequestHandle == 0 {
@@ -229,7 +318,7 @@ func (s *SecureChannel) newRequestMessage(req ua.Request, authToken *ua.NodeID, 
 	req.SetHeader(s.reqhdr)
 
 	// encode the message
-	return NewMessage(req, typeID, s.cfg), nil
+	return s.newMessage(req, typeID), nil
 }
 
 // SendResponse sends a service response.
@@ -243,7 +332,7 @@ func (s *SecureChannel) SendResponse(req ua.Response) error {
 	}
 
 	// encode the message
-	m := NewMessage(req, typeID, s.cfg)
+	m := s.newMessage(req, typeID)
 	reqid := m.SequenceHeader.RequestID
 	b, err := m.Encode()
 	if err != nil {
@@ -314,7 +403,7 @@ func (s *SecureChannel) readChunk() (*MessageChunk, error) {
 		}
 
 		s.cfg.SecurityPolicyURI = m.SecurityPolicyURI
-		s.cfg.RequestID = m.RequestID
+		s.requestID = m.RequestID
 
 		s.enc, err = uapolicy.Asymmetric(m.SecurityPolicyURI, s.cfg.LocalKey, remoteKey)
 		if err != nil {
@@ -347,9 +436,9 @@ func (s *SecureChannel) readChunk() (*MessageChunk, error) {
 	}
 	m.Data = m.Data[n:]
 
-	if s.cfg.SecureChannelID == 0 {
-		s.cfg.SecureChannelID = h.SecureChannelID
-		debug.Printf("uasc %d/%d: set secure channel id to %d", s.c.ID(), m.SequenceHeader.RequestID, s.cfg.SecureChannelID)
+	if s.secureChannelID == 0 {
+		s.secureChannelID = h.SecureChannelID
+		debug.Printf("uasc %d/%d: set secure channel id to %d", s.c.ID(), m.SequenceHeader.RequestID, s.secureChannelID)
 	}
 
 	return m, nil
@@ -375,7 +464,7 @@ func (s *SecureChannel) Receive(ctx context.Context) Response {
 				s.notifyCallers(ctx, err)
 				return Response{
 					ReqID: reqid,
-					SCID:  s.cfg.SecureChannelID,
+					SCID:  s.secureChannelID,
 					V:     svc,
 					Err:   err,
 				}
@@ -388,7 +477,7 @@ func (s *SecureChannel) Receive(ctx context.Context) Response {
 
 			// Revert data race fix from #232 with an additional type check
 			if _, ok := svc.(ua.Request); ok {
-				s.cfg.RequestID = reqid
+				s.requestID = reqid
 			}
 
 			switch svc.(type) {
@@ -411,7 +500,7 @@ func (s *SecureChannel) Receive(ctx context.Context) Response {
 				debug.Printf("uasc %d/%d: no handler for %T, returning result to caller", s.c.ID(), reqid, svc)
 				return Response{
 					ReqID: reqid,
-					SCID:  s.cfg.SecureChannelID,
+					SCID:  s.secureChannelID,
 					V:     svc,
 					Err:   err,
 				}
@@ -422,7 +511,7 @@ func (s *SecureChannel) Receive(ctx context.Context) Response {
 				debug.Printf("sending %T to handler\n", svc)
 				r := Response{
 					ReqID: reqid,
-					SCID:  s.cfg.SecureChannelID,
+					SCID:  s.secureChannelID,
 					V:     svc,
 					Err:   err,
 				}
@@ -524,11 +613,11 @@ func (s *SecureChannel) receive(ctx context.Context) (uint32, interface{}, error
 func (s *SecureChannel) notifyCallers(ctx context.Context, err error) {
 	s.mu.Lock()
 	var reqids []uint32
-	for id := range s.handler {
-		reqids = append(reqids, id)
+	for rid := range s.handler {
+		reqids = append(reqids, rid)
 	}
-	for _, id := range reqids {
-		s.notifyCallerLock(ctx, id, nil, err)
+	for _, rid := range reqids {
+		s.notifyCallerLock(ctx, rid, nil, err)
 	}
 	s.mu.Unlock()
 }
@@ -553,7 +642,7 @@ func (s *SecureChannel) notifyCallerLock(ctx context.Context, reqid uint32, svc 
 	go func() {
 		r := Response{
 			ReqID: reqid,
-			SCID:  s.cfg.SecureChannelID,
+			SCID:  s.secureChannelID,
 			V:     svc,
 			Err:   err,
 		}
@@ -567,7 +656,11 @@ func (s *SecureChannel) notifyCallerLock(ctx context.Context, reqid uint32, svc 
 
 // Open opens a new secure channel with a server
 func (s *SecureChannel) Open() error {
-	return s.openSecureChannel()
+	return s.openSecureChannel(ua.SecurityTokenRequestTypeIssue)
+}
+
+func (s *SecureChannel) Renew() error {
+	return s.openSecureChannel(ua.SecurityTokenRequestTypeRenew)
 }
 
 // Close closes an existing secure channel
@@ -583,7 +676,7 @@ func (s *SecureChannel) Close() error {
 	return io.EOF
 }
 
-func (s *SecureChannel) openSecureChannel() error {
+func (s *SecureChannel) openSecureChannel(requestType ua.SecurityTokenRequestType) error {
 	var err error
 	var localKey *rsa.PrivateKey
 	var remoteKey *rsa.PublicKey
@@ -620,7 +713,7 @@ func (s *SecureChannel) openSecureChannel() error {
 
 	req := &ua.OpenSecureChannelRequest{
 		ClientProtocolVersion: 0,
-		RequestType:           ua.SecurityTokenRequestTypeIssue,
+		RequestType:           requestType,
 		SecurityMode:          s.cfg.SecurityMode,
 		ClientNonce:           nonce,
 		RequestedLifetime:     s.cfg.Lifetime,
@@ -631,7 +724,9 @@ func (s *SecureChannel) openSecureChannel() error {
 		if !ok {
 			return errors.Errorf("got %T, want OpenSecureChannelResponse", req)
 		}
-		s.cfg.SecurityTokenID = resp.SecurityToken.TokenID
+		s.securityTokenID = resp.SecurityToken.TokenID
+		s.lifetime = resp.SecurityToken.RevisedLifetime
+		debug.Printf("received security token tokenID: %v, createdAt: %v, lifetime %v", resp.SecurityToken.TokenID, resp.SecurityToken.CreatedAt, resp.SecurityToken.RevisedLifetime)
 
 		s.enc, err = uapolicy.Symmetric(s.cfg.SecurityPolicyURI, nonce, resp.ServerNonce)
 		if err != nil {
@@ -688,8 +783,8 @@ func (s *SecureChannel) handleOpenSecureChannelRequest(svc interface{}) error {
 		},
 		ServerProtocolVersion: 0,
 		SecurityToken: &ua.ChannelSecurityToken{
-			ChannelID:       s.cfg.SecureChannelID,
-			TokenID:         s.cfg.SecurityTokenID,
+			ChannelID:       s.secureChannelID,
+			TokenID:         s.securityTokenID,
 			CreatedAt:       s.timeNow(),
 			RevisedLifetime: req.RequestedLifetime,
 		},

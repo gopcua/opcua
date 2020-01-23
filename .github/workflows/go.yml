@@ -1,5 +1,5 @@
 name: gopuca
-on: [push]
+on: [push, pull_request]
 jobs:
   test:
     name: Test ${{ matrix.os }}

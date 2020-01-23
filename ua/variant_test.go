@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gopcua/opcua/errors"
+
 	"github.com/pascaldekloe/goe/verify"
 )
 
@@ -468,21 +470,138 @@ func TestVariant(t *testing.T) {
 	RunCodecTest(t, cases)
 }
 
-func TestBigArray(t *testing.T) {
-	b := []byte{
-		// variant encoding mask
-		0x87,
-		// array length
-		0xff, 0xff, 0x01, 0x00,
-		// array values
-		0x00, 0x00, 0x00, 0x00,
-	}
+func TestMustVariant(t *testing.T) {
+	t.Run("int", func(t *testing.T) {
+		defer func() {
+			if r := recover(); r == nil {
+				t.Fatalf("MustVariant(int) did not panic")
+			}
+		}()
+		MustVariant(int(5))
+	})
+	t.Run("uint", func(t *testing.T) {
+		defer func() {
+			if r := recover(); r == nil {
+				t.Fatalf("MustVariant(uint) did not panic")
+			}
+		}()
+		MustVariant(uint(5))
+	})
+}
 
-	_, err := Decode(b, MustVariant([]uint32{0}))
+func TestArray(t *testing.T) {
+	t.Run("one-dimension", func(t *testing.T) {
+		v := MustVariant([]uint32{1, 2, 3})
+		if got, want := v.ArrayLength(), int32(3); got != want {
+			t.Fatalf("got length %d want %d", got, want)
+		}
+		if got, want := v.EncodingMask(), byte(TypeIDUint32|VariantArrayValues); got != want {
+			t.Fatalf("got mask %d want %d", got, want)
+		}
+		verify.Values(t, "", v.ArrayDimensions(), []int32{})
+	})
+	t.Run("multi-dimension", func(t *testing.T) {
+		v := MustVariant([][]uint32{{1, 1}, {2, 2}, {3, 3}})
+		if got, want := v.ArrayLength(), int32(6); got != want {
+			t.Fatalf("got length %d want %d", got, want)
+		}
+		if got, want := v.EncodingMask(), byte(TypeIDUint32|VariantArrayValues|VariantArrayDimensions); got != want {
+			t.Fatalf("got mask %d want %d", got, want)
+		}
+		verify.Values(t, "", v.ArrayDimensions(), []int32{3, 2})
+	})
+	t.Run("unbalanced", func(t *testing.T) {
+		b := []byte{
+			// variant encoding mask
+			0xc7,
+			// array length
+			0x03, 0x00, 0x00, 0x00,
+			// array values
+			0x00, 0x00, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00,
+			0x00, 0x00, 0x00, 0x00,
+			// array dimensions length
+			0x02, 0x00, 0x00, 0x00,
+			// array dimensions
+			0x03, 0x00, 0x00, 0x00,
+			0x02, 0x00, 0x00, 0x00,
+		}
 
-	if err != StatusBadEncodingLimitsExceeded {
-		t.Fatalf("got error %v want %v", err, StatusBadEncodingLimitsExceeded)
-	}
+		_, err := Decode(b, MustVariant([]uint32{0}))
+		if got, want := err, errUnbalancedSlice; !errors.Equal(got, want) {
+			t.Fatalf("got error %#v want %#v", got, want)
+		}
+	})
+	t.Run("length negative", func(t *testing.T) {
+		b := []byte{
+			// variant encoding mask
+			0x87,
+			// array length
+			0xff, 0xff, 0xff, 0xff, // -1
+		}
+
+		_, err := Decode(b, MustVariant([]uint32{0}))
+		if got, want := err, StatusBadEncodingLimitsExceeded; !errors.Equal(got, want) {
+			t.Fatalf("got error %#v want %#v", got, want)
+		}
+	})
+	t.Run("length too big", func(t *testing.T) {
+		b := []byte{
+			// variant encoding mask
+			0x87,
+			// array length
+			0xff, 0xff, 0x01, 0x00,
+			// array values
+			0x00, 0x00, 0x00, 0x00,
+		}
+
+		_, err := Decode(b, MustVariant([]uint32{0}))
+		if got, want := err, StatusBadEncodingLimitsExceeded; !errors.Equal(got, want) {
+			t.Fatalf("got error %v want %v", err, StatusBadEncodingLimitsExceeded)
+		}
+	})
+	t.Run("dimensions length negative", func(t *testing.T) {
+		b := []byte{
+			// variant encoding mask
+			0xc7,
+			// array length
+			0x02, 0x00, 0x00, 0x00,
+			// array values
+			0x01, 0x00, 0x00, 0x00,
+			0x01, 0x00, 0x00, 0x00,
+			// array dimesions length
+			0xff, 0xff, 0xff, 0xff, // -1
+			// array dimesions
+			0x01, 0x00, 0x00, 0x00,
+			0x01, 0x00, 0x00, 0x00,
+		}
+
+		_, err := Decode(b, MustVariant([]uint32{0}))
+		if got, want := err, StatusBadEncodingLimitsExceeded; !errors.Equal(got, want) {
+			t.Fatalf("got error %#v want %#v", got, want)
+		}
+	})
+	t.Run("dimensions negative", func(t *testing.T) {
+		b := []byte{
+			// variant encoding mask
+			0xc7,
+			// array length
+			0x02, 0x00, 0x00, 0x00,
+			// array values
+			0x01, 0x00, 0x00, 0x00,
+			0x01, 0x00, 0x00, 0x00,
+			// array dimesions length
+			0x02, 0x00, 0x00, 0x00,
+			// array dimesions
+			0x01, 0x00, 0x00, 0x00,
+			0xff, 0xff, 0xff, 0xff, // -1
+		}
+
+		_, err := Decode(b, MustVariant([]uint32{0}))
+		if got, want := err, StatusBadEncodingLimitsExceeded; !errors.Equal(got, want) {
+			t.Fatalf("got error %#v want %#v", got, want)
+		}
+	})
 }
 
 func TestSet(t *testing.T) {
@@ -635,138 +754,442 @@ func TestSliceDim(t *testing.T) {
 }
 
 func TestVariantUnsupportedType(t *testing.T) {
-	_, err := NewVariant(int(5))
-	if err == nil {
-		t.Fatal("got nil want err")
+	tests := []interface{}{int(5), uint(5)}
+	for _, v := range tests {
+		t.Run(fmt.Sprintf("%T", v), func(t *testing.T) {
+			if _, err := NewVariant(v); err == nil {
+				t.Fatal("got nil want err")
+			}
+		})
 	}
 }
 
 func TestVariantValueMethod(t *testing.T) {
-	v := MustVariant(int32(5))
-	if got, want := int32(5), v.Value().(int32); got != want {
+	if got, want := MustVariant(int32(5)).Value().(int32), int32(5); got != want {
 		t.Fatalf("got %d want %d", got, want)
 	}
 }
 
-func TestVariantBool(t *testing.T) {
+func TestVariantValueHelpers(t *testing.T) {
 	tests := []struct {
-		v interface{}
-		n bool
+		v    interface{}
+		want interface{}
+		fn   func(v *Variant) interface{}
 	}{
-		{true, true},
-		{"", false},
+		// bool
+		{
+			v:    int32(5),
+			want: false,
+			fn:   func(v *Variant) interface{} { return v.Bool() },
+		},
+		{
+			v:    false,
+			want: false,
+			fn:   func(v *Variant) interface{} { return v.Bool() },
+		},
+		{
+			v:    true,
+			want: true,
+			fn:   func(v *Variant) interface{} { return v.Bool() },
+		},
+
+		// string
+		{
+			v:    false,
+			want: "",
+			fn:   func(v *Variant) interface{} { return v.String() },
+		},
+		{
+			v:    "a",
+			want: "a",
+			fn:   func(v *Variant) interface{} { return v.String() },
+		},
+		{
+			v:    XMLElement("a"),
+			want: "a",
+			fn:   func(v *Variant) interface{} { return v.String() },
+		},
+		{
+			v:    &LocalizedText{Text: "a"},
+			want: "a",
+			fn:   func(v *Variant) interface{} { return v.String() },
+		},
+		{
+			v:    &QualifiedName{Name: "a"},
+			want: "a",
+			fn:   func(v *Variant) interface{} { return v.String() },
+		},
+
+		// float
+		{
+			v:    false,
+			want: float64(0),
+			fn:   func(v *Variant) interface{} { return v.Float() },
+		},
+		{
+			v:    float32(5),
+			want: float64(5),
+			fn:   func(v *Variant) interface{} { return v.Float() },
+		},
+		{
+			v:    float64(5),
+			want: float64(5),
+			fn:   func(v *Variant) interface{} { return v.Float() },
+		},
+
+		// int
+		{
+			v:    false,
+			want: int64(0),
+			fn:   func(v *Variant) interface{} { return v.Int() },
+		},
+		{
+			v:    int8(5),
+			want: int64(5),
+			fn:   func(v *Variant) interface{} { return v.Int() },
+		},
+		{
+			v:    int16(5),
+			want: int64(5),
+			fn:   func(v *Variant) interface{} { return v.Int() },
+		},
+		{
+			v:    int32(5),
+			want: int64(5),
+			fn:   func(v *Variant) interface{} { return v.Int() },
+		},
+		{
+			v:    int64(5),
+			want: int64(5),
+			fn:   func(v *Variant) interface{} { return v.Int() },
+		},
+
+		// uint
+		{
+			v:    false,
+			want: uint64(0),
+			fn:   func(v *Variant) interface{} { return v.Uint() },
+		},
+		{
+			v:    uint8(5),
+			want: uint64(5),
+			fn:   func(v *Variant) interface{} { return v.Uint() },
+		},
+		{
+			v:    uint16(5),
+			want: uint64(5),
+			fn:   func(v *Variant) interface{} { return v.Uint() },
+		},
+		{
+			v:    uint32(5),
+			want: uint64(5),
+			fn:   func(v *Variant) interface{} { return v.Uint() },
+		},
+		{
+			v:    uint64(5),
+			want: uint64(5),
+			fn:   func(v *Variant) interface{} { return v.Uint() },
+		},
+
+		// ByteString
+		{
+			v:    false,
+			want: ([]byte)(nil),
+			fn:   func(v *Variant) interface{} { return v.ByteString() },
+		},
+		{
+			v:    []byte("abc"),
+			want: []byte("abc"),
+			fn:   func(v *Variant) interface{} { return v.ByteString() },
+		},
+
+		// DataValue
+		{
+			v:    false,
+			want: (*DataValue)(nil),
+			fn:   func(v *Variant) interface{} { return v.DataValue() },
+		},
+		{
+			v:    &DataValue{Status: StatusBad},
+			want: &DataValue{Status: StatusBad},
+			fn:   func(v *Variant) interface{} { return v.DataValue() },
+		},
+
+		// DiagnosticInfo
+		{
+			v:    false,
+			want: (*DiagnosticInfo)(nil),
+			fn:   func(v *Variant) interface{} { return v.DiagnosticInfo() },
+		},
+		{
+			v:    &DiagnosticInfo{SymbolicID: 5},
+			want: &DiagnosticInfo{SymbolicID: 5},
+			fn:   func(v *Variant) interface{} { return v.DiagnosticInfo() },
+		},
+
+		// ExpandedNodeID
+		{
+			v:    false,
+			want: (*ExpandedNodeID)(nil),
+			fn:   func(v *Variant) interface{} { return v.ExpandedNodeID() },
+		},
+		{
+			v:    &ExpandedNodeID{NamespaceURI: "abc"},
+			want: &ExpandedNodeID{NamespaceURI: "abc"},
+			fn:   func(v *Variant) interface{} { return v.ExpandedNodeID() },
+		},
+
+		// ExtensionObject
+		{
+			v:    false,
+			want: (*ExtensionObject)(nil),
+			fn:   func(v *Variant) interface{} { return v.ExtensionObject() },
+		},
+		{
+			v:    &ExtensionObject{Value: "abc"},
+			want: &ExtensionObject{Value: "abc"},
+			fn:   func(v *Variant) interface{} { return v.ExtensionObject() },
+		},
+
+		// GUID
+		{
+			v:    false,
+			want: (*GUID)(nil),
+			fn:   func(v *Variant) interface{} { return v.GUID() },
+		},
+		{
+			v:    NewGUID("abc"),
+			want: NewGUID("abc"),
+			fn:   func(v *Variant) interface{} { return v.GUID() },
+		},
+
+		// LocalizedText
+		{
+			v:    false,
+			want: (*LocalizedText)(nil),
+			fn:   func(v *Variant) interface{} { return v.LocalizedText() },
+		},
+		{
+			v:    &LocalizedText{Text: "abc"},
+			want: &LocalizedText{Text: "abc"},
+			fn:   func(v *Variant) interface{} { return v.LocalizedText() },
+		},
+
+		// NodeID
+		{
+			v:    false,
+			want: (*NodeID)(nil),
+			fn:   func(v *Variant) interface{} { return v.NodeID() },
+		},
+		{
+			v:    NewFourByteNodeID(1, 2),
+			want: NewFourByteNodeID(1, 2),
+			fn:   func(v *Variant) interface{} { return v.NodeID() },
+		},
+
+		// QualifiedName
+		{
+			v:    false,
+			want: (*QualifiedName)(nil),
+			fn:   func(v *Variant) interface{} { return v.QualifiedName() },
+		},
+		{
+			v:    &QualifiedName{Name: "a"},
+			want: &QualifiedName{Name: "a"},
+			fn:   func(v *Variant) interface{} { return v.QualifiedName() },
+		},
+
+		// StatusCode
+		{
+			v:    false,
+			want: StatusBadTypeMismatch,
+			fn:   func(v *Variant) interface{} { return v.StatusCode() },
+		},
+		{
+			v:    StatusBad,
+			want: StatusBad,
+			fn:   func(v *Variant) interface{} { return v.StatusCode() },
+		},
+
+		// time.Time
+		{
+			v:    false,
+			want: time.Time{},
+			fn:   func(v *Variant) interface{} { return v.Time() },
+		},
+		{
+			v:    time.Date(2019, 1, 1, 12, 13, 14, 0, time.UTC),
+			want: time.Date(2019, 1, 1, 12, 13, 14, 0, time.UTC),
+			fn:   func(v *Variant) interface{} { return v.Time() },
+		},
+
+		// Variant
+		{
+			v:    false,
+			want: (*Variant)(nil),
+			fn:   func(v *Variant) interface{} { return v.Variant() },
+		},
+		{
+			v:    MustVariant("abc"),
+			want: MustVariant("abc"),
+			fn:   func(v *Variant) interface{} { return v.Variant() },
+		},
+
+		// XMLElement
+		{
+			v:    false,
+			want: XMLElement(""),
+			fn:   func(v *Variant) interface{} { return v.XMLElement() },
+		},
+		{
+			v:    XMLElement("a"),
+			want: XMLElement("a"),
+			fn:   func(v *Variant) interface{} { return v.XMLElement() },
+		},
+
+		// []string
+		{
+			v:    []string{"a", "b", "c"},
+			want: "",
+			fn:   func(v *Variant) interface{} { return v.String() },
+		},
+
+		// []bool
+		{
+			v:    []bool{true, true, true},
+			want: false,
+			fn:   func(v *Variant) interface{} { return v.Bool() },
+		},
+
+		// []float64
+		{
+			v:    []float64{1, 2, 3},
+			want: float64(0),
+			fn:   func(v *Variant) interface{} { return v.Float() },
+		},
+
+		// []int64
+		{
+			v:    []int64{1, 2, 3},
+			want: int64(0),
+			fn:   func(v *Variant) interface{} { return v.Int() },
+		},
+
+		// []uint64
+		{
+			v:    []uint64{1, 2, 3},
+			want: uint64(0),
+			fn:   func(v *Variant) interface{} { return v.Uint() },
+		},
+
+		// [][]byte
+		{
+			v:    [][]byte{{'x', 'y', 'z'}},
+			want: ([]byte)(nil),
+			fn:   func(v *Variant) interface{} { return v.ByteString() },
+		},
+
+		// []*DataValue
+		{
+			v:    []*DataValue{{Status: StatusBad}},
+			want: (*DataValue)(nil),
+			fn:   func(v *Variant) interface{} { return v.DataValue() },
+		},
+
+		// []*DiagnosticInfo
+		{
+			v:    []*DiagnosticInfo{{AdditionalInfo: "nop"}},
+			want: (*DiagnosticInfo)(nil),
+			fn:   func(v *Variant) interface{} { return v.DiagnosticInfo() },
+		},
+
+		// []*ExpandedNodeID
+		{
+			v:    []*ExpandedNodeID{{NamespaceURI: "abc"}},
+			want: (*ExpandedNodeID)(nil),
+			fn:   func(v *Variant) interface{} { return v.ExpandedNodeID() },
+		},
+
+		// []*ExtensionObject
+		{
+			v:    []*ExtensionObject{{Value: "abc"}},
+			want: (*ExtensionObject)(nil),
+			fn:   func(v *Variant) interface{} { return v.ExtensionObject() },
+		},
+
+		// []*GUID
+		{
+			v:    []*GUID{NewGUID("abcd")},
+			want: (*GUID)(nil),
+			fn:   func(v *Variant) interface{} { return v.GUID() },
+		},
+
+		// []*LocalizedText
+		{
+			v:    []*LocalizedText{{Text: "abc"}},
+			want: (*LocalizedText)(nil),
+			fn:   func(v *Variant) interface{} { return v.LocalizedText() },
+		},
+
+		// []*NodeID
+		{
+			v:    []*NodeID{NewFourByteNodeID(1, 2)},
+			want: (*NodeID)(nil),
+			fn:   func(v *Variant) interface{} { return v.NodeID() },
+		},
+
+		// []*QualifiedName
+		{
+			v:    []*QualifiedName{{Name: "a"}},
+			want: (*QualifiedName)(nil),
+			fn:   func(v *Variant) interface{} { return v.QualifiedName() },
+		},
+
+		// []*StatusCode
+		{
+			v:    []StatusCode{StatusOK, StatusBad},
+			want: StatusBadTypeMismatch,
+			fn:   func(v *Variant) interface{} { return v.StatusCode() },
+		},
+
+		// []time.Time
+		{
+			v:    []time.Time{time.Date(2019, 1, 1, 12, 13, 14, 0, time.UTC)},
+			want: time.Time{},
+			fn:   func(v *Variant) interface{} { return v.Time() },
+		},
+
+		// []*Variant
+		{
+			v:    []*Variant{MustVariant("abc")},
+			want: (*Variant)(nil),
+			fn:   func(v *Variant) interface{} { return v.Variant() },
+		},
+
+		// []XMLElement
+		{
+			v:    []XMLElement{XMLElement("a")},
+			want: XMLElement(""),
+			fn:   func(v *Variant) interface{} { return v.XMLElement() },
+		},
 	}
-	for _, tt := range tests {
-		v, err := NewVariant(tt.v)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if got, want := v.Bool(), tt.n; got != want {
-			t.Fatalf("got %v want %v", got, want)
-		}
+	for i, tt := range tests {
+		name := fmt.Sprintf("test-%d %T -> %T", i, tt.v, tt.want)
+		t.Run(name, func(t *testing.T) {
+			verify.Values(t, "", tt.fn(MustVariant(tt.v)), tt.want)
+		})
 	}
 }
 
-func TestVariantString(t *testing.T) {
-	tests := []struct {
-		v interface{}
-		n string
-	}{
-		{"a", "a"},
-		{&LocalizedText{Text: "a"}, "a"},
-		{&QualifiedName{Name: "a"}, "a"},
-		{int32(5), ""},
+func TestDecodeInvalidType(t *testing.T) {
+	b := []byte{
+		// variant encoding mask
+		0x20, // invalid type id
 	}
-	for _, tt := range tests {
-		v, err := NewVariant(tt.v)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if got, want := v.String(), tt.n; got != want {
-			t.Fatalf("got %v want %v", got, want)
-		}
-	}
-}
 
-func TestVariantFloat(t *testing.T) {
-	tests := []struct {
-		v interface{}
-		n float64
-	}{
-		{float32(5), 5},
-		{float64(5), 5},
-		{int32(5), 0},
-	}
-	for _, tt := range tests {
-		v, err := NewVariant(tt.v)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if got, want := v.Float(), tt.n; got != want {
-			t.Fatalf("got %v want %v", got, want)
-		}
-	}
-}
-
-func TestVariantInt(t *testing.T) {
-	tests := []struct {
-		v interface{}
-		n int64
-	}{
-		{int8(5), 5},
-		{int16(5), 5},
-		{int32(5), 5},
-		{int64(5), 5},
-		{"", 0},
-	}
-	for _, tt := range tests {
-		v, err := NewVariant(tt.v)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if got, want := v.Int(), tt.n; got != want {
-			t.Fatalf("got %v want %v", got, want)
-		}
-	}
-}
-
-func TestVariantUint(t *testing.T) {
-	tests := []struct {
-		v interface{}
-		n uint64
-	}{
-		{uint8(5), 5},
-		{uint16(5), 5},
-		{uint32(5), 5},
-		{uint64(5), 5},
-		{"", 0},
-	}
-	for _, tt := range tests {
-		v, err := NewVariant(tt.v)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if got, want := v.Uint(), tt.n; got != want {
-			t.Fatalf("got %v want %v", got, want)
-		}
-	}
-}
-
-func TestVariantTime(t *testing.T) {
-	tests := []struct {
-		v interface{}
-		n time.Time
-	}{
-		{time.Date(2019, 1, 1, 12, 13, 14, 0, time.UTC), time.Date(2019, 1, 1, 12, 13, 14, 0, time.UTC)},
-		{"", time.Time{}},
-	}
-	for _, tt := range tests {
-		v, err := NewVariant(tt.v)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if got, want := v.Time(), tt.n; got != want {
-			t.Fatalf("got %v want %v", got, want)
-		}
+	v := &Variant{}
+	_, err := v.Decode(b)
+	if got, want := err, errors.New("invalid type id: 32"); !errors.Equal(got, want) {
+		t.Fatalf("got error %s want %s", got, want)
 	}
 }

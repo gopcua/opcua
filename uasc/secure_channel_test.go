@@ -54,10 +54,9 @@ func TestNewRequestMessage(t *testing.T) {
 		{
 			name: "subsequent-request",
 			sechan: &SecureChannel{
-				cfg: &Config{
-					SequenceNumber: 777,
-					RequestID:      555,
-				},
+				cfg:            &Config{},
+				sequenceNumber: 777,
+				requestID:      555,
 				reqhdr: &ua.RequestHeader{
 					RequestHandle: 444,
 				},
@@ -89,10 +88,9 @@ func TestNewRequestMessage(t *testing.T) {
 		{
 			name: "counter-rollover",
 			sechan: &SecureChannel{
-				cfg: &Config{
-					SequenceNumber: math.MaxUint32 - 1023,
-					RequestID:      math.MaxUint32,
-				},
+				cfg:            &Config{},
+				sequenceNumber: math.MaxUint32 - 1023,
+				requestID:      math.MaxUint32,
 				reqhdr: &ua.RequestHeader{
 					RequestHandle: math.MaxUint32,
 				},
