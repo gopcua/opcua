@@ -813,27 +813,6 @@ func (c *Client) Republish(req *ua.RepublishRequest) (*ua.RepublishResponse, err
 	return res, err
 }
 
-// Publish executes a synchronous publish request.
-func (c *Client) Publish(acks []*ua.SubscriptionAcknowledgement) (*ua.PublishResponse, error) {
-	return c.PublishWithTimeout(acks, c.cfg.RequestTimeout)
-}
-
-// PublishWithTimeout executes a synchronous publish request with a timeout.
-func (c *Client) PublishWithTimeout(acks []*ua.SubscriptionAcknowledgement, timeout time.Duration) (*ua.PublishResponse, error) {
-	if acks == nil {
-		acks = []*ua.SubscriptionAcknowledgement{}
-	}
-	req := &ua.PublishRequest{
-		SubscriptionAcknowledgements: acks,
-	}
-
-	var res *ua.PublishResponse
-	err := c.sendWithTimeout(req, timeout, func(v interface{}) error {
-		return safeAssign(v, &res)
-	})
-	return res, err
-}
-
 // Browse executes a synchronous browse request.
 func (c *Client) Browse(req *ua.BrowseRequest) (*ua.BrowseResponse, error) {
 	var res *ua.BrowseResponse
