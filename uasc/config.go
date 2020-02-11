@@ -115,7 +115,7 @@ type SessionConfig struct {
 	UserTokenSignature *ua.SignatureData
 
 	// SessionName is an optional name of the session.
-	// The default is a random value.
+	// The default is a unique value for every new session.
 	SessionName string
 
 	// If Session works as a client, SessionTimeout is the requested maximum number of milliseconds
