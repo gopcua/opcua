@@ -34,7 +34,6 @@ type SubscriptionParameters struct {
 	MaxKeepAliveCount          uint32
 	MaxNotificationsPerPublish uint32
 	Priority                   uint8
-	Notifs                     chan *PublishNotificationData
 }
 
 func NewMonitoredItemCreateRequestWithDefaults(nodeID *ua.NodeID, attributeID ua.AttributeID, clientHandle uint32) *ua.MonitoredItemCreateRequest {
@@ -241,8 +240,5 @@ func (p *SubscriptionParameters) setDefaults() {
 		// made only to allow for a one-liner change of default priority should a need arise
 		// and to explicitly expose the default priority as a constant
 		p.Priority = DefaultSubscriptionPriority
-	}
-	if p.Notifs == nil {
-		p.Notifs = make(chan *PublishNotificationData)
 	}
 }

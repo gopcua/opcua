@@ -583,7 +583,7 @@ func (c *Client) UnregisterNodes(req *ua.UnregisterNodesRequest) (*ua.Unregister
 // Subscribe creates a Subscription with given parameters. Parameters that have not been set
 // (have zero values) are overwritten with default values.
 // See opcua.DefaultSubscription* constants
-func (c *Client) Subscribe(params *SubscriptionParameters) (*Subscription, error) {
+func (c *Client) Subscribe(params *SubscriptionParameters, notifyCh chan *PublishNotificationData) (*Subscription, error) {
 	if params == nil {
 		params = &SubscriptionParameters{}
 	}
@@ -613,9 +613,10 @@ func (c *Client) Subscribe(params *SubscriptionParameters) (*Subscription, error
 		time.Duration(res.RevisedPublishingInterval) * time.Millisecond,
 		res.RevisedLifetimeCount,
 		res.RevisedMaxKeepAliveCount,
-		params.Notifs,
+		notifyCh,
 		c,
 	}
+
 	c.subMux.Lock()
 	if sub.SubscriptionID == 0 || c.subscriptions[sub.SubscriptionID] != nil {
 		// this should not happen and is usually indicative of a server bug
