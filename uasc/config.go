@@ -114,6 +114,10 @@ type SessionConfig struct {
 	// The SignatureData type is defined in 7.32.
 	UserTokenSignature *ua.SignatureData
 
+	// SessionName is an optional name of the session.
+	// The default is a unique value for every new session.
+	SessionName string
+
 	// If Session works as a client, SessionTimeout is the requested maximum number of milliseconds
 	// that a Session should remain open without activity. If the Client fails to issue a Service
 	// request within this interval, then the Server shall automatically terminate the Client Session.

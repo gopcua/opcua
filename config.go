@@ -144,6 +144,13 @@ func SecurityPolicy(s string) Option {
 	}
 }
 
+// SessionName sets the name in the session configuration.
+func SessionName(s string) Option {
+	return func(c *uasc.Config, sc *uasc.SessionConfig) {
+		sc.SessionName = s
+	}
+}
+
 // SessionTimeout sets the timeout in the session configuration.
 func SessionTimeout(d time.Duration) Option {
 	return func(c *uasc.Config, sc *uasc.SessionConfig) {

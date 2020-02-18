@@ -277,10 +277,15 @@ func (c *Client) CreateSession(cfg *uasc.SessionConfig) (*Session, error) {
 		return nil, err
 	}
 
+	name := cfg.SessionName
+	if name == "" {
+		name = fmt.Sprintf("gopcua-%d", time.Now().UnixNano())
+	}
+
 	req := &ua.CreateSessionRequest{
 		ClientDescription:       cfg.ClientDescription,
 		EndpointURL:             c.endpointURL,
-		SessionName:             fmt.Sprintf("gopcua-%d", time.Now().UnixNano()),
+		SessionName:             name,
 		ClientNonce:             nonce,
 		ClientCertificate:       c.cfg.Certificate,
 		RequestedSessionTimeout: float64(cfg.SessionTimeout / time.Millisecond),
