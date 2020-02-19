@@ -150,13 +150,18 @@ func TestVariant(t *testing.T) {
 		},
 		{
 			Name:   "GUID",
-			Struct: MustVariant(NewGUID("AAAABBBB-CCDD-EEFF-0101-0123456789AB")),
+			Struct: MustVariant(NewGUID("72962B91-FA75-4AE6-8D28-B404DC7DAF63")),
 			Bytes: []byte{
 				// variant encoding mask
 				0x0e,
-				// value
-				0xbb, 0xbb, 0xaa, 0xaa, 0xdd, 0xcc, 0xff, 0xee,
-				0xab, 0x89, 0x67, 0x45, 0x23, 0x01, 0x01, 0x01,
+				// data1 (inverse order)
+				0x91, 0x2b, 0x96, 0x72,
+				// data2 (inverse order)
+				0x75, 0xfa,
+				// data3 (inverse order)
+				0xe6, 0x4a,
+				// data4 (same order)
+				0x8d, 0x28, 0xb4, 0x04, 0xdc, 0x7d, 0xaf, 0x63,
 			},
 		},
 		{
