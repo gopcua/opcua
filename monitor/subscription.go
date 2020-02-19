@@ -69,7 +69,11 @@ func NewNodeMonitor(client *opcua.Client) (*NodeMonitor, error) {
 	return m, nil
 }
 
-func newSubscription(m *NodeMonitor, notifyChanLength int, nodes ...string) (*Subscription, error) {
+func newSubscription(m *NodeMonitor, params *opcua.SubscriptionParameters, notifyChanLength int, nodes ...string) (*Subscription, error) {
+	if params == nil {
+		params = &opcua.SubscriptionParameters{}
+	}
+
 	s := &Subscription{
 		monitor:          m,
 		closed:           make(chan struct{}),
@@ -79,9 +83,7 @@ func newSubscription(m *NodeMonitor, notifyChanLength int, nodes ...string) (*Su
 	}
 
 	var err error
-	if s.sub, err = m.client.Subscribe(&opcua.SubscriptionParameters{
-		Notifs: s.internalNotifyCh,
-	}); err != nil {
+	if s.sub, err = m.client.Subscribe(params, s.internalNotifyCh); err != nil {
 		return nil, err
 	}
 
@@ -100,8 +102,8 @@ func (m *NodeMonitor) SetErrorHandler(cb ErrHandler) {
 // Subscribe creates a new callback-based subscription and an optional list of nodes.
 // The caller must call `Unsubscribe` to stop and clean up resources. Canceling the context
 // will also cause the subscription to stop, but `Unsubscribe` must still be called.
-func (m *NodeMonitor) Subscribe(ctx context.Context, cb MsgHandler, nodes ...string) (*Subscription, error) {
-	sub, err := newSubscription(m, DefaultCallbackBufferLen, nodes...)
+func (m *NodeMonitor) Subscribe(ctx context.Context, params *opcua.SubscriptionParameters, cb MsgHandler, nodes ...string) (*Subscription, error) {
+	sub, err := newSubscription(m, params, DefaultCallbackBufferLen, nodes...)
 	if err != nil {
 		return nil, err
 	}
@@ -117,8 +119,8 @@ func (m *NodeMonitor) Subscribe(ctx context.Context, cb MsgHandler, nodes ...str
 // via the monitor's `ErrHandler`.
 // The caller must call `Unsubscribe` to stop and clean up resources. Canceling the context
 // will also cause the subscription to stop, but `Unsubscribe` must still be called.
-func (m *NodeMonitor) ChanSubscribe(ctx context.Context, ch chan<- *DataChangeMessage, nodes ...string) (*Subscription, error) {
-	sub, err := newSubscription(m, 16, nodes...)
+func (m *NodeMonitor) ChanSubscribe(ctx context.Context, params *opcua.SubscriptionParameters, ch chan<- *DataChangeMessage, nodes ...string) (*Subscription, error) {
+	sub, err := newSubscription(m, params, 16, nodes...)
 	if err != nil {
 		return nil, err
 	}

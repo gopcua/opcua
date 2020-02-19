@@ -22,11 +22,17 @@ func main() {
 		certFile = flag.String("cert", "", "Path to cert.pem. Required for security mode/policy != None")
 		keyFile  = flag.String("key", "", "Path to private key.pem. Required for security mode/policy != None")
 		nodeID   = flag.String("node", "", "node id to subscribe to")
+		interval = flag.String("interval", opcua.DefaultSubscriptionInterval.String(), "subscription interval")
 	)
 	flag.BoolVar(&debug.Enable, "debug", false, "enable debug logging")
 	flag.Parse()
 
 	// log.SetFlags(0)
+
+	subInterval, err := time.ParseDuration(*interval)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	signalCh := make(chan os.Signal, 1)
 	signal.Notify(signalCh, os.Interrupt)
@@ -78,22 +84,25 @@ func main() {
 	})
 
 	// start callback-based subscription
-	go startCallbackSub(ctx, m, 0, *nodeID)
+	go startCallbackSub(ctx, m, subInterval, 0, *nodeID)
 
 	// start channel-based subscription
-	go startChanSub(ctx, m, 0, *nodeID)
+	go startChanSub(ctx, m, subInterval, 0, *nodeID)
 
 	<-ctx.Done()
 }
 
-func startCallbackSub(ctx context.Context, m *monitor.NodeMonitor, lag time.Duration, nodes ...string) {
+func startCallbackSub(ctx context.Context, m *monitor.NodeMonitor, interval, lag time.Duration, nodes ...string) {
 	sub, err := m.Subscribe(
 		ctx,
+		&opcua.SubscriptionParameters{
+			Interval: interval,
+		},
 		func(s *monitor.Subscription, msg *monitor.DataChangeMessage) {
 			if msg.Error != nil {
 				log.Printf("[callback] sub=%d error=%s", s.SubscriptionID(), msg.Error)
 			} else {
-				log.Printf("[callback] sub=%d node=%s value=%v", s.SubscriptionID(), msg.NodeID, msg.Value.Value())
+				log.Printf("[callback] sub=%d ts=%s node=%s value=%v", s.SubscriptionID(), msg.SourceTimestamp.UTC().Format(time.RFC3339), msg.NodeID, msg.Value.Value())
 			}
 			time.Sleep(lag)
 		},
@@ -108,9 +117,9 @@ func startCallbackSub(ctx context.Context, m *monitor.NodeMonitor, lag time.Dura
 	<-ctx.Done()
 }
 
-func startChanSub(ctx context.Context, m *monitor.NodeMonitor, lag time.Duration, nodes ...string) {
+func startChanSub(ctx context.Context, m *monitor.NodeMonitor, interval, lag time.Duration, nodes ...string) {
 	ch := make(chan *monitor.DataChangeMessage, 16)
-	sub, err := m.ChanSubscribe(ctx, ch, nodes...)
+	sub, err := m.ChanSubscribe(ctx, &opcua.SubscriptionParameters{Interval: interval}, ch, nodes...)
 
 	if err != nil {
 		log.Fatal(err)
@@ -126,7 +135,7 @@ func startChanSub(ctx context.Context, m *monitor.NodeMonitor, lag time.Duration
 			if msg.Error != nil {
 				log.Printf("[channel ] sub=%d error=%s", sub.SubscriptionID(), msg.Error)
 			} else {
-				log.Printf("[channel ] sub=%d node=%s value=%v", sub.SubscriptionID(), msg.NodeID, msg.Value.Value())
+				log.Printf("[channel ] sub=%d ts=%s node=%s value=%v", sub.SubscriptionID(), msg.SourceTimestamp.UTC().Format(time.RFC3339), msg.NodeID, msg.Value.Value())
 			}
 			time.Sleep(lag)
 		}
