@@ -26,7 +26,7 @@ func TestReadRequest(t *testing.T) {
 				MaxAge:             0,
 				TimestampsToReturn: TimestampsToReturnBoth,
 				NodesToRead: []*ReadValueID{
-					&ReadValueID{
+					{
 						NodeID:       NewFourByteNodeID(0, 2256),
 						AttributeID:  AttributeIDValue,
 						DataEncoding: &QualifiedName{},

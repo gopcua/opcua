@@ -8,7 +8,6 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
-	"io"
 	"log"
 	"reflect"
 	"sort"
@@ -106,9 +105,6 @@ type Client struct {
 	subscriptions map[uint32]*Subscription
 	subMux        sync.RWMutex
 
-	//cancelMonitor cancels the monitorChannel goroutine
-	cancelMonitor context.CancelFunc
-
 	// once initializes session
 	once sync.Once
 }
@@ -168,70 +164,53 @@ func (c *Client) Dial(ctx context.Context) error {
 	if c.sechan != nil {
 		return errors.Errorf("secure channel already connected")
 	}
+
 	var err error
 	c.conn, err = uacp.Dial(ctx, c.endpointURL)
 	if err != nil {
 		return err
 	}
+
 	c.sechan, err = uasc.NewSecureChannel(c.endpointURL, c.conn, c.cfg)
 	if err != nil {
 		_ = c.conn.Close()
 		return err
 	}
 
-	// Issue #313: decouple the dial context from the monitor context
-	// mctx must *not* be a child context of 'ctx'. Otherwise, the
-	// monitor go routine terminates whenever the dial context is done
-	// which may get triggered unexpectedly by a timer context.
-	var mctx context.Context
-	mctx, c.cancelMonitor = context.WithCancel(context.Background())
-	go c.monitorChannel(mctx)
-	return c.openSecureChannel(mctx, c.sechan.Open)
-}
-
-func (c *Client) openSecureChannel(ctx context.Context, open func() error) error {
-	if err := open(); err != nil {
-		c.cancelMonitor()
-		_ = c.conn.Close()
-		c.sechan = nil
-		return err
-	}
-	c.scheduleRenewingToken(ctx)
-	return nil
-}
-
-func (c *Client) monitorChannel(ctx context.Context) {
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		default:
-			msg := c.sechan.Receive(ctx)
-			if msg.Err != nil {
-				if msg.Err == io.EOF {
-					debug.Printf("Connection closed")
-				} else {
-					debug.Printf("Received error: %s", msg.Err)
-				}
-				// todo (dh): apart from the above message, we're ignoring this error because there is nothing watching it
-				// I'd prefer to have a way to return the error to the upper application.
-				return
-			}
-			debug.Printf("Received unsolicited message from server: %T", msg.V)
-		}
-	}
+	return c.sechan.Open(ctx)
 }
 
 // Close closes the session and the secure channel.
 func (c *Client) Close() error {
+	defer c.conn.Close()
+
 	// try to close the session but ignore any error
 	// so that we close the underlying channel and connection.
 	_ = c.CloseSession()
-	if c.cancelMonitor != nil {
-		c.cancelMonitor()
-	}
 
-	return c.sechan.Close()
+	_ = c.sechan.Close()
+
+	return nil
+}
+
+var errNotConnected = errors.New("not connected")
+
+// SetReadBuffer sets the operating system's TCP receive buffer
+// of the underlying UACP connection.
+func (c *Client) SetReadBuffer(bytes int) error {
+	if c.conn == nil {
+		return errNotConnected
+	}
+	return c.conn.SetReadBuffer(bytes)
+}
+
+// SetWriteBuffer sets the operating system's TCP transmit buffer
+// of the underlying UACP connection.
+func (c *Client) SetWriteBuffer(bytes int) error {
+	if c.conn == nil {
+		return errNotConnected
+	}
+	return c.conn.SetWriteBuffer(bytes)
 }
 
 // Session returns the active session.
@@ -269,7 +248,7 @@ type Session struct {
 // See Part 4, 5.6.2
 func (c *Client) CreateSession(cfg *uasc.SessionConfig) (*Session, error) {
 	if c.sechan == nil {
-		return nil, errors.Errorf("secure channel not connected")
+		return nil, ua.StatusBadServerNotConnected
 	}
 
 	nonce := make([]byte, 32)
@@ -352,6 +331,9 @@ func anonymousPolicyID(endpoints []*ua.EndpointDescription) string {
 //
 // See Part 4, 5.6.3
 func (c *Client) ActivateSession(s *Session) error {
+	if c.sechan == nil {
+		return ua.StatusBadServerNotConnected
+	}
 	sig, sigAlg, err := c.sechan.NewSessionSignature(s.serverCertificate, s.serverNonce)
 	if err != nil {
 		log.Printf("error creating session signature: %s", err)
@@ -459,6 +441,9 @@ func (c *Client) Send(req ua.Request, h func(interface{}) error) error {
 // the response. If the client has an active session it injects the
 // authentication token.
 func (c *Client) sendWithTimeout(req ua.Request, timeout time.Duration, h func(interface{}) error) error {
+	if c.sechan == nil {
+		return ua.StatusBadServerNotConnected
+	}
 	var authToken *ua.NodeID
 	if s := c.Session(); s != nil {
 		authToken = s.resp.AuthenticationToken
@@ -662,22 +647,12 @@ func (c *Client) notifySubscription(ctx context.Context, response *ua.PublishRes
 		return
 	}
 
-	// Check for errors
-	status := ua.StatusOK
-	for _, res := range response.Results {
-		if res != ua.StatusOK {
-			status = res
-			break
-		}
-	}
-
-	if status != ua.StatusOK {
-		sub.sendNotification(ctx, &PublishNotificationData{
-			SubscriptionID: response.SubscriptionID,
-			Error:          status,
-		})
-		return
-	}
+	// todo(fs): response.Results contains the status codes of which messages were
+	// todo(fs): were successfully removed from the transmission queue on the server.
+	// todo(fs): The client sent the list of ids in the *previous* PublishRequest.
+	// todo(fs): If we want to handle them then we probably need to keep track
+	// todo(fs): of the message ids we have ack'ed.
+	// todo(fs): see discussion in https://github.com/gopcua/opcua/issues/337
 
 	if response.NotificationMessage == nil {
 		sub.sendNotification(ctx, &PublishNotificationData{
@@ -738,21 +713,6 @@ func (c *Client) HistoryReadRawModified(nodes []*ua.HistoryReadValueID, details 
 		return safeAssign(v, &res)
 	})
 	return res, err
-}
-
-func (c *Client) scheduleRenewingToken(ctx context.Context) {
-	timer := time.NewTimer(time.Duration(0.75*float64(c.sechan.Lifetime())) * time.Millisecond) // 0.75 is from Part 4, Section 5.5.2.1
-
-	go func() {
-		select {
-		case <-ctx.Done():
-			timer.Stop()
-		case <-timer.C:
-			debug.Printf("renewing security token...")
-			// Ignore the error. openSecureChannel will close the connection on error and the user will surely notice
-			_ = c.openSecureChannel(ctx, c.sechan.Renew)
-		}
-	}()
 }
 
 // safeAssign implements a type-safe assign from T to *T.

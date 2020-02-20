@@ -187,13 +187,30 @@ const (
 // LocalizedText represents a LocalizedText.
 // A LocalizedText structure contains two fields that could be missing.
 // For that reason, the encoding uses a bit mask to indicate which fields
-// are actually present in the encoded forl.
+// are actually present in the encoded form.
 //
 // Specification: Part 6, 5.2.2.14
 type LocalizedText struct {
 	EncodingMask uint8
 	Locale       string
 	Text         string
+}
+
+// NewLocalizedText creates a new localized text without a locale.
+func NewLocalizedText(text string) *LocalizedText {
+	return NewLocalizedTextWithLocale(text, "")
+}
+
+// NewLocalizedTextWithLocale creates a new localized text with a locale.
+func NewLocalizedTextWithLocale(text, locale string) *LocalizedText {
+	l := &LocalizedText{Text: text, Locale: locale}
+	if text != "" {
+		l.EncodingMask |= LocalizedTextText
+	}
+	if locale != "" {
+		l.EncodingMask |= LocalizedTextLocale
+	}
+	return l
 }
 
 func (l *LocalizedText) Decode(b []byte) (int, error) {

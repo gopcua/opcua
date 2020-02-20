@@ -54,11 +54,11 @@ func TestDataValueArray(t *testing.T) {
 		{
 			Name: "value only and value, source timestamp, server timestamp",
 			Struct: []*DataValue{
-				&DataValue{
+				{
 					EncodingMask: 0x01,
 					Value:        MustVariant(float32(2.50025)),
 				},
-				&DataValue{
+				{
 					EncodingMask:    0x0d,
 					Value:           MustVariant(float32(2.50017)),
 					SourceTimestamp: time.Date(2018, time.September, 17, 14, 28, 29, 112000000, time.UTC),
@@ -128,38 +128,28 @@ func TestLocalizedText(t *testing.T) {
 	cases := []CodecTestCase{
 		{
 			Name:   "nothing",
-			Struct: &LocalizedText{},
+			Struct: NewLocalizedText(""),
 			Bytes:  []byte{0x00},
 		},
 		{
-			Name: "has-locale",
-			Struct: &LocalizedText{
-				EncodingMask: LocalizedTextLocale,
-				Locale:       "foo",
-			},
+			Name:   "has-locale",
+			Struct: NewLocalizedTextWithLocale("", "foo"),
 			Bytes: []byte{
 				0x01,
 				0x03, 0x00, 0x00, 0x00, 0x66, 0x6f, 0x6f,
 			},
 		},
 		{
-			Name: "has-text",
-			Struct: &LocalizedText{
-				EncodingMask: LocalizedTextText,
-				Text:         "bar",
-			},
+			Name:   "has-text",
+			Struct: NewLocalizedText("bar"),
 			Bytes: []byte{
 				0x02,
 				0x03, 0x00, 0x00, 0x00, 0x62, 0x61, 0x72,
 			},
 		},
 		{
-			Name: "has-both",
-			Struct: &LocalizedText{
-				EncodingMask: LocalizedTextLocale | LocalizedTextText,
-				Locale:       "foo",
-				Text:         "bar",
-			},
+			Name:   "has-both",
+			Struct: NewLocalizedTextWithLocale("bar", "foo"),
 			Bytes: []byte{
 				0x03,
 				0x03, 0x00, 0x00, 0x00, 0x66, 0x6f, 0x6f,

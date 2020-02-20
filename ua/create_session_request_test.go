@@ -24,12 +24,9 @@ func TestCreateSessionRequest(t *testing.T) {
 					AdditionalHeader: NewExtensionObject(nil),
 				},
 				ClientDescription: &ApplicationDescription{
-					ApplicationURI: "app-uri",
-					ProductURI:     "prod-uri",
-					ApplicationName: &LocalizedText{
-						EncodingMask: LocalizedTextText,
-						Text:         "app-name",
-					},
+					ApplicationURI:      "app-uri",
+					ProductURI:          "prod-uri",
+					ApplicationName:     NewLocalizedText("app-name"),
 					ApplicationType:     ApplicationTypeClient,
 					GatewayServerURI:    "gw-uri",
 					DiscoveryProfileURI: "profile-uri",

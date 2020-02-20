@@ -13,6 +13,7 @@ import (
 
 	"github.com/gopcua/opcua"
 	"github.com/gopcua/opcua/debug"
+	"github.com/gopcua/opcua/id"
 	"github.com/gopcua/opcua/ua"
 )
 
@@ -24,6 +25,7 @@ func main() {
 		certFile = flag.String("cert", "", "Path to cert.pem. Required for security mode/policy != None")
 		keyFile  = flag.String("key", "", "Path to private key.pem. Required for security mode/policy != None")
 		nodeID   = flag.String("node", "", "node id to subscribe to")
+		event    = flag.Bool("event", false, "subscribe to node event changes (Default: node value changes)")
 		interval = flag.String("interval", opcua.DefaultSubscriptionInterval.String(), "subscription interval")
 	)
 	flag.BoolVar(&debug.Enable, "debug", false, "enable debug logging")
@@ -37,7 +39,7 @@ func main() {
 
 	// add an arbitrary timeout to demonstrate how to stop a subscription
 	// with a context.
-	d := 30 * time.Second
+	d := 60 * time.Second
 	ctx, cancel := context.WithTimeout(context.Background(), d)
 	defer cancel()
 
@@ -83,9 +85,13 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// arbitrary client handle for the monitoring item
-	handle := uint32(42)
-	miCreateRequest := opcua.NewMonitoredItemCreateRequestWithDefaults(id, ua.AttributeIDValue, handle)
+	var miCreateRequest *ua.MonitoredItemCreateRequest
+	var eventFieldNames []string
+	if *event {
+		miCreateRequest, eventFieldNames = eventRequest(id)
+	} else {
+		miCreateRequest = valueRequest(id)
+	}
 	res, err := sub.Monitor(ua.TimestampsToReturnBoth, miCreateRequest)
 	if err != nil || res.Results[0].StatusCode != ua.StatusOK {
 		log.Fatal(err)
@@ -111,9 +117,98 @@ func main() {
 					log.Printf("MonitoredItem with client handle %v = %v", item.ClientHandle, data)
 				}
 
+			case *ua.EventNotificationList:
+				for _, item := range x.Events {
+					log.Printf("Event for client handle: %v\n", item.ClientHandle)
+					for i, field := range item.EventFields {
+						log.Printf("%v: %v of Type: %T", eventFieldNames[i], field.Value(), field.Value())
+					}
+					log.Println()
+				}
+
 			default:
 				log.Printf("what's this publish result? %T", res.Value)
 			}
 		}
 	}
+}
+
+func valueRequest(nodeID *ua.NodeID) *ua.MonitoredItemCreateRequest {
+	handle := uint32(42)
+	return opcua.NewMonitoredItemCreateRequestWithDefaults(nodeID, ua.AttributeIDValue, handle)
+}
+
+func eventRequest(nodeID *ua.NodeID) (*ua.MonitoredItemCreateRequest, []string) {
+	fieldNames := []string{"EventId", "EventType", "Severity", "Time", "Message"}
+	selects := make([]*ua.SimpleAttributeOperand, len(fieldNames))
+
+	for i, name := range fieldNames {
+		selects[i] = &ua.SimpleAttributeOperand{
+			TypeDefinitionID: ua.NewNumericNodeID(0, id.BaseEventType),
+			BrowsePath:       []*ua.QualifiedName{{NamespaceIndex: 0, Name: name}},
+			AttributeID:      ua.AttributeIDValue,
+		}
+	}
+
+	wheres := &ua.ContentFilter{
+		Elements: []*ua.ContentFilterElement{
+			{
+				FilterOperator: ua.FilterOperatorGreaterThanOrEqual,
+				FilterOperands: []*ua.ExtensionObject{
+					{
+						EncodingMask: 1,
+						TypeID: &ua.ExpandedNodeID{
+							NodeID: ua.NewNumericNodeID(0, id.SimpleAttributeOperand_Encoding_DefaultBinary),
+						},
+						Value: ua.SimpleAttributeOperand{
+							TypeDefinitionID: ua.NewNumericNodeID(0, id.BaseEventType),
+							BrowsePath:       []*ua.QualifiedName{{NamespaceIndex: 0, Name: "Severity"}},
+							AttributeID:      ua.AttributeIDValue,
+						},
+					},
+					{
+						EncodingMask: 1,
+						TypeID: &ua.ExpandedNodeID{
+							NodeID: ua.NewNumericNodeID(0, id.LiteralOperand_Encoding_DefaultBinary),
+						},
+						Value: ua.LiteralOperand{
+							Value: ua.MustVariant(uint16(0)),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	filter := ua.EventFilter{
+		SelectClauses: selects,
+		WhereClause:   wheres,
+	}
+
+	filterExtObj := ua.ExtensionObject{
+		EncodingMask: ua.ExtensionObjectBinary,
+		TypeID: &ua.ExpandedNodeID{
+			NodeID: ua.NewNumericNodeID(0, id.EventFilter_Encoding_DefaultBinary),
+		},
+		Value: filter,
+	}
+
+	handle := uint32(42)
+	req := &ua.MonitoredItemCreateRequest{
+		ItemToMonitor: &ua.ReadValueID{
+			NodeID:       nodeID,
+			AttributeID:  ua.AttributeIDEventNotifier,
+			DataEncoding: &ua.QualifiedName{},
+		},
+		MonitoringMode: ua.MonitoringModeReporting,
+		RequestedParameters: &ua.MonitoringParameters{
+			ClientHandle:     handle,
+			DiscardOldest:    true,
+			Filter:           &filterExtObj,
+			QueueSize:        10,
+			SamplingInterval: 1.0,
+		},
+	}
+
+	return req, fieldNames
 }

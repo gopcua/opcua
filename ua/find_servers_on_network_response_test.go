@@ -23,7 +23,7 @@ func TestFindServersOnNetworkResponse(t *testing.T) {
 				},
 				LastCounterResetTime: time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
 				Servers: []*ServerOnNetwork{
-					&ServerOnNetwork{
+					{
 						RecordID:           1,
 						ServerName:         "server-name",
 						DiscoveryURL:       "discov-uri",
@@ -76,13 +76,13 @@ func TestFindServersOnNetworkResponse(t *testing.T) {
 				},
 				LastCounterResetTime: time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
 				Servers: []*ServerOnNetwork{
-					&ServerOnNetwork{
+					{
 						RecordID:           1,
 						ServerName:         "server-name",
 						DiscoveryURL:       "discov-uri",
 						ServerCapabilities: []string{"server-cap-1"},
 					},
-					&ServerOnNetwork{
+					{
 						RecordID:           1,
 						ServerName:         "server-name",
 						DiscoveryURL:       "discov-uri",

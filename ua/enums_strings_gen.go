@@ -52,6 +52,7 @@ func _() {
 	// An "invalid array index" compiler error signifies that the constant values have changed.
 	// Re-run the stringer command to generate them again.
 	var x [1]struct{}
+	_ = x[TypeIDNull-0]
 	_ = x[TypeIDBoolean-1]
 	_ = x[TypeIDSByte-2]
 	_ = x[TypeIDByte-3]
@@ -79,14 +80,13 @@ func _() {
 	_ = x[TypeIDDiagnosticInfo-25]
 }
 
-const _TypeID_name = "TypeIDBooleanTypeIDSByteTypeIDByteTypeIDInt16TypeIDUint16TypeIDInt32TypeIDUint32TypeIDInt64TypeIDUint64TypeIDFloatTypeIDDoubleTypeIDStringTypeIDDateTimeTypeIDGUIDTypeIDByteStringTypeIDXMLElementTypeIDNodeIDTypeIDExpandedNodeIDTypeIDStatusCodeTypeIDQualifiedNameTypeIDLocalizedTextTypeIDExtensionObjectTypeIDDataValueTypeIDVariantTypeIDDiagnosticInfo"
+const _TypeID_name = "TypeIDNullTypeIDBooleanTypeIDSByteTypeIDByteTypeIDInt16TypeIDUint16TypeIDInt32TypeIDUint32TypeIDInt64TypeIDUint64TypeIDFloatTypeIDDoubleTypeIDStringTypeIDDateTimeTypeIDGUIDTypeIDByteStringTypeIDXMLElementTypeIDNodeIDTypeIDExpandedNodeIDTypeIDStatusCodeTypeIDQualifiedNameTypeIDLocalizedTextTypeIDExtensionObjectTypeIDDataValueTypeIDVariantTypeIDDiagnosticInfo"
 
-var _TypeID_index = [...]uint16{0, 13, 24, 34, 45, 57, 68, 80, 91, 103, 114, 126, 138, 152, 162, 178, 194, 206, 226, 242, 261, 280, 301, 316, 329, 349}
+var _TypeID_index = [...]uint16{0, 10, 23, 34, 44, 55, 67, 78, 90, 101, 113, 124, 136, 148, 162, 172, 188, 204, 216, 236, 252, 271, 290, 311, 326, 339, 359}
 
 func (i TypeID) String() string {
-	i -= 1
 	if i >= TypeID(len(_TypeID_index)-1) {
-		return "TypeID(" + strconv.FormatInt(int64(i+1), 10) + ")"
+		return "TypeID(" + strconv.FormatInt(int64(i), 10) + ")"
 	}
 	return _TypeID_name[_TypeID_index[i]:_TypeID_index[i+1]]
 }
@@ -213,7 +213,7 @@ var (
 
 func (i TrustListMasks) String() string {
 	switch {
-	case 0 <= i && i <= 2:
+	case i <= 2:
 		return _TrustListMasks_name_0[_TrustListMasks_index_0[i]:_TrustListMasks_index_0[i+1]]
 	case i == 4:
 		return _TrustListMasks_name_1
@@ -290,7 +290,7 @@ var (
 
 func (i DataSetFieldContentMask) String() string {
 	switch {
-	case 0 <= i && i <= 2:
+	case i <= 2:
 		return _DataSetFieldContentMask_name_0[_DataSetFieldContentMask_index_0[i]:_DataSetFieldContentMask_index_0[i+1]]
 	case i == 4:
 		return _DataSetFieldContentMask_name_1
@@ -379,7 +379,7 @@ var (
 
 func (i UADPNetworkMessageContentMask) String() string {
 	switch {
-	case 0 <= i && i <= 2:
+	case i <= 2:
 		return _UADPNetworkMessageContentMask_name_0[_UADPNetworkMessageContentMask_index_0[i]:_UADPNetworkMessageContentMask_index_0[i+1]]
 	case i == 4:
 		return _UADPNetworkMessageContentMask_name_1
@@ -430,7 +430,7 @@ var (
 
 func (i UADPDataSetMessageContentMask) String() string {
 	switch {
-	case 0 <= i && i <= 2:
+	case i <= 2:
 		return _UADPDataSetMessageContentMask_name_0[_UADPDataSetMessageContentMask_index_0[i]:_UADPDataSetMessageContentMask_index_0[i+1]]
 	case i == 4:
 		return _UADPDataSetMessageContentMask_name_1
@@ -471,7 +471,7 @@ var (
 
 func (i JSONNetworkMessageContentMask) String() string {
 	switch {
-	case 0 <= i && i <= 2:
+	case i <= 2:
 		return _JSONNetworkMessageContentMask_name_0[_JSONNetworkMessageContentMask_index_0[i]:_JSONNetworkMessageContentMask_index_0[i+1]]
 	case i == 4:
 		return _JSONNetworkMessageContentMask_name_1
@@ -510,7 +510,7 @@ var (
 
 func (i JSONDataSetMessageContentMask) String() string {
 	switch {
-	case 0 <= i && i <= 2:
+	case i <= 2:
 		return _JSONDataSetMessageContentMask_name_0[_JSONDataSetMessageContentMask_index_0[i]:_JSONDataSetMessageContentMask_index_0[i+1]]
 	case i == 4:
 		return _JSONDataSetMessageContentMask_name_1
@@ -635,7 +635,7 @@ var (
 
 func (i NodeClass) String() string {
 	switch {
-	case 0 <= i && i <= 2:
+	case i <= 2:
 		return _NodeClass_name_0[_NodeClass_index_0[i]:_NodeClass_index_0[i+1]]
 	case i == 4:
 		return _NodeClass_name_1
@@ -737,7 +737,7 @@ var (
 
 func (i AccessLevelType) String() string {
 	switch {
-	case 0 <= i && i <= 2:
+	case i <= 2:
 		return _AccessLevelType_name_0[_AccessLevelType_index_0[i]:_AccessLevelType_index_0[i+1]]
 	case i == 4:
 		return _AccessLevelType_name_1
@@ -788,7 +788,7 @@ var (
 
 func (i AccessLevelExType) String() string {
 	switch {
-	case 0 <= i && i <= 2:
+	case i <= 2:
 		return _AccessLevelExType_name_0[_AccessLevelExType_index_0[i]:_AccessLevelExType_index_0[i+1]]
 	case i == 4:
 		return _AccessLevelExType_name_1
@@ -832,7 +832,7 @@ var (
 
 func (i EventNotifierType) String() string {
 	switch {
-	case 0 <= i && i <= 1:
+	case i <= 1:
 		return _EventNotifierType_name_0[_EventNotifierType_index_0[i]:_EventNotifierType_index_0[i+1]]
 	case i == 4:
 		return _EventNotifierType_name_1
@@ -1148,7 +1148,7 @@ var (
 
 func (i BrowseResultMask) String() string {
 	switch {
-	case 0 <= i && i <= 4:
+	case i <= 4:
 		return _BrowseResultMask_name_0[_BrowseResultMask_index_0[i]:_BrowseResultMask_index_0[i+1]]
 	case i == 8:
 		return _BrowseResultMask_name_1

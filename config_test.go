@@ -161,7 +161,7 @@ func TestOptions(t *testing.T) {
 			opt:  ApplicationName("a"),
 			sc: func() *uasc.SessionConfig {
 				sc := DefaultSessionConfig()
-				sc.ClientDescription.ApplicationName = &ua.LocalizedText{Text: "a"}
+				sc.ClientDescription.ApplicationName = ua.NewLocalizedText("a")
 				return sc
 			}(),
 		},

@@ -39,24 +39,43 @@ type NodeMonitor struct {
 	errHandlerCB     ErrHandler
 }
 
-// internal struct to manage various ids
-type itemIDs struct {
-	handle uint32 // client-provided
-	id     uint32 // from server
+// Item is a struct to manage Monitored Items
+type Item struct {
+	id     uint32     // from server
+	nodeID *ua.NodeID // from request
+	handle uint32     // client provided
+}
+
+// ID returns the MonitorItemID set by the server
+func (m *Item) ID() uint32 {
+	return m.id
+}
+
+// NodeID returns the NodeID for the Item
+func (m *Item) NodeID() *ua.NodeID {
+	return m.nodeID
+}
+
+// Request is a struct to manage a request to monitor a node
+type Request struct {
+	NodeID               *ua.NodeID
+	MonitoringMode       ua.MonitoringMode
+	MonitoringParameters *ua.MonitoringParameters
+	handle               uint32
 }
 
 // Subscription is an instance of an active subscription.
 // Nodes can be added and removed concurrently.
 type Subscription struct {
+	delivered        uint64
+	dropped          uint64
 	monitor          *NodeMonitor
 	sub              *opcua.Subscription
 	internalNotifyCh chan *opcua.PublishNotificationData
-	delivered        uint64
-	dropped          uint64
 	closed           chan struct{}
 	mu               sync.RWMutex
 	handles          map[uint32]*ua.NodeID
-	nodeLookup       map[string]*itemIDs
+	itemLookup       map[uint32]Item
 }
 
 // NewNodeMonitor creates a new NodeMonitor
@@ -79,7 +98,7 @@ func newSubscription(m *NodeMonitor, params *opcua.SubscriptionParameters, notif
 		closed:           make(chan struct{}),
 		internalNotifyCh: make(chan *opcua.PublishNotificationData, notifyChanLength),
 		handles:          make(map[uint32]*ua.NodeID),
-		nodeLookup:       make(map[string]*itemIDs),
+		itemLookup:       make(map[uint32]Item),
 	}
 
 	var err error
@@ -238,6 +257,7 @@ func (s *Subscription) Dropped() uint64 {
 
 // AddNodes adds nodes defined by their string representation
 func (s *Subscription) AddNodes(nodes ...string) error {
+
 	nodeIDs, err := parseNodeSlice(nodes...)
 	if err != nil {
 		return err
@@ -247,53 +267,73 @@ func (s *Subscription) AddNodes(nodes ...string) error {
 
 // AddNodeIDs adds nodes
 func (s *Subscription) AddNodeIDs(nodes ...*ua.NodeID) error {
+	requests := make([]Request, len(nodes))
+
+	for i, node := range nodes {
+		requests[i] = Request{
+			NodeID:         node,
+			MonitoringMode: ua.MonitoringModeReporting,
+		}
+	}
+	_, err := s.AddMonitorItems(requests...)
+	return err
+}
+
+// AddMonitorItems adds nodes with monitoring parameters to the subscription
+func (s *Subscription) AddMonitorItems(nodes ...Request) ([]Item, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	if len(nodes) == 0 {
 		// some server implementionations allow an empty monitoreditemrequest, some don't.
 		// beter to just return
-		return nil
+		return nil, nil
 	}
 
 	toAdd := make([]*ua.MonitoredItemCreateRequest, 0)
 
-	for _, node := range nodes {
+	// Add handles and make requests
+	for i, node := range nodes {
 		handle := atomic.AddUint32(&s.monitor.nextClientHandle, 1)
+		s.handles[handle] = nodes[i].NodeID
+		nodes[i].handle = handle
 
-		s.handles[handle] = node
-		s.nodeLookup[node.String()] = &itemIDs{
-			handle: handle,
+		request := opcua.NewMonitoredItemCreateRequestWithDefaults(node.NodeID, ua.AttributeIDValue, handle)
+		request.MonitoringMode = node.MonitoringMode
+
+		if node.MonitoringParameters != nil {
+			request.RequestedParameters = node.MonitoringParameters
+			request.RequestedParameters.ClientHandle = handle
 		}
-
-		// log.Printf("node=%s handle=%d", node.String(), handle)
-
-		toAdd = append(toAdd, opcua.NewMonitoredItemCreateRequestWithDefaults(node, ua.AttributeIDValue, handle))
+		toAdd = append(toAdd, request)
 	}
-
 	resp, err := s.sub.Monitor(ua.TimestampsToReturnBoth, toAdd...)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if resp.ResponseHeader.ServiceResult != ua.StatusOK {
-		return resp.ResponseHeader.ServiceResult
+		return nil, resp.ResponseHeader.ServiceResult
 	}
 
 	if len(resp.Results) != len(toAdd) {
-		return errors.Errorf("monitor items response length mismatch")
+		return nil, errors.Errorf("monitor items response length mismatch")
 	}
-
+	var monitoredItems []Item
 	for i, res := range resp.Results {
 		if res.StatusCode != ua.StatusOK {
-			return res.StatusCode
+			return nil, res.StatusCode
 		}
-		// note: this works _iff_ the order of the response is the same as the request
-		sid := toAdd[i].ItemToMonitor.NodeID.String()
-		s.nodeLookup[sid].id = res.MonitoredItemID
+		mn := Item{
+			id:     res.MonitoredItemID,
+			handle: nodes[i].handle,
+			nodeID: toAdd[i].ItemToMonitor.NodeID,
+		}
+		s.itemLookup[res.MonitoredItemID] = mn
+		monitoredItems = append(monitoredItems, mn)
 	}
 
-	return nil
+	return monitoredItems, nil
 }
 
 // RemoveNodes removes nodes defined by their string representation
@@ -307,25 +347,44 @@ func (s *Subscription) RemoveNodes(nodes ...string) error {
 
 // RemoveNodeIDs removes nodes
 func (s *Subscription) RemoveNodeIDs(nodes ...*ua.NodeID) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	if len(nodes) == 0 {
 		return nil
 	}
 
-	toRemove := make([]uint32, len(nodes))
+	var toRemove []Item
 
-	for i, node := range nodes {
-		sid := node.String()
-		ids, ok := s.nodeLookup[sid]
-		if !ok {
-			return errors.Errorf("node not found: %s", sid)
+	for _, node := range nodes {
+		for _, item := range s.itemLookup {
+			if item.nodeID == node {
+				toRemove = append(toRemove, item)
+				break
+			}
 		}
-		delete(s.nodeLookup, sid)
-		delete(s.handles, ids.handle)
+	}
 
-		toRemove[i] = ids.id
+	return s.RemoveMonitorItems(toRemove...)
+}
+
+// RemoveMonitorItems removes nodes
+func (s *Subscription) RemoveMonitorItems(items ...Item) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if len(items) == 0 {
+		return nil
+	}
+
+	var toRemove []uint32
+
+	for _, item := range items {
+
+		_, ok := s.itemLookup[item.id]
+		if !ok {
+			return errors.Errorf("item not found: %s", item.id)
+		}
+		delete(s.itemLookup, item.id)
+		delete(s.handles, item.handle)
+		toRemove = append(toRemove, item.id)
 	}
 
 	resp, err := s.sub.Unmonitor(toRemove...)
@@ -350,6 +409,7 @@ func (s *Subscription) RemoveNodeIDs(nodes ...*ua.NodeID) error {
 	return nil
 }
 
+// Stats returns statistics for the subscription
 func (s *Subscription) Stats() (*ua.SubscriptionDiagnosticsDataType, error) {
 	return s.sub.Stats()
 }

@@ -55,15 +55,16 @@ func newBasic128Rsa15Symmetric(localNonce []byte, remoteNonce []byte) (*Encrypti
 	remoteKeys := generateKeys(remoteHmac, localNonce, signatureKeyLength, encryptionKeyLength, encryptionBlockSize)
 
 	return &EncryptionAlgorithm{
-		blockSize:           AESBlockSize,
-		plainttextBlockSize: AESBlockSize - AESMinPadding,
-		encrypt:             &AES{KeyLength: 128, IV: remoteKeys.iv, Secret: remoteKeys.encryption}, // AES128-CBC
-		decrypt:             &AES{KeyLength: 128, IV: localKeys.iv, Secret: localKeys.encryption},   // AES128-CBC
-		signature:           &HMAC{Hash: crypto.SHA1, Secret: remoteKeys.signing},                   // HMAC-SHA1
-		verifySignature:     &HMAC{Hash: crypto.SHA1, Secret: localKeys.signing},                    // HMAC-SHA1
-		signatureLength:     160 / 8,
-		encryptionURI:       "http://www.w3.org/2001/04/xmlenc#aes128-cbc",
-		signatureURI:        "http://www.w3.org/2000/09/xmldsig#hmac-sha1",
+		blockSize:             AESBlockSize,
+		plainttextBlockSize:   AESBlockSize - AESMinPadding,
+		encrypt:               &AES{KeyLength: 128, IV: remoteKeys.iv, Secret: remoteKeys.encryption}, // AES128-CBC
+		decrypt:               &AES{KeyLength: 128, IV: localKeys.iv, Secret: localKeys.encryption},   // AES128-CBC
+		signature:             &HMAC{Hash: crypto.SHA1, Secret: remoteKeys.signing},                   // HMAC-SHA1
+		verifySignature:       &HMAC{Hash: crypto.SHA1, Secret: localKeys.signing},                    // HMAC-SHA1
+		signatureLength:       160 / 8,
+		remoteSignatureLength: 160 / 8,
+		encryptionURI:         "http://www.w3.org/2001/04/xmlenc#aes128-cbc",
+		signatureURI:          "http://www.w3.org/2000/09/xmldsig#hmac-sha1",
 	}, nil
 }
 
@@ -94,15 +95,16 @@ func newBasic128Rsa15Asymmetric(localKey *rsa.PrivateKey, remoteKey *rsa.PublicK
 	}
 
 	return &EncryptionAlgorithm{
-		blockSize:           remoteKeySize,
-		plainttextBlockSize: remoteKeySize - PKCS1v15MinPadding,
-		encrypt:             &PKCS1v15{PublicKey: remoteKey},                    // RSA-SHA15+KWRSA15
-		decrypt:             &PKCS1v15{PrivateKey: localKey},                    // RSA-SHA15+KWRSA15
-		signature:           &PKCS1v15{Hash: crypto.SHA1, PrivateKey: localKey}, // RSA-SHA1
-		verifySignature:     &PKCS1v15{Hash: crypto.SHA1, PublicKey: remoteKey}, // RSA-SHA1
-		nonceLength:         nonceLength,
-		signatureLength:     localKeySize,
-		encryptionURI:       "http://www.w3.org/2001/04/xmlenc#rsa-1_5",
-		signatureURI:        "http://www.w3.org/2000/09/xmldsig#rsa-sha1",
+		blockSize:             remoteKeySize,
+		plainttextBlockSize:   remoteKeySize - PKCS1v15MinPadding,
+		encrypt:               &PKCS1v15{PublicKey: remoteKey},                    // RSA-SHA15+KWRSA15
+		decrypt:               &PKCS1v15{PrivateKey: localKey},                    // RSA-SHA15+KWRSA15
+		signature:             &PKCS1v15{Hash: crypto.SHA1, PrivateKey: localKey}, // RSA-SHA1
+		verifySignature:       &PKCS1v15{Hash: crypto.SHA1, PublicKey: remoteKey}, // RSA-SHA1
+		nonceLength:           nonceLength,
+		signatureLength:       localKeySize,
+		remoteSignatureLength: remoteKeySize,
+		encryptionURI:         "http://www.w3.org/2001/04/xmlenc#rsa-1_5",
+		signatureURI:          "http://www.w3.org/2000/09/xmldsig#rsa-sha1",
 	}, nil
 }

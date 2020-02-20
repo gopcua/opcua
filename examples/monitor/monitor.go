@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"sync"
 	"time"
 
 	"github.com/gopcua/opcua"
@@ -82,17 +83,21 @@ func main() {
 	m.SetErrorHandler(func(_ *opcua.Client, sub *monitor.Subscription, err error) {
 		log.Printf("error: sub=%d err=%s", sub.SubscriptionID(), err.Error())
 	})
+	wg := &sync.WaitGroup{}
 
 	// start callback-based subscription
-	go startCallbackSub(ctx, m, subInterval, 0, *nodeID)
+	wg.Add(1)
+	go startCallbackSub(ctx, m, subInterval, 0, wg, *nodeID)
 
 	// start channel-based subscription
-	go startChanSub(ctx, m, subInterval, 0, *nodeID)
+	wg.Add(1)
+	go startChanSub(ctx, m, subInterval, 0, wg, *nodeID)
 
 	<-ctx.Done()
+	wg.Wait()
 }
 
-func startCallbackSub(ctx context.Context, m *monitor.NodeMonitor, interval, lag time.Duration, nodes ...string) {
+func startCallbackSub(ctx context.Context, m *monitor.NodeMonitor, interval, lag time.Duration, wg *sync.WaitGroup, nodes ...string) {
 	sub, err := m.Subscribe(
 		ctx,
 		&opcua.SubscriptionParameters{
@@ -112,12 +117,12 @@ func startCallbackSub(ctx context.Context, m *monitor.NodeMonitor, interval, lag
 		log.Fatal(err)
 	}
 
-	defer cleanup(sub)
+	defer cleanup(sub, wg)
 
 	<-ctx.Done()
 }
 
-func startChanSub(ctx context.Context, m *monitor.NodeMonitor, interval, lag time.Duration, nodes ...string) {
+func startChanSub(ctx context.Context, m *monitor.NodeMonitor, interval, lag time.Duration, wg *sync.WaitGroup, nodes ...string) {
 	ch := make(chan *monitor.DataChangeMessage, 16)
 	sub, err := m.ChanSubscribe(ctx, &opcua.SubscriptionParameters{Interval: interval}, ch, nodes...)
 
@@ -125,7 +130,7 @@ func startChanSub(ctx context.Context, m *monitor.NodeMonitor, interval, lag tim
 		log.Fatal(err)
 	}
 
-	defer cleanup(sub)
+	defer cleanup(sub, wg)
 
 	for {
 		select {
@@ -142,7 +147,8 @@ func startChanSub(ctx context.Context, m *monitor.NodeMonitor, interval, lag tim
 	}
 }
 
-func cleanup(sub *monitor.Subscription) {
+func cleanup(sub *monitor.Subscription, wg *sync.WaitGroup) {
 	log.Printf("stats: sub=%d delivered=%d dropped=%d", sub.SubscriptionID(), sub.Delivered(), sub.Dropped())
 	sub.Unsubscribe()
+	wg.Done()
 }

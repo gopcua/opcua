@@ -44,7 +44,7 @@ type Variant struct {
 	// field.
 	arrayLength int32
 
-	// arrayDimensionsLength is the numer of dimensions.
+	// arrayDimensionsLength is the number of dimensions.
 	// This field is only present if the 'array dimensions' flag
 	// is set.
 	arrayDimensionsLength int32
@@ -112,6 +112,11 @@ func (m *Variant) Decode(b []byte) (int, error) {
 	buf := NewBuffer(b)
 	m.mask = buf.ReadByte()
 
+	// a null value specifies that no other fields are encoded
+	if m.Type() == TypeIDNull {
+		return buf.Pos(), buf.Error()
+	}
+
 	// check the type
 	typ, ok := variantTypeIDToType[m.Type()]
 	if !ok {
@@ -147,7 +152,7 @@ func (m *Variant) Decode(b []byte) (int, error) {
 		m.arrayDimensions = make([]int32, m.arrayDimensionsLength)
 		for i := 0; i < int(m.arrayDimensionsLength); i++ {
 			m.arrayDimensions[i] = buf.ReadInt32()
-			if m.arrayDimensions[i] < 0 {
+			if m.arrayDimensions[i] < 1 {
 				return buf.Pos(), StatusBadEncodingLimitsExceeded
 			}
 		}
@@ -302,8 +307,12 @@ func (m *Variant) decodeValue(buf *Buffer) interface{} {
 // Encode implements the codec interface.
 func (m *Variant) Encode() ([]byte, error) {
 	buf := NewBuffer(nil)
-
 	buf.WriteByte(m.mask)
+
+	// a null value specifies that no other fields are encoded
+	if m.Type() == TypeIDNull {
+		return buf.Bytes(), buf.Error()
+	}
 
 	if m.Has(VariantArrayValues) {
 		buf.WriteInt32(m.arrayLength)
@@ -395,6 +404,11 @@ var errUnbalancedSlice = errors.New("unbalanced multi-dimensional array")
 // sliceDim determines the element type, dimensions and the total length
 // of a one or multi-dimensional slice.
 func sliceDim(v reflect.Value) (typ reflect.Type, dim []int32, count int32, err error) {
+	// null type
+	if v.Kind() == reflect.Invalid {
+		return nil, nil, 0, nil
+	}
+
 	// ByteString is its own type
 	if v.Type() == reflect.TypeOf([]byte{}) {
 		return v.Type(), nil, 1, nil
