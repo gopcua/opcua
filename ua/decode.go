@@ -32,11 +32,7 @@ type BinaryDecoder interface {
 
 func Decode(b []byte, v interface{}) (int, error) {
 	val := reflect.ValueOf(v)
-	n, err := decode(b, val, val.Type().String())
-	if err != nil {
-		return n, err
-	}
-	return n, nil
+	return decode(b, val, val.Type().String())
 }
 
 func decode(b []byte, val reflect.Value, name string) (n int, err error) {
