@@ -6,6 +6,7 @@ package uacp
 
 import (
 	"context"
+	"net"
 	"testing"
 	"time"
 
@@ -13,39 +14,52 @@ import (
 )
 
 func TestConn(t *testing.T) {
-	ep := "opc.tcp://127.0.0.1:4840/foo/bar"
-	ln, err := Listen(ep, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer ln.Close()
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	done := make(chan struct{})
-	acceptErr := make(chan error, 1)
-	go func() {
-		c, err := ln.Accept(ctx)
+	t.Run("server exists ", func(t *testing.T) {
+		ep := "opc.tcp://127.0.0.1:4840/foo/bar"
+		ln, err := Listen(ep, nil)
 		if err != nil {
-			acceptErr <- err
-			return
+			t.Fatal(err)
 		}
-		defer c.Close()
-		close(done)
-	}()
+		defer ln.Close()
 
-	if _, err = Dial(ctx, ep); err != nil {
-		t.Error(err)
-	}
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 
-	select {
-	case <-done:
-	case err := <-acceptErr:
-		t.Fatalf("accept fail: %v", err)
-	case <-time.After(time.Second):
-		t.Fatal("timed out")
-	}
+		done := make(chan struct{})
+		acceptErr := make(chan error, 1)
+		go func() {
+			c, err := ln.Accept(ctx)
+			if err != nil {
+				acceptErr <- err
+				return
+			}
+			defer c.Close()
+			close(done)
+		}()
+
+		if _, err = Dial(ctx, ep); err != nil {
+			t.Error(err)
+		}
+
+		select {
+		case <-done:
+		case err := <-acceptErr:
+			t.Fatalf("accept fail: %v", err)
+		case <-time.After(time.Second):
+			t.Fatal("timed out")
+		}
+	})
+
+	t.Run("Address resolves, but does not implement a opcua-server", func(t *testing.T) {
+		ep := "opc.tcp://example.com:56789"
+
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		_, err := Dial(ctx, ep)
+		if !err.(*net.OpError).Timeout() {
+			t.Error(err)
+		}
+	})
 }
 
 func TestClientWrite(t *testing.T) {
