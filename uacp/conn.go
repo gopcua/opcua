@@ -40,7 +40,8 @@ func Dial(ctx context.Context, endpoint string) (*Conn, error) {
 	if err != nil {
 		return nil, err
 	}
-	c, err := net.DialTCP(network, nil, raddr)
+	var dialer net.Dialer
+	c, err := dialer.DialContext(ctx, network, raddr.String())
 	if err != nil {
 		return nil, err
 	}
