@@ -234,6 +234,26 @@ func (c *Client) Close() error {
 	return c.sechan.Close()
 }
 
+var errNotConnected = errors.New("not connected")
+
+// SetReadBuffer sets the operating system's TCP receive buffer
+// of the underlying UACP connection.
+func (c *Client) SetReadBuffer(bytes int) error {
+	if c.conn == nil {
+		return errNotConnected
+	}
+	return c.conn.SetReadBuffer(bytes)
+}
+
+// SetWriteBuffer sets the operating system's TCP transmit buffer
+// of the underlying UACP connection.
+func (c *Client) SetWriteBuffer(bytes int) error {
+	if c.conn == nil {
+		return errNotConnected
+	}
+	return c.conn.SetWriteBuffer(bytes)
+}
+
 // Session returns the active session.
 func (c *Client) Session() *Session {
 	return c.session.Load().(*Session)
