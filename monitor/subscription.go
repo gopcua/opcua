@@ -48,11 +48,11 @@ type itemIDs struct {
 // Subscription is an instance of an active subscription.
 // Nodes can be added and removed concurrently.
 type Subscription struct {
+	delivered        uint64
+	dropped          uint64
 	monitor          *NodeMonitor
 	sub              *opcua.Subscription
 	internalNotifyCh chan *opcua.PublishNotificationData
-	delivered        uint64
-	dropped          uint64
 	closed           chan struct{}
 	mu               sync.RWMutex
 	handles          map[uint32]*ua.NodeID
