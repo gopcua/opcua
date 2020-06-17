@@ -2,6 +2,8 @@ package opcua
 
 import (
 	"context"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gopcua/opcua/debug"
@@ -19,12 +21,20 @@ const (
 	DefaultSubscriptionPriority                   = 0
 )
 
+const terminatedSubscriptionID uint32 = 0xC0CAC01B
+
 type Subscription struct {
 	SubscriptionID            uint32
 	RevisedPublishingInterval time.Duration
 	RevisedLifetimeCount      uint32
 	RevisedMaxKeepAliveCount  uint32
 	Notifs                    chan *PublishNotificationData
+	params                    *SubscriptionParameters
+	monitoredItems            []*MonitoredItem
+	lastSequenceNumber        uint32
+	publishCancel             context.CancelFunc
+	publishWg                 sync.WaitGroup
+	resumeC                   chan struct{}
 	c                         *Client
 }
 
@@ -34,6 +44,15 @@ type SubscriptionParameters struct {
 	MaxKeepAliveCount          uint32
 	MaxNotificationsPerPublish uint32
 	Priority                   uint8
+}
+
+type MonitoredItem struct {
+	MonitoredItemID           uint32
+	ItemToMonitor             *ua.ReadValueID
+	MonitoringParameters      *ua.MonitoringParameters
+	MonitoringMode            ua.MonitoringMode
+	TimestampsToReturn        ua.TimestampsToReturn
+	monitoredItemCreateResult *ua.MonitoredItemCreateResult
 }
 
 func NewMonitoredItemCreateRequestWithDefaults(nodeID *ua.NodeID, attributeID ua.AttributeID, clientHandle uint32) *ua.MonitoredItemCreateRequest {
@@ -67,6 +86,7 @@ type PublishNotificationData struct {
 // loops cannot deliver notifications to it anymore
 func (s *Subscription) Cancel() error {
 	s.c.forgetSubscription(s.SubscriptionID)
+	close(s.resumeC)
 
 	req := &ua.DeleteSubscriptionsRequest{
 		SubscriptionIDs: []uint32{s.SubscriptionID},
@@ -97,6 +117,33 @@ func (s *Subscription) Monitor(ts ua.TimestampsToReturn, items ...*ua.MonitoredI
 	err := s.c.Send(req, func(v interface{}) error {
 		return safeAssign(v, &res)
 	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	for _, result := range res.Results {
+		if status := result.StatusCode; status != ua.StatusOK {
+			return nil, status
+		}
+	}
+
+	// store Monitored items
+	monitoredItems := make([]*MonitoredItem, len(items))
+	for i, item := range items {
+		result := res.Results[i]
+
+		monitoredItems[i] = &MonitoredItem{
+			MonitoredItemID:           result.MonitoredItemID,
+			ItemToMonitor:             item.ItemToMonitor,
+			MonitoringParameters:      item.RequestedParameters,
+			MonitoringMode:            item.MonitoringMode,
+			TimestampsToReturn:        ts,
+			monitoredItemCreateResult: result,
+		}
+	}
+
+	s.monitoredItems = append(s.monitoredItems, monitoredItems...)
 	return res, err
 }
 
@@ -131,6 +178,15 @@ func (s *Subscription) SetTriggering(triggeringItemID uint32, add, remove []uint
 	return res, err
 }
 
+// republish executes a synchronous republish request.
+func (s *Subscription) republish(req *ua.RepublishRequest) (*ua.RepublishResponse, error) {
+	var res *ua.RepublishResponse
+	err := s.c.sechan.SendRequest(req, s.c.Session().resp.AuthenticationToken, func(v interface{}) error {
+		return safeAssign(v, &res)
+	})
+	return res, err
+}
+
 func (s *Subscription) publish(acks []*ua.SubscriptionAcknowledgement) (*ua.PublishResponse, error) {
 	if acks == nil {
 		acks = []*ua.SubscriptionAcknowledgement{}
@@ -157,11 +213,45 @@ func (s *Subscription) publishTimeout() time.Duration {
 	return timeout
 }
 
+func (s *Subscription) stop() {
+	s.publishCancel()
+	s.publishWg.Wait()
+}
+
+func (s *Subscription) resume() {
+	s.resumeC <- struct{}{}
+}
+
 // Run() starts an infinite loop that sends PublishRequests and delivers received
 // notifications to registered Subscriptions.
 // It is the responsibility of the user to stop no longer needed Run() loops by cancelling ctx
 // Note that Run() may return before ctx is cancelled in case of an irrecoverable communication error
 func (s *Subscription) Run(ctx context.Context) {
+	var sctx context.Context
+
+	if !s.c.cfg.AutoReconnect {
+		s.run(ctx)
+		return
+	}
+
+	for {
+		sctx, s.publishCancel = context.WithCancel(ctx)
+		s.publishWg.Add(1)
+		s.run(sctx)
+		s.publishWg.Done()
+
+		select {
+		case <-ctx.Done():
+			return
+		case _, ok := <-s.resumeC:
+			if !ok {
+				return
+			}
+		}
+	}
+}
+
+func (s *Subscription) run(ctx context.Context) {
 	var acks []*ua.SubscriptionAcknowledgement
 
 	for {
@@ -196,6 +286,9 @@ func (s *Subscription) Run(ctx context.Context) {
 						ack := &ua.SubscriptionAcknowledgement{
 							SubscriptionID: res.SubscriptionID,
 							SequenceNumber: i,
+						}
+						if i > atomic.LoadUint32(&s.lastSequenceNumber) {
+							atomic.StoreUint32(&s.lastSequenceNumber, i)
 						}
 						acks = append(acks, ack)
 					}
@@ -260,4 +353,102 @@ func (p *SubscriptionParameters) setDefaults() {
 		// and to explicitly expose the default priority as a constant
 		p.Priority = DefaultSubscriptionPriority
 	}
+}
+
+// recreateSubscriptionAndMonitoredItems recreate a new subscription base of a previous subscription
+// parameters
+func (s *Subscription) recreateSubscriptionAndMonitoredItems() error {
+	if s.SubscriptionID == terminatedSubscriptionID {
+		debug.Printf("Subscription is not in a valid state")
+		return nil
+	}
+
+	params := s.params
+	{
+		req := &ua.DeleteSubscriptionsRequest{
+			SubscriptionIDs: []uint32{s.SubscriptionID},
+		}
+		var res *ua.DeleteSubscriptionsResponse
+		_ = s.c.Send(req, func(v interface{}) error {
+			return safeAssign(v, &res)
+		})
+	}
+	s.c.forgetSubscription(s.SubscriptionID)
+
+	req := &ua.CreateSubscriptionRequest{
+		RequestedPublishingInterval: float64(params.Interval / time.Millisecond),
+		RequestedLifetimeCount:      params.LifetimeCount,
+		RequestedMaxKeepAliveCount:  params.MaxKeepAliveCount,
+		PublishingEnabled:           true,
+		MaxNotificationsPerPublish:  params.MaxNotificationsPerPublish,
+		Priority:                    params.Priority,
+	}
+	var res *ua.CreateSubscriptionResponse
+	err := s.c.Send(req, func(v interface{}) error {
+		return safeAssign(v, &res)
+	})
+	if err != nil {
+		return err
+	}
+	// todo (unknownet): check if necessary
+	if status := res.ResponseHeader.ServiceResult; status != ua.StatusOK {
+		return status
+	}
+
+	s.SubscriptionID = res.SubscriptionID
+	s.RevisedPublishingInterval = time.Duration(res.RevisedPublishingInterval) * time.Millisecond
+	s.RevisedLifetimeCount = res.RevisedLifetimeCount
+	s.RevisedMaxKeepAliveCount = res.RevisedMaxKeepAliveCount
+	atomic.StoreUint32(&s.lastSequenceNumber, 0)
+
+	if err := s.c.registerSubscription(s); err != nil {
+		return err
+	}
+
+	// Sort by timestamp to return
+	itemsByTs := make(map[ua.TimestampsToReturn][]*ua.MonitoredItemCreateRequest)
+	for _, m := range s.monitoredItems {
+
+		if _, ok := itemsByTs[m.TimestampsToReturn]; !ok {
+			itemsByTs[m.TimestampsToReturn] = []*ua.MonitoredItemCreateRequest{}
+		}
+
+		itemsByTs[m.TimestampsToReturn] = append(
+			itemsByTs[m.TimestampsToReturn],
+			&ua.MonitoredItemCreateRequest{
+				ItemToMonitor:       m.ItemToMonitor,
+				MonitoringMode:      m.MonitoringMode,
+				RequestedParameters: m.MonitoringParameters,
+			},
+		)
+	}
+
+	for ts, items := range itemsByTs {
+
+		req := &ua.CreateMonitoredItemsRequest{
+			SubscriptionID:     s.SubscriptionID,
+			TimestampsToReturn: ts,
+			ItemsToCreate:      items,
+		}
+		var res *ua.CreateMonitoredItemsResponse
+		err := s.c.Send(req, func(v interface{}) error {
+			return safeAssign(v, &res)
+		})
+		if err != nil {
+			return err
+		}
+		for _, result := range res.Results {
+			if status := result.StatusCode; status != ua.StatusOK {
+				return status
+			}
+		}
+
+		for i, m := range s.monitoredItems {
+			result := res.Results[i]
+			m.MonitoredItemID = result.MonitoredItemID
+			m.monitoredItemCreateResult = result
+		}
+	}
+
+	return nil
 }
