@@ -457,6 +457,7 @@ func (s *SecureChannel) open(ctx context.Context, instance *channelInstance, req
 		// this seems racy. if another request goes out while the other open request is in flight then won't an error
 		// be raised on the server? can the sequenceNumber be as "global" as the request ID?
 		s.openingInstance.sequenceNumber = instance.sequenceNumber
+		s.openingInstance.secureChannelID = instance.secureChannelID
 	}
 
 	// trigger cleanup after we are all done
