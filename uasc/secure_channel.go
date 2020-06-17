@@ -64,6 +64,12 @@ type SecureChannel struct {
 	activeInstance *channelInstance
 	instancesMu    sync.Mutex
 
+	// prevent sending msg when secure channel renewal occurs
+	bLockReq   bool
+	lockReqMu  sync.Mutex
+	lockReqCnd *sync.Cond
+	pendingReq sync.WaitGroup
+
 	// handles maps request IDs to response channels
 	handlers   map[uint32]chan *response
 	handlersMu sync.Mutex
@@ -108,7 +114,9 @@ func NewSecureChannel(endpoint string, c *uacp.Conn, cfg *Config) (*SecureChanne
 		c:           c,
 		cfg:         cfg,
 		requestID:   cfg.RequestIDSeed,
+		bLockReq:    false,
 	}
+	s.lockReqCnd = sync.NewCond(&s.lockReqMu)
 
 	s.reset()
 
@@ -485,13 +493,40 @@ func (s *SecureChannel) open(ctx context.Context, instance *channelInstance, req
 		RequestedLifetime:     s.cfg.Lifetime,
 	}
 
+	s.lockRequest()
+	defer s.unlockRequest()
+	s.pendingReq.Wait()
+
 	return s.sendRequestWithTimeout(req, reqID, s.openingInstance, nil, s.cfg.RequestTimeout, func(v interface{}) error {
+		s.instancesMu.Lock()
+		defer s.instancesMu.Unlock()
 		resp, ok := v.(*ua.OpenSecureChannelResponse)
 		if !ok {
 			return errors.Errorf("got %T, want OpenSecureChannelResponse", v)
 		}
 		return s.handleOpenSecureChannelResponse(resp, localNonce, s.openingInstance)
 	})
+}
+
+func (s *SecureChannel) lockRequest() {
+	s.lockReqMu.Lock()
+	defer s.lockReqMu.Unlock()
+	s.bLockReq = true
+}
+
+func (s *SecureChannel) unlockRequest() {
+	s.lockReqMu.Lock()
+	defer s.lockReqMu.Unlock()
+	s.bLockReq = false
+	s.lockReqCnd.Broadcast()
+}
+
+func (s *SecureChannel) waitIfReqLock() {
+	s.lockReqMu.Lock()
+	for s.bLockReq {
+		s.lockReqCnd.Wait()
+	}
+	s.lockReqMu.Unlock()
 }
 
 func (s *SecureChannel) handleOpenSecureChannelResponse(resp *ua.OpenSecureChannelResponse, localNonce []byte, instance *channelInstance) (err error) {
@@ -509,9 +544,6 @@ func (s *SecureChannel) handleOpenSecureChannelResponse(resp *ua.OpenSecureChann
 	if instance.algo, err = uapolicy.Symmetric(s.cfg.SecurityPolicyURI, localNonce, resp.ServerNonce); err != nil {
 		return err
 	}
-
-	s.instancesMu.Lock()
-	defer s.instancesMu.Unlock()
 
 	if _, ok := s.instances[resp.SecurityToken.ChannelID]; ok {
 		// since there's already an existing entry for this SecureChannelID it means we are in a renewal
@@ -617,9 +649,11 @@ func (s *SecureChannel) sendRequestWithTimeout(
 	timeout time.Duration,
 	h func(interface{}) error) error {
 
+	s.pendingReq.Add(1)
 	respRequired := h != nil
 
 	ch, err := s.sendAsyncWithTimeout(req, reqID, instance, authToken, respRequired, timeout)
+	s.pendingReq.Done()
 	if err != nil {
 		return err
 	}
@@ -673,6 +707,7 @@ func (s *SecureChannel) SendRequest(req ua.Request, authToken *ua.NodeID, h func
 }
 
 func (s *SecureChannel) SendRequestWithTimeout(req ua.Request, authToken *ua.NodeID, timeout time.Duration, h func(interface{}) error) error {
+	s.waitIfReqLock()
 	active, err := s.getActiveChannelInstance()
 	if err != nil {
 		return err
@@ -764,6 +799,7 @@ func (s *SecureChannel) Close() error {
 		s.reset()
 	}()
 
+	s.unlockRequest()
 	err := s.SendRequest(&ua.CloseSecureChannelRequest{}, nil, nil)
 
 	if err != nil {
