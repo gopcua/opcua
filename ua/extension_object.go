@@ -23,6 +23,8 @@ func init() {
 	RegisterExtensionObject(NewNumericNodeID(0, id.ReadRawModifiedDetails_Encoding_DefaultBinary), new(ReadRawModifiedDetails))
 	RegisterExtensionObject(NewNumericNodeID(0, id.HistoryData_Encoding_DefaultBinary), new(HistoryData))
 	RegisterExtensionObject(NewNumericNodeID(0, id.SubscriptionDiagnosticsDataType_Encoding_DefaultBinary), new(SubscriptionDiagnosticsDataType))
+	RegisterExtensionObject(NewNumericNodeID(0, id.EventFilterResult_Encoding_DefaultBinary), new(EventFilterResult))
+	RegisterExtensionObject(NewNumericNodeID(0, id.EventNotificationList_Encoding_DefaultBinary), new(EventNotificationList))
 }
 
 // RegisterExtensionObject registers a new extension object type.
