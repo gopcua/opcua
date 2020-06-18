@@ -33,6 +33,41 @@ type response struct {
 	Err   error
 }
 
+type conditionLocker struct {
+	bLock   bool
+	lockMu  sync.Mutex
+	lockCnd *sync.Cond
+}
+
+func newConditionLocker() *conditionLocker {
+	c := conditionLocker{
+		bLock: false,
+	}
+	c.lockCnd = sync.NewCond(&c.lockMu)
+	return &c
+}
+
+func (c *conditionLocker) lock() {
+	c.lockMu.Lock()
+	defer c.lockMu.Unlock()
+	c.bLock = true
+}
+
+func (c *conditionLocker) unlock() {
+	c.lockMu.Lock()
+	defer c.lockMu.Unlock()
+	c.bLock = false
+	c.lockCnd.Broadcast()
+}
+
+func (c *conditionLocker) waitIfLock() {
+	c.lockMu.Lock()
+	defer c.lockMu.Unlock()
+	for c.bLock {
+		c.lockCnd.Wait()
+	}
+}
+
 type SecureChannel struct {
 	endpointURL string
 
@@ -65,9 +100,8 @@ type SecureChannel struct {
 	instancesMu    sync.Mutex
 
 	// prevent sending msg when secure channel renewal occurs
-	bLockReq   bool
-	lockReqMu  sync.Mutex
-	lockReqCnd *sync.Cond
+	reqLocker  *conditionLocker
+	rcvLocker  *conditionLocker
 	pendingReq sync.WaitGroup
 
 	// handles maps request IDs to response channels
@@ -117,11 +151,10 @@ func NewSecureChannel(endpoint string, c *uacp.Conn, cfg *Config, errCh chan<- e
 		c:           c,
 		cfg:         cfg,
 		requestID:   cfg.RequestIDSeed,
-		bLockReq:    false,
+		reqLocker:   newConditionLocker(),
+		rcvLocker:   newConditionLocker(),
 		errCh:       errCh,
 	}
-	s.lockReqCnd = sync.NewCond(&s.lockReqMu)
-
 	s.reset()
 
 	return s, nil
@@ -188,6 +221,11 @@ func (s *SecureChannel) dispatcher() {
 				continue
 			}
 
+			// HACK
+			if _, ok := resp.V.(*ua.OpenSecureChannelResponse); ok {
+				s.rcvLocker.lock()
+			}
+
 			debug.Printf("sending %T to handler\n", resp.V)
 			select {
 			case ch <- resp:
@@ -195,6 +233,8 @@ func (s *SecureChannel) dispatcher() {
 				// this should never happen since the chan is of size one
 				debug.Printf("unexpected state. channel write should always succeed.")
 			}
+
+			s.rcvLocker.waitIfLock()
 		}
 	}
 }
@@ -431,6 +471,7 @@ func (s *SecureChannel) Open(ctx context.Context) error {
 
 func (s *SecureChannel) open(ctx context.Context, instance *channelInstance, requestType ua.SecurityTokenRequestType) error {
 	// TODO: do something with the context
+	defer s.rcvLocker.unlock()
 
 	s.openingMu.Lock()
 	defer s.openingMu.Unlock()
@@ -508,40 +549,17 @@ func (s *SecureChannel) open(ctx context.Context, instance *channelInstance, req
 		RequestedLifetime:     s.cfg.Lifetime,
 	}
 
-	s.lockRequest()
-	defer s.unlockRequest()
+	s.reqLocker.lock()
+	defer s.reqLocker.unlock()
 	s.pendingReq.Wait()
 
 	return s.sendRequestWithTimeout(req, reqID, s.openingInstance, nil, s.cfg.RequestTimeout, func(v interface{}) error {
-		s.instancesMu.Lock()
-		defer s.instancesMu.Unlock()
 		resp, ok := v.(*ua.OpenSecureChannelResponse)
 		if !ok {
 			return errors.Errorf("got %T, want OpenSecureChannelResponse", v)
 		}
 		return s.handleOpenSecureChannelResponse(resp, localNonce, s.openingInstance)
 	})
-}
-
-func (s *SecureChannel) lockRequest() {
-	s.lockReqMu.Lock()
-	defer s.lockReqMu.Unlock()
-	s.bLockReq = true
-}
-
-func (s *SecureChannel) unlockRequest() {
-	s.lockReqMu.Lock()
-	defer s.lockReqMu.Unlock()
-	s.bLockReq = false
-	s.lockReqCnd.Broadcast()
-}
-
-func (s *SecureChannel) waitIfReqLock() {
-	s.lockReqMu.Lock()
-	for s.bLockReq {
-		s.lockReqCnd.Wait()
-	}
-	s.lockReqMu.Unlock()
 }
 
 func (s *SecureChannel) handleOpenSecureChannelResponse(resp *ua.OpenSecureChannelResponse, localNonce []byte, instance *channelInstance) (err error) {
@@ -559,6 +577,9 @@ func (s *SecureChannel) handleOpenSecureChannelResponse(resp *ua.OpenSecureChann
 	if instance.algo, err = uapolicy.Symmetric(s.cfg.SecurityPolicyURI, localNonce, resp.ServerNonce); err != nil {
 		return err
 	}
+
+	s.instancesMu.Lock()
+	defer s.instancesMu.Unlock()
 
 	if _, ok := s.instances[resp.SecurityToken.ChannelID]; ok {
 		// since there's already an existing entry for this SecureChannelID it means we are in a renewal
@@ -722,7 +743,7 @@ func (s *SecureChannel) SendRequest(req ua.Request, authToken *ua.NodeID, h func
 }
 
 func (s *SecureChannel) SendRequestWithTimeout(req ua.Request, authToken *ua.NodeID, timeout time.Duration, h func(interface{}) error) error {
-	s.waitIfReqLock()
+	s.reqLocker.waitIfLock()
 	active, err := s.getActiveChannelInstance()
 	if err != nil {
 		return err
@@ -814,7 +835,8 @@ func (s *SecureChannel) Close() error {
 		s.reset()
 	}()
 
-	s.unlockRequest()
+	s.reqLocker.unlock()
+	s.rcvLocker.unlock()
 	// close pending requests
 	s.handlersMu.Lock()
 	for reqID, ch := range s.handlers {
