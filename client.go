@@ -240,13 +240,6 @@ func (c *Client) dispatcher(ctx context.Context) {
 				}
 			}
 
-			// close secure channel to prevent waiting
-			// for publish timeout
-			if rState == RecreateSecureChannel {
-				_ = c.conn.Close()
-				c.sechan.Close()
-			}
-
 			// Stop all subscriptions
 			for _, sub := range c.subscriptions {
 				sub.stop()
