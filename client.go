@@ -196,8 +196,7 @@ func (c *Client) openSecureChannel(ctx context.Context, open func() error) error
 		c.sechan = nil
 		return err
 	}
-	c.scheduleRenewingToken(ctx)
-	return nil
+	return c.scheduleRenewingToken(ctx)
 }
 
 func (c *Client) monitorChannel(ctx context.Context) {
@@ -289,7 +288,7 @@ type Session struct {
 // See Part 4, 5.6.2
 func (c *Client) CreateSession(cfg *uasc.SessionConfig) (*Session, error) {
 	if c.sechan == nil {
-		return nil, errors.Errorf("secure channel not connected")
+		return nil, ua.StatusBadServerNotConnected
 	}
 
 	nonce := make([]byte, 32)
@@ -372,6 +371,9 @@ func anonymousPolicyID(endpoints []*ua.EndpointDescription) string {
 //
 // See Part 4, 5.6.3
 func (c *Client) ActivateSession(s *Session) error {
+	if c.sechan == nil {
+		return ua.StatusBadServerNotConnected
+	}
 	sig, sigAlg, err := c.sechan.NewSessionSignature(s.serverCertificate, s.serverNonce)
 	if err != nil {
 		log.Printf("error creating session signature: %s", err)
@@ -479,6 +481,9 @@ func (c *Client) Send(req ua.Request, h func(interface{}) error) error {
 // the response. If the client has an active session it injects the
 // authentication token.
 func (c *Client) sendWithTimeout(req ua.Request, timeout time.Duration, h func(interface{}) error) error {
+	if c.sechan == nil {
+		return ua.StatusBadServerNotConnected
+	}
 	var authToken *ua.NodeID
 	if s := c.Session(); s != nil {
 		authToken = s.resp.AuthenticationToken
@@ -760,7 +765,10 @@ func (c *Client) HistoryReadRawModified(nodes []*ua.HistoryReadValueID, details 
 	return res, err
 }
 
-func (c *Client) scheduleRenewingToken(ctx context.Context) {
+func (c *Client) scheduleRenewingToken(ctx context.Context) error {
+	if c.sechan == nil {
+		return ua.StatusBadServerNotConnected
+	}
 	timer := time.NewTimer(time.Duration(0.75*float64(c.sechan.Lifetime())) * time.Millisecond) // 0.75 is from Part 4, Section 5.5.2.1
 
 	go func() {
@@ -773,6 +781,7 @@ func (c *Client) scheduleRenewingToken(ctx context.Context) {
 			_ = c.openSecureChannel(ctx, c.sechan.Renew)
 		}
 	}()
+	return nil
 }
 
 // safeAssign implements a type-safe assign from T to *T.
