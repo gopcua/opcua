@@ -229,8 +229,10 @@ func (c *Client) Close() error {
 	if c.cancelMonitor != nil {
 		c.cancelMonitor()
 	}
-
-	return c.sechan.Close()
+	if c.sechan != nil {
+		return c.sechan.Close()
+	}
+	return io.EOF
 }
 
 var errNotConnected = errors.New("not connected")
