@@ -53,7 +53,7 @@ func TestApplicationDescriptionArray(t *testing.T) {
 		{
 			Name: "Normal",
 			Struct: []*ApplicationDescription{
-				&ApplicationDescription{
+				{
 					ApplicationURI: "app-uri",
 					ProductURI:     "prod-uri",
 					ApplicationName: &LocalizedText{
@@ -65,7 +65,7 @@ func TestApplicationDescriptionArray(t *testing.T) {
 					DiscoveryProfileURI: "prof-uri",
 					DiscoveryURLs:       []string{"discov-uri-1", "discov-uri-2"},
 				},
-				&ApplicationDescription{
+				{
 					ApplicationURI: "app-uri",
 					ProductURI:     "prod-uri",
 					ApplicationName: &LocalizedText{

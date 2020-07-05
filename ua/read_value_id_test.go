@@ -48,17 +48,17 @@ func TestReadValueIDArray(t *testing.T) {
 		{
 			Name: "Normal",
 			Struct: []*ReadValueID{
-				&ReadValueID{
+				{
 					NodeID:       NewStringNodeID(1, "Temperature"),
 					AttributeID:  AttributeIDNodeClass,
 					DataEncoding: &QualifiedName{},
 				},
-				&ReadValueID{
+				{
 					NodeID:       NewStringNodeID(1, "Temperature"),
 					AttributeID:  AttributeIDBrowseName,
 					DataEncoding: &QualifiedName{},
 				},
-				&ReadValueID{
+				{
 					NodeID:       NewStringNodeID(1, "Temperature"),
 					AttributeID:  AttributeIDDisplayName,
 					DataEncoding: &QualifiedName{},

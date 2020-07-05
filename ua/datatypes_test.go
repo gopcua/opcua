@@ -54,11 +54,11 @@ func TestDataValueArray(t *testing.T) {
 		{
 			Name: "value only and value, source timestamp, server timestamp",
 			Struct: []*DataValue{
-				&DataValue{
+				{
 					EncodingMask: 0x01,
 					Value:        MustVariant(float32(2.50025)),
 				},
-				&DataValue{
+				{
 					EncodingMask:    0x0d,
 					Value:           MustVariant(float32(2.50017)),
 					SourceTimestamp: time.Date(2018, time.September, 17, 14, 28, 29, 112000000, time.UTC),

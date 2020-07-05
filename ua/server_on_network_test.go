@@ -67,13 +67,13 @@ func TestServerOnNetworkArray(t *testing.T) {
 		{
 			Name: "normal",
 			Struct: []*ServerOnNetwork{
-				&ServerOnNetwork{
+				{
 					RecordID:           1,
 					ServerName:         "server-name",
 					DiscoveryURL:       "discov-uri",
 					ServerCapabilities: []string{"server-cap-1"},
 				},
-				&ServerOnNetwork{
+				{
 					RecordID:           1,
 					ServerName:         "server-name",
 					DiscoveryURL:       "discov-uri",

@@ -22,7 +22,7 @@ func TestFindServersResponse(t *testing.T) {
 					AdditionalHeader:   NewExtensionObject(nil),
 				},
 				Servers: []*ApplicationDescription{
-					&ApplicationDescription{
+					{
 						ApplicationURI: "app-uri",
 						ProductURI:     "prod-uri",
 						ApplicationName: &LocalizedText{
@@ -34,7 +34,7 @@ func TestFindServersResponse(t *testing.T) {
 						DiscoveryProfileURI: "prof-uri",
 						DiscoveryURLs:       []string{"discov-uri-1", "discov-uri-2"},
 					},
-					&ApplicationDescription{
+					{
 						ApplicationURI: "app-uri",
 						ProductURI:     "prod-uri",
 						ApplicationName: &LocalizedText{
