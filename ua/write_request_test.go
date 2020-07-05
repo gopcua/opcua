@@ -24,7 +24,7 @@ func TestWriteRequest(t *testing.T) {
 					AdditionalHeader: NewExtensionObject(nil),
 				},
 				NodesToWrite: []*WriteValue{
-					&WriteValue{
+					{
 						NodeID:      NewFourByteNodeID(0, 2256),
 						AttributeID: AttributeIDValue,
 						Value: &DataValue{
@@ -82,7 +82,7 @@ func TestWriteRequest(t *testing.T) {
 					AdditionalHeader: NewExtensionObject(nil),
 				},
 				NodesToWrite: []*WriteValue{
-					&WriteValue{
+					{
 						NodeID:      NewFourByteNodeID(0, 2256),
 						AttributeID: AttributeIDValue,
 						Value: &DataValue{
@@ -92,7 +92,7 @@ func TestWriteRequest(t *testing.T) {
 							ServerTimestamp: time.Date(2018, time.September, 17, 14, 28, 29, 112000000, time.UTC),
 						},
 					},
-					&WriteValue{
+					{
 						NodeID:      NewFourByteNodeID(0, 2256),
 						AttributeID: AttributeIDValue,
 						Value: &DataValue{

@@ -30,14 +30,14 @@ func TestEndpointDescription(t *testing.T) {
 				SecurityMode:      MessageSecurityModeNone,
 				SecurityPolicyURI: "sec-uri",
 				UserIdentityTokens: []*UserTokenPolicy{
-					&UserTokenPolicy{
+					{
 						PolicyID:          "1",
 						TokenType:         UserTokenTypeAnonymous,
 						IssuedTokenType:   "issued-token",
 						IssuerEndpointURL: "issuer-uri",
 						SecurityPolicyURI: "sec-uri",
 					},
-					&UserTokenPolicy{
+					{
 						PolicyID:          "1",
 						TokenType:         UserTokenTypeAnonymous,
 						IssuedTokenType:   "issued-token",
@@ -112,7 +112,7 @@ func TestEndpointDescriptionArray(t *testing.T) {
 		{
 			Name: "Normal",
 			Struct: []*EndpointDescription{
-				&EndpointDescription{
+				{
 					EndpointURL: "ep-url",
 					Server: &ApplicationDescription{
 						ApplicationURI: "app-uri",
@@ -130,14 +130,14 @@ func TestEndpointDescriptionArray(t *testing.T) {
 					SecurityMode:      MessageSecurityModeNone,
 					SecurityPolicyURI: "sec-uri",
 					UserIdentityTokens: []*UserTokenPolicy{
-						&UserTokenPolicy{
+						{
 							PolicyID:          "1",
 							TokenType:         UserTokenTypeAnonymous,
 							IssuedTokenType:   "issued-token",
 							IssuerEndpointURL: "issuer-uri",
 							SecurityPolicyURI: "sec-uri",
 						},
-						&UserTokenPolicy{
+						{
 							PolicyID:          "1",
 							TokenType:         UserTokenTypeAnonymous,
 							IssuedTokenType:   "issued-token",
@@ -147,7 +147,7 @@ func TestEndpointDescriptionArray(t *testing.T) {
 					},
 					TransportProfileURI: "trans-uri",
 				},
-				&EndpointDescription{
+				{
 					EndpointURL: "ep-url",
 					Server: &ApplicationDescription{
 						ApplicationURI: "app-uri",
@@ -165,14 +165,14 @@ func TestEndpointDescriptionArray(t *testing.T) {
 					SecurityMode:      MessageSecurityModeNone,
 					SecurityPolicyURI: "sec-uri",
 					UserIdentityTokens: []*UserTokenPolicy{
-						&UserTokenPolicy{
+						{
 							PolicyID:          "1",
 							TokenType:         UserTokenTypeAnonymous,
 							IssuedTokenType:   "issued-token",
 							IssuerEndpointURL: "issuer-uri",
 							SecurityPolicyURI: "sec-uri",
 						},
-						&UserTokenPolicy{
+						{
 							PolicyID:          "1",
 							TokenType:         UserTokenTypeAnonymous,
 							IssuedTokenType:   "issued-token",

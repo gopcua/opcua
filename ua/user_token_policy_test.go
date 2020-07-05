@@ -39,14 +39,14 @@ func TestUserTokenPolicyArray(t *testing.T) {
 	cases := []CodecTestCase{
 		{
 			Struct: []*UserTokenPolicy{
-				&UserTokenPolicy{
+				{
 					PolicyID:          "1",
 					TokenType:         UserTokenTypeAnonymous,
 					IssuedTokenType:   "issued-token",
 					IssuerEndpointURL: "issuer-uri",
 					SecurityPolicyURI: "sec-uri",
 				},
-				&UserTokenPolicy{
+				{
 					PolicyID:          "1",
 					TokenType:         UserTokenTypeAnonymous,
 					IssuedTokenType:   "issued-token",

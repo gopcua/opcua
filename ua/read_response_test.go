@@ -22,13 +22,13 @@ func TestReadResponse(t *testing.T) {
 					AdditionalHeader:   NewExtensionObject(nil),
 				},
 				Results: []*DataValue{
-					&DataValue{
+					{
 						EncodingMask: DataValueValue,
 						Value:        MustVariant(float32(2.5001559257507324)),
 					},
 				},
 				DiagnosticInfos: []*DiagnosticInfo{
-					&DiagnosticInfo{},
+					{},
 				},
 			},
 			Bytes: []byte{

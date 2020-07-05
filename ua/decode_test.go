@@ -184,9 +184,9 @@ func TestCodec(t *testing.T) {
 			name: "[]*A",
 			v: &struct{ V []*A }{
 				[]*A{
-					&A{1},
-					&A{2},
-					&A{3},
+					{1},
+					{2},
+					{3},
 				},
 			},
 			b: []byte{
@@ -217,8 +217,8 @@ func TestCodec(t *testing.T) {
 			v: &B{
 				A: &A{V: 0x7890},
 				S: []*A{
-					&A{V: 0x1234},
-					&A{V: 0x4567},
+					{V: 0x1234},
+					{V: 0x4567},
 				},
 			},
 			b: []byte{
