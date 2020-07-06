@@ -99,7 +99,7 @@ func NewGoServer(t *testing.T) *GoServer {
 
 	teardown := func() {
 		cancel()
-		err := s.Shutdown()
+		err := s.Close()
 		if err != nil {
 			t.Errorf("Error shutting down server: %s", err)
 		}

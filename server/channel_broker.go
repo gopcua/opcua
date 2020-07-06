@@ -107,9 +107,9 @@ outer:
 	return nil
 }
 
-// CloseAll gracefully closes all secure channels
+// Close gracefully closes all secure channels
 // todo(fs): use ctx
-func (c *channelBroker) CloseAll() error {
+func (c *channelBroker) Close() error {
 	var err error
 	c.mu.Lock()
 	for _, s := range c.s {

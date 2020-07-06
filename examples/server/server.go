@@ -73,6 +73,7 @@ func main() {
 	if err := s.Start(context.Background()); err != nil {
 		log.Printf("Error starting server, exiting: %s", err)
 	}
+	defer s.Close()
 
 	sigch := make(chan os.Signal, 1)
 	signal.Notify(sigch, os.Interrupt)
@@ -81,5 +82,4 @@ func main() {
 	log.Printf("Press CTRL-C to exit")
 	<-sigch
 	log.Printf("Shutting down the server...")
-	s.Shutdown()
 }

@@ -113,16 +113,14 @@ func (s *Server) Start(ctx context.Context) error {
 	return nil
 }
 
-// Shutdown gracefully shuts the server down by closing all open connections,
+// Close gracefully shuts the server down by closing all open connections,
 // and stops listening on all endpoints
-func (s *Server) Shutdown() error {
+func (s *Server) Close() error {
 	// Close the listener, preventing new sessions from starting
 	s.l.Close()
 
 	// Shut down all secure channels and UACP connections
-	s.cb.CloseAll()
-
-	return nil
+	return s.cb.Close()
 }
 
 type temporary interface {
