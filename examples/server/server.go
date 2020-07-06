@@ -5,13 +5,13 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"crypto/rsa"
 	"crypto/tls"
 	"flag"
 	"log"
 	"os"
+	"os/signal"
 
 	"github.com/gopcua/opcua/debug"
 	"github.com/gopcua/opcua/server"
@@ -70,28 +70,16 @@ func main() {
 	}
 
 	s := server.New(*endpoint, opts...)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	if err := s.Start(ctx); err != nil {
+	if err := s.Start(context.Background()); err != nil {
 		log.Printf("Error starting server, exiting: %s", err)
 	}
 
-	done := make(chan bool)
-	go func() {
-		reader := bufio.NewReader(os.Stdin)
-		log.Printf("Press 'Enter' to exit...")
-		for {
-			reader.ReadString('\n')
-			done <- true
-			return
-		}
-	}()
+	sigch := make(chan os.Signal, 1)
+	signal.Notify(sigch, os.Interrupt)
+	defer signal.Stop(sigch)
 
-	select {
-	case <-done:
-		cancel()
-	}
-
+	log.Printf("Press CTRL-C to exit")
+	<-sigch
 	log.Printf("Shutting down the server...")
 	s.Shutdown()
 }
