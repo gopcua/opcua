@@ -150,14 +150,15 @@ func handleFindServersRequest(s *Server, sc *uasc.SecureChannel, r ua.Request) (
 		return nil, ua.StatusBadRequestTypeInvalid
 	}
 
-	//TODO: Replace with proper response once implemented
-	response := &ua.ServiceFault{ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusBadServiceUnsupported)}
-	// response := &ua.FindServersResponse{
-	//	ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusOK),
-	//  ... remaining fields
-	//}
+	var servers []*ua.ApplicationDescription
+	for _, ep := range s.Endpoints {
+		servers = append(servers, ep.Server)
+	}
 
-	return response, nil
+	return &ua.FindServersResponse{
+		ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusOK),
+		Servers:        servers,
+	}, nil
 }
 
 func handleFindServersOnNetworkRequest(s *Server, sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
