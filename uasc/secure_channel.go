@@ -353,6 +353,11 @@ func (s *SecureChannel) SendResponse(req ua.Response) error {
 		return errors.Errorf("unknown service %T. Did you call register?", req)
 	}
 
+	s.sequenceNumber++
+	if s.sequenceNumber > math.MaxUint32-1023 {
+		s.sequenceNumber = 1
+	}
+
 	// encode the message
 	m := s.newMessage(req, typeID)
 	reqid := m.SequenceHeader.RequestID
