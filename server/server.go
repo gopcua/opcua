@@ -9,6 +9,7 @@ import (
 	"crypto/rsa"
 	"fmt"
 	"log"
+	"net"
 	"strings"
 	"sync"
 
@@ -135,11 +136,18 @@ func (s *Server) acceptAndRegister(ctx context.Context, l *uacp.Listener) {
 		default:
 			c, err := l.Accept(ctx)
 			if err != nil {
-				if nErr, ok := err.(temporary); ok && nErr.Temporary() {
-					continue
+				switch x := err.(type) {
+				case *net.OpError:
+					// socket closed
+					return
+				case temporary:
+					if x.Temporary() {
+						continue
+					}
+				default:
+					debug.Printf("error accepting connection: %s\n", err)
+					return
 				}
-				debug.Printf("error accepting connection: %s\n", err)
-				break
 			}
 
 			go s.cb.RegisterConn(ctx, c, s.cfg.certificate, s.cfg.privateKey)
