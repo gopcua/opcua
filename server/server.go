@@ -1,4 +1,4 @@
-// Copyright 2018-2019 opcua authors. All rights reserved.
+// Copyright 2018-2020 opcua authors. All rights reserved.
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
 
@@ -32,10 +32,10 @@ type Server struct {
 
 	l  *uacp.Listener
 	cb *channelBroker
+	sb *sessionBroker
+	as *AddressSpace
 
 	nextSecureChannelID uint32
-
-	sb *sessionBroker
 
 	// Service Handlers are methods called to respond to service requests from clients
 	// All services should have a method here.
@@ -68,6 +68,7 @@ func New(url string, opts ...Option) *Server {
 		cfg: &serverConfig{},
 		cb:  newChannelBroker(),
 		sb:  newSessionBroker(),
+		as:  newAddressSpace(PredefinedNodes()...),
 	}
 	for _, opt := range opts {
 		opt(s.cfg)
@@ -80,7 +81,6 @@ func (s *Server) URL() string {
 	if s.l != nil {
 		return fmt.Sprintf("opc.tcp://%s", s.l.Addr())
 	}
-
 	return ""
 }
 

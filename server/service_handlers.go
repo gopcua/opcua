@@ -150,15 +150,14 @@ func handleFindServersRequest(s *Server, sc *uasc.SecureChannel, r ua.Request) (
 		return nil, ua.StatusBadRequestTypeInvalid
 	}
 
-	var servers []*ua.ApplicationDescription
-	for _, ep := range s.Endpoints {
-		servers = append(servers, ep.Server)
+	response := &ua.FindServersResponse{
+		ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusOK),
+		Servers: []*ua.ApplicationDescription{
+			s.Endpoints[0].Server,
+		},
 	}
 
-	return &ua.FindServersResponse{
-		ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusOK),
-		Servers:        servers,
-	}, nil
+	return response, nil
 }
 
 func handleFindServersOnNetworkRequest(s *Server, sc *uasc.SecureChannel, r ua.Request) (ua.Response, error) {
@@ -332,6 +331,10 @@ func handleActivateSessionRequest(s *Server, sc *uasc.SecureChannel, r ua.Reques
 	}
 
 	sess := s.sb.Session(req.RequestHeader.AuthenticationToken)
+	if sess == nil {
+		return nil, ua.StatusBadSessionIDInvalid
+	}
+
 	err := sc.VerifySessionSignature(sess.remoteCertificate, sess.serverNonce, req.ClientSignature.Signature)
 	if err != nil {
 		debug.Printf("error verifying session signature with nonce: %s", err)
@@ -348,6 +351,8 @@ func handleActivateSessionRequest(s *Server, sc *uasc.SecureChannel, r ua.Reques
 	response := &ua.ActivateSessionResponse{
 		ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusOK),
 		ServerNonce:    nonce,
+		// Results:         []ua.StatusCode{},
+		// DiagnosticInfos: []*ua.DiagnosticInfo{},
 	}
 
 	return response, nil
@@ -612,24 +617,43 @@ func handleReadRequest(s *Server, sc *uasc.SecureChannel, r ua.Request) (ua.Resp
 		return nil, ua.StatusBadRequestTypeInvalid
 	}
 
-	// TODO: Placeholder until address space implemented
-	serverTimeNode := ua.NewNumericNodeID(0, 2258)
-	if req.NodesToRead == nil || req.NodesToRead[0].NodeID.Namespace() != serverTimeNode.Namespace() || req.NodesToRead[0].NodeID.IntID() != serverTimeNode.IntID() {
-		response := &ua.ServiceFault{ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusBadNodeIDUnknown)}
-		return response, nil
+	results := make([]*ua.DataValue, len(req.NodesToRead))
+	for i, n := range req.NodesToRead {
+		debug.Printf("read: node=%s attr=%s", n.NodeID, n.AttributeID)
+
+		dv := &ua.DataValue{
+			EncodingMask:    ua.DataValueServerTimestamp,
+			ServerTimestamp: time.Now(),
+		}
+
+		v, ts, err := s.as.Attribute(n.NodeID, n.AttributeID)
+		switch x := err.(type) {
+		case nil:
+			dv.EncodingMask |= ua.DataValueStatusCode | ua.DataValueValue
+			dv.Status = ua.StatusOK
+			dv.Value = v
+
+		case ua.StatusCode:
+			dv.EncodingMask |= ua.DataValueStatusCode
+			dv.Status = x
+
+		default:
+			debug.Printf("read: node=%s attr=%s err=%s", n.NodeID, n.AttributeID, err)
+			dv.EncodingMask |= ua.DataValueStatusCode
+			dv.Status = ua.StatusBadInternalError
+		}
+
+		if !ts.IsZero() {
+			dv.EncodingMask |= ua.DataValueSourceTimestamp
+			dv.SourceTimestamp = ts
+		}
+
+		results[i] = dv
 	}
 
 	response := &ua.ReadResponse{
 		ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusOK),
-		Results: []*ua.DataValue{
-			&ua.DataValue{
-				EncodingMask: ua.DataValueValue,
-				Value:        ua.MustVariant(time.Now()),
-			},
-		},
-		DiagnosticInfos: []*ua.DiagnosticInfo{
-			&ua.DiagnosticInfo{},
-		},
+		Results:        results,
 	}
 
 	return response, nil
