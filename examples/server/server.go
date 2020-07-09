@@ -71,7 +71,7 @@ func main() {
 
 	s := server.New(*endpoint, opts...)
 	if err := s.Start(context.Background()); err != nil {
-		log.Printf("Error starting server, exiting: %s", err)
+		log.Fatalf("Error starting server, exiting: %s", err)
 	}
 	defer s.Close()
 

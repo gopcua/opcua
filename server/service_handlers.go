@@ -626,12 +626,12 @@ func handleReadRequest(s *Server, sc *uasc.SecureChannel, r ua.Request) (ua.Resp
 			ServerTimestamp: time.Now(),
 		}
 
-		v, ts, err := s.as.Attribute(n.NodeID, n.AttributeID)
+		v, err := s.as.Attribute(n.NodeID, n.AttributeID)
 		switch x := err.(type) {
 		case nil:
 			dv.EncodingMask |= ua.DataValueStatusCode | ua.DataValueValue
 			dv.Status = ua.StatusOK
-			dv.Value = v
+			dv.Value = v.Value
 
 		case ua.StatusCode:
 			dv.EncodingMask |= ua.DataValueStatusCode
@@ -643,9 +643,9 @@ func handleReadRequest(s *Server, sc *uasc.SecureChannel, r ua.Request) (ua.Resp
 			dv.Status = ua.StatusBadInternalError
 		}
 
-		if !ts.IsZero() {
+		if v != nil && !v.SourceTimestamp.IsZero() {
 			dv.EncodingMask |= ua.DataValueSourceTimestamp
-			dv.SourceTimestamp = ts
+			dv.SourceTimestamp = v.SourceTimestamp
 		}
 
 		results[i] = dv

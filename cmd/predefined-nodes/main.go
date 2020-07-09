@@ -8,7 +8,6 @@ import (
 	"bytes"
 	"encoding/xml"
 	"flag"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
@@ -52,7 +51,7 @@ func main() {
 				log.Fatal(err)
 			}
 			n.Type = ty.Name.Local
-			fmt.Printf("%#v\n", n)
+			// fmt.Printf("%#v\n", n)
 			nodes = append(nodes, n)
 		}
 	}
@@ -76,18 +75,25 @@ type Node struct {
 	Type      string `xml:"-"`
 	Xmlns     string `xml:",attr"`
 	NodeClass string
-	NodeId    struct {
+	NodeID    struct {
 		Identifier *ua.NodeID
-	}
+	} `xml:"NodeId"`
 	BrowseName struct {
 		NamespaceIndex string
 		Name           string
 	}
-	ReferenceTypeId struct {
+	ReferenceTypeID struct {
 		Identifier *ua.NodeID
-	}
-	TypeDefinitionId struct {
+	} `xml:"ReferenceTypeId"`
+	TypeDefinitionID struct {
 		Identifier *ua.NodeID
+	} `xml:"TypeDefinitionId"`
+	SuperTypeID struct {
+		Identifier *ua.NodeID
+	} `xml:"SuperTypeId"`
+	InverseName *struct {
+		Locale string
+		Text   string
 	}
 	IsAbstract bool
 }
@@ -102,16 +108,47 @@ package {{.Package}}
 
 import 	"github.com/gopcua/opcua/ua"
 
+type node struct {
+	id   *ua.NodeID
+	attr map[ua.AttributeID]*AttrValue
+
+	superTypeID *ua.NodeID
+}
+
+func (n *node) ID() *ua.NodeID {
+	return n.id
+}
+
+func (n *node) Attribute(id ua.AttributeID) (*AttrValue, error) {
+	if n.attr == nil {
+		return nil, ua.StatusBadAttributeIDInvalid
+	}
+	v := n.attr[id]
+	if v == nil {
+		return nil, ua.StatusBadAttributeIDInvalid
+	}
+	return v, nil
+}
+
 func PredefinedNodes() []Node{
 	return []Node{
 {{- range .Nodes }}
 {{- if not .IsAbstract }}
 		&node{
-			id: ua.NewNumericNodeID({{.NodeId.Identifier.Namespace}}, {{.NodeId.Identifier.IntID}}),
-			attr: map[ua.AttributeID]*ua.Variant{
-				ua.AttributeIDNodeClass: ua.MustVariant("{{.NodeClass}}"),
-				ua.AttributeIDBrowseName: ua.MustVariant("{{.BrowseName.Name}}"),
+			{{- with .NodeID.Identifier }}
+			id: ua.NewNumericNodeID({{.Namespace}}, {{.IntID}}),
+			{{- end}}
+			attr: map[ua.AttributeID]*AttrValue{
+				ua.AttributeIDNodeClass: NewAttrValue(ua.MustVariant("{{.NodeClass}}")),
+				ua.AttributeIDBrowseName: NewAttrValue(ua.MustVariant("{{.BrowseName.Name}}")),
+				ua.AttributeIDDisplayName: NewAttrValue(ua.MustVariant("{{.BrowseName.Name}}")),
+				{{- with .InverseName }}
+				ua.AttributeIDInverseName: NewAttrValue(ua.MustVariant(&ua.LocalizedText{Locale:"{{.Locale}}", Text:"{{.Text}}"})),
+				{{- end}}
 			},
+			{{- with .SuperTypeID.Identifier }}
+			superTypeID: ua.NewNumericNodeID({{.Namespace}}, {{.IntID}}),
+			{{- end}}
 		},
 {{- end }}
 {{- end }}

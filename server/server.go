@@ -12,6 +12,7 @@ import (
 	"net"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/gopcua/opcua/debug"
 	"github.com/gopcua/opcua/ua"
@@ -27,8 +28,10 @@ type Server struct {
 
 	cfg *serverConfig
 
-	mu        sync.Mutex
-	Endpoints []*ua.EndpointDescription
+	mu         sync.RWMutex
+	status     *ua.ServerStatusDataType
+	Endpoints  []*ua.EndpointDescription
+	namespaces []string
 
 	l  *uacp.Listener
 	cb *channelBroker
@@ -63,17 +66,70 @@ type security struct {
 // New returns an initialized OPC-UA server.
 // Call Start() afterwards to begin listening and serving connections
 func New(url string, opts ...Option) *Server {
-	s := &Server{
+	cfg := &serverConfig{}
+	for _, opt := range opts {
+		opt(cfg)
+	}
+	return &Server{
 		url: url,
-		cfg: &serverConfig{},
+		cfg: cfg,
 		cb:  newChannelBroker(),
 		sb:  newSessionBroker(),
-		as:  newAddressSpace(PredefinedNodes()...),
+		as:  newAddressSpace(),
+		namespaces: []string{
+			"http://opcfoundation.org/UA/", // ns:0
+		},
+		status: &ua.ServerStatusDataType{
+			StartTime:   time.Now(),
+			CurrentTime: time.Now(),
+			State:       ua.ServerStateSuspended,
+			BuildInfo: &ua.BuildInfo{
+				ProductURI:       "https://github.com/gopcua/opcua",
+				ManufacturerName: "The gopcua Team",
+				ProductName:      "gopcua OPC/UA Server",
+				SoftwareVersion:  "0.0.0-dev",
+				BuildNumber:      "",
+				BuildDate:        time.Time{},
+			},
+			SecondsTillShutdown: 0,
+			ShutdownReason:      &ua.LocalizedText{},
+		},
 	}
-	for _, opt := range opts {
-		opt(s.cfg)
+}
+
+func (s *Server) Namespaces() []string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.namespaces
+}
+
+func (s *Server) AddNamespace(ns string) int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if idx := strSliceContains(s.namespaces, ns); idx >= 0 {
+		return idx
 	}
-	return s
+	s.namespaces = append(s.namespaces, ns)
+	return len(s.namespaces)
+}
+
+func strSliceContains(a []string, s string) int {
+	for i, v := range a {
+		if s == v {
+			return i
+		}
+	}
+	return -1
+}
+
+// Status returns the current server status.
+func (s *Server) Status() *ua.ServerStatusDataType {
+	status := new(ua.ServerStatusDataType)
+	s.mu.RLock()
+	*status = *s.status
+	s.mu.RUnlock()
+	status.CurrentTime = time.Now()
+	return status
 }
 
 // URL returns opc endpoint that the server is listening on.
@@ -90,6 +146,15 @@ func (s *Server) URL() string {
 func (s *Server) Start(ctx context.Context) error {
 	var err error
 
+	// init address space
+	nodes := PredefinedNodes()
+	nodes = append(nodes, &currentTime{})
+	nodes = append(nodes, &serverStatus{s})
+	nodes = append(nodes, &namespaces{s})
+	if err := s.as.AddNodes(nodes...); err != nil {
+		return err
+	}
+
 	// Register all service handlers
 	s.initHandlers()
 
@@ -103,6 +168,7 @@ func (s *Server) Start(ctx context.Context) error {
 	log.Printf("Started listening on %s", s.URL())
 
 	s.generateEndpoints()
+	s.setServerState(ua.ServerStateRunning)
 
 	if s.cb == nil {
 		s.cb = newChannelBroker()
@@ -114,11 +180,21 @@ func (s *Server) Start(ctx context.Context) error {
 	return nil
 }
 
+func (s *Server) setServerState(state ua.ServerState) {
+	s.mu.Lock()
+	s.status.State = state
+	s.mu.Unlock()
+}
+
 // Close gracefully shuts the server down by closing all open connections,
 // and stops listening on all endpoints
 func (s *Server) Close() error {
+	s.setServerState(ua.ServerStateShutdown)
+
 	// Close the listener, preventing new sessions from starting
-	s.l.Close()
+	if s.l != nil {
+		s.l.Close()
+	}
 
 	// Shut down all secure channels and UACP connections
 	return s.cb.Close()
