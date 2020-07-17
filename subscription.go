@@ -112,6 +112,22 @@ func (s *Subscription) Unmonitor(monitoredItemIDs ...uint32) (*ua.DeleteMonitore
 	return res, err
 }
 
+func (s *Subscription) SetTriggering(triggeringItemId uint32, add, remove []uint32) (*ua.SetTriggeringResponse, error) {
+	// Part 4, 5.12.5.2 SetTriggering Service Parameters
+	req := &ua.SetTriggeringRequest{
+		SubscriptionID:   s.SubscriptionID,
+		TriggeringItemID: triggeringItemId,
+		LinksToAdd:       add,
+		LinksToRemove:    remove,
+	}
+
+	var res *ua.SetTriggeringResponse
+	err := s.c.Send(req, func(v interface{}) error {
+		return safeAssign(v, &res)
+	})
+	return res, err
+}
+
 func (s *Subscription) publish(acks []*ua.SubscriptionAcknowledgement) (*ua.PublishResponse, error) {
 	if acks == nil {
 		acks = []*ua.SubscriptionAcknowledgement{}
