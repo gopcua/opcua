@@ -19,7 +19,7 @@ import (
 
 func main() {
 	var (
-		endpoint      = flag.String("endpoint", "opc.tcp://morchard-mbp1.local:53530/OPCUA/SimulationServer", "OPC UA Endpoint URL")
+		endpoint      = flag.String("endpoint", "opc.tcp://localhost:4840", "OPC UA Endpoint URL")
 		policy        = flag.String("policy", "", "Security policy: None, Basic128Rsa15, Basic256, Basic256Sha256. Default: auto")
 		mode          = flag.String("mode", "", "Security mode: None, Sign, SignAndEncrypt. Default: auto")
 		certFile      = flag.String("cert", "", "Path to cert.pem. Required for security mode/policy != None")
@@ -118,13 +118,15 @@ func main() {
 	go sub.Run(ctx) // start Publish loop
 
 	triggeringServerID, triggeredServerID := subRes.Results[0].MonitoredItemID, subRes.Results[1].MonitoredItemID
-	tRes, err := sub.SetTriggering(triggeringServerID, []uint32{triggeredServerID}, []uint32{})
+	tRes, err := sub.SetTriggering(triggeringServerID, []uint32{triggeredServerID}, nil)
 
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	log.Print(tRes)
+	if tRes.AddResults[0] != ua.StatusOK {
+		log.Fatal(tRes.AddResults[0].Error())
+	}
 
 	// read from subscription's notification channel until ctx is cancelled
 	for {

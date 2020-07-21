@@ -112,11 +112,14 @@ func (s *Subscription) Unmonitor(monitoredItemIDs ...uint32) (*ua.DeleteMonitore
 	return res, err
 }
 
-func (s *Subscription) SetTriggering(triggeringItemId uint32, add, remove []uint32) (*ua.SetTriggeringResponse, error) {
+// SetTriggering sends a request to the server to add and/or remove triggering links from a triggering item.
+// To add links from a triggering item to an item to report provide the server assigned ID(s) in the `add` argument.
+// To remove links from a triggering item to an item to report provide the server assigned ID(s) in the `remove` argument.
+func (s *Subscription) SetTriggering(triggeringItemID uint32, add, remove []uint32) (*ua.SetTriggeringResponse, error) {
 	// Part 4, 5.12.5.2 SetTriggering Service Parameters
 	req := &ua.SetTriggeringRequest{
 		SubscriptionID:   s.SubscriptionID,
-		TriggeringItemID: triggeringItemId,
+		TriggeringItemID: triggeringItemID,
 		LinksToAdd:       add,
 		LinksToRemove:    remove,
 	}
