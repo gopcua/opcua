@@ -223,16 +223,16 @@ func (c *Client) monitorChannel(ctx context.Context) {
 
 // Close closes the session and the secure channel.
 func (c *Client) Close() error {
+	if c.sechan == nil {
+		return ua.StatusBadServerNotConnected
+	}
 	// try to close the session but ignore any error
 	// so that we close the underlying channel and connection.
 	_ = c.CloseSession()
 	if c.cancelMonitor != nil {
 		c.cancelMonitor()
 	}
-	if c.sechan != nil {
-		return c.sechan.Close()
-	}
-	return io.EOF
+	return c.sechan.Close()
 }
 
 var errNotConnected = errors.New("not connected")
