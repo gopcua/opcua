@@ -137,6 +137,9 @@ type PublishedDataSetDataType struct {
 	DataSetSource   *ExtensionObject
 }
 
+type PublishedDataSetSourceDataType struct {
+}
+
 type PublishedVariableDataType struct {
 	PublishedVariable    *NodeID
 	AttributeID          AttributeID
@@ -170,6 +173,12 @@ type DataSetWriterDataType struct {
 	MessageSettings         *ExtensionObject
 }
 
+type DataSetWriterTransportDataType struct {
+}
+
+type DataSetWriterMessageDataType struct {
+}
+
 type PubSubGroupDataType struct {
 	Name                  string
 	Enabled               bool
@@ -199,6 +208,12 @@ type WriterGroupDataType struct {
 	DataSetWriters        []*DataSetWriterDataType
 }
 
+type WriterGroupTransportDataType struct {
+}
+
+type WriterGroupMessageDataType struct {
+}
+
 type PubSubConnectionDataType struct {
 	Name                 string
 	Enabled              bool
@@ -209,6 +224,9 @@ type PubSubConnectionDataType struct {
 	TransportSettings    *ExtensionObject
 	WriterGroups         []*WriterGroupDataType
 	ReaderGroups         []*ReaderGroupDataType
+}
+
+type ConnectionTransportDataType struct {
 }
 
 type NetworkAddressDataType struct {
@@ -233,6 +251,12 @@ type ReaderGroupDataType struct {
 	DataSetReaders        []*DataSetReaderDataType
 }
 
+type ReaderGroupTransportDataType struct {
+}
+
+type ReaderGroupMessageDataType struct {
+}
+
 type DataSetReaderDataType struct {
 	Name                    string
 	Enabled                 bool
@@ -251,6 +275,15 @@ type DataSetReaderDataType struct {
 	TransportSettings       *ExtensionObject
 	MessageSettings         *ExtensionObject
 	SubscribedDataSet       *ExtensionObject
+}
+
+type DataSetReaderTransportDataType struct {
+}
+
+type DataSetReaderMessageDataType struct {
+}
+
+type SubscribedDataSetDataType struct {
 }
 
 type TargetVariablesDataType struct {
@@ -593,6 +626,9 @@ type OptionSet struct {
 	ValidBits []byte
 }
 
+type Union struct {
+}
+
 type TimeZoneDataType struct {
 	Offset                 int16
 	DaylightSavingInOffset bool
@@ -798,6 +834,9 @@ func (t *RegisterServerResponse) Header() *ResponseHeader {
 
 func (t *RegisterServerResponse) SetHeader(h *ResponseHeader) {
 	t.ResponseHeader = h
+}
+
+type DiscoveryConfiguration struct {
 }
 
 type MdnsDiscoveryConfiguration struct {
@@ -1548,6 +1587,9 @@ type ContentFilter struct {
 	Elements []*ContentFilterElement
 }
 
+type FilterOperand struct {
+}
+
 type ElementOperand struct {
 	Index uint32
 }
@@ -1697,6 +1739,9 @@ type HistoryReadResult struct {
 	StatusCode        StatusCode
 	ContinuationPoint []byte
 	HistoryData       *ExtensionObject
+}
+
+type HistoryReadDetails struct {
 }
 
 type ReadEventDetails struct {
@@ -1923,6 +1968,9 @@ func (t *CallResponse) SetHeader(h *ResponseHeader) {
 	t.ResponseHeader = h
 }
 
+type MonitoringFilter struct {
+}
+
 type DataChangeFilter struct {
 	Trigger       DataChangeTrigger
 	DeadbandType  uint32
@@ -1947,6 +1995,9 @@ type AggregateFilter struct {
 	AggregateType          *NodeID
 	ProcessingInterval     float64
 	AggregateConfiguration *AggregateConfiguration
+}
+
+type MonitoringFilterResult struct {
 }
 
 type EventFilterResult struct {
@@ -2241,6 +2292,9 @@ type NotificationMessage struct {
 	SequenceNumber   uint32
 	PublishTime      time.Time
 	NotificationData []*ExtensionObject
+}
+
+type NotificationData struct {
 }
 
 type DataChangeNotification struct {

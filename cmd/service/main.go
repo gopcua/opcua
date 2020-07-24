@@ -34,6 +34,7 @@ func main() {
 	writeEnums(Enums(dict))
 	writeServiceRegister(ExtObjects(dict))
 	writeExtObjects(ExtObjects(dict))
+	writeRegisterExtObjects(ExtObjects(dict))
 }
 
 func writeEnums(enums []Type) {
@@ -53,6 +54,14 @@ func writeExtObjects(objs []Type) {
 		log.Fatal(err)
 	}
 	write(b.Bytes(), path.Join(out, "extobjs_gen.go"))
+}
+
+func writeRegisterExtObjects(objs []Type) {
+	var b bytes.Buffer
+	if err := tmplRegExtObjs.Execute(&b, objs); err != nil {
+		log.Fatal(err)
+	}
+	write(b.Bytes(), path.Join(out, "register_extobjs_gen.go"))
 }
 
 func writeServiceRegister(objs []Type) {
@@ -264,6 +273,18 @@ const (
 )
 `))
 
+var tmplRegExtObjs = template.Must(template.New("").Parse(`
+import (
+	"github.com/gopcua/opcua/id"
+)
+
+func init() {
+	{{- range $i, $v := . -}}
+		RegisterExtensionObject(NewNumericNodeID(0, id.{{$v.Name}}_Encoding_DefaultBinary), new({{$v.Name}}))
+	{{end -}}
+}
+`))
+
 var tmplReqResp = template.Must(template.New("").Parse(`
 type Request interface {
 	Header() *RequestHeader
@@ -277,7 +298,6 @@ type Response interface {
 `))
 
 var tmplExtObject = template.Must(template.New("").Parse(`
-{{if .Fields}}
 type {{.Name}} struct {
 	{{range $i, $v := .Fields}}{{$v.Name}} {{$v.Type}}
 	{{end}}
@@ -302,7 +322,6 @@ func (t *{{.Name}}) SetHeader(h *ResponseHeader) {
 	t.ResponseHeader = h
 }
 {{- end}}
-{{end}}
 `))
 
 var funcs = template.FuncMap{
