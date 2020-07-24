@@ -137,8 +137,7 @@ type PublishedDataSetDataType struct {
 	DataSetSource   *ExtensionObject
 }
 
-type PublishedDataSetSourceDataType struct {
-}
+type PublishedDataSetSourceDataType struct{}
 
 type PublishedVariableDataType struct {
 	PublishedVariable    *NodeID
@@ -173,11 +172,9 @@ type DataSetWriterDataType struct {
 	MessageSettings         *ExtensionObject
 }
 
-type DataSetWriterTransportDataType struct {
-}
+type DataSetWriterTransportDataType struct{}
 
-type DataSetWriterMessageDataType struct {
-}
+type DataSetWriterMessageDataType struct{}
 
 type PubSubGroupDataType struct {
 	Name                  string
@@ -208,11 +205,9 @@ type WriterGroupDataType struct {
 	DataSetWriters        []*DataSetWriterDataType
 }
 
-type WriterGroupTransportDataType struct {
-}
+type WriterGroupTransportDataType struct{}
 
-type WriterGroupMessageDataType struct {
-}
+type WriterGroupMessageDataType struct{}
 
 type PubSubConnectionDataType struct {
 	Name                 string
@@ -226,8 +221,7 @@ type PubSubConnectionDataType struct {
 	ReaderGroups         []*ReaderGroupDataType
 }
 
-type ConnectionTransportDataType struct {
-}
+type ConnectionTransportDataType struct{}
 
 type NetworkAddressDataType struct {
 	NetworkInterface string
@@ -251,11 +245,9 @@ type ReaderGroupDataType struct {
 	DataSetReaders        []*DataSetReaderDataType
 }
 
-type ReaderGroupTransportDataType struct {
-}
+type ReaderGroupTransportDataType struct{}
 
-type ReaderGroupMessageDataType struct {
-}
+type ReaderGroupMessageDataType struct{}
 
 type DataSetReaderDataType struct {
 	Name                    string
@@ -277,14 +269,11 @@ type DataSetReaderDataType struct {
 	SubscribedDataSet       *ExtensionObject
 }
 
-type DataSetReaderTransportDataType struct {
-}
+type DataSetReaderTransportDataType struct{}
 
-type DataSetReaderMessageDataType struct {
-}
+type DataSetReaderMessageDataType struct{}
 
-type SubscribedDataSetDataType struct {
-}
+type SubscribedDataSetDataType struct{}
 
 type TargetVariablesDataType struct {
 	TargetVariables []*FieldTargetDataType
@@ -626,8 +615,7 @@ type OptionSet struct {
 	ValidBits []byte
 }
 
-type Union struct {
-}
+type Union struct{}
 
 type TimeZoneDataType struct {
 	Offset                 int16
@@ -836,8 +824,7 @@ func (t *RegisterServerResponse) SetHeader(h *ResponseHeader) {
 	t.ResponseHeader = h
 }
 
-type DiscoveryConfiguration struct {
-}
+type DiscoveryConfiguration struct{}
 
 type MdnsDiscoveryConfiguration struct {
 	MdnsServerName     string
@@ -1587,8 +1574,7 @@ type ContentFilter struct {
 	Elements []*ContentFilterElement
 }
 
-type FilterOperand struct {
-}
+type FilterOperand struct{}
 
 type ElementOperand struct {
 	Index uint32
@@ -1741,8 +1727,7 @@ type HistoryReadResult struct {
 	HistoryData       *ExtensionObject
 }
 
-type HistoryReadDetails struct {
-}
+type HistoryReadDetails struct{}
 
 type ReadEventDetails struct {
 	NumValuesPerNode uint32
@@ -1968,8 +1953,7 @@ func (t *CallResponse) SetHeader(h *ResponseHeader) {
 	t.ResponseHeader = h
 }
 
-type MonitoringFilter struct {
-}
+type MonitoringFilter struct{}
 
 type DataChangeFilter struct {
 	Trigger       DataChangeTrigger
@@ -1997,8 +1981,7 @@ type AggregateFilter struct {
 	AggregateConfiguration *AggregateConfiguration
 }
 
-type MonitoringFilterResult struct {
-}
+type MonitoringFilterResult struct{}
 
 type EventFilterResult struct {
 	SelectClauseResults         []StatusCode
@@ -2294,8 +2277,7 @@ type NotificationMessage struct {
 	NotificationData []*ExtensionObject
 }
 
-type NotificationData struct {
-}
+type NotificationData struct{}
 
 type DataChangeNotification struct {
 	MonitoredItems  []*MonitoredItemNotification

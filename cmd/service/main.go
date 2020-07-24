@@ -299,8 +299,10 @@ type Response interface {
 
 var tmplExtObject = template.Must(template.New("").Parse(`
 type {{.Name}} struct {
-	{{range $i, $v := .Fields}}{{$v.Name}} {{$v.Type}}
-	{{end}}
+	{{- if .Fields}}
+		{{range $i, $v := .Fields}}{{$v.Name}} {{$v.Type}}
+		{{end}}
+	{{end -}}
 }
 {{- if .IsRequest}}
 
