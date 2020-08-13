@@ -68,15 +68,16 @@ func newBasic256Rsa256Symmetric(localNonce []byte, remoteNonce []byte) (*Encrypt
 	remoteKeys := generateKeys(remoteHmac, localNonce, signatureKeyLength, encryptionKeyLength, encryptionBlockSize)
 
 	return &EncryptionAlgorithm{
-		blockSize:           AESBlockSize,
-		plainttextBlockSize: AESBlockSize - AESMinPadding,
-		encrypt:             &AES{KeyLength: 256, IV: remoteKeys.iv, Secret: remoteKeys.encryption}, // AES256-CBC
-		decrypt:             &AES{KeyLength: 256, IV: localKeys.iv, Secret: localKeys.encryption},   // AES256-CBC
-		signature:           &HMAC{Hash: crypto.SHA256, Secret: remoteKeys.signing},                 // HMAC-SHA2-256
-		verifySignature:     &HMAC{Hash: crypto.SHA256, Secret: localKeys.signing},                  // HMAC-SHA2-256
-		signatureLength:     256 / 8,
-		encryptionURI:       "http://www.w3.org/2001/04/xmlenc#aes256-cbc",
-		signatureURI:        "http://www.w3.org/2000/09/xmldsig#hmac-sha256",
+		blockSize:             AESBlockSize,
+		plainttextBlockSize:   AESBlockSize - AESMinPadding,
+		encrypt:               &AES{KeyLength: 256, IV: remoteKeys.iv, Secret: remoteKeys.encryption}, // AES256-CBC
+		decrypt:               &AES{KeyLength: 256, IV: localKeys.iv, Secret: localKeys.encryption},   // AES256-CBC
+		signature:             &HMAC{Hash: crypto.SHA256, Secret: remoteKeys.signing},                 // HMAC-SHA2-256
+		verifySignature:       &HMAC{Hash: crypto.SHA256, Secret: localKeys.signing},                  // HMAC-SHA2-256
+		signatureLength:       256 / 8,
+		remoteSignatureLength: 256 / 8,
+		encryptionURI:         "http://www.w3.org/2001/04/xmlenc#aes256-cbc",
+		signatureURI:          "http://www.w3.org/2000/09/xmldsig#hmac-sha256",
 	}, nil
 }
 
@@ -106,15 +107,16 @@ func newBasic256Rsa256Asymmetric(localKey *rsa.PrivateKey, remoteKey *rsa.Public
 	}
 
 	return &EncryptionAlgorithm{
-		blockSize:           remoteKeySize,
-		plainttextBlockSize: remoteKeySize - RSAOAEPMinPaddingSHA1,
-		encrypt:             &RSAOAEP{Hash: crypto.SHA1, PublicKey: remoteKey},    // RSA-OAEP
-		decrypt:             &RSAOAEP{Hash: crypto.SHA1, PrivateKey: localKey},    // RSA-OAEP
-		signature:           &PKCS1v15{Hash: crypto.SHA256, PrivateKey: localKey}, // RSA-PKCS15-SHA2-256
-		verifySignature:     &PKCS1v15{Hash: crypto.SHA256, PublicKey: remoteKey}, // RSA-PKCS15-SHA2-256
-		nonceLength:         nonceLength,
-		signatureLength:     localKeySize,
-		encryptionURI:       "http://www.w3.org/2001/04/xmlenc#rsa-oaep",
-		signatureURI:        "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256",
+		blockSize:             remoteKeySize,
+		plainttextBlockSize:   remoteKeySize - RSAOAEPMinPaddingSHA1,
+		encrypt:               &RSAOAEP{Hash: crypto.SHA1, PublicKey: remoteKey},    // RSA-OAEP
+		decrypt:               &RSAOAEP{Hash: crypto.SHA1, PrivateKey: localKey},    // RSA-OAEP
+		signature:             &PKCS1v15{Hash: crypto.SHA256, PrivateKey: localKey}, // RSA-PKCS15-SHA2-256
+		verifySignature:       &PKCS1v15{Hash: crypto.SHA256, PublicKey: remoteKey}, // RSA-PKCS15-SHA2-256
+		nonceLength:           nonceLength,
+		signatureLength:       localKeySize,
+		remoteSignatureLength: remoteKeySize,
+		encryptionURI:         "http://www.w3.org/2001/04/xmlenc#rsa-oaep",
+		signatureURI:          "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256",
 	}, nil
 }

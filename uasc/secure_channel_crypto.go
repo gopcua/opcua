@@ -95,8 +95,8 @@ func (s *SecureChannel) verifyAndDecrypt(m *MessageChunk, b []byte) ([]byte, err
 		b = append(b[:headerLength], p...)
 	}
 
-	signature := b[len(b)-s.enc.SignatureLength():]
-	messageToVerify := b[:len(b)-s.enc.SignatureLength()]
+	signature := b[len(b)-s.enc.RemoteSignatureLength():]
+	messageToVerify := b[:len(b)-s.enc.RemoteSignatureLength()]
 
 	if err = s.enc.VerifySignature(messageToVerify, signature); err != nil {
 		return nil, ua.StatusBadSecurityChecksFailed
