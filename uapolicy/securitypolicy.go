@@ -62,16 +62,17 @@ func Symmetric(uri string, localNonce, remoteNonce []byte) (*EncryptionAlgorithm
 // The zero value of this struct will use SecurityPolicy#None although
 // using in this manner is discouraged for readability
 type EncryptionAlgorithm struct {
-	blockSize           int
-	plainttextBlockSize int
-	decrypt             interface{ Decrypt([]byte) ([]byte, error) }
-	encrypt             interface{ Encrypt([]byte) ([]byte, error) }
-	signature           interface{ Signature([]byte) ([]byte, error) }
-	verifySignature     interface{ Verify([]byte, []byte) error }
-	nonceLength         int
-	signatureLength     int
-	encryptionURI       string
-	signatureURI        string
+	blockSize             int
+	plainttextBlockSize   int
+	decrypt               interface{ Decrypt([]byte) ([]byte, error) }
+	encrypt               interface{ Encrypt([]byte) ([]byte, error) }
+	signature             interface{ Signature([]byte) ([]byte, error) }
+	verifySignature       interface{ Verify([]byte, []byte) error }
+	nonceLength           int
+	signatureLength       int
+	remoteSignatureLength int
+	encryptionURI         string
+	signatureURI          string
 }
 
 // BlockSize returns the underlying encryption algorithm's blocksize.
@@ -127,9 +128,14 @@ func (e *EncryptionAlgorithm) VerifySignature(message, signature []byte) error {
 	return e.verifySignature.Verify(message, signature)
 }
 
-// SignatureLength returns the length in bytes for the signature algorithm
+// SignatureLength returns the length in bytes for outgoing signatures.
 func (e *EncryptionAlgorithm) SignatureLength() int {
 	return e.signatureLength
+}
+
+// RemoteSignatureLength returns the length in bytes for incoming signatures.
+func (e *EncryptionAlgorithm) RemoteSignatureLength() int {
+	return e.remoteSignatureLength
 }
 
 // NonceLength returns the recommended nonce length in bytes for the security policy

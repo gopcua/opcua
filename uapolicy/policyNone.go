@@ -27,24 +27,26 @@ SecurityPolicy_None_Limits 		DerivedSignatureKeyLength: 0
 */
 func newNoneAsymmetric(*rsa.PrivateKey, *rsa.PublicKey) (*EncryptionAlgorithm, error) {
 	return &EncryptionAlgorithm{
-		blockSize:           NoneBlockSize,
-		plainttextBlockSize: NoneBlockSize - NoneMinPadding,
-		encrypt:             &None{},
-		decrypt:             &None{},
-		signature:           &None{},
-		verifySignature:     &None{},
-		signatureLength:     0,
+		blockSize:             NoneBlockSize,
+		plainttextBlockSize:   NoneBlockSize - NoneMinPadding,
+		encrypt:               &None{},
+		decrypt:               &None{},
+		signature:             &None{},
+		verifySignature:       &None{},
+		signatureLength:       0,
+		remoteSignatureLength: 0,
 	}, nil
 }
 
 func newNoneSymmetric([]byte, []byte) (*EncryptionAlgorithm, error) {
 	return &EncryptionAlgorithm{
-		blockSize:           NoneBlockSize,
-		plainttextBlockSize: NoneBlockSize - NoneMinPadding,
-		encrypt:             &None{},
-		decrypt:             &None{},
-		signature:           &None{},
-		verifySignature:     &None{},
-		signatureLength:     0,
+		blockSize:             NoneBlockSize,
+		plainttextBlockSize:   NoneBlockSize - NoneMinPadding,
+		encrypt:               &None{},
+		decrypt:               &None{},
+		signature:             &None{},
+		verifySignature:       &None{},
+		signatureLength:       0,
+		remoteSignatureLength: 0,
 	}, nil
 }
