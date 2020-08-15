@@ -259,7 +259,7 @@ func TestVariant(t *testing.T) {
 			},
 		},
 		{
-			Name: "ExtensionObjeject",
+			Name: "ExtensionObject",
 			Struct: MustVariant(NewExtensionObject(
 				&AnonymousIdentityToken{PolicyID: "anonymous"},
 			)),
@@ -277,7 +277,7 @@ func TestVariant(t *testing.T) {
 			},
 		},
 		{
-			Name: "ExtensionObjeject - ServerStatusDataType",
+			Name: "ExtensionObject - ServerStatusDataType",
 			Struct: MustVariant(NewExtensionObject(
 				&ServerStatusDataType{
 					StartTime:   time.Date(2019, 3, 29, 19, 45, 3, 816525000, time.UTC), // Mar 29, 2019 20:45:03.816525000 CET
@@ -574,9 +574,9 @@ func TestArray(t *testing.T) {
 			// array values
 			0x01, 0x00, 0x00, 0x00,
 			0x01, 0x00, 0x00, 0x00,
-			// array dimesions length
+			// array dimensions length
 			0xff, 0xff, 0xff, 0xff, // -1
-			// array dimesions
+			// array dimensions
 			0x01, 0x00, 0x00, 0x00,
 			0x01, 0x00, 0x00, 0x00,
 		}
@@ -595,9 +595,9 @@ func TestArray(t *testing.T) {
 			// array values
 			0x01, 0x00, 0x00, 0x00,
 			0x01, 0x00, 0x00, 0x00,
-			// array dimesions length
+			// array dimensions length
 			0x02, 0x00, 0x00, 0x00,
-			// array dimesions
+			// array dimensions
 			0x01, 0x00, 0x00, 0x00,
 			0xff, 0xff, 0xff, 0xff, // -1
 		}
