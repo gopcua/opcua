@@ -18,6 +18,11 @@ import (
 func TestVariant(t *testing.T) {
 	cases := []CodecTestCase{
 		{
+			Name:   "null",
+			Struct: MustVariant(nil),
+			Bytes:  []byte{0x0},
+		},
+		{
 			Name:   "boolean",
 			Struct: MustVariant(false),
 			Bytes: []byte{
@@ -614,6 +619,13 @@ func TestSet(t *testing.T) {
 		err error
 	}{
 		{
+			v: nil,
+			va: &Variant{
+				mask:  byte(TypeIDNull),
+				value: nil,
+			},
+		},
+		{
 			v: []byte{0xca, 0xfe},
 			va: &Variant{
 				mask:  byte(TypeIDByteString),
@@ -693,6 +705,13 @@ func TestSliceDim(t *testing.T) {
 		err error
 	}{
 		// happy flows
+		{
+			v:   nil,
+			et:  nil,
+			dim: nil,
+			len: 0,
+			err: nil,
+		},
 		{
 			v:   "a",
 			et:  reflect.TypeOf(""),
