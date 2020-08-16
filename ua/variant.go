@@ -44,7 +44,7 @@ type Variant struct {
 	// field.
 	arrayLength int32
 
-	// arrayDimensionsLength is the numer of dimensions.
+	// arrayDimensionsLength is the number of dimensions.
 	// This field is only present if the 'array dimensions' flag
 	// is set.
 	arrayDimensionsLength int32
@@ -147,7 +147,7 @@ func (m *Variant) Decode(b []byte) (int, error) {
 		m.arrayDimensions = make([]int32, m.arrayDimensionsLength)
 		for i := 0; i < int(m.arrayDimensionsLength); i++ {
 			m.arrayDimensions[i] = buf.ReadInt32()
-			if m.arrayDimensions[i] < 0 {
+			if m.arrayDimensions[i] < 1 {
 				return buf.Pos(), StatusBadEncodingLimitsExceeded
 			}
 		}
