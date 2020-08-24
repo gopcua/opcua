@@ -689,22 +689,12 @@ func (c *Client) notifySubscription(ctx context.Context, response *ua.PublishRes
 		return
 	}
 
-	// Check for errors
-	// status := ua.StatusOK
-	// for _, res := range response.Results {
-	// 	if res != ua.StatusOK {
-	// 		status = res
-	// 		break
-	// 	}
-	// }
-
-	// if status != ua.StatusOK {
-	// 	sub.sendNotification(ctx, &PublishNotificationData{
-	// 		SubscriptionID: response.SubscriptionID,
-	// 		Error:          status,
-	// 	})
-	// 	return
-	// }
+	// todo(fs): response.Results contains the status codes of which messages were
+	// todo(fs): were successfully removed from the transmission queue on the server.
+	// todo(fs): The client sent the list of ids in the *previous* PublishRequest.
+	// todo(fs): If we want to handle them then we probably need to keep track
+	// todo(fs): of the message ids we have ack'ed.
+	// todo(fs): see discussion in https://github.com/gopcua/opcua/issues/337
 
 	if response.NotificationMessage == nil {
 		sub.sendNotification(ctx, &PublishNotificationData{
