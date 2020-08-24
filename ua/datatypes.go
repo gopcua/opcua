@@ -196,6 +196,23 @@ type LocalizedText struct {
 	Text         string
 }
 
+// NewLocalizedText creates a new localized text without a locale.
+func NewLocalizedText(text string) *LocalizedText {
+	return NewLocalizedTextWithLocale(text, "")
+}
+
+// NewLocalizedTextWithLocale creates a new localized text with a locale.
+func NewLocalizedTextWithLocale(text, locale string) *LocalizedText {
+	l := &LocalizedText{Text: text, Locale: locale}
+	if text != "" {
+		l.EncodingMask |= LocalizedTextText
+	}
+	if locale != "" {
+		l.EncodingMask |= LocalizedTextLocale
+	}
+	return l
+}
+
 func (l *LocalizedText) Decode(b []byte) (int, error) {
 	buf := NewBuffer(b)
 	l.EncodingMask = buf.ReadByte()
@@ -233,23 +250,6 @@ func (l *LocalizedText) UpdateMask() {
 	}
 	if l.Text != "" {
 		l.EncodingMask |= LocalizedTextText
-	}
-}
-
-// NewLocalizedText creates a new localized text struct without any locale
-func NewLocalizedText(text string) *LocalizedText {
-	return &LocalizedText{
-		Text:         text,
-		EncodingMask: LocalizedTextText,
-	}
-}
-
-// NewLocalizedTextWithLocale creates a new localized text struct with a given locale
-func NewLocalizedTextWithLocale(text, locale string) *LocalizedText {
-	return &LocalizedText{
-		Text:         text,
-		EncodingMask: LocalizedTextLocale | LocalizedTextText,
-		Locale:       locale,
 	}
 }
 
