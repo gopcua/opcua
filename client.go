@@ -690,21 +690,21 @@ func (c *Client) notifySubscription(ctx context.Context, response *ua.PublishRes
 	}
 
 	// Check for errors
-	status := ua.StatusOK
-	for _, res := range response.Results {
-		if res != ua.StatusOK {
-			status = res
-			break
-		}
-	}
+	// status := ua.StatusOK
+	// for _, res := range response.Results {
+	// 	if res != ua.StatusOK {
+	// 		status = res
+	// 		break
+	// 	}
+	// }
 
-	if status != ua.StatusOK {
-		sub.sendNotification(ctx, &PublishNotificationData{
-			SubscriptionID: response.SubscriptionID,
-			Error:          status,
-		})
-		return
-	}
+	// if status != ua.StatusOK {
+	// 	sub.sendNotification(ctx, &PublishNotificationData{
+	// 		SubscriptionID: response.SubscriptionID,
+	// 		Error:          status,
+	// 	})
+	// 	return
+	// }
 
 	if response.NotificationMessage == nil {
 		sub.sendNotification(ctx, &PublishNotificationData{
