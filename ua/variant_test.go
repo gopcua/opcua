@@ -248,11 +248,8 @@ func TestVariant(t *testing.T) {
 			},
 		},
 		{
-			Name: "LocalizedText",
-			Struct: MustVariant(&LocalizedText{
-				EncodingMask: LocalizedTextText,
-				Text:         "Gross value",
-			}),
+			Name:   "LocalizedText",
+			Struct: MustVariant(NewLocalizedText("Gross value")),
 			Bytes: []byte{
 				// variant encoding mask
 				0x15,
@@ -297,7 +294,7 @@ func TestVariant(t *testing.T) {
 						BuildDate:        time.Time{},
 					},
 					SecondsTillShutdown: 0,
-					ShutdownReason:      &LocalizedText{},
+					ShutdownReason:      NewLocalizedText(""),
 				},
 			)),
 			Bytes: []byte{
@@ -832,7 +829,7 @@ func TestVariantValueHelpers(t *testing.T) {
 			fn:   func(v *Variant) interface{} { return v.String() },
 		},
 		{
-			v:    &LocalizedText{Text: "a"},
+			v:    NewLocalizedText("a"),
 			want: "a",
 			fn:   func(v *Variant) interface{} { return v.String() },
 		},
@@ -992,8 +989,8 @@ func TestVariantValueHelpers(t *testing.T) {
 			fn:   func(v *Variant) interface{} { return v.LocalizedText() },
 		},
 		{
-			v:    &LocalizedText{Text: "abc"},
-			want: &LocalizedText{Text: "abc"},
+			v:    NewLocalizedText("abc"),
+			want: NewLocalizedText("abc"),
 			fn:   func(v *Variant) interface{} { return v.LocalizedText() },
 		},
 

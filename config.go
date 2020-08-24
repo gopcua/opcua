@@ -39,7 +39,7 @@ func DefaultSessionConfig() *uasc.SessionConfig {
 		ClientDescription: &ua.ApplicationDescription{
 			ApplicationURI:  "urn:gopcua:client",
 			ProductURI:      "urn:gopcua",
-			ApplicationName: &ua.LocalizedText{Text: "gopcua - OPC UA implementation in Go"},
+			ApplicationName: ua.NewLocalizedText("gopcua - OPC UA implementation in Go"),
 			ApplicationType: ua.ApplicationTypeClient,
 		},
 		LocaleIDs:          []string{"en-us"},
@@ -64,7 +64,7 @@ type Option func(*uasc.Config, *uasc.SessionConfig)
 // ApplicationName sets the application name in the session configuration.
 func ApplicationName(s string) Option {
 	return func(c *uasc.Config, sc *uasc.SessionConfig) {
-		sc.ClientDescription.ApplicationName = &ua.LocalizedText{Text: s}
+		sc.ClientDescription.ApplicationName = ua.NewLocalizedText(s)
 	}
 }
 
