@@ -13,12 +13,9 @@ func TestApplicationDescription(t *testing.T) {
 		{
 			Name: "Normal",
 			Struct: &ApplicationDescription{
-				ApplicationURI: "app-uri",
-				ProductURI:     "prod-uri",
-				ApplicationName: &LocalizedText{
-					EncodingMask: LocalizedTextText,
-					Text:         "app-name",
-				},
+				ApplicationURI:      "app-uri",
+				ProductURI:          "prod-uri",
+				ApplicationName:     NewLocalizedText("app-name"),
 				ApplicationType:     ApplicationTypeServer,
 				GatewayServerURI:    "gw-uri",
 				DiscoveryProfileURI: "prof-uri",
@@ -54,24 +51,18 @@ func TestApplicationDescriptionArray(t *testing.T) {
 			Name: "Normal",
 			Struct: []*ApplicationDescription{
 				{
-					ApplicationURI: "app-uri",
-					ProductURI:     "prod-uri",
-					ApplicationName: &LocalizedText{
-						EncodingMask: LocalizedTextText,
-						Text:         "app-name",
-					},
+					ApplicationURI:      "app-uri",
+					ProductURI:          "prod-uri",
+					ApplicationName:     NewLocalizedText("app-name"),
 					ApplicationType:     ApplicationTypeServer,
 					GatewayServerURI:    "gw-uri",
 					DiscoveryProfileURI: "prof-uri",
 					DiscoveryURLs:       []string{"discov-uri-1", "discov-uri-2"},
 				},
 				{
-					ApplicationURI: "app-uri",
-					ProductURI:     "prod-uri",
-					ApplicationName: &LocalizedText{
-						EncodingMask: LocalizedTextText,
-						Text:         "app-name",
-					},
+					ApplicationURI:      "app-uri",
+					ProductURI:          "prod-uri",
+					ApplicationName:     NewLocalizedText("app-name"),
 					ApplicationType:     ApplicationTypeServer,
 					GatewayServerURI:    "gw-uri",
 					DiscoveryProfileURI: "prof-uri",
