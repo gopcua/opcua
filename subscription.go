@@ -129,11 +129,10 @@ func (s *Subscription) Monitor(ts ua.TimestampsToReturn, items ...*ua.MonitoredI
 	}
 
 	// store Monitored items
-	monitoredItems := make([]*monitoredItem, len(items))
 	for i, item := range items {
 		result := res.Results[i]
 
-		monitoredItems[i] = &monitoredItem{
+		mi := &monitoredItem{
 			MonitoredItemID:      result.MonitoredItemID,
 			ItemToMonitor:        item.ItemToMonitor,
 			MonitoringParameters: item.RequestedParameters,
@@ -141,9 +140,9 @@ func (s *Subscription) Monitor(ts ua.TimestampsToReturn, items ...*ua.MonitoredI
 			TimestampsToReturn:   ts,
 			createResult:         result,
 		}
+		s.items = append(s.items, mi)
 	}
 
-	s.items = append(s.items, monitoredItems...)
 	return res, err
 }
 
@@ -312,7 +311,6 @@ func (s *Subscription) sendNotification(ctx context.Context, data *PublishNotifi
 		return
 	case s.Notifs <- data:
 	}
-
 }
 
 // Stats returns a diagnostic struct with metadata about the current subscription
@@ -412,28 +410,21 @@ func (s *Subscription) recreateSubscriptionAndMonitoredItems() error {
 	// Sort by timestamp to return
 	itemsByTs := make(map[ua.TimestampsToReturn][]*ua.MonitoredItemCreateRequest)
 	for _, m := range s.items {
-
-		if _, ok := itemsByTs[m.TimestampsToReturn]; !ok {
-			itemsByTs[m.TimestampsToReturn] = []*ua.MonitoredItemCreateRequest{}
+		cr := &ua.MonitoredItemCreateRequest{
+			ItemToMonitor:       m.ItemToMonitor,
+			MonitoringMode:      m.MonitoringMode,
+			RequestedParameters: m.MonitoringParameters,
 		}
-
-		itemsByTs[m.TimestampsToReturn] = append(
-			itemsByTs[m.TimestampsToReturn],
-			&ua.MonitoredItemCreateRequest{
-				ItemToMonitor:       m.ItemToMonitor,
-				MonitoringMode:      m.MonitoringMode,
-				RequestedParameters: m.MonitoringParameters,
-			},
-		)
+		itemsByTs[m.TimestampsToReturn] = append(itemsByTs[m.TimestampsToReturn], cr)
 	}
 
 	for ts, items := range itemsByTs {
-
 		req := &ua.CreateMonitoredItemsRequest{
 			SubscriptionID:     s.SubscriptionID,
 			TimestampsToReturn: ts,
 			ItemsToCreate:      items,
 		}
+
 		var res *ua.CreateMonitoredItemsResponse
 		err := s.c.Send(req, func(v interface{}) error {
 			return safeAssign(v, &res)
