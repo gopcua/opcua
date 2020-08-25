@@ -86,7 +86,11 @@ type PublishNotificationData struct {
 func (s *Subscription) Cancel() error {
 	s.c.forgetSubscription(s.SubscriptionID)
 	close(s.resumeC)
+	return s.delete()
+}
 
+// delete removes the subscription from the server.
+func (s *Subscription) delete() error {
 	req := &ua.DeleteSubscriptionsRequest{
 		SubscriptionIDs: []uint32{s.SubscriptionID},
 	}
@@ -94,14 +98,14 @@ func (s *Subscription) Cancel() error {
 	err := s.c.Send(req, func(v interface{}) error {
 		return safeAssign(v, &res)
 	})
-	if err != nil {
+	switch {
+	case err != nil:
 		return err
-	}
-	if res.ResponseHeader.ServiceResult != ua.StatusOK {
+	case res.ResponseHeader.ServiceResult != ua.StatusOK:
 		return res.ResponseHeader.ServiceResult
+	default:
+		return nil
 	}
-
-	return nil
 }
 
 func (s *Subscription) Monitor(ts ua.TimestampsToReturn, items ...*ua.MonitoredItemCreateRequest) (*ua.CreateMonitoredItemsResponse, error) {
