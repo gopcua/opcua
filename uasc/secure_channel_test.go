@@ -13,6 +13,16 @@ import (
 
 func TestNewRequestMessage(t *testing.T) {
 	fixedTime := func() time.Time { return time.Date(2019, 1, 1, 12, 13, 14, 0, time.UTC) }
+
+	buildSecureChannel := func(sc *SecureChannel, instance *channelInstance) *SecureChannel {
+		if instance == nil {
+			instance = newChannelInstance(sc)
+		}
+		sc.activeInstance = instance
+		sc.activeInstance.sc = sc
+		return sc
+	}
+
 	tests := []struct {
 		name      string
 		sechan    *SecureChannel
@@ -23,11 +33,11 @@ func TestNewRequestMessage(t *testing.T) {
 	}{
 		{
 			name: "first-request",
-			sechan: &SecureChannel{
-				cfg:    &Config{},
-				reqhdr: &ua.RequestHeader{},
-				time:   fixedTime,
-			},
+			sechan: buildSecureChannel(&SecureChannel{
+				cfg: &Config{},
+				// reqhdr: &ua.RequestHeader{},
+				time: fixedTime,
+			}, nil),
 			req: &ua.ReadRequest{},
 			m: &Message{
 				MessageHeader: &MessageHeader{
@@ -53,15 +63,19 @@ func TestNewRequestMessage(t *testing.T) {
 		},
 		{
 			name: "subsequent-request",
-			sechan: &SecureChannel{
-				cfg:            &Config{},
-				sequenceNumber: 777,
-				requestID:      555,
-				reqhdr: &ua.RequestHeader{
-					RequestHandle: 444,
+			sechan: buildSecureChannel(
+				&SecureChannel{
+					cfg:       &Config{},
+					requestID: 555,
+					// reqhdr: &ua.RequestHeader{
+					// 	RequestHandle: 444,
+					// },
+					time: fixedTime,
 				},
-				time: fixedTime,
-			},
+				&channelInstance{
+					sequenceNumber: 777,
+				},
+			),
 			req: &ua.ReadRequest{},
 			m: &Message{
 				MessageHeader: &MessageHeader{
@@ -80,22 +94,22 @@ func TestNewRequestMessage(t *testing.T) {
 					RequestHeader: &ua.RequestHeader{
 						AuthenticationToken: ua.NewTwoByteNodeID(0),
 						Timestamp:           fixedTime(),
-						RequestHandle:       445,
+						RequestHandle:       556,
 					},
 				},
 			},
 		},
 		{
 			name: "counter-rollover",
-			sechan: &SecureChannel{
-				cfg:            &Config{},
-				sequenceNumber: math.MaxUint32 - 1023,
-				requestID:      math.MaxUint32,
-				reqhdr: &ua.RequestHeader{
-					RequestHandle: math.MaxUint32,
+			sechan: buildSecureChannel(
+				&SecureChannel{
+					cfg:       &Config{},
+					requestID: math.MaxUint32,
+					time:      fixedTime,
 				},
-				time: fixedTime,
-			},
+				&channelInstance{
+					sequenceNumber: math.MaxUint32 - 1023,
+				}),
 			req: &ua.ReadRequest{},
 			m: &Message{
 				MessageHeader: &MessageHeader{
@@ -123,7 +137,7 @@ func TestNewRequestMessage(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			m, err := tt.sechan.newRequestMessage(tt.req, tt.authToken, tt.timeout)
+			m, err := tt.sechan.activeInstance.newRequestMessage(tt.req, tt.sechan.nextRequestID(), tt.authToken, tt.timeout)
 			if err != nil {
 				t.Fatalf("got err %v want nil", err)
 			}

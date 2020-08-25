@@ -8,7 +8,9 @@
 package uapolicy
 
 import (
+	"crypto/rand"
 	"crypto/rsa"
+	"io"
 	"sort"
 
 	"github.com/gopcua/opcua/errors"
@@ -143,6 +145,17 @@ func (e *EncryptionAlgorithm) RemoteSignatureLength() int {
 // report NonceLength as zero
 func (e *EncryptionAlgorithm) NonceLength() int {
 	return e.nonceLength
+}
+
+func (e *EncryptionAlgorithm) MakeNonce() ([]byte, error) {
+	b := make([]byte, e.NonceLength())
+	// note: we use `rand.Reader` instead of `rand.Read(...)` to ensure that we don't accidentally switch to using
+	// math/rand (which has a default, fixed seed). Only crypto/rand exposes a global `io.Reader` var.
+	_, err := io.ReadFull(rand.Reader, b)
+	if err != nil {
+		return nil, err
+	}
+	return b, nil
 }
 
 // EncryptionURI returns the URI for the encryption algorithm as defined
