@@ -953,18 +953,14 @@ func (c *Client) Subscribe(params *SubscriptionParameters, notifyCh chan *Publis
 	}
 
 	sub := &Subscription{
-		res.SubscriptionID,
-		time.Duration(res.RevisedPublishingInterval) * time.Millisecond,
-		res.RevisedLifetimeCount,
-		res.RevisedMaxKeepAliveCount,
-		notifyCh,
-		params,
-		make([]*MonitoredItem, 0),
-		0,
-		nil,
-		sync.WaitGroup{},
-		make(chan struct{}, 1),
-		c,
+		SubscriptionID:            res.SubscriptionID,
+		RevisedPublishingInterval: time.Duration(res.RevisedPublishingInterval) * time.Millisecond,
+		RevisedLifetimeCount:      res.RevisedLifetimeCount,
+		RevisedMaxKeepAliveCount:  res.RevisedMaxKeepAliveCount,
+		Notifs:                    notifyCh,
+		params:                    params,
+		resumeC:                   make(chan struct{}, 1),
+		c:                         c,
 	}
 
 	c.subMux.Lock()
