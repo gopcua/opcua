@@ -82,8 +82,8 @@ type PublishNotificationData struct {
 	Value          interface{}
 }
 
-// Cancel() deletes the Subscription from Server and makes the Client forget it so that publishing
-// loops cannot deliver notifications to it anymore
+// Cancel stops the subscription and removes it
+// from the client and the server.
 func (s *Subscription) Cancel() error {
 	s.c.forgetSubscription(s.SubscriptionID)
 	close(s.resumeC)
@@ -222,10 +222,14 @@ func (s *Subscription) resume() {
 	s.resumeC <- struct{}{}
 }
 
-// Run() starts an infinite loop that sends PublishRequests and delivers received
-// notifications to registered Subscriptions.
-// It is the responsibility of the user to stop no longer needed Run() loops by cancelling ctx
-// Note that Run() may return before ctx is cancelled in case of an irrecoverable communication error
+// Run starts an infinite loop which sends PublishRequests and delivers received
+// notifications to registered subcribers.
+//
+// It is the responsibility of the caller to stop the run loops by
+// cancelling the context.
+//
+// Note that Run may return before the context is cancelled
+// in case of an irrecoverable communication error.
 func (s *Subscription) Run(ctx context.Context) {
 	var sctx context.Context
 
