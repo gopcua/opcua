@@ -437,12 +437,12 @@ func (c *Client) recreateSubscriptionsAndMonitoredItems(subIDs []uint32) error {
 
 		sub := c.subscriptions[subID]
 
-		debug.Printf("Recreating subscription id = %d", subID)
-		if err := sub.recreateSubscriptionAndMonitoredItems(); err != nil {
-			debug.Printf("Recreate subscription failed")
+		debug.Printf("Restoring subscription id = %d", subID)
+		if err := sub.restore(); err != nil {
+			debug.Printf("Restoring subscription failed")
 			return err
 		}
-		debug.Printf("Recreating subscription and monitored item done")
+		debug.Printf("Restored subscription")
 	}
 
 	return nil
@@ -1010,7 +1010,7 @@ func (c *Client) notifySubscriptionsOfError(ctx context.Context, res *ua.Publish
 	}
 	for _, sub := range subsToNotify {
 		go func(s *Subscription) {
-			s.sendNotification(ctx, &PublishNotificationData{Error: err})
+			s.notify(ctx, &PublishNotificationData{Error: err})
 		}(sub)
 	}
 }
@@ -1032,7 +1032,7 @@ func (c *Client) notifySubscription(ctx context.Context, response *ua.PublishRes
 	// todo(fs): see discussion in https://github.com/gopcua/opcua/issues/337
 
 	if response.NotificationMessage == nil {
-		sub.sendNotification(ctx, &PublishNotificationData{
+		sub.notify(ctx, &PublishNotificationData{
 			SubscriptionID: response.SubscriptionID,
 			Error:          errors.Errorf("empty NotificationMessage"),
 		})
@@ -1043,7 +1043,7 @@ func (c *Client) notifySubscription(ctx context.Context, response *ua.PublishRes
 	for _, data := range response.NotificationMessage.NotificationData {
 		// Part 4, 7.20 NotificationData parameters
 		if data == nil || data.Value == nil {
-			sub.sendNotification(ctx, &PublishNotificationData{
+			sub.notify(ctx, &PublishNotificationData{
 				SubscriptionID: response.SubscriptionID,
 				Error:          errors.Errorf("missing NotificationData parameter"),
 			})
@@ -1057,14 +1057,14 @@ func (c *Client) notifySubscription(ctx context.Context, response *ua.PublishRes
 		case *ua.DataChangeNotification,
 			*ua.EventNotificationList,
 			*ua.StatusChangeNotification:
-			sub.sendNotification(ctx, &PublishNotificationData{
+			sub.notify(ctx, &PublishNotificationData{
 				SubscriptionID: response.SubscriptionID,
 				Value:          data.Value,
 			})
 
 		// Error
 		default:
-			sub.sendNotification(ctx, &PublishNotificationData{
+			sub.notify(ctx, &PublishNotificationData{
 				SubscriptionID: response.SubscriptionID,
 				Error:          errors.Errorf("unknown NotificationData parameter: %T", data.Value),
 			})

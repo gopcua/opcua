@@ -307,7 +307,7 @@ func (s *Subscription) run(ctx context.Context) {
 	}
 }
 
-func (s *Subscription) sendNotification(ctx context.Context, data *PublishNotificationData) {
+func (s *Subscription) notify(ctx context.Context, data *PublishNotificationData) {
 	select {
 	case <-ctx.Done():
 		return
@@ -359,9 +359,9 @@ func (p *SubscriptionParameters) setDefaults() {
 	}
 }
 
-// recreateSubscriptionAndMonitoredItems recreate a new subscription base of a previous subscription
-// parameters
-func (s *Subscription) recreateSubscriptionAndMonitoredItems() error {
+// restore creates a new subscription based on the previous subscription
+// parameters and monitored items.
+func (s *Subscription) restore() error {
 	if s.SubscriptionID == terminatedSubscriptionID {
 		debug.Printf("Subscription is not in a valid state")
 		return nil
