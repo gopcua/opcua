@@ -30,7 +30,7 @@ type Subscription struct {
 	RevisedMaxKeepAliveCount  uint32
 	Notifs                    chan *PublishNotificationData
 	params                    *SubscriptionParameters
-	monitoredItems            []*MonitoredItem
+	items                     []*monitoredItem
 	lastSequenceNumber        uint32
 	publishCancel             context.CancelFunc
 	publishWg                 sync.WaitGroup
@@ -46,13 +46,13 @@ type SubscriptionParameters struct {
 	Priority                   uint8
 }
 
-type MonitoredItem struct {
-	MonitoredItemID           uint32
-	ItemToMonitor             *ua.ReadValueID
-	MonitoringParameters      *ua.MonitoringParameters
-	MonitoringMode            ua.MonitoringMode
-	TimestampsToReturn        ua.TimestampsToReturn
-	monitoredItemCreateResult *ua.MonitoredItemCreateResult
+type monitoredItem struct {
+	MonitoredItemID      uint32
+	ItemToMonitor        *ua.ReadValueID
+	MonitoringParameters *ua.MonitoringParameters
+	MonitoringMode       ua.MonitoringMode
+	TimestampsToReturn   ua.TimestampsToReturn
+	createResult         *ua.MonitoredItemCreateResult
 }
 
 func NewMonitoredItemCreateRequestWithDefaults(nodeID *ua.NodeID, attributeID ua.AttributeID, clientHandle uint32) *ua.MonitoredItemCreateRequest {
@@ -129,21 +129,21 @@ func (s *Subscription) Monitor(ts ua.TimestampsToReturn, items ...*ua.MonitoredI
 	}
 
 	// store Monitored items
-	monitoredItems := make([]*MonitoredItem, len(items))
+	monitoredItems := make([]*monitoredItem, len(items))
 	for i, item := range items {
 		result := res.Results[i]
 
-		monitoredItems[i] = &MonitoredItem{
-			MonitoredItemID:           result.MonitoredItemID,
-			ItemToMonitor:             item.ItemToMonitor,
-			MonitoringParameters:      item.RequestedParameters,
-			MonitoringMode:            item.MonitoringMode,
-			TimestampsToReturn:        ts,
-			monitoredItemCreateResult: result,
+		monitoredItems[i] = &monitoredItem{
+			MonitoredItemID:      result.MonitoredItemID,
+			ItemToMonitor:        item.ItemToMonitor,
+			MonitoringParameters: item.RequestedParameters,
+			MonitoringMode:       item.MonitoringMode,
+			TimestampsToReturn:   ts,
+			createResult:         result,
 		}
 	}
 
-	s.monitoredItems = append(s.monitoredItems, monitoredItems...)
+	s.items = append(s.items, monitoredItems...)
 	return res, err
 }
 
@@ -411,7 +411,7 @@ func (s *Subscription) recreateSubscriptionAndMonitoredItems() error {
 
 	// Sort by timestamp to return
 	itemsByTs := make(map[ua.TimestampsToReturn][]*ua.MonitoredItemCreateRequest)
-	for _, m := range s.monitoredItems {
+	for _, m := range s.items {
 
 		if _, ok := itemsByTs[m.TimestampsToReturn]; !ok {
 			itemsByTs[m.TimestampsToReturn] = []*ua.MonitoredItemCreateRequest{}
@@ -447,10 +447,10 @@ func (s *Subscription) recreateSubscriptionAndMonitoredItems() error {
 			}
 		}
 
-		for i, m := range s.monitoredItems {
+		for i, m := range s.items {
 			result := res.Results[i]
 			m.MonitoredItemID = result.MonitoredItemID
-			m.monitoredItemCreateResult = result
+			m.createResult = result
 		}
 	}
 
