@@ -292,6 +292,8 @@ const hdrlen = 8
 // The size of b must be at least ReceiveBufSize. Otherwise,
 // the function returns an error.
 func (c *Conn) Receive() ([]byte, error) {
+	// TODO(kung-foo): allow user-specified buffer
+	// TODO(kung-foo): sync.Pool
 	b := make([]byte, c.ack.ReceiveBufSize)
 
 	if _, err := io.ReadFull(c, b[:hdrlen]); err != nil {
