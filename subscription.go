@@ -47,7 +47,6 @@ type SubscriptionParameters struct {
 }
 
 type monitoredItem struct {
-	MonitoredItemID      uint32
 	ItemToMonitor        *ua.ReadValueID
 	MonitoringParameters *ua.MonitoringParameters
 	MonitoringMode       ua.MonitoringMode
@@ -128,12 +127,11 @@ func (s *Subscription) Monitor(ts ua.TimestampsToReturn, items ...*ua.MonitoredI
 		}
 	}
 
-	// store Monitored items
+	// store monitored items
 	for i, item := range items {
 		result := res.Results[i]
 
 		mi := &monitoredItem{
-			MonitoredItemID:      result.MonitoredItemID,
 			ItemToMonitor:        item.ItemToMonitor,
 			MonitoringParameters: item.RequestedParameters,
 			MonitoringMode:       item.MonitoringMode,
@@ -439,9 +437,7 @@ func (s *Subscription) recreateSubscriptionAndMonitoredItems() error {
 		}
 
 		for i, m := range s.items {
-			result := res.Results[i]
-			m.MonitoredItemID = result.MonitoredItemID
-			m.createResult = result
+			m.createResult = res.Results[i]
 		}
 	}
 
