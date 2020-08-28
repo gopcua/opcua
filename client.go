@@ -333,18 +333,18 @@ func (c *Client) dispatcher(ctx context.Context) {
 						subsToRepair := []uint32{}
 
 						if err != nil {
-							debug.Printf("Transfert subscriptions has failed, %v", err)
+							debug.Printf("Transfer subscriptions failed: %v", err)
 							subsToRestore = subIDs
 							err = nil
 						} else {
 							for id := range res.Results {
 								transferResult := res.Results[id]
 								if transferResult.StatusCode == ua.StatusBadSubscriptionIDInvalid {
-									debug.Printf("Warning suscription (id: %d), should be recreated", id)
+									debug.Printf("Warning suscription %d should be recreated", id)
 									subsToRestore = append(subsToRestore, subIDs[id])
 								} else {
 									debug.Printf(
-										"Subscription (id: %d) can be repaired and available",
+										"Subscription %d can be repaired and available",
 										transferResult.AvailableSequenceNumbers[id],
 									)
 									subsToRepair = append(subsToRepair, subIDs[id])
@@ -354,7 +354,7 @@ func (c *Client) dispatcher(ctx context.Context) {
 
 						if len(subsToRepair) > 0 {
 							if err = c.repairSubscriptions(subsToRepair); err != nil {
-								debug.Printf("Transfert subscriptions has failed, %v", err)
+								debug.Printf("Repair subscriptions failed: %v", err)
 								subsToRestore = append(subsToRestore, subsToRepair...)
 							}
 						}
