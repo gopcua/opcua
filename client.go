@@ -250,6 +250,7 @@ func (c *Client) dispatcher(ctx context.Context) {
 				case <-ctx.Done():
 					c.state.Store(Broken)
 					return
+
 				default:
 
 					switch rState {
@@ -260,26 +261,19 @@ func (c *Client) dispatcher(ctx context.Context) {
 						c.sechan.Close()
 						c.sechan = nil
 
-						var scheduleRecreateSecureChan, recreateSecureChan func()
-
-						scheduleRecreateSecureChan = func() {
-							timer := time.NewTimer(c.cfg.ReconnectInterval)
-							select {
-							case <-ctx.Done():
-								return
-							case <-timer.C:
-								debug.Printf("Trying to recreate secure channel")
-								recreateSecureChan()
-							}
-						}
-
-						recreateSecureChan = func() {
-							if err := c.Dial(ctx); err != nil {
-								scheduleRecreateSecureChan()
-							}
-						}
 						debug.Printf("Trying to recreate secure channel")
-						recreateSecureChan()
+						for {
+							if err := c.Dial(ctx); err != nil {
+								select {
+								case <-ctx.Done():
+									return
+								case <-time.After(c.cfg.ReconnectInterval):
+									debug.Printf("Trying to recreate secure channel")
+									continue
+								}
+							}
+							break
+						}
 						debug.Printf("Secure channel recreated")
 						rState = RestoreSession
 
@@ -305,11 +299,13 @@ func (c *Client) dispatcher(ctx context.Context) {
 
 						debug.Printf("Trying to recreate session")
 						s, err := c.CreateSession(c.sessionCfg)
-						if err == nil {
-							err = c.ActivateSession(s)
-						}
 						if err != nil {
 							debug.Printf("Recreate session failed: %v", err)
+							rState = RecreateSecureChannel
+							continue
+						}
+						if err := c.ActivateSession(s); err != nil {
+							debug.Printf("Reactivate session failed: %v", err)
 							rState = RecreateSecureChannel
 							continue
 						}
@@ -360,6 +356,7 @@ func (c *Client) dispatcher(ctx context.Context) {
 								subsToRestore = append(subsToRestore, subsToRepair...)
 							}
 						}
+
 						if len(subsToRestore) > 0 {
 							if err := c.restoreSubscriptions(subsToRestore); err != nil {
 								debug.Printf("Restore subscripitions failed: %v", err)
