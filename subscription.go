@@ -2,7 +2,7 @@ package opcua
 
 import (
 	"context"
-	"sync"
+	"log"
 	"sync/atomic"
 	"time"
 
@@ -32,9 +32,9 @@ type Subscription struct {
 	params                    *SubscriptionParameters
 	items                     []*monitoredItem
 	lastSequenceNumber        uint32
-	publishCancel             context.CancelFunc
-	publishWg                 sync.WaitGroup
-	resumeC                   chan struct{}
+	pausech                   chan struct{}
+	resumech                  chan struct{}
+	stopch                    chan struct{}
 	c                         *Client
 }
 
@@ -85,7 +85,7 @@ type PublishNotificationData struct {
 // from the client and the server.
 func (s *Subscription) Cancel() error {
 	s.c.forgetSubscription(s.SubscriptionID)
-	close(s.resumeC)
+	s.stop(context.Background())
 	return s.delete()
 }
 
@@ -214,13 +214,35 @@ func (s *Subscription) publishTimeout() time.Duration {
 	return timeout
 }
 
-func (s *Subscription) stop() {
-	s.publishCancel()
-	s.publishWg.Wait()
+// stop terminates the run loop by signalling the stopch
+// Since the channel is unbuffered we wait until the
+// run loop has terminated.
+func (s *Subscription) stop(ctx context.Context) {
+	select {
+	case <-ctx.Done():
+	case s.stopch <- struct{}{}:
+	}
 }
 
-func (s *Subscription) resume() {
-	s.resumeC <- struct{}{}
+// pause suspends the run loop by signalling the pausech.
+// Since the channel is unbuffered we wait until the
+// run loop has completed the current publish message.
+func (s *Subscription) pause(ctx context.Context) {
+	select {
+	case <-ctx.Done():
+	case <-s.stopch:
+	case s.pausech <- struct{}{}:
+	}
+}
+
+// resume restarts the run loop by signalling the resumech.
+// It has no effect if the run loop isn't paused.
+func (s *Subscription) resume(ctx context.Context) {
+	select {
+	case <-ctx.Done():
+	case <-s.stopch:
+	case s.resumech <- struct{}{}:
+	}
 }
 
 // Run starts an infinite loop which sends PublishRequests and delivers received
@@ -232,38 +254,77 @@ func (s *Subscription) resume() {
 // Note that Run may return before the context is cancelled
 // in case of an irrecoverable communication error.
 func (s *Subscription) Run(ctx context.Context) {
-	var sctx context.Context
+	cctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	defer log.Print("sub: done")
 
-	if !s.c.cfg.AutoReconnect {
-		s.run(ctx)
-		return
-	}
-
+outer:
 	for {
-		sctx, s.publishCancel = context.WithCancel(ctx)
-		s.publishWg.Add(1)
-		s.run(sctx)
-		s.publishWg.Done()
-
+		log.Print("sub: select")
 		select {
 		case <-ctx.Done():
+			log.Println("sub: ctx.Done()")
+			cancel()
 			return
-		case _, ok := <-s.resumeC:
-			if !ok {
-				return
+
+		case <-s.stopch:
+			log.Println("sub: stop")
+			cancel()
+			return
+
+		case <-s.pausech:
+			log.Print("sub: pause")
+		inner:
+			for {
+				select {
+				case <-ctx.Done():
+					log.Print("sub: pause: ctx.Done()")
+					cancel()
+					return
+				case <-s.stopch:
+					log.Print("sub: pause: stop")
+					cancel()
+					return
+				case <-s.pausech:
+					log.Print("sub: pause: pause")
+					// ignore since already paused
+					continue inner
+				case <-s.resumech:
+					log.Print("sub: pause: resume")
+					continue outer
+				}
 			}
+
+		case <-s.resumech:
+			log.Print("sub: resume")
+			// ignore since not paused
+			continue
+
+		default:
+			log.Print("sub: publish")
+			s.run(cctx)
 		}
 	}
 }
 
 func (s *Subscription) run(ctx context.Context) {
+	defer log.Print("publish: done")
+
 	var acks []*ua.SubscriptionAcknowledgement
 
 	for {
+		log.Print("publish: select")
 		select {
 		case <-ctx.Done():
+			log.Print("publish: ctx.Done()")
 			return
+
+		case <-s.stopch:
+			log.Printf("publish: stop")
+			return
+
 		default:
+			log.Printf("publish: default")
 			// send the next publish request
 			// note that res contains data even if an error was returned
 			res, err := s.publish(acks)
@@ -280,6 +341,7 @@ func (s *Subscription) run(ctx context.Context) {
 				// irrecoverable error
 				s.c.notifySubscriptionsOfError(ctx, res, err)
 				debug.Printf("subscription %v Run loop stopped", s.SubscriptionID)
+				log.Print("publish: notify error")
 				return
 			}
 
@@ -302,6 +364,7 @@ func (s *Subscription) run(ctx context.Context) {
 
 			if err == nil {
 				s.c.notifySubscription(ctx, res)
+				log.Print("publish: notify")
 			}
 		}
 	}
