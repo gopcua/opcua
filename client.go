@@ -329,19 +329,19 @@ func (c *Client) dispatcher(ctx context.Context) {
 
 						subIDs := c.SubscriptionIDs()
 						res, err := c.transferSubscriptions(subIDs)
-						subsToRecreate := []uint32{}
+						subsToRestore := []uint32{}
 						subsToRepair := []uint32{}
 
 						if err != nil {
 							debug.Printf("Transfert subscriptions has failed, %v", err)
-							subsToRecreate = subIDs
+							subsToRestore = subIDs
 							err = nil
 						} else {
 							for id := range res.Results {
 								transferResult := res.Results[id]
 								if transferResult.StatusCode == ua.StatusBadSubscriptionIDInvalid {
 									debug.Printf("Warning suscription (id: %d), should be recreated", id)
-									subsToRecreate = append(subsToRecreate, subIDs[id])
+									subsToRestore = append(subsToRestore, subIDs[id])
 								} else {
 									debug.Printf(
 										"Subscription (id: %d) can be repaired and available",
@@ -355,12 +355,12 @@ func (c *Client) dispatcher(ctx context.Context) {
 						if len(subsToRepair) > 0 {
 							if err = c.repairSubscriptions(subsToRepair); err != nil {
 								debug.Printf("Transfert subscriptions has failed, %v", err)
-								subsToRecreate = append(subsToRecreate, subsToRepair...)
+								subsToRestore = append(subsToRestore, subsToRepair...)
 							}
 						}
-						if len(subsToRecreate) > 0 {
-							if err = c.restoreSubscriptions(subsToRecreate); err != nil {
-								debug.Printf("Recreate subscriptions failed")
+						if len(subsToRestore) > 0 {
+							if err = c.restoreSubscriptions(subsToRestore); err != nil {
+								debug.Printf("Restore subscripitions failed: %v", err)
 								rState = RecreateSession
 								continue
 							}
