@@ -487,40 +487,41 @@ func (c *Client) repairSubscriptions(ids []uint32) error {
 }
 
 func (c *Client) repairSubscription(sub *Subscription) error {
-	debug.Printf("RepairSubscription  for SubscriptionId %d", sub.SubscriptionID)
-	if err := c.subscriptionRepublish(sub); err != nil {
+	debug.Printf("repairing subscription %d", sub.SubscriptionID)
+	if err := c.republishSubscription(sub); err != nil {
 		status, ok := err.(ua.StatusCode)
 		if !ok {
 			return err
 		}
+
 		switch status {
 		case ua.StatusBadSessionIDInvalid:
 			return nil
 		case ua.StatusBadSubscriptionIDInvalid:
-			debug.Printf("Republish failed, subscriptionId is not valid anymore on server side.")
-			return errors.Errorf("Republish failed, subscriptionId is not valid anymore on server side.")
+			debug.Printf("Republish failed since subscription %d is invalid", sub.SubscriptionID)
+			return errors.Errorf("republish failed since subscription %d is invalid", sub.SubscriptionID)
 		}
 	}
 	return nil
 }
 
-// subscriptionRepublish send republish request for the given subscription
+// republishSubscription send republish request for the given subscription
 // republish should end with a StatusCode BadMessageNotAvailable
 // wich implies that there's no more message to restore
-func (c *Client) subscriptionRepublish(sub *Subscription) error {
+func (c *Client) republishSubscription(sub *Subscription) error {
 	for {
 		req := &ua.RepublishRequest{
 			SubscriptionID:           sub.SubscriptionID,
 			RetransmitSequenceNumber: atomic.LoadUint32(&sub.lastSequenceNumber) + 1,
 		}
 
-		debug.Printf("Republish Request for subscription %d retransmitSequenceNumber=%d",
+		debug.Printf("Republishing subscription %d and sequence number %d",
 			req.SubscriptionID,
 			req.RetransmitSequenceNumber,
 		)
 
 		if c.sessionClosed() {
-			debug.Printf("Republish aborted")
+			debug.Printf("Republishing subscription %d aborted", req.SubscriptionID)
 			return ua.StatusBadSessionClosed
 		}
 
@@ -528,9 +529,10 @@ func (c *Client) subscriptionRepublish(sub *Subscription) error {
 		if err != nil {
 			if err == ua.StatusBadMessageNotAvailable {
 				// No more message to restore
+				debug.Printf("Republishing subscription %d OK", req.SubscriptionID)
 				return nil
 			}
-			debug.Printf("Republish request ends with: %v", err)
+			debug.Printf("Republishing subscription %d failed: %v", req.SubscriptionID, err)
 			return err
 		}
 
@@ -540,7 +542,7 @@ func (c *Client) subscriptionRepublish(sub *Subscription) error {
 		}
 
 		if status != ua.StatusOK {
-			debug.Printf("Republish request ends with: %v", status)
+			debug.Printf("Republishing subscription %d failed: %v", req.SubscriptionID, status)
 			return status
 		}
 	}
