@@ -85,7 +85,7 @@ type PublishNotificationData struct {
 // from the client and the server.
 func (s *Subscription) Cancel() error {
 	s.c.forgetSubscription(s.SubscriptionID)
-	s.stop(context.Background())
+	close(s.stopch)
 	return s.delete()
 }
 
@@ -212,16 +212,6 @@ func (s *Subscription) publishTimeout() time.Duration {
 		return s.c.cfg.RequestTimeout
 	}
 	return timeout
-}
-
-// stop terminates the run loop by signalling the stopch
-// Since the channel is unbuffered we wait until the
-// run loop has terminated.
-func (s *Subscription) stop(ctx context.Context) {
-	select {
-	case <-ctx.Done():
-	case s.stopch <- struct{}{}:
-	}
 }
 
 // pause suspends the run loop by signalling the pausech.
