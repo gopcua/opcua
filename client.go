@@ -319,7 +319,7 @@ func (c *Client) dispatcher(ctx context.Context) {
 
 					case RestoreSubscription:
 
-						if err := c.repairSubscriptions(); err != nil {
+						if err := c.repairSubscriptions(c.SubscriptionIDs()); err != nil {
 							debug.Printf("Restore subscription failed: %v", err)
 							rState = RecreateSecureChannel
 							continue
@@ -354,7 +354,7 @@ func (c *Client) dispatcher(ctx context.Context) {
 						}
 
 						if len(subsToRepair) > 0 {
-							if err = c.repairSubscriptions(subsToRepair...); err != nil {
+							if err = c.repairSubscriptions(subsToRepair); err != nil {
 								debug.Printf("Transfert subscriptions has failed, %v", err)
 								subsToRecreate = append(subsToRecreate, subsToRepair...)
 							}
@@ -469,19 +469,14 @@ func (c *Client) transferSubscriptions(ids []uint32) (*ua.TransferSubscriptionsR
 
 // repairSubscriptions repairs all the subscriptions of subscriptionIDs given,
 // if no subscriptionIDs repair all subscriptions
-func (c *Client) repairSubscriptions(subscriptionIDs ...uint32) error {
-
-	if subscriptionIDs == nil {
-		subscriptionIDs = c.SubscriptionIDs()
-	}
-
+func (c *Client) repairSubscriptions(ids []uint32) error {
 	c.subMux.RLock()
 	defer c.subMux.RUnlock()
 
-	for _, subID := range subscriptionIDs {
-		sub, ok := c.subscriptions[subID]
+	for _, id := range ids {
+		sub, ok := c.subscriptions[id]
 		if !ok {
-			return errors.Errorf("Invalid SubscriptionID, id = %d\n", subID)
+			return errors.Errorf("invalid subscription id %d", id)
 		}
 		if err := c.repairSubscription(sub); err != nil {
 			return err
