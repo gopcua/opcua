@@ -112,10 +112,9 @@ type Client struct {
 	// session is the active session.
 	session atomic.Value // *Session
 
-	// map of active subscriptions managed by this client. key is SubscriptionID
-	// access guarded by subMux
-	subscriptions map[uint32]*Subscription
-	subMux        sync.RWMutex
+	// subs is the set of active subscriptions by id.
+	subs   map[uint32]*Subscription
+	subMux sync.RWMutex
 
 	// state of the client
 	state atomic.Value // ConnectState
@@ -141,11 +140,11 @@ type Client struct {
 func NewClient(endpoint string, opts ...Option) *Client {
 	cfg, sessionCfg := ApplyConfig(opts...)
 	c := Client{
-		endpointURL:   endpoint,
-		cfg:           cfg,
-		sessionCfg:    sessionCfg,
-		sechanErr:     make(chan error, 1),
-		subscriptions: make(map[uint32]*Subscription),
+		endpointURL: endpoint,
+		cfg:         cfg,
+		sessionCfg:  sessionCfg,
+		sechanErr:   make(chan error, 1),
+		subs:        make(map[uint32]*Subscription),
 	}
 	c.state.Store(Closed)
 	return &c
@@ -241,7 +240,7 @@ func (c *Client) dispatcher(ctx context.Context) {
 			}
 
 			// Stop all subscriptions
-			for _, sub := range c.subscriptions {
+			for _, sub := range c.subs {
 				sub.stop()
 			}
 
@@ -381,8 +380,8 @@ func (c *Client) dispatcher(ctx context.Context) {
 				<-c.sechanErr
 			}
 
-			// Resume all subscriptions
-			for _, sub := range c.subscriptions {
+			// Resume all subs
+			for _, sub := range c.subs {
 				sub.resume()
 			}
 		}
@@ -421,7 +420,7 @@ func (c *Client) SubscriptionIDs() []uint32 {
 	defer c.subMux.Unlock()
 
 	var ids []uint32
-	for id := range c.subscriptions {
+	for id := range c.subs {
 		ids = append(ids, id)
 	}
 	return ids
@@ -431,12 +430,12 @@ func (c *Client) SubscriptionIDs() []uint32 {
 // with the same parameters to replace the previous ones
 func (c *Client) restoreSubscriptions(ids []uint32) error {
 	for _, id := range ids {
-		if _, exist := c.subscriptions[id]; !exist {
+		if _, exist := c.subs[id]; !exist {
 			debug.Printf("Cannot restore subscription %d", id)
 			continue
 		}
 
-		sub := c.subscriptions[id]
+		sub := c.subs[id]
 
 		debug.Printf("Restoring subscription %d", id)
 		if err := sub.restore(); err != nil {
@@ -468,13 +467,12 @@ func (c *Client) transferSubscriptions(ids []uint32) (*ua.TransferSubscriptionsR
 }
 
 // repairSubscriptions repairs all the subscriptions of subscriptionIDs given,
-// if no subscriptionIDs repair all subscriptions
 func (c *Client) repairSubscriptions(ids []uint32) error {
 	c.subMux.RLock()
 	defer c.subMux.RUnlock()
 
 	for _, id := range ids {
-		sub, ok := c.subscriptions[id]
+		sub, ok := c.subs[id]
 		if !ok {
 			return errors.Errorf("invalid subscription id %d", id)
 		}
@@ -962,13 +960,13 @@ func (c *Client) Subscribe(params *SubscriptionParameters, notifyCh chan *Publis
 	}
 
 	c.subMux.Lock()
-	if sub.SubscriptionID == 0 || c.subscriptions[sub.SubscriptionID] != nil {
+	if sub.SubscriptionID == 0 || c.subs[sub.SubscriptionID] != nil {
 		// this should not happen and is usually indicative of a server bug
 		// see: Part 4 Section 5.13.2.2, Table 88 – CreateSubscription Service Parameters
 		c.subMux.Unlock()
 		return nil, ua.StatusBadSubscriptionIDInvalid
 	}
-	c.subscriptions[sub.SubscriptionID] = sub
+	c.subs[sub.SubscriptionID] = sub
 	c.subMux.Unlock()
 
 	return sub, nil
@@ -982,17 +980,17 @@ func (c *Client) registerSubscription(sub *Subscription) error {
 
 	c.subMux.Lock()
 	defer c.subMux.Unlock()
-	if _, ok := c.subscriptions[sub.SubscriptionID]; ok {
+	if _, ok := c.subs[sub.SubscriptionID]; ok {
 		return errors.Errorf("SubscriptionID %d already registered", sub.SubscriptionID)
 	}
 
-	c.subscriptions[sub.SubscriptionID] = sub
+	c.subs[sub.SubscriptionID] = sub
 	return nil
 }
 
 func (c *Client) forgetSubscription(id uint32) {
 	c.subMux.Lock()
-	delete(c.subscriptions, id)
+	delete(c.subs, id)
 	c.subMux.Unlock()
 }
 
@@ -1000,10 +998,10 @@ func (c *Client) notifySubscriptionsOfError(ctx context.Context, res *ua.Publish
 	c.subMux.RLock()
 	defer c.subMux.RUnlock()
 
-	subsToNotify := c.subscriptions
+	subsToNotify := c.subs
 	if res != nil && res.SubscriptionID != 0 {
 		subsToNotify = map[uint32]*Subscription{
-			res.SubscriptionID: c.subscriptions[res.SubscriptionID],
+			res.SubscriptionID: c.subs[res.SubscriptionID],
 		}
 	}
 	for _, sub := range subsToNotify {
@@ -1015,7 +1013,7 @@ func (c *Client) notifySubscriptionsOfError(ctx context.Context, res *ua.Publish
 
 func (c *Client) notifySubscription(ctx context.Context, response *ua.PublishResponse) {
 	c.subMux.RLock()
-	sub, ok := c.subscriptions[response.SubscriptionID]
+	sub, ok := c.subs[response.SubscriptionID]
 	c.subMux.RUnlock()
 	if !ok {
 		debug.Printf("Unknown subscription: %v", response.SubscriptionID)
