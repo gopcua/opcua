@@ -316,6 +316,7 @@ func (c *Client) dispatcher(ctx context.Context) {
 						c.state.Store(Open)
 						rState = RecreateSubscription
 
+					// todo(fs): shouldn't this be state RepairSubscription?
 					case RestoreSubscription:
 
 						if err := c.repairSubscriptions(c.SubscriptionIDs()); err != nil {
@@ -325,46 +326,48 @@ func (c *Client) dispatcher(ctx context.Context) {
 						}
 						rState = None
 
+					// todo(fs): shouldn't this be state RestoreSubscription?
 					case RecreateSubscription:
 
 						subIDs := c.SubscriptionIDs()
-						res, err := c.transferSubscriptions(subIDs)
-						subsToRestore := []uint32{}
 						subsToRepair := []uint32{}
+						subsToRestore := []uint32{}
 
+						res, err := c.transferSubscriptions(subIDs)
 						if err != nil {
 							debug.Printf("Transfer subscriptions failed: %v", err)
 							subsToRestore = subIDs
-							err = nil
 						} else {
-							for id := range res.Results {
-								transferResult := res.Results[id]
+							for i := range res.Results {
+								transferResult := res.Results[i]
 								if transferResult.StatusCode == ua.StatusBadSubscriptionIDInvalid {
-									debug.Printf("Warning suscription %d should be recreated", id)
-									subsToRestore = append(subsToRestore, subIDs[id])
+									debug.Printf("Warning suscription %d should be recreated", subIDs[i])
+									subsToRestore = append(subsToRestore, subIDs[i])
 								} else {
 									debug.Printf(
-										"Subscription %d can be repaired and available",
-										transferResult.AvailableSequenceNumbers[id],
+										"Subscription %d can be repaired with sequence number %d",
+										subIDs[i],
+										transferResult.AvailableSequenceNumbers[i],
 									)
-									subsToRepair = append(subsToRepair, subIDs[id])
+									subsToRepair = append(subsToRepair, subIDs[i])
 								}
 							}
 						}
 
 						if len(subsToRepair) > 0 {
-							if err = c.repairSubscriptions(subsToRepair); err != nil {
+							if err := c.repairSubscriptions(subsToRepair); err != nil {
 								debug.Printf("Repair subscriptions failed: %v", err)
 								subsToRestore = append(subsToRestore, subsToRepair...)
 							}
 						}
 						if len(subsToRestore) > 0 {
-							if err = c.restoreSubscriptions(subsToRestore); err != nil {
+							if err := c.restoreSubscriptions(subsToRestore); err != nil {
 								debug.Printf("Restore subscripitions failed: %v", err)
 								rState = RecreateSession
 								continue
 							}
 						}
+
 						rState = None
 
 					case NonRecoverable:
