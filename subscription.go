@@ -248,7 +248,7 @@ func (s *Subscription) Run(ctx context.Context) {
 	defer cancel()
 	defer log.Print("sub: done")
 
-outer:
+publish:
 	for {
 		log.Print("sub: select")
 		select {
@@ -264,7 +264,7 @@ outer:
 
 		case <-s.pausech:
 			log.Print("sub: pause")
-		inner:
+		paused:
 			for {
 				select {
 				case <-ctx.Done():
@@ -278,10 +278,10 @@ outer:
 				case <-s.pausech:
 					log.Print("sub: pause: pause")
 					// ignore since already paused
-					continue inner
+					continue paused
 				case <-s.resumech:
 					log.Print("sub: pause: resume")
-					continue outer
+					continue publish
 				}
 			}
 
