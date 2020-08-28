@@ -417,32 +417,33 @@ func (c *Client) Dial(ctx context.Context) error {
 
 // SubscriptionIDs gets a list of subscriptionIDs
 func (c *Client) SubscriptionIDs() []uint32 {
-	subscriptionIDs := []uint32{}
 	c.subMux.Lock()
 	defer c.subMux.Unlock()
-	for key := range c.subscriptions {
-		subscriptionIDs = append(subscriptionIDs, key)
+
+	var ids []uint32
+	for id := range c.subscriptions {
+		ids = append(ids, id)
 	}
-	return subscriptionIDs
+	return ids
 }
 
 // restoreSubscriptions creates new subscriptions
 // with the same parameters to replace the previous ones
-func (c *Client) restoreSubscriptions(subIDs []uint32) error {
-	for _, subID := range subIDs {
-		if _, exist := c.subscriptions[subID]; !exist {
-			debug.Printf("Cannot restore subscription %d", subID)
+func (c *Client) restoreSubscriptions(ids []uint32) error {
+	for _, id := range ids {
+		if _, exist := c.subscriptions[id]; !exist {
+			debug.Printf("Cannot restore subscription %d", id)
 			continue
 		}
 
-		sub := c.subscriptions[subID]
+		sub := c.subscriptions[id]
 
-		debug.Printf("Restoring subscription %d", subID)
+		debug.Printf("Restoring subscription %d", id)
 		if err := sub.restore(); err != nil {
-			debug.Printf("Restoring subscription %d failed", subID)
+			debug.Printf("Restoring subscription %d failed", id)
 			return err
 		}
-		debug.Printf("Restored subscription %d", subID)
+		debug.Printf("Restored subscription %d", id)
 	}
 
 	return nil
@@ -450,9 +451,9 @@ func (c *Client) restoreSubscriptions(subIDs []uint32) error {
 
 // transferSubscriptions ask the server to transfer the given subscriptions
 // of the previous session to the current one.
-func (c *Client) transferSubscriptions(subIDs []uint32) (*ua.TransferSubscriptionsResponse, error) {
+func (c *Client) transferSubscriptions(ids []uint32) (*ua.TransferSubscriptionsResponse, error) {
 	req := &ua.TransferSubscriptionsRequest{
-		SubscriptionIDs:   subIDs,
+		SubscriptionIDs:   ids,
 		SendInitialValues: false,
 	}
 
@@ -992,9 +993,9 @@ func (c *Client) registerSubscription(sub *Subscription) error {
 	return nil
 }
 
-func (c *Client) forgetSubscription(subID uint32) {
+func (c *Client) forgetSubscription(id uint32) {
 	c.subMux.Lock()
-	delete(c.subscriptions, subID)
+	delete(c.subscriptions, id)
 	c.subMux.Unlock()
 }
 
