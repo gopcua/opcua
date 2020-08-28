@@ -241,7 +241,7 @@ func (c *Client) dispatcher(ctx context.Context) {
 
 			// Stop all subscriptions
 			for _, sub := range c.subs {
-				sub.stop()
+				sub.pause(ctx)
 			}
 
 			for rState != None && c.State() != Closed {
@@ -382,7 +382,7 @@ func (c *Client) dispatcher(ctx context.Context) {
 
 			// Resume all subs
 			for _, sub := range c.subs {
-				sub.resume()
+				sub.resume(ctx)
 			}
 		}
 	}
@@ -955,7 +955,9 @@ func (c *Client) Subscribe(params *SubscriptionParameters, notifyCh chan *Publis
 		RevisedMaxKeepAliveCount:  res.RevisedMaxKeepAliveCount,
 		Notifs:                    notifyCh,
 		params:                    params,
-		resumeC:                   make(chan struct{}, 1),
+		pausech:                   make(chan struct{}), // must be unbuffered
+		resumech:                  make(chan struct{}), // must be unbuffered
+		stopch:                    make(chan struct{}), // must be unbuffered
 		c:                         c,
 	}
 
