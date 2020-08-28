@@ -360,7 +360,7 @@ func (c *Client) dispatcher(ctx context.Context) {
 							}
 						}
 						if len(subsToRecreate) > 0 {
-							if err = c.recreateSubscriptionsAndMonitoredItems(subsToRecreate); err != nil {
+							if err = c.restoreSubscriptions(subsToRecreate); err != nil {
 								debug.Printf("Recreate subscriptions failed")
 								rState = RecreateSession
 								continue
@@ -426,23 +426,23 @@ func (c *Client) SubscriptionIDs() []uint32 {
 	return subscriptionIDs
 }
 
-// recreateSubscriptionsAndMonitoredItems create a new subscription
-// with the same parameters to replace the previous one
-func (c *Client) recreateSubscriptionsAndMonitoredItems(subIDs []uint32) error {
+// restoreSubscriptions creates new subscriptions
+// with the same parameters to replace the previous ones
+func (c *Client) restoreSubscriptions(subIDs []uint32) error {
 	for _, subID := range subIDs {
 		if _, exist := c.subscriptions[subID]; !exist {
-			debug.Printf("Cannot recreate subscription %d", subID)
+			debug.Printf("Cannot restore subscription %d", subID)
 			continue
 		}
 
 		sub := c.subscriptions[subID]
 
-		debug.Printf("Restoring subscription id = %d", subID)
+		debug.Printf("Restoring subscription %d", subID)
 		if err := sub.restore(); err != nil {
-			debug.Printf("Restoring subscription failed")
+			debug.Printf("Restoring subscription %d failed", subID)
 			return err
 		}
-		debug.Printf("Restored subscription")
+		debug.Printf("Restored subscription %d", subID)
 	}
 
 	return nil
