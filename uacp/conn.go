@@ -23,6 +23,11 @@ const (
 	DefaultSendBufSize    = 0xffff
 	DefaultMaxChunkCount  = 512
 	DefaultMaxMessageSize = 2 * MB
+
+	ERRF = "ERRF"
+	ACKF = "ACKF"
+	HELF = "HELF"
+	RHEF = "RHEF"
 )
 
 // connid stores the current connection id. updated with atomic.AddUint32
@@ -177,7 +182,7 @@ func (c *Conn) handshake(endpoint string) error {
 		EndpointURL:    endpoint,
 	}
 
-	if err := c.Send("HELF", hel); err != nil {
+	if err := c.Send(HELF, hel); err != nil {
 		return err
 	}
 
@@ -188,7 +193,7 @@ func (c *Conn) handshake(endpoint string) error {
 
 	msgtyp := string(b[:4])
 	switch msgtyp {
-	case "ACKF":
+	case ACKF:
 		ack := new(Acknowledge)
 		if _, err := ack.Decode(b[hdrlen:]); err != nil {
 			return errors.Errorf("uacp: decode ACK failed: %s", err)
@@ -208,7 +213,7 @@ func (c *Conn) handshake(endpoint string) error {
 		debug.Printf("conn %d: recv %#v", c.id, ack)
 		return nil
 
-	case "ERRF":
+	case ERRF:
 		errf := new(Error)
 		if _, err := errf.Decode(b[hdrlen:]); err != nil {
 			return errors.Errorf("uacp: decode ERR failed: %s", err)
@@ -233,7 +238,7 @@ func (c *Conn) srvhandshake(endpoint string) error {
 	msgtyp := string(b[:4])
 	msg := b[hdrlen:]
 	switch msgtyp {
-	case "HELF":
+	case HELF:
 		hel := new(Hello)
 		if _, err := hel.Decode(msg); err != nil {
 			c.SendError(ua.StatusBadTCPInternalError)
@@ -243,14 +248,14 @@ func (c *Conn) srvhandshake(endpoint string) error {
 			c.SendError(ua.StatusBadTCPEndpointURLInvalid)
 			return errors.Errorf("uacp: invalid endpoint url %s", hel.EndpointURL)
 		}
-		if err := c.Send("ACKF", c.ack); err != nil {
+		if err := c.Send(ACKF, c.ack); err != nil {
 			c.SendError(ua.StatusBadTCPInternalError)
 			return err
 		}
 		debug.Printf("conn %d: recv %#v", c.id, hel)
 		return nil
 
-	case "RHEF":
+	case RHEF:
 		rhe := new(ReverseHello)
 		if _, err := rhe.Decode(msg); err != nil {
 			c.SendError(ua.StatusBadTCPInternalError)
@@ -271,7 +276,7 @@ func (c *Conn) srvhandshake(endpoint string) error {
 		debug.Printf("conn %d: recv %#v", c.id, rhe)
 		return nil
 
-	case "ERRF":
+	case ERRF:
 		errf := new(Error)
 		if _, err := errf.Decode(b[hdrlen:]); err != nil {
 			return errors.Errorf("uacp: decode ERR failed: %s", err)
@@ -319,7 +324,7 @@ func (c *Conn) Receive() ([]byte, error) {
 
 	debug.Printf("conn %d: recv %s%c with %d bytes", c.id, h.MessageType, h.ChunkType, h.MessageSize)
 
-	if h.MessageType == "ERR" {
+	if h.MessageType == ERRF {
 		errf := new(Error)
 		if _, err := errf.Decode(b[hdrlen:h.MessageSize]); err != nil {
 			return nil, errors.Errorf("uacp: failed to decode ERRF message: %s", err)
@@ -367,5 +372,5 @@ func (c *Conn) SendError(code ua.StatusCode) {
 	// we swallow the error to silence complaints from the linter
 	// since sending an error will close the connection and we
 	// want to bubble a different error up.
-	_ = c.Send("ERRF", &Error{ErrorCode: uint32(code)})
+	_ = c.Send(ERRF, &Error{ErrorCode: uint32(code)})
 }
