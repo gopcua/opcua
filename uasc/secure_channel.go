@@ -482,17 +482,30 @@ func (s *SecureChannel) open(ctx context.Context, instance *channelInstance, req
 
 	ch := make(chan error, 1)
 	err = s.sendAsyncWithTimeout(req, reqID, s.openingInstance, nil, true, s.cfg.RequestTimeout, func(r *response) {
+		var err error
+		defer func() {
+			select {
+			case ch <- err:
+			default:
+				// this should never happen since the chan is of size one
+				debug.Printf("unexpected state. channel write should always succeed.")
+			}
+		}()
+
 		if r.Err != nil {
-			ch <- r.Err
+			err = r.Err
 			return
 		}
 		resp, ok := r.V.(*ua.OpenSecureChannelResponse)
 		if !ok {
-			ch <- errors.Errorf("got %T, want OpenSecureChannelResponse", r.V)
+			err = errors.Errorf("got %T, want OpenSecureChannelResponse", r.V)
 			return
 		}
-		ch <- s.handleOpenSecureChannelResponse(resp, localNonce, s.openingInstance)
+		err = s.handleOpenSecureChannelResponse(resp, localNonce, s.openingInstance)
 	})
+	if err != nil {
+		return err
+	}
 
 	// `+ timeoutLeniency` to give the server a chance to respond to TimeoutHint
 	timer := time.NewTimer(s.cfg.RequestTimeout + timeoutLeniency)
