@@ -46,7 +46,7 @@ func SelectEndpoint(endpoints []*ua.EndpointDescription, policy string, mode ua.
 		return nil
 	}
 
-	sort.Sort(bySecurityLevel(endpoints))
+	sort.Sort(sort.Reverse(bySecurityLevel(endpoints)))
 	policy = ua.FormatSecurityPolicyURI(policy)
 
 	// don't care -> return highest security level
