@@ -111,7 +111,7 @@ func TestAutoReconnection(t *testing.T) {
 					case <-ctx.Done():
 						return
 					default:
-						if c.State() != opcua.Open {
+						if c.State() != opcua.Connected {
 							downC <- struct{}{}
 							return
 						}
