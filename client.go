@@ -375,7 +375,7 @@ func (c *Client) monitor(ctx context.Context) {
 						// }
 
 						var subsToRestore []uint32
-						for _, id := range c.SubscriptionIDs() {
+						for _, id := range c.subscriptionIDs() {
 							if err := c.republishSubscription(id); err != nil {
 								debug.Printf("Republish of subscription %d failed", id)
 								subsToRestore = append(subsToRestore, id)
@@ -398,7 +398,7 @@ func (c *Client) monitor(ctx context.Context) {
 						// and try to republish the subscriptions.
 						// Restore the subscriptions where republishing fails.
 
-						subIDs := c.SubscriptionIDs()
+						subIDs := c.subscriptionIDs()
 						subsToRepublish := []uint32{}
 						subsToRestore := []uint32{}
 
@@ -506,8 +506,8 @@ func (c *Client) Dial(ctx context.Context) error {
 	return c.sechan.Open(ctx)
 }
 
-// SubscriptionIDs gets a list of subscriptionIDs
-func (c *Client) SubscriptionIDs() []uint32 {
+// subscriptionIDs gets a list of subscriptionIDs
+func (c *Client) subscriptionIDs() []uint32 {
 	c.subMux.Lock()
 	defer c.subMux.Unlock()
 
