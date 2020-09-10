@@ -623,11 +623,15 @@ func (c *Client) republishSubscription(id uint32) error {
 // until it gets a BadMessageNotAvailable which implies that there are no
 // more messages to restore.
 func (c *Client) sendRepublishRequests(sub *Subscription) error {
+	seq := atomic.LoadUint32(&sub.lastSequenceNumber)
+	defer atomic.StoreUint32(&sub.lastSequenceNumber, seq)
+
 	for {
 		req := &ua.RepublishRequest{
 			SubscriptionID:           sub.SubscriptionID,
-			RetransmitSequenceNumber: atomic.LoadUint32(&sub.lastSequenceNumber) + 1,
+			RetransmitSequenceNumber: seq + 1,
 		}
+		seq++
 
 		debug.Printf("Republishing subscription %d and sequence number %d",
 			req.SubscriptionID,
