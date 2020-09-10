@@ -113,8 +113,9 @@ type Client struct {
 	conn *uacp.Conn
 
 	// sechan is the open secure channel.
-	sechan    *uasc.SecureChannel
-	sechanErr chan error
+	sechan *uasc.SecureChannel
+	// reconnch is reconnection action to perform channel.
+	reconnch chan reconnectAction
 
 	// session is the active session.
 	session atomic.Value // *Session
@@ -150,7 +151,7 @@ func NewClient(endpoint string, opts ...Option) *Client {
 		endpointURL: endpoint,
 		cfg:         cfg,
 		sessionCfg:  sessionCfg,
-		sechanErr:   make(chan error, 1),
+		reconnch:    make(chan reconnectAction, 1),
 		subs:        make(map[uint32]*Subscription),
 	}
 	c.state.Store(Disconnected)
@@ -209,68 +210,98 @@ func (c *Client) Connect(ctx context.Context) (err error) {
 	return nil
 }
 
+func (c *Client) handleError(err error) error {
+
+	// if client reconnecting or disconnected forwards the errors
+	// as the dispatcher is already trying to restore the connection
+	switch c.State() {
+	case Disconnected:
+		fallthrough
+	case Connecting:
+		fallthrough
+	case Reconnecting:
+		debug.Printf("reconnecting... forwarding error: %v", err)
+		return err
+	case Closed:
+		debug.Printf("client closed, closing secure channel")
+		return io.EOF
+	}
+
+	// if client connected send a reconnection action to the dispatcher
+	// depending on what caused the connection to fail the action to resolve it
+	// may change
+	action := none
+	defer func() {
+		select {
+		case c.reconnch <- action:
+		default:
+			debug.Printf("unexpected state. channel write should always succeed.")
+		}
+	}()
+
+	// tell the handler the connection is disconnected
+	c.state.Store(Disconnected)
+
+	if !c.cfg.AutoReconnect {
+		// the connection is closed and should not be restored
+		action = abortReconnect
+		return io.EOF
+	}
+
+	switch err {
+	case io.EOF:
+		// the connection has been closed
+		action = createSecureChannel
+
+	case syscall.ECONNREFUSED:
+		// the connection has been refused by the server
+		action = abortReconnect
+
+	default:
+		switch x := err.(type) {
+		case *uacp.Error:
+			switch ua.StatusCode(x.ErrorCode) {
+			case ua.StatusBadSecureChannelIDInvalid:
+				// the secure channel has been rejected by the server
+				action = createSecureChannel
+
+			case ua.StatusBadSessionIDInvalid:
+				// the session has been rejected by the server
+				action = recreateSession
+
+			case ua.StatusBadSubscriptionIDInvalid:
+				// the subscription has been rejected by the server
+				action = restoreSubscriptions
+
+			case ua.StatusBadCertificateInvalid:
+				// todo(unknownet): recreate server certificate
+				fallthrough
+
+			default:
+				// unknown error has occured
+				action = createSecureChannel
+			}
+
+		default:
+			// unknown error has occured
+			action = createSecureChannel
+		}
+	}
+	return err
+}
+
 // monitor manages connection alteration
 func (c *Client) monitor(ctx context.Context) {
 	defer c.state.Store(Closed)
 
-	action := none
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case err, ok := <-c.sechanErr:
-			// return if channel or connection is closed
-			if !ok || err == io.EOF && c.State() == Closed {
+		case action, ok := <-c.reconnch:
+
+			if !ok {
 				return
-			}
-
-			// tell the handler the connection is disconnected
-			c.state.Store(Disconnected)
-
-			if !c.cfg.AutoReconnect {
-				// the connection is closed and should not be restored
-				action = abortReconnect
-				return
-			}
-
-			switch err {
-			case io.EOF:
-				// the connection has been closed
-				action = createSecureChannel
-
-			case syscall.ECONNREFUSED:
-				// the connection has been refused by the server
-				action = abortReconnect
-
-			default:
-				switch x := err.(type) {
-				case *uacp.Error:
-					switch ua.StatusCode(x.ErrorCode) {
-					case ua.StatusBadSecureChannelIDInvalid:
-						// the secure channel has been rejected by the server
-						action = createSecureChannel
-
-					case ua.StatusBadSessionIDInvalid:
-						// the session has been rejected by the server
-						action = recreateSession
-
-					case ua.StatusBadSubscriptionIDInvalid:
-						// the subscription has been rejected by the server
-						action = restoreSubscriptions
-
-					case ua.StatusBadCertificateInvalid:
-						// todo(unknownet): recreate server certificate
-						fallthrough
-
-					default:
-						// unknown error has occured
-						action = createSecureChannel
-					}
-
-				default:
-					// unknown error has occured
-					action = createSecureChannel
-				}
 			}
 
 			c.state.Store(Disconnected)
@@ -459,11 +490,6 @@ func (c *Client) monitor(ctx context.Context) {
 					}
 				}
 			}
-
-			// clear sechan errors from reconnection
-			for len(c.sechanErr) > 0 {
-				<-c.sechanErr
-			}
 		}
 	}
 }
@@ -488,7 +514,7 @@ func (c *Client) Dial(ctx context.Context) error {
 		return err
 	}
 
-	c.sechan, err = uasc.NewSecureChannel(c.endpointURL, c.conn, c.cfg, c.sechanErr)
+	c.sechan, err = uasc.NewSecureChannel(c.endpointURL, c.conn, c.cfg, c.handleError)
 	if err != nil {
 		_ = c.conn.Close()
 		return err
@@ -670,7 +696,7 @@ func (c *Client) Close() error {
 	// so that we close the underlying channel and connection.
 	_ = c.CloseSession()
 	c.state.Store(Closed)
-	defer close(c.sechanErr)
+	defer close(c.reconnch)
 	if c.sechan != nil {
 		_ = c.sechan.Close()
 	}

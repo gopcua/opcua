@@ -119,11 +119,12 @@ type SecureChannel struct {
 	openingInstance *channelInstance
 	openingMu       sync.Mutex
 
-	// errorCh receive dispatcher errors
-	errCh chan<- error
+	// errorHandler receive dispatcher errors and decides whether or not to override them,
+	// if the return value is EOF it ends the dispatcher
+	errorHandler func(error) error
 }
 
-func NewSecureChannel(endpoint string, c *uacp.Conn, cfg *Config, errCh chan<- error) (*SecureChannel, error) {
+func NewSecureChannel(endpoint string, c *uacp.Conn, cfg *Config, h func(error) error) (*SecureChannel, error) {
 	if c == nil {
 		return nil, errors.Errorf("no connection")
 	}
@@ -148,13 +149,13 @@ func NewSecureChannel(endpoint string, c *uacp.Conn, cfg *Config, errCh chan<- e
 	}
 
 	s := &SecureChannel{
-		endpointURL: endpoint,
-		c:           c,
-		cfg:         cfg,
-		requestID:   cfg.RequestIDSeed,
-		reqLocker:   newConditionLocker(),
-		rcvLocker:   newConditionLocker(),
-		errCh:       errCh,
+		endpointURL:  endpoint,
+		c:            c,
+		cfg:          cfg,
+		requestID:    cfg.RequestIDSeed,
+		reqLocker:    newConditionLocker(),
+		rcvLocker:    newConditionLocker(),
+		errorHandler: h,
 	}
 	s.reset()
 
@@ -192,9 +193,7 @@ func (s *SecureChannel) dispatcher() {
 	s.closingMu.RLock()
 	defer s.closingMu.RUnlock()
 
-	defer func() {
-		close(s.disconnected)
-	}()
+	defer close(s.disconnected)
 
 	for {
 		select {
@@ -204,10 +203,7 @@ func (s *SecureChannel) dispatcher() {
 			resp := s.receive(ctx)
 
 			if resp.Err != nil {
-				select {
-				case s.errCh <- resp.Err:
-				default:
-				}
+				resp.Err = s.fireErrorHandler(resp.Err)
 			}
 
 			if resp.Err == io.EOF {
@@ -723,6 +719,14 @@ func (s *SecureChannel) sendRequestWithTimeout(
 		s.popHandler(reqID)
 		return ua.StatusBadTimeout
 	}
+}
+
+// fireErrorHandler delegate error handling
+func (s *SecureChannel) fireErrorHandler(err error) error {
+	if s.errorHandler != nil {
+		return s.errorHandler(err)
+	}
+	return err
 }
 
 func (s *SecureChannel) popHandler(reqID uint32) (chan *response, bool) {
