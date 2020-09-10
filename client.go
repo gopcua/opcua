@@ -321,6 +321,12 @@ func (c *Client) monitor(ctx context.Context) {
 						// This only works if the session is still open on the server
 						// otherwise recreate it
 
+						if s := c.Session(); s == nil {
+							// no session to restore
+							action = recreateSession
+							continue
+						}
+
 						debug.Printf("Trying to restore session")
 						s, err := c.DetachSession()
 						if err != nil {
