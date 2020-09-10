@@ -324,11 +324,7 @@ func (c *Client) monitor(ctx context.Context) {
 						}
 
 						debug.Printf("Trying to restore session")
-						s, err := c.DetachSession()
-						if err != nil {
-							action = createSecureChannel
-							continue
-						}
+						s, _ := c.DetachSession()
 						if err := c.ActivateSession(s); err != nil {
 							debug.Printf("Restore session failed")
 							action = recreateSession
