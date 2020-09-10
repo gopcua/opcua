@@ -153,7 +153,7 @@ func NewClient(endpoint string, opts ...Option) *Client {
 		sechanErr:   make(chan error, 1),
 		subs:        make(map[uint32]*Subscription),
 	}
-	c.state.Store(Closed)
+	c.state.Store(Disconnected)
 	return &c
 }
 
