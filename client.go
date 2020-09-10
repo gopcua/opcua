@@ -274,11 +274,7 @@ func (c *Client) monitor(ctx context.Context) {
 			}
 
 			c.state.Store(Disconnected)
-
-			// pause all subscriptions
-			for _, sub := range c.subs {
-				sub.pause(ctx)
-			}
+			c.pauseSubscriptions(ctx)
 
 			for action != none {
 
@@ -382,8 +378,10 @@ func (c *Client) monitor(ctx context.Context) {
 							}
 						}
 
+						c.resumeSubscriptions(ctx)
 						if len(subsToRestore) > 0 {
 							if err := c.restoreSubscriptions(subsToRestore); err != nil {
+								c.pauseSubscriptions(ctx)
 								debug.Printf("Restore subscripitions failed: %v", err)
 								action = recreateSession
 								continue
@@ -442,8 +440,10 @@ func (c *Client) monitor(ctx context.Context) {
 							}
 						}
 
+						c.resumeSubscriptions(ctx)
 						if len(subsToRestore) > 0 {
 							if err := c.restoreSubscriptions(subsToRestore); err != nil {
+								c.pauseSubscriptions(ctx)
 								debug.Printf("Restore subscripitions failed: %v", err)
 								action = recreateSession
 								continue
@@ -467,11 +467,6 @@ func (c *Client) monitor(ctx context.Context) {
 			// clear sechan errors from reconnection
 			for len(c.sechanErr) > 0 {
 				<-c.sechanErr
-			}
-
-			// resume all subscriptions
-			for _, sub := range c.subs {
-				sub.resume(ctx)
 			}
 		}
 	}
@@ -506,10 +501,30 @@ func (c *Client) Dial(ctx context.Context) error {
 	return c.sechan.Open(ctx)
 }
 
+// pauseSubscriptions pause all subscriptions
+func (c *Client) pauseSubscriptions(ctx context.Context) {
+	c.subMux.RLock()
+	defer c.subMux.RUnlock()
+
+	for _, sub := range c.subs {
+		sub.pause(ctx)
+	}
+}
+
+// pauseSubscriptions resume all subscriptions
+func (c *Client) resumeSubscriptions(ctx context.Context) {
+	c.subMux.RLock()
+	defer c.subMux.RUnlock()
+
+	for _, sub := range c.subs {
+		sub.resume(ctx)
+	}
+}
+
 // subscriptionIDs gets a list of subscriptionIDs
 func (c *Client) subscriptionIDs() []uint32 {
-	c.subMux.Lock()
-	defer c.subMux.Unlock()
+	c.subMux.RLock()
+	defer c.subMux.RUnlock()
 
 	var ids []uint32
 	for id := range c.subs {
