@@ -163,8 +163,8 @@ type reconnectAction uint8
 const (
 	// none, no reconnection action
 	none reconnectAction = iota
-	// recreateSecureChannel, recreate secure channel action
-	recreateSecureChannel
+	// createSecureChannel, recreate secure channel action
+	createSecureChannel
 	// restoreSession, ask the server to repair session
 	restoreSession
 	// recreateSession, ask the client to repair session
@@ -236,7 +236,7 @@ func (c *Client) monitor(ctx context.Context) {
 			switch err {
 			case io.EOF:
 				// the connection has been closed
-				action = recreateSecureChannel
+				action = createSecureChannel
 
 			case syscall.ECONNREFUSED:
 				// the connection has been refused by the server
@@ -248,7 +248,7 @@ func (c *Client) monitor(ctx context.Context) {
 					switch ua.StatusCode(x.ErrorCode) {
 					case ua.StatusBadSecureChannelIDInvalid:
 						// the secure channel has been rejected by the server
-						action = recreateSecureChannel
+						action = createSecureChannel
 
 					case ua.StatusBadSessionIDInvalid:
 						// the session has been rejected by the server
@@ -264,12 +264,12 @@ func (c *Client) monitor(ctx context.Context) {
 
 					default:
 						// unknown error has occured
-						action = recreateSecureChannel
+						action = createSecureChannel
 					}
 
 				default:
 					// unknown error has occured
-					action = recreateSecureChannel
+					action = createSecureChannel
 				}
 			}
 
@@ -289,7 +289,7 @@ func (c *Client) monitor(ctx context.Context) {
 				default:
 
 					switch action {
-					case recreateSecureChannel:
+					case createSecureChannel:
 						// recreate a secure channel by brute forcing
 						// a reconnection to the server
 
@@ -324,7 +324,7 @@ func (c *Client) monitor(ctx context.Context) {
 						debug.Printf("Trying to restore session")
 						s, err := c.DetachSession()
 						if err != nil {
-							action = recreateSecureChannel
+							action = createSecureChannel
 							continue
 						}
 						if err := c.ActivateSession(s); err != nil {
@@ -342,12 +342,12 @@ func (c *Client) monitor(ctx context.Context) {
 						s, err := c.CreateSession(c.sessionCfg)
 						if err != nil {
 							debug.Printf("Recreate session failed: %v", err)
-							action = recreateSecureChannel
+							action = createSecureChannel
 							continue
 						}
 						if err := c.ActivateSession(s); err != nil {
 							debug.Printf("Reactivate session failed: %v", err)
-							action = recreateSecureChannel
+							action = createSecureChannel
 							continue
 						}
 						action = recreateSubscription
@@ -359,7 +359,7 @@ func (c *Client) monitor(ctx context.Context) {
 
 						if err := c.repairSubscriptions(c.SubscriptionIDs()); err != nil {
 							debug.Printf("Restore subscription failed: %v", err)
-							action = recreateSecureChannel
+							action = createSecureChannel
 							continue
 						}
 						c.state.Store(Connected)
