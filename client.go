@@ -186,6 +186,7 @@ func (c *Client) Connect(ctx context.Context) (err error) {
 	if c.sechan != nil {
 		return errors.Errorf("already connected")
 	}
+
 	c.state.Store(Connecting)
 	if err := c.Dial(ctx); err != nil {
 		return err
@@ -200,17 +201,18 @@ func (c *Client) Connect(ctx context.Context) (err error) {
 		_ = c.Close()
 		return err
 	}
+
 	if err := c.ActivateSession(s); err != nil {
 		_ = c.Close()
 		return err
 	}
+
 	c.state.Store(Connected)
 	return nil
 }
 
 // dispatcher manages connection alteration
 func (c *Client) dispatcher(ctx context.Context) {
-
 	defer c.state.Store(Closed)
 
 	reconn := none
@@ -219,8 +221,8 @@ func (c *Client) dispatcher(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case err, ok := <-c.sechanErr:
-			if !ok ||
-				(err == io.EOF && c.State() == Closed) {
+			// return if channel or connection is closed
+			if !ok || err == io.EOF && c.State() == Closed {
 				return
 			}
 
@@ -234,15 +236,15 @@ func (c *Client) dispatcher(ctx context.Context) {
 			}
 
 			if err == io.EOF {
-				// the connection has brutally ended
-				// ask for total reconnection from secure channel
+				// the connection has been closed
+				// try to recreate the secure channel
 				reconn = recreateSecureChannel
 			}
 
 			switch err {
 			case syscall.ECONNREFUSED:
 				// the connection has been refused by the server
-				// the reconnection isn't possible
+				// reconnection not possible
 				reconn = nonRecoverable
 			}
 
@@ -250,30 +252,34 @@ func (c *Client) dispatcher(ctx context.Context) {
 				status := ua.StatusCode(connErr.ErrorCode)
 				switch status {
 				case ua.StatusBadSecureChannelIDInvalid:
-					// the Secure channel has been rejected by the server
-					// ask for recreating secure channel
+					// the secure channel has been rejected by the server
+					// try to recreate the secure channel
 					reconn = recreateSecureChannel
+
 				case ua.StatusBadSessionIDInvalid:
 					// the session has been rejected by the server
-					// ask for recreating the session
+					// try to recreate the session
 					reconn = recreateSession
+
 				case ua.StatusBadSubscriptionIDInvalid:
 					// the subscription has been rejected by the server
-					// ask for recreate subscription
+					// try to recreate the subscription
 					reconn = recreateSubscription
+
 				case ua.StatusBadCertificateInvalid:
-					// todo (unknownet): recreate server certificate
+					// todo(unknownet): recreate server certificate
 					fallthrough
+
 				default:
 					// unknown error has occured
-					// ask for total reconnection from secure channel
+					// try to recreate the secure channel
 					reconn = recreateSecureChannel
 				}
 			}
 
 			c.state.Store(Disconnected)
 
-			// Stop all subscriptions
+			// pause all subscriptions
 			for _, sub := range c.subs {
 				sub.pause(ctx)
 			}
@@ -316,7 +322,7 @@ func (c *Client) dispatcher(ctx context.Context) {
 
 					case restoreSession:
 						// try to reactivate the session,
-						// it only works if the session is still opened on the server
+						// This only works if the session is still open on the server
 						// otherwise recreate it
 
 						debug.Printf("Trying to restore session")
@@ -325,7 +331,6 @@ func (c *Client) dispatcher(ctx context.Context) {
 							reconn = recreateSecureChannel
 							continue
 						}
-
 						if err := c.ActivateSession(s); err != nil {
 							debug.Printf("Restore session failed")
 							reconn = recreateSession
@@ -353,7 +358,7 @@ func (c *Client) dispatcher(ctx context.Context) {
 
 					// todo(fs): shouldn't this be state RepairSubscription?
 					case restoreSubscription:
-						// try to repair the previous subscriptions on the server side
+						// try to repair the previous subscriptions on the server
 						// otherwise restore it
 
 						if err := c.repairSubscriptions(c.SubscriptionIDs()); err != nil {
@@ -415,19 +420,19 @@ func (c *Client) dispatcher(ctx context.Context) {
 						// non recoverable disconnection
 						// stop the client
 
-						// NOTE: should We store the error
+						// todo(unknownet): should we store the error?
 						debug.Printf("Reconnection not recoverable")
 						return
 					}
 				}
 			}
 
-			// empty sechan error from reconnection
+			// clear sechan errors from reconnection
 			for len(c.sechanErr) > 0 {
 				<-c.sechanErr
 			}
 
-			// Resume all subs
+			// resume all subscriptions
 			for _, sub := range c.subs {
 				sub.resume(ctx)
 			}
