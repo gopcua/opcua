@@ -173,8 +173,8 @@ const (
 	restoreSubscription
 	// recreateSubscription, ask the client to repair this previous subscription
 	recreateSubscription
-	// nonRecoverable, the reconnecting is not possible
-	nonRecoverable
+	// abortReconnect, the reconnecting is not possible
+	abortReconnect
 )
 
 // Connect establishes a secure channel and creates a new session.
@@ -229,7 +229,7 @@ func (c *Client) monitor(ctx context.Context) {
 
 			if !c.cfg.AutoReconnect {
 				// the connection has ended and should not by recovered
-				action = nonRecoverable
+				action = abortReconnect
 				return
 			}
 
@@ -242,7 +242,7 @@ func (c *Client) monitor(ctx context.Context) {
 			case syscall.ECONNREFUSED:
 				// the connection has been refused by the server
 				// reconnection not possible
-				action = nonRecoverable
+				action = abortReconnect
 			}
 
 			if connErr, ok := err.(*uacp.Error); ok {
@@ -413,7 +413,7 @@ func (c *Client) monitor(ctx context.Context) {
 						c.state.Store(Connected)
 						action = none
 
-					case nonRecoverable:
+					case abortReconnect:
 						// non recoverable disconnection
 						// stop the client
 
