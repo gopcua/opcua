@@ -129,8 +129,8 @@ type Client struct {
 	// monitorOnce ensures only one connection monitor is running
 	monitorOnce sync.Once
 
-	// once initializes session
-	once sync.Once
+	// sessionOnce initializes the session
+	sessionOnce sync.Once
 }
 
 // NewClient creates a new Client.
@@ -446,7 +446,10 @@ func (c *Client) Dial(ctx context.Context) error {
 		ctx = context.Background()
 	}
 
-	c.once.Do(func() { c.session.Store((*Session)(nil)) })
+	c.sessionOnce.Do(func() {
+		c.session.Store((*Session)(nil))
+	})
+
 	if c.sechan != nil {
 		return errors.Errorf("secure channel already connected")
 	}
