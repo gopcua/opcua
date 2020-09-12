@@ -169,10 +169,10 @@ const (
 	restoreSession
 	// recreateSession, ask the client to repair session
 	recreateSession
-	// restoreSubscription, ask the server to repair the previous subscription
-	restoreSubscription
-	// recreateSubscription, ask the client to repair this previous subscription
-	recreateSubscription
+	// republishSubscriptions, ask the server to repair the previous subscription
+	republishSubscriptions
+	// restoreSubscriptions moves subscriptions from one session to another
+	restoreSubscriptions
 	// abortReconnect, the reconnecting is not possible
 	abortReconnect
 )
@@ -256,7 +256,7 @@ func (c *Client) monitor(ctx context.Context) {
 
 					case ua.StatusBadSubscriptionIDInvalid:
 						// the subscription has been rejected by the server
-						action = recreateSubscription
+						action = restoreSubscriptions
 
 					case ua.StatusBadCertificateInvalid:
 						// todo(unknownet): recreate server certificate
@@ -333,7 +333,7 @@ func (c *Client) monitor(ctx context.Context) {
 							continue
 						}
 						debug.Printf("Session restored")
-						action = restoreSubscription
+						action = republishSubscriptions
 
 					case recreateSession:
 						// create a new session to replace the previous one
@@ -350,27 +350,50 @@ func (c *Client) monitor(ctx context.Context) {
 							action = createSecureChannel
 							continue
 						}
-						action = recreateSubscription
+						action = restoreSubscriptions
 
-					// todo(fs): shouldn't this be state RepairSubscription?
-					case restoreSubscription:
-						// try to repair the previous subscriptions on the server
-						// otherwise restore it
+					case republishSubscriptions:
+						// try to republish the previous subscriptions from the server
+						// otherwise restore them
 
-						if err := c.repairSubscriptions(c.SubscriptionIDs()); err != nil {
-							debug.Printf("Restore subscription failed: %v", err)
-							action = createSecureChannel
-							continue
+						// todo(fs): do we need this state at all?
+						// todo(fs): isn't this path the same as restoreSubscriptions minus the transfer?
+						// todo(fs): and if the transfer is a NoOp if the subscription is already on the
+						// todo(fs): session then we can omit that or move it to a function which
+						// todo(fs): handles the transfer or not.
+						//
+						// if err := c.republishSubscriptions(c.SubscriptionIDs()); err != nil {
+						// 	debug.Printf("Republish subscription failed: %v", err)
+						// 	action = createSecureChannel
+						// 	continue
+						// }
+
+						var subsToRestore []uint32
+						for _, id := range c.SubscriptionIDs() {
+							if err := c.republishSubscription(id); err != nil {
+								debug.Printf("Republish of subscription %d failed", id)
+								subsToRestore = append(subsToRestore, id)
+							}
 						}
+
+						if len(subsToRestore) > 0 {
+							if err := c.restoreSubscriptions(subsToRestore); err != nil {
+								debug.Printf("Restore subscripitions failed: %v", err)
+								action = recreateSession
+								continue
+							}
+						}
+
 						c.state.Store(Connected)
 						action = none
 
-					// todo(fs): shouldn't this be state RestoreSubscription?
-					case recreateSubscription:
-						// create new subscriptions to replace the previous ones
+					case restoreSubscriptions:
+						// transfer subscriptions from the old to the new session
+						// and try to republish the subscriptions.
+						// Restore the subscriptions where republishing fails.
 
 						subIDs := c.SubscriptionIDs()
-						subsToRepair := []uint32{}
+						subsToRepublish := []uint32{}
 						subsToRestore := []uint32{}
 
 						res, err := c.transferSubscriptions(subIDs)
@@ -389,15 +412,27 @@ func (c *Client) monitor(ctx context.Context) {
 										subIDs[i],
 										transferResult.AvailableSequenceNumbers[i],
 									)
-									subsToRepair = append(subsToRepair, subIDs[i])
+									subsToRepublish = append(subsToRepublish, subIDs[i])
 								}
 							}
 						}
 
-						if len(subsToRepair) > 0 {
-							if err := c.repairSubscriptions(subsToRepair); err != nil {
-								debug.Printf("Repair subscriptions failed: %v", err)
-								subsToRestore = append(subsToRestore, subsToRepair...)
+						// todo(fs): this looks wrong since we may be able to republish
+						// todo(fs): some of the subscriptions but not all of them.
+						// todo(fs): shouldn't we only restore the ones that failed to republish?
+						// todo(fs): an alternative implementation is below
+						//
+						// if len(subsToRepublish) > 0 {
+						// 	if err := c.republishSubscriptions(subsToRepublish); err != nil {
+						// 		debug.Printf("Republish subscriptions failed: %v", err)
+						// 		subsToRestore = append(subsToRestore, subsToRepublish...)
+						// 	}
+						// }
+
+						for _, id := range subsToRepublish {
+							if err := c.republishSubscription(id); err != nil {
+								debug.Printf("Republish of subscription %d failed", id)
+								subsToRestore = append(subsToRestore, id)
 							}
 						}
 
@@ -509,35 +544,43 @@ func (c *Client) transferSubscriptions(ids []uint32) (*ua.TransferSubscriptionsR
 
 	var res *ua.TransferSubscriptionsResponse
 	err := c.Send(req, func(v interface{}) error {
-		if err := safeAssign(v, &res); err != nil {
-			return err
-		}
-		return nil
+		return safeAssign(v, &res)
 	})
 	return res, err
 }
 
-// repairSubscriptions repairs all the subscriptions of subscriptionIDs given,
-func (c *Client) repairSubscriptions(ids []uint32) error {
+// republishSubscriptions sends republish requests for all given subscription ids.
+// func (c *Client) republishSubscriptions(ids []uint32) error {
+// 	c.subMux.RLock()
+// 	defer c.subMux.RUnlock()
+
+// 	for _, id := range ids {
+// 		sub, ok := c.subs[id]
+// 		if !ok {
+// 			return errors.Errorf("invalid subscription id %d", id)
+// 		}
+// 		if err := c.republishSubscription(sub); err != nil {
+// 			return err
+// 		}
+// 	}
+
+// 	return nil
+// }
+
+// republishSubscriptions sends republish requests for the given subscription id.
+func (c *Client) republishSubscription(id uint32) error {
+
+	// todo(fs): do we need to hold the lock for the entire time or only the map lookup?
 	c.subMux.RLock()
 	defer c.subMux.RUnlock()
 
-	for _, id := range ids {
-		sub, ok := c.subs[id]
-		if !ok {
-			return errors.Errorf("invalid subscription id %d", id)
-		}
-		if err := c.repairSubscription(sub); err != nil {
-			return err
-		}
+	sub, ok := c.subs[id]
+	if !ok {
+		return errors.Errorf("invalid subscription id %d", id)
 	}
 
-	return nil
-}
-
-func (c *Client) repairSubscription(sub *Subscription) error {
-	debug.Printf("repairing subscription %d", sub.SubscriptionID)
-	if err := c.republishSubscription(sub); err != nil {
+	debug.Printf("republishing subscription %d", sub.SubscriptionID)
+	if err := c.sendRepublishRequests(sub); err != nil {
 		status, ok := err.(ua.StatusCode)
 		if !ok {
 			return err
@@ -547,17 +590,18 @@ func (c *Client) repairSubscription(sub *Subscription) error {
 		case ua.StatusBadSessionIDInvalid:
 			return nil
 		case ua.StatusBadSubscriptionIDInvalid:
-			debug.Printf("Republish failed since subscription %d is invalid", sub.SubscriptionID)
+			// todo(fs): do we need to forget the subscription id in this case?
+			debug.Printf("republish failed since subscription %d is invalid", sub.SubscriptionID)
 			return errors.Errorf("republish failed since subscription %d is invalid", sub.SubscriptionID)
 		}
 	}
 	return nil
 }
 
-// republishSubscription send republish request for the given subscription
-// republish should end with a StatusCode BadMessageNotAvailable
-// wich implies that there's no more message to restore
-func (c *Client) republishSubscription(sub *Subscription) error {
+// sendRepublishRequests sends republish requests for the given subscription
+// until it gets a BadMessageNotAvailable which implies that there are no
+// more messages to restore.
+func (c *Client) sendRepublishRequests(sub *Subscription) error {
 	for {
 		req := &ua.RepublishRequest{
 			SubscriptionID:           sub.SubscriptionID,
