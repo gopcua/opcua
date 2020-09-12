@@ -241,26 +241,31 @@ func (c *Client) monitor(ctx context.Context) {
 			case syscall.ECONNREFUSED:
 				// the connection has been refused by the server
 				action = abortReconnect
-			}
 
-			if connErr, ok := err.(*uacp.Error); ok {
-				status := ua.StatusCode(connErr.ErrorCode)
-				switch status {
-				case ua.StatusBadSecureChannelIDInvalid:
-					// the secure channel has been rejected by the server
-					action = recreateSecureChannel
+			default:
+				switch x := err.(type) {
+				case *uacp.Error:
+					switch ua.StatusCode(x.ErrorCode) {
+					case ua.StatusBadSecureChannelIDInvalid:
+						// the secure channel has been rejected by the server
+						action = recreateSecureChannel
 
-				case ua.StatusBadSessionIDInvalid:
-					// the session has been rejected by the server
-					action = recreateSession
+					case ua.StatusBadSessionIDInvalid:
+						// the session has been rejected by the server
+						action = recreateSession
 
-				case ua.StatusBadSubscriptionIDInvalid:
-					// the subscription has been rejected by the server
-					action = recreateSubscription
+					case ua.StatusBadSubscriptionIDInvalid:
+						// the subscription has been rejected by the server
+						action = recreateSubscription
 
-				case ua.StatusBadCertificateInvalid:
-					// todo(unknownet): recreate server certificate
-					fallthrough
+					case ua.StatusBadCertificateInvalid:
+						// todo(unknownet): recreate server certificate
+						fallthrough
+
+					default:
+						// unknown error has occured
+						action = recreateSecureChannel
+					}
 
 				default:
 					// unknown error has occured
