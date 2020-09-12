@@ -233,13 +233,12 @@ func (c *Client) monitor(ctx context.Context) {
 				return
 			}
 
-			if err == io.EOF {
+			switch err {
+			case io.EOF:
 				// the connection has been closed
 				// try to recreate the secure channel
 				action = recreateSecureChannel
-			}
 
-			switch err {
 			case syscall.ECONNREFUSED:
 				// the connection has been refused by the server
 				// reconnection not possible
