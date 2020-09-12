@@ -191,23 +191,21 @@ func (c *Client) Connect(ctx context.Context) (err error) {
 	if err := c.Dial(ctx); err != nil {
 		return err
 	}
-
-	c.monitorOnce.Do(func() {
-		go c.monitor(ctx)
-	})
-
 	s, err := c.CreateSession(c.sessionCfg)
 	if err != nil {
 		_ = c.Close()
 		return err
 	}
-
 	if err := c.ActivateSession(s); err != nil {
 		_ = c.Close()
 		return err
 	}
-
 	c.state.Store(Connected)
+
+	c.monitorOnce.Do(func() {
+		go c.monitor(ctx)
+	})
+
 	return nil
 }
 
