@@ -126,8 +126,8 @@ type Client struct {
 	// state of the client
 	state atomic.Value // ConnState
 
-	// startDispatcher ensures only one dispatcher is running
-	startDispatcher sync.Once
+	// monitorOnce ensures only one connection monitor is running
+	monitorOnce sync.Once
 
 	// once initializes session
 	once sync.Once
@@ -192,8 +192,8 @@ func (c *Client) Connect(ctx context.Context) (err error) {
 		return err
 	}
 
-	c.startDispatcher.Do(func() {
-		go c.dispatcher(ctx)
+	c.monitorOnce.Do(func() {
+		go c.monitor(ctx)
 	})
 
 	s, err := c.CreateSession(c.sessionCfg)
@@ -211,8 +211,8 @@ func (c *Client) Connect(ctx context.Context) (err error) {
 	return nil
 }
 
-// dispatcher manages connection alteration
-func (c *Client) dispatcher(ctx context.Context) {
+// monitor manages connection alteration
+func (c *Client) monitor(ctx context.Context) {
 	defer c.state.Store(Closed)
 
 	reconn := none
