@@ -157,12 +157,12 @@ func NewClient(endpoint string, opts ...Option) *Client {
 	return &c
 }
 
-// reconnectState, list of states for handling the client reconnection
-type reconnectState uint8
+// reconnectAction is a list of actions for the client reconnection logic.
+type reconnectAction uint8
 
 const (
 	// none, no reconnection action
-	none reconnectState = iota
+	none reconnectAction = iota
 	// recreateSecureChannel, recreate secure channel action
 	recreateSecureChannel
 	// restoreSession, ask the server to repair session
@@ -215,7 +215,7 @@ func (c *Client) Connect(ctx context.Context) (err error) {
 func (c *Client) monitor(ctx context.Context) {
 	defer c.state.Store(Closed)
 
-	reconn := none
+	action := none
 	for {
 		select {
 		case <-ctx.Done():
@@ -231,21 +231,21 @@ func (c *Client) monitor(ctx context.Context) {
 
 			if !c.cfg.AutoReconnect {
 				// the connection has ended and should not by recovered
-				reconn = nonRecoverable
+				action = nonRecoverable
 				return
 			}
 
 			if err == io.EOF {
 				// the connection has been closed
 				// try to recreate the secure channel
-				reconn = recreateSecureChannel
+				action = recreateSecureChannel
 			}
 
 			switch err {
 			case syscall.ECONNREFUSED:
 				// the connection has been refused by the server
 				// reconnection not possible
-				reconn = nonRecoverable
+				action = nonRecoverable
 			}
 
 			if connErr, ok := err.(*uacp.Error); ok {
@@ -254,17 +254,17 @@ func (c *Client) monitor(ctx context.Context) {
 				case ua.StatusBadSecureChannelIDInvalid:
 					// the secure channel has been rejected by the server
 					// try to recreate the secure channel
-					reconn = recreateSecureChannel
+					action = recreateSecureChannel
 
 				case ua.StatusBadSessionIDInvalid:
 					// the session has been rejected by the server
 					// try to recreate the session
-					reconn = recreateSession
+					action = recreateSession
 
 				case ua.StatusBadSubscriptionIDInvalid:
 					// the subscription has been rejected by the server
 					// try to recreate the subscription
-					reconn = recreateSubscription
+					action = recreateSubscription
 
 				case ua.StatusBadCertificateInvalid:
 					// todo(unknownet): recreate server certificate
@@ -273,7 +273,7 @@ func (c *Client) monitor(ctx context.Context) {
 				default:
 					// unknown error has occured
 					// try to recreate the secure channel
-					reconn = recreateSecureChannel
+					action = recreateSecureChannel
 				}
 			}
 
@@ -284,7 +284,7 @@ func (c *Client) monitor(ctx context.Context) {
 				sub.pause(ctx)
 			}
 
-			for reconn != none {
+			for action != none {
 
 				select {
 				case <-ctx.Done():
@@ -292,7 +292,7 @@ func (c *Client) monitor(ctx context.Context) {
 
 				default:
 
-					switch reconn {
+					switch action {
 					case recreateSecureChannel:
 						// recreate a secure channel by brute forcing
 						// a reconnection to the server
@@ -318,7 +318,7 @@ func (c *Client) monitor(ctx context.Context) {
 							break
 						}
 						debug.Printf("Secure channel recreated")
-						reconn = restoreSession
+						action = restoreSession
 
 					case restoreSession:
 						// try to reactivate the session,
@@ -328,16 +328,16 @@ func (c *Client) monitor(ctx context.Context) {
 						debug.Printf("Trying to restore session")
 						s, err := c.DetachSession()
 						if err != nil {
-							reconn = recreateSecureChannel
+							action = recreateSecureChannel
 							continue
 						}
 						if err := c.ActivateSession(s); err != nil {
 							debug.Printf("Restore session failed")
-							reconn = recreateSession
+							action = recreateSession
 							continue
 						}
 						debug.Printf("Session restored")
-						reconn = restoreSubscription
+						action = restoreSubscription
 
 					case recreateSession:
 						// create a new session to replace the previous one
@@ -346,15 +346,15 @@ func (c *Client) monitor(ctx context.Context) {
 						s, err := c.CreateSession(c.sessionCfg)
 						if err != nil {
 							debug.Printf("Recreate session failed: %v", err)
-							reconn = recreateSecureChannel
+							action = recreateSecureChannel
 							continue
 						}
 						if err := c.ActivateSession(s); err != nil {
 							debug.Printf("Reactivate session failed: %v", err)
-							reconn = recreateSecureChannel
+							action = recreateSecureChannel
 							continue
 						}
-						reconn = recreateSubscription
+						action = recreateSubscription
 
 					// todo(fs): shouldn't this be state RepairSubscription?
 					case restoreSubscription:
@@ -363,11 +363,11 @@ func (c *Client) monitor(ctx context.Context) {
 
 						if err := c.repairSubscriptions(c.SubscriptionIDs()); err != nil {
 							debug.Printf("Restore subscription failed: %v", err)
-							reconn = recreateSecureChannel
+							action = recreateSecureChannel
 							continue
 						}
 						c.state.Store(Connected)
-						reconn = none
+						action = none
 
 					// todo(fs): shouldn't this be state RestoreSubscription?
 					case recreateSubscription:
@@ -408,13 +408,13 @@ func (c *Client) monitor(ctx context.Context) {
 						if len(subsToRestore) > 0 {
 							if err := c.restoreSubscriptions(subsToRestore); err != nil {
 								debug.Printf("Restore subscripitions failed: %v", err)
-								reconn = recreateSession
+								action = recreateSession
 								continue
 							}
 						}
 
 						c.state.Store(Connected)
-						reconn = none
+						action = none
 
 					case nonRecoverable:
 						// non recoverable disconnection
