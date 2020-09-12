@@ -228,7 +228,7 @@ func (c *Client) monitor(ctx context.Context) {
 			c.state.Store(Disconnected)
 
 			if !c.cfg.AutoReconnect {
-				// the connection has ended and should not by recovered
+				// the connection is closed and should not be restored
 				action = abortReconnect
 				return
 			}
@@ -236,12 +236,10 @@ func (c *Client) monitor(ctx context.Context) {
 			switch err {
 			case io.EOF:
 				// the connection has been closed
-				// try to recreate the secure channel
 				action = recreateSecureChannel
 
 			case syscall.ECONNREFUSED:
 				// the connection has been refused by the server
-				// reconnection not possible
 				action = abortReconnect
 			}
 
@@ -250,17 +248,14 @@ func (c *Client) monitor(ctx context.Context) {
 				switch status {
 				case ua.StatusBadSecureChannelIDInvalid:
 					// the secure channel has been rejected by the server
-					// try to recreate the secure channel
 					action = recreateSecureChannel
 
 				case ua.StatusBadSessionIDInvalid:
 					// the session has been rejected by the server
-					// try to recreate the session
 					action = recreateSession
 
 				case ua.StatusBadSubscriptionIDInvalid:
 					// the subscription has been rejected by the server
-					// try to recreate the subscription
 					action = recreateSubscription
 
 				case ua.StatusBadCertificateInvalid:
@@ -269,7 +264,6 @@ func (c *Client) monitor(ctx context.Context) {
 
 				default:
 					// unknown error has occured
-					// try to recreate the secure channel
 					action = recreateSecureChannel
 				}
 			}
