@@ -254,12 +254,10 @@ publish:
 		select {
 		case <-ctx.Done():
 			log.Println("sub: ctx.Done()")
-			cancel()
 			return
 
 		case <-s.stopch:
 			log.Println("sub: stop")
-			cancel()
 			return
 
 		case <-s.pausech:
@@ -269,11 +267,9 @@ publish:
 				select {
 				case <-ctx.Done():
 					log.Print("sub: pause: ctx.Done()")
-					cancel()
 					return
 				case <-s.stopch:
 					log.Print("sub: pause: stop")
-					cancel()
 					return
 				case <-s.pausech:
 					log.Print("sub: pause: pause")
