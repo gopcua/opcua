@@ -3,6 +3,7 @@ package opcua
 import (
 	"context"
 	"log"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -23,6 +24,11 @@ const (
 
 const terminatedSubscriptionID uint32 = 0xC0CAC01B
 
+var (
+	publishID   uint32 = 0
+	publishIDMu sync.Mutex
+)
+
 type Subscription struct {
 	SubscriptionID            uint32
 	RevisedPublishingInterval time.Duration
@@ -32,10 +38,21 @@ type Subscription struct {
 	params                    *SubscriptionParameters
 	items                     []*monitoredItem
 	lastSequenceNumber        uint32
+	publishch                 chan publishReq
+	reqs                      []uint32
+	reqsMu                    sync.Mutex
+	acks                      []*ua.SubscriptionAcknowledgement
+	acksMu                    sync.Mutex
 	pausech                   chan struct{}
 	resumech                  chan struct{}
 	stopch                    chan struct{}
 	c                         *Client
+}
+
+type publishReq struct {
+	ID  uint32
+	Res *ua.PublishResponse
+	Err error
 }
 
 type SubscriptionParameters struct {
@@ -244,10 +261,10 @@ func (s *Subscription) resume(ctx context.Context) {
 // Note that Run may return before the context is cancelled
 // in case of an irrecoverable communication error.
 func (s *Subscription) Run(ctx context.Context) {
-	cctx, cancel := context.WithCancel(ctx)
-	defer cancel()
 	defer log.Print("sub: done")
 
+	// start publish
+	s.sendPublish(ctx)
 publish:
 	for {
 		log.Print("sub: select")
@@ -262,6 +279,12 @@ publish:
 
 		case <-s.pausech:
 			log.Print("sub: pause")
+
+			// ignore previous requests
+			s.reqsMu.Lock()
+			s.reqs = []uint32{}
+			s.reqsMu.Unlock()
+
 		paused:
 			for {
 				select {
@@ -277,6 +300,7 @@ publish:
 					continue paused
 				case <-s.resumech:
 					log.Print("sub: pause: resume")
+					s.sendPublish(ctx)
 					continue publish
 				}
 			}
@@ -286,74 +310,105 @@ publish:
 			// ignore since not paused
 			continue
 
-		default:
-			log.Print("sub: publish")
-			s.run(cctx)
+		case req := <-s.publishch:
+
+			switch {
+			case req.Err == ua.StatusBadSequenceNumberUnknown:
+				// At least one ack has been submitted repeatedly
+				// Ignore the error. Acks will be cleared below
+			case req.Err == ua.StatusBadTimeout:
+				// ignore and continue the loop
+			case req.Err == ua.StatusBadNoSubscription:
+				// All subscriptions have been deleted, but the publishing loop is still running
+				// The user will stop the loop or create subscriptions at his discretion
+			case req.Err != nil:
+				// irrecoverable error
+				s.c.notifySubscriptionsOfError(ctx, req.Res, req.Err)
+				debug.Printf("subscription %v Run loop stopped", s.SubscriptionID)
+				log.Print("publish: notify error")
+
+				// stop sendPublish until pause/resume
+				continue publish
+			}
+
+			if req.Err == nil {
+				s.c.notifySubscription(ctx, req.Res)
+				log.Print("publish: notify")
+			}
+
+			// if a request end send a new one
+			if ok := s.popReq(req.ID); ok {
+				s.sendPublish(ctx)
+			}
 		}
 	}
 }
 
-func (s *Subscription) run(ctx context.Context) {
-	defer log.Print("publish: done")
-
-	var acks []*ua.SubscriptionAcknowledgement
-
-	for {
-		log.Print("publish: select")
-		select {
-		case <-ctx.Done():
-			log.Print("publish: ctx.Done()")
-			return
-
-		case <-s.stopch:
-			log.Printf("publish: stop")
-			return
-
-		default:
-			log.Printf("publish: default")
-			// send the next publish request
-			// note that res contains data even if an error was returned
-			res, err := s.publish(acks)
-			switch {
-			case err == ua.StatusBadSequenceNumberUnknown:
-				// At least one ack has been submitted repeatedly
-				// Ignore the error. Acks will be cleared below
-			case err == ua.StatusBadTimeout:
-				// ignore and continue the loop
-			case err == ua.StatusBadNoSubscription:
-				// All subscriptions have been deleted, but the publishing loop is still running
-				// The user will stop the loop or create subscriptions at his discretion
-			case err != nil:
-				// irrecoverable error
-				s.c.notifySubscriptionsOfError(ctx, res, err)
-				debug.Printf("subscription %v Run loop stopped", s.SubscriptionID)
-				log.Print("publish: notify error")
-				return
-			}
-
-			if res != nil {
-				// Prepare SubscriptionAcknowledgement for next PublishRequest
-				acks = make([]*ua.SubscriptionAcknowledgement, 0)
-				if res.AvailableSequenceNumbers != nil {
-					for _, i := range res.AvailableSequenceNumbers {
-						ack := &ua.SubscriptionAcknowledgement{
-							SubscriptionID: res.SubscriptionID,
-							SequenceNumber: i,
-						}
-						if i > atomic.LoadUint32(&s.lastSequenceNumber) {
-							atomic.StoreUint32(&s.lastSequenceNumber, i)
-						}
-						acks = append(acks, ack)
-					}
-				}
-			}
-
-			if err == nil {
-				s.c.notifySubscription(ctx, res)
-				log.Print("publish: notify")
-			}
+// popReq remove a req
+func (s *Subscription) popReq(reqID uint32) (ok bool) {
+	s.reqsMu.Lock()
+	defer s.reqsMu.Unlock()
+	ok = false
+	for idx, id := range s.reqs {
+		if id == reqID {
+			ok = true
+			s.reqs = append(s.reqs[:idx], s.reqs[idx+1:]...)
 		}
 	}
+	return
+}
+
+func nextPublishID() uint32 {
+	publishIDMu.Lock()
+	defer publishIDMu.Unlock()
+
+	publishID++
+	return publishID
+}
+
+func (s *Subscription) sendPublish(ctx context.Context) {
+	id := nextPublishID()
+
+	s.reqsMu.Lock()
+	s.reqs = append(s.reqs, id)
+	s.reqsMu.Unlock()
+
+	go func() {
+		// send the next publish request
+		// note that res contains data even if an error was returned
+		s.acksMu.Lock()
+		acks := s.acks
+		s.acks = []*ua.SubscriptionAcknowledgement{}
+		s.acksMu.Unlock()
+
+		res, err := s.publish(acks)
+
+		if res != nil {
+			s.acksMu.Lock()
+			s.acks = append(
+				s.acks,
+				&ua.SubscriptionAcknowledgement{
+					SubscriptionID: res.SubscriptionID,
+					SequenceNumber: res.NotificationMessage.SequenceNumber,
+				},
+			)
+			s.acksMu.Unlock()
+		}
+
+		select {
+		case <-ctx.Done():
+			log.Print("sendPublish: ctx.Done()")
+			return
+		case <-s.stopch:
+			log.Printf("sendPublish: stop")
+			return
+		case s.publishch <- publishReq{
+			ID:  id,
+			Res: res,
+			Err: err,
+		}:
+		}
+	}()
 }
 
 func (s *Subscription) notify(ctx context.Context, data *PublishNotificationData) {
