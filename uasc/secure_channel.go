@@ -81,8 +81,11 @@ type SecureChannel struct {
 	time func() time.Time
 
 	// closing is channel used to indicate to go routines that the secure channel is closing
-	closing      chan struct{}
-	disconnected chan struct{}
+	closing chan struct{}
+
+	// disconnected indicates if the channel is still listening
+	disconnected   bool
+	disconnectedMu sync.Mutex
 
 	// closingMu is used to protect the _changing_ of the mutex
 	// i.e. when we _read_ from the closing chan we acquire a read lock, and when in `reset`, we acquire a write lock
@@ -168,7 +171,7 @@ func (s *SecureChannel) reset() {
 
 	// note: we _don't_ reset s.requestID
 	s.closing = make(chan struct{})
-	s.disconnected = make(chan struct{})
+	s.disconnected = false
 	s.startDispatcher = sync.Once{}
 	s.instances = make(map[uint32][]*channelInstance)
 	s.chunks = make(map[uint32][]*MessageChunk)
@@ -193,7 +196,13 @@ func (s *SecureChannel) dispatcher() {
 	s.closingMu.RLock()
 	defer s.closingMu.RUnlock()
 
-	defer close(s.disconnected)
+	defer s.flushHandlers()
+
+	defer func() {
+		s.disconnectedMu.Lock()
+		s.disconnected = true
+		s.disconnectedMu.Unlock()
+	}()
 
 	for {
 		select {
@@ -704,9 +713,6 @@ func (s *SecureChannel) sendRequestWithTimeout(
 	defer timer.Stop()
 
 	select {
-	case <-s.disconnected:
-		s.popHandler(reqID)
-		return io.EOF
 	case resp := <-ch:
 		if resp.Err != nil {
 			if resp.V != nil {
@@ -718,6 +724,23 @@ func (s *SecureChannel) sendRequestWithTimeout(
 	case <-timer.C:
 		s.popHandler(reqID)
 		return ua.StatusBadTimeout
+	}
+}
+
+// flushHandlers stop all the pending requests
+// and make them fail with an EOF error
+func (s *SecureChannel) flushHandlers() {
+	s.handlersMu.Lock()
+	defer s.handlersMu.Unlock()
+
+	for reqID, ch := range s.handlers {
+		delete(s.handlers, reqID)
+		select {
+		case ch <- &response{Err: io.EOF}:
+		default:
+			// this should never happen since the chan is of size one
+			debug.Printf("unexpected state. channel write should always succeed.")
+		}
 	}
 }
 
@@ -850,15 +873,12 @@ func (s *SecureChannel) Close() error {
 	s.reqLocker.unlock()
 	s.rcvLocker.unlock()
 
-	select {
-	case <-s.disconnected:
-		return io.EOF
-	default:
-	}
-	err := s.SendRequest(&ua.CloseSecureChannelRequest{}, nil, nil)
-
-	if err != nil {
-		return err
+	s.disconnectedMu.Lock()
+	defer s.disconnectedMu.Unlock()
+	if !s.disconnected {
+		if err := s.SendRequest(&ua.CloseSecureChannelRequest{}, nil, nil); err != nil {
+			return err
+		}
 	}
 
 	return io.EOF
