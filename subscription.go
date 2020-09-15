@@ -383,7 +383,24 @@ func (s *Subscription) sendPublish(ctx context.Context) {
 
 		res, err := s.publish(acks)
 
+		// reschedule ack if publish failed
+		if err != nil {
+			s.acksMu.Lock()
+			s.acks = append(s.acks, acks...)
+			s.acksMu.Unlock()
+		}
+
 		if res != nil {
+			for idx, status := range res.Results {
+				// switch status {
+				// case ua.StatusBadSubscriptionIDInvalid:
+				// 	// todo(unknownet): ignore err ?
+				// case ua.StatusBadSequenceNumberUnknown:
+				// 	// todo(unknownet): ignore err ?
+				// }
+				log.Printf("acknowledgment of SequenceNumber %d failed: %v", acks[idx], status)
+			}
+
 			s.acksMu.Lock()
 			s.acks = append(
 				s.acks,
