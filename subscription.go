@@ -310,21 +310,21 @@ publish:
 			// ignore since not paused
 			continue
 
-		case req := <-s.publishch:
+		case v := <-s.publishch:
 			log.Print("sub: publish")
 
 			switch {
-			case req.Err == ua.StatusBadSequenceNumberUnknown:
+			case v.Err == ua.StatusBadSequenceNumberUnknown:
 				// At least one ack has been submitted repeatedly
 				// Ignore the error. Acks will be cleared below
-			case req.Err == ua.StatusBadTimeout:
+			case v.Err == ua.StatusBadTimeout:
 				// ignore and continue the loop
-			case req.Err == ua.StatusBadNoSubscription:
+			case v.Err == ua.StatusBadNoSubscription:
 				// All subscriptions have been deleted, but the publishing loop is still running
 				// The user will stop the loop or create subscriptions at his discretion
-			case req.Err != nil:
+			case v.Err != nil:
 				// irrecoverable error
-				s.c.notifySubscriptionsOfError(ctx, req.Res, req.Err)
+				s.c.notifySubscriptionsOfError(ctx, v.Res, v.Err)
 				debug.Printf("subscription %v Run loop stopped", s.SubscriptionID)
 				log.Print("publish: notify error")
 
@@ -335,8 +335,8 @@ publish:
 				continue publish
 			}
 
-			if req.Err == nil {
-				s.c.notifySubscription(ctx, req.Res)
+			if v.Err == nil {
+				s.c.notifySubscription(ctx, v.Res)
 				log.Print("publish: notify")
 			}
 		}
