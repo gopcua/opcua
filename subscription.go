@@ -343,6 +343,8 @@ publish:
 	}
 }
 
+// replenishPublish keep the number of pending publish up
+// requires a new publish every time a previous has returned a response
 func (s *Subscription) replenishPublish(ctx context.Context) {
 	s.pendingMu.Lock()
 	defer s.pendingMu.Unlock()
