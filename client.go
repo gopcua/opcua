@@ -1099,10 +1099,10 @@ func (c *Client) Subscribe(params *SubscriptionParameters, notifyCh chan *Publis
 		RevisedMaxKeepAliveCount:  res.RevisedMaxKeepAliveCount,
 		Notifs:                    notifyCh,
 		params:                    params,
-		publishch:                 make(chan publishReq), // must be unbuffered
-		pausech:                   make(chan struct{}),   // must be unbuffered
-		resumech:                  make(chan struct{}),   // must be unbuffered
-		stopch:                    make(chan struct{}),   // must be unbuffered
+		publishch:                 make(chan publishItem), // must be unbuffered
+		pausech:                   make(chan struct{}),    // must be unbuffered
+		resumech:                  make(chan struct{}),    // must be unbuffered
+		stopch:                    make(chan struct{}),    // must be unbuffered
 		c:                         c,
 	}
 

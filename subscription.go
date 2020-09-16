@@ -23,6 +23,7 @@ const (
 )
 
 const terminatedSubscriptionID uint32 = 0xC0CAC01B
+const publishPoolSize = 1
 
 var (
 	publishID   uint32 = 0
@@ -38,18 +39,18 @@ type Subscription struct {
 	params                    *SubscriptionParameters
 	items                     []*monitoredItem
 	lastSequenceNumber        uint32
-	publishch                 chan publishReq
-	reqs                      []uint32
-	reqsMu                    sync.Mutex
+	pending                   []uint32
+	pendingMu                 sync.Mutex
 	acks                      []*ua.SubscriptionAcknowledgement
 	acksMu                    sync.Mutex
+	publishch                 chan publishItem
 	pausech                   chan struct{}
 	resumech                  chan struct{}
 	stopch                    chan struct{}
 	c                         *Client
 }
 
-type publishReq struct {
+type publishItem struct {
 	ID  uint32
 	Res *ua.PublishResponse
 	Err error
@@ -263,10 +264,10 @@ func (s *Subscription) resume(ctx context.Context) {
 func (s *Subscription) Run(ctx context.Context) {
 	defer log.Print("sub: done")
 
-	// start publish
-	s.sendPublish(ctx)
 publish:
 	for {
+		s.replenishPublish(ctx)
+
 		log.Print("sub: select")
 		select {
 		case <-ctx.Done():
@@ -281,9 +282,9 @@ publish:
 			log.Print("sub: pause")
 
 			// ignore previous requests
-			s.reqsMu.Lock()
-			s.reqs = []uint32{}
-			s.reqsMu.Unlock()
+			s.pendingMu.Lock()
+			s.pending = []uint32{}
+			s.pendingMu.Unlock()
 
 		paused:
 			for {
@@ -300,7 +301,6 @@ publish:
 					continue paused
 				case <-s.resumech:
 					log.Print("sub: pause: resume")
-					s.sendPublish(ctx)
 					continue publish
 				}
 			}
@@ -311,6 +311,7 @@ publish:
 			continue
 
 		case req := <-s.publishch:
+			log.Print("sub: publish")
 
 			switch {
 			case req.Err == ua.StatusBadSequenceNumberUnknown:
@@ -327,7 +328,10 @@ publish:
 				debug.Printf("subscription %v Run loop stopped", s.SubscriptionID)
 				log.Print("publish: notify error")
 
-				// stop sendPublish until pause/resume
+				// don't recover when no reconnection
+				if !s.c.cfg.AutoReconnect {
+					return
+				}
 				continue publish
 			}
 
@@ -335,24 +339,86 @@ publish:
 				s.c.notifySubscription(ctx, req.Res)
 				log.Print("publish: notify")
 			}
-
-			// if a request end send a new one
-			if ok := s.popReq(req.ID); ok {
-				s.sendPublish(ctx)
-			}
 		}
 	}
 }
 
-// popReq remove a req
-func (s *Subscription) popReq(reqID uint32) (ok bool) {
-	s.reqsMu.Lock()
-	defer s.reqsMu.Unlock()
+func (s *Subscription) replenishPublish(ctx context.Context) {
+	s.pendingMu.Lock()
+	defer s.pendingMu.Unlock()
+
+	for len(s.pending) < publishPoolSize {
+		id := nextPublishID()
+		s.pending = append(s.pending, id)
+
+		go func() {
+			// send the next publish request
+			// note that res contains data even if an error was returned
+			s.acksMu.Lock()
+			acks := s.acks
+			s.acks = []*ua.SubscriptionAcknowledgement{}
+			s.acksMu.Unlock()
+
+			res, err := s.publish(acks)
+
+			// publish received remove it from the pool
+			s.popPublish(id)
+
+			// reschedule ack if publish failed
+			if err != nil {
+				s.acksMu.Lock()
+				s.acks = append(s.acks, acks...)
+				s.acksMu.Unlock()
+			}
+
+			if res != nil {
+				for idx, status := range res.Results {
+					// switch status {
+					// case ua.StatusBadSubscriptionIDInvalid:
+					// 	// todo(unknownet): ignore err ?
+					// case ua.StatusBadSequenceNumberUnknown:
+					// 	// todo(unknownet): ignore err ?
+					// }
+					log.Printf("acknowledgment of SequenceNumber %d failed: %v", acks[idx], status)
+				}
+
+				s.acksMu.Lock()
+				s.acks = append(
+					s.acks,
+					&ua.SubscriptionAcknowledgement{
+						SubscriptionID: res.SubscriptionID,
+						SequenceNumber: res.NotificationMessage.SequenceNumber,
+					},
+				)
+				s.acksMu.Unlock()
+			}
+
+			select {
+			case <-ctx.Done():
+				log.Print("sendPublish: ctx.Done()")
+				return
+			case <-s.stopch:
+				log.Printf("sendPublish: stop")
+				return
+			case s.publishch <- publishItem{
+				ID:  id,
+				Res: res,
+				Err: err,
+			}:
+			}
+		}()
+	}
+}
+
+// popPublish remove a publish from the pending
+func (s *Subscription) popPublish(reqID uint32) (ok bool) {
+	s.pendingMu.Lock()
+	defer s.pendingMu.Unlock()
 	ok = false
-	for idx, id := range s.reqs {
+	for idx, id := range s.pending {
 		if id == reqID {
 			ok = true
-			s.reqs = append(s.reqs[:idx], s.reqs[idx+1:]...)
+			s.pending = append(s.pending[:idx], s.pending[idx+1:]...)
 		}
 	}
 	return
@@ -364,68 +430,6 @@ func nextPublishID() uint32 {
 
 	publishID++
 	return publishID
-}
-
-func (s *Subscription) sendPublish(ctx context.Context) {
-	id := nextPublishID()
-
-	s.reqsMu.Lock()
-	s.reqs = append(s.reqs, id)
-	s.reqsMu.Unlock()
-
-	go func() {
-		// send the next publish request
-		// note that res contains data even if an error was returned
-		s.acksMu.Lock()
-		acks := s.acks
-		s.acks = []*ua.SubscriptionAcknowledgement{}
-		s.acksMu.Unlock()
-
-		res, err := s.publish(acks)
-
-		// reschedule ack if publish failed
-		if err != nil {
-			s.acksMu.Lock()
-			s.acks = append(s.acks, acks...)
-			s.acksMu.Unlock()
-		}
-
-		if res != nil {
-			for idx, status := range res.Results {
-				// switch status {
-				// case ua.StatusBadSubscriptionIDInvalid:
-				// 	// todo(unknownet): ignore err ?
-				// case ua.StatusBadSequenceNumberUnknown:
-				// 	// todo(unknownet): ignore err ?
-				// }
-				log.Printf("acknowledgment of SequenceNumber %d failed: %v", acks[idx], status)
-			}
-
-			s.acksMu.Lock()
-			s.acks = append(
-				s.acks,
-				&ua.SubscriptionAcknowledgement{
-					SubscriptionID: res.SubscriptionID,
-					SequenceNumber: res.NotificationMessage.SequenceNumber,
-				},
-			)
-			s.acksMu.Unlock()
-		}
-
-		select {
-		case <-ctx.Done():
-			log.Print("sendPublish: ctx.Done()")
-			return
-		case <-s.stopch:
-			log.Printf("sendPublish: stop")
-			return
-		case s.publishch <- publishReq{
-			ID:  id,
-			Res: res,
-			Err: err,
-		}:
-		}
-	}()
 }
 
 func (s *Subscription) notify(ctx context.Context, data *PublishNotificationData) {
