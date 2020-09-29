@@ -1093,29 +1093,33 @@ func (c *Client) forgetSubscription(id uint32) {
 	c.subMux.Unlock()
 }
 
-func (c *Client) notifySubscriptionsOfError(ctx context.Context, res *ua.PublishResponse, err error) {
+func (c *Client) notifySubscriptionsOfError(ctx context.Context, subID uint32, err error) {
 	c.subMux.RLock()
 	defer c.subMux.RUnlock()
 
 	subsToNotify := c.subs
-	if res != nil && res.SubscriptionID != 0 {
+	if subID != 0 {
 		subsToNotify = map[uint32]*Subscription{
-			res.SubscriptionID: c.subs[res.SubscriptionID],
+			subID: c.subs[subID],
 		}
 	}
 	for _, sub := range subsToNotify {
+		// todo(fs): why do we need this all of a sudden?
+		if sub == nil {
+			continue
+		}
 		go func(s *Subscription) {
 			s.notify(ctx, &PublishNotificationData{Error: err})
 		}(sub)
 	}
 }
 
-func (c *Client) notifySubscription(ctx context.Context, response *ua.PublishResponse) {
+func (c *Client) notifySubscription(ctx context.Context, subID uint32, notif *ua.NotificationMessage) {
 	c.subMux.RLock()
-	sub, ok := c.subs[response.SubscriptionID]
+	sub, ok := c.subs[subID]
 	c.subMux.RUnlock()
 	if !ok {
-		debug.Printf("Unknown subscription: %v", response.SubscriptionID)
+		debug.Printf("Unknown subscription: %v", subID)
 		return
 	}
 
@@ -1126,20 +1130,20 @@ func (c *Client) notifySubscription(ctx context.Context, response *ua.PublishRes
 	// todo(fs): of the message ids we have ack'ed.
 	// todo(fs): see discussion in https://github.com/gopcua/opcua/issues/337
 
-	if response.NotificationMessage == nil {
+	if notif == nil {
 		sub.notify(ctx, &PublishNotificationData{
-			SubscriptionID: response.SubscriptionID,
+			SubscriptionID: subID,
 			Error:          errors.Errorf("empty NotificationMessage"),
 		})
 		return
 	}
 
 	// Part 4, 7.21 NotificationMessage
-	for _, data := range response.NotificationMessage.NotificationData {
+	for _, data := range notif.NotificationData {
 		// Part 4, 7.20 NotificationData parameters
 		if data == nil || data.Value == nil {
 			sub.notify(ctx, &PublishNotificationData{
-				SubscriptionID: response.SubscriptionID,
+				SubscriptionID: subID,
 				Error:          errors.Errorf("missing NotificationData parameter"),
 			})
 			continue
@@ -1153,14 +1157,14 @@ func (c *Client) notifySubscription(ctx context.Context, response *ua.PublishRes
 			*ua.EventNotificationList,
 			*ua.StatusChangeNotification:
 			sub.notify(ctx, &PublishNotificationData{
-				SubscriptionID: response.SubscriptionID,
+				SubscriptionID: subID,
 				Value:          data.Value,
 			})
 
 		// Error
 		default:
 			sub.notify(ctx, &PublishNotificationData{
-				SubscriptionID: response.SubscriptionID,
+				SubscriptionID: subID,
 				Error:          errors.Errorf("unknown NotificationData parameter: %T", data.Value),
 			})
 		}

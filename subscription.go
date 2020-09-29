@@ -2,7 +2,9 @@ package opcua
 
 import (
 	"context"
+	"fmt"
 	"log"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -31,11 +33,14 @@ type Subscription struct {
 	Notifs                    chan *PublishNotificationData
 	params                    *SubscriptionParameters
 	items                     []*monitoredItem
-	lastSequenceNumber        uint32
+	lastSequenceNumber        uint32 // use atomic.Load/Store
 	pausech                   chan struct{}
 	resumech                  chan struct{}
 	stopch                    chan struct{}
 	c                         *Client
+
+	pendingAcks    []uint32
+	pendingAcksMux sync.RWMutex
 }
 
 type SubscriptionParameters struct {
@@ -188,13 +193,18 @@ func (s *Subscription) republish(req *ua.RepublishRequest) (*ua.RepublishRespons
 	return res, err
 }
 
-func (s *Subscription) publish(acks []*ua.SubscriptionAcknowledgement) (*ua.PublishResponse, error) {
-	if acks == nil {
-		acks = []*ua.SubscriptionAcknowledgement{}
-	}
+func (s *Subscription) publish() (*ua.PublishResponse, error) {
+	s.pendingAcksMux.RLock()
 	req := &ua.PublishRequest{
-		SubscriptionAcknowledgements: acks,
+		SubscriptionAcknowledgements: make([]*ua.SubscriptionAcknowledgement, len(s.pendingAcks)),
 	}
+	for i := range s.pendingAcks {
+		req.SubscriptionAcknowledgements[i] = &ua.SubscriptionAcknowledgement{
+			SubscriptionID: s.SubscriptionID,
+			SequenceNumber: s.pendingAcks[i],
+		}
+	}
+	s.pendingAcksMux.RUnlock()
 
 	var res *ua.PublishResponse
 	err := s.c.sendWithTimeout(req, s.publishTimeout(), func(v interface{}) error {
@@ -244,123 +254,216 @@ func (s *Subscription) resume(ctx context.Context) {
 // Note that Run may return before the context is cancelled
 // in case of an irrecoverable communication error.
 func (s *Subscription) Run(ctx context.Context) {
+	plog := log.New(log.Writer(), fmt.Sprintf("sub %d: ", s.SubscriptionID), log.Flags()|log.Lmsgprefix)
+
 	cctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	defer log.Print("sub: done")
+	defer plog.Print("done")
 
 publish:
 	for {
-		log.Print("sub: select")
+		plog.Print("select")
 		select {
 		case <-ctx.Done():
-			log.Println("sub: ctx.Done()")
+			plog.Println("ctx.Done()")
 			cancel()
 			return
 
 		case <-s.stopch:
-			log.Println("sub: stop")
+			plog.Println("stop")
 			cancel()
 			return
 
 		case <-s.pausech:
-			log.Print("sub: pause")
+			plog.Print("pause")
 		paused:
 			for {
 				select {
 				case <-ctx.Done():
-					log.Print("sub: pause: ctx.Done()")
+					plog.Print("pause: ctx.Done()")
 					cancel()
 					return
 				case <-s.stopch:
-					log.Print("sub: pause: stop")
+					plog.Print("pause: stop")
 					cancel()
 					return
 				case <-s.pausech:
-					log.Print("sub: pause: pause")
+					plog.Print("pause: pause")
 					// ignore since already paused
 					continue paused
 				case <-s.resumech:
-					log.Print("sub: pause: resume")
+					plog.Print("pause: resume")
 					continue publish
 				}
 			}
 
 		case <-s.resumech:
-			log.Print("sub: resume")
+			plog.Print("resume")
 			// ignore since not paused
 			continue
 
 		default:
-			log.Print("sub: publish")
-			s.run(cctx)
+			plog.Print("publish")
+			s.runPublish(cctx)
 		}
 	}
 }
 
-func (s *Subscription) run(ctx context.Context) {
-	defer log.Print("publish: done")
+func (s *Subscription) runPublish(ctx context.Context) {
+	plog := log.New(log.Writer(), fmt.Sprintf("sub %d: publish: ", s.SubscriptionID), log.Flags()|log.Lmsgprefix)
 
-	var acks []*ua.SubscriptionAcknowledgement
+	defer plog.Print("done")
 
 	for {
-		log.Print("publish: select")
+		plog.Print("select")
 		select {
 		case <-ctx.Done():
-			log.Print("publish: ctx.Done()")
+			plog.Print("ctx.Done()")
 			return
 
 		case <-s.stopch:
-			log.Printf("publish: stop")
+			plog.Printf("stop")
 			return
 
 		default:
-			log.Printf("publish: default")
+			plog.Printf("default")
+
 			// send the next publish request
 			// note that res contains data even if an error was returned
-			res, err := s.publish(acks)
+			res, err := s.publish()
 			switch {
+			case err == nil && res.SubscriptionID != s.SubscriptionID:
+				plog.Printf("Got notifs for other subscription %d. Skipping", res.SubscriptionID)
+				continue
+
 			case err == ua.StatusBadSequenceNumberUnknown:
-				// At least one ack has been submitted repeatedly
-				// Ignore the error. Acks will be cleared below
+				// todo(fs): this should only happen per in the status codes
+				// todo(fs): lets log this here to see
+				plog.Printf("Got error %s which should only happen in the ACK results", err)
+
+			case err == ua.StatusBadTooManyPublishRequests:
+				// todo(fs): we have sent too many publish requests
+				// todo(fs): we need to slow down
+				plog.Printf("got %s. Sleeping for one second", err)
+				time.Sleep(time.Second) // does this make sense
+
 			case err == ua.StatusBadTimeout:
 				// ignore and continue the loop
+				plog.Print("Timeout. ignoring")
+
 			case err == ua.StatusBadNoSubscription:
 				// All subscriptions have been deleted, but the publishing loop is still running
 				// The user will stop the loop or create subscriptions at his discretion
+				plog.Print("Subscription invalid. Waiting for publishing loop to stop")
+
 			case err != nil:
 				// irrecoverable error
-				s.c.notifySubscriptionsOfError(ctx, res, err)
-				debug.Printf("subscription %v Run loop stopped", s.SubscriptionID)
-				log.Print("publish: notify error")
+				s.c.notifySubscriptionsOfError(ctx, s.SubscriptionID, err)
+				plog.Printf("Notify error %s. Stopping publish loop", err)
 				return
 			}
 
 			if res != nil {
-				// Prepare SubscriptionAcknowledgement for next PublishRequest
-				acks = make([]*ua.SubscriptionAcknowledgement, 0)
-				if res.AvailableSequenceNumbers != nil {
-					for _, i := range res.AvailableSequenceNumbers {
-						ack := &ua.SubscriptionAcknowledgement{
-							SubscriptionID: res.SubscriptionID,
-							SequenceNumber: i,
-						}
-						if i > atomic.LoadUint32(&s.lastSequenceNumber) {
-							atomic.StoreUint32(&s.lastSequenceNumber, i)
-						}
-						acks = append(acks, ack)
+				// clean up pending acks
+				s.pendingAcksMux.RLock()
+				pendingAcks := s.pendingAcks
+				s.pendingAcksMux.RUnlock()
+
+				// we assume that the number of results in the response match
+				// the number of pending acks from the previous PublishRequest.
+				if len(pendingAcks) != len(res.Results) {
+					plog.Printf("Got %d results for pending ACKs, want %d", len(res.Results), len(pendingAcks))
+					// todo(fs): what should we do here?
+					pendingAcks = nil
+				}
+
+				// find the messages which we have received but which we have not acked.
+				var notAcked []uint32
+				for i, seqnr := range pendingAcks {
+					err := res.Results[i]
+					switch err {
+					case ua.StatusOK:
+					// publish response ack'ed -> skip
+					case ua.StatusBadSubscriptionIDInvalid:
+						// old subscription id -> skip
+						plog.Printf("Old subscription id: %s", err)
+					case ua.StatusBadSequenceNumberUnknown:
+						// server does not have the message in its retransmission queue anymore
+						plog.Printf("Server does not have notif %d anymore: %s", seqnr, err)
+					default:
+						// otherwise, we try to ack again
+						notAcked = append(notAcked, seqnr)
+						plog.Printf("Retrying to ACK notif %d: %s", seqnr, err)
 					}
 				}
-			}
+				pendingAcks = notAcked
 
-			if err == nil {
-				s.c.notifySubscription(ctx, res)
-				log.Print("publish: notify")
+				// check if we have missed a notification
+				// we assume that the sequence numbers are increasing monotonically
+				// and if we missed one then we should ask the server to republish
+				// it, if it is still in its retransmission queue
+
+				var (
+					lastSeq   = s.lastSequenceNumber
+					nextSeq   = lastSeq + 1
+					thisSeq   = res.NotificationMessage.SequenceNumber
+					availSeqs = res.AvailableSequenceNumbers
+				)
+
+				if thisSeq > nextSeq {
+					for seqnr := nextSeq; seqnr < thisSeq; seqnr++ {
+						if !uint32SliceContains(seqnr, availSeqs) {
+							plog.Printf("Missed notif %d but server no longer has it. Data loss", seqnr)
+							continue
+						}
+
+						plog.Printf("Requesting republish of missed notif %d", seqnr)
+						rpres, rperr := s.republish(&ua.RepublishRequest{
+							SubscriptionID:           res.SubscriptionID,
+							RetransmitSequenceNumber: seqnr,
+						})
+						switch rperr {
+						case ua.StatusOK:
+							lastSeq = seqnr
+							pendingAcks = append(pendingAcks, seqnr)
+							s.c.notifySubscription(ctx, res.SubscriptionID, rpres.NotificationMessage)
+							plog.Printf("Received missed notif %d", seqnr)
+						default:
+							lastSeq = seqnr
+							plog.Printf("Republish request for missed notif %d failed. Data loss: %s", seqnr, err)
+						}
+					}
+				}
+
+				if err == nil {
+					s.c.notifySubscription(ctx, res.SubscriptionID, res.NotificationMessage)
+					plog.Printf("notif %d", res.NotificationMessage.SequenceNumber)
+					lastSeq = res.NotificationMessage.SequenceNumber
+					pendingAcks = append(pendingAcks, res.NotificationMessage.SequenceNumber)
+				}
+
+				s.lastSequenceNumber = lastSeq
+				s.pendingAcksMux.Lock()
+				s.pendingAcks = pendingAcks
+				s.pendingAcksMux.Unlock()
 			}
 		}
 	}
 }
 
+func uint32SliceContains(n uint32, a []uint32) bool {
+	for _, v := range a {
+		if v == n {
+			return true
+		}
+	}
+	return false
+}
+
 func (s *Subscription) notify(ctx context.Context, data *PublishNotificationData) {
+	if s == nil {
+		panic("s == nil")
+	}
 	select {
 	case <-ctx.Done():
 		return
