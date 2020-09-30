@@ -187,12 +187,12 @@ func (s *Subscription) SetTriggering(triggeringItemID uint32, add, remove []uint
 
 // republish executes a synchronous republish request.
 func (s *Subscription) republish(req *ua.RepublishRequest) (*ua.RepublishResponse, error) {
-	log.Println("RepublishRequest:", toJSON(req))
+	log.Printf("sub %d: publish: RepublishRequest: %s", s.SubscriptionID, toJSON(req))
 	var res *ua.RepublishResponse
 	err := s.c.sechan.SendRequest(req, s.c.Session().resp.AuthenticationToken, func(v interface{}) error {
 		return safeAssign(v, &res)
 	})
-	log.Println("RepublishResponse:", toJSON(res))
+	log.Printf("sub %d: publish: RepublishResponse: %s", s.SubscriptionID, toJSON(res))
 	return res, err
 }
 
@@ -217,12 +217,12 @@ func (s *Subscription) sendPublishRequest() (*ua.PublishResponse, error) {
 	}
 	s.pendingAcksMux.RUnlock()
 
-	log.Println("PublishRequest:", toJSON(req))
+	log.Printf("sub %d: publish: PublishRequest: %s", s.SubscriptionID, toJSON(req))
 	var res *ua.PublishResponse
 	err := s.c.sendWithTimeout(req, s.publishTimeout(), func(v interface{}) error {
 		return safeAssign(v, &res)
 	})
-	log.Println("PublishResponse:", toJSON(res))
+	log.Printf("sub %d: publish: PublishResponse: %s", s.SubscriptionID, toJSON(res))
 	return res, err
 }
 
