@@ -451,10 +451,13 @@ func (s *Subscription) runPublish(ctx context.Context) {
 				}
 
 				if err == nil {
-					s.c.notifySubscription(ctx, res.SubscriptionID, res.NotificationMessage)
-					plog.Printf("notif: %d", res.NotificationMessage.SequenceNumber)
 					lastSeq = res.NotificationMessage.SequenceNumber
-					pendingAcks = append(pendingAcks, res.NotificationMessage.SequenceNumber)
+
+					if len(res.NotificationMessage.NotificationData) > 0 {
+						s.c.notifySubscription(ctx, res.SubscriptionID, res.NotificationMessage)
+						plog.Printf("notif: %d", res.NotificationMessage.SequenceNumber)
+						pendingAcks = append(pendingAcks, res.NotificationMessage.SequenceNumber)
+					}
 				}
 
 				s.lastSequenceNumber = lastSeq
