@@ -128,7 +128,6 @@ func (m *NodeMonitor) Subscribe(ctx context.Context, params *opcua.SubscriptionP
 	}
 
 	go sub.pump(ctx, nil, cb)
-	go sub.sub.Run(ctx)
 
 	return sub, nil
 }
@@ -145,7 +144,6 @@ func (m *NodeMonitor) ChanSubscribe(ctx context.Context, params *opcua.Subscript
 	}
 
 	go sub.pump(ctx, ch, nil)
-	go sub.sub.Run(ctx)
 
 	return sub, nil
 }
