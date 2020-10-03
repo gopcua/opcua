@@ -2,6 +2,7 @@ package opcua
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/gopcua/opcua/debug"
@@ -237,11 +238,13 @@ func (p *SubscriptionParameters) setDefaults() {
 	}
 }
 
-// restore creates a new subscription based on the previous subscription
+// recreate creates a new subscription based on the previous subscription
 // parameters and monitored items.
-func (s *Subscription) restore() error {
+func (s *Subscription) recreate() error {
+	dlog := debug.NewPrefixLogger("sub %d: recreate: ", s.SubscriptionID)
+
 	if s.SubscriptionID == terminatedSubscriptionID {
-		debug.Printf("Subscription is not in a valid state")
+		dlog.Printf("subscription is not in a valid state")
 		return nil
 	}
 
@@ -254,8 +257,10 @@ func (s *Subscription) restore() error {
 		_ = s.c.Send(req, func(v interface{}) error {
 			return safeAssign(v, &res)
 		})
+		dlog.Print("subscription deleted")
 	}
 	s.c.forgetSubscription(s.SubscriptionID)
+	dlog.Printf("subscription forgotton")
 
 	req := &ua.CreateSubscriptionRequest{
 		RequestedPublishingInterval: float64(params.Interval / time.Millisecond),
@@ -270,12 +275,15 @@ func (s *Subscription) restore() error {
 		return safeAssign(v, &res)
 	})
 	if err != nil {
+		dlog.Printf("failed to recreate subscription")
 		return err
 	}
 	// todo (unknownet): check if necessary
 	if status := res.ResponseHeader.ServiceResult; status != ua.StatusOK {
 		return status
 	}
+	dlog.Printf("recreated as subscription %d", res.SubscriptionID)
+	dlog.SetPrefix(fmt.Sprintf("sub %d: recreate: ", res.SubscriptionID))
 
 	s.SubscriptionID = res.SubscriptionID
 	s.RevisedPublishingInterval = time.Duration(res.RevisedPublishingInterval) * time.Millisecond
@@ -287,6 +295,7 @@ func (s *Subscription) restore() error {
 	if err := s.c.registerSubscription(s); err != nil {
 		return err
 	}
+	dlog.Printf("subscription registered")
 
 	// Sort by timestamp to return
 	itemsByTs := make(map[ua.TimestampsToReturn][]*ua.MonitoredItemCreateRequest)
@@ -311,6 +320,7 @@ func (s *Subscription) restore() error {
 			return safeAssign(v, &res)
 		})
 		if err != nil {
+			dlog.Printf("failed to create monitored items: %v", err)
 			return err
 		}
 		for _, result := range res.Results {
@@ -323,6 +333,7 @@ func (s *Subscription) restore() error {
 			m.createResult = res.Results[i]
 		}
 	}
+	dlog.Printf("subscription successfully recreated")
 
 	return nil
 }

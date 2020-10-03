@@ -161,8 +161,8 @@ func NewClient(endpoint string, opts ...Option) *Client {
 		sessionCfg:     sessionCfg,
 		sechanErr:      make(chan error, 1),
 		subs:           make(map[uint32]*Subscription),
-		pausech:        make(chan struct{}, 1),
-		resumech:       make(chan struct{}, 1),
+		pausech:        make(chan struct{}, 2),
+		resumech:       make(chan struct{}, 2),
 		pendingAcks:    []*ua.SubscriptionAcknowledgement{},
 		publishTimeout: uasc.MaxTimeout,
 	}
@@ -175,20 +175,14 @@ func NewClient(endpoint string, opts ...Option) *Client {
 type reconnectAction uint8
 
 const (
-	// none, no reconnection action
-	none reconnectAction = iota
-	// createSecureChannel, recreate secure channel action
-	createSecureChannel
-	// restoreSession, ask the server to repair session
-	restoreSession
-	// recreateSession, ask the client to repair session
-	recreateSession
-	// republishSubscriptions, ask the server to repair the previous subscription
-	republishSubscriptions
-	// restoreSubscriptions moves subscriptions from one session to another
-	restoreSubscriptions
-	// abortReconnect, the reconnecting is not possible
-	abortReconnect
+	none reconnectAction = iota // no reconnection action
+
+	createSecureChannel   // recreate secure channel action
+	restoreSession        // ask the server to repair session
+	recreateSession       // ask the client to repair session
+	restoreSubscriptions  // republish or recreate subscriptions
+	transferSubscriptions // move subscriptions from one session to another
+	abortReconnect        // the reconnecting is not possible
 )
 
 // Connect establishes a secure channel and creates a new session.
@@ -285,7 +279,7 @@ func (c *Client) monitor(ctx context.Context) {
 
 					case ua.StatusBadSubscriptionIDInvalid:
 						// the subscription has been rejected by the server
-						action = restoreSubscriptions
+						action = transferSubscriptions
 
 					case ua.StatusBadCertificateInvalid:
 						// todo(unknownet): recreate server certificate
@@ -306,6 +300,12 @@ func (c *Client) monitor(ctx context.Context) {
 
 			c.pauseSubscriptions()
 
+			var (
+				subsToRepublish []uint32 // subscription ids for which to send republish requests
+				subsToRecreate  []uint32 // subscription ids which need to be recreated as new subscriptions
+				availableSeqs   map[uint32][]uint32
+			)
+
 			for action != none {
 
 				select {
@@ -316,6 +316,8 @@ func (c *Client) monitor(ctx context.Context) {
 					switch action {
 
 					case createSecureChannel:
+						dlog.Printf("action: createSecureChannel")
+
 						// recreate a secure channel by brute forcing
 						// a reconnection to the server
 
@@ -343,6 +345,8 @@ func (c *Client) monitor(ctx context.Context) {
 						action = restoreSession
 
 					case restoreSession:
+						dlog.Printf("action: restoreSession")
+
 						// try to reactivate the session,
 						// This only works if the session is still open on the server
 						// otherwise recreate it
@@ -359,9 +363,11 @@ func (c *Client) monitor(ctx context.Context) {
 							continue
 						}
 						dlog.Printf("session restored")
-						action = republishSubscriptions
+						action = restoreSubscriptions
 
 					case recreateSession:
+						dlog.Printf("action: recreateSession")
+
 						// create a new session to replace the previous one
 
 						dlog.Printf("trying to recreate session")
@@ -376,95 +382,67 @@ func (c *Client) monitor(ctx context.Context) {
 							action = createSecureChannel
 							continue
 						}
-						action = restoreSubscriptions
+						action = transferSubscriptions
 
-					case republishSubscriptions:
-						// try to republish the previous subscriptions from the server
-						// otherwise restore them
+					case transferSubscriptions:
+						dlog.Printf("action: transferSubscriptions")
 
-						// todo(fs): do we need this state at all?
-						// todo(fs): isn't this path the same as restoreSubscriptions minus the transfer?
-						// todo(fs): and if the transfer is a NoOp if the subscription is already on the
-						// todo(fs): session then we can omit that or move it to a function which
-						// todo(fs): handles the transfer or not.
-						//
-						// if err := c.republishSubscriptions(c.SubscriptionIDs()); err != nil {
-						// 	debug.Printf("Republish subscription failed: %v", err)
-						// 	action = createSecureChannel
-						// 	continue
-						// }
-
-						var subsToRestore []uint32
-						for _, id := range c.SubscriptionIDs() {
-							if err := c.republishSubscription(id); err != nil {
-								dlog.Printf("republish of subscription %d failed", id)
-								subsToRestore = append(subsToRestore, id)
-							}
-						}
-
-						if len(subsToRestore) > 0 {
-							if err := c.restoreSubscriptions(subsToRestore); err != nil {
-								dlog.Printf("restore subscripitions failed: %v", err)
-								action = recreateSession
-								continue
-							}
-						}
-
-						c.state.Store(Connected)
-						action = none
-
-					case restoreSubscriptions:
 						// transfer subscriptions from the old to the new session
 						// and try to republish the subscriptions.
 						// Restore the subscriptions where republishing fails.
 
 						subIDs := c.SubscriptionIDs()
-						subsToRepublish := []uint32{}
-						subsToRestore := []uint32{}
 
+						availableSeqs = map[uint32][]uint32{}
+						subsToRecreate = nil
+						subsToRepublish = nil
+
+						// try to transfer all subscriptions to the new session and
+						// recreate them all if that fails.
 						res, err := c.transferSubscriptions(subIDs)
-						if err != nil {
-							dlog.Printf("transfer subscriptions failed: %v", err)
-							subsToRestore = subIDs
-						} else {
+						switch {
+						case err != nil:
+							dlog.Printf("transfer subscriptions failed. Recreating all subscriptions: %v", err)
+							subsToRepublish = nil
+							subsToRecreate = subIDs
+
+						default:
+							// otherwise, try a republish for the subscriptions that were transferred
+							// and recreate the rest.
 							for i := range res.Results {
 								transferResult := res.Results[i]
-								if transferResult.StatusCode == ua.StatusBadSubscriptionIDInvalid {
-									dlog.Printf("warning suscription %d should be recreated", subIDs[i])
-									subsToRestore = append(subsToRestore, subIDs[i])
-								} else {
-									debug.Printf(
-										"client: subscription %d can be repaired with sequence number %d",
-										subIDs[i],
-										transferResult.AvailableSequenceNumbers[i],
-									)
+								switch transferResult.StatusCode {
+								case ua.StatusBadSubscriptionIDInvalid:
+									dlog.Printf("sub %d: transfer subscription failed", subIDs[i])
+									subsToRecreate = append(subsToRecreate, subIDs[i])
+
+								default:
 									subsToRepublish = append(subsToRepublish, subIDs[i])
+									availableSeqs[subIDs[i]] = transferResult.AvailableSequenceNumbers
 								}
 							}
 						}
 
-						// todo(fs): this looks wrong since we may be able to republish
-						// todo(fs): some of the subscriptions but not all of them.
-						// todo(fs): shouldn't we only restore the ones that failed to republish?
-						// todo(fs): an alternative implementation is below
-						//
-						// if len(subsToRepublish) > 0 {
-						// 	if err := c.republishSubscriptions(subsToRepublish); err != nil {
-						// 		debug.Printf("Republish subscriptions failed: %v", err)
-						// 		subsToRestore = append(subsToRestore, subsToRepublish...)
-						// 	}
-						// }
+						action = restoreSubscriptions
+
+					case restoreSubscriptions:
+						dlog.Printf("action: restoreSubscriptions")
+
+						// try to republish the previous subscriptions from the server
+						// otherwise restore them.
+						// Assume that subsToRecreate and subsToRepublish have been
+						// populated in the previous step.
 
 						for _, id := range subsToRepublish {
-							if err := c.republishSubscription(id); err != nil {
+							if err := c.republishSubscription(id, availableSeqs[id]); err != nil {
 								dlog.Printf("republish of subscription %d failed", id)
-								subsToRestore = append(subsToRestore, id)
+								subsToRecreate = append(subsToRecreate, id)
 							}
 						}
 
-						if len(subsToRestore) > 0 {
-							if err := c.restoreSubscriptions(subsToRestore); err != nil {
-								dlog.Printf("restore subscripitions failed: %v", err)
+						for _, id := range subsToRecreate {
+							if err := c.recreateSubscription(id); err != nil {
+								dlog.Printf("recreate subscripitions failed: %v", err)
 								action = recreateSession
 								continue
 							}
@@ -474,6 +452,8 @@ func (c *Client) monitor(ctx context.Context) {
 						action = none
 
 					case abortReconnect:
+						dlog.Printf("action: abortReconnect")
+
 						// non recoverable disconnection
 						// stop the client
 
@@ -489,7 +469,9 @@ func (c *Client) monitor(ctx context.Context) {
 				<-c.sechanErr
 			}
 
+			dlog.Printf("resuming subscriptions")
 			c.resumeSubscriptions()
+			dlog.Printf("resumed subscriptions")
 		}
 	}
 }
@@ -928,6 +910,15 @@ func safeAssign(t, ptrT interface{}) error {
 	// this is *ptrT = t
 	reflect.ValueOf(ptrT).Elem().Set(reflect.ValueOf(t))
 	return nil
+}
+
+func uint32SliceContains(n uint32, a []uint32) bool {
+	for _, v := range a {
+		if n == v {
+			return true
+		}
+	}
+	return false
 }
 
 type InvalidResponseTypeError struct {
