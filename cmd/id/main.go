@@ -70,10 +70,25 @@ var tmpl = template.Must(template.New("").Parse(`
 
 package id
 
+import "strconv"
+
+func Name(id uint32) string {
+	if s, ok := name[id]; ok {
+		return s
+	}
+	return strconv.FormatUint(uint64(id), 10)
+}
+
 const (
 	{{range .}}{{index . 0}} = {{index . 1}}
 	{{end}}
 )
+
+var name = map[uint32]string{
+	{{- range .}}
+	{{index . 1}}: "{{index . 0}}",
+	{{- end}}
+}
 `))
 
 func goName(s string) string {
