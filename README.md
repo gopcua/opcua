@@ -45,7 +45,11 @@ go run examples/crypto/*.go -endpoint opc.tcp://localhost:4840 -cert path/to/cer
 
 The `gopcua` project is sponsored by the following organizations by supporting the active committers to the project:
 
-* [Northvolt](https://raw.githubusercontent.com/gopcua/opcua/master/logo/northvolt.png)
+<p align="center">
+  <a href="https://northvolt.com/">
+    <img alt="Northvolt" width="50%" src="https://raw.githubusercontent.com/gopcua/opcua/master/logo/northvolt.png">
+  </a>
+</p>
 
 ### Users
 
