@@ -97,8 +97,6 @@ func main() {
 		log.Fatal(err)
 	}
 
-	go sub.Run(ctx) // start Publish loop
-
 	// read from subscription's notification channel until ctx is cancelled
 	for {
 		select {

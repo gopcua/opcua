@@ -115,8 +115,6 @@ func main() {
 		log.Fatal(err)
 	}
 
-	go sub.Run(ctx) // start Publish loop
-
 	triggeringServerID, triggeredServerID := subRes.Results[0].MonitoredItemID, subRes.Results[1].MonitoredItemID
 	tRes, err := sub.SetTriggering(triggeringServerID, []uint32{triggeredServerID}, nil)
 

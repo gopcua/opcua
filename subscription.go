@@ -2,8 +2,7 @@ package opcua
 
 import (
 	"context"
-	"log"
-	"sync/atomic"
+	"fmt"
 	"time"
 
 	"github.com/gopcua/opcua/debug"
@@ -31,10 +30,8 @@ type Subscription struct {
 	Notifs                    chan *PublishNotificationData
 	params                    *SubscriptionParameters
 	items                     []*monitoredItem
-	lastSequenceNumber        uint32
-	pausech                   chan struct{}
-	resumech                  chan struct{}
-	stopch                    chan struct{}
+	lastSeq                   uint32
+	nextSeq                   uint32
 	c                         *Client
 }
 
@@ -85,7 +82,6 @@ type PublishNotificationData struct {
 // from the client and the server.
 func (s *Subscription) Cancel() error {
 	s.c.forgetSubscription(s.SubscriptionID)
-	close(s.stopch)
 	return s.delete()
 }
 
@@ -99,12 +95,12 @@ func (s *Subscription) delete() error {
 		return safeAssign(v, &res)
 	})
 	switch {
+	case err == ua.StatusOK:
+		return nil
 	case err != nil:
 		return err
-	case res.ResponseHeader.ServiceResult != ua.StatusOK:
-		return res.ResponseHeader.ServiceResult
 	default:
-		return nil
+		return res.ResponseHeader.ServiceResult
 	}
 }
 
@@ -179,30 +175,6 @@ func (s *Subscription) SetTriggering(triggeringItemID uint32, add, remove []uint
 	return res, err
 }
 
-// republish executes a synchronous republish request.
-func (s *Subscription) republish(req *ua.RepublishRequest) (*ua.RepublishResponse, error) {
-	var res *ua.RepublishResponse
-	err := s.c.sechan.SendRequest(req, s.c.Session().resp.AuthenticationToken, func(v interface{}) error {
-		return safeAssign(v, &res)
-	})
-	return res, err
-}
-
-func (s *Subscription) publish(acks []*ua.SubscriptionAcknowledgement) (*ua.PublishResponse, error) {
-	if acks == nil {
-		acks = []*ua.SubscriptionAcknowledgement{}
-	}
-	req := &ua.PublishRequest{
-		SubscriptionAcknowledgements: acks,
-	}
-
-	var res *ua.PublishResponse
-	err := s.c.sendWithTimeout(req, s.publishTimeout(), func(v interface{}) error {
-		return safeAssign(v, &res)
-	})
-	return res, err
-}
-
 func (s *Subscription) publishTimeout() time.Duration {
 	timeout := time.Duration(s.RevisedMaxKeepAliveCount) * s.RevisedPublishingInterval // expected keepalive interval
 	if timeout > uasc.MaxTimeout {
@@ -212,152 +184,6 @@ func (s *Subscription) publishTimeout() time.Duration {
 		return s.c.cfg.RequestTimeout
 	}
 	return timeout
-}
-
-// pause suspends the run loop by signalling the pausech.
-// Since the channel is unbuffered we wait until the
-// run loop has completed the current publish message.
-func (s *Subscription) pause(ctx context.Context) {
-	select {
-	case <-ctx.Done():
-	case <-s.stopch:
-	case s.pausech <- struct{}{}:
-	}
-}
-
-// resume restarts the run loop by signalling the resumech.
-// It has no effect if the run loop isn't paused.
-func (s *Subscription) resume(ctx context.Context) {
-	select {
-	case <-ctx.Done():
-	case <-s.stopch:
-	case s.resumech <- struct{}{}:
-	}
-}
-
-// Run starts an infinite loop which sends PublishRequests and delivers received
-// notifications to registered subcribers.
-//
-// It is the responsibility of the caller to stop the run loops by
-// cancelling the context.
-//
-// Note that Run may return before the context is cancelled
-// in case of an irrecoverable communication error.
-func (s *Subscription) Run(ctx context.Context) {
-	cctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	defer log.Print("sub: done")
-
-publish:
-	for {
-		log.Print("sub: select")
-		select {
-		case <-ctx.Done():
-			log.Println("sub: ctx.Done()")
-			cancel()
-			return
-
-		case <-s.stopch:
-			log.Println("sub: stop")
-			cancel()
-			return
-
-		case <-s.pausech:
-			log.Print("sub: pause")
-		paused:
-			for {
-				select {
-				case <-ctx.Done():
-					log.Print("sub: pause: ctx.Done()")
-					cancel()
-					return
-				case <-s.stopch:
-					log.Print("sub: pause: stop")
-					cancel()
-					return
-				case <-s.pausech:
-					log.Print("sub: pause: pause")
-					// ignore since already paused
-					continue paused
-				case <-s.resumech:
-					log.Print("sub: pause: resume")
-					continue publish
-				}
-			}
-
-		case <-s.resumech:
-			log.Print("sub: resume")
-			// ignore since not paused
-			continue
-
-		default:
-			log.Print("sub: publish")
-			s.run(cctx)
-		}
-	}
-}
-
-func (s *Subscription) run(ctx context.Context) {
-	defer log.Print("publish: done")
-
-	var acks []*ua.SubscriptionAcknowledgement
-
-	for {
-		log.Print("publish: select")
-		select {
-		case <-ctx.Done():
-			log.Print("publish: ctx.Done()")
-			return
-
-		case <-s.stopch:
-			log.Printf("publish: stop")
-			return
-
-		default:
-			log.Printf("publish: default")
-			// send the next publish request
-			// note that res contains data even if an error was returned
-			res, err := s.publish(acks)
-			switch {
-			case err == ua.StatusBadSequenceNumberUnknown:
-				// At least one ack has been submitted repeatedly
-				// Ignore the error. Acks will be cleared below
-			case err == ua.StatusBadTimeout:
-				// ignore and continue the loop
-			case err == ua.StatusBadNoSubscription:
-				// All subscriptions have been deleted, but the publishing loop is still running
-				// The user will stop the loop or create subscriptions at his discretion
-			case err != nil:
-				// irrecoverable error
-				s.c.notifySubscriptionsOfError(ctx, res, err)
-				debug.Printf("subscription %v Run loop stopped", s.SubscriptionID)
-				log.Print("publish: notify error")
-				return
-			}
-
-			if res != nil {
-				// Prepare SubscriptionAcknowledgement for next PublishRequest
-				acks = make([]*ua.SubscriptionAcknowledgement, 0)
-				if res.AvailableSequenceNumbers != nil {
-					for _, i := range res.AvailableSequenceNumbers {
-						ack := &ua.SubscriptionAcknowledgement{
-							SubscriptionID: res.SubscriptionID,
-							SequenceNumber: i,
-						}
-						if i > atomic.LoadUint32(&s.lastSequenceNumber) {
-							atomic.StoreUint32(&s.lastSequenceNumber, i)
-						}
-						acks = append(acks, ack)
-					}
-				}
-			}
-
-			if err == nil {
-				s.c.notifySubscription(ctx, res)
-				log.Print("publish: notify")
-			}
-		}
-	}
 }
 
 func (s *Subscription) notify(ctx context.Context, data *PublishNotificationData) {
@@ -412,11 +238,13 @@ func (p *SubscriptionParameters) setDefaults() {
 	}
 }
 
-// restore creates a new subscription based on the previous subscription
+// recreate creates a new subscription based on the previous subscription
 // parameters and monitored items.
-func (s *Subscription) restore() error {
+func (s *Subscription) recreate() error {
+	dlog := debug.NewPrefixLogger("sub %d: recreate: ", s.SubscriptionID)
+
 	if s.SubscriptionID == terminatedSubscriptionID {
-		debug.Printf("Subscription is not in a valid state")
+		dlog.Printf("subscription is not in a valid state")
 		return nil
 	}
 
@@ -429,8 +257,10 @@ func (s *Subscription) restore() error {
 		_ = s.c.Send(req, func(v interface{}) error {
 			return safeAssign(v, &res)
 		})
+		dlog.Print("subscription deleted")
 	}
 	s.c.forgetSubscription(s.SubscriptionID)
+	dlog.Printf("subscription forgotton")
 
 	req := &ua.CreateSubscriptionRequest{
 		RequestedPublishingInterval: float64(params.Interval / time.Millisecond),
@@ -445,22 +275,27 @@ func (s *Subscription) restore() error {
 		return safeAssign(v, &res)
 	})
 	if err != nil {
+		dlog.Printf("failed to recreate subscription")
 		return err
 	}
 	// todo (unknownet): check if necessary
 	if status := res.ResponseHeader.ServiceResult; status != ua.StatusOK {
 		return status
 	}
+	dlog.Printf("recreated as subscription %d", res.SubscriptionID)
+	dlog.SetPrefix(fmt.Sprintf("sub %d: recreate: ", res.SubscriptionID))
 
 	s.SubscriptionID = res.SubscriptionID
 	s.RevisedPublishingInterval = time.Duration(res.RevisedPublishingInterval) * time.Millisecond
 	s.RevisedLifetimeCount = res.RevisedLifetimeCount
 	s.RevisedMaxKeepAliveCount = res.RevisedMaxKeepAliveCount
-	atomic.StoreUint32(&s.lastSequenceNumber, 0)
+	s.lastSeq = 0
+	s.nextSeq = 1
 
 	if err := s.c.registerSubscription(s); err != nil {
 		return err
 	}
+	dlog.Printf("subscription registered")
 
 	// Sort by timestamp to return
 	itemsByTs := make(map[ua.TimestampsToReturn][]*ua.MonitoredItemCreateRequest)
@@ -485,6 +320,7 @@ func (s *Subscription) restore() error {
 			return safeAssign(v, &res)
 		})
 		if err != nil {
+			dlog.Printf("failed to create monitored items: %v", err)
 			return err
 		}
 		for _, result := range res.Results {
@@ -497,6 +333,7 @@ func (s *Subscription) restore() error {
 			m.createResult = res.Results[i]
 		}
 	}
+	dlog.Printf("subscription successfully recreated")
 
 	return nil
 }
