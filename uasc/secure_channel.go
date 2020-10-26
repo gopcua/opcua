@@ -33,6 +33,41 @@ type response struct {
 	Err   error
 }
 
+type conditionLocker struct {
+	bLock   bool
+	lockMu  sync.Mutex
+	lockCnd *sync.Cond
+}
+
+func newConditionLocker() *conditionLocker {
+	c := conditionLocker{
+		bLock: false,
+	}
+	c.lockCnd = sync.NewCond(&c.lockMu)
+	return &c
+}
+
+func (c *conditionLocker) lock() {
+	c.lockMu.Lock()
+	defer c.lockMu.Unlock()
+	c.bLock = true
+}
+
+func (c *conditionLocker) unlock() {
+	c.lockMu.Lock()
+	defer c.lockMu.Unlock()
+	c.bLock = false
+	c.lockCnd.Broadcast()
+}
+
+func (c *conditionLocker) waitIfLock() {
+	c.lockMu.Lock()
+	defer c.lockMu.Unlock()
+	for c.bLock {
+		c.lockCnd.Wait()
+	}
+}
+
 type SecureChannel struct {
 	endpointURL string
 
@@ -46,7 +81,8 @@ type SecureChannel struct {
 	time func() time.Time
 
 	// closing is channel used to indicate to go routines that the secure channel is closing
-	closing chan struct{}
+	closing      chan struct{}
+	disconnected chan struct{}
 
 	// closingMu is used to protect the _changing_ of the mutex
 	// i.e. when we _read_ from the closing chan we acquire a read lock, and when in `reset`, we acquire a write lock
@@ -64,6 +100,11 @@ type SecureChannel struct {
 	activeInstance *channelInstance
 	instancesMu    sync.Mutex
 
+	// prevent sending msg when secure channel renewal occurs
+	reqLocker  *conditionLocker
+	rcvLocker  *conditionLocker
+	pendingReq sync.WaitGroup
+
 	// handles maps request IDs to response channels
 	handlers   map[uint32]chan *response
 	handlersMu sync.Mutex
@@ -77,9 +118,12 @@ type SecureChannel struct {
 	// duration of the "open" request.
 	openingInstance *channelInstance
 	openingMu       sync.Mutex
+
+	// errorCh receive dispatcher errors
+	errCh chan<- error
 }
 
-func NewSecureChannel(endpoint string, c *uacp.Conn, cfg *Config) (*SecureChannel, error) {
+func NewSecureChannel(endpoint string, c *uacp.Conn, cfg *Config, errCh chan<- error) (*SecureChannel, error) {
 	if c == nil {
 		return nil, errors.Errorf("no connection")
 	}
@@ -108,8 +152,10 @@ func NewSecureChannel(endpoint string, c *uacp.Conn, cfg *Config) (*SecureChanne
 		c:           c,
 		cfg:         cfg,
 		requestID:   cfg.RequestIDSeed,
+		reqLocker:   newConditionLocker(),
+		rcvLocker:   newConditionLocker(),
+		errCh:       errCh,
 	}
-
 	s.reset()
 
 	return s, nil
@@ -121,6 +167,7 @@ func (s *SecureChannel) reset() {
 
 	// note: we _don't_ reset s.requestID
 	s.closing = make(chan struct{})
+	s.disconnected = make(chan struct{})
 	s.startDispatcher = sync.Once{}
 	s.instances = make(map[uint32][]*channelInstance)
 	s.chunks = make(map[uint32][]*MessageChunk)
@@ -145,12 +192,24 @@ func (s *SecureChannel) dispatcher() {
 	s.closingMu.RLock()
 	defer s.closingMu.RUnlock()
 
+	defer func() {
+		close(s.disconnected)
+	}()
+
 	for {
 		select {
 		case <-s.closing:
 			return
 		default:
 			resp := s.receive(ctx)
+
+			if resp.Err != nil {
+				select {
+				case s.errCh <- resp.Err:
+				default:
+				}
+			}
+
 			if resp.Err == io.EOF {
 				return
 			}
@@ -168,6 +227,11 @@ func (s *SecureChannel) dispatcher() {
 				continue
 			}
 
+			// HACK
+			if _, ok := resp.V.(*ua.OpenSecureChannelResponse); ok {
+				s.rcvLocker.lock()
+			}
+
 			debug.Printf("sending %T to handler\n", resp.V)
 			select {
 			case ch <- resp:
@@ -175,6 +239,8 @@ func (s *SecureChannel) dispatcher() {
 				// this should never happen since the chan is of size one
 				debug.Printf("unexpected state. channel write should always succeed.")
 			}
+
+			s.rcvLocker.waitIfLock()
 		}
 	}
 }
@@ -289,7 +355,10 @@ func (s *SecureChannel) readChunk() (*MessageChunk, error) {
 	if err == io.EOF || len(b) == 0 {
 		return nil, io.EOF
 	}
-
+	// do not wrap this error since it hides conn error
+	if _, ok := err.(*uacp.Error); ok {
+		return nil, err
+	}
 	if err != nil {
 		return nil, errors.Errorf("sechan: read header failed: %s %#v", err, err)
 	}
@@ -408,6 +477,7 @@ func (s *SecureChannel) Open(ctx context.Context) error {
 
 func (s *SecureChannel) open(ctx context.Context, instance *channelInstance, requestType ua.SecurityTokenRequestType) error {
 	// TODO: do something with the context
+	defer s.rcvLocker.unlock()
 
 	s.openingMu.Lock()
 	defer s.openingMu.Unlock()
@@ -562,6 +632,9 @@ func (s *SecureChannel) scheduleRenewal(instance *channelInstance) {
 
 func (s *SecureChannel) renew(instance *channelInstance) error {
 	// lock ensure no one else renews this at the same time
+	s.reqLocker.lock()
+	defer s.reqLocker.unlock()
+	s.pendingReq.Wait()
 	instance.Lock()
 	defer instance.Unlock()
 
@@ -617,9 +690,11 @@ func (s *SecureChannel) sendRequestWithTimeout(
 	timeout time.Duration,
 	h func(interface{}) error) error {
 
+	s.pendingReq.Add(1)
 	respRequired := h != nil
 
 	ch, err := s.sendAsyncWithTimeout(req, reqID, instance, authToken, respRequired, timeout)
+	s.pendingReq.Done()
 	if err != nil {
 		return err
 	}
@@ -633,6 +708,9 @@ func (s *SecureChannel) sendRequestWithTimeout(
 	defer timer.Stop()
 
 	select {
+	case <-s.disconnected:
+		s.popHandler(reqID)
+		return io.EOF
 	case resp := <-ch:
 		if resp.Err != nil {
 			if resp.V != nil {
@@ -673,6 +751,7 @@ func (s *SecureChannel) SendRequest(req ua.Request, authToken *ua.NodeID, h func
 }
 
 func (s *SecureChannel) SendRequestWithTimeout(req ua.Request, authToken *ua.NodeID, timeout time.Duration, h func(interface{}) error) error {
+	s.reqLocker.waitIfLock()
 	active, err := s.getActiveChannelInstance()
 	if err != nil {
 		return err
@@ -764,6 +843,14 @@ func (s *SecureChannel) Close() error {
 		s.reset()
 	}()
 
+	s.reqLocker.unlock()
+	s.rcvLocker.unlock()
+
+	select {
+	case <-s.disconnected:
+		return io.EOF
+	default:
+	}
 	err := s.SendRequest(&ua.CloseSecureChannelRequest{}, nil, nil)
 
 	if err != nil {

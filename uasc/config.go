@@ -54,6 +54,17 @@ type Config struct {
 	// depends on the mapping used and is described in the Part 6.
 	SecurityMode ua.MessageSecurityMode
 
+	// AutoReconnect will make sure that once communication is restored,
+	// the old session is used whenever possible and that Susbcription data is not missed.
+	// You may choose to use AutoReconnect (true by default) or do it manually.
+	// AutoReconnect will make the UaClient to try to reconnect to the server every second,
+	// once the communication is broken. If you do it manually, you must be prepared to do it until it succeeds.
+	AutoReconnect bool
+
+	// ReconnectInterval is interval duration between each reconnection attempt,
+	// ignored if AutoReconnect is set to false.
+	ReconnectInterval time.Duration
+
 	// Lifetime is the requested lifetime, in milliseconds, for the new SecurityToken when the
 	// SecureChannel works as client. It specifies when the Client expects to renew the SecureChannel
 	// by calling the OpenSecureChannel Service again. If a SecureChannel is not renewed, then all

@@ -8,11 +8,13 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"io"
 	"log"
 	"reflect"
 	"sort"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/gopcua/opcua/debug"
@@ -25,7 +27,7 @@ import (
 
 // GetEndpoints returns the available endpoint descriptions for the server.
 func GetEndpoints(endpoint string) ([]*ua.EndpointDescription, error) {
-	c := NewClient(endpoint)
+	c := NewClient(endpoint, AutoReconnect(false))
 	if err := c.Dial(context.Background()); err != nil {
 		return nil, err
 	}
@@ -79,6 +81,22 @@ func (a bySecurityLevel) Len() int           { return len(a) }
 func (a bySecurityLevel) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a bySecurityLevel) Less(i, j int) bool { return a[i].SecurityLevel < a[j].SecurityLevel }
 
+// ConnState is the ua client connection state
+type ConnState uint8
+
+const (
+	// Closed, the Connection is currently closed
+	Closed ConnState = iota
+	// Connected, the Connection is currently connected
+	Connected
+	// Connecting, the Connection is currently connecting to a server for the first time
+	Connecting
+	// Disconnected, the Connection is currently disconnected
+	Disconnected
+	// Reconnecting, the Connection is currently attempting to reconnect to a server it was previously connected to
+	Reconnecting
+)
+
 // Client is a high-level client for an OPC/UA server.
 // It establishes a secure channel and a session.
 type Client struct {
@@ -95,18 +113,24 @@ type Client struct {
 	conn *uacp.Conn
 
 	// sechan is the open secure channel.
-	sechan *uasc.SecureChannel
+	sechan    *uasc.SecureChannel
+	sechanErr chan error
 
 	// session is the active session.
 	session atomic.Value // *Session
 
-	// map of active subscriptions managed by this client. key is SubscriptionID
-	// access guarded by subMux
-	subscriptions map[uint32]*Subscription
-	subMux        sync.RWMutex
+	// subs is the set of active subscriptions by id.
+	subs   map[uint32]*Subscription
+	subMux sync.RWMutex
 
-	// once initializes session
-	once sync.Once
+	// state of the client
+	state atomic.Value // ConnState
+
+	// monitorOnce ensures only one connection monitor is running
+	monitorOnce sync.Once
+
+	// sessionOnce initializes the session
+	sessionOnce sync.Once
 }
 
 // NewClient creates a new Client.
@@ -122,13 +146,36 @@ type Client struct {
 // https://godoc.org/github.com/gopcua/opcua#Option
 func NewClient(endpoint string, opts ...Option) *Client {
 	cfg, sessionCfg := ApplyConfig(opts...)
-	return &Client{
-		endpointURL:   endpoint,
-		cfg:           cfg,
-		sessionCfg:    sessionCfg,
-		subscriptions: make(map[uint32]*Subscription),
+	c := Client{
+		endpointURL: endpoint,
+		cfg:         cfg,
+		sessionCfg:  sessionCfg,
+		sechanErr:   make(chan error, 1),
+		subs:        make(map[uint32]*Subscription),
 	}
+	c.state.Store(Closed)
+	return &c
 }
+
+// reconnectAction is a list of actions for the client reconnection logic.
+type reconnectAction uint8
+
+const (
+	// none, no reconnection action
+	none reconnectAction = iota
+	// createSecureChannel, recreate secure channel action
+	createSecureChannel
+	// restoreSession, ask the server to repair session
+	restoreSession
+	// recreateSession, ask the client to repair session
+	recreateSession
+	// republishSubscriptions, ask the server to repair the previous subscription
+	republishSubscriptions
+	// restoreSubscriptions moves subscriptions from one session to another
+	restoreSubscriptions
+	// abortReconnect, the reconnecting is not possible
+	abortReconnect
+)
 
 // Connect establishes a secure channel and creates a new session.
 func (c *Client) Connect(ctx context.Context) (err error) {
@@ -139,6 +186,8 @@ func (c *Client) Connect(ctx context.Context) (err error) {
 	if c.sechan != nil {
 		return errors.Errorf("already connected")
 	}
+
+	c.state.Store(Connecting)
 	if err := c.Dial(ctx); err != nil {
 		return err
 	}
@@ -151,7 +200,275 @@ func (c *Client) Connect(ctx context.Context) (err error) {
 		_ = c.Close()
 		return err
 	}
+	c.state.Store(Connected)
+
+	c.monitorOnce.Do(func() {
+		go c.monitor(ctx)
+	})
+
 	return nil
+}
+
+// monitor manages connection alteration
+func (c *Client) monitor(ctx context.Context) {
+	defer c.state.Store(Closed)
+
+	action := none
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case err, ok := <-c.sechanErr:
+			// return if channel or connection is closed
+			if !ok || err == io.EOF && c.State() == Closed {
+				return
+			}
+
+			// tell the handler the connection is disconnected
+			c.state.Store(Disconnected)
+
+			if !c.cfg.AutoReconnect {
+				// the connection is closed and should not be restored
+				action = abortReconnect
+				return
+			}
+
+			switch err {
+			case io.EOF:
+				// the connection has been closed
+				action = createSecureChannel
+
+			case syscall.ECONNREFUSED:
+				// the connection has been refused by the server
+				action = abortReconnect
+
+			default:
+				switch x := err.(type) {
+				case *uacp.Error:
+					switch ua.StatusCode(x.ErrorCode) {
+					case ua.StatusBadSecureChannelIDInvalid:
+						// the secure channel has been rejected by the server
+						action = createSecureChannel
+
+					case ua.StatusBadSessionIDInvalid:
+						// the session has been rejected by the server
+						action = recreateSession
+
+					case ua.StatusBadSubscriptionIDInvalid:
+						// the subscription has been rejected by the server
+						action = restoreSubscriptions
+
+					case ua.StatusBadCertificateInvalid:
+						// todo(unknownet): recreate server certificate
+						fallthrough
+
+					default:
+						// unknown error has occured
+						action = createSecureChannel
+					}
+
+				default:
+					// unknown error has occured
+					action = createSecureChannel
+				}
+			}
+
+			c.state.Store(Disconnected)
+
+			// pause all subscriptions
+			for _, sub := range c.subs {
+				sub.pause(ctx)
+			}
+
+			for action != none {
+
+				select {
+				case <-ctx.Done():
+					return
+
+				default:
+
+					switch action {
+					case createSecureChannel:
+						// recreate a secure channel by brute forcing
+						// a reconnection to the server
+
+						// close previous secure channel
+						_ = c.conn.Close()
+						c.sechan.Close()
+						c.sechan = nil
+
+						c.state.Store(Reconnecting)
+
+						debug.Printf("Trying to recreate secure channel")
+						for {
+							if err := c.Dial(ctx); err != nil {
+								select {
+								case <-ctx.Done():
+									return
+								case <-time.After(c.cfg.ReconnectInterval):
+									debug.Printf("Trying to recreate secure channel")
+									continue
+								}
+							}
+							break
+						}
+						debug.Printf("Secure channel recreated")
+						action = restoreSession
+
+					case restoreSession:
+						// try to reactivate the session,
+						// This only works if the session is still open on the server
+						// otherwise recreate it
+
+						debug.Printf("Trying to restore session")
+						s, err := c.DetachSession()
+						if err != nil {
+							action = createSecureChannel
+							continue
+						}
+						if err := c.ActivateSession(s); err != nil {
+							debug.Printf("Restore session failed")
+							action = recreateSession
+							continue
+						}
+						debug.Printf("Session restored")
+						action = republishSubscriptions
+
+					case recreateSession:
+						// create a new session to replace the previous one
+
+						debug.Printf("Trying to recreate session")
+						s, err := c.CreateSession(c.sessionCfg)
+						if err != nil {
+							debug.Printf("Recreate session failed: %v", err)
+							action = createSecureChannel
+							continue
+						}
+						if err := c.ActivateSession(s); err != nil {
+							debug.Printf("Reactivate session failed: %v", err)
+							action = createSecureChannel
+							continue
+						}
+						action = restoreSubscriptions
+
+					case republishSubscriptions:
+						// try to republish the previous subscriptions from the server
+						// otherwise restore them
+
+						// todo(fs): do we need this state at all?
+						// todo(fs): isn't this path the same as restoreSubscriptions minus the transfer?
+						// todo(fs): and if the transfer is a NoOp if the subscription is already on the
+						// todo(fs): session then we can omit that or move it to a function which
+						// todo(fs): handles the transfer or not.
+						//
+						// if err := c.republishSubscriptions(c.SubscriptionIDs()); err != nil {
+						// 	debug.Printf("Republish subscription failed: %v", err)
+						// 	action = createSecureChannel
+						// 	continue
+						// }
+
+						var subsToRestore []uint32
+						for _, id := range c.SubscriptionIDs() {
+							if err := c.republishSubscription(id); err != nil {
+								debug.Printf("Republish of subscription %d failed", id)
+								subsToRestore = append(subsToRestore, id)
+							}
+						}
+
+						if len(subsToRestore) > 0 {
+							if err := c.restoreSubscriptions(subsToRestore); err != nil {
+								debug.Printf("Restore subscripitions failed: %v", err)
+								action = recreateSession
+								continue
+							}
+						}
+
+						c.state.Store(Connected)
+						action = none
+
+					case restoreSubscriptions:
+						// transfer subscriptions from the old to the new session
+						// and try to republish the subscriptions.
+						// Restore the subscriptions where republishing fails.
+
+						subIDs := c.SubscriptionIDs()
+						subsToRepublish := []uint32{}
+						subsToRestore := []uint32{}
+
+						res, err := c.transferSubscriptions(subIDs)
+						if err != nil {
+							debug.Printf("Transfer subscriptions failed: %v", err)
+							subsToRestore = subIDs
+						} else {
+							for i := range res.Results {
+								transferResult := res.Results[i]
+								if transferResult.StatusCode == ua.StatusBadSubscriptionIDInvalid {
+									debug.Printf("Warning suscription %d should be recreated", subIDs[i])
+									subsToRestore = append(subsToRestore, subIDs[i])
+								} else {
+									debug.Printf(
+										"Subscription %d can be repaired with sequence number %d",
+										subIDs[i],
+										transferResult.AvailableSequenceNumbers[i],
+									)
+									subsToRepublish = append(subsToRepublish, subIDs[i])
+								}
+							}
+						}
+
+						// todo(fs): this looks wrong since we may be able to republish
+						// todo(fs): some of the subscriptions but not all of them.
+						// todo(fs): shouldn't we only restore the ones that failed to republish?
+						// todo(fs): an alternative implementation is below
+						//
+						// if len(subsToRepublish) > 0 {
+						// 	if err := c.republishSubscriptions(subsToRepublish); err != nil {
+						// 		debug.Printf("Republish subscriptions failed: %v", err)
+						// 		subsToRestore = append(subsToRestore, subsToRepublish...)
+						// 	}
+						// }
+
+						for _, id := range subsToRepublish {
+							if err := c.republishSubscription(id); err != nil {
+								debug.Printf("Republish of subscription %d failed", id)
+								subsToRestore = append(subsToRestore, id)
+							}
+						}
+
+						if len(subsToRestore) > 0 {
+							if err := c.restoreSubscriptions(subsToRestore); err != nil {
+								debug.Printf("Restore subscripitions failed: %v", err)
+								action = recreateSession
+								continue
+							}
+						}
+
+						c.state.Store(Connected)
+						action = none
+
+					case abortReconnect:
+						// non recoverable disconnection
+						// stop the client
+
+						// todo(unknownet): should we store the error?
+						debug.Printf("Reconnection not recoverable")
+						return
+					}
+				}
+			}
+
+			// clear sechan errors from reconnection
+			for len(c.sechanErr) > 0 {
+				<-c.sechanErr
+			}
+
+			// resume all subscriptions
+			for _, sub := range c.subs {
+				sub.resume(ctx)
+			}
+		}
+	}
 }
 
 // Dial establishes a secure channel.
@@ -160,7 +477,10 @@ func (c *Client) Dial(ctx context.Context) error {
 		ctx = context.Background()
 	}
 
-	c.once.Do(func() { c.session.Store((*Session)(nil)) })
+	c.sessionOnce.Do(func() {
+		c.session.Store((*Session)(nil))
+	})
+
 	if c.sechan != nil {
 		return errors.Errorf("secure channel already connected")
 	}
@@ -171,13 +491,154 @@ func (c *Client) Dial(ctx context.Context) error {
 		return err
 	}
 
-	c.sechan, err = uasc.NewSecureChannel(c.endpointURL, c.conn, c.cfg)
+	c.sechan, err = uasc.NewSecureChannel(c.endpointURL, c.conn, c.cfg, c.sechanErr)
 	if err != nil {
 		_ = c.conn.Close()
 		return err
 	}
 
 	return c.sechan.Open(ctx)
+}
+
+// SubscriptionIDs gets a list of subscriptionIDs
+func (c *Client) SubscriptionIDs() []uint32 {
+	c.subMux.Lock()
+	defer c.subMux.Unlock()
+
+	var ids []uint32
+	for id := range c.subs {
+		ids = append(ids, id)
+	}
+	return ids
+}
+
+// restoreSubscriptions creates new subscriptions
+// with the same parameters to replace the previous ones
+func (c *Client) restoreSubscriptions(ids []uint32) error {
+	for _, id := range ids {
+		if _, exist := c.subs[id]; !exist {
+			debug.Printf("Cannot restore subscription %d", id)
+			continue
+		}
+
+		sub := c.subs[id]
+
+		debug.Printf("Restoring subscription %d", id)
+		if err := sub.restore(); err != nil {
+			debug.Printf("Restoring subscription %d failed", id)
+			return err
+		}
+		debug.Printf("Restored subscription %d", id)
+	}
+
+	return nil
+}
+
+// transferSubscriptions ask the server to transfer the given subscriptions
+// of the previous session to the current one.
+func (c *Client) transferSubscriptions(ids []uint32) (*ua.TransferSubscriptionsResponse, error) {
+	req := &ua.TransferSubscriptionsRequest{
+		SubscriptionIDs:   ids,
+		SendInitialValues: false,
+	}
+
+	var res *ua.TransferSubscriptionsResponse
+	err := c.Send(req, func(v interface{}) error {
+		return safeAssign(v, &res)
+	})
+	return res, err
+}
+
+// republishSubscriptions sends republish requests for all given subscription ids.
+// func (c *Client) republishSubscriptions(ids []uint32) error {
+// 	c.subMux.RLock()
+// 	defer c.subMux.RUnlock()
+
+// 	for _, id := range ids {
+// 		sub, ok := c.subs[id]
+// 		if !ok {
+// 			return errors.Errorf("invalid subscription id %d", id)
+// 		}
+// 		if err := c.republishSubscription(sub); err != nil {
+// 			return err
+// 		}
+// 	}
+
+// 	return nil
+// }
+
+// republishSubscriptions sends republish requests for the given subscription id.
+func (c *Client) republishSubscription(id uint32) error {
+
+	// todo(fs): do we need to hold the lock for the entire time or only the map lookup?
+	c.subMux.RLock()
+	defer c.subMux.RUnlock()
+
+	sub, ok := c.subs[id]
+	if !ok {
+		return errors.Errorf("invalid subscription id %d", id)
+	}
+
+	debug.Printf("republishing subscription %d", sub.SubscriptionID)
+	if err := c.sendRepublishRequests(sub); err != nil {
+		status, ok := err.(ua.StatusCode)
+		if !ok {
+			return err
+		}
+
+		switch status {
+		case ua.StatusBadSessionIDInvalid:
+			return nil
+		case ua.StatusBadSubscriptionIDInvalid:
+			// todo(fs): do we need to forget the subscription id in this case?
+			debug.Printf("republish failed since subscription %d is invalid", sub.SubscriptionID)
+			return errors.Errorf("republish failed since subscription %d is invalid", sub.SubscriptionID)
+		}
+	}
+	return nil
+}
+
+// sendRepublishRequests sends republish requests for the given subscription
+// until it gets a BadMessageNotAvailable which implies that there are no
+// more messages to restore.
+func (c *Client) sendRepublishRequests(sub *Subscription) error {
+	for {
+		req := &ua.RepublishRequest{
+			SubscriptionID:           sub.SubscriptionID,
+			RetransmitSequenceNumber: atomic.LoadUint32(&sub.lastSequenceNumber) + 1,
+		}
+
+		debug.Printf("Republishing subscription %d and sequence number %d",
+			req.SubscriptionID,
+			req.RetransmitSequenceNumber,
+		)
+
+		if c.sessionClosed() {
+			debug.Printf("Republishing subscription %d aborted", req.SubscriptionID)
+			return ua.StatusBadSessionClosed
+		}
+
+		res, err := sub.republish(req)
+		if err != nil {
+			if err == ua.StatusBadMessageNotAvailable {
+				// No more message to restore
+				debug.Printf("Republishing subscription %d OK", req.SubscriptionID)
+				return nil
+			}
+			debug.Printf("Republishing subscription %d failed: %v", req.SubscriptionID, err)
+			return err
+		}
+
+		status := ua.StatusBad
+		if res != nil {
+			status = res.ResponseHeader.ServiceResult
+		}
+
+		if status != ua.StatusOK {
+			debug.Printf("Republishing subscription %d failed: %v", req.SubscriptionID, status)
+			return status
+		}
+	}
 }
 
 // Close closes the session and the secure channel.
@@ -187,35 +648,26 @@ func (c *Client) Close() error {
 	// try to close the session but ignore any error
 	// so that we close the underlying channel and connection.
 	_ = c.CloseSession()
-
-	_ = c.sechan.Close()
+	c.state.Store(Closed)
+	defer close(c.sechanErr)
+	if c.sechan != nil {
+		_ = c.sechan.Close()
+	}
 
 	return nil
 }
 
-var errNotConnected = errors.New("not connected")
-
-// SetReadBuffer sets the operating system's TCP receive buffer
-// of the underlying UACP connection.
-func (c *Client) SetReadBuffer(bytes int) error {
-	if c.conn == nil {
-		return errNotConnected
-	}
-	return c.conn.SetReadBuffer(bytes)
-}
-
-// SetWriteBuffer sets the operating system's TCP transmit buffer
-// of the underlying UACP connection.
-func (c *Client) SetWriteBuffer(bytes int) error {
-	if c.conn == nil {
-		return errNotConnected
-	}
-	return c.conn.SetWriteBuffer(bytes)
+func (c *Client) State() ConnState {
+	return c.state.Load().(ConnState)
 }
 
 // Session returns the active session.
 func (c *Client) Session() *Session {
 	return c.session.Load().(*Session)
+}
+
+func (c *Client) sessionClosed() bool {
+	return c.Session() == nil
 }
 
 // Session is a OPC/UA session as described in Part 4, 5.6.
@@ -594,30 +1046,50 @@ func (c *Client) Subscribe(params *SubscriptionParameters, notifyCh chan *Publis
 	}
 
 	sub := &Subscription{
-		res.SubscriptionID,
-		time.Duration(res.RevisedPublishingInterval) * time.Millisecond,
-		res.RevisedLifetimeCount,
-		res.RevisedMaxKeepAliveCount,
-		notifyCh,
-		c,
+		SubscriptionID:            res.SubscriptionID,
+		RevisedPublishingInterval: time.Duration(res.RevisedPublishingInterval) * time.Millisecond,
+		RevisedLifetimeCount:      res.RevisedLifetimeCount,
+		RevisedMaxKeepAliveCount:  res.RevisedMaxKeepAliveCount,
+		Notifs:                    notifyCh,
+		params:                    params,
+		pausech:                   make(chan struct{}), // must be unbuffered
+		resumech:                  make(chan struct{}), // must be unbuffered
+		stopch:                    make(chan struct{}), // must be unbuffered
+		c:                         c,
 	}
 
 	c.subMux.Lock()
-	if sub.SubscriptionID == 0 || c.subscriptions[sub.SubscriptionID] != nil {
+	if sub.SubscriptionID == 0 || c.subs[sub.SubscriptionID] != nil {
 		// this should not happen and is usually indicative of a server bug
 		// see: Part 4 Section 5.13.2.2, Table 88 – CreateSubscription Service Parameters
 		c.subMux.Unlock()
 		return nil, ua.StatusBadSubscriptionIDInvalid
 	}
-	c.subscriptions[sub.SubscriptionID] = sub
+	c.subs[sub.SubscriptionID] = sub
 	c.subMux.Unlock()
 
 	return sub, nil
 }
 
-func (c *Client) forgetSubscription(subID uint32) {
+// registerSubscription register a subscription
+func (c *Client) registerSubscription(sub *Subscription) error {
+	if sub.SubscriptionID == 0 {
+		return ua.StatusBadSubscriptionIDInvalid
+	}
+
 	c.subMux.Lock()
-	delete(c.subscriptions, subID)
+	defer c.subMux.Unlock()
+	if _, ok := c.subs[sub.SubscriptionID]; ok {
+		return errors.Errorf("SubscriptionID %d already registered", sub.SubscriptionID)
+	}
+
+	c.subs[sub.SubscriptionID] = sub
+	return nil
+}
+
+func (c *Client) forgetSubscription(id uint32) {
+	c.subMux.Lock()
+	delete(c.subs, id)
 	c.subMux.Unlock()
 }
 
@@ -625,22 +1097,22 @@ func (c *Client) notifySubscriptionsOfError(ctx context.Context, res *ua.Publish
 	c.subMux.RLock()
 	defer c.subMux.RUnlock()
 
-	subsToNotify := c.subscriptions
+	subsToNotify := c.subs
 	if res != nil && res.SubscriptionID != 0 {
 		subsToNotify = map[uint32]*Subscription{
-			res.SubscriptionID: c.subscriptions[res.SubscriptionID],
+			res.SubscriptionID: c.subs[res.SubscriptionID],
 		}
 	}
 	for _, sub := range subsToNotify {
 		go func(s *Subscription) {
-			s.sendNotification(ctx, &PublishNotificationData{Error: err})
+			s.notify(ctx, &PublishNotificationData{Error: err})
 		}(sub)
 	}
 }
 
 func (c *Client) notifySubscription(ctx context.Context, response *ua.PublishResponse) {
 	c.subMux.RLock()
-	sub, ok := c.subscriptions[response.SubscriptionID]
+	sub, ok := c.subs[response.SubscriptionID]
 	c.subMux.RUnlock()
 	if !ok {
 		debug.Printf("Unknown subscription: %v", response.SubscriptionID)
@@ -655,7 +1127,7 @@ func (c *Client) notifySubscription(ctx context.Context, response *ua.PublishRes
 	// todo(fs): see discussion in https://github.com/gopcua/opcua/issues/337
 
 	if response.NotificationMessage == nil {
-		sub.sendNotification(ctx, &PublishNotificationData{
+		sub.notify(ctx, &PublishNotificationData{
 			SubscriptionID: response.SubscriptionID,
 			Error:          errors.Errorf("empty NotificationMessage"),
 		})
@@ -666,7 +1138,7 @@ func (c *Client) notifySubscription(ctx context.Context, response *ua.PublishRes
 	for _, data := range response.NotificationMessage.NotificationData {
 		// Part 4, 7.20 NotificationData parameters
 		if data == nil || data.Value == nil {
-			sub.sendNotification(ctx, &PublishNotificationData{
+			sub.notify(ctx, &PublishNotificationData{
 				SubscriptionID: response.SubscriptionID,
 				Error:          errors.Errorf("missing NotificationData parameter"),
 			})
@@ -680,14 +1152,14 @@ func (c *Client) notifySubscription(ctx context.Context, response *ua.PublishRes
 		case *ua.DataChangeNotification,
 			*ua.EventNotificationList,
 			*ua.StatusChangeNotification:
-			sub.sendNotification(ctx, &PublishNotificationData{
+			sub.notify(ctx, &PublishNotificationData{
 				SubscriptionID: response.SubscriptionID,
 				Value:          data.Value,
 			})
 
 		// Error
 		default:
-			sub.sendNotification(ctx, &PublishNotificationData{
+			sub.notify(ctx, &PublishNotificationData{
 				SubscriptionID: response.SubscriptionID,
 				Error:          errors.Errorf("unknown NotificationData parameter: %T", data.Value),
 			})

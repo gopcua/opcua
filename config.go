@@ -28,6 +28,8 @@ func DefaultClientConfig() *uasc.Config {
 		SecurityMode:      ua.MessageSecurityModeNone,
 		Lifetime:          uint32(time.Hour / time.Millisecond),
 		RequestTimeout:    10 * time.Second,
+		AutoReconnect:     true,
+		ReconnectInterval: 5 * time.Second,
 	}
 }
 
@@ -72,6 +74,20 @@ func ApplicationName(s string) Option {
 func ApplicationURI(s string) Option {
 	return func(c *uasc.Config, sc *uasc.SessionConfig) {
 		sc.ClientDescription.ApplicationURI = s
+	}
+}
+
+// AutoReconnect sets the auto reconnect state of the secure channel.
+func AutoReconnect(b bool) Option {
+	return func(c *uasc.Config, sc *uasc.SessionConfig) {
+		c.AutoReconnect = b
+	}
+}
+
+// ReconnectInterval is interval duration between each reconnection attempt.
+func ReconnectInterval(d time.Duration) Option {
+	return func(c *uasc.Config, sc *uasc.SessionConfig) {
+		c.ReconnectInterval = d
 	}
 }
 
