@@ -27,13 +27,14 @@ type Server struct {
 	// They are valid after the server has been started.
 	Opts []opcua.Option
 
-	cmd *exec.Cmd
+	cmd    *exec.Cmd
+	waitch chan error
 }
 
 // NewServer creates a test server and starts it. The function
 // panics if the server cannot be started.
 func NewServer(path string) *Server {
-	s := &Server{Path: path}
+	s := &Server{Path: path, waitch: make(chan error)}
 	if err := s.Run(); err != nil {
 		panic(err)
 	}
@@ -58,24 +59,37 @@ func (s *Server) Run() error {
 	}
 
 	s.cmd = exec.Command(py, path)
+	s.cmd.Stdout = os.Stdout
+	s.cmd.Stderr = os.Stderr
 	s.Endpoint = "opc.tcp://127.0.0.1:4840"
 	s.Opts = []opcua.Option{opcua.SecurityMode(ua.MessageSecurityModeNone)}
 	if err := s.cmd.Start(); err != nil {
 		return err
 	}
+	go func() { s.waitch <- s.cmd.Wait() }()
 
 	// wait until endpoint is available
-	deadline := time.Now().Add(10 * time.Second)
-	for time.Now().Before(deadline) {
-		c, err := net.Dial("tcp", "127.0.0.1:4840")
-		if err != nil {
-			time.Sleep(100 * time.Millisecond)
-			continue
+	errch := make(chan error)
+	go func() {
+		deadline := time.Now().Add(10 * time.Second)
+		for time.Now().Before(deadline) {
+			c, err := net.Dial("tcp", "127.0.0.1:4840")
+			if err != nil {
+				time.Sleep(100 * time.Millisecond)
+				continue
+			}
+			c.Close()
+			errch <- nil
 		}
-		c.Close()
-		return nil
+		errch <- errors.Errorf("timeout")
+	}()
+
+	select {
+	case err := <-s.waitch:
+		return err
+	case err := <-errch:
+		return err
 	}
-	return errors.Errorf("timeout")
 }
 
 func (s *Server) Close() error {
@@ -83,5 +97,5 @@ func (s *Server) Close() error {
 		return errors.Errorf("not running")
 	}
 	go func() { s.cmd.Process.Kill() }()
-	return s.cmd.Wait()
+	return <-s.waitch
 }
