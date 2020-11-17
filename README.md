@@ -49,6 +49,9 @@ The `gopcua` project is sponsored by the following organizations by supporting t
   <a href="https://northvolt.com/">
     <img alt="Northvolt" width="50%" src="https://raw.githubusercontent.com/gopcua/opcua/master/logo/northvolt.png">
   </a>
+  <a href="https://www.evosoft.com/">
+    <img alt="evosoft" width="40%" src="https://raw.githubusercontent.com/gopcua/opcua/master/logo/evosoft.png">
+  </a>
 </p>
 
 ### Users
