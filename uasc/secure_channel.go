@@ -770,26 +770,22 @@ func (s *SecureChannel) sendAsyncWithTimeout(
 ) (<-chan *response, error) {
 
 	instance.Lock()
+	defer instance.Unlock()
 
 	m, err := instance.newRequestMessage(req, reqID, authToken, timeout)
 	if err != nil {
-		instance.Unlock()
 		return nil, err
 	}
 
 	b, err := m.Encode()
 	if err != nil {
-		instance.Unlock()
 		return nil, err
 	}
 
 	b, err = instance.signAndEncrypt(m, b)
 	if err != nil {
-		instance.Unlock()
 		return nil, err
 	}
-
-	instance.Unlock()
 
 	var resp chan *response
 
