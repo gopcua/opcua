@@ -10,10 +10,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gopcua/opcua/errors"
-	"github.com/gopcua/opcua/id"
-	"github.com/gopcua/opcua/ua"
-	"github.com/gopcua/opcua/uapolicy"
+	"github.com/liuxgo/opcua/errors"
+	"github.com/liuxgo/opcua/id"
+	"github.com/liuxgo/opcua/ua"
+	"github.com/liuxgo/opcua/uapolicy"
 )
 
 type instanceState int

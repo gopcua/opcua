@@ -17,12 +17,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/gopcua/opcua/debug"
-	"github.com/gopcua/opcua/errors"
-	"github.com/gopcua/opcua/id"
-	"github.com/gopcua/opcua/ua"
-	"github.com/gopcua/opcua/uacp"
-	"github.com/gopcua/opcua/uasc"
+	"github.com/liuxgo/opcua/debug"
+	"github.com/liuxgo/opcua/errors"
+	"github.com/liuxgo/opcua/id"
+	"github.com/liuxgo/opcua/ua"
+	"github.com/liuxgo/opcua/uacp"
+	"github.com/liuxgo/opcua/uasc"
 )
 
 // GetEndpoints returns the available endpoint descriptions for the server.

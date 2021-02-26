@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gopcua/opcua"
-	"github.com/gopcua/opcua/monitor"
-	"github.com/gopcua/opcua/ua"
+	"github.com/liuxgo/opcua"
+	"github.com/liuxgo/opcua/monitor"
+	"github.com/liuxgo/opcua/ua"
 )
 
 const (

@@ -13,7 +13,7 @@ import (
 	_ "crypto/sha1"
 	_ "crypto/sha256"
 
-	"github.com/gopcua/opcua/errors"
+	"github.com/liuxgo/opcua/errors"
 )
 
 /*

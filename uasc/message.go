@@ -5,8 +5,8 @@
 package uasc
 
 import (
-	"github.com/gopcua/opcua/errors"
-	"github.com/gopcua/opcua/ua"
+	"github.com/liuxgo/opcua/errors"
+	"github.com/liuxgo/opcua/ua"
 )
 
 type MessageHeader struct {

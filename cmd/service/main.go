@@ -12,8 +12,8 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/gopcua/opcua/cmd/service/goname"
-	"github.com/gopcua/opcua/errors"
+	"github.com/liuxgo/opcua/cmd/service/goname"
+	"github.com/liuxgo/opcua/errors"
 )
 
 var in, out, pkg string
@@ -275,7 +275,7 @@ const (
 
 var tmplRegExtObjs = template.Must(template.New("").Parse(`
 import (
-	"github.com/gopcua/opcua/id"
+	"github.com/liuxgo/opcua/id"
 )
 
 func init() {
@@ -334,7 +334,7 @@ var funcs = template.FuncMap{
 
 var tmplRegister = template.Must(template.New("").Funcs(funcs).Parse(`
 
-import "github.com/gopcua/opcua/id"
+import "github.com/liuxgo/opcua/id"
 
 func init() {
 	{{- range $i, $v := . -}}

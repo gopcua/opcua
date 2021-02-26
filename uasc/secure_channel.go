@@ -14,11 +14,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/gopcua/opcua/debug"
-	"github.com/gopcua/opcua/errors"
-	"github.com/gopcua/opcua/ua"
-	"github.com/gopcua/opcua/uacp"
-	"github.com/gopcua/opcua/uapolicy"
+	"github.com/liuxgo/opcua/debug"
+	"github.com/liuxgo/opcua/errors"
+	"github.com/liuxgo/opcua/ua"
+	"github.com/liuxgo/opcua/uacp"
+	"github.com/liuxgo/opcua/uapolicy"
 )
 
 const (

@@ -5,8 +5,8 @@
 package ua
 
 import (
-	"github.com/gopcua/opcua/errors"
-	"github.com/gopcua/opcua/id"
+	"github.com/liuxgo/opcua/errors"
+	"github.com/liuxgo/opcua/id"
 )
 
 // eotypes contains all known extension objects.

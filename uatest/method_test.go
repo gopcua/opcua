@@ -6,8 +6,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/gopcua/opcua"
-	"github.com/gopcua/opcua/ua"
+	"github.com/liuxgo/opcua"
+	"github.com/liuxgo/opcua/ua"
 	"github.com/pascaldekloe/goe/verify"
 )
 

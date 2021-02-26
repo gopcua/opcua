@@ -9,7 +9,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/gopcua/opcua/errors"
+	"github.com/liuxgo/opcua/errors"
 )
 
 func TestNodeID(t *testing.T) {

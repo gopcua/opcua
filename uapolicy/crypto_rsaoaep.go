@@ -9,7 +9,7 @@ import (
 	_ "crypto/sha1"
 	_ "crypto/sha256"
 
-	"github.com/gopcua/opcua/ua"
+	"github.com/liuxgo/opcua/ua"
 )
 
 // messageLen = (keyLenBits / 8) - 2*(hashLenBits / 8) - 2

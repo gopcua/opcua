@@ -5,9 +5,9 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/gopcua/opcua"
-	"github.com/gopcua/opcua/errors"
-	"github.com/gopcua/opcua/ua"
+	"github.com/liuxgo/opcua"
+	"github.com/liuxgo/opcua/errors"
+	"github.com/liuxgo/opcua/ua"
 )
 
 var (

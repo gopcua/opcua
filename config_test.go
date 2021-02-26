@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gopcua/opcua/ua"
-	"github.com/gopcua/opcua/uapolicy"
-	"github.com/gopcua/opcua/uasc"
+	"github.com/liuxgo/opcua/ua"
+	"github.com/liuxgo/opcua/uapolicy"
+	"github.com/liuxgo/opcua/uasc"
 
 	"github.com/pascaldekloe/goe/verify"
 )

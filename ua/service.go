@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/gopcua/opcua/debug"
+	"github.com/liuxgo/opcua/debug"
 )
 
 // svcreg contains all known service request/response objects.

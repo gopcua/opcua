@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gopcua/opcua/errors"
+	"github.com/liuxgo/opcua/errors"
 
 	"github.com/pascaldekloe/goe/verify"
 )

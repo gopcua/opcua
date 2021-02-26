@@ -10,7 +10,7 @@ import (
 	"math"
 	"time"
 
-	"github.com/gopcua/opcua/errors"
+	"github.com/liuxgo/opcua/errors"
 )
 
 const (

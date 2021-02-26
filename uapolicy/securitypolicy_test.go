@@ -12,7 +12,7 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/gopcua/opcua/ua"
+	"github.com/liuxgo/opcua/ua"
 
 	"github.com/pascaldekloe/goe/verify"
 )
