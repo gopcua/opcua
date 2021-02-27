@@ -1,3 +1,4 @@
+
 // Copyright 2018-2020 opcua authors. All rights reserved.
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
@@ -7,6 +8,7 @@
 package ua
 
 import "time"
+
 
 type Request interface {
 	Header() *RequestHeader
@@ -19,641 +21,754 @@ type Response interface {
 }
 
 type KeyValuePair struct {
-	Key   *QualifiedName
-	Value *Variant
-}
-
-type AdditionalParametersType struct {
-	Parameters []*KeyValuePair
-}
-
-type EphemeralKeyType struct {
-	PublicKey []byte
-	Signature []byte
-}
+		Key *QualifiedName
+		Value *Variant
+		
+	}
 
 type EndpointType struct {
-	EndpointURL         string
-	SecurityMode        MessageSecurityMode
-	SecurityPolicyURI   string
-	TransportProfileURI string
-}
+		EndpointURL string
+		SecurityMode MessageSecurityMode
+		SecurityPolicyURI string
+		TransportProfileURI string
+		
+	}
+
+type RationalNumber struct {
+		Numerator int32
+		Denominator uint32
+		
+	}
+
+type Vector struct {}
+
+type ThreeDVector struct {
+		X float64
+		Y float64
+		Z float64
+		
+	}
+
+type CartesianCoordinates struct {}
+
+type ThreeDCartesianCoordinates struct {
+		X float64
+		Y float64
+		Z float64
+		
+	}
+
+type Orientation struct {}
+
+type ThreeDOrientation struct {
+		A float64
+		B float64
+		C float64
+		
+	}
+
+type Frame struct {}
+
+type ThreeDFrame struct {
+		CartesianCoordinates *ThreeDCartesianCoordinates
+		Orientation *ThreeDOrientation
+		
+	}
 
 type IdentityMappingRuleType struct {
-	CriteriaType IdentityCriteriaType
-	Criteria     string
-}
+		CriteriaType IdentityCriteriaType
+		Criteria string
+		
+	}
+
+type CurrencyUnitType struct {
+		NumericCode int16
+		Exponent int8
+		AlphabeticCode string
+		Currency *LocalizedText
+		
+	}
 
 type TrustListDataType struct {
-	SpecifiedLists      uint32
-	TrustedCertificates [][]byte
-	TrustedCrls         [][]byte
-	IssuerCertificates  [][]byte
-	IssuerCrls          [][]byte
-}
+		SpecifiedLists uint32
+		TrustedCertificates [][]byte
+		TrustedCrls [][]byte
+		IssuerCertificates [][]byte
+		IssuerCrls [][]byte
+		
+	}
 
 type DecimalDataType struct {
-	Scale int16
-	Value []byte
-}
+		Scale int16
+		Value []byte
+		
+	}
 
 type DataTypeSchemaHeader struct {
-	Namespaces         []string
-	StructureDataTypes []*StructureDescription
-	EnumDataTypes      []*EnumDescription
-	SimpleDataTypes    []*SimpleTypeDescription
-}
+		Namespaces []string
+		StructureDataTypes []*StructureDescription
+		EnumDataTypes []*EnumDescription
+		SimpleDataTypes []*SimpleTypeDescription
+		
+	}
 
 type DataTypeDescription struct {
-	DataTypeID *NodeID
-	Name       *QualifiedName
-}
+		DataTypeID *NodeID
+		Name *QualifiedName
+		
+	}
 
 type StructureDescription struct {
-	DataTypeID          *NodeID
-	Name                *QualifiedName
-	StructureDefinition *StructureDefinition
-}
+		DataTypeID *NodeID
+		Name *QualifiedName
+		StructureDefinition *StructureDefinition
+		
+	}
 
 type EnumDescription struct {
-	DataTypeID     *NodeID
-	Name           *QualifiedName
-	EnumDefinition *EnumDefinition
-	BuiltInType    uint8
-}
+		DataTypeID *NodeID
+		Name *QualifiedName
+		EnumDefinition *EnumDefinition
+		BuiltInType uint8
+		
+	}
 
 type SimpleTypeDescription struct {
-	DataTypeID   *NodeID
-	Name         *QualifiedName
-	BaseDataType *NodeID
-	BuiltInType  uint8
-}
+		DataTypeID *NodeID
+		Name *QualifiedName
+		BaseDataType *NodeID
+		BuiltInType uint8
+		
+	}
 
 type UABinaryFileDataType struct {
-	Namespaces         []string
-	StructureDataTypes []*StructureDescription
-	EnumDataTypes      []*EnumDescription
-	SimpleDataTypes    []*SimpleTypeDescription
-	SchemaLocation     string
-	FileHeader         []*KeyValuePair
-	Body               *Variant
-}
+		Namespaces []string
+		StructureDataTypes []*StructureDescription
+		EnumDataTypes []*EnumDescription
+		SimpleDataTypes []*SimpleTypeDescription
+		SchemaLocation string
+		FileHeader []*KeyValuePair
+		Body *Variant
+		
+	}
 
 type DataSetMetaDataType struct {
-	Namespaces           []string
-	StructureDataTypes   []*StructureDescription
-	EnumDataTypes        []*EnumDescription
-	SimpleDataTypes      []*SimpleTypeDescription
-	Name                 string
-	Description          *LocalizedText
-	Fields               []*FieldMetaData
-	DataSetClassID       *GUID
-	ConfigurationVersion *ConfigurationVersionDataType
-}
+		Namespaces []string
+		StructureDataTypes []*StructureDescription
+		EnumDataTypes []*EnumDescription
+		SimpleDataTypes []*SimpleTypeDescription
+		Name string
+		Description *LocalizedText
+		Fields []*FieldMetaData
+		DataSetClassID *GUID
+		ConfigurationVersion *ConfigurationVersionDataType
+		
+	}
 
 type FieldMetaData struct {
-	Name            string
-	Description     *LocalizedText
-	FieldFlags      DataSetFieldFlags
-	BuiltInType     uint8
-	DataType        *NodeID
-	ValueRank       int32
-	ArrayDimensions []uint32
-	MaxStringLength uint32
-	DataSetFieldID  *GUID
-	Properties      []*KeyValuePair
-}
+		Name string
+		Description *LocalizedText
+		FieldFlags DataSetFieldFlags
+		BuiltInType uint8
+		DataType *NodeID
+		ValueRank int32
+		ArrayDimensions []uint32
+		MaxStringLength uint32
+		DataSetFieldID *GUID
+		Properties []*KeyValuePair
+		
+	}
 
 type ConfigurationVersionDataType struct {
-	MajorVersion uint32
-	MinorVersion uint32
-}
+		MajorVersion uint32
+		MinorVersion uint32
+		
+	}
 
 type PublishedDataSetDataType struct {
-	Name            string
-	DataSetFolder   []string
-	DataSetMetaData *DataSetMetaDataType
-	ExtensionFields []*KeyValuePair
-	DataSetSource   *ExtensionObject
-}
+		Name string
+		DataSetFolder []string
+		DataSetMetaData *DataSetMetaDataType
+		ExtensionFields []*KeyValuePair
+		DataSetSource *ExtensionObject
+		
+	}
 
-type PublishedDataSetSourceDataType struct{}
+type PublishedDataSetSourceDataType struct {}
 
 type PublishedVariableDataType struct {
-	PublishedVariable    *NodeID
-	AttributeID          AttributeID
-	SamplingIntervalHint float64
-	DeadbandType         uint32
-	DeadbandValue        float64
-	IndexRange           string
-	SubstituteValue      *Variant
-	MetaDataProperties   []*QualifiedName
-}
+		PublishedVariable *NodeID
+		AttributeID AttributeID
+		SamplingIntervalHint float64
+		DeadbandType uint32
+		DeadbandValue float64
+		IndexRange string
+		SubstituteValue *Variant
+		MetaDataProperties []*QualifiedName
+		
+	}
 
 type PublishedDataItemsDataType struct {
-	PublishedData []*PublishedVariableDataType
-}
+		PublishedData []*PublishedVariableDataType
+		
+	}
 
 type PublishedEventsDataType struct {
-	EventNotifier  *NodeID
-	SelectedFields []*SimpleAttributeOperand
-	Filter         *ContentFilter
-}
+		EventNotifier *NodeID
+		SelectedFields []*SimpleAttributeOperand
+		Filter *ContentFilter
+		
+	}
 
 type DataSetWriterDataType struct {
-	Name                    string
-	Enabled                 bool
-	DataSetWriterID         uint16
-	DataSetFieldContentMask DataSetFieldContentMask
-	KeyFrameCount           uint32
-	DataSetName             string
-	DataSetWriterProperties []*KeyValuePair
-	TransportSettings       *ExtensionObject
-	MessageSettings         *ExtensionObject
-}
+		Name string
+		Enabled bool
+		DataSetWriterID uint16
+		DataSetFieldContentMask DataSetFieldContentMask
+		KeyFrameCount uint32
+		DataSetName string
+		DataSetWriterProperties []*KeyValuePair
+		TransportSettings *ExtensionObject
+		MessageSettings *ExtensionObject
+		
+	}
 
-type DataSetWriterTransportDataType struct{}
+type DataSetWriterTransportDataType struct {}
 
-type DataSetWriterMessageDataType struct{}
+type DataSetWriterMessageDataType struct {}
 
 type PubSubGroupDataType struct {
-	Name                  string
-	Enabled               bool
-	SecurityMode          MessageSecurityMode
-	SecurityGroupID       string
-	SecurityKeyServices   []*EndpointDescription
-	MaxNetworkMessageSize uint32
-	GroupProperties       []*KeyValuePair
-}
+		Name string
+		Enabled bool
+		SecurityMode MessageSecurityMode
+		SecurityGroupID string
+		SecurityKeyServices []*EndpointDescription
+		MaxNetworkMessageSize uint32
+		GroupProperties []*KeyValuePair
+		
+	}
 
 type WriterGroupDataType struct {
-	Name                  string
-	Enabled               bool
-	SecurityMode          MessageSecurityMode
-	SecurityGroupID       string
-	SecurityKeyServices   []*EndpointDescription
-	MaxNetworkMessageSize uint32
-	GroupProperties       []*KeyValuePair
-	WriterGroupID         uint16
-	PublishingInterval    float64
-	KeepAliveTime         float64
-	Priority              uint8
-	LocaleIDs             []string
-	HeaderLayoutURI       string
-	TransportSettings     *ExtensionObject
-	MessageSettings       *ExtensionObject
-	DataSetWriters        []*DataSetWriterDataType
-}
+		Name string
+		Enabled bool
+		SecurityMode MessageSecurityMode
+		SecurityGroupID string
+		SecurityKeyServices []*EndpointDescription
+		MaxNetworkMessageSize uint32
+		GroupProperties []*KeyValuePair
+		WriterGroupID uint16
+		PublishingInterval float64
+		KeepAliveTime float64
+		Priority uint8
+		LocaleIDs []string
+		HeaderLayoutURI string
+		TransportSettings *ExtensionObject
+		MessageSettings *ExtensionObject
+		DataSetWriters []*DataSetWriterDataType
+		
+	}
 
-type WriterGroupTransportDataType struct{}
+type WriterGroupTransportDataType struct {}
 
-type WriterGroupMessageDataType struct{}
+type WriterGroupMessageDataType struct {}
 
 type PubSubConnectionDataType struct {
-	Name                 string
-	Enabled              bool
-	PublisherID          *Variant
-	TransportProfileURI  string
-	Address              *ExtensionObject
-	ConnectionProperties []*KeyValuePair
-	TransportSettings    *ExtensionObject
-	WriterGroups         []*WriterGroupDataType
-	ReaderGroups         []*ReaderGroupDataType
-}
+		Name string
+		Enabled bool
+		PublisherID *Variant
+		TransportProfileURI string
+		Address *ExtensionObject
+		ConnectionProperties []*KeyValuePair
+		TransportSettings *ExtensionObject
+		WriterGroups []*WriterGroupDataType
+		ReaderGroups []*ReaderGroupDataType
+		
+	}
 
-type ConnectionTransportDataType struct{}
+type ConnectionTransportDataType struct {}
 
 type NetworkAddressDataType struct {
-	NetworkInterface string
-}
+		NetworkInterface string
+		
+	}
 
 type NetworkAddressURLDataType struct {
-	NetworkInterface string
-	URL              string
-}
+		NetworkInterface string
+		URL string
+		
+	}
 
 type ReaderGroupDataType struct {
-	Name                  string
-	Enabled               bool
-	SecurityMode          MessageSecurityMode
-	SecurityGroupID       string
-	SecurityKeyServices   []*EndpointDescription
-	MaxNetworkMessageSize uint32
-	GroupProperties       []*KeyValuePair
-	TransportSettings     *ExtensionObject
-	MessageSettings       *ExtensionObject
-	DataSetReaders        []*DataSetReaderDataType
-}
+		Name string
+		Enabled bool
+		SecurityMode MessageSecurityMode
+		SecurityGroupID string
+		SecurityKeyServices []*EndpointDescription
+		MaxNetworkMessageSize uint32
+		GroupProperties []*KeyValuePair
+		TransportSettings *ExtensionObject
+		MessageSettings *ExtensionObject
+		DataSetReaders []*DataSetReaderDataType
+		
+	}
 
-type ReaderGroupTransportDataType struct{}
+type ReaderGroupTransportDataType struct {}
 
-type ReaderGroupMessageDataType struct{}
+type ReaderGroupMessageDataType struct {}
 
 type DataSetReaderDataType struct {
-	Name                    string
-	Enabled                 bool
-	PublisherID             *Variant
-	WriterGroupID           uint16
-	DataSetWriterID         uint16
-	DataSetMetaData         *DataSetMetaDataType
-	DataSetFieldContentMask DataSetFieldContentMask
-	MessageReceiveTimeout   float64
-	KeyFrameCount           uint32
-	HeaderLayoutURI         string
-	SecurityMode            MessageSecurityMode
-	SecurityGroupID         string
-	SecurityKeyServices     []*EndpointDescription
-	DataSetReaderProperties []*KeyValuePair
-	TransportSettings       *ExtensionObject
-	MessageSettings         *ExtensionObject
-	SubscribedDataSet       *ExtensionObject
-}
+		Name string
+		Enabled bool
+		PublisherID *Variant
+		WriterGroupID uint16
+		DataSetWriterID uint16
+		DataSetMetaData *DataSetMetaDataType
+		DataSetFieldContentMask DataSetFieldContentMask
+		MessageReceiveTimeout float64
+		KeyFrameCount uint32
+		HeaderLayoutURI string
+		SecurityMode MessageSecurityMode
+		SecurityGroupID string
+		SecurityKeyServices []*EndpointDescription
+		DataSetReaderProperties []*KeyValuePair
+		TransportSettings *ExtensionObject
+		MessageSettings *ExtensionObject
+		SubscribedDataSet *ExtensionObject
+		
+	}
 
-type DataSetReaderTransportDataType struct{}
+type DataSetReaderTransportDataType struct {}
 
-type DataSetReaderMessageDataType struct{}
+type DataSetReaderMessageDataType struct {}
 
-type SubscribedDataSetDataType struct{}
+type SubscribedDataSetDataType struct {}
 
 type TargetVariablesDataType struct {
-	TargetVariables []*FieldTargetDataType
-}
+		TargetVariables []*FieldTargetDataType
+		
+	}
 
 type FieldTargetDataType struct {
-	DataSetFieldID        *GUID
-	ReceiverIndexRange    string
-	TargetNodeID          *NodeID
-	AttributeID           AttributeID
-	WriteIndexRange       string
-	OverrideValueHandling OverrideValueHandling
-	OverrideValue         *Variant
-}
+		DataSetFieldID *GUID
+		ReceiverIndexRange string
+		TargetNodeID *NodeID
+		AttributeID AttributeID
+		WriteIndexRange string
+		OverrideValueHandling OverrideValueHandling
+		OverrideValue *Variant
+		
+	}
 
 type SubscribedDataSetMirrorDataType struct {
-	ParentNodeName  string
-	RolePermissions []*RolePermissionType
-}
+		ParentNodeName string
+		RolePermissions []*RolePermissionType
+		
+	}
 
 type PubSubConfigurationDataType struct {
-	PublishedDataSets []*PublishedDataSetDataType
-	Connections       []*PubSubConnectionDataType
-	Enabled           bool
-}
+		PublishedDataSets []*PublishedDataSetDataType
+		Connections []*PubSubConnectionDataType
+		Enabled bool
+		
+	}
 
 type UADPWriterGroupMessageDataType struct {
-	GroupVersion              uint32
-	DataSetOrdering           DataSetOrderingType
-	NetworkMessageContentMask UADPNetworkMessageContentMask
-	SamplingOffset            float64
-	PublishingOffset          []float64
-}
+		GroupVersion uint32
+		DataSetOrdering DataSetOrderingType
+		NetworkMessageContentMask UADPNetworkMessageContentMask
+		SamplingOffset float64
+		PublishingOffset []float64
+		
+	}
 
 type UADPDataSetWriterMessageDataType struct {
-	DataSetMessageContentMask UADPDataSetMessageContentMask
-	ConfiguredSize            uint16
-	NetworkMessageNumber      uint16
-	DataSetOffset             uint16
-}
+		DataSetMessageContentMask UADPDataSetMessageContentMask
+		ConfiguredSize uint16
+		NetworkMessageNumber uint16
+		DataSetOffset uint16
+		
+	}
 
 type UADPDataSetReaderMessageDataType struct {
-	GroupVersion              uint32
-	NetworkMessageNumber      uint16
-	DataSetOffset             uint16
-	DataSetClassID            *GUID
-	NetworkMessageContentMask UADPNetworkMessageContentMask
-	DataSetMessageContentMask UADPDataSetMessageContentMask
-	PublishingInterval        float64
-	ReceiveOffset             float64
-	ProcessingOffset          float64
-}
+		GroupVersion uint32
+		NetworkMessageNumber uint16
+		DataSetOffset uint16
+		DataSetClassID *GUID
+		NetworkMessageContentMask UADPNetworkMessageContentMask
+		DataSetMessageContentMask UADPDataSetMessageContentMask
+		PublishingInterval float64
+		ReceiveOffset float64
+		ProcessingOffset float64
+		
+	}
 
 type JSONWriterGroupMessageDataType struct {
-	NetworkMessageContentMask JSONNetworkMessageContentMask
-}
+		NetworkMessageContentMask JSONNetworkMessageContentMask
+		
+	}
 
 type JSONDataSetWriterMessageDataType struct {
-	DataSetMessageContentMask JSONDataSetMessageContentMask
-}
+		DataSetMessageContentMask JSONDataSetMessageContentMask
+		
+	}
 
 type JSONDataSetReaderMessageDataType struct {
-	NetworkMessageContentMask JSONNetworkMessageContentMask
-	DataSetMessageContentMask JSONDataSetMessageContentMask
-}
+		NetworkMessageContentMask JSONNetworkMessageContentMask
+		DataSetMessageContentMask JSONDataSetMessageContentMask
+		
+	}
 
 type DatagramConnectionTransportDataType struct {
-	DiscoveryAddress *ExtensionObject
-}
+		DiscoveryAddress *ExtensionObject
+		
+	}
 
 type DatagramWriterGroupTransportDataType struct {
-	MessageRepeatCount uint8
-	MessageRepeatDelay float64
-}
+		MessageRepeatCount uint8
+		MessageRepeatDelay float64
+		
+	}
 
 type BrokerConnectionTransportDataType struct {
-	ResourceURI              string
-	AuthenticationProfileURI string
-}
+		ResourceURI string
+		AuthenticationProfileURI string
+		
+	}
 
 type BrokerWriterGroupTransportDataType struct {
-	QueueName                  string
-	ResourceURI                string
-	AuthenticationProfileURI   string
-	RequestedDeliveryGuarantee BrokerTransportQoS
-}
+		QueueName string
+		ResourceURI string
+		AuthenticationProfileURI string
+		RequestedDeliveryGuarantee BrokerTransportQoS
+		
+	}
 
 type BrokerDataSetWriterTransportDataType struct {
-	QueueName                  string
-	ResourceURI                string
-	AuthenticationProfileURI   string
-	RequestedDeliveryGuarantee BrokerTransportQoS
-	MetaDataQueueName          string
-	MetaDataUpdateTime         float64
-}
+		QueueName string
+		ResourceURI string
+		AuthenticationProfileURI string
+		RequestedDeliveryGuarantee BrokerTransportQoS
+		MetaDataQueueName string
+		MetaDataUpdateTime float64
+		
+	}
 
 type BrokerDataSetReaderTransportDataType struct {
-	QueueName                  string
-	ResourceURI                string
-	AuthenticationProfileURI   string
-	RequestedDeliveryGuarantee BrokerTransportQoS
-	MetaDataQueueName          string
-}
+		QueueName string
+		ResourceURI string
+		AuthenticationProfileURI string
+		RequestedDeliveryGuarantee BrokerTransportQoS
+		MetaDataQueueName string
+		
+	}
+
+type AliasNameDataType struct {
+		AliasName *QualifiedName
+		ReferencedNodes []*ExpandedNodeID
+		
+	}
 
 type RolePermissionType struct {
-	RoleID      *NodeID
-	Permissions PermissionType
-}
+		RoleID *NodeID
+		Permissions PermissionType
+		
+	}
 
 type StructureField struct {
-	Name            string
-	Description     *LocalizedText
-	DataType        *NodeID
-	ValueRank       int32
-	ArrayDimensions []uint32
-	MaxStringLength uint32
-	IsOptional      bool
-}
+		Name string
+		Description *LocalizedText
+		DataType *NodeID
+		ValueRank int32
+		ArrayDimensions []uint32
+		MaxStringLength uint32
+		IsOptional bool
+		
+	}
 
 type StructureDefinition struct {
-	DefaultEncodingID *NodeID
-	BaseDataType      *NodeID
-	StructureType     StructureType
-	Fields            []*StructureField
-}
+		DefaultEncodingID *NodeID
+		BaseDataType *NodeID
+		StructureType StructureType
+		Fields []*StructureField
+		
+	}
 
 type EnumDefinition struct {
-	Fields []*EnumField
-}
+		Fields []*EnumField
+		
+	}
 
 type Node struct {
-	NodeID              *NodeID
-	NodeClass           NodeClass
-	BrowseName          *QualifiedName
-	DisplayName         *LocalizedText
-	Description         *LocalizedText
-	WriteMask           uint32
-	UserWriteMask       uint32
-	RolePermissions     []*RolePermissionType
-	UserRolePermissions []*RolePermissionType
-	AccessRestrictions  uint16
-	References          []*ReferenceNode
-}
+		NodeID *NodeID
+		NodeClass NodeClass
+		BrowseName *QualifiedName
+		DisplayName *LocalizedText
+		Description *LocalizedText
+		WriteMask uint32
+		UserWriteMask uint32
+		RolePermissions []*RolePermissionType
+		UserRolePermissions []*RolePermissionType
+		AccessRestrictions uint16
+		References []*ReferenceNode
+		
+	}
 
 type InstanceNode struct {
-	NodeID              *NodeID
-	NodeClass           NodeClass
-	BrowseName          *QualifiedName
-	DisplayName         *LocalizedText
-	Description         *LocalizedText
-	WriteMask           uint32
-	UserWriteMask       uint32
-	RolePermissions     []*RolePermissionType
-	UserRolePermissions []*RolePermissionType
-	AccessRestrictions  uint16
-	References          []*ReferenceNode
-}
+		NodeID *NodeID
+		NodeClass NodeClass
+		BrowseName *QualifiedName
+		DisplayName *LocalizedText
+		Description *LocalizedText
+		WriteMask uint32
+		UserWriteMask uint32
+		RolePermissions []*RolePermissionType
+		UserRolePermissions []*RolePermissionType
+		AccessRestrictions uint16
+		References []*ReferenceNode
+		
+	}
 
 type TypeNode struct {
-	NodeID              *NodeID
-	NodeClass           NodeClass
-	BrowseName          *QualifiedName
-	DisplayName         *LocalizedText
-	Description         *LocalizedText
-	WriteMask           uint32
-	UserWriteMask       uint32
-	RolePermissions     []*RolePermissionType
-	UserRolePermissions []*RolePermissionType
-	AccessRestrictions  uint16
-	References          []*ReferenceNode
-}
+		NodeID *NodeID
+		NodeClass NodeClass
+		BrowseName *QualifiedName
+		DisplayName *LocalizedText
+		Description *LocalizedText
+		WriteMask uint32
+		UserWriteMask uint32
+		RolePermissions []*RolePermissionType
+		UserRolePermissions []*RolePermissionType
+		AccessRestrictions uint16
+		References []*ReferenceNode
+		
+	}
 
 type ObjectNode struct {
-	NodeID              *NodeID
-	NodeClass           NodeClass
-	BrowseName          *QualifiedName
-	DisplayName         *LocalizedText
-	Description         *LocalizedText
-	WriteMask           uint32
-	UserWriteMask       uint32
-	RolePermissions     []*RolePermissionType
-	UserRolePermissions []*RolePermissionType
-	AccessRestrictions  uint16
-	References          []*ReferenceNode
-	EventNotifier       uint8
-}
+		NodeID *NodeID
+		NodeClass NodeClass
+		BrowseName *QualifiedName
+		DisplayName *LocalizedText
+		Description *LocalizedText
+		WriteMask uint32
+		UserWriteMask uint32
+		RolePermissions []*RolePermissionType
+		UserRolePermissions []*RolePermissionType
+		AccessRestrictions uint16
+		References []*ReferenceNode
+		EventNotifier uint8
+		
+	}
 
 type ObjectTypeNode struct {
-	NodeID              *NodeID
-	NodeClass           NodeClass
-	BrowseName          *QualifiedName
-	DisplayName         *LocalizedText
-	Description         *LocalizedText
-	WriteMask           uint32
-	UserWriteMask       uint32
-	RolePermissions     []*RolePermissionType
-	UserRolePermissions []*RolePermissionType
-	AccessRestrictions  uint16
-	References          []*ReferenceNode
-	IsAbstract          bool
-}
+		NodeID *NodeID
+		NodeClass NodeClass
+		BrowseName *QualifiedName
+		DisplayName *LocalizedText
+		Description *LocalizedText
+		WriteMask uint32
+		UserWriteMask uint32
+		RolePermissions []*RolePermissionType
+		UserRolePermissions []*RolePermissionType
+		AccessRestrictions uint16
+		References []*ReferenceNode
+		IsAbstract bool
+		
+	}
 
 type VariableNode struct {
-	NodeID                  *NodeID
-	NodeClass               NodeClass
-	BrowseName              *QualifiedName
-	DisplayName             *LocalizedText
-	Description             *LocalizedText
-	WriteMask               uint32
-	UserWriteMask           uint32
-	RolePermissions         []*RolePermissionType
-	UserRolePermissions     []*RolePermissionType
-	AccessRestrictions      uint16
-	References              []*ReferenceNode
-	Value                   *Variant
-	DataType                *NodeID
-	ValueRank               int32
-	ArrayDimensions         []uint32
-	AccessLevel             uint8
-	UserAccessLevel         uint8
-	MinimumSamplingInterval float64
-	Historizing             bool
-	AccessLevelEx           uint32
-}
+		NodeID *NodeID
+		NodeClass NodeClass
+		BrowseName *QualifiedName
+		DisplayName *LocalizedText
+		Description *LocalizedText
+		WriteMask uint32
+		UserWriteMask uint32
+		RolePermissions []*RolePermissionType
+		UserRolePermissions []*RolePermissionType
+		AccessRestrictions uint16
+		References []*ReferenceNode
+		Value *Variant
+		DataType *NodeID
+		ValueRank int32
+		ArrayDimensions []uint32
+		AccessLevel uint8
+		UserAccessLevel uint8
+		MinimumSamplingInterval float64
+		Historizing bool
+		AccessLevelEx uint32
+		
+	}
 
 type VariableTypeNode struct {
-	NodeID              *NodeID
-	NodeClass           NodeClass
-	BrowseName          *QualifiedName
-	DisplayName         *LocalizedText
-	Description         *LocalizedText
-	WriteMask           uint32
-	UserWriteMask       uint32
-	RolePermissions     []*RolePermissionType
-	UserRolePermissions []*RolePermissionType
-	AccessRestrictions  uint16
-	References          []*ReferenceNode
-	Value               *Variant
-	DataType            *NodeID
-	ValueRank           int32
-	ArrayDimensions     []uint32
-	IsAbstract          bool
-}
+		NodeID *NodeID
+		NodeClass NodeClass
+		BrowseName *QualifiedName
+		DisplayName *LocalizedText
+		Description *LocalizedText
+		WriteMask uint32
+		UserWriteMask uint32
+		RolePermissions []*RolePermissionType
+		UserRolePermissions []*RolePermissionType
+		AccessRestrictions uint16
+		References []*ReferenceNode
+		Value *Variant
+		DataType *NodeID
+		ValueRank int32
+		ArrayDimensions []uint32
+		IsAbstract bool
+		
+	}
 
 type ReferenceTypeNode struct {
-	NodeID              *NodeID
-	NodeClass           NodeClass
-	BrowseName          *QualifiedName
-	DisplayName         *LocalizedText
-	Description         *LocalizedText
-	WriteMask           uint32
-	UserWriteMask       uint32
-	RolePermissions     []*RolePermissionType
-	UserRolePermissions []*RolePermissionType
-	AccessRestrictions  uint16
-	References          []*ReferenceNode
-	IsAbstract          bool
-	Symmetric           bool
-	InverseName         *LocalizedText
-}
+		NodeID *NodeID
+		NodeClass NodeClass
+		BrowseName *QualifiedName
+		DisplayName *LocalizedText
+		Description *LocalizedText
+		WriteMask uint32
+		UserWriteMask uint32
+		RolePermissions []*RolePermissionType
+		UserRolePermissions []*RolePermissionType
+		AccessRestrictions uint16
+		References []*ReferenceNode
+		IsAbstract bool
+		Symmetric bool
+		InverseName *LocalizedText
+		
+	}
 
 type MethodNode struct {
-	NodeID              *NodeID
-	NodeClass           NodeClass
-	BrowseName          *QualifiedName
-	DisplayName         *LocalizedText
-	Description         *LocalizedText
-	WriteMask           uint32
-	UserWriteMask       uint32
-	RolePermissions     []*RolePermissionType
-	UserRolePermissions []*RolePermissionType
-	AccessRestrictions  uint16
-	References          []*ReferenceNode
-	Executable          bool
-	UserExecutable      bool
-}
+		NodeID *NodeID
+		NodeClass NodeClass
+		BrowseName *QualifiedName
+		DisplayName *LocalizedText
+		Description *LocalizedText
+		WriteMask uint32
+		UserWriteMask uint32
+		RolePermissions []*RolePermissionType
+		UserRolePermissions []*RolePermissionType
+		AccessRestrictions uint16
+		References []*ReferenceNode
+		Executable bool
+		UserExecutable bool
+		
+	}
 
 type ViewNode struct {
-	NodeID              *NodeID
-	NodeClass           NodeClass
-	BrowseName          *QualifiedName
-	DisplayName         *LocalizedText
-	Description         *LocalizedText
-	WriteMask           uint32
-	UserWriteMask       uint32
-	RolePermissions     []*RolePermissionType
-	UserRolePermissions []*RolePermissionType
-	AccessRestrictions  uint16
-	References          []*ReferenceNode
-	ContainsNoLoops     bool
-	EventNotifier       uint8
-}
+		NodeID *NodeID
+		NodeClass NodeClass
+		BrowseName *QualifiedName
+		DisplayName *LocalizedText
+		Description *LocalizedText
+		WriteMask uint32
+		UserWriteMask uint32
+		RolePermissions []*RolePermissionType
+		UserRolePermissions []*RolePermissionType
+		AccessRestrictions uint16
+		References []*ReferenceNode
+		ContainsNoLoops bool
+		EventNotifier uint8
+		
+	}
 
 type DataTypeNode struct {
-	NodeID              *NodeID
-	NodeClass           NodeClass
-	BrowseName          *QualifiedName
-	DisplayName         *LocalizedText
-	Description         *LocalizedText
-	WriteMask           uint32
-	UserWriteMask       uint32
-	RolePermissions     []*RolePermissionType
-	UserRolePermissions []*RolePermissionType
-	AccessRestrictions  uint16
-	References          []*ReferenceNode
-	IsAbstract          bool
-	DataTypeDefinition  *ExtensionObject
-}
+		NodeID *NodeID
+		NodeClass NodeClass
+		BrowseName *QualifiedName
+		DisplayName *LocalizedText
+		Description *LocalizedText
+		WriteMask uint32
+		UserWriteMask uint32
+		RolePermissions []*RolePermissionType
+		UserRolePermissions []*RolePermissionType
+		AccessRestrictions uint16
+		References []*ReferenceNode
+		IsAbstract bool
+		DataTypeDefinition *ExtensionObject
+		
+	}
 
 type ReferenceNode struct {
-	ReferenceTypeID *NodeID
-	IsInverse       bool
-	TargetID        *ExpandedNodeID
-}
+		ReferenceTypeID *NodeID
+		IsInverse bool
+		TargetID *ExpandedNodeID
+		
+	}
 
 type Argument struct {
-	Name            string
-	DataType        *NodeID
-	ValueRank       int32
-	ArrayDimensions []uint32
-	Description     *LocalizedText
-}
+		Name string
+		DataType *NodeID
+		ValueRank int32
+		ArrayDimensions []uint32
+		Description *LocalizedText
+		
+	}
 
 type EnumValueType struct {
-	Value       int64
-	DisplayName *LocalizedText
-	Description *LocalizedText
-}
+		Value int64
+		DisplayName *LocalizedText
+		Description *LocalizedText
+		
+	}
 
 type EnumField struct {
-	Value       int64
-	DisplayName *LocalizedText
-	Description *LocalizedText
-	Name        string
-}
+		Value int64
+		DisplayName *LocalizedText
+		Description *LocalizedText
+		Name string
+		
+	}
 
 type OptionSet struct {
-	Value     []byte
-	ValidBits []byte
-}
+		Value []byte
+		ValidBits []byte
+		
+	}
 
-type Union struct{}
+type Union struct {}
 
 type TimeZoneDataType struct {
-	Offset                 int16
-	DaylightSavingInOffset bool
-}
+		Offset int16
+		DaylightSavingInOffset bool
+		
+	}
 
 type ApplicationDescription struct {
-	ApplicationURI      string
-	ProductURI          string
-	ApplicationName     *LocalizedText
-	ApplicationType     ApplicationType
-	GatewayServerURI    string
-	DiscoveryProfileURI string
-	DiscoveryURLs       []string
-}
+		ApplicationURI string
+		ProductURI string
+		ApplicationName *LocalizedText
+		ApplicationType ApplicationType
+		GatewayServerURI string
+		DiscoveryProfileURI string
+		DiscoveryURLs []string
+		
+	}
 
 type RequestHeader struct {
-	AuthenticationToken *NodeID
-	Timestamp           time.Time
-	RequestHandle       uint32
-	ReturnDiagnostics   uint32
-	AuditEntryID        string
-	TimeoutHint         uint32
-	AdditionalHeader    *ExtensionObject
-}
+		AuthenticationToken *NodeID
+		Timestamp time.Time
+		RequestHandle uint32
+		ReturnDiagnostics uint32
+		AuditEntryID string
+		TimeoutHint uint32
+		AdditionalHeader *ExtensionObject
+		
+	}
 
 type ResponseHeader struct {
-	Timestamp          time.Time
-	RequestHandle      uint32
-	ServiceResult      StatusCode
-	ServiceDiagnostics *DiagnosticInfo
-	StringTable        []string
-	AdditionalHeader   *ExtensionObject
-}
+		Timestamp time.Time
+		RequestHandle uint32
+		ServiceResult StatusCode
+		ServiceDiagnostics *DiagnosticInfo
+		StringTable []string
+		AdditionalHeader *ExtensionObject
+		
+	}
 
 type ServiceFault struct {
-	ResponseHeader *ResponseHeader
-}
+		ResponseHeader *ResponseHeader
+		
+	}
 
 func (t *ServiceFault) Header() *ResponseHeader {
 	return t.ResponseHeader
@@ -664,25 +779,28 @@ func (t *ServiceFault) SetHeader(h *ResponseHeader) {
 }
 
 type SessionlessInvokeRequestType struct {
-	URIsVersion   []uint32
-	NamespaceURIs []string
-	ServerURIs    []string
-	LocaleIDs     []string
-	ServiceID     uint32
-}
+		URIsVersion []uint32
+		NamespaceURIs []string
+		ServerURIs []string
+		LocaleIDs []string
+		ServiceID uint32
+		
+	}
 
 type SessionlessInvokeResponseType struct {
-	NamespaceURIs []string
-	ServerURIs    []string
-	ServiceID     uint32
-}
+		NamespaceURIs []string
+		ServerURIs []string
+		ServiceID uint32
+		
+	}
 
 type FindServersRequest struct {
-	RequestHeader *RequestHeader
-	EndpointURL   string
-	LocaleIDs     []string
-	ServerURIs    []string
-}
+		RequestHeader *RequestHeader
+		EndpointURL string
+		LocaleIDs []string
+		ServerURIs []string
+		
+	}
 
 func (t *FindServersRequest) Header() *RequestHeader {
 	return t.RequestHeader
@@ -693,9 +811,10 @@ func (t *FindServersRequest) SetHeader(h *RequestHeader) {
 }
 
 type FindServersResponse struct {
-	ResponseHeader *ResponseHeader
-	Servers        []*ApplicationDescription
-}
+		ResponseHeader *ResponseHeader
+		Servers []*ApplicationDescription
+		
+	}
 
 func (t *FindServersResponse) Header() *ResponseHeader {
 	return t.ResponseHeader
@@ -706,18 +825,20 @@ func (t *FindServersResponse) SetHeader(h *ResponseHeader) {
 }
 
 type ServerOnNetwork struct {
-	RecordID           uint32
-	ServerName         string
-	DiscoveryURL       string
-	ServerCapabilities []string
-}
+		RecordID uint32
+		ServerName string
+		DiscoveryURL string
+		ServerCapabilities []string
+		
+	}
 
 type FindServersOnNetworkRequest struct {
-	RequestHeader          *RequestHeader
-	StartingRecordID       uint32
-	MaxRecordsToReturn     uint32
-	ServerCapabilityFilter []string
-}
+		RequestHeader *RequestHeader
+		StartingRecordID uint32
+		MaxRecordsToReturn uint32
+		ServerCapabilityFilter []string
+		
+	}
 
 func (t *FindServersOnNetworkRequest) Header() *RequestHeader {
 	return t.RequestHeader
@@ -728,10 +849,11 @@ func (t *FindServersOnNetworkRequest) SetHeader(h *RequestHeader) {
 }
 
 type FindServersOnNetworkResponse struct {
-	ResponseHeader       *ResponseHeader
-	LastCounterResetTime time.Time
-	Servers              []*ServerOnNetwork
-}
+		ResponseHeader *ResponseHeader
+		LastCounterResetTime time.Time
+		Servers []*ServerOnNetwork
+		
+	}
 
 func (t *FindServersOnNetworkResponse) Header() *ResponseHeader {
 	return t.ResponseHeader
@@ -742,30 +864,33 @@ func (t *FindServersOnNetworkResponse) SetHeader(h *ResponseHeader) {
 }
 
 type UserTokenPolicy struct {
-	PolicyID          string
-	TokenType         UserTokenType
-	IssuedTokenType   string
-	IssuerEndpointURL string
-	SecurityPolicyURI string
-}
+		PolicyID string
+		TokenType UserTokenType
+		IssuedTokenType string
+		IssuerEndpointURL string
+		SecurityPolicyURI string
+		
+	}
 
 type EndpointDescription struct {
-	EndpointURL         string
-	Server              *ApplicationDescription
-	ServerCertificate   []byte
-	SecurityMode        MessageSecurityMode
-	SecurityPolicyURI   string
-	UserIdentityTokens  []*UserTokenPolicy
-	TransportProfileURI string
-	SecurityLevel       uint8
-}
+		EndpointURL string
+		Server *ApplicationDescription
+		ServerCertificate []byte
+		SecurityMode MessageSecurityMode
+		SecurityPolicyURI string
+		UserIdentityTokens []*UserTokenPolicy
+		TransportProfileURI string
+		SecurityLevel uint8
+		
+	}
 
 type GetEndpointsRequest struct {
-	RequestHeader *RequestHeader
-	EndpointURL   string
-	LocaleIDs     []string
-	ProfileURIs   []string
-}
+		RequestHeader *RequestHeader
+		EndpointURL string
+		LocaleIDs []string
+		ProfileURIs []string
+		
+	}
 
 func (t *GetEndpointsRequest) Header() *RequestHeader {
 	return t.RequestHeader
@@ -776,9 +901,10 @@ func (t *GetEndpointsRequest) SetHeader(h *RequestHeader) {
 }
 
 type GetEndpointsResponse struct {
-	ResponseHeader *ResponseHeader
-	Endpoints      []*EndpointDescription
-}
+		ResponseHeader *ResponseHeader
+		Endpoints []*EndpointDescription
+		
+	}
 
 func (t *GetEndpointsResponse) Header() *ResponseHeader {
 	return t.ResponseHeader
@@ -789,20 +915,22 @@ func (t *GetEndpointsResponse) SetHeader(h *ResponseHeader) {
 }
 
 type RegisteredServer struct {
-	ServerURI         string
-	ProductURI        string
-	ServerNames       []*LocalizedText
-	ServerType        ApplicationType
-	GatewayServerURI  string
-	DiscoveryURLs     []string
-	SemaphoreFilePath string
-	IsOnline          bool
-}
+		ServerURI string
+		ProductURI string
+		ServerNames []*LocalizedText
+		ServerType ApplicationType
+		GatewayServerURI string
+		DiscoveryURLs []string
+		SemaphoreFilePath string
+		IsOnline bool
+		
+	}
 
 type RegisterServerRequest struct {
-	RequestHeader *RequestHeader
-	Server        *RegisteredServer
-}
+		RequestHeader *RequestHeader
+		Server *RegisteredServer
+		
+	}
 
 func (t *RegisterServerRequest) Header() *RequestHeader {
 	return t.RequestHeader
@@ -813,8 +941,9 @@ func (t *RegisterServerRequest) SetHeader(h *RequestHeader) {
 }
 
 type RegisterServerResponse struct {
-	ResponseHeader *ResponseHeader
-}
+		ResponseHeader *ResponseHeader
+		
+	}
 
 func (t *RegisterServerResponse) Header() *ResponseHeader {
 	return t.ResponseHeader
@@ -824,18 +953,20 @@ func (t *RegisterServerResponse) SetHeader(h *ResponseHeader) {
 	t.ResponseHeader = h
 }
 
-type DiscoveryConfiguration struct{}
+type DiscoveryConfiguration struct {}
 
 type MdnsDiscoveryConfiguration struct {
-	MdnsServerName     string
-	ServerCapabilities []string
-}
+		MdnsServerName string
+		ServerCapabilities []string
+		
+	}
 
 type RegisterServer2Request struct {
-	RequestHeader          *RequestHeader
-	Server                 *RegisteredServer
-	DiscoveryConfiguration []*ExtensionObject
-}
+		RequestHeader *RequestHeader
+		Server *RegisteredServer
+		DiscoveryConfiguration []*ExtensionObject
+		
+	}
 
 func (t *RegisterServer2Request) Header() *RequestHeader {
 	return t.RequestHeader
@@ -846,10 +977,11 @@ func (t *RegisterServer2Request) SetHeader(h *RequestHeader) {
 }
 
 type RegisterServer2Response struct {
-	ResponseHeader       *ResponseHeader
-	ConfigurationResults []StatusCode
-	DiagnosticInfos      []*DiagnosticInfo
-}
+		ResponseHeader *ResponseHeader
+		ConfigurationResults []StatusCode
+		DiagnosticInfos []*DiagnosticInfo
+		
+	}
 
 func (t *RegisterServer2Response) Header() *ResponseHeader {
 	return t.ResponseHeader
@@ -860,20 +992,22 @@ func (t *RegisterServer2Response) SetHeader(h *ResponseHeader) {
 }
 
 type ChannelSecurityToken struct {
-	ChannelID       uint32
-	TokenID         uint32
-	CreatedAt       time.Time
-	RevisedLifetime uint32
-}
+		ChannelID uint32
+		TokenID uint32
+		CreatedAt time.Time
+		RevisedLifetime uint32
+		
+	}
 
 type OpenSecureChannelRequest struct {
-	RequestHeader         *RequestHeader
-	ClientProtocolVersion uint32
-	RequestType           SecurityTokenRequestType
-	SecurityMode          MessageSecurityMode
-	ClientNonce           []byte
-	RequestedLifetime     uint32
-}
+		RequestHeader *RequestHeader
+		ClientProtocolVersion uint32
+		RequestType SecurityTokenRequestType
+		SecurityMode MessageSecurityMode
+		ClientNonce []byte
+		RequestedLifetime uint32
+		
+	}
 
 func (t *OpenSecureChannelRequest) Header() *RequestHeader {
 	return t.RequestHeader
@@ -884,11 +1018,12 @@ func (t *OpenSecureChannelRequest) SetHeader(h *RequestHeader) {
 }
 
 type OpenSecureChannelResponse struct {
-	ResponseHeader        *ResponseHeader
-	ServerProtocolVersion uint32
-	SecurityToken         *ChannelSecurityToken
-	ServerNonce           []byte
-}
+		ResponseHeader *ResponseHeader
+		ServerProtocolVersion uint32
+		SecurityToken *ChannelSecurityToken
+		ServerNonce []byte
+		
+	}
 
 func (t *OpenSecureChannelResponse) Header() *ResponseHeader {
 	return t.ResponseHeader
@@ -899,8 +1034,9 @@ func (t *OpenSecureChannelResponse) SetHeader(h *ResponseHeader) {
 }
 
 type CloseSecureChannelRequest struct {
-	RequestHeader *RequestHeader
-}
+		RequestHeader *RequestHeader
+		
+	}
 
 func (t *CloseSecureChannelRequest) Header() *RequestHeader {
 	return t.RequestHeader
@@ -911,8 +1047,9 @@ func (t *CloseSecureChannelRequest) SetHeader(h *RequestHeader) {
 }
 
 type CloseSecureChannelResponse struct {
-	ResponseHeader *ResponseHeader
-}
+		ResponseHeader *ResponseHeader
+		
+	}
 
 func (t *CloseSecureChannelResponse) Header() *ResponseHeader {
 	return t.ResponseHeader
@@ -923,26 +1060,29 @@ func (t *CloseSecureChannelResponse) SetHeader(h *ResponseHeader) {
 }
 
 type SignedSoftwareCertificate struct {
-	CertificateData []byte
-	Signature       []byte
-}
+		CertificateData []byte
+		Signature []byte
+		
+	}
 
 type SignatureData struct {
-	Algorithm string
-	Signature []byte
-}
+		Algorithm string
+		Signature []byte
+		
+	}
 
 type CreateSessionRequest struct {
-	RequestHeader           *RequestHeader
-	ClientDescription       *ApplicationDescription
-	ServerURI               string
-	EndpointURL             string
-	SessionName             string
-	ClientNonce             []byte
-	ClientCertificate       []byte
-	RequestedSessionTimeout float64
-	MaxResponseMessageSize  uint32
-}
+		RequestHeader *RequestHeader
+		ClientDescription *ApplicationDescription
+		ServerURI string
+		EndpointURL string
+		SessionName string
+		ClientNonce []byte
+		ClientCertificate []byte
+		RequestedSessionTimeout float64
+		MaxResponseMessageSize uint32
+		
+	}
 
 func (t *CreateSessionRequest) Header() *RequestHeader {
 	return t.RequestHeader
@@ -953,17 +1093,18 @@ func (t *CreateSessionRequest) SetHeader(h *RequestHeader) {
 }
 
 type CreateSessionResponse struct {
-	ResponseHeader             *ResponseHeader
-	SessionID                  *NodeID
-	AuthenticationToken        *NodeID
-	RevisedSessionTimeout      float64
-	ServerNonce                []byte
-	ServerCertificate          []byte
-	ServerEndpoints            []*EndpointDescription
-	ServerSoftwareCertificates []*SignedSoftwareCertificate
-	ServerSignature            *SignatureData
-	MaxRequestMessageSize      uint32
-}
+		ResponseHeader *ResponseHeader
+		SessionID *NodeID
+		AuthenticationToken *NodeID
+		RevisedSessionTimeout float64
+		ServerNonce []byte
+		ServerCertificate []byte
+		ServerEndpoints []*EndpointDescription
+		ServerSoftwareCertificates []*SignedSoftwareCertificate
+		ServerSignature *SignatureData
+		MaxRequestMessageSize uint32
+		
+	}
 
 func (t *CreateSessionResponse) Header() *ResponseHeader {
 	return t.ResponseHeader
@@ -974,39 +1115,45 @@ func (t *CreateSessionResponse) SetHeader(h *ResponseHeader) {
 }
 
 type UserIdentityToken struct {
-	PolicyID string
-}
+		PolicyID string
+		
+	}
 
 type AnonymousIdentityToken struct {
-	PolicyID string
-}
+		PolicyID string
+		
+	}
 
 type UserNameIdentityToken struct {
-	PolicyID            string
-	UserName            string
-	Password            []byte
-	EncryptionAlgorithm string
-}
+		PolicyID string
+		UserName string
+		Password []byte
+		EncryptionAlgorithm string
+		
+	}
 
 type X509IdentityToken struct {
-	PolicyID        string
-	CertificateData []byte
-}
+		PolicyID string
+		CertificateData []byte
+		
+	}
 
 type IssuedIdentityToken struct {
-	PolicyID            string
-	TokenData           []byte
-	EncryptionAlgorithm string
-}
+		PolicyID string
+		TokenData []byte
+		EncryptionAlgorithm string
+		
+	}
 
 type ActivateSessionRequest struct {
-	RequestHeader              *RequestHeader
-	ClientSignature            *SignatureData
-	ClientSoftwareCertificates []*SignedSoftwareCertificate
-	LocaleIDs                  []string
-	UserIdentityToken          *ExtensionObject
-	UserTokenSignature         *SignatureData
-}
+		RequestHeader *RequestHeader
+		ClientSignature *SignatureData
+		ClientSoftwareCertificates []*SignedSoftwareCertificate
+		LocaleIDs []string
+		UserIdentityToken *ExtensionObject
+		UserTokenSignature *SignatureData
+		
+	}
 
 func (t *ActivateSessionRequest) Header() *RequestHeader {
 	return t.RequestHeader
@@ -1017,11 +1164,12 @@ func (t *ActivateSessionRequest) SetHeader(h *RequestHeader) {
 }
 
 type ActivateSessionResponse struct {
-	ResponseHeader  *ResponseHeader
-	ServerNonce     []byte
-	Results         []StatusCode
-	DiagnosticInfos []*DiagnosticInfo
-}
+		ResponseHeader *ResponseHeader
+		ServerNonce []byte
+		Results []StatusCode
+		DiagnosticInfos []*DiagnosticInfo
+		
+	}
 
 func (t *ActivateSessionResponse) Header() *ResponseHeader {
 	return t.ResponseHeader
@@ -1032,9 +1180,10 @@ func (t *ActivateSessionResponse) SetHeader(h *ResponseHeader) {
 }
 
 type CloseSessionRequest struct {
-	RequestHeader       *RequestHeader
-	DeleteSubscriptions bool
-}
+		RequestHeader *RequestHeader
+		DeleteSubscriptions bool
+		
+	}
 
 func (t *CloseSessionRequest) Header() *RequestHeader {
 	return t.RequestHeader
@@ -1045,8 +1194,9 @@ func (t *CloseSessionRequest) SetHeader(h *RequestHeader) {
 }
 
 type CloseSessionResponse struct {
-	ResponseHeader *ResponseHeader
-}
+		ResponseHeader *ResponseHeader
+		
+	}
 
 func (t *CloseSessionResponse) Header() *ResponseHeader {
 	return t.ResponseHeader
@@ -1057,9 +1207,10 @@ func (t *CloseSessionResponse) SetHeader(h *ResponseHeader) {
 }
 
 type CancelRequest struct {
-	RequestHeader *RequestHeader
-	RequestHandle uint32
-}
+		RequestHeader *RequestHeader
+		RequestHandle uint32
+		
+	}
 
 func (t *CancelRequest) Header() *RequestHeader {
 	return t.RequestHeader
@@ -1070,9 +1221,10 @@ func (t *CancelRequest) SetHeader(h *RequestHeader) {
 }
 
 type CancelResponse struct {
-	ResponseHeader *ResponseHeader
-	CancelCount    uint32
-}
+		ResponseHeader *ResponseHeader
+		CancelCount uint32
+		
+	}
 
 func (t *CancelResponse) Header() *ResponseHeader {
 	return t.ResponseHeader
@@ -1083,133 +1235,147 @@ func (t *CancelResponse) SetHeader(h *ResponseHeader) {
 }
 
 type NodeAttributes struct {
-	SpecifiedAttributes uint32
-	DisplayName         *LocalizedText
-	Description         *LocalizedText
-	WriteMask           uint32
-	UserWriteMask       uint32
-}
+		SpecifiedAttributes uint32
+		DisplayName *LocalizedText
+		Description *LocalizedText
+		WriteMask uint32
+		UserWriteMask uint32
+		
+	}
 
 type ObjectAttributes struct {
-	SpecifiedAttributes uint32
-	DisplayName         *LocalizedText
-	Description         *LocalizedText
-	WriteMask           uint32
-	UserWriteMask       uint32
-	EventNotifier       uint8
-}
+		SpecifiedAttributes uint32
+		DisplayName *LocalizedText
+		Description *LocalizedText
+		WriteMask uint32
+		UserWriteMask uint32
+		EventNotifier uint8
+		
+	}
 
 type VariableAttributes struct {
-	SpecifiedAttributes     uint32
-	DisplayName             *LocalizedText
-	Description             *LocalizedText
-	WriteMask               uint32
-	UserWriteMask           uint32
-	Value                   *Variant
-	DataType                *NodeID
-	ValueRank               int32
-	ArrayDimensions         []uint32
-	AccessLevel             uint8
-	UserAccessLevel         uint8
-	MinimumSamplingInterval float64
-	Historizing             bool
-}
+		SpecifiedAttributes uint32
+		DisplayName *LocalizedText
+		Description *LocalizedText
+		WriteMask uint32
+		UserWriteMask uint32
+		Value *Variant
+		DataType *NodeID
+		ValueRank int32
+		ArrayDimensions []uint32
+		AccessLevel uint8
+		UserAccessLevel uint8
+		MinimumSamplingInterval float64
+		Historizing bool
+		
+	}
 
 type MethodAttributes struct {
-	SpecifiedAttributes uint32
-	DisplayName         *LocalizedText
-	Description         *LocalizedText
-	WriteMask           uint32
-	UserWriteMask       uint32
-	Executable          bool
-	UserExecutable      bool
-}
+		SpecifiedAttributes uint32
+		DisplayName *LocalizedText
+		Description *LocalizedText
+		WriteMask uint32
+		UserWriteMask uint32
+		Executable bool
+		UserExecutable bool
+		
+	}
 
 type ObjectTypeAttributes struct {
-	SpecifiedAttributes uint32
-	DisplayName         *LocalizedText
-	Description         *LocalizedText
-	WriteMask           uint32
-	UserWriteMask       uint32
-	IsAbstract          bool
-}
+		SpecifiedAttributes uint32
+		DisplayName *LocalizedText
+		Description *LocalizedText
+		WriteMask uint32
+		UserWriteMask uint32
+		IsAbstract bool
+		
+	}
 
 type VariableTypeAttributes struct {
-	SpecifiedAttributes uint32
-	DisplayName         *LocalizedText
-	Description         *LocalizedText
-	WriteMask           uint32
-	UserWriteMask       uint32
-	Value               *Variant
-	DataType            *NodeID
-	ValueRank           int32
-	ArrayDimensions     []uint32
-	IsAbstract          bool
-}
+		SpecifiedAttributes uint32
+		DisplayName *LocalizedText
+		Description *LocalizedText
+		WriteMask uint32
+		UserWriteMask uint32
+		Value *Variant
+		DataType *NodeID
+		ValueRank int32
+		ArrayDimensions []uint32
+		IsAbstract bool
+		
+	}
 
 type ReferenceTypeAttributes struct {
-	SpecifiedAttributes uint32
-	DisplayName         *LocalizedText
-	Description         *LocalizedText
-	WriteMask           uint32
-	UserWriteMask       uint32
-	IsAbstract          bool
-	Symmetric           bool
-	InverseName         *LocalizedText
-}
+		SpecifiedAttributes uint32
+		DisplayName *LocalizedText
+		Description *LocalizedText
+		WriteMask uint32
+		UserWriteMask uint32
+		IsAbstract bool
+		Symmetric bool
+		InverseName *LocalizedText
+		
+	}
 
 type DataTypeAttributes struct {
-	SpecifiedAttributes uint32
-	DisplayName         *LocalizedText
-	Description         *LocalizedText
-	WriteMask           uint32
-	UserWriteMask       uint32
-	IsAbstract          bool
-}
+		SpecifiedAttributes uint32
+		DisplayName *LocalizedText
+		Description *LocalizedText
+		WriteMask uint32
+		UserWriteMask uint32
+		IsAbstract bool
+		
+	}
 
 type ViewAttributes struct {
-	SpecifiedAttributes uint32
-	DisplayName         *LocalizedText
-	Description         *LocalizedText
-	WriteMask           uint32
-	UserWriteMask       uint32
-	ContainsNoLoops     bool
-	EventNotifier       uint8
-}
+		SpecifiedAttributes uint32
+		DisplayName *LocalizedText
+		Description *LocalizedText
+		WriteMask uint32
+		UserWriteMask uint32
+		ContainsNoLoops bool
+		EventNotifier uint8
+		
+	}
 
 type GenericAttributeValue struct {
-	AttributeID AttributeID
-	Value       *Variant
-}
+		AttributeID AttributeID
+		Value *Variant
+		
+	}
 
 type GenericAttributes struct {
-	SpecifiedAttributes uint32
-	DisplayName         *LocalizedText
-	Description         *LocalizedText
-	WriteMask           uint32
-	UserWriteMask       uint32
-	AttributeValues     []*GenericAttributeValue
-}
+		SpecifiedAttributes uint32
+		DisplayName *LocalizedText
+		Description *LocalizedText
+		WriteMask uint32
+		UserWriteMask uint32
+		AttributeValues []*GenericAttributeValue
+		
+	}
 
 type AddNodesItem struct {
-	ParentNodeID       *ExpandedNodeID
-	ReferenceTypeID    *NodeID
-	RequestedNewNodeID *ExpandedNodeID
-	BrowseName         *QualifiedName
-	NodeClass          NodeClass
-	NodeAttributes     *ExtensionObject
-	TypeDefinition     *ExpandedNodeID
-}
+		ParentNodeID *ExpandedNodeID
+		ReferenceTypeID *NodeID
+		RequestedNewNodeID *ExpandedNodeID
+		BrowseName *QualifiedName
+		NodeClass NodeClass
+		NodeAttributes *ExtensionObject
+		TypeDefinition *ExpandedNodeID
+		
+	}
 
 type AddNodesResult struct {
-	StatusCode  StatusCode
-	AddedNodeID *NodeID
-}
+		StatusCode StatusCode
+		AddedNodeID *NodeID
+		
+	}
 
 type AddNodesRequest struct {
-	RequestHeader *RequestHeader
-	NodesToAdd    []*AddNodesItem
-}
+		RequestHeader *RequestHeader
+		NodesToAdd []*AddNodesItem
+		
+	}
 
 func (t *AddNodesRequest) Header() *RequestHeader {
 	return t.RequestHeader
@@ -1220,10 +1386,11 @@ func (t *AddNodesRequest) SetHeader(h *RequestHeader) {
 }
 
 type AddNodesResponse struct {
-	ResponseHeader  *ResponseHeader
-	Results         []*AddNodesResult
-	DiagnosticInfos []*DiagnosticInfo
-}
+		ResponseHeader *ResponseHeader
+		Results []*AddNodesResult
+		DiagnosticInfos []*DiagnosticInfo
+		
+	}
 
 func (t *AddNodesResponse) Header() *ResponseHeader {
 	return t.ResponseHeader
@@ -1234,18 +1401,20 @@ func (t *AddNodesResponse) SetHeader(h *ResponseHeader) {
 }
 
 type AddReferencesItem struct {
-	SourceNodeID    *NodeID
-	ReferenceTypeID *NodeID
-	IsForward       bool
-	TargetServerURI string
-	TargetNodeID    *ExpandedNodeID
-	TargetNodeClass NodeClass
-}
+		SourceNodeID *NodeID
+		ReferenceTypeID *NodeID
+		IsForward bool
+		TargetServerURI string
+		TargetNodeID *ExpandedNodeID
+		TargetNodeClass NodeClass
+		
+	}
 
 type AddReferencesRequest struct {
-	RequestHeader   *RequestHeader
-	ReferencesToAdd []*AddReferencesItem
-}
+		RequestHeader *RequestHeader
+		ReferencesToAdd []*AddReferencesItem
+		
+	}
 
 func (t *AddReferencesRequest) Header() *RequestHeader {
 	return t.RequestHeader
@@ -1256,10 +1425,11 @@ func (t *AddReferencesRequest) SetHeader(h *RequestHeader) {
 }
 
 type AddReferencesResponse struct {
-	ResponseHeader  *ResponseHeader
-	Results         []StatusCode
-	DiagnosticInfos []*DiagnosticInfo
-}
+		ResponseHeader *ResponseHeader
+		Results []StatusCode
+		DiagnosticInfos []*DiagnosticInfo
+		
+	}
 
 func (t *AddReferencesResponse) Header() *ResponseHeader {
 	return t.ResponseHeader
@@ -1270,14 +1440,16 @@ func (t *AddReferencesResponse) SetHeader(h *ResponseHeader) {
 }
 
 type DeleteNodesItem struct {
-	NodeID                 *NodeID
-	DeleteTargetReferences bool
-}
+		NodeID *NodeID
+		DeleteTargetReferences bool
+		
+	}
 
 type DeleteNodesRequest struct {
-	RequestHeader *RequestHeader
-	NodesToDelete []*DeleteNodesItem
-}
+		RequestHeader *RequestHeader
+		NodesToDelete []*DeleteNodesItem
+		
+	}
 
 func (t *DeleteNodesRequest) Header() *RequestHeader {
 	return t.RequestHeader
@@ -1288,10 +1460,11 @@ func (t *DeleteNodesRequest) SetHeader(h *RequestHeader) {
 }
 
 type DeleteNodesResponse struct {
-	ResponseHeader  *ResponseHeader
-	Results         []StatusCode
-	DiagnosticInfos []*DiagnosticInfo
-}
+		ResponseHeader *ResponseHeader
+		Results []StatusCode
+		DiagnosticInfos []*DiagnosticInfo
+		
+	}
 
 func (t *DeleteNodesResponse) Header() *ResponseHeader {
 	return t.ResponseHeader
@@ -1302,17 +1475,19 @@ func (t *DeleteNodesResponse) SetHeader(h *ResponseHeader) {
 }
 
 type DeleteReferencesItem struct {
-	SourceNodeID        *NodeID
-	ReferenceTypeID     *NodeID
-	IsForward           bool
-	TargetNodeID        *ExpandedNodeID
-	DeleteBidirectional bool
-}
+		SourceNodeID *NodeID
+		ReferenceTypeID *NodeID
+		IsForward bool
+		TargetNodeID *ExpandedNodeID
+		DeleteBidirectional bool
+		
+	}
 
 type DeleteReferencesRequest struct {
-	RequestHeader      *RequestHeader
-	ReferencesToDelete []*DeleteReferencesItem
-}
+		RequestHeader *RequestHeader
+		ReferencesToDelete []*DeleteReferencesItem
+		
+	}
 
 func (t *DeleteReferencesRequest) Header() *RequestHeader {
 	return t.RequestHeader
@@ -1323,10 +1498,11 @@ func (t *DeleteReferencesRequest) SetHeader(h *RequestHeader) {
 }
 
 type DeleteReferencesResponse struct {
-	ResponseHeader  *ResponseHeader
-	Results         []StatusCode
-	DiagnosticInfos []*DiagnosticInfo
-}
+		ResponseHeader *ResponseHeader
+		Results []StatusCode
+		DiagnosticInfos []*DiagnosticInfo
+		
+	}
 
 func (t *DeleteReferencesResponse) Header() *ResponseHeader {
 	return t.ResponseHeader
@@ -1337,42 +1513,47 @@ func (t *DeleteReferencesResponse) SetHeader(h *ResponseHeader) {
 }
 
 type ViewDescription struct {
-	ViewID      *NodeID
-	Timestamp   time.Time
-	ViewVersion uint32
-}
+		ViewID *NodeID
+		Timestamp time.Time
+		ViewVersion uint32
+		
+	}
 
 type BrowseDescription struct {
-	NodeID          *NodeID
-	BrowseDirection BrowseDirection
-	ReferenceTypeID *NodeID
-	IncludeSubtypes bool
-	NodeClassMask   uint32
-	ResultMask      uint32
-}
+		NodeID *NodeID
+		BrowseDirection BrowseDirection
+		ReferenceTypeID *NodeID
+		IncludeSubtypes bool
+		NodeClassMask uint32
+		ResultMask uint32
+		
+	}
 
 type ReferenceDescription struct {
-	ReferenceTypeID *NodeID
-	IsForward       bool
-	NodeID          *ExpandedNodeID
-	BrowseName      *QualifiedName
-	DisplayName     *LocalizedText
-	NodeClass       NodeClass
-	TypeDefinition  *ExpandedNodeID
-}
+		ReferenceTypeID *NodeID
+		IsForward bool
+		NodeID *ExpandedNodeID
+		BrowseName *QualifiedName
+		DisplayName *LocalizedText
+		NodeClass NodeClass
+		TypeDefinition *ExpandedNodeID
+		
+	}
 
 type BrowseResult struct {
-	StatusCode        StatusCode
-	ContinuationPoint []byte
-	References        []*ReferenceDescription
-}
+		StatusCode StatusCode
+		ContinuationPoint []byte
+		References []*ReferenceDescription
+		
+	}
 
 type BrowseRequest struct {
-	RequestHeader                 *RequestHeader
-	View                          *ViewDescription
-	RequestedMaxReferencesPerNode uint32
-	NodesToBrowse                 []*BrowseDescription
-}
+		RequestHeader *RequestHeader
+		View *ViewDescription
+		RequestedMaxReferencesPerNode uint32
+		NodesToBrowse []*BrowseDescription
+		
+	}
 
 func (t *BrowseRequest) Header() *RequestHeader {
 	return t.RequestHeader
@@ -1383,10 +1564,11 @@ func (t *BrowseRequest) SetHeader(h *RequestHeader) {
 }
 
 type BrowseResponse struct {
-	ResponseHeader  *ResponseHeader
-	Results         []*BrowseResult
-	DiagnosticInfos []*DiagnosticInfo
-}
+		ResponseHeader *ResponseHeader
+		Results []*BrowseResult
+		DiagnosticInfos []*DiagnosticInfo
+		
+	}
 
 func (t *BrowseResponse) Header() *ResponseHeader {
 	return t.ResponseHeader
@@ -1397,10 +1579,11 @@ func (t *BrowseResponse) SetHeader(h *ResponseHeader) {
 }
 
 type BrowseNextRequest struct {
-	RequestHeader             *RequestHeader
-	ReleaseContinuationPoints bool
-	ContinuationPoints        [][]byte
-}
+		RequestHeader *RequestHeader
+		ReleaseContinuationPoints bool
+		ContinuationPoints [][]byte
+		
+	}
 
 func (t *BrowseNextRequest) Header() *RequestHeader {
 	return t.RequestHeader
@@ -1411,10 +1594,11 @@ func (t *BrowseNextRequest) SetHeader(h *RequestHeader) {
 }
 
 type BrowseNextResponse struct {
-	ResponseHeader  *ResponseHeader
-	Results         []*BrowseResult
-	DiagnosticInfos []*DiagnosticInfo
-}
+		ResponseHeader *ResponseHeader
+		Results []*BrowseResult
+		DiagnosticInfos []*DiagnosticInfo
+		
+	}
 
 func (t *BrowseNextResponse) Header() *ResponseHeader {
 	return t.ResponseHeader
@@ -1425,35 +1609,41 @@ func (t *BrowseNextResponse) SetHeader(h *ResponseHeader) {
 }
 
 type RelativePathElement struct {
-	ReferenceTypeID *NodeID
-	IsInverse       bool
-	IncludeSubtypes bool
-	TargetName      *QualifiedName
-}
+		ReferenceTypeID *NodeID
+		IsInverse bool
+		IncludeSubtypes bool
+		TargetName *QualifiedName
+		
+	}
 
 type RelativePath struct {
-	Elements []*RelativePathElement
-}
+		Elements []*RelativePathElement
+		
+	}
 
 type BrowsePath struct {
-	StartingNode *NodeID
-	RelativePath *RelativePath
-}
+		StartingNode *NodeID
+		RelativePath *RelativePath
+		
+	}
 
 type BrowsePathTarget struct {
-	TargetID           *ExpandedNodeID
-	RemainingPathIndex uint32
-}
+		TargetID *ExpandedNodeID
+		RemainingPathIndex uint32
+		
+	}
 
 type BrowsePathResult struct {
-	StatusCode StatusCode
-	Targets    []*BrowsePathTarget
-}
+		StatusCode StatusCode
+		Targets []*BrowsePathTarget
+		
+	}
 
 type TranslateBrowsePathsToNodeIDsRequest struct {
-	RequestHeader *RequestHeader
-	BrowsePaths   []*BrowsePath
-}
+		RequestHeader *RequestHeader
+		BrowsePaths []*BrowsePath
+		
+	}
 
 func (t *TranslateBrowsePathsToNodeIDsRequest) Header() *RequestHeader {
 	return t.RequestHeader
@@ -1464,10 +1654,11 @@ func (t *TranslateBrowsePathsToNodeIDsRequest) SetHeader(h *RequestHeader) {
 }
 
 type TranslateBrowsePathsToNodeIDsResponse struct {
-	ResponseHeader  *ResponseHeader
-	Results         []*BrowsePathResult
-	DiagnosticInfos []*DiagnosticInfo
-}
+		ResponseHeader *ResponseHeader
+		Results []*BrowsePathResult
+		DiagnosticInfos []*DiagnosticInfo
+		
+	}
 
 func (t *TranslateBrowsePathsToNodeIDsResponse) Header() *ResponseHeader {
 	return t.ResponseHeader
@@ -1478,9 +1669,10 @@ func (t *TranslateBrowsePathsToNodeIDsResponse) SetHeader(h *ResponseHeader) {
 }
 
 type RegisterNodesRequest struct {
-	RequestHeader   *RequestHeader
-	NodesToRegister []*NodeID
-}
+		RequestHeader *RequestHeader
+		NodesToRegister []*NodeID
+		
+	}
 
 func (t *RegisterNodesRequest) Header() *RequestHeader {
 	return t.RequestHeader
@@ -1491,9 +1683,10 @@ func (t *RegisterNodesRequest) SetHeader(h *RequestHeader) {
 }
 
 type RegisterNodesResponse struct {
-	ResponseHeader    *ResponseHeader
-	RegisteredNodeIDs []*NodeID
-}
+		ResponseHeader *ResponseHeader
+		RegisteredNodeIDs []*NodeID
+		
+	}
 
 func (t *RegisterNodesResponse) Header() *ResponseHeader {
 	return t.ResponseHeader
@@ -1504,9 +1697,10 @@ func (t *RegisterNodesResponse) SetHeader(h *ResponseHeader) {
 }
 
 type UnregisterNodesRequest struct {
-	RequestHeader     *RequestHeader
-	NodesToUnregister []*NodeID
-}
+		RequestHeader *RequestHeader
+		NodesToUnregister []*NodeID
+		
+	}
 
 func (t *UnregisterNodesRequest) Header() *RequestHeader {
 	return t.RequestHeader
@@ -1517,8 +1711,9 @@ func (t *UnregisterNodesRequest) SetHeader(h *RequestHeader) {
 }
 
 type UnregisterNodesResponse struct {
-	ResponseHeader *ResponseHeader
-}
+		ResponseHeader *ResponseHeader
+		
+	}
 
 func (t *UnregisterNodesResponse) Header() *ResponseHeader {
 	return t.ResponseHeader
@@ -1529,101 +1724,116 @@ func (t *UnregisterNodesResponse) SetHeader(h *ResponseHeader) {
 }
 
 type EndpointConfiguration struct {
-	OperationTimeout      int32
-	UseBinaryEncoding     bool
-	MaxStringLength       int32
-	MaxByteStringLength   int32
-	MaxArrayLength        int32
-	MaxMessageSize        int32
-	MaxBufferSize         int32
-	ChannelLifetime       int32
-	SecurityTokenLifetime int32
-}
+		OperationTimeout int32
+		UseBinaryEncoding bool
+		MaxStringLength int32
+		MaxByteStringLength int32
+		MaxArrayLength int32
+		MaxMessageSize int32
+		MaxBufferSize int32
+		ChannelLifetime int32
+		SecurityTokenLifetime int32
+		
+	}
 
 type QueryDataDescription struct {
-	RelativePath *RelativePath
-	AttributeID  AttributeID
-	IndexRange   string
-}
+		RelativePath *RelativePath
+		AttributeID AttributeID
+		IndexRange string
+		
+	}
 
 type NodeTypeDescription struct {
-	TypeDefinitionNode *ExpandedNodeID
-	IncludeSubTypes    bool
-	DataToReturn       []*QueryDataDescription
-}
+		TypeDefinitionNode *ExpandedNodeID
+		IncludeSubTypes bool
+		DataToReturn []*QueryDataDescription
+		
+	}
 
 type QueryDataSet struct {
-	NodeID             *ExpandedNodeID
-	TypeDefinitionNode *ExpandedNodeID
-	Values             []*Variant
-}
+		NodeID *ExpandedNodeID
+		TypeDefinitionNode *ExpandedNodeID
+		Values []*Variant
+		
+	}
 
 type NodeReference struct {
-	NodeID            *NodeID
-	ReferenceTypeID   *NodeID
-	IsForward         bool
-	ReferencedNodeIDs []*NodeID
-}
+		NodeID *NodeID
+		ReferenceTypeID *NodeID
+		IsForward bool
+		ReferencedNodeIDs []*NodeID
+		
+	}
 
 type ContentFilterElement struct {
-	FilterOperator FilterOperator
-	FilterOperands []*ExtensionObject
-}
+		FilterOperator FilterOperator
+		FilterOperands []*ExtensionObject
+		
+	}
 
 type ContentFilter struct {
-	Elements []*ContentFilterElement
-}
+		Elements []*ContentFilterElement
+		
+	}
 
-type FilterOperand struct{}
+type FilterOperand struct {}
 
 type ElementOperand struct {
-	Index uint32
-}
+		Index uint32
+		
+	}
 
 type LiteralOperand struct {
-	Value *Variant
-}
+		Value *Variant
+		
+	}
 
 type AttributeOperand struct {
-	NodeID      *NodeID
-	Alias       string
-	BrowsePath  *RelativePath
-	AttributeID AttributeID
-	IndexRange  string
-}
+		NodeID *NodeID
+		Alias string
+		BrowsePath *RelativePath
+		AttributeID AttributeID
+		IndexRange string
+		
+	}
 
 type SimpleAttributeOperand struct {
-	TypeDefinitionID *NodeID
-	BrowsePath       []*QualifiedName
-	AttributeID      AttributeID
-	IndexRange       string
-}
+		TypeDefinitionID *NodeID
+		BrowsePath []*QualifiedName
+		AttributeID AttributeID
+		IndexRange string
+		
+	}
 
 type ContentFilterElementResult struct {
-	StatusCode             StatusCode
-	OperandStatusCodes     []StatusCode
-	OperandDiagnosticInfos []*DiagnosticInfo
-}
+		StatusCode StatusCode
+		OperandStatusCodes []StatusCode
+		OperandDiagnosticInfos []*DiagnosticInfo
+		
+	}
 
 type ContentFilterResult struct {
-	ElementResults         []*ContentFilterElementResult
-	ElementDiagnosticInfos []*DiagnosticInfo
-}
+		ElementResults []*ContentFilterElementResult
+		ElementDiagnosticInfos []*DiagnosticInfo
+		
+	}
 
 type ParsingResult struct {
-	StatusCode          StatusCode
-	DataStatusCodes     []StatusCode
-	DataDiagnosticInfos []*DiagnosticInfo
-}
+		StatusCode StatusCode
+		DataStatusCodes []StatusCode
+		DataDiagnosticInfos []*DiagnosticInfo
+		
+	}
 
 type QueryFirstRequest struct {
-	RequestHeader         *RequestHeader
-	View                  *ViewDescription
-	NodeTypes             []*NodeTypeDescription
-	Filter                *ContentFilter
-	MaxDataSetsToReturn   uint32
-	MaxReferencesToReturn uint32
-}
+		RequestHeader *RequestHeader
+		View *ViewDescription
+		NodeTypes []*NodeTypeDescription
+		Filter *ContentFilter
+		MaxDataSetsToReturn uint32
+		MaxReferencesToReturn uint32
+		
+	}
 
 func (t *QueryFirstRequest) Header() *RequestHeader {
 	return t.RequestHeader
@@ -1634,13 +1844,14 @@ func (t *QueryFirstRequest) SetHeader(h *RequestHeader) {
 }
 
 type QueryFirstResponse struct {
-	ResponseHeader    *ResponseHeader
-	QueryDataSets     []*QueryDataSet
-	ContinuationPoint []byte
-	ParsingResults    []*ParsingResult
-	DiagnosticInfos   []*DiagnosticInfo
-	FilterResult      *ContentFilterResult
-}
+		ResponseHeader *ResponseHeader
+		QueryDataSets []*QueryDataSet
+		ContinuationPoint []byte
+		ParsingResults []*ParsingResult
+		DiagnosticInfos []*DiagnosticInfo
+		FilterResult *ContentFilterResult
+		
+	}
 
 func (t *QueryFirstResponse) Header() *ResponseHeader {
 	return t.ResponseHeader
@@ -1651,10 +1862,11 @@ func (t *QueryFirstResponse) SetHeader(h *ResponseHeader) {
 }
 
 type QueryNextRequest struct {
-	RequestHeader            *RequestHeader
-	ReleaseContinuationPoint bool
-	ContinuationPoint        []byte
-}
+		RequestHeader *RequestHeader
+		ReleaseContinuationPoint bool
+		ContinuationPoint []byte
+		
+	}
 
 func (t *QueryNextRequest) Header() *RequestHeader {
 	return t.RequestHeader
@@ -1665,10 +1877,11 @@ func (t *QueryNextRequest) SetHeader(h *RequestHeader) {
 }
 
 type QueryNextResponse struct {
-	ResponseHeader           *ResponseHeader
-	QueryDataSets            []*QueryDataSet
-	RevisedContinuationPoint []byte
-}
+		ResponseHeader *ResponseHeader
+		QueryDataSets []*QueryDataSet
+		RevisedContinuationPoint []byte
+		
+	}
 
 func (t *QueryNextResponse) Header() *ResponseHeader {
 	return t.ResponseHeader
@@ -1679,18 +1892,20 @@ func (t *QueryNextResponse) SetHeader(h *ResponseHeader) {
 }
 
 type ReadValueID struct {
-	NodeID       *NodeID
-	AttributeID  AttributeID
-	IndexRange   string
-	DataEncoding *QualifiedName
-}
+		NodeID *NodeID
+		AttributeID AttributeID
+		IndexRange string
+		DataEncoding *QualifiedName
+		
+	}
 
 type ReadRequest struct {
-	RequestHeader      *RequestHeader
-	MaxAge             float64
-	TimestampsToReturn TimestampsToReturn
-	NodesToRead        []*ReadValueID
-}
+		RequestHeader *RequestHeader
+		MaxAge float64
+		TimestampsToReturn TimestampsToReturn
+		NodesToRead []*ReadValueID
+		
+	}
 
 func (t *ReadRequest) Header() *RequestHeader {
 	return t.RequestHeader
@@ -1701,10 +1916,11 @@ func (t *ReadRequest) SetHeader(h *RequestHeader) {
 }
 
 type ReadResponse struct {
-	ResponseHeader  *ResponseHeader
-	Results         []*DataValue
-	DiagnosticInfos []*DiagnosticInfo
-}
+		ResponseHeader *ResponseHeader
+		Results []*DataValue
+		DiagnosticInfos []*DiagnosticInfo
+		
+	}
 
 func (t *ReadResponse) Header() *ResponseHeader {
 	return t.ResponseHeader
@@ -1715,74 +1931,90 @@ func (t *ReadResponse) SetHeader(h *ResponseHeader) {
 }
 
 type HistoryReadValueID struct {
-	NodeID            *NodeID
-	IndexRange        string
-	DataEncoding      *QualifiedName
-	ContinuationPoint []byte
-}
+		NodeID *NodeID
+		IndexRange string
+		DataEncoding *QualifiedName
+		ContinuationPoint []byte
+		
+	}
 
 type HistoryReadResult struct {
-	StatusCode        StatusCode
-	ContinuationPoint []byte
-	HistoryData       *ExtensionObject
-}
+		StatusCode StatusCode
+		ContinuationPoint []byte
+		HistoryData *ExtensionObject
+		
+	}
 
-type HistoryReadDetails struct{}
+type HistoryReadDetails struct {}
 
 type ReadEventDetails struct {
-	NumValuesPerNode uint32
-	StartTime        time.Time
-	EndTime          time.Time
-	Filter           *EventFilter
-}
+		NumValuesPerNode uint32
+		StartTime time.Time
+		EndTime time.Time
+		Filter *EventFilter
+		
+	}
 
 type ReadRawModifiedDetails struct {
-	IsReadModified   bool
-	StartTime        time.Time
-	EndTime          time.Time
-	NumValuesPerNode uint32
-	ReturnBounds     bool
-}
+		IsReadModified bool
+		StartTime time.Time
+		EndTime time.Time
+		NumValuesPerNode uint32
+		ReturnBounds bool
+		
+	}
 
 type ReadProcessedDetails struct {
-	StartTime              time.Time
-	EndTime                time.Time
-	ProcessingInterval     float64
-	AggregateType          []*NodeID
-	AggregateConfiguration *AggregateConfiguration
-}
+		StartTime time.Time
+		EndTime time.Time
+		ProcessingInterval float64
+		AggregateType []*NodeID
+		AggregateConfiguration *AggregateConfiguration
+		
+	}
 
 type ReadAtTimeDetails struct {
-	ReqTimes        []time.Time
-	UseSimpleBounds bool
-}
+		ReqTimes []time.Time
+		UseSimpleBounds bool
+		
+	}
+
+type ReadAnnotationDataDetails struct {
+		ReqTimes []time.Time
+		
+	}
 
 type HistoryData struct {
-	DataValues []*DataValue
-}
+		DataValues []*DataValue
+		
+	}
 
 type ModificationInfo struct {
-	ModificationTime time.Time
-	UpdateType       HistoryUpdateType
-	UserName         string
-}
+		ModificationTime time.Time
+		UpdateType HistoryUpdateType
+		UserName string
+		
+	}
 
 type HistoryModifiedData struct {
-	DataValues        []*DataValue
-	ModificationInfos []*ModificationInfo
-}
+		DataValues []*DataValue
+		ModificationInfos []*ModificationInfo
+		
+	}
 
 type HistoryEvent struct {
-	Events []*HistoryEventFieldList
-}
+		Events []*HistoryEventFieldList
+		
+	}
 
 type HistoryReadRequest struct {
-	RequestHeader             *RequestHeader
-	HistoryReadDetails        *ExtensionObject
-	TimestampsToReturn        TimestampsToReturn
-	ReleaseContinuationPoints bool
-	NodesToRead               []*HistoryReadValueID
-}
+		RequestHeader *RequestHeader
+		HistoryReadDetails *ExtensionObject
+		TimestampsToReturn TimestampsToReturn
+		ReleaseContinuationPoints bool
+		NodesToRead []*HistoryReadValueID
+		
+	}
 
 func (t *HistoryReadRequest) Header() *RequestHeader {
 	return t.RequestHeader
@@ -1793,10 +2025,11 @@ func (t *HistoryReadRequest) SetHeader(h *RequestHeader) {
 }
 
 type HistoryReadResponse struct {
-	ResponseHeader  *ResponseHeader
-	Results         []*HistoryReadResult
-	DiagnosticInfos []*DiagnosticInfo
-}
+		ResponseHeader *ResponseHeader
+		Results []*HistoryReadResult
+		DiagnosticInfos []*DiagnosticInfo
+		
+	}
 
 func (t *HistoryReadResponse) Header() *ResponseHeader {
 	return t.ResponseHeader
@@ -1807,16 +2040,18 @@ func (t *HistoryReadResponse) SetHeader(h *ResponseHeader) {
 }
 
 type WriteValue struct {
-	NodeID      *NodeID
-	AttributeID AttributeID
-	IndexRange  string
-	Value       *DataValue
-}
+		NodeID *NodeID
+		AttributeID AttributeID
+		IndexRange string
+		Value *DataValue
+		
+	}
 
 type WriteRequest struct {
-	RequestHeader *RequestHeader
-	NodesToWrite  []*WriteValue
-}
+		RequestHeader *RequestHeader
+		NodesToWrite []*WriteValue
+		
+	}
 
 func (t *WriteRequest) Header() *RequestHeader {
 	return t.RequestHeader
@@ -1827,10 +2062,11 @@ func (t *WriteRequest) SetHeader(h *RequestHeader) {
 }
 
 type WriteResponse struct {
-	ResponseHeader  *ResponseHeader
-	Results         []StatusCode
-	DiagnosticInfos []*DiagnosticInfo
-}
+		ResponseHeader *ResponseHeader
+		Results []StatusCode
+		DiagnosticInfos []*DiagnosticInfo
+		
+	}
 
 func (t *WriteResponse) Header() *ResponseHeader {
 	return t.ResponseHeader
@@ -1841,55 +2077,64 @@ func (t *WriteResponse) SetHeader(h *ResponseHeader) {
 }
 
 type HistoryUpdateDetails struct {
-	NodeID *NodeID
-}
+		NodeID *NodeID
+		
+	}
 
 type UpdateDataDetails struct {
-	NodeID               *NodeID
-	PerformInsertReplace PerformUpdateType
-	UpdateValues         []*DataValue
-}
+		NodeID *NodeID
+		PerformInsertReplace PerformUpdateType
+		UpdateValues []*DataValue
+		
+	}
 
 type UpdateStructureDataDetails struct {
-	NodeID               *NodeID
-	PerformInsertReplace PerformUpdateType
-	UpdateValues         []*DataValue
-}
+		NodeID *NodeID
+		PerformInsertReplace PerformUpdateType
+		UpdateValues []*DataValue
+		
+	}
 
 type UpdateEventDetails struct {
-	NodeID               *NodeID
-	PerformInsertReplace PerformUpdateType
-	Filter               *EventFilter
-	EventData            []*HistoryEventFieldList
-}
+		NodeID *NodeID
+		PerformInsertReplace PerformUpdateType
+		Filter *EventFilter
+		EventData []*HistoryEventFieldList
+		
+	}
 
 type DeleteRawModifiedDetails struct {
-	NodeID           *NodeID
-	IsDeleteModified bool
-	StartTime        time.Time
-	EndTime          time.Time
-}
+		NodeID *NodeID
+		IsDeleteModified bool
+		StartTime time.Time
+		EndTime time.Time
+		
+	}
 
 type DeleteAtTimeDetails struct {
-	NodeID   *NodeID
-	ReqTimes []time.Time
-}
+		NodeID *NodeID
+		ReqTimes []time.Time
+		
+	}
 
 type DeleteEventDetails struct {
-	NodeID   *NodeID
-	EventIDs [][]byte
-}
+		NodeID *NodeID
+		EventIDs [][]byte
+		
+	}
 
 type HistoryUpdateResult struct {
-	StatusCode       StatusCode
-	OperationResults []StatusCode
-	DiagnosticInfos  []*DiagnosticInfo
-}
+		StatusCode StatusCode
+		OperationResults []StatusCode
+		DiagnosticInfos []*DiagnosticInfo
+		
+	}
 
 type HistoryUpdateRequest struct {
-	RequestHeader        *RequestHeader
-	HistoryUpdateDetails []*ExtensionObject
-}
+		RequestHeader *RequestHeader
+		HistoryUpdateDetails []*ExtensionObject
+		
+	}
 
 func (t *HistoryUpdateRequest) Header() *RequestHeader {
 	return t.RequestHeader
@@ -1900,10 +2145,11 @@ func (t *HistoryUpdateRequest) SetHeader(h *RequestHeader) {
 }
 
 type HistoryUpdateResponse struct {
-	ResponseHeader  *ResponseHeader
-	Results         []*HistoryUpdateResult
-	DiagnosticInfos []*DiagnosticInfo
-}
+		ResponseHeader *ResponseHeader
+		Results []*HistoryUpdateResult
+		DiagnosticInfos []*DiagnosticInfo
+		
+	}
 
 func (t *HistoryUpdateResponse) Header() *ResponseHeader {
 	return t.ResponseHeader
@@ -1914,22 +2160,25 @@ func (t *HistoryUpdateResponse) SetHeader(h *ResponseHeader) {
 }
 
 type CallMethodRequest struct {
-	ObjectID       *NodeID
-	MethodID       *NodeID
-	InputArguments []*Variant
-}
+		ObjectID *NodeID
+		MethodID *NodeID
+		InputArguments []*Variant
+		
+	}
 
 type CallMethodResult struct {
-	StatusCode                   StatusCode
-	InputArgumentResults         []StatusCode
-	InputArgumentDiagnosticInfos []*DiagnosticInfo
-	OutputArguments              []*Variant
-}
+		StatusCode StatusCode
+		InputArgumentResults []StatusCode
+		InputArgumentDiagnosticInfos []*DiagnosticInfo
+		OutputArguments []*Variant
+		
+	}
 
 type CallRequest struct {
-	RequestHeader *RequestHeader
-	MethodsToCall []*CallMethodRequest
-}
+		RequestHeader *RequestHeader
+		MethodsToCall []*CallMethodRequest
+		
+	}
 
 func (t *CallRequest) Header() *RequestHeader {
 	return t.RequestHeader
@@ -1940,10 +2189,11 @@ func (t *CallRequest) SetHeader(h *RequestHeader) {
 }
 
 type CallResponse struct {
-	ResponseHeader  *ResponseHeader
-	Results         []*CallMethodResult
-	DiagnosticInfos []*DiagnosticInfo
-}
+		ResponseHeader *ResponseHeader
+		Results []*CallMethodResult
+		DiagnosticInfos []*DiagnosticInfo
+		
+	}
 
 func (t *CallResponse) Header() *ResponseHeader {
 	return t.ResponseHeader
@@ -1953,76 +2203,86 @@ func (t *CallResponse) SetHeader(h *ResponseHeader) {
 	t.ResponseHeader = h
 }
 
-type MonitoringFilter struct{}
+type MonitoringFilter struct {}
 
 type DataChangeFilter struct {
-	Trigger       DataChangeTrigger
-	DeadbandType  uint32
-	DeadbandValue float64
-}
+		Trigger DataChangeTrigger
+		DeadbandType uint32
+		DeadbandValue float64
+		
+	}
 
 type EventFilter struct {
-	SelectClauses []*SimpleAttributeOperand
-	WhereClause   *ContentFilter
-}
+		SelectClauses []*SimpleAttributeOperand
+		WhereClause *ContentFilter
+		
+	}
 
 type AggregateConfiguration struct {
-	UseServerCapabilitiesDefaults bool
-	TreatUncertainAsBad           bool
-	PercentDataBad                uint8
-	PercentDataGood               uint8
-	UseSlopedExtrapolation        bool
-}
+		UseServerCapabilitiesDefaults bool
+		TreatUncertainAsBad bool
+		PercentDataBad uint8
+		PercentDataGood uint8
+		UseSlopedExtrapolation bool
+		
+	}
 
 type AggregateFilter struct {
-	StartTime              time.Time
-	AggregateType          *NodeID
-	ProcessingInterval     float64
-	AggregateConfiguration *AggregateConfiguration
-}
+		StartTime time.Time
+		AggregateType *NodeID
+		ProcessingInterval float64
+		AggregateConfiguration *AggregateConfiguration
+		
+	}
 
-type MonitoringFilterResult struct{}
+type MonitoringFilterResult struct {}
 
 type EventFilterResult struct {
-	SelectClauseResults         []StatusCode
-	SelectClauseDiagnosticInfos []*DiagnosticInfo
-	WhereClauseResult           *ContentFilterResult
-}
+		SelectClauseResults []StatusCode
+		SelectClauseDiagnosticInfos []*DiagnosticInfo
+		WhereClauseResult *ContentFilterResult
+		
+	}
 
 type AggregateFilterResult struct {
-	RevisedStartTime              time.Time
-	RevisedProcessingInterval     float64
-	RevisedAggregateConfiguration *AggregateConfiguration
-}
+		RevisedStartTime time.Time
+		RevisedProcessingInterval float64
+		RevisedAggregateConfiguration *AggregateConfiguration
+		
+	}
 
 type MonitoringParameters struct {
-	ClientHandle     uint32
-	SamplingInterval float64
-	Filter           *ExtensionObject
-	QueueSize        uint32
-	DiscardOldest    bool
-}
+		ClientHandle uint32
+		SamplingInterval float64
+		Filter *ExtensionObject
+		QueueSize uint32
+		DiscardOldest bool
+		
+	}
 
 type MonitoredItemCreateRequest struct {
-	ItemToMonitor       *ReadValueID
-	MonitoringMode      MonitoringMode
-	RequestedParameters *MonitoringParameters
-}
+		ItemToMonitor *ReadValueID
+		MonitoringMode MonitoringMode
+		RequestedParameters *MonitoringParameters
+		
+	}
 
 type MonitoredItemCreateResult struct {
-	StatusCode              StatusCode
-	MonitoredItemID         uint32
-	RevisedSamplingInterval float64
-	RevisedQueueSize        uint32
-	FilterResult            *ExtensionObject
-}
+		StatusCode StatusCode
+		MonitoredItemID uint32
+		RevisedSamplingInterval float64
+		RevisedQueueSize uint32
+		FilterResult *ExtensionObject
+		
+	}
 
 type CreateMonitoredItemsRequest struct {
-	RequestHeader      *RequestHeader
-	SubscriptionID     uint32
-	TimestampsToReturn TimestampsToReturn
-	ItemsToCreate      []*MonitoredItemCreateRequest
-}
+		RequestHeader *RequestHeader
+		SubscriptionID uint32
+		TimestampsToReturn TimestampsToReturn
+		ItemsToCreate []*MonitoredItemCreateRequest
+		
+	}
 
 func (t *CreateMonitoredItemsRequest) Header() *RequestHeader {
 	return t.RequestHeader
@@ -2033,10 +2293,11 @@ func (t *CreateMonitoredItemsRequest) SetHeader(h *RequestHeader) {
 }
 
 type CreateMonitoredItemsResponse struct {
-	ResponseHeader  *ResponseHeader
-	Results         []*MonitoredItemCreateResult
-	DiagnosticInfos []*DiagnosticInfo
-}
+		ResponseHeader *ResponseHeader
+		Results []*MonitoredItemCreateResult
+		DiagnosticInfos []*DiagnosticInfo
+		
+	}
 
 func (t *CreateMonitoredItemsResponse) Header() *ResponseHeader {
 	return t.ResponseHeader
@@ -2047,23 +2308,26 @@ func (t *CreateMonitoredItemsResponse) SetHeader(h *ResponseHeader) {
 }
 
 type MonitoredItemModifyRequest struct {
-	MonitoredItemID     uint32
-	RequestedParameters *MonitoringParameters
-}
+		MonitoredItemID uint32
+		RequestedParameters *MonitoringParameters
+		
+	}
 
 type MonitoredItemModifyResult struct {
-	StatusCode              StatusCode
-	RevisedSamplingInterval float64
-	RevisedQueueSize        uint32
-	FilterResult            *ExtensionObject
-}
+		StatusCode StatusCode
+		RevisedSamplingInterval float64
+		RevisedQueueSize uint32
+		FilterResult *ExtensionObject
+		
+	}
 
 type ModifyMonitoredItemsRequest struct {
-	RequestHeader      *RequestHeader
-	SubscriptionID     uint32
-	TimestampsToReturn TimestampsToReturn
-	ItemsToModify      []*MonitoredItemModifyRequest
-}
+		RequestHeader *RequestHeader
+		SubscriptionID uint32
+		TimestampsToReturn TimestampsToReturn
+		ItemsToModify []*MonitoredItemModifyRequest
+		
+	}
 
 func (t *ModifyMonitoredItemsRequest) Header() *RequestHeader {
 	return t.RequestHeader
@@ -2074,10 +2338,11 @@ func (t *ModifyMonitoredItemsRequest) SetHeader(h *RequestHeader) {
 }
 
 type ModifyMonitoredItemsResponse struct {
-	ResponseHeader  *ResponseHeader
-	Results         []*MonitoredItemModifyResult
-	DiagnosticInfos []*DiagnosticInfo
-}
+		ResponseHeader *ResponseHeader
+		Results []*MonitoredItemModifyResult
+		DiagnosticInfos []*DiagnosticInfo
+		
+	}
 
 func (t *ModifyMonitoredItemsResponse) Header() *ResponseHeader {
 	return t.ResponseHeader
@@ -2088,11 +2353,12 @@ func (t *ModifyMonitoredItemsResponse) SetHeader(h *ResponseHeader) {
 }
 
 type SetMonitoringModeRequest struct {
-	RequestHeader    *RequestHeader
-	SubscriptionID   uint32
-	MonitoringMode   MonitoringMode
-	MonitoredItemIDs []uint32
-}
+		RequestHeader *RequestHeader
+		SubscriptionID uint32
+		MonitoringMode MonitoringMode
+		MonitoredItemIDs []uint32
+		
+	}
 
 func (t *SetMonitoringModeRequest) Header() *RequestHeader {
 	return t.RequestHeader
@@ -2103,10 +2369,11 @@ func (t *SetMonitoringModeRequest) SetHeader(h *RequestHeader) {
 }
 
 type SetMonitoringModeResponse struct {
-	ResponseHeader  *ResponseHeader
-	Results         []StatusCode
-	DiagnosticInfos []*DiagnosticInfo
-}
+		ResponseHeader *ResponseHeader
+		Results []StatusCode
+		DiagnosticInfos []*DiagnosticInfo
+		
+	}
 
 func (t *SetMonitoringModeResponse) Header() *ResponseHeader {
 	return t.ResponseHeader
@@ -2117,12 +2384,13 @@ func (t *SetMonitoringModeResponse) SetHeader(h *ResponseHeader) {
 }
 
 type SetTriggeringRequest struct {
-	RequestHeader    *RequestHeader
-	SubscriptionID   uint32
-	TriggeringItemID uint32
-	LinksToAdd       []uint32
-	LinksToRemove    []uint32
-}
+		RequestHeader *RequestHeader
+		SubscriptionID uint32
+		TriggeringItemID uint32
+		LinksToAdd []uint32
+		LinksToRemove []uint32
+		
+	}
 
 func (t *SetTriggeringRequest) Header() *RequestHeader {
 	return t.RequestHeader
@@ -2133,12 +2401,13 @@ func (t *SetTriggeringRequest) SetHeader(h *RequestHeader) {
 }
 
 type SetTriggeringResponse struct {
-	ResponseHeader        *ResponseHeader
-	AddResults            []StatusCode
-	AddDiagnosticInfos    []*DiagnosticInfo
-	RemoveResults         []StatusCode
-	RemoveDiagnosticInfos []*DiagnosticInfo
-}
+		ResponseHeader *ResponseHeader
+		AddResults []StatusCode
+		AddDiagnosticInfos []*DiagnosticInfo
+		RemoveResults []StatusCode
+		RemoveDiagnosticInfos []*DiagnosticInfo
+		
+	}
 
 func (t *SetTriggeringResponse) Header() *ResponseHeader {
 	return t.ResponseHeader
@@ -2149,10 +2418,11 @@ func (t *SetTriggeringResponse) SetHeader(h *ResponseHeader) {
 }
 
 type DeleteMonitoredItemsRequest struct {
-	RequestHeader    *RequestHeader
-	SubscriptionID   uint32
-	MonitoredItemIDs []uint32
-}
+		RequestHeader *RequestHeader
+		SubscriptionID uint32
+		MonitoredItemIDs []uint32
+		
+	}
 
 func (t *DeleteMonitoredItemsRequest) Header() *RequestHeader {
 	return t.RequestHeader
@@ -2163,10 +2433,11 @@ func (t *DeleteMonitoredItemsRequest) SetHeader(h *RequestHeader) {
 }
 
 type DeleteMonitoredItemsResponse struct {
-	ResponseHeader  *ResponseHeader
-	Results         []StatusCode
-	DiagnosticInfos []*DiagnosticInfo
-}
+		ResponseHeader *ResponseHeader
+		Results []StatusCode
+		DiagnosticInfos []*DiagnosticInfo
+		
+	}
 
 func (t *DeleteMonitoredItemsResponse) Header() *ResponseHeader {
 	return t.ResponseHeader
@@ -2177,14 +2448,15 @@ func (t *DeleteMonitoredItemsResponse) SetHeader(h *ResponseHeader) {
 }
 
 type CreateSubscriptionRequest struct {
-	RequestHeader               *RequestHeader
-	RequestedPublishingInterval float64
-	RequestedLifetimeCount      uint32
-	RequestedMaxKeepAliveCount  uint32
-	MaxNotificationsPerPublish  uint32
-	PublishingEnabled           bool
-	Priority                    uint8
-}
+		RequestHeader *RequestHeader
+		RequestedPublishingInterval float64
+		RequestedLifetimeCount uint32
+		RequestedMaxKeepAliveCount uint32
+		MaxNotificationsPerPublish uint32
+		PublishingEnabled bool
+		Priority uint8
+		
+	}
 
 func (t *CreateSubscriptionRequest) Header() *RequestHeader {
 	return t.RequestHeader
@@ -2195,12 +2467,13 @@ func (t *CreateSubscriptionRequest) SetHeader(h *RequestHeader) {
 }
 
 type CreateSubscriptionResponse struct {
-	ResponseHeader            *ResponseHeader
-	SubscriptionID            uint32
-	RevisedPublishingInterval float64
-	RevisedLifetimeCount      uint32
-	RevisedMaxKeepAliveCount  uint32
-}
+		ResponseHeader *ResponseHeader
+		SubscriptionID uint32
+		RevisedPublishingInterval float64
+		RevisedLifetimeCount uint32
+		RevisedMaxKeepAliveCount uint32
+		
+	}
 
 func (t *CreateSubscriptionResponse) Header() *ResponseHeader {
 	return t.ResponseHeader
@@ -2211,14 +2484,15 @@ func (t *CreateSubscriptionResponse) SetHeader(h *ResponseHeader) {
 }
 
 type ModifySubscriptionRequest struct {
-	RequestHeader               *RequestHeader
-	SubscriptionID              uint32
-	RequestedPublishingInterval float64
-	RequestedLifetimeCount      uint32
-	RequestedMaxKeepAliveCount  uint32
-	MaxNotificationsPerPublish  uint32
-	Priority                    uint8
-}
+		RequestHeader *RequestHeader
+		SubscriptionID uint32
+		RequestedPublishingInterval float64
+		RequestedLifetimeCount uint32
+		RequestedMaxKeepAliveCount uint32
+		MaxNotificationsPerPublish uint32
+		Priority uint8
+		
+	}
 
 func (t *ModifySubscriptionRequest) Header() *RequestHeader {
 	return t.RequestHeader
@@ -2229,11 +2503,12 @@ func (t *ModifySubscriptionRequest) SetHeader(h *RequestHeader) {
 }
 
 type ModifySubscriptionResponse struct {
-	ResponseHeader            *ResponseHeader
-	RevisedPublishingInterval float64
-	RevisedLifetimeCount      uint32
-	RevisedMaxKeepAliveCount  uint32
-}
+		ResponseHeader *ResponseHeader
+		RevisedPublishingInterval float64
+		RevisedLifetimeCount uint32
+		RevisedMaxKeepAliveCount uint32
+		
+	}
 
 func (t *ModifySubscriptionResponse) Header() *ResponseHeader {
 	return t.ResponseHeader
@@ -2244,10 +2519,11 @@ func (t *ModifySubscriptionResponse) SetHeader(h *ResponseHeader) {
 }
 
 type SetPublishingModeRequest struct {
-	RequestHeader     *RequestHeader
-	PublishingEnabled bool
-	SubscriptionIDs   []uint32
-}
+		RequestHeader *RequestHeader
+		PublishingEnabled bool
+		SubscriptionIDs []uint32
+		
+	}
 
 func (t *SetPublishingModeRequest) Header() *RequestHeader {
 	return t.RequestHeader
@@ -2258,10 +2534,11 @@ func (t *SetPublishingModeRequest) SetHeader(h *RequestHeader) {
 }
 
 type SetPublishingModeResponse struct {
-	ResponseHeader  *ResponseHeader
-	Results         []StatusCode
-	DiagnosticInfos []*DiagnosticInfo
-}
+		ResponseHeader *ResponseHeader
+		Results []StatusCode
+		DiagnosticInfos []*DiagnosticInfo
+		
+	}
 
 func (t *SetPublishingModeResponse) Header() *ResponseHeader {
 	return t.ResponseHeader
@@ -2272,50 +2549,59 @@ func (t *SetPublishingModeResponse) SetHeader(h *ResponseHeader) {
 }
 
 type NotificationMessage struct {
-	SequenceNumber   uint32
-	PublishTime      time.Time
-	NotificationData []*ExtensionObject
-}
+		SequenceNumber uint32
+		PublishTime time.Time
+		NotificationData []*ExtensionObject
+		
+	}
 
-type NotificationData struct{}
+type NotificationData struct {}
 
 type DataChangeNotification struct {
-	MonitoredItems  []*MonitoredItemNotification
-	DiagnosticInfos []*DiagnosticInfo
-}
+		MonitoredItems []*MonitoredItemNotification
+		DiagnosticInfos []*DiagnosticInfo
+		
+	}
 
 type MonitoredItemNotification struct {
-	ClientHandle uint32
-	Value        *DataValue
-}
+		ClientHandle uint32
+		Value *DataValue
+		
+	}
 
 type EventNotificationList struct {
-	Events []*EventFieldList
-}
+		Events []*EventFieldList
+		
+	}
 
 type EventFieldList struct {
-	ClientHandle uint32
-	EventFields  []*Variant
-}
+		ClientHandle uint32
+		EventFields []*Variant
+		
+	}
 
 type HistoryEventFieldList struct {
-	EventFields []*Variant
-}
+		EventFields []*Variant
+		
+	}
 
 type StatusChangeNotification struct {
-	Status         StatusCode
-	DiagnosticInfo *DiagnosticInfo
-}
+		Status StatusCode
+		DiagnosticInfo *DiagnosticInfo
+		
+	}
 
 type SubscriptionAcknowledgement struct {
-	SubscriptionID uint32
-	SequenceNumber uint32
-}
+		SubscriptionID uint32
+		SequenceNumber uint32
+		
+	}
 
 type PublishRequest struct {
-	RequestHeader                *RequestHeader
-	SubscriptionAcknowledgements []*SubscriptionAcknowledgement
-}
+		RequestHeader *RequestHeader
+		SubscriptionAcknowledgements []*SubscriptionAcknowledgement
+		
+	}
 
 func (t *PublishRequest) Header() *RequestHeader {
 	return t.RequestHeader
@@ -2326,14 +2612,15 @@ func (t *PublishRequest) SetHeader(h *RequestHeader) {
 }
 
 type PublishResponse struct {
-	ResponseHeader           *ResponseHeader
-	SubscriptionID           uint32
-	AvailableSequenceNumbers []uint32
-	MoreNotifications        bool
-	NotificationMessage      *NotificationMessage
-	Results                  []StatusCode
-	DiagnosticInfos          []*DiagnosticInfo
-}
+		ResponseHeader *ResponseHeader
+		SubscriptionID uint32
+		AvailableSequenceNumbers []uint32
+		MoreNotifications bool
+		NotificationMessage *NotificationMessage
+		Results []StatusCode
+		DiagnosticInfos []*DiagnosticInfo
+		
+	}
 
 func (t *PublishResponse) Header() *ResponseHeader {
 	return t.ResponseHeader
@@ -2344,10 +2631,11 @@ func (t *PublishResponse) SetHeader(h *ResponseHeader) {
 }
 
 type RepublishRequest struct {
-	RequestHeader            *RequestHeader
-	SubscriptionID           uint32
-	RetransmitSequenceNumber uint32
-}
+		RequestHeader *RequestHeader
+		SubscriptionID uint32
+		RetransmitSequenceNumber uint32
+		
+	}
 
 func (t *RepublishRequest) Header() *RequestHeader {
 	return t.RequestHeader
@@ -2358,9 +2646,10 @@ func (t *RepublishRequest) SetHeader(h *RequestHeader) {
 }
 
 type RepublishResponse struct {
-	ResponseHeader      *ResponseHeader
-	NotificationMessage *NotificationMessage
-}
+		ResponseHeader *ResponseHeader
+		NotificationMessage *NotificationMessage
+		
+	}
 
 func (t *RepublishResponse) Header() *ResponseHeader {
 	return t.ResponseHeader
@@ -2371,15 +2660,17 @@ func (t *RepublishResponse) SetHeader(h *ResponseHeader) {
 }
 
 type TransferResult struct {
-	StatusCode               StatusCode
-	AvailableSequenceNumbers []uint32
-}
+		StatusCode StatusCode
+		AvailableSequenceNumbers []uint32
+		
+	}
 
 type TransferSubscriptionsRequest struct {
-	RequestHeader     *RequestHeader
-	SubscriptionIDs   []uint32
-	SendInitialValues bool
-}
+		RequestHeader *RequestHeader
+		SubscriptionIDs []uint32
+		SendInitialValues bool
+		
+	}
 
 func (t *TransferSubscriptionsRequest) Header() *RequestHeader {
 	return t.RequestHeader
@@ -2390,10 +2681,11 @@ func (t *TransferSubscriptionsRequest) SetHeader(h *RequestHeader) {
 }
 
 type TransferSubscriptionsResponse struct {
-	ResponseHeader  *ResponseHeader
-	Results         []*TransferResult
-	DiagnosticInfos []*DiagnosticInfo
-}
+		ResponseHeader *ResponseHeader
+		Results []*TransferResult
+		DiagnosticInfos []*DiagnosticInfo
+		
+	}
 
 func (t *TransferSubscriptionsResponse) Header() *ResponseHeader {
 	return t.ResponseHeader
@@ -2404,9 +2696,10 @@ func (t *TransferSubscriptionsResponse) SetHeader(h *ResponseHeader) {
 }
 
 type DeleteSubscriptionsRequest struct {
-	RequestHeader   *RequestHeader
-	SubscriptionIDs []uint32
-}
+		RequestHeader *RequestHeader
+		SubscriptionIDs []uint32
+		
+	}
 
 func (t *DeleteSubscriptionsRequest) Header() *RequestHeader {
 	return t.RequestHeader
@@ -2417,10 +2710,11 @@ func (t *DeleteSubscriptionsRequest) SetHeader(h *RequestHeader) {
 }
 
 type DeleteSubscriptionsResponse struct {
-	ResponseHeader  *ResponseHeader
-	Results         []StatusCode
-	DiagnosticInfos []*DiagnosticInfo
-}
+		ResponseHeader *ResponseHeader
+		Results []StatusCode
+		DiagnosticInfos []*DiagnosticInfo
+		
+	}
 
 func (t *DeleteSubscriptionsResponse) Header() *ResponseHeader {
 	return t.ResponseHeader
@@ -2431,238 +2725,261 @@ func (t *DeleteSubscriptionsResponse) SetHeader(h *ResponseHeader) {
 }
 
 type BuildInfo struct {
-	ProductURI       string
-	ManufacturerName string
-	ProductName      string
-	SoftwareVersion  string
-	BuildNumber      string
-	BuildDate        time.Time
-}
+		ProductURI string
+		ManufacturerName string
+		ProductName string
+		SoftwareVersion string
+		BuildNumber string
+		BuildDate time.Time
+		
+	}
 
 type RedundantServerDataType struct {
-	ServerID     string
-	ServiceLevel uint8
-	ServerState  ServerState
-}
+		ServerID string
+		ServiceLevel uint8
+		ServerState ServerState
+		
+	}
 
 type EndpointURLListDataType struct {
-	EndpointURLList []string
-}
+		EndpointURLList []string
+		
+	}
 
 type NetworkGroupDataType struct {
-	ServerURI    string
-	NetworkPaths []*EndpointURLListDataType
-}
+		ServerURI string
+		NetworkPaths []*EndpointURLListDataType
+		
+	}
 
 type SamplingIntervalDiagnosticsDataType struct {
-	SamplingInterval           float64
-	MonitoredItemCount         uint32
-	MaxMonitoredItemCount      uint32
-	DisabledMonitoredItemCount uint32
-}
+		SamplingInterval float64
+		MonitoredItemCount uint32
+		MaxMonitoredItemCount uint32
+		DisabledMonitoredItemCount uint32
+		
+	}
 
 type ServerDiagnosticsSummaryDataType struct {
-	ServerViewCount               uint32
-	CurrentSessionCount           uint32
-	CumulatedSessionCount         uint32
-	SecurityRejectedSessionCount  uint32
-	RejectedSessionCount          uint32
-	SessionTimeoutCount           uint32
-	SessionAbortCount             uint32
-	CurrentSubscriptionCount      uint32
-	CumulatedSubscriptionCount    uint32
-	PublishingIntervalCount       uint32
-	SecurityRejectedRequestsCount uint32
-	RejectedRequestsCount         uint32
-}
+		ServerViewCount uint32
+		CurrentSessionCount uint32
+		CumulatedSessionCount uint32
+		SecurityRejectedSessionCount uint32
+		RejectedSessionCount uint32
+		SessionTimeoutCount uint32
+		SessionAbortCount uint32
+		CurrentSubscriptionCount uint32
+		CumulatedSubscriptionCount uint32
+		PublishingIntervalCount uint32
+		SecurityRejectedRequestsCount uint32
+		RejectedRequestsCount uint32
+		
+	}
 
 type ServerStatusDataType struct {
-	StartTime           time.Time
-	CurrentTime         time.Time
-	State               ServerState
-	BuildInfo           *BuildInfo
-	SecondsTillShutdown uint32
-	ShutdownReason      *LocalizedText
-}
+		StartTime time.Time
+		CurrentTime time.Time
+		State ServerState
+		BuildInfo *BuildInfo
+		SecondsTillShutdown uint32
+		ShutdownReason *LocalizedText
+		
+	}
 
 type SessionDiagnosticsDataType struct {
-	SessionID                          *NodeID
-	SessionName                        string
-	ClientDescription                  *ApplicationDescription
-	ServerURI                          string
-	EndpointURL                        string
-	LocaleIDs                          []string
-	ActualSessionTimeout               float64
-	MaxResponseMessageSize             uint32
-	ClientConnectionTime               time.Time
-	ClientLastContactTime              time.Time
-	CurrentSubscriptionsCount          uint32
-	CurrentMonitoredItemsCount         uint32
-	CurrentPublishRequestsInQueue      uint32
-	TotalRequestCount                  *ServiceCounterDataType
-	UnauthorizedRequestCount           uint32
-	ReadCount                          *ServiceCounterDataType
-	HistoryReadCount                   *ServiceCounterDataType
-	WriteCount                         *ServiceCounterDataType
-	HistoryUpdateCount                 *ServiceCounterDataType
-	CallCount                          *ServiceCounterDataType
-	CreateMonitoredItemsCount          *ServiceCounterDataType
-	ModifyMonitoredItemsCount          *ServiceCounterDataType
-	SetMonitoringModeCount             *ServiceCounterDataType
-	SetTriggeringCount                 *ServiceCounterDataType
-	DeleteMonitoredItemsCount          *ServiceCounterDataType
-	CreateSubscriptionCount            *ServiceCounterDataType
-	ModifySubscriptionCount            *ServiceCounterDataType
-	SetPublishingModeCount             *ServiceCounterDataType
-	PublishCount                       *ServiceCounterDataType
-	RepublishCount                     *ServiceCounterDataType
-	TransferSubscriptionsCount         *ServiceCounterDataType
-	DeleteSubscriptionsCount           *ServiceCounterDataType
-	AddNodesCount                      *ServiceCounterDataType
-	AddReferencesCount                 *ServiceCounterDataType
-	DeleteNodesCount                   *ServiceCounterDataType
-	DeleteReferencesCount              *ServiceCounterDataType
-	BrowseCount                        *ServiceCounterDataType
-	BrowseNextCount                    *ServiceCounterDataType
-	TranslateBrowsePathsToNodeIDsCount *ServiceCounterDataType
-	QueryFirstCount                    *ServiceCounterDataType
-	QueryNextCount                     *ServiceCounterDataType
-	RegisterNodesCount                 *ServiceCounterDataType
-	UnregisterNodesCount               *ServiceCounterDataType
-}
+		SessionID *NodeID
+		SessionName string
+		ClientDescription *ApplicationDescription
+		ServerURI string
+		EndpointURL string
+		LocaleIDs []string
+		ActualSessionTimeout float64
+		MaxResponseMessageSize uint32
+		ClientConnectionTime time.Time
+		ClientLastContactTime time.Time
+		CurrentSubscriptionsCount uint32
+		CurrentMonitoredItemsCount uint32
+		CurrentPublishRequestsInQueue uint32
+		TotalRequestCount *ServiceCounterDataType
+		UnauthorizedRequestCount uint32
+		ReadCount *ServiceCounterDataType
+		HistoryReadCount *ServiceCounterDataType
+		WriteCount *ServiceCounterDataType
+		HistoryUpdateCount *ServiceCounterDataType
+		CallCount *ServiceCounterDataType
+		CreateMonitoredItemsCount *ServiceCounterDataType
+		ModifyMonitoredItemsCount *ServiceCounterDataType
+		SetMonitoringModeCount *ServiceCounterDataType
+		SetTriggeringCount *ServiceCounterDataType
+		DeleteMonitoredItemsCount *ServiceCounterDataType
+		CreateSubscriptionCount *ServiceCounterDataType
+		ModifySubscriptionCount *ServiceCounterDataType
+		SetPublishingModeCount *ServiceCounterDataType
+		PublishCount *ServiceCounterDataType
+		RepublishCount *ServiceCounterDataType
+		TransferSubscriptionsCount *ServiceCounterDataType
+		DeleteSubscriptionsCount *ServiceCounterDataType
+		AddNodesCount *ServiceCounterDataType
+		AddReferencesCount *ServiceCounterDataType
+		DeleteNodesCount *ServiceCounterDataType
+		DeleteReferencesCount *ServiceCounterDataType
+		BrowseCount *ServiceCounterDataType
+		BrowseNextCount *ServiceCounterDataType
+		TranslateBrowsePathsToNodeIDsCount *ServiceCounterDataType
+		QueryFirstCount *ServiceCounterDataType
+		QueryNextCount *ServiceCounterDataType
+		RegisterNodesCount *ServiceCounterDataType
+		UnregisterNodesCount *ServiceCounterDataType
+		
+	}
 
 type SessionSecurityDiagnosticsDataType struct {
-	SessionID               *NodeID
-	ClientUserIDOfSession   string
-	ClientUserIDHistory     []string
-	AuthenticationMechanism string
-	Encoding                string
-	TransportProtocol       string
-	SecurityMode            MessageSecurityMode
-	SecurityPolicyURI       string
-	ClientCertificate       []byte
-}
+		SessionID *NodeID
+		ClientUserIDOfSession string
+		ClientUserIDHistory []string
+		AuthenticationMechanism string
+		Encoding string
+		TransportProtocol string
+		SecurityMode MessageSecurityMode
+		SecurityPolicyURI string
+		ClientCertificate []byte
+		
+	}
 
 type ServiceCounterDataType struct {
-	TotalCount uint32
-	ErrorCount uint32
-}
+		TotalCount uint32
+		ErrorCount uint32
+		
+	}
 
 type StatusResult struct {
-	StatusCode     StatusCode
-	DiagnosticInfo *DiagnosticInfo
-}
+		StatusCode StatusCode
+		DiagnosticInfo *DiagnosticInfo
+		
+	}
 
 type SubscriptionDiagnosticsDataType struct {
-	SessionID                    *NodeID
-	SubscriptionID               uint32
-	Priority                     uint8
-	PublishingInterval           float64
-	MaxKeepAliveCount            uint32
-	MaxLifetimeCount             uint32
-	MaxNotificationsPerPublish   uint32
-	PublishingEnabled            bool
-	ModifyCount                  uint32
-	EnableCount                  uint32
-	DisableCount                 uint32
-	RepublishRequestCount        uint32
-	RepublishMessageRequestCount uint32
-	RepublishMessageCount        uint32
-	TransferRequestCount         uint32
-	TransferredToAltClientCount  uint32
-	TransferredToSameClientCount uint32
-	PublishRequestCount          uint32
-	DataChangeNotificationsCount uint32
-	EventNotificationsCount      uint32
-	NotificationsCount           uint32
-	LatePublishRequestCount      uint32
-	CurrentKeepAliveCount        uint32
-	CurrentLifetimeCount         uint32
-	UnacknowledgedMessageCount   uint32
-	DiscardedMessageCount        uint32
-	MonitoredItemCount           uint32
-	DisabledMonitoredItemCount   uint32
-	MonitoringQueueOverflowCount uint32
-	NextSequenceNumber           uint32
-	EventQueueOverFlowCount      uint32
-}
+		SessionID *NodeID
+		SubscriptionID uint32
+		Priority uint8
+		PublishingInterval float64
+		MaxKeepAliveCount uint32
+		MaxLifetimeCount uint32
+		MaxNotificationsPerPublish uint32
+		PublishingEnabled bool
+		ModifyCount uint32
+		EnableCount uint32
+		DisableCount uint32
+		RepublishRequestCount uint32
+		RepublishMessageRequestCount uint32
+		RepublishMessageCount uint32
+		TransferRequestCount uint32
+		TransferredToAltClientCount uint32
+		TransferredToSameClientCount uint32
+		PublishRequestCount uint32
+		DataChangeNotificationsCount uint32
+		EventNotificationsCount uint32
+		NotificationsCount uint32
+		LatePublishRequestCount uint32
+		CurrentKeepAliveCount uint32
+		CurrentLifetimeCount uint32
+		UnacknowledgedMessageCount uint32
+		DiscardedMessageCount uint32
+		MonitoredItemCount uint32
+		DisabledMonitoredItemCount uint32
+		MonitoringQueueOverflowCount uint32
+		NextSequenceNumber uint32
+		EventQueueOverFlowCount uint32
+		
+	}
 
 type ModelChangeStructureDataType struct {
-	Affected     *NodeID
-	AffectedType *NodeID
-	Verb         uint8
-}
+		Affected *NodeID
+		AffectedType *NodeID
+		Verb uint8
+		
+	}
 
 type SemanticChangeStructureDataType struct {
-	Affected     *NodeID
-	AffectedType *NodeID
-}
+		Affected *NodeID
+		AffectedType *NodeID
+		
+	}
 
 type Range struct {
-	Low  float64
-	High float64
-}
+		Low float64
+		High float64
+		
+	}
 
 type EUInformation struct {
-	NamespaceURI string
-	UnitID       int32
-	DisplayName  *LocalizedText
-	Description  *LocalizedText
-}
+		NamespaceURI string
+		UnitID int32
+		DisplayName *LocalizedText
+		Description *LocalizedText
+		
+	}
 
 type ComplexNumberType struct {
-	Real      float32
-	Imaginary float32
-}
+		Real float32
+		Imaginary float32
+		
+	}
 
 type DoubleComplexNumberType struct {
-	Real      float64
-	Imaginary float64
-}
+		Real float64
+		Imaginary float64
+		
+	}
 
 type AxisInformation struct {
-	EngineeringUnits *EUInformation
-	EURange          *Range
-	Title            *LocalizedText
-	AxisScaleType    AxisScaleEnumeration
-	AxisSteps        []float64
-}
+		EngineeringUnits *EUInformation
+		EURange *Range
+		Title *LocalizedText
+		AxisScaleType AxisScaleEnumeration
+		AxisSteps []float64
+		
+	}
 
 type XVType struct {
-	X     float64
-	Value float32
-}
+		X float64
+		Value float32
+		
+	}
 
 type ProgramDiagnosticDataType struct {
-	CreateSessionID           *NodeID
-	CreateClientName          string
-	InvocationCreationTime    time.Time
-	LastTransitionTime        time.Time
-	LastMethodCall            string
-	LastMethodSessionID       *NodeID
-	LastMethodInputArguments  []*Argument
-	LastMethodOutputArguments []*Argument
-	LastMethodCallTime        time.Time
-	LastMethodReturnStatus    *StatusResult
-}
+		CreateSessionID *NodeID
+		CreateClientName string
+		InvocationCreationTime time.Time
+		LastTransitionTime time.Time
+		LastMethodCall string
+		LastMethodSessionID *NodeID
+		LastMethodInputArguments []*Argument
+		LastMethodOutputArguments []*Argument
+		LastMethodCallTime time.Time
+		LastMethodReturnStatus *StatusResult
+		
+	}
 
 type ProgramDiagnostic2DataType struct {
-	CreateSessionID           *NodeID
-	CreateClientName          string
-	InvocationCreationTime    time.Time
-	LastTransitionTime        time.Time
-	LastMethodCall            string
-	LastMethodSessionID       *NodeID
-	LastMethodInputArguments  []*Argument
-	LastMethodOutputArguments []*Argument
-	LastMethodInputValues     []*Variant
-	LastMethodOutputValues    []*Variant
-	LastMethodCallTime        time.Time
-	LastMethodReturnStatus    *StatusResult
-}
+		CreateSessionID *NodeID
+		CreateClientName string
+		InvocationCreationTime time.Time
+		LastTransitionTime time.Time
+		LastMethodCall string
+		LastMethodSessionID *NodeID
+		LastMethodInputArguments []*Argument
+		LastMethodOutputArguments []*Argument
+		LastMethodInputValues []*Variant
+		LastMethodOutputValues []*Variant
+		LastMethodCallTime time.Time
+		LastMethodReturnStatus *StatusResult
+		
+	}
 
 type Annotation struct {
-	Message        string
-	UserName       string
-	AnnotationTime time.Time
-}
+		Message string
+		UserName string
+		AnnotationTime time.Time
+		
+	}

@@ -1,3 +1,4 @@
+
 // Copyright 2018-2020 opcua authors. All rights reserved.
 // Use of this source code is governed by a MIT-style license that can be
 // found in the LICENSE file.
@@ -6,16 +7,24 @@
 
 package ua
 
+
 import (
 	"github.com/liuxgo/opcua/id"
 )
 
-func init() {
-	RegisterExtensionObject(NewNumericNodeID(0, id.KeyValuePair_Encoding_DefaultBinary), new(KeyValuePair))
-	RegisterExtensionObject(NewNumericNodeID(0, id.AdditionalParametersType_Encoding_DefaultBinary), new(AdditionalParametersType))
-	RegisterExtensionObject(NewNumericNodeID(0, id.EphemeralKeyType_Encoding_DefaultBinary), new(EphemeralKeyType))
+func init() {RegisterExtensionObject(NewNumericNodeID(0, id.KeyValuePair_Encoding_DefaultBinary), new(KeyValuePair))
 	RegisterExtensionObject(NewNumericNodeID(0, id.EndpointType_Encoding_DefaultBinary), new(EndpointType))
+	RegisterExtensionObject(NewNumericNodeID(0, id.RationalNumber_Encoding_DefaultBinary), new(RationalNumber))
+	RegisterExtensionObject(NewNumericNodeID(0, id.Vector_Encoding_DefaultBinary), new(Vector))
+	RegisterExtensionObject(NewNumericNodeID(0, id.ThreeDVector_Encoding_DefaultBinary), new(ThreeDVector))
+	RegisterExtensionObject(NewNumericNodeID(0, id.CartesianCoordinates_Encoding_DefaultBinary), new(CartesianCoordinates))
+	RegisterExtensionObject(NewNumericNodeID(0, id.ThreeDCartesianCoordinates_Encoding_DefaultBinary), new(ThreeDCartesianCoordinates))
+	RegisterExtensionObject(NewNumericNodeID(0, id.Orientation_Encoding_DefaultBinary), new(Orientation))
+	RegisterExtensionObject(NewNumericNodeID(0, id.ThreeDOrientation_Encoding_DefaultBinary), new(ThreeDOrientation))
+	RegisterExtensionObject(NewNumericNodeID(0, id.Frame_Encoding_DefaultBinary), new(Frame))
+	RegisterExtensionObject(NewNumericNodeID(0, id.ThreeDFrame_Encoding_DefaultBinary), new(ThreeDFrame))
 	RegisterExtensionObject(NewNumericNodeID(0, id.IdentityMappingRuleType_Encoding_DefaultBinary), new(IdentityMappingRuleType))
+	RegisterExtensionObject(NewNumericNodeID(0, id.CurrencyUnitType_Encoding_DefaultBinary), new(CurrencyUnitType))
 	RegisterExtensionObject(NewNumericNodeID(0, id.TrustListDataType_Encoding_DefaultBinary), new(TrustListDataType))
 	RegisterExtensionObject(NewNumericNodeID(0, id.DecimalDataType_Encoding_DefaultBinary), new(DecimalDataType))
 	RegisterExtensionObject(NewNumericNodeID(0, id.DataTypeSchemaHeader_Encoding_DefaultBinary), new(DataTypeSchemaHeader))
@@ -66,6 +75,7 @@ func init() {
 	RegisterExtensionObject(NewNumericNodeID(0, id.BrokerWriterGroupTransportDataType_Encoding_DefaultBinary), new(BrokerWriterGroupTransportDataType))
 	RegisterExtensionObject(NewNumericNodeID(0, id.BrokerDataSetWriterTransportDataType_Encoding_DefaultBinary), new(BrokerDataSetWriterTransportDataType))
 	RegisterExtensionObject(NewNumericNodeID(0, id.BrokerDataSetReaderTransportDataType_Encoding_DefaultBinary), new(BrokerDataSetReaderTransportDataType))
+	RegisterExtensionObject(NewNumericNodeID(0, id.AliasNameDataType_Encoding_DefaultBinary), new(AliasNameDataType))
 	RegisterExtensionObject(NewNumericNodeID(0, id.RolePermissionType_Encoding_DefaultBinary), new(RolePermissionType))
 	RegisterExtensionObject(NewNumericNodeID(0, id.StructureField_Encoding_DefaultBinary), new(StructureField))
 	RegisterExtensionObject(NewNumericNodeID(0, id.StructureDefinition_Encoding_DefaultBinary), new(StructureDefinition))
@@ -202,6 +212,7 @@ func init() {
 	RegisterExtensionObject(NewNumericNodeID(0, id.ReadRawModifiedDetails_Encoding_DefaultBinary), new(ReadRawModifiedDetails))
 	RegisterExtensionObject(NewNumericNodeID(0, id.ReadProcessedDetails_Encoding_DefaultBinary), new(ReadProcessedDetails))
 	RegisterExtensionObject(NewNumericNodeID(0, id.ReadAtTimeDetails_Encoding_DefaultBinary), new(ReadAtTimeDetails))
+	RegisterExtensionObject(NewNumericNodeID(0, id.ReadAnnotationDataDetails_Encoding_DefaultBinary), new(ReadAnnotationDataDetails))
 	RegisterExtensionObject(NewNumericNodeID(0, id.HistoryData_Encoding_DefaultBinary), new(HistoryData))
 	RegisterExtensionObject(NewNumericNodeID(0, id.ModificationInfo_Encoding_DefaultBinary), new(ModificationInfo))
 	RegisterExtensionObject(NewNumericNodeID(0, id.HistoryModifiedData_Encoding_DefaultBinary), new(HistoryModifiedData))
@@ -295,4 +306,4 @@ func init() {
 	RegisterExtensionObject(NewNumericNodeID(0, id.ProgramDiagnosticDataType_Encoding_DefaultBinary), new(ProgramDiagnosticDataType))
 	RegisterExtensionObject(NewNumericNodeID(0, id.ProgramDiagnostic2DataType_Encoding_DefaultBinary), new(ProgramDiagnostic2DataType))
 	RegisterExtensionObject(NewNumericNodeID(0, id.Annotation_Encoding_DefaultBinary), new(Annotation))
-}
+	}

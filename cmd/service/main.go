@@ -3,11 +3,9 @@ package main
 import (
 	"bytes"
 	"flag"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
-	"os/exec"
 	"path"
 	"strings"
 	"text/template"
@@ -84,10 +82,10 @@ func write(src []byte, filename string) {
 		log.Fatalf("Failed to write %s: %v", filename, err)
 	}
 
-	if err := exec.Command("goimports", "-w", filename).Run(); err != nil {
-		fmt.Println(string(src))
-		log.Fatalf("Failed to format %s: %v", filename, err)
-	}
+	//if err := exec.Command("goimports", "-w", filename).Run(); err != nil {
+	//	fmt.Println(string(src))
+	//	log.Fatalf("Failed to format %s: %v", filename, err)
+	//}
 
 	log.Printf("Wrote %s", filename)
 }
@@ -142,7 +140,7 @@ func ExtObjects(dict *TypeDictionary) []Type {
 		// Extensionobject is the base class for all extension objects.
 		"ua:ExtensionObject": &Type{Name: "ExtensionObject"},
 
-		// DataTypeDefinition is referenced in Opc.Ua.Types.bsd but not defined there
+		// DataTypeDefinition is referenced in Opc.Ua.Types.Reduced.bsd but not defined there
 		// From what I can tell it is an abstract base class without any fields.
 		// We define it here to be able to generate code for derived classes.
 		"tns:DataTypeDefinition": &Type{Name: "DataTypeDefinition"},
