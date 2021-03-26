@@ -6,6 +6,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"log"
 
@@ -19,7 +20,7 @@ func main() {
 	flag.Parse()
 	log.SetFlags(0)
 
-	eps, err := opcua.GetEndpoints(*endpoint)
+	eps, err := opcua.GetEndpoints(context.Background(), *endpoint)
 	if err != nil {
 		log.Fatal(err)
 	}
