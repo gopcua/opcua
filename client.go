@@ -26,9 +26,9 @@ import (
 )
 
 // GetEndpoints returns the available endpoint descriptions for the server.
-func GetEndpoints(endpoint string) ([]*ua.EndpointDescription, error) {
+func GetEndpoints(ctx context.Context, endpoint string) ([]*ua.EndpointDescription, error) {
 	c := NewClient(endpoint, AutoReconnect(false))
-	if err := c.Dial(context.Background()); err != nil {
+	if err := c.Dial(ctx); err != nil {
 		return nil, err
 	}
 	defer c.Close()
