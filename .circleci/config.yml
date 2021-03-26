@@ -4,15 +4,15 @@ workflows:
   version: 2
   test:
     jobs:
-      - test-1.14
-      - test-1.14-32bit
       - test-1.15
       - test-1.15-32bit
+      - test-1.16
+      - test-1.16-32bit
 
 jobs:
-  test-1.14:
+  test-1.15:
     docker:
-      - image: 'circleci/golang:1.14'
+      - image: 'circleci/golang:1.15'
     environment:
       - GO_TEST_FLAGS: -race
     steps: &ref_0
@@ -29,21 +29,21 @@ jobs:
           key: go-mod-{{ checksum "go.sum" }}
           paths:
             - "/go/pkg/mod"
-  test-1.15:
+  test-1.16:
     docker:
-      - image: 'circleci/golang:1.15'
+      - image: 'circleci/golang:1.16'
     environment:
       - GO_TEST_FLAGS: -race
-    steps: *ref_0
-  test-1.14-32bit:
-    docker:
-      - image: 'circleci/golang:1.14'
-    environment:
-      - GOARCH: 386
     steps: *ref_0
   test-1.15-32bit:
     docker:
       - image: 'circleci/golang:1.15'
+    environment:
+      - GOARCH: 386
+    steps: *ref_0
+  test-1.16-32bit:
+    docker:
+      - image: 'circleci/golang:1.16'
     environment:
       - GOARCH: 386
     steps: *ref_0
