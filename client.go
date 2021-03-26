@@ -187,10 +187,6 @@ const (
 
 // Connect establishes a secure channel and creates a new session.
 func (c *Client) Connect(ctx context.Context) (err error) {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-
 	if c.sechan != nil {
 		return errors.Errorf("already connected")
 	}
