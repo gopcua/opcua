@@ -6,6 +6,7 @@ package ua
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"reflect"
 	"testing"
 
@@ -395,5 +396,26 @@ func TestSetNamespace(t *testing.T) {
 				t.Fatalf("got value %d want %d", got, want)
 			}
 		})
+	}
+}
+
+func TestNodeIDJSON(t *testing.T) {
+	n, err := ParseNodeID(`ns=4;s=abc`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := json.Marshal(n)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := string(b), `"ns=4;s=abc"`; got != want {
+		t.Fatalf("got %s want %s", got, want)
+	}
+	var nn NodeID
+	if err := json.Unmarshal(b, &nn); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := nn.String(), n.String(); got != want {
+		t.Fatalf("got %s want %s", got, want)
 	}
 }

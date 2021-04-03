@@ -6,6 +6,7 @@ package ua
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"math"
 	"strconv"
@@ -416,4 +417,24 @@ func (n *NodeID) Encode() ([]byte, error) {
 		return nil, errors.Errorf("invalid node id type %v", n.Type())
 	}
 	return buf.Bytes(), buf.Error()
+}
+
+func (n *NodeID) MarshalJSON() ([]byte, error) {
+	if n == nil {
+		return []byte(`null`), nil
+	}
+	return json.Marshal(n.String())
+}
+
+func (n *NodeID) UnmarshalJSON(b []byte) error {
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	nid, err := ParseNodeID(s)
+	if err != nil {
+		return err
+	}
+	*n = *nid
+	return nil
 }
