@@ -6,6 +6,7 @@ package ua
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"reflect"
 	"testing"
 
@@ -396,4 +397,68 @@ func TestSetNamespace(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestNodeIDJSON(t *testing.T) {
+	t.Run("value", func(t *testing.T) {
+		n, err := ParseNodeID(`ns=4;s=abc`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		b, err := json.Marshal(n)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got, want := string(b), `"ns=4;s=abc"`; got != want {
+			t.Fatalf("got %s want %s", got, want)
+		}
+		var nn NodeID
+		if err := json.Unmarshal(b, &nn); err != nil {
+			t.Fatal(err)
+		}
+		if got, want := nn.String(), n.String(); got != want {
+			t.Fatalf("got %s want %s", got, want)
+		}
+	})
+
+	t.Run("nil", func(t *testing.T) {
+		var n *NodeID
+		b, err := json.Marshal(n)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got, want := string(b), "null"; got != want {
+			t.Fatalf("got %s want %s", got, want)
+		}
+	})
+
+	type X struct{ N *NodeID }
+	t.Run("struct", func(t *testing.T) {
+		x := X{NewStringNodeID(4, "abc")}
+		b, err := json.Marshal(x)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got, want := string(b), `{"N":"ns=4;s=abc"}`; got != want {
+			t.Fatalf("got %s want %s", got, want)
+		}
+	})
+
+	t.Run("nil struct", func(t *testing.T) {
+		var x X
+		b, err := json.Marshal(x)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got, want := string(b), `{"N":null}`; got != want {
+			t.Fatalf("got %s want %s", got, want)
+		}
+		var xx X
+		if err := json.Unmarshal(b, &xx); err != nil {
+			t.Fatal(err)
+		}
+		if got, want := xx, x; !reflect.DeepEqual(got, want) {
+			t.Fatalf("got %s want %s", got, want)
+		}
+	})
 }
