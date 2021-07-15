@@ -26,6 +26,16 @@ func TestCallMethod(t *testing.T) {
 			},
 			out: []*ua.Variant{ua.MustVariant(true)},
 		},
+		{
+			req: &ua.CallMethodRequest{
+				ObjectID: ua.NewStringNodeID(2, "main"),
+				MethodID: ua.NewStringNodeID(2, "square"),
+				InputArguments: []*ua.Variant{
+					ua.MustVariant(int64(3)),
+				},
+			},
+			out: []*ua.Variant{ua.MustVariant(int64(9))},
+		},
 	}
 
 	srv := NewServer("method_server.py")
