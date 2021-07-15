@@ -16,7 +16,7 @@ def square(parent, variant):
 def sum_of_squares(parent, variant):
     # print("sum_of_square methos call with parameter: ", variant.Value)
     ret = 3*3 + 8*8
-    return [ua.Variant(ret, ua.VariantType.Boolean)]
+    return [ua.Variant(ret, ua.VariantType.Int64)]
 
 if __name__ == "__main__":
     server = Server()

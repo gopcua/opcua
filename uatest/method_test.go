@@ -12,8 +12,7 @@ import (
 )
 
 type Complex struct {
-	i int
-	j int
+	i, j int64
 }
 
 func TestCallMethod(t *testing.T) {
