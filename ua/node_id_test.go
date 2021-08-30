@@ -7,6 +7,7 @@ package ua
 import (
 	"encoding/base64"
 	"encoding/json"
+	"math"
 	"reflect"
 	"testing"
 
@@ -47,6 +48,18 @@ func TestNodeID(t *testing.T) {
 				0x0a, 0x00,
 				// id
 				0xef, 0xbe, 0xad, 0xde,
+			},
+		},
+		{
+			Name:   "Numeric max.Uint32",
+			Struct: NewNumericNodeID(10, math.MaxUint32),
+			Bytes: []byte{
+				// mask
+				0x02,
+				// namespace
+				0x0a, 0x00,
+				// id
+				0xff, 0xff, 0xff, 0xff,
 			},
 		},
 		{
@@ -134,6 +147,7 @@ func TestParseNodeID(t *testing.T) {
 		{s: "ns=256;i=2", n: NewNumericNodeID(256, 2)},
 		{s: "ns=1;i=65536", n: NewNumericNodeID(1, 65536)},
 		{s: "ns=65535;i=65536", n: NewNumericNodeID(65535, 65536)},
+		{s: "ns=2;i=4294967295", n: NewNumericNodeID(2, math.MaxUint32)},
 		{s: "ns=1;g=5eac051c-c313-43d7-b790-24aa2c3cfd37", n: NewGUIDNodeID(1, "5eac051c-c313-43d7-b790-24aa2c3cfd37")},
 		{s: "ns=1;b=YWJj", n: NewByteStringNodeID(1, []byte{'a', 'b', 'c'})},
 		{s: "ns=1;s=a", n: NewStringNodeID(1, "a")},
