@@ -58,56 +58,9 @@ type Variant struct {
 	value interface{}
 }
 
-func variantTypeIsBuiltin(v interface{}) bool {
-	if v == nil {
-		// we accept nil
-		return true
-	}
-	switch v.(type) {
-	case
-		bool,
-		int8,
-		byte,
-		int16,
-		uint16,
-		int32,
-		uint32,
-		int64,
-		uint64,
-		float32,
-		float64,
-		string,
-		time.Time,
-		*GUID,
-		[]byte,
-		XMLElement,
-		*NodeID,
-		*ExpandedNodeID,
-		StatusCode,
-		*QualifiedName,
-		*LocalizedText,
-		*ExtensionObject,
-		*DataValue,
-		*Variant,
-		*DiagnosticInfo:
-		return true
-	default:
-		// it can be an array, or slice of some builtin
-		v := reflect.ValueOf(v)
-		switch v.Type().Kind() {
-		case reflect.Array, reflect.Slice:
-			innerType := v.Type().Elem()
-			zeroValue := reflect.New(innerType).Elem().Interface()
-			return variantTypeIsBuiltin(zeroValue)
-		default:
-			return false
-		}
-	}
-}
-
 func NewVariant(v interface{}) (*Variant, error) {
 	va := &Variant{}
-	if !variantTypeIsBuiltin(v) {
+	if !isBuiltinType(v) {
 		return nil, fmt.Errorf("trying to create a variant from a type that it is not suppoted: %s", reflect.ValueOf(v).Type().Name())
 	}
 	if err := va.set(v); err != nil {
@@ -777,6 +730,57 @@ func (m *Variant) XMLElement() XMLElement {
 		return m.value.(XMLElement)
 	default:
 		return ""
+	}
+}
+
+func isBuiltinType(v interface{}) bool {
+	if v == nil {
+		return true
+	}
+
+	switch v.(type) {
+
+	// builtin types
+	case
+		bool,
+		int8,
+		int16,
+		int32,
+		int64,
+		uint8,
+		uint16,
+		uint32,
+		uint64,
+		float32,
+		float64,
+		string,
+		[]byte,
+		*DataValue,
+		*DiagnosticInfo,
+		*ExpandedNodeID,
+		*ExtensionObject,
+		*GUID,
+		*LocalizedText,
+		*NodeID,
+		*QualifiedName,
+		*Variant,
+		StatusCode,
+		time.Time,
+		XMLElement:
+		return true
+
+	// slice or array of a builtin type
+	default:
+		v := reflect.ValueOf(v)
+		switch v.Type().Kind() {
+		case reflect.Array, reflect.Slice:
+			innerType := v.Type().Elem()
+			zeroValue := reflect.New(innerType).Elem().Interface()
+			return isBuiltinType(zeroValue)
+
+		default:
+			return false
+		}
 	}
 }
 
