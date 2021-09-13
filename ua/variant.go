@@ -5,6 +5,7 @@
 package ua
 
 import (
+	"fmt"
 	"reflect"
 	"time"
 
@@ -26,7 +27,7 @@ const (
 
 // Variant is a union of the built-in types.
 //
-// Specification: Part 6, 5.2.2.16
+// Specification: Part 6, 5.1.2 Table 1
 type Variant struct {
 	// mask contains the type and the array flags
 	// bits 0:5: built-in type id 1-25
@@ -59,6 +60,9 @@ type Variant struct {
 
 func NewVariant(v interface{}) (*Variant, error) {
 	va := &Variant{}
+	if !isBuiltinType(v) {
+		return nil, fmt.Errorf("trying to create a variant from a type that it is not suppoted: %s", reflect.ValueOf(v).Type().Name())
+	}
 	if err := va.set(v); err != nil {
 		return nil, err
 	}
@@ -462,7 +466,7 @@ func (m *Variant) set(v interface{}) error {
 
 	typeid, ok := variantTypeToTypeID[et]
 	if !ok {
-		return errors.Errorf("cannot set variant to %T", v)
+		typeid = TypeIDVariant
 	}
 	m.setType(typeid)
 	m.value = v
@@ -726,6 +730,57 @@ func (m *Variant) XMLElement() XMLElement {
 		return m.value.(XMLElement)
 	default:
 		return ""
+	}
+}
+
+func isBuiltinType(v interface{}) bool {
+	if v == nil {
+		return true
+	}
+
+	switch v.(type) {
+
+	// builtin types
+	case
+		bool,
+		int8,
+		int16,
+		int32,
+		int64,
+		uint8,
+		uint16,
+		uint32,
+		uint64,
+		float32,
+		float64,
+		string,
+		[]byte,
+		*DataValue,
+		*DiagnosticInfo,
+		*ExpandedNodeID,
+		*ExtensionObject,
+		*GUID,
+		*LocalizedText,
+		*NodeID,
+		*QualifiedName,
+		*Variant,
+		StatusCode,
+		time.Time,
+		XMLElement:
+		return true
+
+	// slice or array of a builtin type
+	default:
+		v := reflect.ValueOf(v)
+		switch v.Type().Kind() {
+		case reflect.Array, reflect.Slice:
+			innerType := v.Type().Elem()
+			zeroValue := reflect.New(innerType).Elem().Interface()
+			return isBuiltinType(zeroValue)
+
+		default:
+			return false
+		}
 	}
 }
 
