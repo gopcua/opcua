@@ -126,7 +126,7 @@ type Client struct {
 	pendingAcks    []*ua.SubscriptionAcknowledgement
 	pendingAcksMux sync.RWMutex
 
-	publishTimeout time.Duration
+	publishTimeout *int64
 
 	pausech  chan struct{} // pauses subscription publish loop
 	resumech chan struct{} // resumes subscription publish loop
@@ -155,6 +155,7 @@ type Client struct {
 // https://godoc.org/github.com/gopcua/opcua#Option
 func NewClient(endpoint string, opts ...Option) *Client {
 	cfg, sessionCfg := ApplyConfig(opts...)
+	maxTimeout := int64(uasc.MaxTimeout)
 	c := Client{
 		endpointURL:    endpoint,
 		cfg:            cfg,
@@ -164,7 +165,7 @@ func NewClient(endpoint string, opts ...Option) *Client {
 		pausech:        make(chan struct{}, 2),
 		resumech:       make(chan struct{}, 2),
 		pendingAcks:    []*ua.SubscriptionAcknowledgement{},
-		publishTimeout: uasc.MaxTimeout,
+		publishTimeout: &maxTimeout,
 	}
 	c.pauseSubscriptions()
 	c.state.Store(Closed)
