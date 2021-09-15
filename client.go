@@ -123,8 +123,7 @@ type Client struct {
 	subs   map[uint32]*Subscription
 	subMux sync.RWMutex
 
-	pendingAcks    []*ua.SubscriptionAcknowledgement
-	pendingAcksMux sync.RWMutex
+	pendingAcks []*ua.SubscriptionAcknowledgement
 
 	publishTimeout time.Duration
 
