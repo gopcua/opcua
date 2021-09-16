@@ -126,11 +126,12 @@ type Client struct {
 	pendingAcks    []*ua.SubscriptionAcknowledgement
 	pendingAcksMux sync.RWMutex
 
-	publishTimeout time.Duration
-
 	pausech  chan struct{} // pauses subscription publish loop
 	resumech chan struct{} // resumes subscription publish loop
 	mcancel  func()        // stops subscription publish loop
+
+	// timeout for sending PublishRequests
+	publishTimeout atomic.Value
 
 	// state of the client
 	state atomic.Value // ConnState
@@ -156,16 +157,16 @@ type Client struct {
 func NewClient(endpoint string, opts ...Option) *Client {
 	cfg, sessionCfg := ApplyConfig(opts...)
 	c := Client{
-		endpointURL:    endpoint,
-		cfg:            cfg,
-		sessionCfg:     sessionCfg,
-		sechanErr:      make(chan error, 1),
-		subs:           make(map[uint32]*Subscription),
-		pausech:        make(chan struct{}, 2),
-		resumech:       make(chan struct{}, 2),
-		pendingAcks:    []*ua.SubscriptionAcknowledgement{},
-		publishTimeout: uasc.MaxTimeout,
+		endpointURL: endpoint,
+		cfg:         cfg,
+		sessionCfg:  sessionCfg,
+		sechanErr:   make(chan error, 1),
+		subs:        make(map[uint32]*Subscription),
+		pausech:     make(chan struct{}, 2),
+		resumech:    make(chan struct{}, 2),
+		pendingAcks: []*ua.SubscriptionAcknowledgement{},
 	}
+	c.publishTimeout.Store(uasc.MaxTimeout)
 	c.pauseSubscriptions()
 	c.state.Store(Closed)
 	return &c
