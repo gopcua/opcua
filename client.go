@@ -156,7 +156,6 @@ type Client struct {
 // https://godoc.org/github.com/gopcua/opcua#Option
 func NewClient(endpoint string, opts ...Option) *Client {
 	cfg, sessionCfg := ApplyConfig(opts...)
-	maxTimeout := int64(uasc.MaxTimeout)
 	c := Client{
 		endpointURL: endpoint,
 		cfg:         cfg,
@@ -167,7 +166,7 @@ func NewClient(endpoint string, opts ...Option) *Client {
 		resumech:    make(chan struct{}, 2),
 		pendingAcks: []*ua.SubscriptionAcknowledgement{},
 	}
-	c.publishTimeout.Store(maxTimeout)
+	c.publishTimeout.Store(uasc.MaxTimeout)
 	c.pauseSubscriptions()
 	c.state.Store(Closed)
 	return &c
