@@ -490,7 +490,6 @@ func (c *Client) Close() error {
 	// so that we close the underlying channel and connection.
 	c.CloseSession()
 	c.state.Store(Closed)
-	defer close(c.sechanErr)
 	if c.mcancel != nil {
 		c.mcancel()
 	}
