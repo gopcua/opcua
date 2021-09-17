@@ -484,18 +484,26 @@ func (c *Client) Dial(ctx context.Context) error {
 
 // Close closes the session and the secure channel.
 func (c *Client) Close() error {
-	defer c.conn.Close()
-
 	// try to close the session but ignore any error
 	// so that we close the underlying channel and connection.
 	c.CloseSession()
 	c.state.Store(Closed)
+
 	if c.mcancel != nil {
 		c.mcancel()
 	}
 	if c.sechan != nil {
 		c.sechan.Close()
 	}
+
+	// todo(fs): closing the sechanErr here triggers a "panic: send on closed channel"
+	// todo(fs): in the tests. We should try to fully shutdown the secure channel to
+	// todo(fs): avoid this.
+	close(c.sechanErr)
+
+	// close the connection but ignore the error since there isn't
+	// anything we can do about it anyway
+	c.conn.Close()
 
 	return nil
 }
