@@ -6,6 +6,10 @@ test:
 integration:
 	go test -v -tags=integration ./uatest/...
 
+test-race:
+	go test -race ./...
+	go test -race -v -tags=integration ./uatest/...
+
 install-py-opcua:
 	pip3 install opcua
 
