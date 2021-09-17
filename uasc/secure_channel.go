@@ -40,32 +40,30 @@ type conditionLocker struct {
 }
 
 func newConditionLocker() *conditionLocker {
-	c := conditionLocker{
-		bLock: false,
-	}
+	c := &conditionLocker{}
 	c.lockCnd = sync.NewCond(&c.lockMu)
-	return &c
+	return c
 }
 
 func (c *conditionLocker) lock() {
 	c.lockMu.Lock()
-	defer c.lockMu.Unlock()
 	c.bLock = true
+	c.lockMu.Unlock()
 }
 
 func (c *conditionLocker) unlock() {
 	c.lockMu.Lock()
-	defer c.lockMu.Unlock()
 	c.bLock = false
+	c.lockMu.Unlock()
 	c.lockCnd.Broadcast()
 }
 
 func (c *conditionLocker) waitIfLock() {
 	c.lockMu.Lock()
-	defer c.lockMu.Unlock()
 	for c.bLock {
 		c.lockCnd.Wait()
 	}
+	c.lockMu.Unlock()
 }
 
 type SecureChannel struct {
