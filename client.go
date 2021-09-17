@@ -496,9 +496,8 @@ func (c *Client) Close() error {
 		c.sechan.Close()
 	}
 
-	// todo(fs): closing the sechanErr here triggers a "panic: send on closed channel"
-	// todo(fs): in the tests. We should try to fully shutdown the secure channel to
-	// todo(fs): avoid this.
+	// close the error channel to clean up and to ensure that the
+	// secure channel also properly terminates any pending requests.
 	close(c.sechanErr)
 
 	// close the connection but ignore the error since there isn't
