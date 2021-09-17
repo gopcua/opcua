@@ -185,8 +185,13 @@ func (s *SecureChannel) dispatcher() {
 
 			if resp.Err != nil {
 				select {
-				case s.errCh <- resp.Err:
+				case <-s.closing:
+					return
 				default:
+					select {
+					case s.errCh <- resp.Err:
+					default:
+					}
 				}
 			}
 
