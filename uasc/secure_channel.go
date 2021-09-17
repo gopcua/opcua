@@ -82,10 +82,6 @@ type SecureChannel struct {
 	closing      chan struct{}
 	disconnected chan struct{}
 
-	// closingMu is used to protect the _changing_ of the mutex
-	// i.e. when we _read_ from the closing chan we acquire a read lock, and when in `reset`, we acquire a write lock
-	closingMu sync.RWMutex
-
 	// startDispatcher ensures only one dispatcher is running
 	startDispatcher sync.Once
 
@@ -146,32 +142,21 @@ func NewSecureChannel(endpoint string, c *uacp.Conn, cfg *Config, errCh chan<- e
 	}
 
 	s := &SecureChannel{
-		endpointURL: endpoint,
-		c:           c,
-		cfg:         cfg,
-		requestID:   cfg.RequestIDSeed,
-		reqLocker:   newConditionLocker(),
-		rcvLocker:   newConditionLocker(),
-		errCh:       errCh,
+		endpointURL:  endpoint,
+		c:            c,
+		cfg:          cfg,
+		requestID:    cfg.RequestIDSeed,
+		reqLocker:    newConditionLocker(),
+		rcvLocker:    newConditionLocker(),
+		errCh:        errCh,
+		closing:      make(chan struct{}),
+		disconnected: make(chan struct{}),
+		instances:    make(map[uint32][]*channelInstance),
+		chunks:       make(map[uint32][]*MessageChunk),
+		handlers:     make(map[uint32]chan *response),
 	}
-	s.reset()
 
 	return s, nil
-}
-
-func (s *SecureChannel) reset() {
-	s.closingMu.Lock()
-	defer s.closingMu.Unlock()
-
-	// note: we _don't_ reset s.requestID
-	s.closing = make(chan struct{})
-	s.disconnected = make(chan struct{})
-	s.startDispatcher = sync.Once{}
-	s.instances = make(map[uint32][]*channelInstance)
-	s.chunks = make(map[uint32][]*MessageChunk)
-	s.handlers = make(map[uint32]chan *response)
-	s.activeInstance = nil
-	s.openingInstance = nil
 }
 
 func (s *SecureChannel) getActiveChannelInstance() (*channelInstance, error) {
@@ -186,9 +171,6 @@ func (s *SecureChannel) getActiveChannelInstance() (*channelInstance, error) {
 func (s *SecureChannel) dispatcher() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-
-	s.closingMu.RLock()
-	defer s.closingMu.RUnlock()
 
 	defer func() {
 		close(s.disconnected)
@@ -613,9 +595,6 @@ func (s *SecureChannel) scheduleRenewal(instance *channelInstance) {
 	t := time.NewTimer(when)
 	defer t.Stop()
 
-	s.closingMu.RLock()
-	defer s.closingMu.RUnlock()
-
 	select {
 	case <-s.closing:
 		return
@@ -646,9 +625,6 @@ func (s *SecureChannel) scheduleExpiration(instance *channelInstance) {
 	debug.Printf("channelID %d/%d will expire at %s", instance.secureChannelID, instance.securityTokenID, when.UTC().Format(time.RFC3339))
 
 	t := time.NewTimer(time.Until(when))
-
-	s.closingMu.RLock()
-	defer s.closingMu.RUnlock()
 
 	select {
 	case <-s.closing:
@@ -832,7 +808,6 @@ func (s *SecureChannel) Close() error {
 
 	defer func() {
 		close(s.closing)
-		s.reset()
 	}()
 
 	s.reqLocker.unlock()
@@ -843,8 +818,8 @@ func (s *SecureChannel) Close() error {
 		return io.EOF
 	default:
 	}
-	err := s.SendRequest(&ua.CloseSecureChannelRequest{}, nil, nil)
 
+	err := s.SendRequest(&ua.CloseSecureChannelRequest{}, nil, nil)
 	if err != nil {
 		return err
 	}
