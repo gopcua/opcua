@@ -496,9 +496,13 @@ func (c *Client) Close() error {
 		c.sechan.Close()
 	}
 
-	// close the error channel to clean up and to ensure that the
-	// secure channel also properly terminates any pending requests.
-	close(c.sechanErr)
+	// https://github.com/gopcua/opcua/pull/462
+	//
+	// do not close the c.sechanErr channel since it leads to
+	// race conditions and it gets garbage collected anyway.
+	// There is nothing we can do with this error while
+	// shutting down the client so I think it is safe to ignore
+	// them.
 
 	// close the connection but ignore the error since there isn't
 	// anything we can do about it anyway
