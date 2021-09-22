@@ -163,17 +163,28 @@ func NewSecureChannel(endpoint string, c *uacp.Conn, cfg *Config, errCh chan<- e
 
 func (s *SecureChannel) reset() {
 	s.closingMu.Lock()
-	defer s.closingMu.Unlock()
-
 	// note: we _don't_ reset s.requestID
 	s.closing = make(chan struct{})
 	s.disconnected = make(chan struct{})
-	s.startDispatcher = sync.Once{}
+	s.closingMu.Unlock()
+
+	s.instancesMu.Lock()
 	s.instances = make(map[uint32][]*channelInstance)
-	s.chunks = make(map[uint32][]*MessageChunk)
-	s.handlers = make(map[uint32]chan *response)
 	s.activeInstance = nil
+	s.instancesMu.Unlock()
+
+	s.chunksMu.Lock()
+	s.chunks = make(map[uint32][]*MessageChunk)
+	s.chunksMu.Unlock()
+
+	s.handlersMu.Lock()
+	s.handlers = make(map[uint32]chan *response)
+	s.handlersMu.Unlock()
+
+	s.openingMu.Lock()
+	s.startDispatcher = sync.Once{}
 	s.openingInstance = nil
+	s.openingMu.Unlock()
 }
 
 func (s *SecureChannel) getActiveChannelInstance() (*channelInstance, error) {
@@ -707,6 +718,9 @@ func (s *SecureChannel) sendRequestWithTimeout(
 	timer := time.NewTimer(timeout + timeoutLeniency)
 	defer timer.Stop()
 
+	s.closingMu.RLock()
+	defer s.closingMu.RUnlock()
+
 	select {
 	case <-s.disconnected:
 		s.popHandler(reqID)
@@ -835,18 +849,24 @@ func (s *SecureChannel) Close() error {
 	debug.Printf("uasc Close()")
 
 	defer func() {
+		s.closingMu.Lock()
 		close(s.closing)
+		s.closingMu.Unlock()
+
 		s.reset()
 	}()
 
 	s.reqLocker.unlock()
 	s.rcvLocker.unlock()
 
+	s.closingMu.RLock()
+	defer s.closingMu.RUnlock()
 	select {
 	case <-s.disconnected:
 		return io.EOF
 	default:
 	}
+
 	err := s.SendRequest(&ua.CloseSecureChannelRequest{}, nil, nil)
 
 	if err != nil {
