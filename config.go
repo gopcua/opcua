@@ -59,19 +59,20 @@ type Config struct {
 	session     *uasc.SessionConfig
 }
 
-func (c *Config) Dialer() *uacp.Dialer {
-	d := c.dialer
+// NewDialer creates a uacp.Dialer from the config options
+func NewDialer(cfg *Config) *uacp.Dialer {
+	d := cfg.dialer
 	if d == nil {
 		d = &uacp.Dialer{}
 	}
 	if d.Dialer == nil {
 		d.Dialer = &net.Dialer{}
 	}
-	if c.dialTimeout > 0 {
-		d.Dialer.Timeout = c.dialTimeout
+	if cfg.dialTimeout > 0 {
+		d.Dialer.Timeout = cfg.dialTimeout
 	}
 	if d.Dialer.Timeout == 0 {
-		d.Dialer.Timeout = c.sechan.RequestTimeout
+		d.Dialer.Timeout = cfg.sechan.RequestTimeout
 	}
 	return d
 }
