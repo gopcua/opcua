@@ -464,7 +464,7 @@ func (c *Client) Dial(ctx context.Context) error {
 	}
 
 	var err error
-	c.conn, err = uacp.Dial(ctx, c.endpointURL)
+	c.conn, err = c.cfg.Dialer().Dial(ctx, c.endpointURL)
 	if err != nil {
 		return err
 	}

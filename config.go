@@ -11,11 +11,13 @@ import (
 	"io/ioutil"
 	"log"
 	"math/rand"
+	"net"
 	"strings"
 	"time"
 
 	"github.com/gopcua/opcua/errors"
 	"github.com/gopcua/opcua/ua"
+	"github.com/gopcua/opcua/uacp"
 	"github.com/gopcua/opcua/uapolicy"
 	"github.com/gopcua/opcua/uasc"
 )
@@ -51,8 +53,27 @@ func DefaultSessionConfig() *uasc.SessionConfig {
 
 // Config contains all config options.
 type Config struct {
-	sechan  *uasc.Config
-	session *uasc.SessionConfig
+	dialer      *uacp.Dialer
+	dialTimeout time.Duration
+	sechan      *uasc.Config
+	session     *uasc.SessionConfig
+}
+
+func (c *Config) Dialer() *uacp.Dialer {
+	d := c.dialer
+	if d == nil {
+		d = &uacp.Dialer{}
+	}
+	if d.Dialer == nil {
+		d.Dialer = &net.Dialer{}
+	}
+	if c.dialTimeout > 0 {
+		d.Dialer.Timeout = c.dialTimeout
+	}
+	if d.Dialer.Timeout == 0 {
+		d.Dialer.Timeout = c.sechan.RequestTimeout
+	}
+	return d
 }
 
 // ApplyConfig applies the config options to the default configuration.
@@ -438,5 +459,20 @@ func AuthIssuedToken(tokenData []byte) Option {
 func RequestTimeout(t time.Duration) Option {
 	return func(cfg *Config) {
 		cfg.sechan.RequestTimeout = t
+	}
+}
+
+// Dialer sets the uacp.Dialer to establish the connection to the server.
+func Dialer(d *uacp.Dialer) Option {
+	return func(cfg *Config) {
+		cfg.dialer = d
+	}
+}
+
+// DialTimeout sets the timeout for establishing the UACP connection.
+// Defaults to the RequestTimeout.
+func DialTimeout(d time.Duration) Option {
+	return func(cfg *Config) {
+		cfg.dialTimeout = d
 	}
 }
