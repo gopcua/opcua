@@ -1,10 +1,13 @@
-all: test integration
+all: test integration examples
 
 test:
 	go test ./...
 
 integration:
 	go test -v -tags=integration ./uatest/...
+
+examples:
+	go build -o build/ ./examples/...
 
 test-race:
 	go test -race ./...
@@ -20,3 +23,5 @@ gen:
 
 release:
 	GITHUB_TOKEN=$$(security find-generic-password -gs GITHUB_TOKEN -w) goreleaser --rm-dist
+
+.PHONY: all examples gen integration test release
