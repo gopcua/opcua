@@ -81,22 +81,6 @@ func (a bySecurityLevel) Len() int           { return len(a) }
 func (a bySecurityLevel) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a bySecurityLevel) Less(i, j int) bool { return a[i].SecurityLevel < a[j].SecurityLevel }
 
-// ConnState is the ua client connection state
-type ConnState uint8
-
-const (
-	// Closed, the Connection is currently closed
-	Closed ConnState = iota
-	// Connected, the Connection is currently connected
-	Connected
-	// Connecting, the Connection is currently connecting to a server for the first time
-	Connecting
-	// Disconnected, the Connection is currently disconnected
-	Disconnected
-	// Reconnecting, the Connection is currently attempting to reconnect to a server it was previously connected to
-	Reconnecting
-)
-
 // Client is a high-level client for an OPC/UA server.
 // It establishes a secure channel and a session.
 type Client struct {
