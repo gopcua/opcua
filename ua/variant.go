@@ -25,6 +25,9 @@ const (
 	VariantArrayValues = 0x80
 )
 
+// ByteArray encodes a byte array as an OPC/UA array of Byte.
+type ByteArray []byte
+
 // Variant is a union of the built-in types.
 //
 // Specification: Part 6, 5.1.2 Table 1
@@ -142,7 +145,13 @@ func (m *Variant) Decode(b []byte) (int, error) {
 		return buf.Pos(), StatusBadEncodingLimitsExceeded
 	}
 
-	vals := reflect.MakeSlice(reflect.SliceOf(typ), n, n)
+	var vals reflect.Value
+	switch m.Type() {
+	case TypeIDByte:
+		vals = reflect.MakeSlice(reflect.TypeOf(ByteArray{}), n, n)
+	default:
+		vals = reflect.MakeSlice(reflect.SliceOf(typ), n, n)
+	}
 	for i := 0; i < n; i++ {
 		vals.Index(i).Set(reflect.ValueOf(m.decodeValue(buf)))
 	}
@@ -413,8 +422,15 @@ func sliceDim(v reflect.Value) (typ reflect.Type, dim []int32, count int32, err 
 		return nil, nil, 0, nil
 	}
 
-	// ByteString is its own type
-	if v.Type() == reflect.TypeOf([]byte{}) {
+	// https://reference.opcfoundation.org/v104/Core/docs/Part6/5.1.4/
+	//
+	// We default to treating a []byte as a ByteString which is sent as a length
+	// encoded value. However, this makes it impossible to send a []byte as an
+	// array of Byte. The ByteArray type alias supports sending a []byte as an
+	// array of Byte.
+	//
+	// https://github.com/gopcua/opcua/issues/463
+	if v.Type() == reflect.TypeOf([]byte{}) && v.Type() != reflect.TypeOf(ByteArray{}) {
 		return v.Type(), nil, 1, nil
 	}
 
@@ -561,6 +577,22 @@ func (m *Variant) Uint() uint64 {
 		return m.value.(uint64)
 	default:
 		return 0
+	}
+}
+
+func (m *Variant) ByteArray() ByteArray {
+	if m.ArrayLength() == 0 {
+		return nil
+	}
+	if len(m.ArrayDimensions()) > 0 {
+		return nil
+	}
+
+	switch m.Type() {
+	case TypeIDByte:
+		return m.value.(ByteArray)
+	default:
+		return nil
 	}
 }
 
