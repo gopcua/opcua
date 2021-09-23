@@ -153,192 +153,229 @@ func TestOptions(t *testing.T) {
 	tests := []struct {
 		name string
 		opt  Option
-		c    *uasc.Config
-		sc   *uasc.SessionConfig
+		cfg  *Config
 	}{
 		{
 			name: `ApplicationName("a")`,
 			opt:  ApplicationName("a"),
-			sc: func() *uasc.SessionConfig {
-				sc := DefaultSessionConfig()
-				sc.ClientDescription.ApplicationName = ua.NewLocalizedText("a")
-				return sc
-			}(),
+			cfg: &Config{
+				session: func() *uasc.SessionConfig {
+					sc := DefaultSessionConfig()
+					sc.ClientDescription.ApplicationName = ua.NewLocalizedText("a")
+					return sc
+				}(),
+			},
 		},
 		{
 			name: `ApplicationURI("a")`,
 			opt:  ApplicationURI("a"),
-			sc: func() *uasc.SessionConfig {
-				sc := DefaultSessionConfig()
-				sc.ClientDescription.ApplicationURI = "a"
-				return sc
-			}(),
+			cfg: &Config{
+				session: func() *uasc.SessionConfig {
+					sc := DefaultSessionConfig()
+					sc.ClientDescription.ApplicationURI = "a"
+					return sc
+				}(),
+			},
 		},
 		{
 			name: `AuthAnonymous()`,
 			opt:  AuthAnonymous(),
-			sc: func() *uasc.SessionConfig {
-				sc := DefaultSessionConfig()
-				sc.UserIdentityToken = &ua.AnonymousIdentityToken{}
-				return sc
-			}(),
+			cfg: &Config{
+				session: func() *uasc.SessionConfig {
+					sc := DefaultSessionConfig()
+					sc.UserIdentityToken = &ua.AnonymousIdentityToken{}
+					return sc
+				}(),
+			},
 		},
 		{
 			name: `AuthCertificate()`,
 			opt:  AuthCertificate(certDER),
-			sc: func() *uasc.SessionConfig {
-				sc := DefaultSessionConfig()
-				sc.UserIdentityToken = &ua.X509IdentityToken{
-					CertificateData: certDER,
-				}
-				return sc
-			}(),
+			cfg: &Config{
+				session: func() *uasc.SessionConfig {
+					sc := DefaultSessionConfig()
+					sc.UserIdentityToken = &ua.X509IdentityToken{
+						CertificateData: certDER,
+					}
+					return sc
+				}(),
+			},
 		},
 		{
 			name: `AuthIssuedToken()`,
 			opt:  AuthIssuedToken([]byte("a")),
-			sc: func() *uasc.SessionConfig {
-				sc := DefaultSessionConfig()
-				sc.UserIdentityToken = &ua.IssuedIdentityToken{
-					TokenData: []byte("a"),
-				}
-				return sc
-			}(),
+			cfg: &Config{
+				session: func() *uasc.SessionConfig {
+					sc := DefaultSessionConfig()
+					sc.UserIdentityToken = &ua.IssuedIdentityToken{
+						TokenData: []byte("a"),
+					}
+					return sc
+				}(),
+			},
 		},
 		{
 			name: `AuthUsername()`,
 			opt:  AuthUsername("user", "pass"),
-			sc: func() *uasc.SessionConfig {
-				sc := DefaultSessionConfig()
-				sc.UserIdentityToken = &ua.UserNameIdentityToken{
-					UserName: "user",
-				}
-				sc.AuthPassword = "pass"
-				return sc
-			}(),
+			cfg: &Config{
+				session: func() *uasc.SessionConfig {
+					sc := DefaultSessionConfig()
+					sc.UserIdentityToken = &ua.UserNameIdentityToken{
+						UserName: "user",
+					}
+					sc.AuthPassword = "pass"
+					return sc
+				}(),
+			},
 		},
 		{
 			name: `Certificate`,
 			opt:  Certificate(certDER),
-			c: func() *uasc.Config {
-				c := DefaultClientConfig()
-				c.Certificate = certDER
-				// todo(fs): test with cert that has a URI
-				// sc.ClientDescription.ApplicationURI = ...
-				return c
-			}(),
+			cfg: &Config{
+				sechan: func() *uasc.Config {
+					c := DefaultClientConfig()
+					c.Certificate = certDER
+					// todo(fs): test with cert that has a URI
+					// sc.ClientDescription.ApplicationURI = ...
+					return c
+				}(),
+			},
 		},
 		{
 			name: `CertificateFile("cert.der")`,
 			opt:  CertificateFile(certDERFile),
-			c: func() *uasc.Config {
-				c := DefaultClientConfig()
-				c.Certificate = certDER
-				// todo(fs): test with cert that has a URI
-				// sc.ClientDescription.ApplicationURI = ...
-				return c
-			}(),
+			cfg: &Config{
+				sechan: func() *uasc.Config {
+					c := DefaultClientConfig()
+					c.Certificate = certDER
+					// todo(fs): test with cert that has a URI
+					// sc.ClientDescription.ApplicationURI = ...
+					return c
+				}(),
+			},
 		},
 		{
 			name: `CertificateFile("cert.pem")`,
 			opt:  CertificateFile(certPEMFile),
-			c: func() *uasc.Config {
-				c := DefaultClientConfig()
-				c.Certificate = certDER
-				// todo(fs): test with cert that has a URI
-				// sc.ClientDescription.ApplicationURI = ...
-				return c
-			}(),
+			cfg: &Config{
+				sechan: func() *uasc.Config {
+					c := DefaultClientConfig()
+					c.Certificate = certDER
+					// todo(fs): test with cert that has a URI
+					// sc.ClientDescription.ApplicationURI = ...
+					return c
+				}(),
+			},
 		},
 		{
 			name: `Lifetime(10ms)`,
 			opt:  Lifetime(10 * time.Millisecond),
-			c: func() *uasc.Config {
-				c := DefaultClientConfig()
-				c.Lifetime = 10
-				return c
-			}(),
+			cfg: &Config{
+				sechan: func() *uasc.Config {
+					c := DefaultClientConfig()
+					c.Lifetime = 10
+					return c
+				}(),
+			},
 		},
 		{
 			name: `Locales("en-us", "de-de")`,
 			opt:  Locales("en-us", "de-de"),
-			sc: func() *uasc.SessionConfig {
-				sc := DefaultSessionConfig()
-				sc.LocaleIDs = []string{"en-us", "de-de"}
-				return sc
-			}(),
+			cfg: &Config{
+				session: func() *uasc.SessionConfig {
+					sc := DefaultSessionConfig()
+					sc.LocaleIDs = []string{"en-us", "de-de"}
+					return sc
+				}(),
+			},
 		},
 		{
 			name: `PrivateKey()`,
 			opt:  PrivateKey(cert.PrivateKey.(*rsa.PrivateKey)),
-			c: func() *uasc.Config {
-				c := DefaultClientConfig()
-				c.LocalKey = cert.PrivateKey.(*rsa.PrivateKey)
-				return c
-			}(),
+			cfg: &Config{
+				sechan: func() *uasc.Config {
+					c := DefaultClientConfig()
+					c.LocalKey = cert.PrivateKey.(*rsa.PrivateKey)
+					return c
+				}(),
+			},
 		},
 		{
 			name: `PrivateKeyFile("key.der")`,
 			opt:  PrivateKeyFile(keyDERFile),
-			c: func() *uasc.Config {
-				c := DefaultClientConfig()
-				c.LocalKey = cert.PrivateKey.(*rsa.PrivateKey)
-				return c
-			}(),
+			cfg: &Config{
+				sechan: func() *uasc.Config {
+					c := DefaultClientConfig()
+					c.LocalKey = cert.PrivateKey.(*rsa.PrivateKey)
+					return c
+				}(),
+			},
 		},
 		{
 			name: `PrivateKeyFile("key.pem")`,
 			opt:  PrivateKeyFile(keyPEMFile),
-			c: func() *uasc.Config {
-				c := DefaultClientConfig()
-				c.LocalKey = cert.PrivateKey.(*rsa.PrivateKey)
-				return c
-			}(),
+			cfg: &Config{
+				sechan: func() *uasc.Config {
+					c := DefaultClientConfig()
+					c.LocalKey = cert.PrivateKey.(*rsa.PrivateKey)
+					return c
+				}(),
+			},
 		},
 		{
 			name: `ProductURI("a")`,
 			opt:  ProductURI("a"),
-			sc: func() *uasc.SessionConfig {
-				sc := DefaultSessionConfig()
-				sc.ClientDescription.ProductURI = "a"
-				return sc
-			}(),
+			cfg: &Config{
+				session: func() *uasc.SessionConfig {
+					sc := DefaultSessionConfig()
+					sc.ClientDescription.ProductURI = "a"
+					return sc
+				}(),
+			},
 		},
 		{
 			name: `RemoteCertificate`,
 			opt:  RemoteCertificate(certDER),
-			c: func() *uasc.Config {
-				c := DefaultClientConfig()
-				c.RemoteCertificate = certDER
-				return c
-			}(),
+			cfg: &Config{
+				sechan: func() *uasc.Config {
+					c := DefaultClientConfig()
+					c.RemoteCertificate = certDER
+					return c
+				}(),
+			},
 		},
 		{
 			name: `RemoteCertificateFile("cert.der")`,
 			opt:  RemoteCertificateFile(certDERFile),
-			c: func() *uasc.Config {
-				c := DefaultClientConfig()
-				c.RemoteCertificate = certDER
-				return c
-			}(),
+			cfg: &Config{
+				sechan: func() *uasc.Config {
+					c := DefaultClientConfig()
+					c.RemoteCertificate = certDER
+					return c
+				}(),
+			},
 		},
 		{
 			name: `RemoteCertificateFile("cert.pem")`,
 			opt:  RemoteCertificateFile(certPEMFile),
-			c: func() *uasc.Config {
-				c := DefaultClientConfig()
-				c.RemoteCertificate = certDER
-				return c
-			}(),
+			cfg: &Config{
+				sechan: func() *uasc.Config {
+					c := DefaultClientConfig()
+					c.RemoteCertificate = certDER
+					return c
+				}(),
+			},
 		},
 		{
 			name: `RequestTimeout(5s)`,
 			opt:  RequestTimeout(5 * time.Second),
-			c: func() *uasc.Config {
-				c := DefaultClientConfig()
-				c.RequestTimeout = 5 * time.Second
-				return c
-			}(),
+			cfg: &Config{
+				sechan: func() *uasc.Config {
+					c := DefaultClientConfig()
+					c.RequestTimeout = 5 * time.Second
+					return c
+				}(),
+			},
 		},
 		{
 			name: `SecurityFromEndpoint(no-match)`,
@@ -347,219 +384,250 @@ func TestOptions(t *testing.T) {
 				SecurityMode:      5,
 				ServerCertificate: certDER,
 			}, 0),
-			c: func() *uasc.Config {
-				c := DefaultClientConfig()
-				c.SecurityPolicyURI = "a"
-				c.SecurityMode = 5
-				c.RemoteCertificate = certDER
-				c.Thumbprint = uapolicy.Thumbprint(certDER)
-				return c
-			}(),
-			sc: func() *uasc.SessionConfig {
-				sc := DefaultSessionConfig()
-				sc.UserIdentityToken = &ua.AnonymousIdentityToken{
-					PolicyID: defaultAnonymousPolicyID,
-				}
-				sc.AuthPolicyURI = ua.SecurityPolicyURINone
-				return sc
-			}(),
+			cfg: &Config{
+				sechan: func() *uasc.Config {
+					c := DefaultClientConfig()
+					c.SecurityPolicyURI = "a"
+					c.SecurityMode = 5
+					c.RemoteCertificate = certDER
+					c.Thumbprint = uapolicy.Thumbprint(certDER)
+					return c
+				}(),
+				session: func() *uasc.SessionConfig {
+					sc := DefaultSessionConfig()
+					sc.UserIdentityToken = &ua.AnonymousIdentityToken{
+						PolicyID: defaultAnonymousPolicyID,
+					}
+					sc.AuthPolicyURI = ua.SecurityPolicyURINone
+					return sc
+				}(),
+			},
 		},
 		{
 			name: `SecurityFromEndpoint(anonymous)`,
 			opt:  SecurityFromEndpoint(endpoints[0], ua.UserTokenTypeAnonymous),
-			c: func() *uasc.Config {
-				c := DefaultClientConfig()
-				c.SecurityPolicyURI = "a"
-				c.SecurityMode = 5
-				c.RemoteCertificate = certDER
-				c.Thumbprint = uapolicy.Thumbprint(certDER)
-				return c
-			}(),
-			sc: func() *uasc.SessionConfig {
-				sc := DefaultSessionConfig()
-				sc.UserIdentityToken = &ua.AnonymousIdentityToken{}
-				sc.AuthPolicyURI = "b"
-				return sc
-			}(),
+			cfg: &Config{
+				sechan: func() *uasc.Config {
+					c := DefaultClientConfig()
+					c.SecurityPolicyURI = "a"
+					c.SecurityMode = 5
+					c.RemoteCertificate = certDER
+					c.Thumbprint = uapolicy.Thumbprint(certDER)
+					return c
+				}(),
+				session: func() *uasc.SessionConfig {
+					sc := DefaultSessionConfig()
+					sc.UserIdentityToken = &ua.AnonymousIdentityToken{}
+					sc.AuthPolicyURI = "b"
+					return sc
+				}(),
+			},
 		},
 		{
 			name: `SecurityFromEndpoint(username)`,
 			opt:  SecurityFromEndpoint(endpoints[1], ua.UserTokenTypeUserName),
-			c: func() *uasc.Config {
-				c := DefaultClientConfig()
-				c.SecurityPolicyURI = "a"
-				c.SecurityMode = 5
-				c.RemoteCertificate = certDER
-				c.Thumbprint = uapolicy.Thumbprint(certDER)
-				return c
-			}(),
-			sc: func() *uasc.SessionConfig {
-				sc := DefaultSessionConfig()
-				sc.UserIdentityToken = &ua.UserNameIdentityToken{}
-				sc.AuthPolicyURI = "b"
-				return sc
-			}(),
+			cfg: &Config{
+				sechan: func() *uasc.Config {
+					c := DefaultClientConfig()
+					c.SecurityPolicyURI = "a"
+					c.SecurityMode = 5
+					c.RemoteCertificate = certDER
+					c.Thumbprint = uapolicy.Thumbprint(certDER)
+					return c
+				}(),
+				session: func() *uasc.SessionConfig {
+					sc := DefaultSessionConfig()
+					sc.UserIdentityToken = &ua.UserNameIdentityToken{}
+					sc.AuthPolicyURI = "b"
+					return sc
+				}(),
+			},
 		},
 		{
 			name: `SecurityFromEndpoint(certificate)`,
 			opt:  SecurityFromEndpoint(endpoints[2], ua.UserTokenTypeCertificate),
-			c: func() *uasc.Config {
-				c := DefaultClientConfig()
-				c.SecurityPolicyURI = "a"
-				c.SecurityMode = 5
-				c.RemoteCertificate = certDER
-				c.Thumbprint = uapolicy.Thumbprint(certDER)
-				return c
-			}(),
-			sc: func() *uasc.SessionConfig {
-				sc := DefaultSessionConfig()
-				sc.UserIdentityToken = &ua.X509IdentityToken{}
-				sc.AuthPolicyURI = "b"
-				return sc
-			}(),
+			cfg: &Config{
+				sechan: func() *uasc.Config {
+					c := DefaultClientConfig()
+					c.SecurityPolicyURI = "a"
+					c.SecurityMode = 5
+					c.RemoteCertificate = certDER
+					c.Thumbprint = uapolicy.Thumbprint(certDER)
+					return c
+				}(),
+				session: func() *uasc.SessionConfig {
+					sc := DefaultSessionConfig()
+					sc.UserIdentityToken = &ua.X509IdentityToken{}
+					sc.AuthPolicyURI = "b"
+					return sc
+				}(),
+			},
 		},
 		{
 			name: `SecurityFromEndpoint(token)`,
 			opt:  SecurityFromEndpoint(endpoints[3], ua.UserTokenTypeIssuedToken),
-			c: func() *uasc.Config {
-				c := DefaultClientConfig()
-				c.SecurityPolicyURI = "a"
-				c.SecurityMode = 5
-				c.RemoteCertificate = certDER
-				c.Thumbprint = uapolicy.Thumbprint(certDER)
-				return c
-			}(),
-			sc: func() *uasc.SessionConfig {
-				sc := DefaultSessionConfig()
-				sc.UserIdentityToken = &ua.IssuedIdentityToken{}
-				sc.AuthPolicyURI = "b"
-				return sc
-			}(),
+			cfg: &Config{
+				sechan: func() *uasc.Config {
+					c := DefaultClientConfig()
+					c.SecurityPolicyURI = "a"
+					c.SecurityMode = 5
+					c.RemoteCertificate = certDER
+					c.Thumbprint = uapolicy.Thumbprint(certDER)
+					return c
+				}(),
+				session: func() *uasc.SessionConfig {
+					sc := DefaultSessionConfig()
+					sc.UserIdentityToken = &ua.IssuedIdentityToken{}
+					sc.AuthPolicyURI = "b"
+					return sc
+				}(),
+			},
 		},
 		{
 			name: `SecurityPolicy("None")`,
 			opt:  SecurityPolicy("None"),
-			c: func() *uasc.Config {
-				c := DefaultClientConfig()
-				c.SecurityPolicyURI = ua.SecurityPolicyURINone
-				return c
-			}(),
+			cfg: &Config{
+				sechan: func() *uasc.Config {
+					c := DefaultClientConfig()
+					c.SecurityPolicyURI = ua.SecurityPolicyURINone
+					return c
+				}(),
+			},
 		},
 		{
 			name: `SecurityMode(Sign)`,
 			opt:  SecurityMode(ua.MessageSecurityModeSign),
-			c: func() *uasc.Config {
-				c := DefaultClientConfig()
-				c.SecurityMode = ua.MessageSecurityModeSign
-				return c
-			}(),
+			cfg: &Config{
+				sechan: func() *uasc.Config {
+					c := DefaultClientConfig()
+					c.SecurityMode = ua.MessageSecurityModeSign
+					return c
+				}(),
+			},
 		},
 		{
 			name: `SecurityModeString("bad")`,
 			opt:  SecurityModeString("bad"),
-			c: func() *uasc.Config {
-				c := DefaultClientConfig()
-				c.SecurityMode = ua.MessageSecurityModeInvalid
-				return c
-			}(),
+			cfg: &Config{
+				sechan: func() *uasc.Config {
+					c := DefaultClientConfig()
+					c.SecurityMode = ua.MessageSecurityModeInvalid
+					return c
+				}(),
+			},
 		},
 		{
 			name: `SecurityModeString("None")`,
 			opt:  SecurityModeString("None"),
-			c: func() *uasc.Config {
-				c := DefaultClientConfig()
-				c.SecurityMode = ua.MessageSecurityModeNone
-				return c
-			}(),
+			cfg: &Config{
+				sechan: func() *uasc.Config {
+					c := DefaultClientConfig()
+					c.SecurityMode = ua.MessageSecurityModeNone
+					return c
+				}(),
+			},
 		},
 		{
 			name: `SecurityModeString("Sign")`,
 			opt:  SecurityModeString("Sign"),
-			c: func() *uasc.Config {
-				c := DefaultClientConfig()
-				c.SecurityMode = ua.MessageSecurityModeSign
-				return c
-			}(),
+			cfg: &Config{
+				sechan: func() *uasc.Config {
+					c := DefaultClientConfig()
+					c.SecurityMode = ua.MessageSecurityModeSign
+					return c
+				}(),
+			},
 		},
 		{
 			name: `SecurityModeString("SignAndEncrypt")`,
 			opt:  SecurityModeString("SignAndEncrypt"),
-			c: func() *uasc.Config {
-				c := DefaultClientConfig()
-				c.SecurityMode = ua.MessageSecurityModeSignAndEncrypt
-				return c
-			}(),
+			cfg: &Config{
+				sechan: func() *uasc.Config {
+					c := DefaultClientConfig()
+					c.SecurityMode = ua.MessageSecurityModeSignAndEncrypt
+					return c
+				}(),
+			},
 		},
 		{
 			name: `SecurityPolicy("Basic128Rsa15")`,
 			opt:  SecurityPolicy("Basic128Rsa15"),
-			c: func() *uasc.Config {
-				c := DefaultClientConfig()
-				c.SecurityPolicyURI = ua.SecurityPolicyURIBasic128Rsa15
-				return c
-			}(),
+			cfg: &Config{
+				sechan: func() *uasc.Config {
+					c := DefaultClientConfig()
+					c.SecurityPolicyURI = ua.SecurityPolicyURIBasic128Rsa15
+					return c
+				}(),
+			},
 		},
 		{
 			name: `SecurityPolicy("Basic256")`,
 			opt:  SecurityPolicy("Basic256"),
-			c: func() *uasc.Config {
-				c := DefaultClientConfig()
-				c.SecurityPolicyURI = ua.SecurityPolicyURIBasic256
-				return c
-			}(),
+			cfg: &Config{
+				sechan: func() *uasc.Config {
+					c := DefaultClientConfig()
+					c.SecurityPolicyURI = ua.SecurityPolicyURIBasic256
+					return c
+				}(),
+			},
 		},
 		{
 			name: `SecurityPolicy("Basic256Sha256")`,
 			opt:  SecurityPolicy("Basic256Sha256"),
-			c: func() *uasc.Config {
-				c := DefaultClientConfig()
-				c.SecurityPolicyURI = ua.SecurityPolicyURIBasic256Sha256
-				return c
-			}(),
+			cfg: &Config{
+				sechan: func() *uasc.Config {
+					c := DefaultClientConfig()
+					c.SecurityPolicyURI = ua.SecurityPolicyURIBasic256Sha256
+					return c
+				}(),
+			},
 		},
 		{
 			name: `SecurityPolicy("Aes128_Sha256_RsaOaep")`,
 			opt:  SecurityPolicy("Aes128_Sha256_RsaOaep"),
-			c: func() *uasc.Config {
-				c := DefaultClientConfig()
-				c.SecurityPolicyURI = ua.SecurityPolicyURIAes128Sha256RsaOaep
-				return c
-			}(),
+			cfg: &Config{
+				sechan: func() *uasc.Config {
+					c := DefaultClientConfig()
+					c.SecurityPolicyURI = ua.SecurityPolicyURIAes128Sha256RsaOaep
+					return c
+				}(),
+			},
 		},
 		{
 			name: `SecurityPolicy("Aes256_Sha256_RsaPss")`,
 			opt:  SecurityPolicy("Aes256_Sha256_RsaPss"),
-			c: func() *uasc.Config {
-				c := DefaultClientConfig()
-				c.SecurityPolicyURI = ua.SecurityPolicyURIAes256Sha256RsaPss
-				return c
-			}(),
+			cfg: &Config{
+				sechan: func() *uasc.Config {
+					c := DefaultClientConfig()
+					c.SecurityPolicyURI = ua.SecurityPolicyURIAes256Sha256RsaPss
+					return c
+				}(),
+			},
 		},
 		{
 			name: `SessionTimeout(5s)`,
 			opt:  SessionTimeout(5 * time.Second),
-			sc: func() *uasc.SessionConfig {
-				sc := DefaultSessionConfig()
-				sc.SessionTimeout = 5 * time.Second
-				return sc
-			}(),
+			cfg: &Config{
+				session: func() *uasc.SessionConfig {
+					sc := DefaultSessionConfig()
+					sc.SessionTimeout = 5 * time.Second
+					return sc
+				}(),
+			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ttc := tt.c
-			if ttc == nil {
-				ttc = DefaultClientConfig()
+			if tt.cfg.sechan == nil {
+				tt.cfg.sechan = DefaultClientConfig()
 			}
-			ttsc := tt.sc
-			if ttsc == nil {
-				ttsc = DefaultSessionConfig()
+			if tt.cfg.session == nil {
+				tt.cfg.session = DefaultSessionConfig()
 			}
 
-			c, sc := ApplyConfig(tt.opt)
-			verify.Values(t, "", c, ttc)
-			verify.Values(t, "", sc, ttsc)
+			cfg := ApplyConfig(tt.opt)
+			verify.Values(t, "", cfg, tt.cfg)
 		})
 	}
 }
