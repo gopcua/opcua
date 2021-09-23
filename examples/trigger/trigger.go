@@ -27,16 +27,11 @@ func main() {
 		triggerNodeID = flag.String("trigger", "", "node id to trigger with")
 		reportNodeID  = flag.String("report", "", "node id value to report on trigger")
 		filter        = flag.String("filter", "timestamp", "DataFilter: status, value, timestamp.")
-		interval      = flag.String("interval", opcua.DefaultSubscriptionInterval.String(), "subscription interval")
+		interval      = flag.Duration("interval", opcua.DefaultSubscriptionInterval, "subscription interval")
 	)
 	flag.BoolVar(&debug.Enable, "debug", false, "enable debug logging")
 	flag.Parse()
 	log.SetFlags(0)
-
-	subInterval, err := time.ParseDuration(*interval)
-	if err != nil {
-		log.Fatal(err)
-	}
 
 	// add an arbitrary timeout to demonstrate how to stop a subscription
 	// with a context.
@@ -73,7 +68,7 @@ func main() {
 	notifyCh := make(chan *opcua.PublishNotificationData)
 
 	sub, err := c.Subscribe(&opcua.SubscriptionParameters{
-		Interval: subInterval,
+		Interval: *interval,
 	}, notifyCh)
 	if err != nil {
 		log.Fatal(err)

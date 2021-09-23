@@ -23,17 +23,12 @@ func main() {
 		certFile = flag.String("cert", "", "Path to cert.pem. Required for security mode/policy != None")
 		keyFile  = flag.String("key", "", "Path to private key.pem. Required for security mode/policy != None")
 		nodeID   = flag.String("node", "", "node id to subscribe to")
-		interval = flag.String("interval", opcua.DefaultSubscriptionInterval.String(), "subscription interval")
+		interval = flag.Duration("interval", opcua.DefaultSubscriptionInterval, "subscription interval")
 	)
 	flag.BoolVar(&debug.Enable, "debug", false, "enable debug logging")
 	flag.Parse()
 
 	// log.SetFlags(0)
-
-	subInterval, err := time.ParseDuration(*interval)
-	if err != nil {
-		log.Fatal(err)
-	}
 
 	signalCh := make(chan os.Signal, 1)
 	signal.Notify(signalCh, os.Interrupt)
@@ -87,11 +82,11 @@ func main() {
 
 	// start callback-based subscription
 	wg.Add(1)
-	go startCallbackSub(ctx, m, subInterval, 0, wg, *nodeID)
+	go startCallbackSub(ctx, m, *interval, 0, wg, *nodeID)
 
 	// start channel-based subscription
 	wg.Add(1)
-	go startChanSub(ctx, m, subInterval, 0, wg, *nodeID)
+	go startChanSub(ctx, m, *interval, 0, wg, *nodeID)
 
 	<-ctx.Done()
 	wg.Wait()
