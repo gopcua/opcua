@@ -54,7 +54,7 @@ func DefaultSessionConfig() *uasc.SessionConfig {
 // Config contains all config options.
 type Config struct {
 	dialer      *uacp.Dialer
-	dialTimeout time.Duration
+	dialTimeout *time.Duration
 	sechan      *uasc.Config
 	session     *uasc.SessionConfig
 }
@@ -68,11 +68,8 @@ func NewDialer(cfg *Config) *uacp.Dialer {
 	if d.Dialer == nil {
 		d.Dialer = &net.Dialer{}
 	}
-	if cfg.dialTimeout > 0 {
-		d.Dialer.Timeout = cfg.dialTimeout
-	}
-	if d.Dialer.Timeout == 0 {
-		d.Dialer.Timeout = cfg.sechan.RequestTimeout
+	if cfg.dialTimeout != nil {
+		d.Dialer.Timeout = *cfg.dialTimeout
 	}
 	return d
 }
@@ -471,9 +468,9 @@ func Dialer(d *uacp.Dialer) Option {
 }
 
 // DialTimeout sets the timeout for establishing the UACP connection.
-// Defaults to the RequestTimeout.
+// Defaults to DefaultDialTimeout. Set to zero for no timeout.
 func DialTimeout(d time.Duration) Option {
 	return func(cfg *Config) {
-		cfg.dialTimeout = d
+		cfg.dialTimeout = &d
 	}
 }
