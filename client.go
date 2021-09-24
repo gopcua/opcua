@@ -483,19 +483,29 @@ func (c *Client) Dial(ctx context.Context) error {
 
 // Close closes the session and the secure channel.
 func (c *Client) Close() error {
-	defer c.conn.Close()
-
 	// try to close the session but ignore any error
 	// so that we close the underlying channel and connection.
 	c.CloseSession()
 	c.state.Store(Closed)
-	defer close(c.sechanErr)
+
 	if c.mcancel != nil {
 		c.mcancel()
 	}
 	if c.sechan != nil {
 		c.sechan.Close()
 	}
+
+	// https://github.com/gopcua/opcua/pull/462
+	//
+	// do not close the c.sechanErr channel since it leads to
+	// race conditions and it gets garbage collected anyway.
+	// There is nothing we can do with this error while
+	// shutting down the client so I think it is safe to ignore
+	// them.
+
+	// close the connection but ignore the error since there isn't
+	// anything we can do about it anyway
+	c.conn.Close()
 
 	return nil
 }
