@@ -180,8 +180,8 @@ func (s *Subscription) publishTimeout() time.Duration {
 	if timeout > uasc.MaxTimeout {
 		return uasc.MaxTimeout
 	}
-	if timeout < s.c.cfg.RequestTimeout {
-		return s.c.cfg.RequestTimeout
+	if timeout < s.c.cfg.sechan.RequestTimeout {
+		return s.c.cfg.sechan.RequestTimeout
 	}
 	return timeout
 }
