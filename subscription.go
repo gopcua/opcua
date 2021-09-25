@@ -128,6 +128,7 @@ func (s *Subscription) Monitor(ts ua.TimestampsToReturn, items ...*ua.MonitoredI
 	}
 
 	// store monitored items
+	// todo(fs): should we guard this with a lock?
 	for i, item := range items {
 		result := res.Results[i]
 
@@ -149,10 +150,27 @@ func (s *Subscription) Unmonitor(monitoredItemIDs ...uint32) (*ua.DeleteMonitore
 		MonitoredItemIDs: monitoredItemIDs,
 		SubscriptionID:   s.SubscriptionID,
 	}
+
 	var res *ua.DeleteMonitoredItemsResponse
 	err := s.c.Send(req, func(v interface{}) error {
 		return safeAssign(v, &res)
 	})
+
+	if err == nil {
+		// remove monitored items
+		// todo(fs): should we guard this with a lock?
+		var items []*monitoredItem
+		for _, id := range monitoredItemIDs {
+			for _, item := range s.items {
+				if item.createResult.MonitoredItemID == id {
+					continue
+				}
+				items = append(items, item)
+			}
+		}
+		s.items = items
+	}
+
 	return res, err
 }
 
