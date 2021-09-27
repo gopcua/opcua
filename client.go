@@ -299,6 +299,14 @@ func (c *Client) monitor(ctx context.Context) {
 						// a reconnection to the server
 
 						// close previous secure channel
+						//
+						// todo(fs): the two calls to Close() trigger a double-close on both the
+						// todo(fs): secure channel and the UACP connection. I have guarded for this
+						// todo(fs): with a sync.Once but that feels like a band-aid. We need to investigate
+						// todo(fs): why we are trying to create a new secure channel when we shut the client
+						// todo(fs): down.
+						//
+						// https://github.com/gopcua/opcua/pull/470
 						_ = c.conn.Close()
 						c.sechan.Close()
 						c.sechan = nil
