@@ -159,7 +159,7 @@ func (s *Subscription) Unmonitor(monitoredItemIDs ...uint32) (*ua.DeleteMonitore
 	if err == nil {
 		// remove monitored items
 		// todo(fs): should we guard this with a lock?
-		var items []*monitoredItem
+		items := make([]*monitoredItem, 0, len(s.items))
 		for _, id := range monitoredItemIDs {
 			for _, item := range s.items {
 				if item.createResult.MonitoredItemID == id {
