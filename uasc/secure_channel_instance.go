@@ -35,10 +35,10 @@ type channelInstance struct {
 	algo            *uapolicy.EncryptionAlgorithm
 	maxBodySize     uint32
 
-	messagesSent uint32
-	// messagesReceived uint32
-	bytesSent uint64
+	bytesSent uint64 // atomic.Load/Store - needs to be aligned for 32bit systems
 	// bytesReceived    uint64
+	messagesSent uint32 // atomic.Load/Store
+	// messagesReceived uint32
 }
 
 func newChannelInstance(sc *SecureChannel) *channelInstance {
