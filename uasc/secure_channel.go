@@ -8,6 +8,7 @@ import (
 	"context"
 	"crypto/rsa"
 	"crypto/x509"
+	"encoding/binary"
 	"io"
 	"math"
 	"sync"
@@ -526,6 +527,7 @@ func (s *SecureChannel) open(ctx context.Context, instance *channelInstance, req
 	reqID := s.nextRequestID()
 
 	s.openingInstance.algo = algo
+	s.openingInstance.SetMaximumBodySize(int(s.c.SendBufSize()))
 
 	localNonce, err := algo.MakeNonce()
 	if err != nil {
@@ -564,6 +566,8 @@ func (s *SecureChannel) handleOpenSecureChannelResponse(resp *ua.OpenSecureChann
 	if instance.algo, err = uapolicy.Symmetric(s.cfg.SecurityPolicyURI, localNonce, resp.ServerNonce); err != nil {
 		return err
 	}
+
+	instance.SetMaximumBodySize(int(s.c.SendBufSize()))
 
 	s.instancesMu.Lock()
 	defer s.instancesMu.Unlock()
@@ -754,16 +758,6 @@ func (s *SecureChannel) sendAsyncWithTimeout(
 		return nil, err
 	}
 
-	b, err := m.Encode()
-	if err != nil {
-		return nil, err
-	}
-
-	b, err = instance.signAndEncrypt(m, b)
-	if err != nil {
-		return nil, err
-	}
-
 	var resp chan *response
 
 	if respRequired {
@@ -781,16 +775,33 @@ func (s *SecureChannel) sendAsyncWithTimeout(
 		s.handlersMu.Unlock()
 	}
 
-	// send the message
-	var n int
-	if n, err = s.c.Write(b); err != nil {
+	chunks, err := m.EncodeChunks(instance.maxBodySize)
+	if err != nil {
 		return nil, err
 	}
 
-	atomic.AddUint64(&instance.bytesSent, uint64(n))
-	atomic.AddUint32(&instance.messagesSent, 1)
+	for i, chunk := range chunks {
+		if i > 0 { // fix sequence number on subsequent chunks
+			number := instance.nextSequenceNumber()
+			binary.LittleEndian.PutUint32(chunk[16:], uint32(number))
+		}
 
-	debug.Printf("uasc %d/%d: send %T with %d bytes", s.c.ID(), reqID, req, len(b))
+		chunk, err = instance.signAndEncrypt(m, chunk)
+		if err != nil {
+			return nil, err
+		}
+
+		// send the message
+		var n int
+		if n, err = s.c.Write(chunk); err != nil {
+			return nil, err
+		}
+
+		atomic.AddUint64(&instance.bytesSent, uint64(n))
+		atomic.AddUint32(&instance.messagesSent, 1)
+
+		debug.Printf("uasc %d/%d: send %T with %d bytes", s.c.ID(), reqID, req, len(chunk))
+	}
 
 	return resp, nil
 }
