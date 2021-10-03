@@ -50,6 +50,7 @@ func (c *Client) Subscribe(params *SubscriptionParameters, notifyCh chan *Publis
 		RevisedLifetimeCount:      res.RevisedLifetimeCount,
 		RevisedMaxKeepAliveCount:  res.RevisedMaxKeepAliveCount,
 		Notifs:                    notifyCh,
+		items:                     make(map[uint32]*monitoredItem),
 		params:                    params,
 		nextSeq:                   1,
 		c:                         c,

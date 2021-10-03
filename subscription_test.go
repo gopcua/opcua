@@ -40,7 +40,7 @@ func BenchmarkUnmonitorItems(b *testing.B) {
 		src := make([]*monitoredItem, b.N)
 		for i := 0; i < b.N; i++ {
 			src[i] = &monitoredItem{
-				createResult: &ua.MonitoredItemCreateResult{
+				res: &ua.MonitoredItemCreateResult{
 					MonitoredItemID: uint32(i),
 				},
 			}
@@ -49,7 +49,7 @@ func BenchmarkUnmonitorItems(b *testing.B) {
 		b.ResetTimer()
 		var dst []*monitoredItem
 		for _, item := range src {
-			if item.createResult.MonitoredItemID%2 == 0 {
+			if item.res.MonitoredItemID%2 == 0 {
 				continue
 			}
 			dst = append(dst, item)
@@ -62,7 +62,7 @@ func BenchmarkUnmonitorItems(b *testing.B) {
 		src := make([]*monitoredItem, b.N)
 		for i := 0; i < b.N; i++ {
 			src[i] = &monitoredItem{
-				createResult: &ua.MonitoredItemCreateResult{
+				res: &ua.MonitoredItemCreateResult{
 					MonitoredItemID: uint32(i),
 				},
 			}
@@ -71,7 +71,7 @@ func BenchmarkUnmonitorItems(b *testing.B) {
 		b.ResetTimer()
 		dst := make([]*monitoredItem, 0, len(src))
 		for _, item := range src {
-			if item.createResult.MonitoredItemID%2 == 0 {
+			if item.res.MonitoredItemID%2 == 0 {
 				continue
 			}
 			dst = append(dst, item)
@@ -86,7 +86,7 @@ func BenchmarkUnmonitorItems(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			id := uint32(i)
 			src[id] = &monitoredItem{
-				createResult: &ua.MonitoredItemCreateResult{
+				res: &ua.MonitoredItemCreateResult{
 					MonitoredItemID: id,
 				},
 			}
