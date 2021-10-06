@@ -171,11 +171,21 @@ func (c *channelInstance) signAndEncrypt(m *Message, b []byte) ([]byte, error) {
 	var encryptedLength int
 	if c.sc.cfg.SecurityMode == ua.MessageSecurityModeSignAndEncrypt || isAsymmetric {
 		plaintextBlockSize := c.algo.PlaintextBlockSize()
-		paddingLength := plaintextBlockSize - ((len(b[headerLength:]) + c.algo.SignatureLength() + 1) % plaintextBlockSize)
+		dataLength := len(b[headerLength:]) + c.algo.SignatureLength()
+
+		if plaintextBlockSize > 256 {
+			dataLength += 2 // account for extraPadding Byte Number;
+		} else {
+			dataLength++
+		}
+
+		n := dataLength % plaintextBlockSize
+		paddingLength := (plaintextBlockSize - n) % plaintextBlockSize
 
 		for i := 0; i <= paddingLength; i++ {
 			b = append(b, byte(paddingLength))
 		}
+
 		encryptedLength = ((len(b[headerLength:]) + c.algo.SignatureLength()) / plaintextBlockSize) * c.algo.BlockSize()
 	} else { // MessageSecurityModeSign
 		encryptedLength = len(b[headerLength:]) + c.algo.SignatureLength()
