@@ -26,9 +26,10 @@ import (
 )
 
 // GetEndpoints returns the available endpoint descriptions for the server.
-func GetEndpoints(endpoint string) ([]*ua.EndpointDescription, error) {
-	c := NewClient(endpoint, AutoReconnect(false))
-	if err := c.Dial(context.Background()); err != nil {
+func GetEndpoints(ctx context.Context, endpoint string, opts ...Option) ([]*ua.EndpointDescription, error) {
+	opts = append(opts, AutoReconnect(false))
+	c := NewClient(endpoint, opts...)
+	if err := c.Dial(ctx); err != nil {
 		return nil, err
 	}
 	defer c.Close()
@@ -81,33 +82,14 @@ func (a bySecurityLevel) Len() int           { return len(a) }
 func (a bySecurityLevel) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a bySecurityLevel) Less(i, j int) bool { return a[i].SecurityLevel < a[j].SecurityLevel }
 
-// ConnState is the ua client connection state
-type ConnState uint8
-
-const (
-	// Closed, the Connection is currently closed
-	Closed ConnState = iota
-	// Connected, the Connection is currently connected
-	Connected
-	// Connecting, the Connection is currently connecting to a server for the first time
-	Connecting
-	// Disconnected, the Connection is currently disconnected
-	Disconnected
-	// Reconnecting, the Connection is currently attempting to reconnect to a server it was previously connected to
-	Reconnecting
-)
-
 // Client is a high-level client for an OPC/UA server.
 // It establishes a secure channel and a session.
 type Client struct {
 	// endpointURL is the endpoint URL the client connects to.
 	endpointURL string
 
-	// cfg is the configuration for the secure channel.
-	cfg *uasc.Config
-
-	// sessionCfg is the configuration for the session.
-	sessionCfg *uasc.SessionConfig
+	// cfg is the configuration for the client.
+	cfg *Config
 
 	// conn is the open connection
 	conn *uacp.Conn
@@ -123,14 +105,14 @@ type Client struct {
 	subs   map[uint32]*Subscription
 	subMux sync.RWMutex
 
-	pendingAcks    []*ua.SubscriptionAcknowledgement
-	pendingAcksMux sync.RWMutex
-
-	publishTimeout time.Duration
+	pendingAcks []*ua.SubscriptionAcknowledgement
 
 	pausech  chan struct{} // pauses subscription publish loop
 	resumech chan struct{} // resumes subscription publish loop
 	mcancel  func()        // stops subscription publish loop
+
+	// timeout for sending PublishRequests
+	publishTimeout atomic.Value
 
 	// state of the client
 	state atomic.Value // ConnState
@@ -154,18 +136,17 @@ type Client struct {
 //
 // https://godoc.org/github.com/gopcua/opcua#Option
 func NewClient(endpoint string, opts ...Option) *Client {
-	cfg, sessionCfg := ApplyConfig(opts...)
+	cfg := ApplyConfig(opts...)
 	c := Client{
-		endpointURL:    endpoint,
-		cfg:            cfg,
-		sessionCfg:     sessionCfg,
-		sechanErr:      make(chan error, 1),
-		subs:           make(map[uint32]*Subscription),
-		pausech:        make(chan struct{}, 2),
-		resumech:       make(chan struct{}, 2),
-		pendingAcks:    []*ua.SubscriptionAcknowledgement{},
-		publishTimeout: uasc.MaxTimeout,
+		endpointURL: endpoint,
+		cfg:         cfg,
+		sechanErr:   make(chan error, 1),
+		subs:        make(map[uint32]*Subscription),
+		pausech:     make(chan struct{}, 2),
+		resumech:    make(chan struct{}, 2),
+		pendingAcks: []*ua.SubscriptionAcknowledgement{},
 	}
+	c.publishTimeout.Store(uasc.MaxTimeout)
 	c.pauseSubscriptions()
 	c.state.Store(Closed)
 	return &c
@@ -187,10 +168,6 @@ const (
 
 // Connect establishes a secure channel and creates a new session.
 func (c *Client) Connect(ctx context.Context) (err error) {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-
 	if c.sechan != nil {
 		return errors.Errorf("already connected")
 	}
@@ -199,7 +176,7 @@ func (c *Client) Connect(ctx context.Context) (err error) {
 	if err := c.Dial(ctx); err != nil {
 		return err
 	}
-	s, err := c.CreateSession(c.sessionCfg)
+	s, err := c.CreateSession(c.cfg.session)
 	if err != nil {
 		_ = c.Close()
 		return err
@@ -247,7 +224,7 @@ func (c *Client) monitor(ctx context.Context) {
 			c.state.Store(Disconnected)
 			dlog.Print("disconnected")
 
-			if !c.cfg.AutoReconnect {
+			if !c.cfg.sechan.AutoReconnect {
 				// the connection is closed and should not be restored
 				action = abortReconnect
 				dlog.Print("auto-reconnect disabled")
@@ -334,7 +311,7 @@ func (c *Client) monitor(ctx context.Context) {
 								select {
 								case <-ctx.Done():
 									return
-								case <-time.After(c.cfg.ReconnectInterval):
+								case <-time.After(c.cfg.sechan.ReconnectInterval):
 									dlog.Printf("trying to recreate secure channel")
 									continue
 								}
@@ -371,7 +348,7 @@ func (c *Client) monitor(ctx context.Context) {
 						// create a new session to replace the previous one
 
 						dlog.Printf("trying to recreate session")
-						s, err := c.CreateSession(c.sessionCfg)
+						s, err := c.CreateSession(c.cfg.session)
 						if err != nil {
 							dlog.Printf("recreate session failed: %v", err)
 							action = createSecureChannel
@@ -487,12 +464,13 @@ func (c *Client) Dial(ctx context.Context) error {
 	}
 
 	var err error
-	c.conn, err = uacp.Dial(ctx, c.endpointURL)
+	var d = NewDialer(c.cfg)
+	c.conn, err = d.Dial(ctx, c.endpointURL)
 	if err != nil {
 		return err
 	}
 
-	c.sechan, err = uasc.NewSecureChannel(c.endpointURL, c.conn, c.cfg, c.sechanErr)
+	c.sechan, err = uasc.NewSecureChannel(c.endpointURL, c.conn, c.cfg.sechan, c.sechanErr)
 	if err != nil {
 		_ = c.conn.Close()
 		return err
@@ -503,19 +481,29 @@ func (c *Client) Dial(ctx context.Context) error {
 
 // Close closes the session and the secure channel.
 func (c *Client) Close() error {
-	defer c.conn.Close()
-
 	// try to close the session but ignore any error
 	// so that we close the underlying channel and connection.
 	c.CloseSession()
 	c.state.Store(Closed)
-	defer close(c.sechanErr)
+
 	if c.mcancel != nil {
 		c.mcancel()
 	}
 	if c.sechan != nil {
 		c.sechan.Close()
 	}
+
+	// https://github.com/gopcua/opcua/pull/462
+	//
+	// do not close the c.sechanErr channel since it leads to
+	// race conditions and it gets garbage collected anyway.
+	// There is nothing we can do with this error while
+	// shutting down the client so I think it is safe to ignore
+	// them.
+
+	// close the connection but ignore the error since there isn't
+	// anything we can do about it anyway
+	c.conn.Close()
 
 	return nil
 }
@@ -582,7 +570,7 @@ func (c *Client) CreateSession(cfg *uasc.SessionConfig) (*Session, error) {
 		EndpointURL:             c.endpointURL,
 		SessionName:             name,
 		ClientNonce:             nonce,
-		ClientCertificate:       c.cfg.Certificate,
+		ClientCertificate:       c.cfg.sechan.Certificate,
 		RequestedSessionTimeout: float64(cfg.SessionTimeout / time.Millisecond),
 	}
 
@@ -602,13 +590,13 @@ func (c *Client) CreateSession(cfg *uasc.SessionConfig) (*Session, error) {
 		}
 
 		// Ensure we have a valid identity token that the server will accept before trying to activate a session
-		if c.sessionCfg.UserIdentityToken == nil {
+		if c.cfg.session.UserIdentityToken == nil {
 			opt := AuthAnonymous()
-			opt(c.cfg, c.sessionCfg)
+			opt(c.cfg)
 
 			p := anonymousPolicyID(res.ServerEndpoints)
 			opt = AuthPolicyID(p)
-			opt(c.cfg, c.sessionCfg)
+			opt(c.cfg)
 		}
 
 		s = &Session{
@@ -750,7 +738,7 @@ func (c *Client) DetachSession() (*Session, error) {
 // the response. If the client has an active session it injects the
 // authentication token.
 func (c *Client) Send(req ua.Request, h func(interface{}) error) error {
-	return c.sendWithTimeout(req, c.cfg.RequestTimeout, h)
+	return c.sendWithTimeout(req, c.cfg.sechan.RequestTimeout, h)
 }
 
 // sendWithTimeout sends the request via the secure channel with a custom timeout and registers a handler for

@@ -5,6 +5,7 @@
 package ua
 
 import (
+	"fmt"
 	"reflect"
 	"time"
 
@@ -24,9 +25,12 @@ const (
 	VariantArrayValues = 0x80
 )
 
+// ByteArray encodes a byte array as an OPC/UA array of Byte.
+type ByteArray []byte
+
 // Variant is a union of the built-in types.
 //
-// Specification: Part 6, 5.2.2.16
+// Specification: Part 6, 5.1.2 Table 1
 type Variant struct {
 	// mask contains the type and the array flags
 	// bits 0:5: built-in type id 1-25
@@ -59,6 +63,9 @@ type Variant struct {
 
 func NewVariant(v interface{}) (*Variant, error) {
 	va := &Variant{}
+	if !isBuiltinType(v) {
+		return nil, fmt.Errorf("trying to create a variant from a type that it is not suppoted: %s", reflect.ValueOf(v).Type().Name())
+	}
 	if err := va.set(v); err != nil {
 		return nil, err
 	}
@@ -138,7 +145,13 @@ func (m *Variant) Decode(b []byte) (int, error) {
 		return buf.Pos(), buf.Error()
 	}
 
-	vals := reflect.MakeSlice(reflect.SliceOf(typ), n, n)
+	var vals reflect.Value
+	switch m.Type() {
+	case TypeIDByte:
+		vals = reflect.MakeSlice(reflect.TypeOf(ByteArray{}), n, n)
+	default:
+		vals = reflect.MakeSlice(reflect.SliceOf(typ), n, n)
+	}
 	for i := 0; i < n; i++ {
 		vals.Index(i).Set(reflect.ValueOf(m.decodeValue(buf)))
 	}
@@ -409,8 +422,15 @@ func sliceDim(v reflect.Value) (typ reflect.Type, dim []int32, count int32, err 
 		return nil, nil, 0, nil
 	}
 
-	// ByteString is its own type
-	if v.Type() == reflect.TypeOf([]byte{}) {
+	// https://reference.opcfoundation.org/v104/Core/docs/Part6/5.1.4/
+	//
+	// We default to treating a []byte as a ByteString which is sent as a length
+	// encoded value. However, this makes it impossible to send a []byte as an
+	// array of Byte. The ByteArray type alias supports sending a []byte as an
+	// array of Byte.
+	//
+	// https://github.com/gopcua/opcua/issues/463
+	if v.Type() == reflect.TypeOf([]byte{}) && v.Type() != reflect.TypeOf(ByteArray{}) {
 		return v.Type(), nil, 1, nil
 	}
 
@@ -462,7 +482,7 @@ func (m *Variant) set(v interface{}) error {
 
 	typeid, ok := variantTypeToTypeID[et]
 	if !ok {
-		return errors.Errorf("cannot set variant to %T", v)
+		typeid = TypeIDVariant
 	}
 	m.setType(typeid)
 	m.value = v
@@ -557,6 +577,22 @@ func (m *Variant) Uint() uint64 {
 		return m.value.(uint64)
 	default:
 		return 0
+	}
+}
+
+func (m *Variant) ByteArray() ByteArray {
+	if m.ArrayLength() == 0 {
+		return nil
+	}
+	if len(m.ArrayDimensions()) > 0 {
+		return nil
+	}
+
+	switch m.Type() {
+	case TypeIDByte:
+		return m.value.(ByteArray)
+	default:
+		return nil
 	}
 }
 
@@ -726,6 +762,57 @@ func (m *Variant) XMLElement() XMLElement {
 		return m.value.(XMLElement)
 	default:
 		return ""
+	}
+}
+
+func isBuiltinType(v interface{}) bool {
+	if v == nil {
+		return true
+	}
+
+	switch v.(type) {
+
+	// builtin types
+	case
+		bool,
+		int8,
+		int16,
+		int32,
+		int64,
+		uint8,
+		uint16,
+		uint32,
+		uint64,
+		float32,
+		float64,
+		string,
+		[]byte,
+		*DataValue,
+		*DiagnosticInfo,
+		*ExpandedNodeID,
+		*ExtensionObject,
+		*GUID,
+		*LocalizedText,
+		*NodeID,
+		*QualifiedName,
+		*Variant,
+		StatusCode,
+		time.Time,
+		XMLElement:
+		return true
+
+	// slice or array of a builtin type
+	default:
+		v := reflect.ValueOf(v)
+		switch v.Type().Kind() {
+		case reflect.Array, reflect.Slice:
+			innerType := v.Type().Elem()
+			zeroValue := reflect.New(innerType).Elem().Interface()
+			return isBuiltinType(zeroValue)
+
+		default:
+			return false
+		}
 	}
 }
 

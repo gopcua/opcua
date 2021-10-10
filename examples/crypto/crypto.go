@@ -46,7 +46,7 @@ func main() {
 	ctx := context.Background()
 
 	// Get a list of the endpoints for our target server
-	endpoints, err := opcua.GetEndpoints(*endpoint)
+	endpoints, err := opcua.GetEndpoints(ctx, *endpoint)
 	if err != nil {
 		log.Fatal(err)
 	}
