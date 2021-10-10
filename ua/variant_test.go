@@ -452,6 +452,35 @@ func TestVariant(t *testing.T) {
 				0x01, 0x00, 0x00, 0x00,
 			},
 		},
+		{
+			Name:   "ByteArray",
+			Struct: MustVariant(ByteArray{0x01, 0x02, 0x03}),
+			Bytes: []byte{
+				// variant encoding mask
+				0x83,
+				// array length
+				0x03, 0x00, 0x00, 0x00,
+				// array values
+				0x01, 0x02, 0x03,
+			},
+		},
+		{
+			Name:   "[]ByteArray",
+			Struct: MustVariant([]ByteArray{{0x01}, {0x02}, {0x03}}),
+			Bytes: []byte{
+				// variant encoding mask
+				0xc3,
+				// array length
+				0x03, 0x00, 0x00, 0x00,
+				// array values
+				0x01, 0x02, 0x03,
+				// array dimensions length
+				0x02, 0x00, 0x00, 0x00,
+				// array dimensions
+				0x03, 0x00, 0x00, 0x00,
+				0x01, 0x00, 0x00, 0x00,
+			},
+		},
 	}
 	RunCodecTest(t, cases)
 }
@@ -638,6 +667,24 @@ func TestSet(t *testing.T) {
 			},
 		},
 		{
+			v: ByteArray{0xca, 0xfe},
+			va: &Variant{
+				mask:        byte(VariantArrayValues | TypeIDByte),
+				arrayLength: 2,
+				value:       ByteArray{0xca, 0xfe},
+			},
+		},
+		{
+			v: []ByteArray{{0xca}, {0xfe}},
+			va: &Variant{
+				mask:                  byte(VariantArrayDimensions | VariantArrayValues | TypeIDByte),
+				arrayLength:           2,
+				arrayDimensionsLength: 2,
+				arrayDimensions:       []int32{2, 1},
+				value:                 []ByteArray{{0xca}, {0xfe}},
+			},
+		},
+		{
 			v: int32(5),
 			va: &Variant{
 				mask:  byte(TypeIDInt32),
@@ -688,7 +735,11 @@ func TestSet(t *testing.T) {
 			if got, want := err, tt.err; got != want {
 				t.Fatalf("got error %v want %v", got, want)
 			}
-			verify.Values(t, "variant", va, tt.va)
+			verify.Values(t, "variant.mask", va.mask, tt.va.mask)
+			verify.Values(t, "variant.arrayLength", va.arrayLength, tt.va.arrayLength)
+			verify.Values(t, "variant.arrayDimensionsLength", va.arrayDimensionsLength, tt.va.arrayDimensionsLength)
+			verify.Values(t, "variant.arrayDimensions", va.arrayDimensions, tt.va.arrayDimensions)
+			verify.Values(t, "variant.value", va.value, tt.va.value)
 		})
 	}
 }
@@ -742,6 +793,18 @@ func TestSliceDim(t *testing.T) {
 		{
 			v:   [][]int{{}, {}, {}},
 			et:  reflect.TypeOf(int(0)),
+			dim: []int32{3, 0},
+			len: 0,
+		},
+		{
+			v:   ByteArray{},
+			et:  reflect.TypeOf(byte(0)),
+			dim: []int32{0},
+			len: 0,
+		},
+		{
+			v:   []ByteArray{{}, {}, {}},
+			et:  reflect.TypeOf(byte(0)),
 			dim: []int32{3, 0},
 			len: 0,
 		},
@@ -908,6 +971,18 @@ func TestVariantValueHelpers(t *testing.T) {
 			v:    uint64(5),
 			want: uint64(5),
 			fn:   func(v *Variant) interface{} { return v.Uint() },
+		},
+
+		// ByteArray
+		{
+			v:    false,
+			want: (ByteArray)(nil),
+			fn:   func(v *Variant) interface{} { return v.ByteArray() },
+		},
+		{
+			v:    ByteArray("abc"),
+			want: ByteArray("abc"),
+			fn:   func(v *Variant) interface{} { return v.ByteArray() },
 		},
 
 		// ByteString
@@ -1106,6 +1181,13 @@ func TestVariantValueHelpers(t *testing.T) {
 			v:    [][]byte{{'x', 'y', 'z'}},
 			want: ([]byte)(nil),
 			fn:   func(v *Variant) interface{} { return v.ByteString() },
+		},
+
+		// []ByteArray
+		{
+			v:    []ByteArray{{'x', 'y', 'z'}},
+			want: (ByteArray)(nil),
+			fn:   func(v *Variant) interface{} { return v.ByteArray() },
 		},
 
 		// []*DataValue

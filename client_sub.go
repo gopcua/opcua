@@ -222,12 +222,13 @@ func (c *Client) forgetSubscription(id uint32) {
 }
 
 func (c *Client) updatePublishTimeout() {
-	c.publishTimeout = uasc.MaxTimeout
+	maxTimeout := uasc.MaxTimeout
 	for _, s := range c.subs {
-		if d := s.publishTimeout(); d < c.publishTimeout {
-			c.publishTimeout = d
+		if d := s.publishTimeout(); d < maxTimeout {
+			maxTimeout = d
 		}
 	}
+	c.publishTimeout.Store(maxTimeout)
 }
 
 func (c *Client) notifySubscriptionsOfError(ctx context.Context, subID uint32, err error) {
@@ -508,7 +509,7 @@ func (c *Client) sendPublishRequest() (*ua.PublishResponse, error) {
 
 	dlog.Printf("PublishRequest: %s", debug.ToJSON(req))
 	var res *ua.PublishResponse
-	err := c.sendWithTimeout(req, c.publishTimeout, func(v interface{}) error {
+	err := c.sendWithTimeout(req, c.publishTimeout.Load().(time.Duration), func(v interface{}) error {
 		return safeAssign(v, &res)
 	})
 	dlog.Printf("PublishResponse: %s", debug.ToJSON(res))

@@ -6,6 +6,7 @@ package ua
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"math"
 	"strconv"
@@ -79,6 +80,17 @@ func NewByteStringNodeID(ns uint16, id []byte) *NodeID {
 	}
 }
 
+// MustParseNodeID returns a node id from a string definition
+// if it is parseable by ParseNodeID. Otherwise, the function
+// panics.
+func MustParseNodeID(s string) *NodeID {
+	id, err := ParseNodeID(s)
+	if err != nil {
+		panic(err.Error())
+	}
+	return id
+}
+
 // ParseNodeID returns a node id from a string definition of the format
 // 'ns=<namespace>;{s,i,b,g}=<identifier>'.
 //
@@ -88,7 +100,6 @@ func NewByteStringNodeID(ns uint16, id []byte) *NodeID {
 // and id value is returned.
 //
 // Namespace URLs 'nsu=' are not supported since they require a lookup.
-//
 func ParseNodeID(s string) (*NodeID, error) {
 	if s == "" {
 		return NewTwoByteNodeID(0), nil
@@ -138,7 +149,7 @@ func ParseNodeID(s string) (*NodeID, error) {
 			return NewTwoByteNodeID(byte(id)), nil
 		case ns < 256 && id < math.MaxUint16:
 			return NewFourByteNodeID(byte(ns), uint16(id)), nil
-		case id < math.MaxUint32:
+		case id <= math.MaxUint32:
 			return NewNumericNodeID(ns, uint32(id)), nil
 		default:
 			return nil, errors.Errorf("numeric id out of range (0..2^32-1): %s", s)
@@ -416,4 +427,24 @@ func (n *NodeID) Encode() ([]byte, error) {
 		return nil, errors.Errorf("invalid node id type %v", n.Type())
 	}
 	return buf.Bytes(), buf.Error()
+}
+
+func (n *NodeID) MarshalJSON() ([]byte, error) {
+	if n == nil {
+		return []byte(`null`), nil
+	}
+	return json.Marshal(n.String())
+}
+
+func (n *NodeID) UnmarshalJSON(b []byte) error {
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	nid, err := ParseNodeID(s)
+	if err != nil {
+		return err
+	}
+	*n = *nid
+	return nil
 }

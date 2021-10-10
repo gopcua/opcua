@@ -1,4 +1,5 @@
 .DS_Store
 vendor/
+build/
 dist/
 __pycache__/

@@ -1,17 +1,27 @@
-all: test integration
+all: test integration examples
 
 test:
-	go test ./...
+	go test -race ./...
 
 integration:
-	go test -v -tags=integration ./uatest/...
+	go test -race -v -tags=integration ./uatest/...
+
+examples:
+	go build -o build/ ./examples/...
+
+test-race:
+	go test -race ./...
+	go test -race -v -tags=integration ./uatest/...
 
 install-py-opcua:
 	pip3 install opcua
 
 gen:
-	GOMODULES111=on go get -u golang.org/x/tools/cmd/stringer
+	go get -d golang.org/x/tools/cmd/stringer
 	go generate ./...
+	go mod tidy
 
 release:
 	GITHUB_TOKEN=$$(security find-generic-password -gs GITHUB_TOKEN -w) goreleaser --rm-dist
+
+.PHONY: all examples gen integration test release

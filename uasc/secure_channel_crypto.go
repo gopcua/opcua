@@ -65,13 +65,13 @@ func (s *SecureChannel) VerifySessionSignature(cert, nonce, signature []byte) er
 
 // EncryptUserPassword issues a new signature for the client to send in ActivateSessionRequest
 func (s *SecureChannel) EncryptUserPassword(policyURI, password string, cert, nonce []byte) ([]byte, string, error) {
-	if policyURI == ua.SecurityPolicyURINone {
-		return []byte(password), "", nil
-	}
-
 	// If the User ID Token's policy was null, then default to the secure channel's policy
 	if policyURI == "" {
 		policyURI = s.cfg.SecurityPolicyURI
+	}
+
+	if policyURI == ua.SecurityPolicyURINone {
+		return []byte(password), "", nil
 	}
 
 	remoteX509Cert, err := x509.ParseCertificate(cert)

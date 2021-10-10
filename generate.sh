@@ -15,5 +15,8 @@ enums=$(grep -w '^type' ua/enums*.go | awk '{print $2;}' | paste -sd, -)
 (cd ua && stringer -type $enums -output enums_strings_gen.go)
 echo "Wrote ua/enums_strings_gen.go"
 
+stringer -type ConnState -output connstate_strings_gen.go
+echo "Wrote connstate_strings_gen.go"
+
 # remove golang.org/x/tools/cmd/stringer from list of dependencies
 go mod tidy

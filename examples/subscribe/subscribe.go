@@ -26,16 +26,11 @@ func main() {
 		keyFile  = flag.String("key", "", "Path to private key.pem. Required for security mode/policy != None")
 		nodeID   = flag.String("node", "", "node id to subscribe to")
 		event    = flag.Bool("event", false, "subscribe to node event changes (Default: node value changes)")
-		interval = flag.String("interval", opcua.DefaultSubscriptionInterval.String(), "subscription interval")
+		interval = flag.Duration("interval", opcua.DefaultSubscriptionInterval, "subscription interval")
 	)
 	flag.BoolVar(&debug.Enable, "debug", false, "enable debug logging")
 	flag.Parse()
 	log.SetFlags(0)
-
-	subInterval, err := time.ParseDuration(*interval)
-	if err != nil {
-		log.Fatal(err)
-	}
 
 	// add an arbitrary timeout to demonstrate how to stop a subscription
 	// with a context.
@@ -43,7 +38,7 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), d)
 	defer cancel()
 
-	endpoints, err := opcua.GetEndpoints(*endpoint)
+	endpoints, err := opcua.GetEndpoints(ctx, *endpoint)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -72,7 +67,7 @@ func main() {
 	notifyCh := make(chan *opcua.PublishNotificationData)
 
 	sub, err := c.Subscribe(&opcua.SubscriptionParameters{
-		Interval: subInterval,
+		Interval: *interval,
 	}, notifyCh)
 	if err != nil {
 		log.Fatal(err)
