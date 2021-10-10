@@ -76,7 +76,7 @@ func (e *ExtensionObject) Decode(b []byte) (int, error) {
 	e.Value = eotypes.New(typeID)
 	if e.Value == nil {
 		//return buf.Pos(), errors.Errorf("invalid extension object with id %s", typeID)
-		buf.pos += int(length)
+		body.ReadN(int(length))
 	} else {
 		body.ReadStruct(e.Value)
 	}
