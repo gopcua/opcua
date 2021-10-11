@@ -799,7 +799,24 @@ func (c *Client) Read(req *ua.ReadRequest) (*ua.ReadResponse, error) {
 
 	var res *ua.ReadResponse
 	err := c.Send(req, func(v interface{}) error {
-		return safeAssign(v, &res)
+		err := safeAssign(v, &res)
+
+		// If the client cannot decode an extension object then its
+		// value will be nil. However, since the EO was known to the
+		// server the StatusCode for that data value will be OK. We
+		// therefore check for extension objects with nil values and set
+		// the status code to StatusBadDataTypeIDUnknown.
+		if err == nil {
+			for _, dv := range res.Results {
+				val := dv.Value.Value()
+				fmt.Printf("read resp val: %#v\n", val)
+				if eo, ok := val.(*ua.ExtensionObject); ok && eo.Value == nil {
+					dv.Status = ua.StatusBadDataTypeIDUnknown
+				}
+			}
+		}
+
+		return err
 	})
 	return res, err
 }
