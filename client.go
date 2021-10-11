@@ -691,12 +691,15 @@ func (c *Client) ActivateSession(s *Session) error {
 		// save the nonce for the next request
 		s.serverNonce = res.ServerNonce
 
-		if err := c.CloseSession(); err != nil {
-			// try to close the newly created session but report
-			// only the initial error.
-			_ = c.closeSession(s)
-			return err
-		}
+		// close the previous session
+		//
+		// https://github.com/gopcua/opcua/issues/474
+		//
+		// We decided not to check the error of CloseSession() since we
+		// can't do much about it anyway and it creates a race in the
+		// re-connection logic.
+		c.CloseSession()
+
 		c.session.Store(s)
 		return nil
 	})
