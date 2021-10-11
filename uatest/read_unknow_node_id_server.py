@@ -31,8 +31,7 @@ if __name__ == "__main__":
     ns = server.register_namespace("http://gopcua.com/")
 
     complexNode = ua.StringNodeId("ComplexType", ns)
-    uatypes.register_extension_object(
-        'Complex', complexNode, Complex)
+    uatypes.register_extension_object('Complex', complexNode, Complex)
 
     # definitely not clear why this is needed, but without it does not work
     setattr(ua.ObjectIds, 'Complex', 'ComplexType')

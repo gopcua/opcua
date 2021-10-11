@@ -1,3 +1,4 @@
+//go:build integration
 // +build integration
 
 package uatest
@@ -13,10 +14,7 @@ import (
 
 // TestRead performs an integration test to read values
 // from an OPC/UA server.
-func TestRead_UnknowNodeID(t *testing.T) {
-
-	unknownNodeId := ua.NewStringNodeID(2, "ComplexZero")
-
+func TestReadUnknowNodeID(t *testing.T) {
 	srv := NewServer("read_unknow_node_id_server.py")
 	defer srv.Close()
 
@@ -26,16 +24,30 @@ func TestRead_UnknowNodeID(t *testing.T) {
 	}
 	defer c.Close()
 
-	resp, err := c.Read(&ua.ReadRequest{NodesToRead: []*ua.ReadValueID{{NodeID: unknownNodeId}}})
+	// read node with unknown extension object
+	// This should be OK
+	nodeWithUnknownType := ua.NewStringNodeID(2, "ComplexZero")
+	resp, err := c.Read(&ua.ReadRequest{
+		NodesToRead: []*ua.ReadValueID{
+			{NodeID: nodeWithUnknownType},
+		},
+	})
 	if err != nil {
-		t.Error(err)
-	}
-	if resp.Results[0].Status == ua.StatusOK {
-		t.Errorf("got StatusOK for a node we don't know")
+		t.Fatal(err)
 	}
 
-	resp, err = c.Read(&ua.ReadRequest{NodesToRead: []*ua.ReadValueID{
-		{NodeID: ua.NewNumericNodeID(0, id.Server_ServerStatus_State), AttributeID: ua.AttributeIDValue}}})
+	if got, want := resp.Results[0].Status, ua.StatusBadDataTypeIDUnknown; got != want {
+		t.Errorf("got status %v want %v for a node with an unknown type", got, want)
+	}
+
+	// check that the connection is still usable by reading another node.
+	_, err = c.Read(&ua.ReadRequest{
+		NodesToRead: []*ua.ReadValueID{
+			{
+				NodeID: ua.NewNumericNodeID(0, id.Server_ServerStatus_State),
+			},
+		},
+	})
 	if err != nil {
 		t.Error(err)
 	}
