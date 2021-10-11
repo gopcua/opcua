@@ -26,7 +26,7 @@ func TestReadUnknowNodeID(t *testing.T) {
 
 	// read node with unknown extension object
 	// This should be OK
-	nodeWithUnknownType := ua.NewStringNodeID(2, "ComplexZero")
+	nodeWithUnknownType := ua.NewStringNodeID(2, "IntValZero")
 	resp, err := c.Read(&ua.ReadRequest{
 		NodesToRead: []*ua.ReadValueID{
 			{NodeID: nodeWithUnknownType},
