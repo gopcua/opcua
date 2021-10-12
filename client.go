@@ -811,6 +811,9 @@ func (c *Client) Read(req *ua.ReadRequest) (*ua.ReadResponse, error) {
 		// the status code to StatusBadDataTypeIDUnknown.
 		if err == nil {
 			for _, dv := range res.Results {
+				if dv.Value == nil {
+					continue
+				}
 				val := dv.Value.Value()
 				if eo, ok := val.(*ua.ExtensionObject); ok && eo.Value == nil {
 					dv.Status = ua.StatusBadDataTypeIDUnknown
