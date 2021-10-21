@@ -16,4 +16,7 @@ if __name__ == "__main__":
     rwInt32 = main.add_variable(ua.NodeId("rw_int32", ns), "rw_int32", 5, ua.VariantType.Int32)
     rwInt32.set_writable()
 
+    roArrayInt32 = main.add_variable(ua.NodeId("array_int32", ns), "array_int32", [1,2,3], ua.VariantType.Int32)
+    ro2DArrayInt32 = main.add_variable(ua.NodeId("2d_array_int32", ns), "2d_array_int32", [[1],[2],[3]], ua.VariantType.Int32)
+
     server.start()
