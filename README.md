@@ -58,7 +58,7 @@ The `gopcua` project is sponsored by the following organizations by supporting t
       </td>
       <td width="33%">
         <a href="https://www.intelecy.com/">
-          <img alt="Intelecy AS" src="https://raw.githubusercontent.com/gopcua/opcua/add-logo/logo/intelecy.png">
+          <img alt="Intelecy AS" src="https://raw.githubusercontent.com/gopcua/opcua/main/logo/intelecy.png">
         </a>
       </td>
    </tr>
