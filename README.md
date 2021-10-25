@@ -44,14 +44,25 @@ go run examples/crypto/*.go -endpoint opc.tcp://localhost:4840 -cert path/to/cer
 
 The `gopcua` project is sponsored by the following organizations by supporting the active committers to the project:
 
-<p align="center">
-  <a href="https://northvolt.com/">
-    <img alt="Northvolt" width="50%" src="https://raw.githubusercontent.com/gopcua/opcua/master/logo/northvolt.png">
-  </a>
-  <a href="https://www.evosoft.com/">
-    <img alt="evosoft" width="40%" src="https://raw.githubusercontent.com/gopcua/opcua/master/logo/evosoft.png">
-  </a>
-</p>
+<table border="0">
+   <tr valign="middle">
+      <td width="33%">
+        <a href="https://northvolt.com/">
+          <img alt="Northvolt" src="https://raw.githubusercontent.com/gopcua/opcua/main/logo/northvolt.png">
+        </a>
+      </td>
+      <td width="34%">
+        <a href="https://www.evosoft.com/">
+          <img alt="evosoft" src="https://raw.githubusercontent.com/gopcua/opcua/main/logo/evosoft.png">
+        </a>
+      </td>
+      <td width="33%">
+        <a href="https://www.intelecy.com/">
+          <img alt="Intelecy AS" src="https://raw.githubusercontent.com/gopcua/opcua/add-logo/logo/intelecy.png">
+        </a>
+      </td>
+   </tr>
+</table>
 
 ### Users
 
