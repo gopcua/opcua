@@ -88,18 +88,20 @@ func (s *Subscription) delete() error {
 	req := &ua.DeleteSubscriptionsRequest{
 		SubscriptionIDs: []uint32{s.SubscriptionID},
 	}
+
 	var res *ua.DeleteSubscriptionsResponse
 	err := s.c.Send(req, func(v interface{}) error {
 		return safeAssign(v, &res)
 	})
+
 	switch {
-	case err == ua.StatusOK:
-		s.items = make(map[uint32]*monitoredItem)
-		return nil
 	case err != nil:
 		return err
+	case res.Results[0] == ua.StatusOK:
+		s.items = make(map[uint32]*monitoredItem)
+		return nil
 	default:
-		return res.ResponseHeader.ServiceResult
+		return res.Results[0]
 	}
 }
 
