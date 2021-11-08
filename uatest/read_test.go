@@ -1,3 +1,4 @@
+//go:build integration
 // +build integration
 
 package uatest
@@ -22,6 +23,8 @@ func TestRead(t *testing.T) {
 		{ua.NewStringNodeID(2, "rw_bool"), true},
 		{ua.NewStringNodeID(2, "ro_int32"), int32(5)},
 		{ua.NewStringNodeID(2, "rw_int32"), int32(5)},
+		{ua.NewStringNodeID(2, "array_int32"), []int32{1, 2, 3}},
+		{ua.NewStringNodeID(2, "2d_array_int32"), [][]int32{{1}, {2}, {3}}},
 	}
 
 	srv := NewServer("rw_server.py")
