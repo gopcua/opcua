@@ -33,11 +33,12 @@ type channelInstance struct {
 	securityTokenID uint32
 	sequenceNumber  uint32
 	algo            *uapolicy.EncryptionAlgorithm
+	maxBodySize     uint32
 
-	messagesSent uint32
-	// messagesReceived uint32
-	bytesSent uint64
+	bytesSent uint64 // atomic.Load/Store - needs to be aligned for 32bit systems
 	// bytesReceived    uint64
+	messagesSent uint32 // atomic.Load/Store
+	// messagesReceived uint32
 }
 
 func newChannelInstance(sc *SecureChannel) *channelInstance {
@@ -128,6 +129,23 @@ func (c *channelInstance) newMessage(srv interface{}, typeID uint16, requestID u
 			Service: srv,
 		}
 	}
+}
+
+func (c *channelInstance) SetMaximumBodySize(chunkSize int) {
+	sequenceHeaderSize := 8
+	headerSize := 12
+	symmetricAlgorithmHeader := 4
+
+	// this is the formula proposed by OPCUA - source node-opcua
+	maxBodySize :=
+		c.algo.PlaintextBlockSize()*
+			((chunkSize-headerSize-symmetricAlgorithmHeader-c.algo.SignatureLength()-1)/c.algo.BlockSize()) -
+			sequenceHeaderSize
+	c.maxBodySize = uint32(maxBodySize)
+
+	// this is the formula proposed by ERN - source node-opcua
+	// maxBlock := (chunkSize - headerSize) / c.algo.BlockSize()
+	// c.maxBodySize = c.algo.PlaintextBlockSize()*maxBlock - sequenceHeaderSize - c.algo.SignatureLength() - 1
 }
 
 // signAndEncrypt encrypts the message bytes stored in b and returns the

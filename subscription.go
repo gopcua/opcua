@@ -29,7 +29,7 @@ type Subscription struct {
 	RevisedMaxKeepAliveCount  uint32
 	Notifs                    chan *PublishNotificationData
 	params                    *SubscriptionParameters
-	items                     []*monitoredItem
+	items                     map[uint32]*monitoredItem
 	lastSeq                   uint32
 	nextSeq                   uint32
 	c                         *Client
@@ -44,11 +44,9 @@ type SubscriptionParameters struct {
 }
 
 type monitoredItem struct {
-	ItemToMonitor        *ua.ReadValueID
-	MonitoringParameters *ua.MonitoringParameters
-	MonitoringMode       ua.MonitoringMode
-	TimestampsToReturn   ua.TimestampsToReturn
-	createResult         *ua.MonitoredItemCreateResult
+	item *ua.MonitoredItemCreateRequest
+	res  *ua.MonitoredItemCreateResult
+	ts   ua.TimestampsToReturn
 }
 
 func NewMonitoredItemCreateRequestWithDefaults(nodeID *ua.NodeID, attributeID ua.AttributeID, clientHandle uint32) *ua.MonitoredItemCreateRequest {
@@ -96,6 +94,7 @@ func (s *Subscription) delete() error {
 	})
 	switch {
 	case err == ua.StatusOK:
+		s.items = make(map[uint32]*monitoredItem)
 		return nil
 	case err != nil:
 		return err
@@ -128,17 +127,15 @@ func (s *Subscription) Monitor(ts ua.TimestampsToReturn, items ...*ua.MonitoredI
 	}
 
 	// store monitored items
+	// todo(fs): should we guard this with a lock?
 	for i, item := range items {
 		result := res.Results[i]
 
-		mi := &monitoredItem{
-			ItemToMonitor:        item.ItemToMonitor,
-			MonitoringParameters: item.RequestedParameters,
-			MonitoringMode:       item.MonitoringMode,
-			TimestampsToReturn:   ts,
-			createResult:         result,
+		s.items[result.MonitoredItemID] = &monitoredItem{
+			item: item,
+			res:  result,
+			ts:   ts,
 		}
-		s.items = append(s.items, mi)
 	}
 
 	return res, err
@@ -149,10 +146,20 @@ func (s *Subscription) Unmonitor(monitoredItemIDs ...uint32) (*ua.DeleteMonitore
 		MonitoredItemIDs: monitoredItemIDs,
 		SubscriptionID:   s.SubscriptionID,
 	}
+
 	var res *ua.DeleteMonitoredItemsResponse
 	err := s.c.Send(req, func(v interface{}) error {
 		return safeAssign(v, &res)
 	})
+
+	if err == nil {
+		// remove monitored items
+		// todo(fs): should we guard this with a lock?
+		for _, id := range monitoredItemIDs {
+			delete(s.items, id)
+		}
+	}
+
 	return res, err
 }
 
@@ -298,17 +305,13 @@ func (s *Subscription) recreate() error {
 	dlog.Printf("subscription registered")
 
 	// Sort by timestamp to return
-	itemsByTs := make(map[ua.TimestampsToReturn][]*ua.MonitoredItemCreateRequest)
-	for _, m := range s.items {
-		cr := &ua.MonitoredItemCreateRequest{
-			ItemToMonitor:       m.ItemToMonitor,
-			MonitoringMode:      m.MonitoringMode,
-			RequestedParameters: m.MonitoringParameters,
-		}
-		itemsByTs[m.TimestampsToReturn] = append(itemsByTs[m.TimestampsToReturn], cr)
+	itemsByTimestamps := make(map[ua.TimestampsToReturn][]*ua.MonitoredItemCreateRequest)
+	for _, mi := range s.items {
+		itemsByTimestamps[mi.ts] = append(itemsByTimestamps[mi.ts], mi.item)
 	}
 
-	for ts, items := range itemsByTs {
+	s.items = make(map[uint32]*monitoredItem, len(s.items))
+	for ts, items := range itemsByTimestamps {
 		req := &ua.CreateMonitoredItemsRequest{
 			SubscriptionID:     s.SubscriptionID,
 			TimestampsToReturn: ts,
@@ -329,8 +332,12 @@ func (s *Subscription) recreate() error {
 			}
 		}
 
-		for i, m := range s.items {
-			m.createResult = res.Results[i]
+		for i, item := range items {
+			s.items[res.Results[i].MonitoredItemID] = &monitoredItem{
+				item: item,
+				res:  res.Results[i],
+				ts:   ts,
+			}
 		}
 	}
 	dlog.Printf("subscription successfully recreated")

@@ -691,12 +691,15 @@ func (c *Client) ActivateSession(s *Session) error {
 		// save the nonce for the next request
 		s.serverNonce = res.ServerNonce
 
-		if err := c.CloseSession(); err != nil {
-			// try to close the newly created session but report
-			// only the initial error.
-			_ = c.closeSession(s)
-			return err
-		}
+		// close the previous session
+		//
+		// https://github.com/gopcua/opcua/issues/474
+		//
+		// We decided not to check the error of CloseSession() since we
+		// can't do much about it anyway and it creates a race in the
+		// re-connection logic.
+		c.CloseSession()
+
 		c.session.Store(s)
 		return nil
 	})
@@ -799,7 +802,26 @@ func (c *Client) Read(req *ua.ReadRequest) (*ua.ReadResponse, error) {
 
 	var res *ua.ReadResponse
 	err := c.Send(req, func(v interface{}) error {
-		return safeAssign(v, &res)
+		err := safeAssign(v, &res)
+
+		// If the client cannot decode an extension object then its
+		// value will be nil. However, since the EO was known to the
+		// server the StatusCode for that data value will be OK. We
+		// therefore check for extension objects with nil values and set
+		// the status code to StatusBadDataTypeIDUnknown.
+		if err == nil {
+			for _, dv := range res.Results {
+				if dv.Value == nil {
+					continue
+				}
+				val := dv.Value.Value()
+				if eo, ok := val.(*ua.ExtensionObject); ok && eo.Value == nil {
+					dv.Status = ua.StatusBadDataTypeIDUnknown
+				}
+			}
+		}
+
+		return err
 	})
 	return res, err
 }
