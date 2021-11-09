@@ -125,6 +125,9 @@ func x509Cert(c, k []byte) tls.Certificate {
 }
 
 func TestOptions(t *testing.T) {
+	randomRequestID = func() uint32 { return 125 }
+	defer func() { randomRequestID = nil }()
+
 	d, err := ioutil.TempDir("", "gopcua")
 	if err != nil {
 		t.Fatal(err)
@@ -231,6 +234,17 @@ func TestOptions(t *testing.T) {
 			},
 		},
 		{
+			name: `AutoReconnect()`,
+			opt:  AutoReconnect(true),
+			cfg: &Config{
+				sechan: func() *uasc.Config {
+					c := DefaultClientConfig()
+					c.AutoReconnect = true
+					return c
+				}(),
+			},
+		},
+		{
 			name: `Certificate`,
 			opt:  Certificate(certDER),
 			cfg: &Config{
@@ -332,6 +346,28 @@ func TestOptions(t *testing.T) {
 					sc := DefaultSessionConfig()
 					sc.ClientDescription.ProductURI = "a"
 					return sc
+				}(),
+			},
+		},
+		{
+			name: `RandomRequestID()`,
+			opt:  RandomRequestID(),
+			cfg: &Config{
+				sechan: func() *uasc.Config {
+					c := DefaultClientConfig()
+					c.RequestIDSeed = 125
+					return c
+				}(),
+			},
+		},
+		{
+			name: `ReconnectInterval()`,
+			opt:  ReconnectInterval(5 * time.Second),
+			cfg: &Config{
+				sechan: func() *uasc.Config {
+					c := DefaultClientConfig()
+					c.ReconnectInterval = 5 * time.Second
+					return c
 				}(),
 			},
 		},
@@ -603,6 +639,17 @@ func TestOptions(t *testing.T) {
 					c := DefaultClientConfig()
 					c.SecurityPolicyURI = ua.SecurityPolicyURIAes256Sha256RsaPss
 					return c
+				}(),
+			},
+		},
+		{
+			name: `SessionName()`,
+			opt:  SessionName("a"),
+			cfg: &Config{
+				session: func() *uasc.SessionConfig {
+					sc := DefaultSessionConfig()
+					sc.SessionName = "a"
+					return sc
 				}(),
 			},
 		},

@@ -131,10 +131,21 @@ func ProductURI(s string) Option {
 	}
 }
 
+// stubbed out for testing
+var randomRequestID func() uint32 = nil
+
 // RandomRequestID assigns a random initial request id.
+//
+// The request id is generated using the 'rand' package and it
+// is the caller's responsibility to initialize the random number
+// generator properly.
 func RandomRequestID() Option {
 	return func(cfg *Config) {
-		cfg.sechan.RequestIDSeed = uint32(rand.Int31())
+		if randomRequestID != nil {
+			cfg.sechan.RequestIDSeed = randomRequestID()
+		} else {
+			cfg.sechan.RequestIDSeed = uint32(rand.Int31())
+		}
 	}
 }
 
