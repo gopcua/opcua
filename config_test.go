@@ -5,12 +5,14 @@ import (
 	"crypto/tls"
 	"encoding/pem"
 	"io/ioutil"
+	"net"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/gopcua/opcua/ua"
+	"github.com/gopcua/opcua/uacp"
 	"github.com/gopcua/opcua/uapolicy"
 	"github.com/gopcua/opcua/uasc"
 
@@ -612,6 +614,68 @@ func TestOptions(t *testing.T) {
 					sc := DefaultSessionConfig()
 					sc.SessionTimeout = 5 * time.Second
 					return sc
+				}(),
+			},
+		},
+		{
+			name: `Dialer()`,
+			opt:  Dialer(&uacp.Dialer{}),
+			cfg: &Config{
+				dialer: &uacp.Dialer{},
+			},
+		},
+		{
+			name: `DialTimeout(5s)`,
+			opt:  DialTimeout(5 * time.Second),
+			cfg: &Config{
+				dialer: &uacp.Dialer{
+					Dialer: &net.Dialer{
+						Timeout: 5 * time.Second,
+					},
+				},
+			},
+		},
+		{
+			name: `MaxMessageSize()`,
+			opt:  MaxMessageSize(5),
+			cfg: &Config{
+				dialer: func() *uacp.Dialer {
+					d := &uacp.Dialer{ClientACK: uacp.DefaultClientACK}
+					d.ClientACK.MaxMessageSize = 5
+					return d
+				}(),
+			},
+		},
+		{
+			name: `MaxChunkCount()`,
+			opt:  MaxChunkCount(5),
+			cfg: &Config{
+				dialer: func() *uacp.Dialer {
+					d := &uacp.Dialer{ClientACK: uacp.DefaultClientACK}
+					d.ClientACK.MaxChunkCount = 5
+					return d
+				}(),
+			},
+		},
+		{
+			name: `ReceiveBufferSize()`,
+			opt:  ReceiveBufferSize(5),
+			cfg: &Config{
+				dialer: func() *uacp.Dialer {
+					d := &uacp.Dialer{ClientACK: uacp.DefaultClientACK}
+					d.ClientACK.ReceiveBufSize = 5
+					return d
+				}(),
+			},
+		},
+		{
+			name: `SendBufferSize()`,
+			opt:  SendBufferSize(5),
+			cfg: &Config{
+				dialer: func() *uacp.Dialer {
+					d := &uacp.Dialer{ClientACK: uacp.DefaultClientACK}
+					d.ClientACK.SendBufSize = 5
+					return d
 				}(),
 			},
 		},
