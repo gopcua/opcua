@@ -1,18 +1,19 @@
 <p align="center">
-   <img width="50%" src="https://raw.githubusercontent.com/gopcua/opcua/master/gopher.png">
+   <img width="25%" src="https://raw.githubusercontent.com/gopcua/opcua/master/gopher.png">
 </p>
 
 <p align="center">
-  Artwork by <a href="https://twitter.com/ashleymcnamara">Ashley McNamara</a> -
-  Inspired by <a href="http://reneefrench.blogspot.co.uk/">Renee French</a> -
+  Artwork by <a href="https://twitter.com/ashleymcnamara">Ashley McNamara</a><br/>
+  Inspired by <a href="http://reneefrench.blogspot.co.uk/">Renee French</a><br/>
   Taken from <a href="https://gopherize.me">https://gopherize.me</a> by <a href="https://twitter.com/matryer">Mat Ryer</a>
 </p>
 
-<h1 align="center">OPCUA</h1>
+<h1 align="center">OPC/UA</h1>
 
 A native Go implementation of the OPC/UA Binary Protocol.
 
-You need go1.13 or higher. We test with the current and previous Go version.
+You need go1.13 or higher. We test with the current and previous Go version. 
+See below for a list of [Tested Platforms](#tested-platforms) and [Supported Features](#supported-features).
 
 [![GitHub](https://github.com/gopcua/opcua/workflows/gopuca/badge.svg)](https://github.com/gopcua/opcua/actions)
 [![GoDoc](https://godoc.org/github.com/gopcua/opcua?status.svg)](https://godoc.org/github.com/gopcua/opcua)
@@ -71,7 +72,7 @@ We would also like to list organizations which use `gopcua` in production. Pleas
    <a href="https://strateos.com">
       <img alt="strtaeos" width="10%" src="https://avatars1.githubusercontent.com/u/50255519?s=400&u=3c18028de0bd1a28b604d34d6b239d7a593a7e49&v=4">
    </a>
-   </p>
+</p>
 
 ## Disclaimer
 
@@ -97,34 +98,42 @@ If you are looking for ways to contribute you can
 
 Also, if the library is already useful please spread the word as a motivation.
 
-## Authors
+## Tested Platforms
 
-The [Gopcua Team](https://github.com/gopcua/opcua/graphs/contributors).
+`gopcua` is run in production by several companies and with different equipment. 
+The table below is an incomplete list of where and how `gopcua` is used to provide
+some guidance on the level of testing.
 
-If you need to get in touch with us directly you may find us on [Keybase.io](https://keybase.io)
-but try to create an issue first.
+We would be happy if you can add your equipment to the list. Just open a PR :)
+
+| Device                      | gopcua version    | Environment | By           |
+|-----------------------------|-------------------|-------------|--------------|
+| Siemens S7-1500             | v0.1.x, v0.2.x    | production  | Northvolt    |
+| Beckhoff                    | v0.1.x, v0.2.x    | production  | Northvolt    |
+| Kepware 6.x                 | v0.1.x, v0.2.x    | production  | Northvolt    |
+| InfluxDB plugin             | v0.2.x            | ?           | Community    |
 
 ## Supported Features
 
 The current focus is on the OPC UA Binary protocol over TCP. No other protocols are supported at this point.
 
-| Categories     | Features                         | Supported | Notes |
-|----------------|----------------------------------|-----------|-------|
-| Encoding       | OPC UA Binary                    | Yes       |       |
+| Categories     | Features                         | Supported | Notes       |
+|----------------|----------------------------------|-----------|-------------|
+| Encoding       | OPC UA Binary                    | Yes       |             |
 |                | OPC UA JSON                      |           | not planned |
 |                | OPC UA XML                       |           | not planned |
-| Transport      | UA-TCP UA-SC UA Binary           | Yes       |       |
+| Transport      | UA-TCP UA-SC UA Binary           | Yes       |             |
 |                | OPC UA HTTPS                     |           | not planned |
 |                | SOAP-HTTP WS-SC UA Binary        |           | not planned |
 |                | SOAP-HTTP WS-SC UA XML           |           | not planned |
 |                | SOAP-HTTP WS-SC UA XML-UA Binary |           | not planned |
-| Encryption     | None                             | Yes       |       |
-|                | Basic128Rsa15                    | Yes       |       |
-|                | Basic256                         | Yes       |       |
-|                | Basic256Sha256                   | Yes       |       |
-| Authentication | Anonymous                        | Yes       |       |
-|                | User Name Password               | Yes       |       |
-|                | X509 Certificate                 | Yes       |       |
+| Encryption     | None                             | Yes       |             |
+|                | Basic128Rsa15                    | Yes       |             |
+|                | Basic256                         | Yes       |             |
+|                | Basic256Sha256                   | Yes       |             |
+| Authentication | Anonymous                        | Yes       |             |
+|                | User Name Password               | Yes       |             |
+|                | X509 Certificate                 | Yes       |             |
 
 ### Services
 
@@ -171,6 +180,13 @@ The current set of supported services is only for the high-level client.
 |                             | Republish                     |           |              |
 |                             | DeleteSubscriptions           | Yes       |              |
 |                             | TransferSubscriptions         |           |              |
+
+## Authors
+
+The [Gopcua Team](https://github.com/gopcua/opcua/graphs/contributors).
+
+If you need to get in touch with us directly you may find us on [Keybase.io](https://keybase.io)
+but try to create an issue first.
 
 ## License
 
