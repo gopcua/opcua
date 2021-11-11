@@ -666,9 +666,25 @@ func TestOptions(t *testing.T) {
 		},
 		{
 			name: `Dialer()`,
-			opt:  Dialer(&uacp.Dialer{}),
+			opt: Dialer(&uacp.Dialer{
+				Dialer: &net.Dialer{Timeout: 3 * time.Second},
+				ClientACK: &uacp.Acknowledge{
+					MaxMessageSize: 1,
+					MaxChunkCount:  2,
+					SendBufSize:    3,
+					ReceiveBufSize: 4,
+				},
+			}),
 			cfg: &Config{
-				dialer: &uacp.Dialer{},
+				dialer: &uacp.Dialer{
+					Dialer: &net.Dialer{Timeout: 3 * time.Second},
+					ClientACK: &uacp.Acknowledge{
+						MaxMessageSize: 1,
+						MaxChunkCount:  2,
+						SendBufSize:    3,
+						ReceiveBufSize: 4,
+					},
+				},
 			},
 		},
 		{
@@ -676,9 +692,8 @@ func TestOptions(t *testing.T) {
 			opt:  DialTimeout(5 * time.Second),
 			cfg: &Config{
 				dialer: &uacp.Dialer{
-					Dialer: &net.Dialer{
-						Timeout: 5 * time.Second,
-					},
+					Dialer:    &net.Dialer{Timeout: 5 * time.Second},
+					ClientACK: uacp.DefaultClientACK,
 				},
 			},
 		},
@@ -687,7 +702,10 @@ func TestOptions(t *testing.T) {
 			opt:  MaxMessageSize(5),
 			cfg: &Config{
 				dialer: func() *uacp.Dialer {
-					d := &uacp.Dialer{ClientACK: uacp.DefaultClientACK}
+					d := &uacp.Dialer{
+						Dialer:    &net.Dialer{},
+						ClientACK: uacp.DefaultClientACK,
+					}
 					d.ClientACK.MaxMessageSize = 5
 					return d
 				}(),
@@ -698,7 +716,10 @@ func TestOptions(t *testing.T) {
 			opt:  MaxChunkCount(5),
 			cfg: &Config{
 				dialer: func() *uacp.Dialer {
-					d := &uacp.Dialer{ClientACK: uacp.DefaultClientACK}
+					d := &uacp.Dialer{
+						Dialer:    &net.Dialer{},
+						ClientACK: uacp.DefaultClientACK,
+					}
 					d.ClientACK.MaxChunkCount = 5
 					return d
 				}(),
@@ -709,7 +730,10 @@ func TestOptions(t *testing.T) {
 			opt:  ReceiveBufferSize(5),
 			cfg: &Config{
 				dialer: func() *uacp.Dialer {
-					d := &uacp.Dialer{ClientACK: uacp.DefaultClientACK}
+					d := &uacp.Dialer{
+						Dialer:    &net.Dialer{},
+						ClientACK: uacp.DefaultClientACK,
+					}
 					d.ClientACK.ReceiveBufSize = 5
 					return d
 				}(),
@@ -720,7 +744,10 @@ func TestOptions(t *testing.T) {
 			opt:  SendBufferSize(5),
 			cfg: &Config{
 				dialer: func() *uacp.Dialer {
-					d := &uacp.Dialer{ClientACK: uacp.DefaultClientACK}
+					d := &uacp.Dialer{
+						Dialer:    &net.Dialer{},
+						ClientACK: uacp.DefaultClientACK,
+					}
 					d.ClientACK.SendBufSize = 5
 					return d
 				}(),

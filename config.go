@@ -466,6 +466,7 @@ func RequestTimeout(t time.Duration) Option {
 // Dialer sets the uacp.Dialer to establish the connection to the server.
 func Dialer(d *uacp.Dialer) Option {
 	return func(cfg *Config) {
+		initDialer(cfg)
 		cfg.dialer = d
 	}
 }
@@ -474,12 +475,7 @@ func Dialer(d *uacp.Dialer) Option {
 // Defaults to DefaultDialTimeout. Set to zero for no timeout.
 func DialTimeout(d time.Duration) Option {
 	return func(cfg *Config) {
-		if cfg.dialer == nil {
-			cfg.dialer = &uacp.Dialer{}
-		}
-		if cfg.dialer.Dialer == nil {
-			cfg.dialer.Dialer = &net.Dialer{}
-		}
+		initDialer(cfg)
 		cfg.dialer.Dialer.Timeout = d
 	}
 }
@@ -487,12 +483,7 @@ func DialTimeout(d time.Duration) Option {
 // MaxMessageSize sets the maximum message size for the UACP handshake.
 func MaxMessageSize(n uint32) Option {
 	return func(cfg *Config) {
-		if cfg.dialer == nil {
-			cfg.dialer = &uacp.Dialer{}
-		}
-		if cfg.dialer.ClientACK == nil {
-			cfg.dialer.ClientACK = uacp.DefaultClientACK
-		}
+		initDialer(cfg)
 		cfg.dialer.ClientACK.MaxMessageSize = n
 	}
 }
@@ -500,12 +491,7 @@ func MaxMessageSize(n uint32) Option {
 // MaxChunkCount sets the maximum chunk count for the UACP handshake.
 func MaxChunkCount(n uint32) Option {
 	return func(cfg *Config) {
-		if cfg.dialer == nil {
-			cfg.dialer = &uacp.Dialer{}
-		}
-		if cfg.dialer.ClientACK == nil {
-			cfg.dialer.ClientACK = uacp.DefaultClientACK
-		}
+		initDialer(cfg)
 		cfg.dialer.ClientACK.MaxChunkCount = n
 	}
 }
@@ -513,12 +499,7 @@ func MaxChunkCount(n uint32) Option {
 // ReceiveBufferSize sets the receive buffer size for the UACP handshake.
 func ReceiveBufferSize(n uint32) Option {
 	return func(cfg *Config) {
-		if cfg.dialer == nil {
-			cfg.dialer = &uacp.Dialer{}
-		}
-		if cfg.dialer.ClientACK == nil {
-			cfg.dialer.ClientACK = uacp.DefaultClientACK
-		}
+		initDialer(cfg)
 		cfg.dialer.ClientACK.ReceiveBufSize = n
 	}
 }
@@ -526,12 +507,19 @@ func ReceiveBufferSize(n uint32) Option {
 // SendBufferSize sets the send buffer size for the UACP handshake.
 func SendBufferSize(n uint32) Option {
 	return func(cfg *Config) {
-		if cfg.dialer == nil {
-			cfg.dialer = &uacp.Dialer{}
-		}
-		if cfg.dialer.ClientACK == nil {
-			cfg.dialer.ClientACK = uacp.DefaultClientACK
-		}
+		initDialer(cfg)
 		cfg.dialer.ClientACK.SendBufSize = n
+	}
+}
+
+func initDialer(cfg *Config) {
+	if cfg.dialer == nil {
+		cfg.dialer = &uacp.Dialer{}
+	}
+	if cfg.dialer.Dialer == nil {
+		cfg.dialer.Dialer = &net.Dialer{}
+	}
+	if cfg.dialer.ClientACK == nil {
+		cfg.dialer.ClientACK = uacp.DefaultClientACK
 	}
 }
