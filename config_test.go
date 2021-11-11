@@ -5,12 +5,14 @@ import (
 	"crypto/tls"
 	"encoding/pem"
 	"io/ioutil"
+	"net"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/gopcua/opcua/ua"
+	"github.com/gopcua/opcua/uacp"
 	"github.com/gopcua/opcua/uapolicy"
 	"github.com/gopcua/opcua/uasc"
 
@@ -123,6 +125,9 @@ func x509Cert(c, k []byte) tls.Certificate {
 }
 
 func TestOptions(t *testing.T) {
+	randomRequestID = func() uint32 { return 125 }
+	defer func() { randomRequestID = nil }()
+
 	d, err := ioutil.TempDir("", "gopcua")
 	if err != nil {
 		t.Fatal(err)
@@ -229,6 +234,17 @@ func TestOptions(t *testing.T) {
 			},
 		},
 		{
+			name: `AutoReconnect()`,
+			opt:  AutoReconnect(true),
+			cfg: &Config{
+				sechan: func() *uasc.Config {
+					c := DefaultClientConfig()
+					c.AutoReconnect = true
+					return c
+				}(),
+			},
+		},
+		{
 			name: `Certificate`,
 			opt:  Certificate(certDER),
 			cfg: &Config{
@@ -330,6 +346,28 @@ func TestOptions(t *testing.T) {
 					sc := DefaultSessionConfig()
 					sc.ClientDescription.ProductURI = "a"
 					return sc
+				}(),
+			},
+		},
+		{
+			name: `RandomRequestID()`,
+			opt:  RandomRequestID(),
+			cfg: &Config{
+				sechan: func() *uasc.Config {
+					c := DefaultClientConfig()
+					c.RequestIDSeed = 125
+					return c
+				}(),
+			},
+		},
+		{
+			name: `ReconnectInterval()`,
+			opt:  ReconnectInterval(5 * time.Second),
+			cfg: &Config{
+				sechan: func() *uasc.Config {
+					c := DefaultClientConfig()
+					c.ReconnectInterval = 5 * time.Second
+					return c
 				}(),
 			},
 		},
@@ -605,6 +643,17 @@ func TestOptions(t *testing.T) {
 			},
 		},
 		{
+			name: `SessionName()`,
+			opt:  SessionName("a"),
+			cfg: &Config{
+				session: func() *uasc.SessionConfig {
+					sc := DefaultSessionConfig()
+					sc.SessionName = "a"
+					return sc
+				}(),
+			},
+		},
+		{
 			name: `SessionTimeout(5s)`,
 			opt:  SessionTimeout(5 * time.Second),
 			cfg: &Config{
@@ -612,6 +661,95 @@ func TestOptions(t *testing.T) {
 					sc := DefaultSessionConfig()
 					sc.SessionTimeout = 5 * time.Second
 					return sc
+				}(),
+			},
+		},
+		{
+			name: `Dialer()`,
+			opt: Dialer(&uacp.Dialer{
+				Dialer: &net.Dialer{Timeout: 3 * time.Second},
+				ClientACK: &uacp.Acknowledge{
+					MaxMessageSize: 1,
+					MaxChunkCount:  2,
+					SendBufSize:    3,
+					ReceiveBufSize: 4,
+				},
+			}),
+			cfg: &Config{
+				dialer: &uacp.Dialer{
+					Dialer: &net.Dialer{Timeout: 3 * time.Second},
+					ClientACK: &uacp.Acknowledge{
+						MaxMessageSize: 1,
+						MaxChunkCount:  2,
+						SendBufSize:    3,
+						ReceiveBufSize: 4,
+					},
+				},
+			},
+		},
+		{
+			name: `DialTimeout(5s)`,
+			opt:  DialTimeout(5 * time.Second),
+			cfg: &Config{
+				dialer: &uacp.Dialer{
+					Dialer:    &net.Dialer{Timeout: 5 * time.Second},
+					ClientACK: uacp.DefaultClientACK,
+				},
+			},
+		},
+		{
+			name: `MaxMessageSize()`,
+			opt:  MaxMessageSize(5),
+			cfg: &Config{
+				dialer: func() *uacp.Dialer {
+					d := &uacp.Dialer{
+						Dialer:    &net.Dialer{},
+						ClientACK: uacp.DefaultClientACK,
+					}
+					d.ClientACK.MaxMessageSize = 5
+					return d
+				}(),
+			},
+		},
+		{
+			name: `MaxChunkCount()`,
+			opt:  MaxChunkCount(5),
+			cfg: &Config{
+				dialer: func() *uacp.Dialer {
+					d := &uacp.Dialer{
+						Dialer:    &net.Dialer{},
+						ClientACK: uacp.DefaultClientACK,
+					}
+					d.ClientACK.MaxChunkCount = 5
+					return d
+				}(),
+			},
+		},
+		{
+			name: `ReceiveBufferSize()`,
+			opt:  ReceiveBufferSize(5),
+			cfg: &Config{
+				dialer: func() *uacp.Dialer {
+					d := &uacp.Dialer{
+						Dialer:    &net.Dialer{},
+						ClientACK: uacp.DefaultClientACK,
+					}
+					d.ClientACK.ReceiveBufSize = 5
+					return d
+				}(),
+			},
+		},
+		{
+			name: `SendBufferSize()`,
+			opt:  SendBufferSize(5),
+			cfg: &Config{
+				dialer: func() *uacp.Dialer {
+					d := &uacp.Dialer{
+						Dialer:    &net.Dialer{},
+						ClientACK: uacp.DefaultClientACK,
+					}
+					d.ClientACK.SendBufSize = 5
+					return d
 				}(),
 			},
 		},
