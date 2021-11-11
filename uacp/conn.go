@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"sync"
 	"sync/atomic"
 
 	"github.com/gopcua/opcua/debug"
@@ -144,7 +145,7 @@ func (l *Listener) Accept(ctx context.Context) (*Conn, error) {
 	if err != nil {
 		return nil, err
 	}
-	conn := &Conn{c, nextid(), l.ack}
+	conn := &Conn{TCPConn: c, id: nextid(), ack: l.ack}
 	if err := conn.srvhandshake(l.endpoint); err != nil {
 		c.Close()
 		return nil, err
@@ -171,6 +172,8 @@ type Conn struct {
 	*net.TCPConn
 	id  uint32
 	ack *Acknowledge
+
+	closeOnce sync.Once
 }
 
 func NewConn(c *net.TCPConn, ack *Acknowledge) (*Conn, error) {
@@ -203,7 +206,13 @@ func (c *Conn) MaxChunkCount() uint32 {
 	return c.ack.MaxChunkCount
 }
 
-func (c *Conn) Close() error {
+func (c *Conn) Close() (err error) {
+	err = io.EOF
+	c.closeOnce.Do(func() { err = c.close() })
+	return err
+}
+
+func (c *Conn) close() error {
 	debug.Printf("conn %d: close", c.id)
 	return c.TCPConn.Close()
 }

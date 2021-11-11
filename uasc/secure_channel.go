@@ -116,6 +116,8 @@ type SecureChannel struct {
 
 	// errorCh receive dispatcher errors
 	errCh chan<- error
+
+	closeOnce sync.Once
 }
 
 func NewSecureChannel(endpoint string, c *uacp.Conn, cfg *Config, errCh chan<- error) (*SecureChannel, error) {
@@ -819,7 +821,15 @@ func (s *SecureChannel) nextRequestID() uint32 {
 }
 
 // Close closes an existing secure channel
-func (s *SecureChannel) Close() error {
+func (s *SecureChannel) Close() (err error) {
+	// https://github.com/gopcua/opcua/pull/470
+	// guard against double close until we found the root cause
+	err = io.EOF
+	s.closeOnce.Do(func() { err = s.close() })
+	return
+}
+
+func (s *SecureChannel) close() error {
 	debug.Printf("uasc Close()")
 
 	defer func() {
