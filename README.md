@@ -109,7 +109,7 @@ We would be happy if you can add your equipment to the list. Just open a PR :)
 | Device                      | gopcua version    | Environment | By           |
 |-----------------------------|-------------------|-------------|--------------|
 | Siemens S7-1500             | v0.1.x, v0.2.x    | production  | Northvolt    |
-| Beckhoff                    | v0.1.x, v0.2.x    | production  | Northvolt    |
+| Beckhoff C6015-0010,C6030-0060 on OPC/UA server 4.3.x | v0.1.x, v0.2.x    | production  | Northvolt    |
 | Kepware 6.x                 | v0.1.x, v0.2.x    | production  | Northvolt    |
 | Kepware 6.x                 | v0.1.x            | production  | Intelecy     |
 | Cogent DataHub 9.x          | v0.1.x            | production  | Intelecy     |
