@@ -39,7 +39,7 @@ func main() {
 	req := &ua.ReadRequest{
 		MaxAge: 2000,
 		NodesToRead: []*ua.ReadValueID{
-			&ua.ReadValueID{NodeID: id},
+			{NodeID: id},
 		},
 		TimestampsToReturn: ua.TimestampsToReturnBoth,
 	}
