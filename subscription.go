@@ -122,12 +122,6 @@ func (s *Subscription) Monitor(ts ua.TimestampsToReturn, items ...*ua.MonitoredI
 		return nil, err
 	}
 
-	for _, result := range res.Results {
-		if status := result.StatusCode; status != ua.StatusOK {
-			return nil, status
-		}
-	}
-
 	// store monitored items
 	// todo(fs): should we guard this with a lock?
 	for i, item := range items {
