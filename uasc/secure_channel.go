@@ -574,15 +574,10 @@ func (s *SecureChannel) handleOpenSecureChannelResponse(resp *ua.OpenSecureChann
 	s.instancesMu.Lock()
 	defer s.instancesMu.Unlock()
 
-	if _, ok := s.instances[resp.SecurityToken.ChannelID]; ok {
-		// since there's already an existing entry for this SecureChannelID it means we are in a renewal
-		s.instances[resp.SecurityToken.ChannelID] = append(
-			s.instances[resp.SecurityToken.ChannelID],
-			s.openingInstance,
-		)
-	} else {
-		s.instances[resp.SecurityToken.ChannelID] = []*channelInstance{s.openingInstance}
-	}
+	s.instances[resp.SecurityToken.ChannelID] = append(
+		s.instances[resp.SecurityToken.ChannelID],
+		s.openingInstance,
+	)
 
 	s.activeInstance = instance
 
