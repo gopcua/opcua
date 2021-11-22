@@ -405,6 +405,12 @@ func (n *NodeID) Decode(b []byte) (int, error) {
 }
 
 func (n *NodeID) Encode() ([]byte, error) {
+	// https://github.com/gopcua/opcua/issues/506
+	// encode 'nil' node ids as two byte zero values
+	if n == nil {
+		return []byte{0, 0}, nil
+	}
+
 	buf := NewBuffer(nil)
 	buf.WriteByte(byte(n.mask))
 
