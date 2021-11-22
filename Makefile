@@ -3,6 +3,9 @@ all: test integration examples
 test:
 	go test -race ./...
 
+lint:
+	staticcheck ./...
+
 integration:
 	go test -race -v -tags=integration ./uatest/...
 
