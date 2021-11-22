@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/gopcua/opcua/errors"
+	"github.com/pascaldekloe/goe/verify"
 )
 
 func TestNodeID(t *testing.T) {
@@ -130,6 +131,15 @@ func BenchmarkReflectDecode(b *testing.B) {
 			b.Fatal(err)
 		}
 	}
+}
+
+func TestEncodeNilNodeID(t *testing.T) {
+	var n *NodeID
+	b, err := n.Encode()
+	if err != nil {
+		t.Fatalf("got error %v want %v", err, nil)
+	}
+	verify.Values(t, "", b, []byte{0, 0})
 }
 
 func TestParseNodeID(t *testing.T) {
