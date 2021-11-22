@@ -783,13 +783,7 @@ func (c *Client) GetEndpoints() (*ua.GetEndpointsResponse, error) {
 	return res, err
 }
 
-// Read executes a synchronous read request.
-//
-// By default, the function requests the value of the nodes
-// in the default encoding of the server.
-func (c *Client) Read(req *ua.ReadRequest) (*ua.ReadResponse, error) {
-	// clone the request and the ReadValueIDs to set defaults without
-	// manipulating them in-place.
+func cloneReadRequest(req *ua.ReadRequest) *ua.ReadRequest {
 	rvs := make([]*ua.ReadValueID, len(req.NodesToRead))
 	for i, rv := range req.NodesToRead {
 		rc := &ua.ReadValueID{}
@@ -802,11 +796,21 @@ func (c *Client) Read(req *ua.ReadRequest) (*ua.ReadResponse, error) {
 		}
 		rvs[i] = rc
 	}
-	req = &ua.ReadRequest{
+	return &ua.ReadRequest{
 		MaxAge:             req.MaxAge,
 		TimestampsToReturn: req.TimestampsToReturn,
 		NodesToRead:        rvs,
 	}
+}
+
+// Read executes a synchronous read request.
+//
+// By default, the function requests the value of the nodes
+// in the default encoding of the server.
+func (c *Client) Read(req *ua.ReadRequest) (*ua.ReadResponse, error) {
+	// clone the request and the ReadValueIDs to set defaults without
+	// manipulating them in-place.
+	req = cloneReadRequest(req)
 
 	var res *ua.ReadResponse
 	err := c.Send(req, func(v interface{}) error {
