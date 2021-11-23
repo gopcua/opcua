@@ -3,6 +3,7 @@ package opcua
 import (
 	"testing"
 
+	"github.com/gopcua/opcua/id"
 	"github.com/gopcua/opcua/ua"
 	"github.com/pascaldekloe/goe/verify"
 )
@@ -94,6 +95,87 @@ func TestCloneReadRequest(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := cloneReadRequest(tt.req)
+			verify.Values(t, "", got, tt.want)
+		})
+	}
+}
+
+func TestCloneBrowseRequest(t *testing.T) {
+	tests := []struct {
+		name      string
+		req, want *ua.BrowseRequest
+	}{
+		{
+			name: "empty",
+			req:  &ua.BrowseRequest{},
+			want: &ua.BrowseRequest{
+				View: &ua.ViewDescription{
+					ViewID: ua.NewTwoByteNodeID(0),
+				},
+				NodesToBrowse: []*ua.BrowseDescription{},
+			},
+		},
+		{
+			name: "view id missing",
+			req: &ua.BrowseRequest{
+				View: &ua.ViewDescription{},
+			},
+			want: &ua.BrowseRequest{
+				View: &ua.ViewDescription{
+					ViewID: ua.NewTwoByteNodeID(0),
+				},
+				NodesToBrowse: []*ua.BrowseDescription{},
+			},
+		},
+		{
+			name: "keep view id",
+			req: &ua.BrowseRequest{
+				View: &ua.ViewDescription{
+					ViewID: ua.NewTwoByteNodeID(1),
+				},
+			},
+			want: &ua.BrowseRequest{
+				View: &ua.ViewDescription{
+					ViewID: ua.NewTwoByteNodeID(1),
+				},
+				NodesToBrowse: []*ua.BrowseDescription{},
+			},
+		},
+		{
+			name: "set reference id",
+			req: &ua.BrowseRequest{
+				NodesToBrowse: []*ua.BrowseDescription{
+					{
+						NodeID:          ua.MustParseNodeID("i=85"),
+						BrowseDirection: ua.BrowseDirectionForward,
+						ReferenceTypeID: nil,
+						IncludeSubtypes: true,
+						NodeClassMask:   1,
+						ResultMask:      2,
+					},
+				},
+			},
+			want: &ua.BrowseRequest{
+				View: &ua.ViewDescription{
+					ViewID: ua.NewTwoByteNodeID(0),
+				},
+				NodesToBrowse: []*ua.BrowseDescription{
+					{
+						NodeID:          ua.MustParseNodeID("i=85"),
+						BrowseDirection: ua.BrowseDirectionForward,
+						ReferenceTypeID: ua.NewNumericNodeID(0, id.References),
+						IncludeSubtypes: true,
+						NodeClassMask:   1,
+						ResultMask:      2,
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := cloneBrowseRequest(tt.req)
 			verify.Values(t, "", got, tt.want)
 		})
 	}

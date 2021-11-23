@@ -847,8 +847,36 @@ func (c *Client) Write(req *ua.WriteRequest) (*ua.WriteResponse, error) {
 	return res, err
 }
 
+func cloneBrowseRequest(req *ua.BrowseRequest) *ua.BrowseRequest {
+	descs := make([]*ua.BrowseDescription, len(req.NodesToBrowse))
+	for i, d := range req.NodesToBrowse {
+		dc := &ua.BrowseDescription{}
+		*dc = *d
+		if dc.ReferenceTypeID == nil {
+			dc.ReferenceTypeID = ua.NewNumericNodeID(0, id.References)
+		}
+		descs[i] = dc
+	}
+	reqc := &ua.BrowseRequest{
+		View:                          req.View,
+		RequestedMaxReferencesPerNode: req.RequestedMaxReferencesPerNode,
+		NodesToBrowse:                 descs,
+	}
+	if reqc.View == nil {
+		reqc.View = &ua.ViewDescription{}
+	}
+	if reqc.View.ViewID == nil {
+		reqc.View.ViewID = ua.NewTwoByteNodeID(0)
+	}
+	return reqc
+}
+
 // Browse executes a synchronous browse request.
 func (c *Client) Browse(req *ua.BrowseRequest) (*ua.BrowseResponse, error) {
+	// clone the request and the NodesToBrowse to set defaults without
+	// manipulating them in-place.
+	req = cloneBrowseRequest(req)
+
 	var res *ua.BrowseResponse
 	err := c.Send(req, func(v interface{}) error {
 		return safeAssign(v, &res)
