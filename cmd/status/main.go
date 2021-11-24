@@ -109,10 +109,10 @@ type StatusCodeDesc struct {
 
 // StatusCodes maps status codes to the status code error types.
 var StatusCodes = map[StatusCode]StatusCodeDesc{
-	StatusOK: StatusCodeDesc{Name: "OK", Text: ""},
-	StatusUncertain: StatusCodeDesc{Name: "Uncertain", Text: ""},
-	StatusBad: StatusCodeDesc{Name: "Bad", Text: ""},
-	{{range .}}{{index . 0}}: StatusCodeDesc{ Name: "{{index . 0}}", Text: "{{index . 2}}" },
+	StatusOK: {Name: "OK", Text: ""},
+	StatusUncertain: {Name: "Uncertain", Text: ""},
+	StatusBad: {Name: "Bad", Text: ""},
+	{{range .}}{{index . 0}}: { Name: "{{index . 0}}", Text: "{{index . 2}}" },
 	{{end}}
 }
 `))
