@@ -698,6 +698,13 @@ func TestOptions(t *testing.T) {
 			},
 		},
 		{
+			name: `DisableUpdateNamespaceArrayOnConnect()`,
+			opt:  DisableUpdateNamespaceArrayOnConnect(),
+			cfg: &Config{
+				disableNamespaceUpdate: true,
+			},
+		},
+		{
 			name: `MaxMessageSize()`,
 			opt:  MaxMessageSize(5),
 			cfg: &Config{

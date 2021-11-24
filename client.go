@@ -126,6 +126,9 @@ type Client struct {
 	// state of the client
 	state atomic.Value // ConnState
 
+	// list of cached namespaces on the server
+	namespaces atomic.Value // []string
+
 	// monitorOnce ensures only one connection monitor is running
 	monitorOnce sync.Once
 
@@ -158,6 +161,7 @@ func NewClient(endpoint string, opts ...Option) *Client {
 	c.publishTimeout.Store(uasc.MaxTimeout)
 	c.pauseSubscriptions(context.Background())
 	c.state.Store(Closed)
+	c.namespaces.Store([]string{})
 	return &c
 }
 
@@ -185,13 +189,15 @@ func (c *Client) Connect(ctx context.Context) (err error) {
 	if err := c.Dial(ctx); err != nil {
 		return err
 	}
+
 	s, err := c.CreateSession(c.cfg.session)
 	if err != nil {
-		_ = c.Close()
+		c.Close()
 		return err
 	}
+
 	if err := c.ActivateSession(s); err != nil {
-		_ = c.Close()
+		c.Close()
 		return err
 	}
 	c.state.Store(Connected)
@@ -202,6 +208,13 @@ func (c *Client) Connect(ctx context.Context) (err error) {
 		go c.monitor(mctx)
 		go c.monitorSubscriptions(mctx)
 	})
+
+	if !c.cfg.disableNamespaceUpdate {
+		if err := c.UpdateNamespaces(); err != nil {
+			c.Close()
+			return err
+		}
+	}
 
 	return nil
 }
@@ -489,11 +502,16 @@ func (c *Client) Dial(ctx context.Context) error {
 
 	c.sechan, err = uasc.NewSecureChannel(c.endpointURL, c.conn, c.cfg.sechan, c.sechanErr)
 	if err != nil {
-		_ = c.conn.Close()
+		c.conn.Close()
 		return err
 	}
 
-	return c.sechan.Open(ctx)
+	if err := c.sechan.Open(ctx); err != nil {
+		c.conn.Close()
+		return err
+	}
+
+	return nil
 }
 
 // Close closes the session and the secure channel.
@@ -527,6 +545,11 @@ func (c *Client) Close() error {
 
 func (c *Client) State() ConnState {
 	return c.state.Load().(ConnState)
+}
+
+// Namespaces returns the currently cached list of namespaces.
+func (c *Client) Namespaces() []string {
+	return c.namespaces.Load().([]string)
 }
 
 // Session returns the active session.
@@ -958,6 +981,31 @@ func (c *Client) HistoryReadRawModified(nodes []*ua.HistoryReadValueID, details 
 		return safeAssign(v, &res)
 	})
 	return res, err
+}
+
+// NamespaceArray returns the list of namespaces registered on the server.
+func (c *Client) NamespaceArray() ([]string, error) {
+	node := c.Node(ua.NewNumericNodeID(0, id.Server_NamespaceArray))
+	v, err := node.Value()
+	if err != nil {
+		return nil, err
+	}
+
+	ns, ok := v.Value().([]string)
+	if !ok {
+		return nil, errors.Errorf("error fetching namespace array. id=%d, type=%T", v.Type(), v.Value())
+	}
+	return ns, nil
+}
+
+// UpdateNamespaces updates the list of cached namespaces from the server.
+func (c *Client) UpdateNamespaces() error {
+	ns, err := c.NamespaceArray()
+	if err != nil {
+		return err
+	}
+	c.namespaces.Store(ns)
+	return nil
 }
 
 // safeAssign implements a type-safe assign from T to *T.

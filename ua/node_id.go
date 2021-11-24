@@ -9,8 +9,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
-	"strconv"
-	"strings"
 
 	"github.com/gopcua/opcua/errors"
 )
@@ -94,90 +92,25 @@ func MustParseNodeID(s string) *NodeID {
 // ParseNodeID returns a node id from a string definition of the format
 // 'ns=<namespace>;{s,i,b,g}=<identifier>'.
 //
-// For string node ids the 's=' prefix can be omitted.
+// The 's=' prefix can be omitted for string node ids in namespace 0.
 //
 // For numeric ids the smallest possible type which can store the namespace
 // and id value is returned.
 //
-// Namespace URLs 'nsu=' are not supported since they require a lookup.
+// Namespace URIs are not supported since NodeID cannot store them. If you need
+// to support namespace URIs use ParseExpandedNodeID.
 func ParseNodeID(s string) (*NodeID, error) {
-	if s == "" {
-		return NewTwoByteNodeID(0), nil
+	id, err := ParseExpandedNodeID(s, nil)
+	if err != nil {
+		return nil, err
 	}
-
-	var nsval, idval string
-
-	p := strings.SplitN(s, ";", 2)
-	switch len(p) {
-	case 1:
-		nsval, idval = "ns=0", p[0]
-	case 2:
-		nsval, idval = p[0], p[1]
-	default:
-		return nil, errors.Errorf("invalid node id: %s", s)
+	if id.HasNamespaceURI() {
+		return nil, errors.Errorf("namespace uris are not supported. use `ua.ParseExpandedNodeID`")
 	}
-
-	// parse namespace
-	var ns uint16
-	switch {
-	case strings.HasPrefix(nsval, "nsu="):
-		return nil, errors.Errorf("namespace urls are not supported: %s", s)
-
-	case strings.HasPrefix(nsval, "ns="):
-		n, err := strconv.Atoi(nsval[3:])
-		if err != nil {
-			return nil, errors.Errorf("invalid namespace id: %s", s)
-		}
-		if n < 0 || n > math.MaxUint16 {
-			return nil, errors.Errorf("namespace id out of range (0..65535): %s", s)
-		}
-		ns = uint16(n)
-
-	default:
-		return nil, errors.Errorf("invalid node id: %s", s)
+	if id.HasServerIndex() {
+		return nil, errors.Errorf("server index is not supported. use `ua.ParseExpandedNodeID`")
 	}
-
-	// parse identifier
-	switch {
-	case strings.HasPrefix(idval, "i="):
-		id, err := strconv.ParseUint(idval[2:], 10, 64)
-		if err != nil {
-			return nil, errors.Errorf("invalid numeric id: %s", s)
-		}
-		switch {
-		case ns == 0 && id < 256:
-			return NewTwoByteNodeID(byte(id)), nil
-		case ns < 256 && id < math.MaxUint16:
-			return NewFourByteNodeID(byte(ns), uint16(id)), nil
-		case id <= math.MaxUint32:
-			return NewNumericNodeID(ns, uint32(id)), nil
-		default:
-			return nil, errors.Errorf("numeric id out of range (0..2^32-1): %s", s)
-		}
-
-	case strings.HasPrefix(idval, "s="):
-		return NewStringNodeID(ns, idval[2:]), nil
-
-	case strings.HasPrefix(idval, "g="):
-		n := NewGUIDNodeID(ns, idval[2:])
-		if n == nil || n.StringID() == "" {
-			return nil, errors.Errorf("invalid guid node id: %s", s)
-		}
-		return n, nil
-
-	case strings.HasPrefix(idval, "b="):
-		b, err := base64.StdEncoding.DecodeString(idval[2:])
-		if err != nil {
-			return nil, errors.Errorf("invalid opaque node id: %s", s)
-		}
-		return NewByteStringNodeID(ns, b), nil
-
-	case strings.HasPrefix(idval, "ns="):
-		return nil, errors.Errorf("invalid node id: %s", s)
-
-	default:
-		return NewStringNodeID(ns, idval), nil
-	}
+	return id.NodeID, nil
 }
 
 // EncodingMask returns the encoding mask field including the
