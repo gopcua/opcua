@@ -358,9 +358,9 @@ func (n *NodeID) String() string {
 
 	case NodeIDTypeByteString:
 		if n.ns == 0 {
-			return fmt.Sprintf("o=%s", n.StringID())
+			return fmt.Sprintf("b=%s", n.StringID())
 		}
-		return fmt.Sprintf("ns=%d;o=%s", n.ns, n.StringID())
+		return fmt.Sprintf("ns=%d;b=%s", n.ns, n.StringID())
 
 	default:
 		panic(fmt.Sprintf("invalid node id type: %d", n.Type()))
