@@ -101,10 +101,14 @@ type Client struct {
 	// session is the active session.
 	session atomic.Value // *Session
 
-	// subs is the set of active subscriptions by id.
-	subs   map[uint32]*Subscription
+	// subMux guards subs and pendingAcks.
 	subMux sync.RWMutex
 
+	// subs is the set of active subscriptions by id.
+	subs map[uint32]*Subscription
+
+	// pendingAcks contains the pending subscription acknowledgements
+	// for all active subscriptions.
 	pendingAcks []*ua.SubscriptionAcknowledgement
 
 	pausech  chan struct{} // pauses subscription publish loop
@@ -142,9 +146,9 @@ func NewClient(endpoint string, opts ...Option) *Client {
 		cfg:         cfg,
 		sechanErr:   make(chan error, 1),
 		subs:        make(map[uint32]*Subscription),
+		pendingAcks: make([]*ua.SubscriptionAcknowledgement, 0),
 		pausech:     make(chan struct{}, 2),
 		resumech:    make(chan struct{}, 2),
-		pendingAcks: []*ua.SubscriptionAcknowledgement{},
 	}
 	c.publishTimeout.Store(uasc.MaxTimeout)
 	c.pauseSubscriptions(context.Background())
