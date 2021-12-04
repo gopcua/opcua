@@ -111,9 +111,14 @@ type Client struct {
 	// for all active subscriptions.
 	pendingAcks []*ua.SubscriptionAcknowledgement
 
-	pausech  chan struct{} // pauses subscription publish loop
-	resumech chan struct{} // resumes subscription publish loop
-	mcancel  func()        // stops subscription publish loop
+	// pausech pauses the subscription publish loop
+	pausech chan struct{}
+
+	// resumech resumes subscription publish loop
+	resumech chan struct{}
+
+	// mcancel stops subscription publish loop
+	mcancel func()
 
 	// timeout for sending PublishRequests
 	publishTimeout atomic.Value
