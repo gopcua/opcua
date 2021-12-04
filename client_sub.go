@@ -84,12 +84,12 @@ func (c *Client) SubscriptionIDs() []uint32 {
 
 // recreateSubscriptions creates new subscriptions
 // with the same parameters to replace the previous ones
-func (c *Client) recreateSubscription(id uint32) error {
+func (c *Client) recreateSubscription(ctx context.Context, id uint32) error {
 	sub, ok := c.subs[id]
 	if !ok {
 		return ua.StatusBadSubscriptionIDInvalid
 	}
-	return sub.recreate()
+	return sub.recreate(ctx)
 }
 
 // transferSubscriptions ask the server to transfer the given subscriptions
@@ -212,14 +212,14 @@ func (c *Client) registerSubscription(sub *Subscription) error {
 	return nil
 }
 
-func (c *Client) forgetSubscription(id uint32) {
+func (c *Client) forgetSubscription(ctx context.Context, id uint32) {
 	c.subMux.Lock()
 	delete(c.subs, id)
 	c.subMux.Unlock()
 
 	c.updatePublishTimeout()
 	if len(c.subs) == 0 {
-		c.pauseSubscriptions()
+		c.pauseSubscriptions(ctx)
 	}
 }
 
@@ -300,14 +300,20 @@ func (c *Client) notifySubscription(ctx context.Context, sub *Subscription, noti
 
 // pauseSubscriptions suspends the publish loop by signalling the pausech.
 // It has no effect if the publish loop is already paused.
-func (c *Client) pauseSubscriptions() {
-	c.pausech <- struct{}{}
+func (c *Client) pauseSubscriptions(ctx context.Context) {
+	select {
+	case <-ctx.Done():
+	case c.pausech <- struct{}{}:
+	}
 }
 
 // resumeSubscriptions restarts the publish loop by signalling the resumech.
 // It has no effect if the publish loop is not paused.
-func (c *Client) resumeSubscriptions() {
-	c.resumech <- struct{}{}
+func (c *Client) resumeSubscriptions(ctx context.Context) {
+	select {
+	case <-ctx.Done():
+	case c.resumech <- struct{}{}:
+	}
 }
 
 // monitorSubscriptions sends publish requests and handles publish responses
@@ -349,7 +355,7 @@ publish:
 			// send publish request and handle response
 			if err := c.publish(ctx); err != nil {
 				dlog.Print("error: ", err.Error())
-				c.pauseSubscriptions()
+				c.pauseSubscriptions(ctx)
 			}
 		}
 	}

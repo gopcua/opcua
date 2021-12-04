@@ -72,7 +72,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer sub.Cancel()
+	defer sub.Cancel(ctx)
 	log.Printf("Created subscription with id %v", sub.SubscriptionID)
 
 	id, err := ua.ParseNodeID(*nodeID)

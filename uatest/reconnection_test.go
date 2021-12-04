@@ -1,3 +1,4 @@
+//go:build integration
 // +build integration
 
 package uatest
@@ -90,7 +91,7 @@ func TestAutoReconnection(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer sub.Unsubscribe()
+	defer sub.Unsubscribe(ctx)
 
 	for _, tt := range tests {
 		ok := t.Run(tt.name, func(t *testing.T) {

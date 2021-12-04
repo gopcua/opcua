@@ -147,7 +147,7 @@ func NewClient(endpoint string, opts ...Option) *Client {
 		pendingAcks: []*ua.SubscriptionAcknowledgement{},
 	}
 	c.publishTimeout.Store(uasc.MaxTimeout)
-	c.pauseSubscriptions()
+	c.pauseSubscriptions(context.Background())
 	c.state.Store(Closed)
 	return &c
 }
@@ -275,7 +275,7 @@ func (c *Client) monitor(ctx context.Context) {
 
 			c.state.Store(Disconnected)
 
-			c.pauseSubscriptions()
+			c.pauseSubscriptions(ctx)
 
 			var (
 				subsToRepublish []uint32 // subscription ids for which to send republish requests
@@ -426,7 +426,7 @@ func (c *Client) monitor(ctx context.Context) {
 						}
 
 						for _, id := range subsToRecreate {
-							if err := c.recreateSubscription(id); err != nil {
+							if err := c.recreateSubscription(ctx, id); err != nil {
 								dlog.Printf("recreate subscripitions failed: %v", err)
 								action = recreateSession
 								continue
@@ -455,7 +455,7 @@ func (c *Client) monitor(ctx context.Context) {
 			}
 
 			dlog.Printf("resuming subscriptions")
-			c.resumeSubscriptions()
+			c.resumeSubscriptions(ctx)
 			dlog.Printf("resumed subscriptions")
 		}
 	}
