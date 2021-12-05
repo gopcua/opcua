@@ -224,10 +224,10 @@ func (s *Subscription) pump(ctx context.Context, notifyCh chan<- *DataChangeMess
 }
 
 // Unsubscribe removes the subscription interests and cleans up any resources
-func (s *Subscription) Unsubscribe() error {
+func (s *Subscription) Unsubscribe(ctx context.Context) error {
 	// TODO: make idempotent
 	close(s.closed)
-	return s.sub.Cancel()
+	return s.sub.Cancel(ctx)
 }
 
 // Subscribed returns the number of currently subscribed to nodes

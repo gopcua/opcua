@@ -101,15 +101,24 @@ type Client struct {
 	// session is the active session.
 	session atomic.Value // *Session
 
-	// subs is the set of active subscriptions by id.
-	subs   map[uint32]*Subscription
+	// subMux guards subs and pendingAcks.
 	subMux sync.RWMutex
 
+	// subs is the set of active subscriptions by id.
+	subs map[uint32]*Subscription
+
+	// pendingAcks contains the pending subscription acknowledgements
+	// for all active subscriptions.
 	pendingAcks []*ua.SubscriptionAcknowledgement
 
-	pausech  chan struct{} // pauses subscription publish loop
-	resumech chan struct{} // resumes subscription publish loop
-	mcancel  func()        // stops subscription publish loop
+	// pausech pauses the subscription publish loop
+	pausech chan struct{}
+
+	// resumech resumes subscription publish loop
+	resumech chan struct{}
+
+	// mcancel stops subscription publish loop
+	mcancel func()
 
 	// timeout for sending PublishRequests
 	publishTimeout atomic.Value
@@ -142,12 +151,12 @@ func NewClient(endpoint string, opts ...Option) *Client {
 		cfg:         cfg,
 		sechanErr:   make(chan error, 1),
 		subs:        make(map[uint32]*Subscription),
+		pendingAcks: make([]*ua.SubscriptionAcknowledgement, 0),
 		pausech:     make(chan struct{}, 2),
 		resumech:    make(chan struct{}, 2),
-		pendingAcks: []*ua.SubscriptionAcknowledgement{},
 	}
 	c.publishTimeout.Store(uasc.MaxTimeout)
-	c.pauseSubscriptions()
+	c.pauseSubscriptions(context.Background())
 	c.state.Store(Closed)
 	return &c
 }
@@ -275,7 +284,7 @@ func (c *Client) monitor(ctx context.Context) {
 
 			c.state.Store(Disconnected)
 
-			c.pauseSubscriptions()
+			c.pauseSubscriptions(ctx)
 
 			var (
 				subsToRepublish []uint32 // subscription ids for which to send republish requests
@@ -426,7 +435,7 @@ func (c *Client) monitor(ctx context.Context) {
 						}
 
 						for _, id := range subsToRecreate {
-							if err := c.recreateSubscription(id); err != nil {
+							if err := c.recreateSubscription(ctx, id); err != nil {
 								dlog.Printf("recreate subscripitions failed: %v", err)
 								action = recreateSession
 								continue
@@ -455,7 +464,7 @@ func (c *Client) monitor(ctx context.Context) {
 			}
 
 			dlog.Printf("resuming subscriptions")
-			c.resumeSubscriptions()
+			c.resumeSubscriptions(ctx)
 			dlog.Printf("resumed subscriptions")
 		}
 	}

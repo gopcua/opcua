@@ -112,7 +112,7 @@ func startCallbackSub(ctx context.Context, m *monitor.NodeMonitor, interval, lag
 		log.Fatal(err)
 	}
 
-	defer cleanup(sub, wg)
+	defer cleanup(ctx, sub, wg)
 
 	<-ctx.Done()
 }
@@ -125,7 +125,7 @@ func startChanSub(ctx context.Context, m *monitor.NodeMonitor, interval, lag tim
 		log.Fatal(err)
 	}
 
-	defer cleanup(sub, wg)
+	defer cleanup(ctx, sub, wg)
 
 	for {
 		select {
@@ -142,8 +142,8 @@ func startChanSub(ctx context.Context, m *monitor.NodeMonitor, interval, lag tim
 	}
 }
 
-func cleanup(sub *monitor.Subscription, wg *sync.WaitGroup) {
+func cleanup(ctx context.Context, sub *monitor.Subscription, wg *sync.WaitGroup) {
 	log.Printf("stats: sub=%d delivered=%d dropped=%d", sub.SubscriptionID(), sub.Delivered(), sub.Dropped())
-	sub.Unsubscribe()
+	sub.Unsubscribe(ctx)
 	wg.Done()
 }

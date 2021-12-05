@@ -78,8 +78,8 @@ type PublishNotificationData struct {
 
 // Cancel stops the subscription and removes it
 // from the client and the server.
-func (s *Subscription) Cancel() error {
-	s.c.forgetSubscription(s.SubscriptionID)
+func (s *Subscription) Cancel(ctx context.Context) error {
+	s.c.forgetSubscription(ctx, s.SubscriptionID)
 	return s.delete()
 }
 
@@ -243,7 +243,7 @@ func (p *SubscriptionParameters) setDefaults() {
 
 // recreate creates a new subscription based on the previous subscription
 // parameters and monitored items.
-func (s *Subscription) recreate() error {
+func (s *Subscription) recreate(ctx context.Context) error {
 	dlog := debug.NewPrefixLogger("sub %d: recreate: ", s.SubscriptionID)
 
 	if s.SubscriptionID == terminatedSubscriptionID {
@@ -262,7 +262,7 @@ func (s *Subscription) recreate() error {
 		})
 		dlog.Print("subscription deleted")
 	}
-	s.c.forgetSubscription(s.SubscriptionID)
+	s.c.forgetSubscription(ctx, s.SubscriptionID)
 	dlog.Printf("subscription forgotton")
 
 	req := &ua.CreateSubscriptionRequest{
