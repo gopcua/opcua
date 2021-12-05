@@ -476,3 +476,37 @@ func TestNodeIDJSON(t *testing.T) {
 		}
 	})
 }
+
+func TestNodeIDToString(t *testing.T) {
+	tests := []struct {
+		s    string
+		want string
+	}{
+		{"i=123", "i=123"},
+		{"s=123", "s=123"},
+		{"b=MTIz", "b=MTIz"},
+		{"g=F11BD41E-2DF5-41D3-8CE2-A37D22D1E469", "g=F11BD41E-2DF5-41D3-8CE2-A37D22D1E469"},
+
+		{"ns=0;i=123", "i=123"},
+		{"ns=0;s=123", "s=123"},
+		{"ns=0;b=MTIz", "b=MTIz"},
+		{"ns=0;g=F11BD41E-2DF5-41D3-8CE2-A37D22D1E469", "g=F11BD41E-2DF5-41D3-8CE2-A37D22D1E469"},
+
+		{"ns=1;i=123", "ns=1;i=123"},
+		{"ns=1;s=123", "ns=1;s=123"},
+		{"ns=1;b=MTIz", "ns=1;b=MTIz"},
+		{"ns=1;g=F11BD41E-2DF5-41D3-8CE2-A37D22D1E469", "ns=1;g=F11BD41E-2DF5-41D3-8CE2-A37D22D1E469"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.s, func(t *testing.T) {
+			n, err := ParseNodeID(tt.s)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got, want := n.String(), tt.want; got != want {
+				t.Fatalf("got %s want %s", got, want)
+			}
+		})
+	}
+}
