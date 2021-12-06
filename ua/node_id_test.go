@@ -154,8 +154,10 @@ func TestParseNodeID(t *testing.T) {
 		{s: "ns=1;a", n: NewStringNodeID(1, "a")},
 
 		// error flows
+		{s: "abc=0;i=2", err: errors.New("invalid node id: abc=0;i=2")},
+		{s: "ns=0;i=1;s=2", err: errors.New("invalid node id: ns=0;i=1;s=2")},
 		{s: "ns=0", err: errors.New("invalid node id: ns=0")},
-		{s: "nsu=abc;i=1", err: errors.New("namespace urls are not supported: nsu=abc;i=1")},
+		{s: "nsu=abc;i=1", err: errors.New("namespace urls require a server NamespaceArray")},
 		{s: "ns=65536;i=1", err: errors.New("namespace id out of range (0..65535): ns=65536;i=1")},
 		{s: "ns=abc;i=1", err: errors.New("invalid namespace id: ns=abc;i=1")},
 		{s: "ns=1;i=abc", err: errors.New("invalid numeric id: ns=1;i=abc")},

@@ -206,12 +206,8 @@ func TestVariant(t *testing.T) {
 			},
 		},
 		{
-			Name: "ExpandedNodeID",
-			Struct: MustVariant(NewExpandedNodeID(
-				true, false,
-				NewTwoByteNodeID(0xff),
-				"foobar", 0,
-			)),
+			Name:   "ExpandedNodeID",
+			Struct: MustVariant(NewExpandedNodeID(NewTwoByteNodeID(0xff), "foobar", 0)),
 			Bytes: []byte{
 				// variant encoding mask
 				0x12,
