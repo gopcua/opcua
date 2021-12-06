@@ -3,6 +3,7 @@ package opcua
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/gopcua/opcua/debug"
@@ -30,6 +31,7 @@ type Subscription struct {
 	Notifs                    chan *PublishNotificationData
 	params                    *SubscriptionParameters
 	items                     map[uint32]*monitoredItem
+	itemsMu                   sync.Mutex
 	lastSeq                   uint32
 	nextSeq                   uint32
 	c                         *Client
@@ -98,7 +100,9 @@ func (s *Subscription) delete() error {
 	case err != nil:
 		return err
 	case res.Results[0] == ua.StatusOK:
+		s.itemsMu.Lock()
 		s.items = make(map[uint32]*monitoredItem)
+		s.itemsMu.Unlock()
 		return nil
 	default:
 		return res.Results[0]
@@ -123,16 +127,16 @@ func (s *Subscription) Monitor(ts ua.TimestampsToReturn, items ...*ua.MonitoredI
 	}
 
 	// store monitored items
-	// todo(fs): should we guard this with a lock?
+	s.itemsMu.Lock()
 	for i, item := range items {
 		result := res.Results[i]
-
 		s.items[result.MonitoredItemID] = &monitoredItem{
 			item: item,
 			res:  result,
 			ts:   ts,
 		}
 	}
+	s.itemsMu.Unlock()
 
 	return res, err
 }
@@ -150,10 +154,11 @@ func (s *Subscription) Unmonitor(monitoredItemIDs ...uint32) (*ua.DeleteMonitore
 
 	if err == nil {
 		// remove monitored items
-		// todo(fs): should we guard this with a lock?
+		s.itemsMu.Lock()
 		for _, id := range monitoredItemIDs {
 			delete(s.items, id)
 		}
+		s.itemsMu.Unlock()
 	}
 
 	return res, err
@@ -302,11 +307,13 @@ func (s *Subscription) recreate(ctx context.Context) error {
 
 	// Sort by timestamp to return
 	itemsByTimestamps := make(map[ua.TimestampsToReturn][]*ua.MonitoredItemCreateRequest)
+	s.itemsMu.Lock()
 	for _, mi := range s.items {
 		itemsByTimestamps[mi.ts] = append(itemsByTimestamps[mi.ts], mi.item)
 	}
-
 	s.items = make(map[uint32]*monitoredItem, len(s.items))
+	s.itemsMu.Unlock()
+
 	for ts, items := range itemsByTimestamps {
 		req := &ua.CreateMonitoredItemsRequest{
 			SubscriptionID:     s.SubscriptionID,
@@ -322,12 +329,14 @@ func (s *Subscription) recreate(ctx context.Context) error {
 			dlog.Printf("failed to create monitored items: %v", err)
 			return err
 		}
+
 		for _, result := range res.Results {
 			if status := result.StatusCode; status != ua.StatusOK {
 				return status
 			}
 		}
 
+		s.itemsMu.Lock()
 		for i, item := range items {
 			s.items[res.Results[i].MonitoredItemID] = &monitoredItem{
 				item: item,
@@ -335,6 +344,7 @@ func (s *Subscription) recreate(ctx context.Context) error {
 				ts:   ts,
 			}
 		}
+		s.itemsMu.Unlock()
 	}
 	dlog.Printf("subscription successfully recreated")
 
