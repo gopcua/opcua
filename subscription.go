@@ -46,9 +46,9 @@ type SubscriptionParameters struct {
 }
 
 type monitoredItem struct {
-	item *ua.MonitoredItemCreateRequest
-	res  *ua.MonitoredItemCreateResult
-	ts   ua.TimestampsToReturn
+	req *ua.MonitoredItemCreateRequest
+	res *ua.MonitoredItemCreateResult
+	ts  ua.TimestampsToReturn
 }
 
 func NewMonitoredItemCreateRequestWithDefaults(nodeID *ua.NodeID, attributeID ua.AttributeID, clientHandle uint32) *ua.MonitoredItemCreateRequest {
@@ -131,9 +131,9 @@ func (s *Subscription) Monitor(ts ua.TimestampsToReturn, items ...*ua.MonitoredI
 	for i, item := range items {
 		result := res.Results[i]
 		s.items[result.MonitoredItemID] = &monitoredItem{
-			item: item,
-			res:  result,
-			ts:   ts,
+			req: item,
+			res: result,
+			ts:  ts,
 		}
 	}
 	s.itemsMu.Unlock()
@@ -160,6 +160,40 @@ func (s *Subscription) Unmonitor(monitoredItemIDs ...uint32) (*ua.DeleteMonitore
 		}
 		s.itemsMu.Unlock()
 	}
+
+	return res, err
+}
+
+func (s *Subscription) Modify(ts ua.TimestampsToReturn, items ...*ua.MonitoredItemModifyRequest) (*ua.ModifyMonitoredItemsResponse, error) {
+	req := &ua.ModifyMonitoredItemsRequest{
+		SubscriptionID:     s.SubscriptionID,
+		TimestampsToReturn: ts,
+		ItemsToModify:      items,
+	}
+	var res *ua.ModifyMonitoredItemsResponse
+	err := s.c.Send(req, func(v interface{}) error {
+		return safeAssign(v, &res)
+	})
+
+	if err == nil {
+		// update monitored items
+		s.itemsMu.Lock()
+		for i, res := range res.Results {
+			id := req.ItemsToModify[i].MonitoredItemID
+			item := s.items[id]
+			if item == nil {
+				return nil, fmt.Errorf("sub %d: cannot modify unknown monitored item id: %d", s.SubscriptionID, id)
+			}
+
+			item.ts = req.TimestampsToReturn
+			item.req.RequestedParameters = req.ItemsToModify[i].RequestedParameters
+			item.res.StatusCode = res.StatusCode
+			item.res.RevisedSamplingInterval = res.RevisedSamplingInterval
+			item.res.RevisedQueueSize = res.RevisedQueueSize
+			item.res.FilterResult = res.FilterResult
+		}
+	}
+	s.itemsMu.Unlock()
 
 	return res, err
 }
@@ -309,7 +343,7 @@ func (s *Subscription) recreate(ctx context.Context) error {
 	itemsByTimestamps := make(map[ua.TimestampsToReturn][]*ua.MonitoredItemCreateRequest)
 	s.itemsMu.Lock()
 	for _, mi := range s.items {
-		itemsByTimestamps[mi.ts] = append(itemsByTimestamps[mi.ts], mi.item)
+		itemsByTimestamps[mi.ts] = append(itemsByTimestamps[mi.ts], mi.req)
 	}
 	s.items = make(map[uint32]*monitoredItem, len(s.items))
 	s.itemsMu.Unlock()
@@ -339,9 +373,9 @@ func (s *Subscription) recreate(ctx context.Context) error {
 		s.itemsMu.Lock()
 		for i, item := range items {
 			s.items[res.Results[i].MonitoredItemID] = &monitoredItem{
-				item: item,
-				res:  res.Results[i],
-				ts:   ts,
+				req: item,
+				res: res.Results[i],
+				ts:  ts,
 			}
 		}
 		s.itemsMu.Unlock()
