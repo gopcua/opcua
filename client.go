@@ -209,11 +209,13 @@ func (c *Client) Connect(ctx context.Context) (err error) {
 		go c.monitorSubscriptions(mctx)
 	})
 
-	if !c.cfg.disableNamespaceUpdate {
-		if err := c.UpdateNamespaces(); err != nil {
-			c.Close()
-			return err
-		}
+	// todo(fs): we might need to guard this with an option in case of a broken
+	// todo(fs): server. For the sake of simplicity we left the option out but
+	// todo(fs): see the discussion in https://github.com/gopcua/opcua/pull/512
+	// todo(fs): and you should find a commit that implements this option.
+	if err := c.UpdateNamespaces(); err != nil {
+		c.Close()
+		return err
 	}
 
 	return nil

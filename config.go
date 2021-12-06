@@ -53,10 +53,9 @@ func DefaultSessionConfig() *uasc.SessionConfig {
 
 // Config contains all config options.
 type Config struct {
-	dialer                 *uacp.Dialer
-	sechan                 *uasc.Config
-	session                *uasc.SessionConfig
-	disableNamespaceUpdate bool
+	dialer  *uacp.Dialer
+	sechan  *uasc.Config
+	session *uasc.SessionConfig
 }
 
 // NewDialer creates a uacp.Dialer from the config options
@@ -478,14 +477,6 @@ func DialTimeout(d time.Duration) Option {
 	return func(cfg *Config) {
 		initDialer(cfg)
 		cfg.dialer.Dialer.Timeout = d
-	}
-}
-
-// DisableUpdateNamespaceArrayOnConnect disables fetching the NamespaceArray
-// from the server on connect.
-func DisableUpdateNamespaceArrayOnConnect() Option {
-	return func(cfg *Config) {
-		cfg.disableNamespaceUpdate = true
 	}
 }
 
