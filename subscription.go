@@ -164,7 +164,16 @@ func (s *Subscription) Unmonitor(monitoredItemIDs ...uint32) (*ua.DeleteMonitore
 	return res, err
 }
 
-func (s *Subscription) Modify(ts ua.TimestampsToReturn, items ...*ua.MonitoredItemModifyRequest) (*ua.ModifyMonitoredItemsResponse, error) {
+func (s *Subscription) ModifyMonitoredItems(ts ua.TimestampsToReturn, items ...*ua.MonitoredItemModifyRequest) (*ua.ModifyMonitoredItemsResponse, error) {
+	s.itemsMu.Lock()
+	for _, item := range items {
+		id := item.MonitoredItemID
+		if _, exists := s.items[id]; !exists {
+			return nil, fmt.Errorf("sub %d: cannot modify unknown monitored item id: %d", s.SubscriptionID, id)
+		}
+	}
+	s.itemsMu.Unlock()
+
 	req := &ua.ModifyMonitoredItemsRequest{
 		SubscriptionID:     s.SubscriptionID,
 		TimestampsToReturn: ts,
@@ -174,28 +183,29 @@ func (s *Subscription) Modify(ts ua.TimestampsToReturn, items ...*ua.MonitoredIt
 	err := s.c.Send(req, func(v interface{}) error {
 		return safeAssign(v, &res)
 	})
+	if err != nil {
+		return nil, err
+	}
 
-	if err == nil {
-		// update monitored items
-		s.itemsMu.Lock()
-		for i, res := range res.Results {
-			id := req.ItemsToModify[i].MonitoredItemID
-			item := s.items[id]
-			if item == nil {
-				return nil, fmt.Errorf("sub %d: cannot modify unknown monitored item id: %d", s.SubscriptionID, id)
-			}
-
-			item.ts = req.TimestampsToReturn
-			item.req.RequestedParameters = req.ItemsToModify[i].RequestedParameters
-			item.res.StatusCode = res.StatusCode
-			item.res.RevisedSamplingInterval = res.RevisedSamplingInterval
-			item.res.RevisedQueueSize = res.RevisedQueueSize
-			item.res.FilterResult = res.FilterResult
+	// update monitored items
+	s.itemsMu.Lock()
+	for i, res := range res.Results {
+		if res.StatusCode != ua.StatusOK {
+			continue
 		}
+
+		id := req.ItemsToModify[i].MonitoredItemID
+		item := s.items[id]
+		item.ts = req.TimestampsToReturn
+		item.req.RequestedParameters = req.ItemsToModify[i].RequestedParameters
+		item.res.StatusCode = res.StatusCode
+		item.res.RevisedSamplingInterval = res.RevisedSamplingInterval
+		item.res.RevisedQueueSize = res.RevisedQueueSize
+		item.res.FilterResult = res.FilterResult
 	}
 	s.itemsMu.Unlock()
 
-	return res, err
+	return res, nil
 }
 
 // SetTriggering sends a request to the server to add and/or remove triggering links from a triggering item.
