@@ -270,6 +270,14 @@ func (c *Client) monitor(ctx context.Context) {
 				switch x := err.(type) {
 				case *uacp.Error:
 					switch ua.StatusCode(x.ErrorCode) {
+					case ua.StatusBadTimeout:
+						if !c.cfg.sechan.AutoReconnect {
+							// the server is not responding and the connection should not be restored
+							action = abortReconnect
+							dlog.Print("auto-reconnect disabled")
+							return
+						}
+
 					case ua.StatusBadSecureChannelIDInvalid:
 						// the secure channel has been rejected by the server
 						action = createSecureChannel
