@@ -82,17 +82,17 @@ type PublishNotificationData struct {
 // from the client and the server.
 func (s *Subscription) Cancel(ctx context.Context) error {
 	s.c.forgetSubscription(ctx, s.SubscriptionID)
-	return s.delete()
+	return s.delete(ctx)
 }
 
 // delete removes the subscription from the server.
-func (s *Subscription) delete() error {
+func (s *Subscription) delete(ctx context.Context) error {
 	req := &ua.DeleteSubscriptionsRequest{
 		SubscriptionIDs: []uint32{s.SubscriptionID},
 	}
 
 	var res *ua.DeleteSubscriptionsResponse
-	err := s.c.Send(req, func(v interface{}) error {
+	err := s.c.Send(ctx, req, func(v interface{}) error {
 		return safeAssign(v, &res)
 	})
 
@@ -109,7 +109,7 @@ func (s *Subscription) delete() error {
 	}
 }
 
-func (s *Subscription) Monitor(ts ua.TimestampsToReturn, items ...*ua.MonitoredItemCreateRequest) (*ua.CreateMonitoredItemsResponse, error) {
+func (s *Subscription) Monitor(ctx context.Context, ts ua.TimestampsToReturn, items ...*ua.MonitoredItemCreateRequest) (*ua.CreateMonitoredItemsResponse, error) {
 	// Part 4, 5.12.2.2 CreateMonitoredItems Service Parameters
 	req := &ua.CreateMonitoredItemsRequest{
 		SubscriptionID:     s.SubscriptionID,
@@ -118,7 +118,7 @@ func (s *Subscription) Monitor(ts ua.TimestampsToReturn, items ...*ua.MonitoredI
 	}
 
 	var res *ua.CreateMonitoredItemsResponse
-	err := s.c.Send(req, func(v interface{}) error {
+	err := s.c.Send(ctx, req, func(v interface{}) error {
 		return safeAssign(v, &res)
 	})
 
@@ -141,14 +141,14 @@ func (s *Subscription) Monitor(ts ua.TimestampsToReturn, items ...*ua.MonitoredI
 	return res, err
 }
 
-func (s *Subscription) Unmonitor(monitoredItemIDs ...uint32) (*ua.DeleteMonitoredItemsResponse, error) {
+func (s *Subscription) Unmonitor(ctx context.Context, monitoredItemIDs ...uint32) (*ua.DeleteMonitoredItemsResponse, error) {
 	req := &ua.DeleteMonitoredItemsRequest{
 		MonitoredItemIDs: monitoredItemIDs,
 		SubscriptionID:   s.SubscriptionID,
 	}
 
 	var res *ua.DeleteMonitoredItemsResponse
-	err := s.c.Send(req, func(v interface{}) error {
+	err := s.c.Send(ctx, req, func(v interface{}) error {
 		return safeAssign(v, &res)
 	})
 
@@ -164,7 +164,7 @@ func (s *Subscription) Unmonitor(monitoredItemIDs ...uint32) (*ua.DeleteMonitore
 	return res, err
 }
 
-func (s *Subscription) ModifyMonitoredItems(ts ua.TimestampsToReturn, items ...*ua.MonitoredItemModifyRequest) (*ua.ModifyMonitoredItemsResponse, error) {
+func (s *Subscription) ModifyMonitoredItems(ctx context.Context, ts ua.TimestampsToReturn, items ...*ua.MonitoredItemModifyRequest) (*ua.ModifyMonitoredItemsResponse, error) {
 	s.itemsMu.Lock()
 	for _, item := range items {
 		id := item.MonitoredItemID
@@ -180,7 +180,7 @@ func (s *Subscription) ModifyMonitoredItems(ts ua.TimestampsToReturn, items ...*
 		ItemsToModify:      items,
 	}
 	var res *ua.ModifyMonitoredItemsResponse
-	err := s.c.Send(req, func(v interface{}) error {
+	err := s.c.Send(ctx, req, func(v interface{}) error {
 		return safeAssign(v, &res)
 	})
 	if err != nil {
@@ -211,7 +211,7 @@ func (s *Subscription) ModifyMonitoredItems(ts ua.TimestampsToReturn, items ...*
 // SetTriggering sends a request to the server to add and/or remove triggering links from a triggering item.
 // To add links from a triggering item to an item to report provide the server assigned ID(s) in the `add` argument.
 // To remove links from a triggering item to an item to report provide the server assigned ID(s) in the `remove` argument.
-func (s *Subscription) SetTriggering(triggeringItemID uint32, add, remove []uint32) (*ua.SetTriggeringResponse, error) {
+func (s *Subscription) SetTriggering(ctx context.Context, triggeringItemID uint32, add, remove []uint32) (*ua.SetTriggeringResponse, error) {
 	// Part 4, 5.12.5.2 SetTriggering Service Parameters
 	req := &ua.SetTriggeringRequest{
 		SubscriptionID:   s.SubscriptionID,
@@ -221,7 +221,7 @@ func (s *Subscription) SetTriggering(triggeringItemID uint32, add, remove []uint
 	}
 
 	var res *ua.SetTriggeringResponse
-	err := s.c.Send(req, func(v interface{}) error {
+	err := s.c.Send(ctx, req, func(v interface{}) error {
 		return safeAssign(v, &res)
 	})
 	return res, err
@@ -247,13 +247,13 @@ func (s *Subscription) notify(ctx context.Context, data *PublishNotificationData
 }
 
 // Stats returns a diagnostic struct with metadata about the current subscription
-func (s *Subscription) Stats() (*ua.SubscriptionDiagnosticsDataType, error) {
+func (s *Subscription) Stats(ctx context.Context) (*ua.SubscriptionDiagnosticsDataType, error) {
 	// TODO(kung-foo): once browsing feature is merged, attempt to get direct access to the
 	// diagnostics node. for example, Prosys lists them like:
 	// i=2290/ns=1;g=918ee6f4-2d25-4506-980d-e659441c166d
 	// maybe cache the nodeid to speed up future stats queries
 	node := s.c.Node(ua.NewNumericNodeID(0, id.Server_ServerDiagnostics_SubscriptionDiagnosticsArray))
-	v, err := node.Value()
+	v, err := node.Value(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -306,7 +306,7 @@ func (s *Subscription) recreate(ctx context.Context) error {
 			SubscriptionIDs: []uint32{s.SubscriptionID},
 		}
 		var res *ua.DeleteSubscriptionsResponse
-		_ = s.c.Send(req, func(v interface{}) error {
+		_ = s.c.Send(ctx, req, func(v interface{}) error {
 			return safeAssign(v, &res)
 		})
 		dlog.Print("subscription deleted")
@@ -323,7 +323,7 @@ func (s *Subscription) recreate(ctx context.Context) error {
 		Priority:                    params.Priority,
 	}
 	var res *ua.CreateSubscriptionResponse
-	err := s.c.Send(req, func(v interface{}) error {
+	err := s.c.Send(ctx, req, func(v interface{}) error {
 		return safeAssign(v, &res)
 	})
 	if err != nil {
@@ -366,7 +366,7 @@ func (s *Subscription) recreate(ctx context.Context) error {
 		}
 
 		var res *ua.CreateMonitoredItemsResponse
-		err := s.c.Send(req, func(v interface{}) error {
+		err := s.c.Send(ctx, req, func(v interface{}) error {
 			return safeAssign(v, &res)
 		})
 		if err != nil {

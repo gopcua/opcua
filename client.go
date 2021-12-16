@@ -33,7 +33,7 @@ func GetEndpoints(ctx context.Context, endpoint string, opts ...Option) ([]*ua.E
 		return nil, err
 	}
 	defer c.Close()
-	res, err := c.GetEndpoints()
+	res, err := c.GetEndpoints(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -190,13 +190,13 @@ func (c *Client) Connect(ctx context.Context) (err error) {
 		return err
 	}
 
-	s, err := c.CreateSession(c.cfg.session)
+	s, err := c.CreateSession(ctx, c.cfg.session)
 	if err != nil {
 		c.Close()
 		return err
 	}
 
-	if err := c.ActivateSession(s); err != nil {
+	if err := c.ActivateSession(ctx, s); err != nil {
 		c.Close()
 		return err
 	}
@@ -213,7 +213,7 @@ func (c *Client) Connect(ctx context.Context) (err error) {
 	// todo(fs): server. For the sake of simplicity we left the option out but
 	// todo(fs): see the discussion in https://github.com/gopcua/opcua/pull/512
 	// todo(fs): and you should find a commit that implements this option.
-	if err := c.UpdateNamespaces(); err != nil {
+	if err := c.UpdateNamespaces(ctx); err != nil {
 		c.Close()
 		return err
 	}
@@ -366,7 +366,7 @@ func (c *Client) monitor(ctx context.Context) {
 							action = createSecureChannel
 							continue
 						}
-						if err := c.ActivateSession(s); err != nil {
+						if err := c.ActivateSession(ctx, s); err != nil {
 							dlog.Printf("restore session failed")
 							action = recreateSession
 							continue
@@ -380,13 +380,13 @@ func (c *Client) monitor(ctx context.Context) {
 						// create a new session to replace the previous one
 
 						dlog.Printf("trying to recreate session")
-						s, err := c.CreateSession(c.cfg.session)
+						s, err := c.CreateSession(ctx, c.cfg.session)
 						if err != nil {
 							dlog.Printf("recreate session failed: %v", err)
 							action = createSecureChannel
 							continue
 						}
-						if err := c.ActivateSession(s); err != nil {
+						if err := c.ActivateSession(ctx, s); err != nil {
 							dlog.Printf("reactivate session failed: %v", err)
 							action = createSecureChannel
 							continue
@@ -408,7 +408,7 @@ func (c *Client) monitor(ctx context.Context) {
 
 						// try to transfer all subscriptions to the new session and
 						// recreate them all if that fails.
-						res, err := c.transferSubscriptions(subIDs)
+						res, err := c.transferSubscriptions(ctx, subIDs)
 						switch {
 						case err != nil:
 							dlog.Printf("transfer subscriptions failed. Recreating all subscriptions: %v", err)
@@ -443,7 +443,7 @@ func (c *Client) monitor(ctx context.Context) {
 						// populated in the previous step.
 
 						for _, id := range subsToRepublish {
-							if err := c.republishSubscription(id, availableSeqs[id]); err != nil {
+							if err := c.republishSubscription(ctx, id, availableSeqs[id]); err != nil {
 								dlog.Printf("republish of subscription %d failed", id)
 								subsToRecreate = append(subsToRecreate, id)
 							}
@@ -592,7 +592,7 @@ type Session struct {
 // "Anonymous" wii be set if it's missing in response.
 //
 // See Part 4, 5.6.2
-func (c *Client) CreateSession(cfg *uasc.SessionConfig) (*Session, error) {
+func (c *Client) CreateSession(ctx context.Context, cfg *uasc.SessionConfig) (*Session, error) {
 	if c.sechan == nil {
 		return nil, ua.StatusBadServerNotConnected
 	}
@@ -619,7 +619,7 @@ func (c *Client) CreateSession(cfg *uasc.SessionConfig) (*Session, error) {
 	var s *Session
 	// for the CreateSessionRequest the authToken is always nil.
 	// use c.sechan.SendRequest() to enforce this.
-	err := c.sechan.SendRequest(req, nil, func(v interface{}) error {
+	err := c.sechan.SendRequest(ctx, req, nil, func(v interface{}) error {
 		var res *ua.CreateSessionResponse
 		if err := safeAssign(v, &res); err != nil {
 			return err
@@ -676,7 +676,7 @@ func anonymousPolicyID(endpoints []*ua.EndpointDescription) string {
 // session call DetachSession.
 //
 // See Part 4, 5.6.3
-func (c *Client) ActivateSession(s *Session) error {
+func (c *Client) ActivateSession(ctx context.Context, s *Session) error {
 	if c.sechan == nil {
 		return ua.StatusBadServerNotConnected
 	}
@@ -724,7 +724,7 @@ func (c *Client) ActivateSession(s *Session) error {
 		UserIdentityToken:          ua.NewExtensionObject(s.cfg.UserIdentityToken),
 		UserTokenSignature:         s.cfg.UserTokenSignature,
 	}
-	return c.sechan.SendRequest(req, s.resp.AuthenticationToken, func(v interface{}) error {
+	return c.sechan.SendRequest(ctx, req, s.resp.AuthenticationToken, func(v interface{}) error {
 		var res *ua.ActivateSessionResponse
 		if err := safeAssign(v, &res); err != nil {
 			return err
@@ -765,7 +765,7 @@ func (c *Client) closeSession(s *Session) error {
 	}
 	req := &ua.CloseSessionRequest{DeleteSubscriptions: true}
 	var res *ua.CloseSessionResponse
-	return c.Send(req, func(v interface{}) error {
+	return c.Send(context.Background(), req, func(v interface{}) error {
 		return safeAssign(v, &res)
 	})
 }
@@ -782,14 +782,14 @@ func (c *Client) DetachSession() (*Session, error) {
 // Send sends the request via the secure channel and registers a handler for
 // the response. If the client has an active session it injects the
 // authentication token.
-func (c *Client) Send(req ua.Request, h func(interface{}) error) error {
-	return c.sendWithTimeout(req, c.cfg.sechan.RequestTimeout, h)
+func (c *Client) Send(ctx context.Context, req ua.Request, h func(interface{}) error) error {
+	return c.sendWithTimeout(ctx, req, c.cfg.sechan.RequestTimeout, h)
 }
 
 // sendWithTimeout sends the request via the secure channel with a custom timeout and registers a handler for
 // the response. If the client has an active session it injects the
 // authentication token.
-func (c *Client) sendWithTimeout(req ua.Request, timeout time.Duration, h func(interface{}) error) error {
+func (c *Client) sendWithTimeout(ctx context.Context, req ua.Request, timeout time.Duration, h func(interface{}) error) error {
 	if c.sechan == nil {
 		return ua.StatusBadServerNotConnected
 	}
@@ -797,7 +797,7 @@ func (c *Client) sendWithTimeout(req ua.Request, timeout time.Duration, h func(i
 	if s := c.Session(); s != nil {
 		authToken = s.resp.AuthenticationToken
 	}
-	return c.sechan.SendRequestWithTimeout(req, authToken, timeout, h)
+	return c.sechan.SendRequestWithTimeout(ctx, req, authToken, timeout, h)
 }
 
 // Node returns a node object which accesses its attributes
@@ -806,12 +806,12 @@ func (c *Client) Node(id *ua.NodeID) *Node {
 	return &Node{ID: id, c: c}
 }
 
-func (c *Client) GetEndpoints() (*ua.GetEndpointsResponse, error) {
+func (c *Client) GetEndpoints(ctx context.Context) (*ua.GetEndpointsResponse, error) {
 	req := &ua.GetEndpointsRequest{
 		EndpointURL: c.endpointURL,
 	}
 	var res *ua.GetEndpointsResponse
-	err := c.Send(req, func(v interface{}) error {
+	err := c.Send(ctx, req, func(v interface{}) error {
 		return safeAssign(v, &res)
 	})
 	return res, err
@@ -841,13 +841,13 @@ func cloneReadRequest(req *ua.ReadRequest) *ua.ReadRequest {
 //
 // By default, the function requests the value of the nodes
 // in the default encoding of the server.
-func (c *Client) Read(req *ua.ReadRequest) (*ua.ReadResponse, error) {
+func (c *Client) Read(ctx context.Context, req *ua.ReadRequest) (*ua.ReadResponse, error) {
 	// clone the request and the ReadValueIDs to set defaults without
 	// manipulating them in-place.
 	req = cloneReadRequest(req)
 
 	var res *ua.ReadResponse
-	err := c.Send(req, func(v interface{}) error {
+	err := c.Send(ctx, req, func(v interface{}) error {
 		err := safeAssign(v, &res)
 
 		// If the client cannot decode an extension object then its
@@ -873,9 +873,9 @@ func (c *Client) Read(req *ua.ReadRequest) (*ua.ReadResponse, error) {
 }
 
 // Write executes a synchronous write request.
-func (c *Client) Write(req *ua.WriteRequest) (*ua.WriteResponse, error) {
+func (c *Client) Write(ctx context.Context, req *ua.WriteRequest) (*ua.WriteResponse, error) {
 	var res *ua.WriteResponse
-	err := c.Send(req, func(v interface{}) error {
+	err := c.Send(ctx, req, func(v interface{}) error {
 		return safeAssign(v, &res)
 	})
 	return res, err
@@ -906,25 +906,25 @@ func cloneBrowseRequest(req *ua.BrowseRequest) *ua.BrowseRequest {
 }
 
 // Browse executes a synchronous browse request.
-func (c *Client) Browse(req *ua.BrowseRequest) (*ua.BrowseResponse, error) {
+func (c *Client) Browse(ctx context.Context, req *ua.BrowseRequest) (*ua.BrowseResponse, error) {
 	// clone the request and the NodesToBrowse to set defaults without
 	// manipulating them in-place.
 	req = cloneBrowseRequest(req)
 
 	var res *ua.BrowseResponse
-	err := c.Send(req, func(v interface{}) error {
+	err := c.Send(ctx, req, func(v interface{}) error {
 		return safeAssign(v, &res)
 	})
 	return res, err
 }
 
 // Call executes a synchronous call request for a single method.
-func (c *Client) Call(req *ua.CallMethodRequest) (*ua.CallMethodResult, error) {
+func (c *Client) Call(ctx context.Context, req *ua.CallMethodRequest) (*ua.CallMethodResult, error) {
 	creq := &ua.CallRequest{
 		MethodsToCall: []*ua.CallMethodRequest{req},
 	}
 	var res *ua.CallResponse
-	err := c.Send(creq, func(v interface{}) error {
+	err := c.Send(ctx, creq, func(v interface{}) error {
 		return safeAssign(v, &res)
 	})
 	if err != nil {
@@ -937,9 +937,9 @@ func (c *Client) Call(req *ua.CallMethodRequest) (*ua.CallMethodResult, error) {
 }
 
 // BrowseNext executes a synchronous browse request.
-func (c *Client) BrowseNext(req *ua.BrowseNextRequest) (*ua.BrowseNextResponse, error) {
+func (c *Client) BrowseNext(ctx context.Context, req *ua.BrowseNextRequest) (*ua.BrowseNextResponse, error) {
 	var res *ua.BrowseNextResponse
-	err := c.Send(req, func(v interface{}) error {
+	err := c.Send(ctx, req, func(v interface{}) error {
 		return safeAssign(v, &res)
 	})
 	return res, err
@@ -947,9 +947,9 @@ func (c *Client) BrowseNext(req *ua.BrowseNextRequest) (*ua.BrowseNextResponse, 
 
 // RegisterNodes registers node ids for more efficient reads.
 // Part 4, Section 5.8.5
-func (c *Client) RegisterNodes(req *ua.RegisterNodesRequest) (*ua.RegisterNodesResponse, error) {
+func (c *Client) RegisterNodes(ctx context.Context, req *ua.RegisterNodesRequest) (*ua.RegisterNodesResponse, error) {
 	var res *ua.RegisterNodesResponse
-	err := c.Send(req, func(v interface{}) error {
+	err := c.Send(ctx, req, func(v interface{}) error {
 		return safeAssign(v, &res)
 	})
 	return res, err
@@ -957,15 +957,15 @@ func (c *Client) RegisterNodes(req *ua.RegisterNodesRequest) (*ua.RegisterNodesR
 
 // UnregisterNodes unregisters node ids previously registered with RegisterNodes.
 // Part 4, Section 5.8.6
-func (c *Client) UnregisterNodes(req *ua.UnregisterNodesRequest) (*ua.UnregisterNodesResponse, error) {
+func (c *Client) UnregisterNodes(ctx context.Context, req *ua.UnregisterNodesRequest) (*ua.UnregisterNodesResponse, error) {
 	var res *ua.UnregisterNodesResponse
-	err := c.Send(req, func(v interface{}) error {
+	err := c.Send(ctx, req, func(v interface{}) error {
 		return safeAssign(v, &res)
 	})
 	return res, err
 }
 
-func (c *Client) HistoryReadRawModified(nodes []*ua.HistoryReadValueID, details *ua.ReadRawModifiedDetails) (*ua.HistoryReadResponse, error) {
+func (c *Client) HistoryReadRawModified(ctx context.Context, nodes []*ua.HistoryReadValueID, details *ua.ReadRawModifiedDetails) (*ua.HistoryReadResponse, error) {
 	// Part 4, 5.10.3 HistoryRead
 	req := &ua.HistoryReadRequest{
 		TimestampsToReturn: ua.TimestampsToReturnBoth,
@@ -979,16 +979,16 @@ func (c *Client) HistoryReadRawModified(nodes []*ua.HistoryReadValueID, details 
 	}
 
 	var res *ua.HistoryReadResponse
-	err := c.Send(req, func(v interface{}) error {
+	err := c.Send(ctx, req, func(v interface{}) error {
 		return safeAssign(v, &res)
 	})
 	return res, err
 }
 
 // NamespaceArray returns the list of namespaces registered on the server.
-func (c *Client) NamespaceArray() ([]string, error) {
+func (c *Client) NamespaceArray(ctx context.Context) ([]string, error) {
 	node := c.Node(ua.NewNumericNodeID(0, id.Server_NamespaceArray))
-	v, err := node.Value()
+	v, err := node.Value(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -1001,8 +1001,8 @@ func (c *Client) NamespaceArray() ([]string, error) {
 }
 
 // UpdateNamespaces updates the list of cached namespaces from the server.
-func (c *Client) UpdateNamespaces() error {
-	ns, err := c.NamespaceArray()
+func (c *Client) UpdateNamespaces(ctx context.Context) error {
+	ns, err := c.NamespaceArray(ctx)
 	if err != nil {
 		return err
 	}

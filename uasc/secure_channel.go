@@ -464,7 +464,6 @@ func (s *SecureChannel) Open(ctx context.Context) error {
 }
 
 func (s *SecureChannel) open(ctx context.Context, instance *channelInstance, requestType ua.SecurityTokenRequestType) error {
-	// TODO: do something with the context
 	defer s.rcvLocker.unlock()
 
 	s.openingMu.Lock()
@@ -544,7 +543,7 @@ func (s *SecureChannel) open(ctx context.Context, instance *channelInstance, req
 		RequestedLifetime:     s.cfg.Lifetime,
 	}
 
-	return s.sendRequestWithTimeout(req, reqID, s.openingInstance, nil, s.cfg.RequestTimeout, func(v interface{}) error {
+	return s.sendRequestWithTimeout(ctx, req, reqID, s.openingInstance, nil, s.cfg.RequestTimeout, func(v interface{}) error {
 		resp, ok := v.(*ua.OpenSecureChannelResponse)
 		if !ok {
 			return errors.Errorf("got %T, want OpenSecureChannelResponse", v)
@@ -661,6 +660,7 @@ func (s *SecureChannel) scheduleExpiration(instance *channelInstance) {
 }
 
 func (s *SecureChannel) sendRequestWithTimeout(
+	ctx context.Context,
 	req ua.Request,
 	reqID uint32,
 	instance *channelInstance,
@@ -671,7 +671,7 @@ func (s *SecureChannel) sendRequestWithTimeout(
 	s.pendingReq.Add(1)
 	respRequired := h != nil
 
-	ch, err := s.sendAsyncWithTimeout(req, reqID, instance, authToken, respRequired, timeout)
+	ch, err := s.sendAsyncWithTimeout(ctx, req, reqID, instance, authToken, respRequired, timeout)
 	s.pendingReq.Done()
 	if err != nil {
 		return err
@@ -686,6 +686,9 @@ func (s *SecureChannel) sendRequestWithTimeout(
 	defer timer.Stop()
 
 	select {
+	case <-ctx.Done():
+		s.popHandler(reqID)
+		return ctx.Err()
 	case <-s.disconnected:
 		s.popHandler(reqID)
 		return io.EOF
@@ -724,21 +727,23 @@ func (s *SecureChannel) Renew(ctx context.Context) error {
 }
 
 // SendRequest sends the service request and calls h with the response.
-func (s *SecureChannel) SendRequest(req ua.Request, authToken *ua.NodeID, h func(interface{}) error) error {
-	return s.SendRequestWithTimeout(req, authToken, s.cfg.RequestTimeout, h)
+func (s *SecureChannel) SendRequest(ctx context.Context, req ua.Request, authToken *ua.NodeID, h func(interface{}) error) error {
+
+	return s.SendRequestWithTimeout(ctx, req, authToken, s.cfg.RequestTimeout, h)
 }
 
-func (s *SecureChannel) SendRequestWithTimeout(req ua.Request, authToken *ua.NodeID, timeout time.Duration, h func(interface{}) error) error {
+func (s *SecureChannel) SendRequestWithTimeout(ctx context.Context, req ua.Request, authToken *ua.NodeID, timeout time.Duration, h func(interface{}) error) error {
 	s.reqLocker.waitIfLock()
 	active, err := s.getActiveChannelInstance()
 	if err != nil {
 		return err
 	}
 
-	return s.sendRequestWithTimeout(req, s.nextRequestID(), active, authToken, timeout, h)
+	return s.sendRequestWithTimeout(ctx, req, s.nextRequestID(), active, authToken, timeout, h)
 }
 
 func (s *SecureChannel) sendAsyncWithTimeout(
+	ctx context.Context,
 	req ua.Request,
 	reqID uint32,
 	instance *channelInstance,
@@ -778,6 +783,11 @@ func (s *SecureChannel) sendAsyncWithTimeout(
 	}
 
 	for i, chunk := range chunks {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+		}
 		if i > 0 { // fix sequence number on subsequent chunks
 			number := instance.nextSequenceNumber()
 			binary.LittleEndian.PutUint32(chunk[16:], uint32(number))
@@ -840,7 +850,7 @@ func (s *SecureChannel) close() error {
 	default:
 	}
 
-	err := s.SendRequest(&ua.CloseSecureChannelRequest{}, nil, nil)
+	err := s.SendRequest(context.Background(), &ua.CloseSecureChannelRequest{}, nil, nil)
 	if err != nil {
 		return err
 	}

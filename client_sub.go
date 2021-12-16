@@ -15,7 +15,7 @@ import (
 // Subscribe creates a Subscription with given parameters.
 // Parameters that have not been set are set to their default values.
 // See opcua.DefaultSubscription* constants
-func (c *Client) Subscribe(params *SubscriptionParameters, notifyCh chan *PublishNotificationData) (*Subscription, error) {
+func (c *Client) Subscribe(ctx context.Context, params *SubscriptionParameters, notifyCh chan *PublishNotificationData) (*Subscription, error) {
 	if params == nil {
 		params = &SubscriptionParameters{}
 	}
@@ -31,7 +31,7 @@ func (c *Client) Subscribe(params *SubscriptionParameters, notifyCh chan *Publis
 	}
 
 	var res *ua.CreateSubscriptionResponse
-	err := c.Send(req, func(v interface{}) error {
+	err := c.Send(ctx, req, func(v interface{}) error {
 		return safeAssign(v, &res)
 	})
 	if err != nil {
@@ -94,21 +94,21 @@ func (c *Client) recreateSubscription(ctx context.Context, id uint32) error {
 
 // transferSubscriptions ask the server to transfer the given subscriptions
 // of the previous session to the current one.
-func (c *Client) transferSubscriptions(ids []uint32) (*ua.TransferSubscriptionsResponse, error) {
+func (c *Client) transferSubscriptions(ctx context.Context, ids []uint32) (*ua.TransferSubscriptionsResponse, error) {
 	req := &ua.TransferSubscriptionsRequest{
 		SubscriptionIDs:   ids,
 		SendInitialValues: false,
 	}
 
 	var res *ua.TransferSubscriptionsResponse
-	err := c.Send(req, func(v interface{}) error {
+	err := c.Send(ctx, req, func(v interface{}) error {
 		return safeAssign(v, &res)
 	})
 	return res, err
 }
 
 // republishSubscriptions sends republish requests for the given subscription id.
-func (c *Client) republishSubscription(id uint32, availableSeq []uint32) error {
+func (c *Client) republishSubscription(ctx context.Context, id uint32, availableSeq []uint32) error {
 	c.subMux.RLock()
 	defer c.subMux.RUnlock()
 
@@ -118,7 +118,7 @@ func (c *Client) republishSubscription(id uint32, availableSeq []uint32) error {
 	}
 
 	debug.Printf("republishing subscription %d", sub.SubscriptionID)
-	if err := c.sendRepublishRequests(sub, availableSeq); err != nil {
+	if err := c.sendRepublishRequests(ctx, sub, availableSeq); err != nil {
 		status, ok := err.(ua.StatusCode)
 		if !ok {
 			return err
@@ -139,7 +139,7 @@ func (c *Client) republishSubscription(id uint32, availableSeq []uint32) error {
 // sendRepublishRequests sends republish requests for the given subscription
 // until it gets a BadMessageNotAvailable which implies that there are no
 // more messages to restore.
-func (c *Client) sendRepublishRequests(sub *Subscription, availableSeq []uint32) error {
+func (c *Client) sendRepublishRequests(ctx context.Context, sub *Subscription, availableSeq []uint32) error {
 	// todo(fs): check if sub.nextSeq is in the available sequence numbers
 	// todo(fs): if not then we need to decide whether we fail b/c of data loss
 	// todo(fs): or whether we log it and continue.
@@ -165,7 +165,7 @@ func (c *Client) sendRepublishRequests(sub *Subscription, availableSeq []uint32)
 
 		debug.Printf("RepublishRequest: req=%s", debug.ToJSON(req))
 		var res *ua.RepublishResponse
-		err := c.sechan.SendRequest(req, c.Session().resp.AuthenticationToken, func(v interface{}) error {
+		err := c.sechan.SendRequest(ctx, req, c.Session().resp.AuthenticationToken, func(v interface{}) error {
 			return safeAssign(v, &res)
 		})
 		debug.Printf("RepublishResponse: res=%s err=%v", debug.ToJSON(res), err)
@@ -371,7 +371,7 @@ func (c *Client) publish(ctx context.Context) error {
 
 	// send the next publish request
 	// note that res contains data even if an error was returned
-	res, err := c.sendPublishRequest()
+	res, err := c.sendPublishRequest(ctx)
 	switch {
 	case err == io.EOF:
 		dlog.Printf("eof: pausing publish loop")
@@ -499,7 +499,7 @@ func (c *Client) handleNotification(ctx context.Context, sub *Subscription, res 
 	})
 }
 
-func (c *Client) sendPublishRequest() (*ua.PublishResponse, error) {
+func (c *Client) sendPublishRequest(ctx context.Context) (*ua.PublishResponse, error) {
 	dlog := debug.NewPrefixLogger("publish: ")
 
 	c.subMux.RLock()
@@ -513,7 +513,7 @@ func (c *Client) sendPublishRequest() (*ua.PublishResponse, error) {
 
 	dlog.Printf("PublishRequest: %s", debug.ToJSON(req))
 	var res *ua.PublishResponse
-	err := c.sendWithTimeout(req, c.publishTimeout.Load().(time.Duration), func(v interface{}) error {
+	err := c.sendWithTimeout(ctx, req, c.publishTimeout.Load().(time.Duration), func(v interface{}) error {
 		return safeAssign(v, &res)
 	})
 	dlog.Printf("PublishResponse: %s", debug.ToJSON(res))
