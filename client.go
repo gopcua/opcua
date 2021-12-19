@@ -7,6 +7,7 @@ package opcua
 import (
 	"context"
 	"crypto/rand"
+	"expvar"
 	"fmt"
 	"io"
 	"log"
@@ -20,6 +21,7 @@ import (
 	"github.com/gopcua/opcua/debug"
 	"github.com/gopcua/opcua/errors"
 	"github.com/gopcua/opcua/id"
+	"github.com/gopcua/opcua/stats"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uacp"
 	"github.com/gopcua/opcua/uasc"
@@ -186,17 +188,23 @@ func (c *Client) Connect(ctx context.Context) (err error) {
 
 	c.setState(Connecting)
 	if err := c.Dial(ctx); err != nil {
+		stats.RecordError(err)
+
 		return err
 	}
 
 	s, err := c.CreateSession(c.cfg.session)
 	if err != nil {
 		c.Close()
+		stats.RecordError(err)
+
 		return err
 	}
 
 	if err := c.ActivateSession(s); err != nil {
 		c.Close()
+		stats.RecordError(err)
+
 		return err
 	}
 	c.setState(Connected)
@@ -214,6 +222,8 @@ func (c *Client) Connect(ctx context.Context) (err error) {
 	// todo(fs): and you should find a commit that implements this option.
 	if err := c.UpdateNamespaces(); err != nil {
 		c.Close()
+		stats.RecordError(err)
+
 		return err
 	}
 
@@ -237,6 +247,8 @@ func (c *Client) monitor(ctx context.Context) {
 			return
 
 		case err, ok := <-c.sechanErr:
+			stats.RecordError(err)
+
 			// return if channel or connection is closed
 			if !ok || err == io.EOF && c.State() == Closed {
 				dlog.Print("closed")
@@ -490,6 +502,8 @@ func (c *Client) monitor(ctx context.Context) {
 
 // Dial establishes a secure channel.
 func (c *Client) Dial(ctx context.Context) error {
+	stats.Client().Add("Dial", 1)
+
 	if c.SecureChannel() != nil {
 		return errors.Errorf("secure channel already connected")
 	}
@@ -518,6 +532,8 @@ func (c *Client) Dial(ctx context.Context) error {
 
 // Close closes the session and the secure channel.
 func (c *Client) Close() error {
+	stats.Client().Add("Close", 1)
+
 	// try to close the session but ignore any error
 	// so that we close the underlying channel and connection.
 	c.CloseSession()
@@ -552,6 +568,9 @@ func (c *Client) State() ConnState {
 
 func (c *Client) setState(s ConnState) {
 	c.atomicState.Store(s)
+	n := new(expvar.Int)
+	n.Set(int64(s))
+	stats.Client().Set("State", n)
 }
 
 // Namespaces returns the currently cached list of namespaces.
@@ -578,6 +597,7 @@ func (c *Client) SecureChannel() *uasc.SecureChannel {
 
 func (c *Client) setSecureChannel(sc *uasc.SecureChannel) {
 	c.atomicSechan.Store(sc)
+	stats.Client().Add("SecureChannel", 1)
 }
 
 // Session returns the active session.
@@ -587,6 +607,7 @@ func (c *Client) Session() *Session {
 
 func (c *Client) setSession(s *Session) {
 	c.atomicSession.Store(s)
+	stats.Client().Add("Session", 1)
 }
 
 // sessionClosed returns true when there is no session.
@@ -710,6 +731,7 @@ func (c *Client) ActivateSession(s *Session) error {
 	if c.SecureChannel() == nil {
 		return ua.StatusBadServerNotConnected
 	}
+	stats.Client().Add("ActivateSession", 1)
 	sig, sigAlg, err := c.SecureChannel().NewSessionSignature(s.serverCertificate, s.serverNonce)
 	if err != nil {
 		log.Printf("error creating session signature: %s", err)
@@ -781,6 +803,7 @@ func (c *Client) ActivateSession(s *Session) error {
 //
 // See Part 4, 5.6.4
 func (c *Client) CloseSession() error {
+	stats.Client().Add("CloseSession", 1)
 	if err := c.closeSession(c.Session()); err != nil {
 		return err
 	}
@@ -804,6 +827,7 @@ func (c *Client) closeSession(s *Session) error {
 // caller is responsible to close or re-activate the session. If the client
 // does not have an active session the function returns no error.
 func (c *Client) DetachSession() (*Session, error) {
+	stats.Client().Add("DetachSession", 1)
 	s := c.Session()
 	c.setSession(nil)
 	return s, nil
@@ -813,7 +837,12 @@ func (c *Client) DetachSession() (*Session, error) {
 // the response. If the client has an active session it injects the
 // authentication token.
 func (c *Client) Send(req ua.Request, h func(interface{}) error) error {
-	return c.sendWithTimeout(req, c.cfg.sechan.RequestTimeout, h)
+	stats.Client().Add("Send", 1)
+
+	err := c.sendWithTimeout(req, c.cfg.sechan.RequestTimeout, h)
+	stats.RecordError(err)
+
+	return err
 }
 
 // sendWithTimeout sends the request via the secure channel with a custom timeout and registers a handler for
@@ -837,6 +866,8 @@ func (c *Client) Node(id *ua.NodeID) *Node {
 }
 
 func (c *Client) GetEndpoints() (*ua.GetEndpointsResponse, error) {
+	stats.Client().Add("GetEndpoints", 1)
+
 	req := &ua.GetEndpointsRequest{
 		EndpointURL: c.endpointURL,
 	}
@@ -872,6 +903,9 @@ func cloneReadRequest(req *ua.ReadRequest) *ua.ReadRequest {
 // By default, the function requests the value of the nodes
 // in the default encoding of the server.
 func (c *Client) Read(req *ua.ReadRequest) (*ua.ReadResponse, error) {
+	stats.Client().Add("Read", 1)
+	stats.Client().Add("NodesToRead", int64(len(req.NodesToRead)))
+
 	// clone the request and the ReadValueIDs to set defaults without
 	// manipulating them in-place.
 	req = cloneReadRequest(req)
@@ -904,6 +938,9 @@ func (c *Client) Read(req *ua.ReadRequest) (*ua.ReadResponse, error) {
 
 // Write executes a synchronous write request.
 func (c *Client) Write(req *ua.WriteRequest) (*ua.WriteResponse, error) {
+	stats.Client().Add("Write", 1)
+	stats.Client().Add("NodesToWrite", int64(len(req.NodesToWrite)))
+
 	var res *ua.WriteResponse
 	err := c.Send(req, func(v interface{}) error {
 		return safeAssign(v, &res)
@@ -937,6 +974,9 @@ func cloneBrowseRequest(req *ua.BrowseRequest) *ua.BrowseRequest {
 
 // Browse executes a synchronous browse request.
 func (c *Client) Browse(req *ua.BrowseRequest) (*ua.BrowseResponse, error) {
+	stats.Client().Add("Browse", 1)
+	stats.Client().Add("NodesToBrowse", int64(len(req.NodesToBrowse)))
+
 	// clone the request and the NodesToBrowse to set defaults without
 	// manipulating them in-place.
 	req = cloneBrowseRequest(req)
@@ -950,6 +990,8 @@ func (c *Client) Browse(req *ua.BrowseRequest) (*ua.BrowseResponse, error) {
 
 // Call executes a synchronous call request for a single method.
 func (c *Client) Call(req *ua.CallMethodRequest) (*ua.CallMethodResult, error) {
+	stats.Client().Add("Call", 1)
+
 	creq := &ua.CallRequest{
 		MethodsToCall: []*ua.CallMethodRequest{req},
 	}
@@ -968,6 +1010,8 @@ func (c *Client) Call(req *ua.CallMethodRequest) (*ua.CallMethodResult, error) {
 
 // BrowseNext executes a synchronous browse request.
 func (c *Client) BrowseNext(req *ua.BrowseNextRequest) (*ua.BrowseNextResponse, error) {
+	stats.Client().Add("BrowseNext", 1)
+
 	var res *ua.BrowseNextResponse
 	err := c.Send(req, func(v interface{}) error {
 		return safeAssign(v, &res)
@@ -978,6 +1022,9 @@ func (c *Client) BrowseNext(req *ua.BrowseNextRequest) (*ua.BrowseNextResponse, 
 // RegisterNodes registers node ids for more efficient reads.
 // Part 4, Section 5.8.5
 func (c *Client) RegisterNodes(req *ua.RegisterNodesRequest) (*ua.RegisterNodesResponse, error) {
+	stats.Client().Add("RegisterNodes", 1)
+	stats.Client().Add("NodesToRegister", int64(len(req.NodesToRegister)))
+
 	var res *ua.RegisterNodesResponse
 	err := c.Send(req, func(v interface{}) error {
 		return safeAssign(v, &res)
@@ -988,6 +1035,9 @@ func (c *Client) RegisterNodes(req *ua.RegisterNodesRequest) (*ua.RegisterNodesR
 // UnregisterNodes unregisters node ids previously registered with RegisterNodes.
 // Part 4, Section 5.8.6
 func (c *Client) UnregisterNodes(req *ua.UnregisterNodesRequest) (*ua.UnregisterNodesResponse, error) {
+	stats.Client().Add("UnregisterNodes", 1)
+	stats.Client().Add("NodesToUnregister", int64(len(req.NodesToUnregister)))
+
 	var res *ua.UnregisterNodesResponse
 	err := c.Send(req, func(v interface{}) error {
 		return safeAssign(v, &res)
@@ -996,6 +1046,9 @@ func (c *Client) UnregisterNodes(req *ua.UnregisterNodesRequest) (*ua.Unregister
 }
 
 func (c *Client) HistoryReadRawModified(nodes []*ua.HistoryReadValueID, details *ua.ReadRawModifiedDetails) (*ua.HistoryReadResponse, error) {
+	stats.Client().Add("HistoryReadRawModified", 1)
+	stats.Client().Add("HistoryReadValueID", int64(len(nodes)))
+
 	// Part 4, 5.10.3 HistoryRead
 	req := &ua.HistoryReadRequest{
 		TimestampsToReturn: ua.TimestampsToReturnBoth,
@@ -1017,6 +1070,7 @@ func (c *Client) HistoryReadRawModified(nodes []*ua.HistoryReadValueID, details 
 
 // NamespaceArray returns the list of namespaces registered on the server.
 func (c *Client) NamespaceArray() ([]string, error) {
+	stats.Client().Add("NamespaceArray", 1)
 	node := c.Node(ua.NewNumericNodeID(0, id.Server_NamespaceArray))
 	v, err := node.Value()
 	if err != nil {
@@ -1032,6 +1086,7 @@ func (c *Client) NamespaceArray() ([]string, error) {
 
 // UpdateNamespaces updates the list of cached namespaces from the server.
 func (c *Client) UpdateNamespaces() error {
+	stats.Client().Add("UpdateNamespaces", 1)
 	ns, err := c.NamespaceArray()
 	if err != nil {
 		return err
