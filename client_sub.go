@@ -215,15 +215,17 @@ func (c *Client) registerSubscription(sub *Subscription) error {
 func (c *Client) forgetSubscription(ctx context.Context, id uint32) {
 	c.subMux.Lock()
 	delete(c.subs, id)
+	c.updatePublishTimeout()
 	c.subMux.Unlock()
 
-	c.updatePublishTimeout()
 	if len(c.subs) == 0 {
 		c.pauseSubscriptions(ctx)
 	}
 }
 
 func (c *Client) updatePublishTimeout() {
+	// we need to hold the subMux lock already
+
 	maxTimeout := uasc.MaxTimeout
 	for _, s := range c.subs {
 		if d := s.publishTimeout(); d < maxTimeout {
