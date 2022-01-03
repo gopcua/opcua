@@ -360,12 +360,14 @@ func (c *Client) monitor(ctx context.Context) {
 						// This only works if the session is still open on the server
 						// otherwise recreate it
 
-						dlog.Printf("trying to restore session")
-						s, err := c.DetachSession()
-						if err != nil {
-							action = createSecureChannel
+						s := c.Session()
+						if s == nil {
+							dlog.Printf("no session to restore")
+							action = recreateSession
 							continue
 						}
+
+						dlog.Printf("trying to restore session")
 						if err := c.ActivateSession(s); err != nil {
 							dlog.Printf("restore session failed")
 							action = recreateSession
