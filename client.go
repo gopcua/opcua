@@ -95,11 +95,11 @@ type Client struct {
 	conn *uacp.Conn
 
 	// sechan is the open secure channel.
-	sechan    *uasc.SecureChannel
-	sechanErr chan error
+	atomicSechan atomic.Value // *uasc.SecureChannel
+	sechanErr    chan error
 
-	// session is the active session.
-	session atomic.Value // *Session
+	// atomicSession is the active atomicSession.
+	atomicSession atomic.Value // *Session
 
 	// subMux guards subs and pendingAcks.
 	subMux sync.RWMutex
@@ -121,19 +121,16 @@ type Client struct {
 	mcancel func()
 
 	// timeout for sending PublishRequests
-	publishTimeout atomic.Value
+	atomicPublishTimeout atomic.Value // time.Duration
 
-	// state of the client
-	state atomic.Value // ConnState
+	// atomicState of the client
+	atomicState atomic.Value // ConnState
 
-	// list of cached namespaces on the server
-	namespaces atomic.Value // []string
+	// list of cached atomicNamespaces on the server
+	atomicNamespaces atomic.Value // []string
 
 	// monitorOnce ensures only one connection monitor is running
 	monitorOnce sync.Once
-
-	// sessionOnce initializes the session
-	sessionOnce sync.Once
 }
 
 // NewClient creates a new Client.
@@ -158,10 +155,12 @@ func NewClient(endpoint string, opts ...Option) *Client {
 		pausech:     make(chan struct{}, 2),
 		resumech:    make(chan struct{}, 2),
 	}
-	c.publishTimeout.Store(uasc.MaxTimeout)
 	c.pauseSubscriptions(context.Background())
-	c.state.Store(Closed)
-	c.namespaces.Store([]string{})
+	c.setPublishTimeout(uasc.MaxTimeout)
+	c.setState(Closed)
+	c.setSecureChannel(nil)
+	c.setSession(nil)
+	c.setNamespaces([]string{})
 	return &c
 }
 
@@ -181,11 +180,11 @@ const (
 
 // Connect establishes a secure channel and creates a new session.
 func (c *Client) Connect(ctx context.Context) (err error) {
-	if c.sechan != nil {
+	if c.SecureChannel() != nil {
 		return errors.Errorf("already connected")
 	}
 
-	c.state.Store(Connecting)
+	c.setState(Connecting)
 	if err := c.Dial(ctx); err != nil {
 		return err
 	}
@@ -200,7 +199,7 @@ func (c *Client) Connect(ctx context.Context) (err error) {
 		c.Close()
 		return err
 	}
-	c.state.Store(Connected)
+	c.setState(Connected)
 
 	mctx, mcancel := context.WithCancel(context.Background())
 	c.mcancel = mcancel
@@ -229,7 +228,7 @@ func (c *Client) monitor(ctx context.Context) {
 	defer dlog.Printf("done")
 
 	defer c.mcancel()
-	defer c.state.Store(Closed)
+	defer c.setState(Closed)
 
 	action := none
 	for {
@@ -245,7 +244,7 @@ func (c *Client) monitor(ctx context.Context) {
 			}
 
 			// tell the handler the connection is disconnected
-			c.state.Store(Disconnected)
+			c.setState(Disconnected)
 			dlog.Print("disconnected")
 
 			if !c.cfg.sechan.AutoReconnect {
@@ -297,7 +296,7 @@ func (c *Client) monitor(ctx context.Context) {
 				}
 			}
 
-			c.state.Store(Disconnected)
+			c.setState(Disconnected)
 
 			c.pauseSubscriptions(ctx)
 
@@ -331,11 +330,13 @@ func (c *Client) monitor(ctx context.Context) {
 						// todo(fs): down.
 						//
 						// https://github.com/gopcua/opcua/pull/470
-						_ = c.conn.Close()
-						c.sechan.Close()
-						c.sechan = nil
+						c.conn.Close()
+						if sc := c.SecureChannel(); sc != nil {
+							sc.Close()
+							c.setSecureChannel(nil)
+						}
 
-						c.state.Store(Reconnecting)
+						c.setState(Reconnecting)
 
 						dlog.Printf("trying to recreate secure channel")
 						for {
@@ -459,7 +460,7 @@ func (c *Client) monitor(ctx context.Context) {
 							}
 						}
 
-						c.state.Store(Connected)
+						c.setState(Connected)
 						action = none
 
 					case abortReconnect:
@@ -489,11 +490,7 @@ func (c *Client) monitor(ctx context.Context) {
 
 // Dial establishes a secure channel.
 func (c *Client) Dial(ctx context.Context) error {
-	c.sessionOnce.Do(func() {
-		c.session.Store((*Session)(nil))
-	})
-
-	if c.sechan != nil {
+	if c.SecureChannel() != nil {
 		return errors.Errorf("secure channel already connected")
 	}
 
@@ -504,16 +501,17 @@ func (c *Client) Dial(ctx context.Context) error {
 		return err
 	}
 
-	c.sechan, err = uasc.NewSecureChannel(c.endpointURL, c.conn, c.cfg.sechan, c.sechanErr)
+	sc, err := uasc.NewSecureChannel(c.endpointURL, c.conn, c.cfg.sechan, c.sechanErr)
 	if err != nil {
 		c.conn.Close()
 		return err
 	}
 
-	if err := c.sechan.Open(ctx); err != nil {
+	if err := sc.Open(ctx); err != nil {
 		c.conn.Close()
 		return err
 	}
+	c.setSecureChannel(sc)
 
 	return nil
 }
@@ -523,13 +521,13 @@ func (c *Client) Close() error {
 	// try to close the session but ignore any error
 	// so that we close the underlying channel and connection.
 	c.CloseSession()
-	c.state.Store(Closed)
+	c.setState(Closed)
 
 	if c.mcancel != nil {
 		c.mcancel()
 	}
-	if c.sechan != nil {
-		c.sechan.Close()
+	if c.SecureChannel() != nil {
+		c.SecureChannel().Close()
 	}
 
 	// https://github.com/gopcua/opcua/pull/462
@@ -547,18 +545,48 @@ func (c *Client) Close() error {
 	return nil
 }
 
+// State returns the current connection state.
 func (c *Client) State() ConnState {
-	return c.state.Load().(ConnState)
+	return c.atomicState.Load().(ConnState)
+}
+
+func (c *Client) setState(s ConnState) {
+	c.atomicState.Store(s)
 }
 
 // Namespaces returns the currently cached list of namespaces.
 func (c *Client) Namespaces() []string {
-	return c.namespaces.Load().([]string)
+	return c.atomicNamespaces.Load().([]string)
+}
+
+func (c *Client) setNamespaces(ns []string) {
+	c.atomicNamespaces.Store(ns)
+}
+
+func (c *Client) publishTimeout() time.Duration {
+	return c.atomicPublishTimeout.Load().(time.Duration)
+}
+
+func (c *Client) setPublishTimeout(d time.Duration) {
+	c.atomicPublishTimeout.Store(d)
+}
+
+// SecureChannel returns the active secure channel.
+func (c *Client) SecureChannel() *uasc.SecureChannel {
+	return c.atomicSechan.Load().(*uasc.SecureChannel)
+}
+
+func (c *Client) setSecureChannel(sc *uasc.SecureChannel) {
+	c.atomicSechan.Store(sc)
 }
 
 // Session returns the active session.
 func (c *Client) Session() *Session {
-	return c.session.Load().(*Session)
+	return c.atomicSession.Load().(*Session)
+}
+
+func (c *Client) setSession(s *Session) {
+	c.atomicSession.Store(s)
 }
 
 // sessionClosed returns true when there is no session.
@@ -595,7 +623,7 @@ type Session struct {
 //
 // See Part 4, 5.6.2
 func (c *Client) CreateSession(cfg *uasc.SessionConfig) (*Session, error) {
-	if c.sechan == nil {
+	if c.SecureChannel() == nil {
 		return nil, ua.StatusBadServerNotConnected
 	}
 
@@ -620,14 +648,14 @@ func (c *Client) CreateSession(cfg *uasc.SessionConfig) (*Session, error) {
 
 	var s *Session
 	// for the CreateSessionRequest the authToken is always nil.
-	// use c.sechan.SendRequest() to enforce this.
-	err := c.sechan.SendRequest(req, nil, func(v interface{}) error {
+	// use c.SecureChannel().SendRequest() to enforce this.
+	err := c.SecureChannel().SendRequest(req, nil, func(v interface{}) error {
 		var res *ua.CreateSessionResponse
 		if err := safeAssign(v, &res); err != nil {
 			return err
 		}
 
-		err := c.sechan.VerifySessionSignature(res.ServerCertificate, nonce, res.ServerSignature.Signature)
+		err := c.SecureChannel().VerifySessionSignature(res.ServerCertificate, nonce, res.ServerSignature.Signature)
 		if err != nil {
 			log.Printf("error verifying session signature: %s", err)
 			return nil
@@ -679,10 +707,10 @@ func anonymousPolicyID(endpoints []*ua.EndpointDescription) string {
 //
 // See Part 4, 5.6.3
 func (c *Client) ActivateSession(s *Session) error {
-	if c.sechan == nil {
+	if c.SecureChannel() == nil {
 		return ua.StatusBadServerNotConnected
 	}
-	sig, sigAlg, err := c.sechan.NewSessionSignature(s.serverCertificate, s.serverNonce)
+	sig, sigAlg, err := c.SecureChannel().NewSessionSignature(s.serverCertificate, s.serverNonce)
 	if err != nil {
 		log.Printf("error creating session signature: %s", err)
 		return nil
@@ -693,7 +721,7 @@ func (c *Client) ActivateSession(s *Session) error {
 		// nothing to do
 
 	case *ua.UserNameIdentityToken:
-		pass, passAlg, err := c.sechan.EncryptUserPassword(s.cfg.AuthPolicyURI, s.cfg.AuthPassword, s.serverCertificate, s.serverNonce)
+		pass, passAlg, err := c.SecureChannel().EncryptUserPassword(s.cfg.AuthPolicyURI, s.cfg.AuthPassword, s.serverCertificate, s.serverNonce)
 		if err != nil {
 			log.Printf("error encrypting user password: %s", err)
 			return err
@@ -702,7 +730,7 @@ func (c *Client) ActivateSession(s *Session) error {
 		tok.EncryptionAlgorithm = passAlg
 
 	case *ua.X509IdentityToken:
-		tokSig, tokSigAlg, err := c.sechan.NewUserTokenSignature(s.cfg.AuthPolicyURI, s.serverCertificate, s.serverNonce)
+		tokSig, tokSigAlg, err := c.SecureChannel().NewUserTokenSignature(s.cfg.AuthPolicyURI, s.serverCertificate, s.serverNonce)
 		if err != nil {
 			log.Printf("error creating session signature: %s", err)
 			return err
@@ -726,7 +754,7 @@ func (c *Client) ActivateSession(s *Session) error {
 		UserIdentityToken:          ua.NewExtensionObject(s.cfg.UserIdentityToken),
 		UserTokenSignature:         s.cfg.UserTokenSignature,
 	}
-	return c.sechan.SendRequest(req, s.resp.AuthenticationToken, func(v interface{}) error {
+	return c.SecureChannel().SendRequest(req, s.resp.AuthenticationToken, func(v interface{}) error {
 		var res *ua.ActivateSessionResponse
 		if err := safeAssign(v, &res); err != nil {
 			return err
@@ -744,7 +772,7 @@ func (c *Client) ActivateSession(s *Session) error {
 		// re-connection logic.
 		c.CloseSession()
 
-		c.session.Store(s)
+		c.setSession(s)
 		return nil
 	})
 }
@@ -756,7 +784,7 @@ func (c *Client) CloseSession() error {
 	if err := c.closeSession(c.Session()); err != nil {
 		return err
 	}
-	c.session.Store((*Session)(nil))
+	c.setSession(nil)
 	return nil
 }
 
@@ -777,7 +805,7 @@ func (c *Client) closeSession(s *Session) error {
 // does not have an active session the function returns no error.
 func (c *Client) DetachSession() (*Session, error) {
 	s := c.Session()
-	c.session.Store((*Session)(nil))
+	c.setSession(nil)
 	return s, nil
 }
 
@@ -792,14 +820,14 @@ func (c *Client) Send(req ua.Request, h func(interface{}) error) error {
 // the response. If the client has an active session it injects the
 // authentication token.
 func (c *Client) sendWithTimeout(req ua.Request, timeout time.Duration, h func(interface{}) error) error {
-	if c.sechan == nil {
+	if c.SecureChannel() == nil {
 		return ua.StatusBadServerNotConnected
 	}
 	var authToken *ua.NodeID
 	if s := c.Session(); s != nil {
 		authToken = s.resp.AuthenticationToken
 	}
-	return c.sechan.SendRequestWithTimeout(req, authToken, timeout, h)
+	return c.SecureChannel().SendRequestWithTimeout(req, authToken, timeout, h)
 }
 
 // Node returns a node object which accesses its attributes
@@ -1008,7 +1036,8 @@ func (c *Client) UpdateNamespaces() error {
 	if err != nil {
 		return err
 	}
-	c.namespaces.Store(ns)
+	c.setSession(nil)
+	c.setNamespaces(ns)
 	return nil
 }
 
