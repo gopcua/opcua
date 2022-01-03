@@ -32,20 +32,38 @@ func TestStats(t *testing.T) {
 
 	c.Close()
 
-	expected := map[string]*expvar.Int{
+	want := map[string]*expvar.Int{
 		"Dial":             newExpVarInt(1),
 		"ActivateSession":  newExpVarInt(1),
 		"NamespaceArray":   newExpVarInt(1),
 		"UpdateNamespaces": newExpVarInt(1),
 		"NodesToRead":      newExpVarInt(1),
 		"Read":             newExpVarInt(1),
-		"Send":             newExpVarInt(2),
+		"Send":             newExpVarInt(1),
 		"Close":            newExpVarInt(1),
 		"CloseSession":     newExpVarInt(2),
+		"SecureChannel":    newExpVarInt(2),
+		"Session":          newExpVarInt(5),
+		"State":            newExpVarInt(0),
 	}
 
-	for k, ev := range expected {
+	got := map[string]expvar.Var{}
+	stats.Client().Do(func(kv expvar.KeyValue) { got[kv.Key] = kv.Value })
+	for k := range got {
+		if _, ok := want[k]; !ok {
+			t.Fatalf("got unexpected key %q", k)
+		}
+	}
+	for k := range want {
+		if _, ok := got[k]; !ok {
+			t.Fatalf("missing expected key %q", k)
+		}
+	}
+
+	for k, ev := range want {
 		v := stats.Client().Get(k)
-		verify.Values(t, k, v, ev)
+		if !verify.Values(t, "", v, ev) {
+			t.Errorf("got %s for %q, want %s", v.String(), k, ev.String())
+		}
 	}
 }
