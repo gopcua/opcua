@@ -8,6 +8,7 @@ import (
 
 	"github.com/gopcua/opcua/debug"
 	"github.com/gopcua/opcua/errors"
+	"github.com/gopcua/opcua/stats"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uasc"
 )
@@ -16,6 +17,8 @@ import (
 // Parameters that have not been set are set to their default values.
 // See opcua.DefaultSubscription* constants
 func (c *Client) Subscribe(params *SubscriptionParameters, notifyCh chan *PublishNotificationData) (*Subscription, error) {
+	stats.Client().Add("Subscribe", 1)
+
 	if params == nil {
 		params = &SubscriptionParameters{}
 	}
@@ -40,6 +43,8 @@ func (c *Client) Subscribe(params *SubscriptionParameters, notifyCh chan *Publis
 	if res.ResponseHeader.ServiceResult != ua.StatusOK {
 		return nil, res.ResponseHeader.ServiceResult
 	}
+
+	stats.Subscription().Add("Count", 1)
 
 	// start the publish loop if it isn't already running
 	c.resumech <- struct{}{}
@@ -217,6 +222,7 @@ func (c *Client) forgetSubscription(ctx context.Context, id uint32) {
 	delete(c.subs, id)
 	c.updatePublishTimeout()
 	c.subMux.Unlock()
+	stats.Subscription().Add("Count", -1)
 
 	if len(c.subs) == 0 {
 		c.pauseSubscriptions(ctx)
@@ -374,6 +380,7 @@ func (c *Client) publish(ctx context.Context) error {
 	// send the next publish request
 	// note that res contains data even if an error was returned
 	res, err := c.sendPublishRequest()
+	stats.RecordError(err)
 	switch {
 	case err == io.EOF:
 		dlog.Printf("eof: pausing publish loop")
@@ -518,6 +525,7 @@ func (c *Client) sendPublishRequest() (*ua.PublishResponse, error) {
 	err := c.sendWithTimeout(req, c.publishTimeout(), func(v interface{}) error {
 		return safeAssign(v, &res)
 	})
+	stats.RecordError(err)
 	dlog.Printf("PublishResponse: %s", debug.ToJSON(res))
 	return res, err
 }

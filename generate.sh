@@ -4,6 +4,7 @@ rm -f */*_gen.go
 go run cmd/id/main.go
 go run cmd/status/main.go
 go run cmd/service/*.go
+go run cmd/stats/*.go
 
 # install stringer if not installed already
 command -v stringer || go get -u golang.org/x/tools/cmd/stringer
@@ -17,6 +18,9 @@ echo "Wrote ua/enums_strings_gen.go"
 
 stringer -type ConnState -output connstate_strings_gen.go
 echo "Wrote connstate_strings_gen.go"
+
+(cd stats && stringer -type Metric -output metrics_strings_gen.go)
+echo "Wrote stats/metrics_strings_gen.go"
 
 # remove golang.org/x/tools/cmd/stringer from list of dependencies
 go mod tidy

@@ -9,6 +9,7 @@ import (
 	"github.com/gopcua/opcua/debug"
 	"github.com/gopcua/opcua/errors"
 	"github.com/gopcua/opcua/id"
+	"github.com/gopcua/opcua/stats"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uasc"
 )
@@ -81,6 +82,7 @@ type PublishNotificationData struct {
 // Cancel stops the subscription and removes it
 // from the client and the server.
 func (s *Subscription) Cancel(ctx context.Context) error {
+	stats.Subscription().Add("Cancel", 1)
 	s.c.forgetSubscription(ctx, s.SubscriptionID)
 	return s.delete()
 }
@@ -110,6 +112,9 @@ func (s *Subscription) delete() error {
 }
 
 func (s *Subscription) Monitor(ts ua.TimestampsToReturn, items ...*ua.MonitoredItemCreateRequest) (*ua.CreateMonitoredItemsResponse, error) {
+	stats.Subscription().Add("Monitor", 1)
+	stats.Subscription().Add("MonitoredItems", int64(len(items)))
+
 	// Part 4, 5.12.2.2 CreateMonitoredItems Service Parameters
 	req := &ua.CreateMonitoredItemsRequest{
 		SubscriptionID:     s.SubscriptionID,
@@ -142,6 +147,9 @@ func (s *Subscription) Monitor(ts ua.TimestampsToReturn, items ...*ua.MonitoredI
 }
 
 func (s *Subscription) Unmonitor(monitoredItemIDs ...uint32) (*ua.DeleteMonitoredItemsResponse, error) {
+	stats.Subscription().Add("Unmonitor", 1)
+	stats.Subscription().Add("UnmonitoredItems", int64(len(monitoredItemIDs)))
+
 	req := &ua.DeleteMonitoredItemsRequest{
 		MonitoredItemIDs: monitoredItemIDs,
 		SubscriptionID:   s.SubscriptionID,
@@ -165,6 +173,9 @@ func (s *Subscription) Unmonitor(monitoredItemIDs ...uint32) (*ua.DeleteMonitore
 }
 
 func (s *Subscription) ModifyMonitoredItems(ts ua.TimestampsToReturn, items ...*ua.MonitoredItemModifyRequest) (*ua.ModifyMonitoredItemsResponse, error) {
+	stats.Subscription().Add("ModifyMonitoredItems", 1)
+	stats.Subscription().Add("ModifiedMonitoredItems", int64(len(items)))
+
 	s.itemsMu.Lock()
 	for _, item := range items {
 		id := item.MonitoredItemID
@@ -212,6 +223,8 @@ func (s *Subscription) ModifyMonitoredItems(ts ua.TimestampsToReturn, items ...*
 // To add links from a triggering item to an item to report provide the server assigned ID(s) in the `add` argument.
 // To remove links from a triggering item to an item to report provide the server assigned ID(s) in the `remove` argument.
 func (s *Subscription) SetTriggering(triggeringItemID uint32, add, remove []uint32) (*ua.SetTriggeringResponse, error) {
+	stats.Subscription().Add("SetTriggering", 1)
+
 	// Part 4, 5.12.5.2 SetTriggering Service Parameters
 	req := &ua.SetTriggeringRequest{
 		SubscriptionID:   s.SubscriptionID,
