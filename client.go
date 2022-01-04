@@ -1091,7 +1091,6 @@ func (c *Client) UpdateNamespaces() error {
 	if err != nil {
 		return err
 	}
-	c.setSession(nil)
 	c.setNamespaces(ns)
 	return nil
 }
