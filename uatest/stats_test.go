@@ -39,11 +39,11 @@ func TestStats(t *testing.T) {
 		"UpdateNamespaces": newExpVarInt(1),
 		"NodesToRead":      newExpVarInt(1),
 		"Read":             newExpVarInt(1),
-		"Send":             newExpVarInt(1),
+		"Send":             newExpVarInt(2),
 		"Close":            newExpVarInt(1),
 		"CloseSession":     newExpVarInt(2),
 		"SecureChannel":    newExpVarInt(2),
-		"Session":          newExpVarInt(5),
+		"Session":          newExpVarInt(4),
 		"State":            newExpVarInt(0),
 	}
 
