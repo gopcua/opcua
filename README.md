@@ -20,6 +20,11 @@ See below for a list of [Tested Platforms](#tested-platforms) and [Supported Fea
 [![License](https://img.shields.io/github/license/mashape/apistatus.svg)](https://github.com/gopcua/opcua/blob/master/LICENSE)
 [![Version](https://img.shields.io/github/tag/gopcua/opcua.svg?color=blue&label=version)](https://github.com/gopcua/opcua/releases)
 
+## Note
+
+`v0.2.4` and `v0.2.5` are broken and should not be used. Please upgrade to `v0.2.6` or later. 
+See [#538](https://github.com/gopcua/opcua/issues/538) for details.
+
 ## Quickstart
 
 ```sh
