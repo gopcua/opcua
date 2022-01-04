@@ -220,12 +220,12 @@ func (s *SecureChannel) dispatcher() {
 				s.rcvLocker.lock()
 			}
 
-			debug.Printf("sending %T to handler\n", resp.V)
+			debug.Printf("uasc %d/%d: sending %T to handler", s.c.ID(), resp.ReqID, resp.V)
 			select {
 			case ch <- resp:
 			default:
 				// this should never happen since the chan is of size one
-				debug.Printf("unexpected state. channel write should always succeed.")
+				debug.Printf("uasc %d/%d: unexpected state. channel write should always succeed.", s.c.ID(), resp.ReqID)
 			}
 
 			s.rcvLocker.waitIfLock()
@@ -245,7 +245,7 @@ func (s *SecureChannel) receive(ctx context.Context) *response {
 		default:
 			chunk, err := s.readChunk()
 			if err == io.EOF {
-				debug.Printf("uasc readChunk EOF")
+				debug.Printf("uasc %d: readChunk EOF", s.c.ID())
 				return &response{Err: err}
 			}
 
@@ -272,7 +272,7 @@ func (s *SecureChannel) receive(ctx context.Context) *response {
 
 				msga := new(MessageAbort)
 				if _, err := msga.Decode(chunk.Data); err != nil {
-					debug.Printf("conn %d/%d: invalid MSGA chunk. %s", s.c.ID(), reqID, err)
+					debug.Printf("uasc %d/%d: invalid MSGA chunk. %s", s.c.ID(), reqID, err)
 					resp.Err = ua.StatusBadDecodingError
 					return resp
 				}
@@ -367,8 +367,6 @@ func (s *SecureChannel) readChunk() (*MessageChunk, error) {
 
 	switch m.MessageType {
 	case "OPN":
-		debug.Printf("uasc OPN Request")
-
 		// Make sure we have a valid security header
 		if m.AsymmetricSecurityHeader == nil {
 			return nil, ua.StatusBadDecodingError // todo(dh): check if this is the correct error
@@ -380,7 +378,7 @@ func (s *SecureChannel) readChunk() (*MessageChunk, error) {
 
 		if m.SecurityPolicyURI != ua.SecurityPolicyURINone {
 			s.cfg.RemoteCertificate = m.AsymmetricSecurityHeader.SenderCertificate
-			debug.Printf("Setting securityPolicy to %s", m.SecurityPolicyURI)
+			debug.Printf("uasc %d: setting securityPolicy to %s", s.c.ID(), m.SecurityPolicyURI)
 		}
 
 		s.cfg.SecurityPolicyURI = m.SecurityPolicyURI
@@ -389,7 +387,7 @@ func (s *SecureChannel) readChunk() (*MessageChunk, error) {
 	case "CLO":
 		return nil, io.EOF
 	case "MSG":
-		// nop
+		// noop
 	default:
 		return nil, errors.Errorf("sechan: unknown message type: %s", m.MessageType)
 	}
@@ -427,13 +425,10 @@ func (s *SecureChannel) verifyAndDecrypt(m *MessageChunk, b []byte, instance *ch
 	)
 
 	for i := len(instances) - 1; i >= 0; i-- {
-		// instances[i].Lock()
 		if verified, err = instances[i].verifyAndDecrypt(m, b); err == nil {
-			// instances[i].Unlock()
 			return verified, nil
 		}
-		// instances[i].Unlock()
-		debug.Printf("attempting an older channel state...")
+		debug.Printf("uasc %d: attempting an older channel state...", s.c.ID())
 	}
 
 	return nil, err
@@ -521,7 +516,7 @@ func (s *SecureChannel) open(ctx context.Context, instance *channelInstance, req
 	// trigger cleanup after we are all done
 	defer func() {
 		if s.openingInstance == nil || s.openingInstance.state != channelActive {
-			debug.Printf("failed to open a new secure channel")
+			debug.Printf("uasc %d: failed to open a new secure channel", s.c.ID())
 		}
 		s.openingInstance = nil
 	}()
@@ -581,7 +576,7 @@ func (s *SecureChannel) handleOpenSecureChannelResponse(resp *ua.OpenSecureChann
 
 	s.activeInstance = instance
 
-	debug.Printf("received security token: channelID=%d tokenID=%d createdAt=%s lifetime=%s", instance.secureChannelID, instance.securityTokenID, instance.createdAt.Format(time.RFC3339), instance.revisedLifetime)
+	debug.Printf("uasc %d: received security token. channelID=%d tokenID=%d createdAt=%s lifetime=%s", s.c.ID(), instance.secureChannelID, instance.securityTokenID, instance.createdAt.Format(time.RFC3339), instance.revisedLifetime)
 
 	go s.scheduleRenewal(instance)
 	go s.scheduleExpiration(instance)
@@ -596,7 +591,7 @@ func (s *SecureChannel) scheduleRenewal(instance *channelInstance) {
 	const renewAfter = 0.75
 	when := time.Second * time.Duration(instance.revisedLifetime.Seconds()*renewAfter)
 
-	debug.Printf("channelID %d will be refreshed in %s (%s)", instance.secureChannelID, when, time.Now().UTC().Add(when).Format(time.RFC3339))
+	debug.Printf("uasc %d: security token is refreshed at %s (%s). channelID=%d tokenID=%d", s.c.ID(), time.Now().UTC().Add(when).Format(time.RFC3339), when, instance.secureChannelID, instance.securityTokenID)
 
 	t := time.NewTimer(when)
 	defer t.Stop()
@@ -628,7 +623,7 @@ func (s *SecureChannel) scheduleExpiration(instance *channelInstance) {
 	const expireAfter = 1.25
 	when := instance.createdAt.Add(time.Second * time.Duration(instance.revisedLifetime.Seconds()*expireAfter))
 
-	debug.Printf("channelID %d/%d will expire at %s", instance.secureChannelID, instance.securityTokenID, when.UTC().Format(time.RFC3339))
+	debug.Printf("uasc %d: security token expires at %s. channelID=%d tokenID=%d", s.c.ID(), when.UTC().Format(time.RFC3339), instance.secureChannelID, instance.securityTokenID)
 
 	t := time.NewTimer(time.Until(when))
 
@@ -648,7 +643,7 @@ func (s *SecureChannel) scheduleExpiration(instance *channelInstance) {
 	for _, oldInstance := range oldInstances {
 		if oldInstance.secureChannelID != instance.secureChannelID {
 			// something has gone horribly wrong!
-			debug.Printf("secureChannelID mismatch during scheduleExpiration!")
+			debug.Printf("uasc %d: secureChannelID mismatch during scheduleExpiration!", s.c.ID())
 		}
 		if oldInstance.securityTokenID == instance.securityTokenID {
 			continue
@@ -825,7 +820,7 @@ func (s *SecureChannel) Close() (err error) {
 }
 
 func (s *SecureChannel) close() error {
-	debug.Printf("uasc Close()")
+	debug.Printf("uasc %d: Close()", s.c.ID())
 
 	defer func() {
 		close(s.closing)
@@ -863,14 +858,8 @@ func mergeChunks(chunks []*MessageChunk) ([]byte, error) {
 		return chunks[0].Data, nil
 	}
 
-	// todo(fs): check if this is correct and necessary
-	// sort.Sort(bySequence(chunks))
-
-	var (
-		b     []byte
-		seqnr uint32
-	)
-
+	var b []byte
+	var seqnr uint32
 	for _, c := range chunks {
 		if c.SequenceHeader.SequenceNumber == seqnr {
 			continue // duplicate chunk
@@ -880,12 +869,3 @@ func mergeChunks(chunks []*MessageChunk) ([]byte, error) {
 	}
 	return b, nil
 }
-
-// todo(fs): we only need this if we need to sort chunks. Need to check the spec
-// type bySequence []*MessageChunk
-
-// func (a bySequence) Len() int      { return len(a) }
-// func (a bySequence) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
-// func (a bySequence) Less(i, j int) bool {
-// 	return a[i].SequenceHeader.SequenceNumber < a[j].SequenceHeader.SequenceNumber
-// }

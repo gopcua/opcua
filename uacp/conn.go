@@ -66,7 +66,7 @@ type Dialer struct {
 }
 
 func (d *Dialer) Dial(ctx context.Context, endpoint string) (*Conn, error) {
-	debug.Printf("Connecting to %s", endpoint)
+	debug.Printf("uacp: connecting to %s", endpoint)
 	_, raddr, err := ResolveEndpoint(endpoint)
 	if err != nil {
 		return nil, err
@@ -88,9 +88,9 @@ func (d *Dialer) Dial(ctx context.Context, endpoint string) (*Conn, error) {
 		return nil, err
 	}
 
-	debug.Printf("conn %d: start HEL/ACK handshake", conn.id)
+	debug.Printf("uacp %d: start HEL/ACK handshake", conn.id)
 	if err := conn.Handshake(endpoint); err != nil {
-		debug.Printf("conn %d: HEL/ACK handshake failed: %s", conn.id, err)
+		debug.Printf("uacp %d: HEL/ACK handshake failed: %s", conn.id, err)
 		conn.Close()
 		return nil, err
 	}
@@ -213,7 +213,7 @@ func (c *Conn) Close() (err error) {
 }
 
 func (c *Conn) close() error {
-	debug.Printf("conn %d: close", c.id)
+	debug.Printf("uacp %d: close", c.id)
 	return c.TCPConn.Close()
 }
 
@@ -248,14 +248,14 @@ func (c *Conn) Handshake(endpoint string) error {
 		}
 		if ack.MaxChunkCount == 0 {
 			ack.MaxChunkCount = DefaultMaxChunkCount
-			debug.Printf("conn %d: server has no chunk limit. Using %d", c.id, ack.MaxChunkCount)
+			debug.Printf("uacp %d: server has no chunk limit. Using %d", c.id, ack.MaxChunkCount)
 		}
 		if ack.MaxMessageSize == 0 {
 			ack.MaxMessageSize = DefaultMaxMessageSize
-			debug.Printf("conn %d: server has no message size limit. Using %d", c.id, ack.MaxMessageSize)
+			debug.Printf("uacp %d: server has no message size limit. Using %d", c.id, ack.MaxMessageSize)
 		}
 		c.ack = ack
-		debug.Printf("conn %d: recv %#v", c.id, ack)
+		debug.Printf("uacp %d: recv %#v", c.id, ack)
 		return nil
 
 	case "ERRF":
@@ -263,7 +263,7 @@ func (c *Conn) Handshake(endpoint string) error {
 		if _, err := errf.Decode(b[hdrlen:]); err != nil {
 			return errors.Errorf("uacp: decode ERR failed: %s", err)
 		}
-		debug.Printf("conn %d: recv %#v", c.id, errf)
+		debug.Printf("uacp %d: recv %#v", c.id, errf)
 		return errf
 
 	default:
@@ -297,7 +297,7 @@ func (c *Conn) srvhandshake(endpoint string) error {
 			c.SendError(ua.StatusBadTCPInternalError)
 			return err
 		}
-		debug.Printf("conn %d: recv %#v", c.id, hel)
+		debug.Printf("uacp %d: recv %#v", c.id, hel)
 		return nil
 
 	case "RHEF":
@@ -310,7 +310,7 @@ func (c *Conn) srvhandshake(endpoint string) error {
 			c.SendError(ua.StatusBadTCPEndpointURLInvalid)
 			return errors.Errorf("uacp: invalid endpoint url %s", rhe.EndpointURL)
 		}
-		debug.Printf("conn %d: connecting to %s", c.id, rhe.ServerURI)
+		debug.Printf("uacp %d: connecting to %s", c.id, rhe.ServerURI)
 		c.Close()
 		var dialer net.Dialer
 		c2, err := dialer.DialContext(context.Background(), "tcp", rhe.ServerURI)
@@ -318,7 +318,7 @@ func (c *Conn) srvhandshake(endpoint string) error {
 			return err
 		}
 		c.TCPConn = c2.(*net.TCPConn)
-		debug.Printf("conn %d: recv %#v", c.id, rhe)
+		debug.Printf("uacp %d: recv %#v", c.id, rhe)
 		return nil
 
 	case "ERRF":
@@ -326,7 +326,7 @@ func (c *Conn) srvhandshake(endpoint string) error {
 		if _, err := errf.Decode(b[hdrlen:]); err != nil {
 			return errors.Errorf("uacp: decode ERR failed: %s", err)
 		}
-		debug.Printf("conn %d: recv %#v", c.id, errf)
+		debug.Printf("uacp %d: recv %#v", c.id, errf)
 		return errf
 
 	default:
@@ -367,7 +367,7 @@ func (c *Conn) Receive() ([]byte, error) {
 		return nil, err
 	}
 
-	debug.Printf("conn %d: recv %s%c with %d bytes", c.id, h.MessageType, h.ChunkType, h.MessageSize)
+	debug.Printf("uacp %d: recv %s%c with %d bytes", c.id, h.MessageType, h.ChunkType, h.MessageSize)
 
 	if h.MessageType == "ERR" {
 		errf := new(Error)
@@ -408,7 +408,7 @@ func (c *Conn) Send(typ string, msg interface{}) error {
 	if _, err := c.Write(b); err != nil {
 		return errors.Errorf("write failed: %s", err)
 	}
-	debug.Printf("conn %d: sent %s with %d bytes", c.id, typ, len(b))
+	debug.Printf("uacp %d: sent %s with %d bytes", c.id, typ, len(b))
 
 	return nil
 }
