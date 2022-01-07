@@ -423,7 +423,7 @@ func (c *Client) monitor(ctx context.Context) {
 
 						// try to transfer all subscriptions to the new session and
 						// recreate them all if that fails.
-						res, err := c.transferSubscriptions(subIDs)
+						res, err := c.transferSubscriptions(ctx, subIDs)
 						switch {
 						case err != nil:
 							dlog.Printf("transfer subscriptions failed. Recreating all subscriptions: %v", err)
