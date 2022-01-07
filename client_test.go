@@ -1,6 +1,7 @@
 package opcua
 
 import (
+	"context"
 	"testing"
 
 	"github.com/gopcua/opcua/id"
@@ -10,7 +11,7 @@ import (
 
 func TestClient_Send_DoesNotPanicWhenDisconnected(t *testing.T) {
 	c := NewClient("opc.tcp://example.com:4840")
-	err := c.Send(&ua.ReadRequest{}, func(i interface{}) error {
+	err := c.SendWithContext(context.Background(), &ua.ReadRequest{}, func(i interface{}) error {
 		return nil
 	})
 	verify.Values(t, "", err, ua.StatusBadServerNotConnected)

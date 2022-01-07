@@ -35,7 +35,7 @@ func GetEndpoints(ctx context.Context, endpoint string, opts ...Option) ([]*ua.E
 		return nil, err
 	}
 	defer c.Close()
-	res, err := c.GetEndpoints()
+	res, err := c.GetEndpointsWithContext(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -810,8 +810,11 @@ func (c *Client) ActivateSessionWithContext(ctx context.Context, s *Session) err
 //
 // See Part 4, 5.6.4
 func (c *Client) CloseSession() error {
+	return c.CloseSessionWithContext(context.Background())
+}
+func (c *Client) CloseSessionWithContext(ctx context.Context) error {
 	stats.Client().Add("CloseSession", 1)
-	if err := c.closeSession(c.Session()); err != nil {
+	if err := c.closeSession(ctx, c.Session()); err != nil {
 		return err
 	}
 	c.setSession(nil)
@@ -819,13 +822,13 @@ func (c *Client) CloseSession() error {
 }
 
 // closeSession closes the given session.
-func (c *Client) closeSession(s *Session) error {
+func (c *Client) closeSession(ctx context.Context, s *Session) error {
 	if s == nil {
 		return nil
 	}
 	req := &ua.CloseSessionRequest{DeleteSubscriptions: true}
 	var res *ua.CloseSessionResponse
-	return c.Send(req, func(v interface{}) error {
+	return c.SendWithContext(ctx, req, func(v interface{}) error {
 		return safeAssign(v, &res)
 	})
 }
@@ -876,13 +879,16 @@ func (c *Client) Node(id *ua.NodeID) *Node {
 }
 
 func (c *Client) GetEndpoints() (*ua.GetEndpointsResponse, error) {
+	return c.GetEndpointsWithContext(context.Background())
+}
+func (c *Client) GetEndpointsWithContext(ctx context.Context) (*ua.GetEndpointsResponse, error) {
 	stats.Client().Add("GetEndpoints", 1)
 
 	req := &ua.GetEndpointsRequest{
 		EndpointURL: c.endpointURL,
 	}
 	var res *ua.GetEndpointsResponse
-	err := c.Send(req, func(v interface{}) error {
+	err := c.SendWithContext(ctx, req, func(v interface{}) error {
 		return safeAssign(v, &res)
 	})
 	return res, err
@@ -1077,6 +1083,9 @@ func (c *Client) UnregisterNodesWithContext(ctx context.Context, req *ua.Unregis
 }
 
 func (c *Client) HistoryReadRawModified(nodes []*ua.HistoryReadValueID, details *ua.ReadRawModifiedDetails) (*ua.HistoryReadResponse, error) {
+	return c.HistoryReadRawModifiedWithContext(context.Background(), nodes, details)
+}
+func (c *Client) HistoryReadRawModifiedWithContext(ctx context.Context, nodes []*ua.HistoryReadValueID, details *ua.ReadRawModifiedDetails) (*ua.HistoryReadResponse, error) {
 	stats.Client().Add("HistoryReadRawModified", 1)
 	stats.Client().Add("HistoryReadValueID", int64(len(nodes)))
 
@@ -1093,7 +1102,7 @@ func (c *Client) HistoryReadRawModified(nodes []*ua.HistoryReadValueID, details 
 	}
 
 	var res *ua.HistoryReadResponse
-	err := c.Send(req, func(v interface{}) error {
+	err := c.SendWithContext(ctx, req, func(v interface{}) error {
 		return safeAssign(v, &res)
 	})
 	return res, err
