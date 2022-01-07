@@ -844,9 +844,12 @@ func (c *Client) DetachSession() (*Session, error) {
 // the response. If the client has an active session it injects the
 // authentication token.
 func (c *Client) Send(req ua.Request, h func(interface{}) error) error {
+	return c.SendWithContext(context.Background(), req, h)
+}
+func (c *Client) SendWithContext(ctx context.Context, req ua.Request, h func(interface{}) error) error {
 	stats.Client().Add("Send", 1)
 
-	err := c.sendWithTimeout(req, c.cfg.sechan.RequestTimeout, h)
+	err := c.sendWithTimeout(ctx, req, c.cfg.sechan.RequestTimeout, h)
 	stats.RecordError(err)
 
 	return err
@@ -855,7 +858,7 @@ func (c *Client) Send(req ua.Request, h func(interface{}) error) error {
 // sendWithTimeout sends the request via the secure channel with a custom timeout and registers a handler for
 // the response. If the client has an active session it injects the
 // authentication token.
-func (c *Client) sendWithTimeout(req ua.Request, timeout time.Duration, h func(interface{}) error) error {
+func (c *Client) sendWithTimeout(ctx context.Context, req ua.Request, timeout time.Duration, h func(interface{}) error) error {
 	if c.SecureChannel() == nil {
 		return ua.StatusBadServerNotConnected
 	}
@@ -863,7 +866,7 @@ func (c *Client) sendWithTimeout(req ua.Request, timeout time.Duration, h func(i
 	if s := c.Session(); s != nil {
 		authToken = s.resp.AuthenticationToken
 	}
-	return c.SecureChannel().SendRequestWithTimeout(req, authToken, timeout, h)
+	return c.SecureChannel().SendRequestWithTimeoutWithContext(ctx, req, authToken, timeout, h)
 }
 
 // Node returns a node object which accesses its attributes

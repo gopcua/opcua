@@ -379,7 +379,7 @@ func (c *Client) publish(ctx context.Context) error {
 
 	// send the next publish request
 	// note that res contains data even if an error was returned
-	res, err := c.sendPublishRequest()
+	res, err := c.sendPublishRequest(ctx)
 	stats.RecordError(err)
 	switch {
 	case err == io.EOF:
@@ -508,7 +508,7 @@ func (c *Client) handleNotification(ctx context.Context, sub *Subscription, res 
 	})
 }
 
-func (c *Client) sendPublishRequest() (*ua.PublishResponse, error) {
+func (c *Client) sendPublishRequest(ctx context.Context) (*ua.PublishResponse, error) {
 	dlog := debug.NewPrefixLogger("publish: ")
 
 	c.subMux.RLock()
@@ -522,7 +522,7 @@ func (c *Client) sendPublishRequest() (*ua.PublishResponse, error) {
 
 	dlog.Printf("PublishRequest: %s", debug.ToJSON(req))
 	var res *ua.PublishResponse
-	err := c.sendWithTimeout(req, c.publishTimeout(), func(v interface{}) error {
+	err := c.sendWithTimeout(ctx, req, c.publishTimeout(), func(v interface{}) error {
 		return safeAssign(v, &res)
 	})
 	stats.RecordError(err)
