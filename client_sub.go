@@ -113,7 +113,7 @@ func (c *Client) transferSubscriptions(ids []uint32) (*ua.TransferSubscriptionsR
 }
 
 // republishSubscriptions sends republish requests for the given subscription id.
-func (c *Client) republishSubscription(id uint32, availableSeq []uint32) error {
+func (c *Client) republishSubscription(ctx context.Context, id uint32, availableSeq []uint32) error {
 	c.subMux.RLock()
 	defer c.subMux.RUnlock()
 
@@ -123,7 +123,7 @@ func (c *Client) republishSubscription(id uint32, availableSeq []uint32) error {
 	}
 
 	debug.Printf("republishing subscription %d", sub.SubscriptionID)
-	if err := c.sendRepublishRequests(sub, availableSeq); err != nil {
+	if err := c.sendRepublishRequests(ctx, sub, availableSeq); err != nil {
 		status, ok := err.(ua.StatusCode)
 		if !ok {
 			return err
@@ -144,7 +144,7 @@ func (c *Client) republishSubscription(id uint32, availableSeq []uint32) error {
 // sendRepublishRequests sends republish requests for the given subscription
 // until it gets a BadMessageNotAvailable which implies that there are no
 // more messages to restore.
-func (c *Client) sendRepublishRequests(sub *Subscription, availableSeq []uint32) error {
+func (c *Client) sendRepublishRequests(ctx context.Context, sub *Subscription, availableSeq []uint32) error {
 	// todo(fs): check if sub.nextSeq is in the available sequence numbers
 	// todo(fs): if not then we need to decide whether we fail b/c of data loss
 	// todo(fs): or whether we log it and continue.
@@ -170,7 +170,7 @@ func (c *Client) sendRepublishRequests(sub *Subscription, availableSeq []uint32)
 
 		debug.Printf("RepublishRequest: req=%s", debug.ToJSON(req))
 		var res *ua.RepublishResponse
-		err := c.SecureChannel().SendRequest(req, c.Session().resp.AuthenticationToken, func(v interface{}) error {
+		err := c.SecureChannel().SendRequestWithContext(ctx, req, c.Session().resp.AuthenticationToken, func(v interface{}) error {
 			return safeAssign(v, &res)
 		})
 		debug.Printf("RepublishResponse: res=%s err=%v", debug.ToJSON(res), err)

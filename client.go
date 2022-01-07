@@ -193,7 +193,7 @@ func (c *Client) Connect(ctx context.Context) (err error) {
 		return err
 	}
 
-	s, err := c.CreateSession(c.cfg.session)
+	s, err := c.CreateSessionWithContext(ctx, c.cfg.session)
 	if err != nil {
 		c.Close()
 		stats.RecordError(err)
@@ -201,7 +201,7 @@ func (c *Client) Connect(ctx context.Context) (err error) {
 		return err
 	}
 
-	if err := c.ActivateSession(s); err != nil {
+	if err := c.ActivateSessionWithContext(ctx, s); err != nil {
 		c.Close()
 		stats.RecordError(err)
 
@@ -381,7 +381,7 @@ func (c *Client) monitor(ctx context.Context) {
 						}
 
 						dlog.Printf("trying to restore session")
-						if err := c.ActivateSession(s); err != nil {
+						if err := c.ActivateSessionWithContext(ctx, s); err != nil {
 							dlog.Printf("restore session failed")
 							action = recreateSession
 							continue
@@ -395,13 +395,13 @@ func (c *Client) monitor(ctx context.Context) {
 						// create a new session to replace the previous one
 
 						dlog.Printf("trying to recreate session")
-						s, err := c.CreateSession(c.cfg.session)
+						s, err := c.CreateSessionWithContext(ctx, c.cfg.session)
 						if err != nil {
 							dlog.Printf("recreate session failed: %v", err)
 							action = createSecureChannel
 							continue
 						}
-						if err := c.ActivateSession(s); err != nil {
+						if err := c.ActivateSessionWithContext(ctx, s); err != nil {
 							dlog.Printf("reactivate session failed: %v", err)
 							action = createSecureChannel
 							continue
@@ -458,7 +458,7 @@ func (c *Client) monitor(ctx context.Context) {
 						// populated in the previous step.
 
 						for _, id := range subsToRepublish {
-							if err := c.republishSubscription(id, availableSeqs[id]); err != nil {
+							if err := c.republishSubscription(ctx, id, availableSeqs[id]); err != nil {
 								dlog.Printf("republish of subscription %d failed", id)
 								subsToRecreate = append(subsToRecreate, id)
 							}
@@ -644,6 +644,9 @@ type Session struct {
 //
 // See Part 4, 5.6.2
 func (c *Client) CreateSession(cfg *uasc.SessionConfig) (*Session, error) {
+	return c.CreateSessionWithContext(context.Background(), cfg)
+}
+func (c *Client) CreateSessionWithContext(ctx context.Context, cfg *uasc.SessionConfig) (*Session, error) {
 	if c.SecureChannel() == nil {
 		return nil, ua.StatusBadServerNotConnected
 	}
@@ -670,7 +673,7 @@ func (c *Client) CreateSession(cfg *uasc.SessionConfig) (*Session, error) {
 	var s *Session
 	// for the CreateSessionRequest the authToken is always nil.
 	// use c.SecureChannel().SendRequest() to enforce this.
-	err := c.SecureChannel().SendRequest(req, nil, func(v interface{}) error {
+	err := c.SecureChannel().SendRequestWithContext(ctx, req, nil, func(v interface{}) error {
 		var res *ua.CreateSessionResponse
 		if err := safeAssign(v, &res); err != nil {
 			return err
@@ -727,7 +730,11 @@ func anonymousPolicyID(endpoints []*ua.EndpointDescription) string {
 // session call DetachSession.
 //
 // See Part 4, 5.6.3
+
 func (c *Client) ActivateSession(s *Session) error {
+	return c.ActivateSessionWithContext(context.Background(), s)
+}
+func (c *Client) ActivateSessionWithContext(ctx context.Context, s *Session) error {
 	if c.SecureChannel() == nil {
 		return ua.StatusBadServerNotConnected
 	}
@@ -776,7 +783,7 @@ func (c *Client) ActivateSession(s *Session) error {
 		UserIdentityToken:          ua.NewExtensionObject(s.cfg.UserIdentityToken),
 		UserTokenSignature:         s.cfg.UserTokenSignature,
 	}
-	return c.SecureChannel().SendRequest(req, s.resp.AuthenticationToken, func(v interface{}) error {
+	return c.SecureChannel().SendRequestWithContext(ctx, req, s.resp.AuthenticationToken, func(v interface{}) error {
 		var res *ua.ActivateSessionResponse
 		if err := safeAssign(v, &res); err != nil {
 			return err
