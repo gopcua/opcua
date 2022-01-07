@@ -913,6 +913,9 @@ func cloneReadRequest(req *ua.ReadRequest) *ua.ReadRequest {
 // By default, the function requests the value of the nodes
 // in the default encoding of the server.
 func (c *Client) Read(req *ua.ReadRequest) (*ua.ReadResponse, error) {
+	return c.ReadWithContext(context.Background(), req)
+}
+func (c *Client) ReadWithContext(ctx context.Context, req *ua.ReadRequest) (*ua.ReadResponse, error) {
 	stats.Client().Add("Read", 1)
 	stats.Client().Add("NodesToRead", int64(len(req.NodesToRead)))
 
@@ -921,7 +924,7 @@ func (c *Client) Read(req *ua.ReadRequest) (*ua.ReadResponse, error) {
 	req = cloneReadRequest(req)
 
 	var res *ua.ReadResponse
-	err := c.Send(req, func(v interface{}) error {
+	err := c.SendWithContext(ctx, req, func(v interface{}) error {
 		err := safeAssign(v, &res)
 
 		// If the client cannot decode an extension object then its
@@ -948,11 +951,14 @@ func (c *Client) Read(req *ua.ReadRequest) (*ua.ReadResponse, error) {
 
 // Write executes a synchronous write request.
 func (c *Client) Write(req *ua.WriteRequest) (*ua.WriteResponse, error) {
+	return c.WriteWithContext(context.Background(), req)
+}
+func (c *Client) WriteWithContext(ctx context.Context, req *ua.WriteRequest) (*ua.WriteResponse, error) {
 	stats.Client().Add("Write", 1)
 	stats.Client().Add("NodesToWrite", int64(len(req.NodesToWrite)))
 
 	var res *ua.WriteResponse
-	err := c.Send(req, func(v interface{}) error {
+	err := c.SendWithContext(ctx, req, func(v interface{}) error {
 		return safeAssign(v, &res)
 	})
 	return res, err
@@ -984,6 +990,9 @@ func cloneBrowseRequest(req *ua.BrowseRequest) *ua.BrowseRequest {
 
 // Browse executes a synchronous browse request.
 func (c *Client) Browse(req *ua.BrowseRequest) (*ua.BrowseResponse, error) {
+	return c.BrowseWithContext(context.Background(), req)
+}
+func (c *Client) BrowseWithContext(ctx context.Context, req *ua.BrowseRequest) (*ua.BrowseResponse, error) {
 	stats.Client().Add("Browse", 1)
 	stats.Client().Add("NodesToBrowse", int64(len(req.NodesToBrowse)))
 
@@ -992,7 +1001,7 @@ func (c *Client) Browse(req *ua.BrowseRequest) (*ua.BrowseResponse, error) {
 	req = cloneBrowseRequest(req)
 
 	var res *ua.BrowseResponse
-	err := c.Send(req, func(v interface{}) error {
+	err := c.SendWithContext(ctx, req, func(v interface{}) error {
 		return safeAssign(v, &res)
 	})
 	return res, err
@@ -1000,13 +1009,16 @@ func (c *Client) Browse(req *ua.BrowseRequest) (*ua.BrowseResponse, error) {
 
 // Call executes a synchronous call request for a single method.
 func (c *Client) Call(req *ua.CallMethodRequest) (*ua.CallMethodResult, error) {
+	return c.CallWithContext(context.Background(), req)
+}
+func (c *Client) CallWithContext(ctx context.Context, req *ua.CallMethodRequest) (*ua.CallMethodResult, error) {
 	stats.Client().Add("Call", 1)
 
 	creq := &ua.CallRequest{
 		MethodsToCall: []*ua.CallMethodRequest{req},
 	}
 	var res *ua.CallResponse
-	err := c.Send(creq, func(v interface{}) error {
+	err := c.SendWithContext(ctx, creq, func(v interface{}) error {
 		return safeAssign(v, &res)
 	})
 	if err != nil {
@@ -1020,10 +1032,13 @@ func (c *Client) Call(req *ua.CallMethodRequest) (*ua.CallMethodResult, error) {
 
 // BrowseNext executes a synchronous browse request.
 func (c *Client) BrowseNext(req *ua.BrowseNextRequest) (*ua.BrowseNextResponse, error) {
+	return c.BrowseNextWithContext(context.Background(), req)
+}
+func (c *Client) BrowseNextWithContext(ctx context.Context, req *ua.BrowseNextRequest) (*ua.BrowseNextResponse, error) {
 	stats.Client().Add("BrowseNext", 1)
 
 	var res *ua.BrowseNextResponse
-	err := c.Send(req, func(v interface{}) error {
+	err := c.SendWithContext(ctx, req, func(v interface{}) error {
 		return safeAssign(v, &res)
 	})
 	return res, err
@@ -1032,11 +1047,14 @@ func (c *Client) BrowseNext(req *ua.BrowseNextRequest) (*ua.BrowseNextResponse, 
 // RegisterNodes registers node ids for more efficient reads.
 // Part 4, Section 5.8.5
 func (c *Client) RegisterNodes(req *ua.RegisterNodesRequest) (*ua.RegisterNodesResponse, error) {
+	return c.RegisterNodesWithContext(context.Background(), req)
+}
+func (c *Client) RegisterNodesWithContext(ctx context.Context, req *ua.RegisterNodesRequest) (*ua.RegisterNodesResponse, error) {
 	stats.Client().Add("RegisterNodes", 1)
 	stats.Client().Add("NodesToRegister", int64(len(req.NodesToRegister)))
 
 	var res *ua.RegisterNodesResponse
-	err := c.Send(req, func(v interface{}) error {
+	err := c.SendWithContext(ctx, req, func(v interface{}) error {
 		return safeAssign(v, &res)
 	})
 	return res, err
@@ -1045,11 +1063,14 @@ func (c *Client) RegisterNodes(req *ua.RegisterNodesRequest) (*ua.RegisterNodesR
 // UnregisterNodes unregisters node ids previously registered with RegisterNodes.
 // Part 4, Section 5.8.6
 func (c *Client) UnregisterNodes(req *ua.UnregisterNodesRequest) (*ua.UnregisterNodesResponse, error) {
+	return c.UnregisterNodesWithContext(context.Background(), req)
+}
+func (c *Client) UnregisterNodesWithContext(ctx context.Context, req *ua.UnregisterNodesRequest) (*ua.UnregisterNodesResponse, error) {
 	stats.Client().Add("UnregisterNodes", 1)
 	stats.Client().Add("NodesToUnregister", int64(len(req.NodesToUnregister)))
 
 	var res *ua.UnregisterNodesResponse
-	err := c.Send(req, func(v interface{}) error {
+	err := c.SendWithContext(ctx, req, func(v interface{}) error {
 		return safeAssign(v, &res)
 	})
 	return res, err
