@@ -1084,6 +1084,21 @@ func (c *Client) NamespaceArray() ([]string, error) {
 	return ns, nil
 }
 
+// FindNamespace returns the id of the namespace with the given name.
+func (c *Client) FindNamespace(name string) (uint16, error) {
+	stats.Client().Add("FindNamespace", 1)
+	nsa, err := c.NamespaceArray()
+	if err != nil {
+		return 0, err
+	}
+	for i, ns := range nsa {
+		if ns == name {
+			return uint16(i), nil
+		}
+	}
+	return 0, errors.Errorf("namespace not found. name=%s", name)
+}
+
 // UpdateNamespaces updates the list of cached namespaces from the server.
 func (c *Client) UpdateNamespaces() error {
 	stats.Client().Add("UpdateNamespaces", 1)
