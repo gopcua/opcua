@@ -29,7 +29,7 @@ type Subscription struct {
 	RevisedPublishingInterval time.Duration
 	RevisedLifetimeCount      uint32
 	RevisedMaxKeepAliveCount  uint32
-	Notifs                    chan *PublishNotificationData
+	Notifs                    chan<- *PublishNotificationData
 	params                    *SubscriptionParameters
 	items                     map[uint32]*monitoredItem
 	itemsMu                   sync.Mutex

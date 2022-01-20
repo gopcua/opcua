@@ -16,7 +16,7 @@ import (
 // Subscribe creates a Subscription with given parameters.
 // Parameters that have not been set are set to their default values.
 // See opcua.DefaultSubscription* constants
-func (c *Client) Subscribe(params *SubscriptionParameters, notifyCh chan *PublishNotificationData) (*Subscription, error) {
+func (c *Client) Subscribe(params *SubscriptionParameters, notifyCh chan<- *PublishNotificationData) (*Subscription, error) {
 	stats.Client().Add("Subscribe", 1)
 
 	if params == nil {
