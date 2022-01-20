@@ -62,7 +62,7 @@ func main() {
 	if err := c.Connect(ctx); err != nil {
 		log.Fatal(err)
 	}
-	defer c.Close()
+	defer c.CloseSessionWithContext(ctx)
 
 	notifyCh := make(chan *opcua.PublishNotificationData)
 

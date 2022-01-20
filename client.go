@@ -35,7 +35,7 @@ func GetEndpoints(ctx context.Context, endpoint string, opts ...Option) ([]*ua.E
 		return nil, err
 	}
 	defer c.Close()
-	res, err := c.GetEndpoints()
+	res, err := c.GetEndpointsWithContext(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -193,7 +193,7 @@ func (c *Client) Connect(ctx context.Context) (err error) {
 		return err
 	}
 
-	s, err := c.CreateSession(c.cfg.session)
+	s, err := c.CreateSessionWithContext(ctx, c.cfg.session)
 	if err != nil {
 		c.Close()
 		stats.RecordError(err)
@@ -201,7 +201,7 @@ func (c *Client) Connect(ctx context.Context) (err error) {
 		return err
 	}
 
-	if err := c.ActivateSession(s); err != nil {
+	if err := c.ActivateSessionWithContext(ctx, s); err != nil {
 		c.Close()
 		stats.RecordError(err)
 
@@ -381,7 +381,7 @@ func (c *Client) monitor(ctx context.Context) {
 						}
 
 						dlog.Printf("trying to restore session")
-						if err := c.ActivateSession(s); err != nil {
+						if err := c.ActivateSessionWithContext(ctx, s); err != nil {
 							dlog.Printf("restore session failed")
 							action = recreateSession
 							continue
@@ -395,13 +395,13 @@ func (c *Client) monitor(ctx context.Context) {
 						// create a new session to replace the previous one
 
 						dlog.Printf("trying to recreate session")
-						s, err := c.CreateSession(c.cfg.session)
+						s, err := c.CreateSessionWithContext(ctx, c.cfg.session)
 						if err != nil {
 							dlog.Printf("recreate session failed: %v", err)
 							action = createSecureChannel
 							continue
 						}
-						if err := c.ActivateSession(s); err != nil {
+						if err := c.ActivateSessionWithContext(ctx, s); err != nil {
 							dlog.Printf("reactivate session failed: %v", err)
 							action = createSecureChannel
 							continue
@@ -458,7 +458,7 @@ func (c *Client) monitor(ctx context.Context) {
 						// populated in the previous step.
 
 						for _, id := range subsToRepublish {
-							if err := c.republishSubscription(id, availableSeqs[id]); err != nil {
+							if err := c.republishSubscription(ctx, id, availableSeqs[id]); err != nil {
 								dlog.Printf("republish of subscription %d failed", id)
 								subsToRecreate = append(subsToRecreate, id)
 							}
@@ -644,6 +644,9 @@ type Session struct {
 //
 // See Part 4, 5.6.2
 func (c *Client) CreateSession(cfg *uasc.SessionConfig) (*Session, error) {
+	return c.CreateSessionWithContext(context.Background(), cfg)
+}
+func (c *Client) CreateSessionWithContext(ctx context.Context, cfg *uasc.SessionConfig) (*Session, error) {
 	if c.SecureChannel() == nil {
 		return nil, ua.StatusBadServerNotConnected
 	}
@@ -670,7 +673,7 @@ func (c *Client) CreateSession(cfg *uasc.SessionConfig) (*Session, error) {
 	var s *Session
 	// for the CreateSessionRequest the authToken is always nil.
 	// use c.SecureChannel().SendRequest() to enforce this.
-	err := c.SecureChannel().SendRequest(req, nil, func(v interface{}) error {
+	err := c.SecureChannel().SendRequestWithContext(ctx, req, nil, func(v interface{}) error {
 		var res *ua.CreateSessionResponse
 		if err := safeAssign(v, &res); err != nil {
 			return err
@@ -727,7 +730,11 @@ func anonymousPolicyID(endpoints []*ua.EndpointDescription) string {
 // session call DetachSession.
 //
 // See Part 4, 5.6.3
+
 func (c *Client) ActivateSession(s *Session) error {
+	return c.ActivateSessionWithContext(context.Background(), s)
+}
+func (c *Client) ActivateSessionWithContext(ctx context.Context, s *Session) error {
 	if c.SecureChannel() == nil {
 		return ua.StatusBadServerNotConnected
 	}
@@ -776,7 +783,7 @@ func (c *Client) ActivateSession(s *Session) error {
 		UserIdentityToken:          ua.NewExtensionObject(s.cfg.UserIdentityToken),
 		UserTokenSignature:         s.cfg.UserTokenSignature,
 	}
-	return c.SecureChannel().SendRequest(req, s.resp.AuthenticationToken, func(v interface{}) error {
+	return c.SecureChannel().SendRequestWithContext(ctx, req, s.resp.AuthenticationToken, func(v interface{}) error {
 		var res *ua.ActivateSessionResponse
 		if err := safeAssign(v, &res); err != nil {
 			return err
@@ -803,8 +810,11 @@ func (c *Client) ActivateSession(s *Session) error {
 //
 // See Part 4, 5.6.4
 func (c *Client) CloseSession() error {
+	return c.CloseSessionWithContext(context.Background())
+}
+func (c *Client) CloseSessionWithContext(ctx context.Context) error {
 	stats.Client().Add("CloseSession", 1)
-	if err := c.closeSession(c.Session()); err != nil {
+	if err := c.closeSession(ctx, c.Session()); err != nil {
 		return err
 	}
 	c.setSession(nil)
@@ -812,13 +822,13 @@ func (c *Client) CloseSession() error {
 }
 
 // closeSession closes the given session.
-func (c *Client) closeSession(s *Session) error {
+func (c *Client) closeSession(ctx context.Context, s *Session) error {
 	if s == nil {
 		return nil
 	}
 	req := &ua.CloseSessionRequest{DeleteSubscriptions: true}
 	var res *ua.CloseSessionResponse
-	return c.Send(req, func(v interface{}) error {
+	return c.SendWithContext(ctx, req, func(v interface{}) error {
 		return safeAssign(v, &res)
 	})
 }
@@ -826,7 +836,15 @@ func (c *Client) closeSession(s *Session) error {
 // DetachSession removes the session from the client without closing it. The
 // caller is responsible to close or re-activate the session. If the client
 // does not have an active session the function returns no error.
+//
+// Note: Starting with v0.5 this method will require a context
+// and the corresponding XXXWithContext(ctx) method will be removed.
 func (c *Client) DetachSession() (*Session, error) {
+	return c.DetachSessionWithContext(context.Background())
+}
+
+// Note: Starting with v0.5 this method is superseded by the non 'WithContext' method.
+func (c *Client) DetachSessionWithContext(ctx context.Context) (*Session, error) {
 	stats.Client().Add("DetachSession", 1)
 	s := c.Session()
 	c.setSession(nil)
@@ -836,10 +854,18 @@ func (c *Client) DetachSession() (*Session, error) {
 // Send sends the request via the secure channel and registers a handler for
 // the response. If the client has an active session it injects the
 // authentication token.
+//
+// Note: Starting with v0.5 this method will require a context
+// and the corresponding XXXWithContext(ctx) method will be removed.
 func (c *Client) Send(req ua.Request, h func(interface{}) error) error {
+	return c.SendWithContext(context.Background(), req, h)
+}
+
+// Note: Starting with v0.5 this method is superseded by the non 'WithContext' method.
+func (c *Client) SendWithContext(ctx context.Context, req ua.Request, h func(interface{}) error) error {
 	stats.Client().Add("Send", 1)
 
-	err := c.sendWithTimeout(req, c.cfg.sechan.RequestTimeout, h)
+	err := c.sendWithTimeout(ctx, req, c.cfg.sechan.RequestTimeout, h)
 	stats.RecordError(err)
 
 	return err
@@ -848,7 +874,7 @@ func (c *Client) Send(req ua.Request, h func(interface{}) error) error {
 // sendWithTimeout sends the request via the secure channel with a custom timeout and registers a handler for
 // the response. If the client has an active session it injects the
 // authentication token.
-func (c *Client) sendWithTimeout(req ua.Request, timeout time.Duration, h func(interface{}) error) error {
+func (c *Client) sendWithTimeout(ctx context.Context, req ua.Request, timeout time.Duration, h func(interface{}) error) error {
 	if c.SecureChannel() == nil {
 		return ua.StatusBadServerNotConnected
 	}
@@ -856,7 +882,7 @@ func (c *Client) sendWithTimeout(req ua.Request, timeout time.Duration, h func(i
 	if s := c.Session(); s != nil {
 		authToken = s.resp.AuthenticationToken
 	}
-	return c.SecureChannel().SendRequestWithTimeout(req, authToken, timeout, h)
+	return c.SecureChannel().SendRequestWithTimeoutWithContext(ctx, req, authToken, timeout, h)
 }
 
 // Node returns a node object which accesses its attributes
@@ -865,14 +891,23 @@ func (c *Client) Node(id *ua.NodeID) *Node {
 	return &Node{ID: id, c: c}
 }
 
+// GetEndpoints returns the list of available endpoints of the server.
+//
+// Note: Starting with v0.5 this method will require a context
+// and the corresponding XXXWithContext(ctx) method will be removed.
 func (c *Client) GetEndpoints() (*ua.GetEndpointsResponse, error) {
+	return c.GetEndpointsWithContext(context.Background())
+}
+
+// Note: Starting with v0.5 this method is superseded by the non 'WithContext' method.
+func (c *Client) GetEndpointsWithContext(ctx context.Context) (*ua.GetEndpointsResponse, error) {
 	stats.Client().Add("GetEndpoints", 1)
 
 	req := &ua.GetEndpointsRequest{
 		EndpointURL: c.endpointURL,
 	}
 	var res *ua.GetEndpointsResponse
-	err := c.Send(req, func(v interface{}) error {
+	err := c.SendWithContext(ctx, req, func(v interface{}) error {
 		return safeAssign(v, &res)
 	})
 	return res, err
@@ -902,7 +937,15 @@ func cloneReadRequest(req *ua.ReadRequest) *ua.ReadRequest {
 //
 // By default, the function requests the value of the nodes
 // in the default encoding of the server.
+//
+// Note: Starting with v0.5 this method will require a context
+// and the corresponding XXXWithContext(ctx) method will be removed.
 func (c *Client) Read(req *ua.ReadRequest) (*ua.ReadResponse, error) {
+	return c.ReadWithContext(context.Background(), req)
+}
+
+// Note: Starting with v0.5 this method is superseded by the non 'WithContext' method.
+func (c *Client) ReadWithContext(ctx context.Context, req *ua.ReadRequest) (*ua.ReadResponse, error) {
 	stats.Client().Add("Read", 1)
 	stats.Client().Add("NodesToRead", int64(len(req.NodesToRead)))
 
@@ -911,7 +954,7 @@ func (c *Client) Read(req *ua.ReadRequest) (*ua.ReadResponse, error) {
 	req = cloneReadRequest(req)
 
 	var res *ua.ReadResponse
-	err := c.Send(req, func(v interface{}) error {
+	err := c.SendWithContext(ctx, req, func(v interface{}) error {
 		err := safeAssign(v, &res)
 
 		// If the client cannot decode an extension object then its
@@ -937,12 +980,20 @@ func (c *Client) Read(req *ua.ReadRequest) (*ua.ReadResponse, error) {
 }
 
 // Write executes a synchronous write request.
+//
+// Note: Starting with v0.5 this method will require a context
+// and the corresponding XXXWithContext(ctx) method will be removed.
 func (c *Client) Write(req *ua.WriteRequest) (*ua.WriteResponse, error) {
+	return c.WriteWithContext(context.Background(), req)
+}
+
+// Note: Starting with v0.5 this method is superseded by the non 'WithContext' method.
+func (c *Client) WriteWithContext(ctx context.Context, req *ua.WriteRequest) (*ua.WriteResponse, error) {
 	stats.Client().Add("Write", 1)
 	stats.Client().Add("NodesToWrite", int64(len(req.NodesToWrite)))
 
 	var res *ua.WriteResponse
-	err := c.Send(req, func(v interface{}) error {
+	err := c.SendWithContext(ctx, req, func(v interface{}) error {
 		return safeAssign(v, &res)
 	})
 	return res, err
@@ -973,7 +1024,15 @@ func cloneBrowseRequest(req *ua.BrowseRequest) *ua.BrowseRequest {
 }
 
 // Browse executes a synchronous browse request.
+//
+// Note: Starting with v0.5 this method will require a context
+// and the corresponding XXXWithContext(ctx) method will be removed.
 func (c *Client) Browse(req *ua.BrowseRequest) (*ua.BrowseResponse, error) {
+	return c.BrowseWithContext(context.Background(), req)
+}
+
+// Note: Starting with v0.5 this method is superseded by the non 'WithContext' method.
+func (c *Client) BrowseWithContext(ctx context.Context, req *ua.BrowseRequest) (*ua.BrowseResponse, error) {
 	stats.Client().Add("Browse", 1)
 	stats.Client().Add("NodesToBrowse", int64(len(req.NodesToBrowse)))
 
@@ -982,21 +1041,29 @@ func (c *Client) Browse(req *ua.BrowseRequest) (*ua.BrowseResponse, error) {
 	req = cloneBrowseRequest(req)
 
 	var res *ua.BrowseResponse
-	err := c.Send(req, func(v interface{}) error {
+	err := c.SendWithContext(ctx, req, func(v interface{}) error {
 		return safeAssign(v, &res)
 	})
 	return res, err
 }
 
 // Call executes a synchronous call request for a single method.
+//
+// Note: Starting with v0.5 this method will require a context
+// and the corresponding XXXWithContext(ctx) method will be removed.
 func (c *Client) Call(req *ua.CallMethodRequest) (*ua.CallMethodResult, error) {
+	return c.CallWithContext(context.Background(), req)
+}
+
+// Note: Starting with v0.5 this method is superseded by the non 'WithContext' method.
+func (c *Client) CallWithContext(ctx context.Context, req *ua.CallMethodRequest) (*ua.CallMethodResult, error) {
 	stats.Client().Add("Call", 1)
 
 	creq := &ua.CallRequest{
 		MethodsToCall: []*ua.CallMethodRequest{req},
 	}
 	var res *ua.CallResponse
-	err := c.Send(creq, func(v interface{}) error {
+	err := c.SendWithContext(ctx, creq, func(v interface{}) error {
 		return safeAssign(v, &res)
 	})
 	if err != nil {
@@ -1009,43 +1076,76 @@ func (c *Client) Call(req *ua.CallMethodRequest) (*ua.CallMethodResult, error) {
 }
 
 // BrowseNext executes a synchronous browse request.
+//
+// Note: Starting with v0.5 this method will require a context
+// and the corresponding XXXWithContext(ctx) method will be removed.
 func (c *Client) BrowseNext(req *ua.BrowseNextRequest) (*ua.BrowseNextResponse, error) {
+	return c.BrowseNextWithContext(context.Background(), req)
+}
+
+// Note: Starting with v0.5 this method is superseded by the non 'WithContext' method.
+func (c *Client) BrowseNextWithContext(ctx context.Context, req *ua.BrowseNextRequest) (*ua.BrowseNextResponse, error) {
 	stats.Client().Add("BrowseNext", 1)
 
 	var res *ua.BrowseNextResponse
-	err := c.Send(req, func(v interface{}) error {
+	err := c.SendWithContext(ctx, req, func(v interface{}) error {
 		return safeAssign(v, &res)
 	})
 	return res, err
 }
 
 // RegisterNodes registers node ids for more efficient reads.
+//
 // Part 4, Section 5.8.5
+//
+// Note: Starting with v0.5 this method will require a context
+// and the corresponding XXXWithContext(ctx) method will be removed.
 func (c *Client) RegisterNodes(req *ua.RegisterNodesRequest) (*ua.RegisterNodesResponse, error) {
+	return c.RegisterNodesWithContext(context.Background(), req)
+}
+
+// Note: Starting with v0.5 this method is superseded by the non 'WithContext' method.
+func (c *Client) RegisterNodesWithContext(ctx context.Context, req *ua.RegisterNodesRequest) (*ua.RegisterNodesResponse, error) {
 	stats.Client().Add("RegisterNodes", 1)
 	stats.Client().Add("NodesToRegister", int64(len(req.NodesToRegister)))
 
 	var res *ua.RegisterNodesResponse
-	err := c.Send(req, func(v interface{}) error {
+	err := c.SendWithContext(ctx, req, func(v interface{}) error {
 		return safeAssign(v, &res)
 	})
 	return res, err
 }
 
 // UnregisterNodes unregisters node ids previously registered with RegisterNodes.
+//
 // Part 4, Section 5.8.6
+//
+// Note: Starting with v0.5 this method will require a context
+// and the corresponding XXXWithContext(ctx) method will be removed.
 func (c *Client) UnregisterNodes(req *ua.UnregisterNodesRequest) (*ua.UnregisterNodesResponse, error) {
+	return c.UnregisterNodesWithContext(context.Background(), req)
+}
+
+// Note: Starting with v0.5 this method is superseded by the non 'WithContext' method.
+func (c *Client) UnregisterNodesWithContext(ctx context.Context, req *ua.UnregisterNodesRequest) (*ua.UnregisterNodesResponse, error) {
 	stats.Client().Add("UnregisterNodes", 1)
 	stats.Client().Add("NodesToUnregister", int64(len(req.NodesToUnregister)))
 
 	var res *ua.UnregisterNodesResponse
-	err := c.Send(req, func(v interface{}) error {
+	err := c.SendWithContext(ctx, req, func(v interface{}) error {
 		return safeAssign(v, &res)
 	})
 	return res, err
 }
 
+// Note: Starting with v0.5 this method will require a context
+// and the corresponding XXXWithContext(ctx) method will be removed.
 func (c *Client) HistoryReadRawModified(nodes []*ua.HistoryReadValueID, details *ua.ReadRawModifiedDetails) (*ua.HistoryReadResponse, error) {
+	return c.HistoryReadRawModifiedWithContext(context.Background(), nodes, details)
+}
+
+// Note: Starting with v0.5 this method is superseded by the non 'WithContext' method.
+func (c *Client) HistoryReadRawModifiedWithContext(ctx context.Context, nodes []*ua.HistoryReadValueID, details *ua.ReadRawModifiedDetails) (*ua.HistoryReadResponse, error) {
 	stats.Client().Add("HistoryReadRawModified", 1)
 	stats.Client().Add("HistoryReadValueID", int64(len(nodes)))
 
@@ -1062,17 +1162,25 @@ func (c *Client) HistoryReadRawModified(nodes []*ua.HistoryReadValueID, details 
 	}
 
 	var res *ua.HistoryReadResponse
-	err := c.Send(req, func(v interface{}) error {
+	err := c.SendWithContext(ctx, req, func(v interface{}) error {
 		return safeAssign(v, &res)
 	})
 	return res, err
 }
 
 // NamespaceArray returns the list of namespaces registered on the server.
+//
+// Note: Starting with v0.5 this method will require a context
+// and the corresponding XXXWithContext(ctx) method will be removed.
 func (c *Client) NamespaceArray() ([]string, error) {
+	return c.NamespaceArrayWithContext(context.Background())
+}
+
+// Note: Starting with v0.5 this method is superseded by the non 'WithContext' method.
+func (c *Client) NamespaceArrayWithContext(ctx context.Context) ([]string, error) {
 	stats.Client().Add("NamespaceArray", 1)
 	node := c.Node(ua.NewNumericNodeID(0, id.Server_NamespaceArray))
-	v, err := node.Value()
+	v, err := node.ValueWithContext(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -1085,9 +1193,17 @@ func (c *Client) NamespaceArray() ([]string, error) {
 }
 
 // FindNamespace returns the id of the namespace with the given name.
+//
+// Note: Starting with v0.5 this method will require a context
+// and the corresponding XXXWithContext(ctx) method will be removed.
 func (c *Client) FindNamespace(name string) (uint16, error) {
+	return c.FindNamespaceWithContext(context.Background(), name)
+}
+
+// Note: Starting with v0.5 this method is superseded by the non 'WithContext' method.
+func (c *Client) FindNamespaceWithContext(ctx context.Context, name string) (uint16, error) {
 	stats.Client().Add("FindNamespace", 1)
-	nsa, err := c.NamespaceArray()
+	nsa, err := c.NamespaceArrayWithContext(ctx)
 	if err != nil {
 		return 0, err
 	}
@@ -1100,9 +1216,17 @@ func (c *Client) FindNamespace(name string) (uint16, error) {
 }
 
 // UpdateNamespaces updates the list of cached namespaces from the server.
+//
+// Note: Starting with v0.5 this method will require a context
+// and the corresponding XXXWithContext(ctx) method will be removed.
 func (c *Client) UpdateNamespaces() error {
+	return c.UpdateNamespacesWithContext(context.Background())
+}
+
+// Note: Starting with v0.5 this method is superseded by the non 'WithContext' method.
+func (c *Client) UpdateNamespacesWithContext(ctx context.Context) error {
 	stats.Client().Add("UpdateNamespaces", 1)
-	ns, err := c.NamespaceArray()
+	ns, err := c.NamespaceArrayWithContext(ctx)
 	if err != nil {
 		return err
 	}

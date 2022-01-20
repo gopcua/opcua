@@ -68,7 +68,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	defer c.Close()
+	defer c.CloseSessionWithContext(ctx)
 
 	m, err := monitor.NewNodeMonitor(c)
 	if err != nil {
