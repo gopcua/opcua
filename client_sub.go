@@ -16,9 +16,14 @@ import (
 // Subscribe creates a Subscription with given parameters.
 // Parameters that have not been set are set to their default values.
 // See opcua.DefaultSubscription* constants
+//
+// Note: Starting with v0.5 this method will require a context
+// and the corresponding XXXWithContext(ctx) method will be removed.
 func (c *Client) Subscribe(params *SubscriptionParameters, notifyCh chan<- *PublishNotificationData) (*Subscription, error) {
 	return c.SubscribeWithContext(context.Background(), params, notifyCh)
 }
+
+// Note: Starting with v0.5 this method is superseded by the non 'WithContext' method.
 func (c *Client) SubscribeWithContext(ctx context.Context, params *SubscriptionParameters, notifyCh chan<- *PublishNotificationData) (*Subscription, error) {
 	stats.Client().Add("Subscribe", 1)
 

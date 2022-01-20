@@ -111,9 +111,13 @@ func (s *Subscription) delete(ctx context.Context) error {
 	}
 }
 
+// Note: Starting with v0.5 this method will require a context
+// and the corresponding XXXWithContext(ctx) method will be removed.
 func (s *Subscription) Monitor(ts ua.TimestampsToReturn, items ...*ua.MonitoredItemCreateRequest) (*ua.CreateMonitoredItemsResponse, error) {
 	return s.MonitorWithContext(context.Background(), ts, items...)
 }
+
+// Note: Starting with v0.5 this method is superseded by the non 'WithContext' method.
 func (s *Subscription) MonitorWithContext(ctx context.Context, ts ua.TimestampsToReturn, items ...*ua.MonitoredItemCreateRequest) (*ua.CreateMonitoredItemsResponse, error) {
 	stats.Subscription().Add("Monitor", 1)
 	stats.Subscription().Add("MonitoredItems", int64(len(items)))
@@ -149,9 +153,13 @@ func (s *Subscription) MonitorWithContext(ctx context.Context, ts ua.TimestampsT
 	return res, err
 }
 
+// Note: Starting with v0.5 this method will require a context
+// and the corresponding XXXWithContext(ctx) method will be removed.
 func (s *Subscription) Unmonitor(monitoredItemIDs ...uint32) (*ua.DeleteMonitoredItemsResponse, error) {
 	return s.UnmonitorWithContext(context.Background(), monitoredItemIDs...)
 }
+
+// Note: Starting with v0.5 this method is superseded by the non 'WithContext' method.
 func (s *Subscription) UnmonitorWithContext(ctx context.Context, monitoredItemIDs ...uint32) (*ua.DeleteMonitoredItemsResponse, error) {
 	stats.Subscription().Add("Unmonitor", 1)
 	stats.Subscription().Add("UnmonitoredItems", int64(len(monitoredItemIDs)))
@@ -178,9 +186,13 @@ func (s *Subscription) UnmonitorWithContext(ctx context.Context, monitoredItemID
 	return res, err
 }
 
+// Note: Starting with v0.5 this method will require a context
+// and the corresponding XXXWithContext(ctx) method will be removed.
 func (s *Subscription) ModifyMonitoredItems(ts ua.TimestampsToReturn, items ...*ua.MonitoredItemModifyRequest) (*ua.ModifyMonitoredItemsResponse, error) {
 	return s.ModifyMonitoredItemsWithContext(context.Background(), ts, items...)
 }
+
+// Note: Starting with v0.5 this method is superseded by the non 'WithContext' method.
 func (s *Subscription) ModifyMonitoredItemsWithContext(ctx context.Context, ts ua.TimestampsToReturn, items ...*ua.MonitoredItemModifyRequest) (*ua.ModifyMonitoredItemsResponse, error) {
 	stats.Subscription().Add("ModifyMonitoredItems", 1)
 	stats.Subscription().Add("ModifiedMonitoredItems", int64(len(items)))
@@ -231,9 +243,14 @@ func (s *Subscription) ModifyMonitoredItemsWithContext(ctx context.Context, ts u
 // SetTriggering sends a request to the server to add and/or remove triggering links from a triggering item.
 // To add links from a triggering item to an item to report provide the server assigned ID(s) in the `add` argument.
 // To remove links from a triggering item to an item to report provide the server assigned ID(s) in the `remove` argument.
+//
+// Note: Starting with v0.5 this method will require a context
+// and the corresponding XXXWithContext(ctx) method will be removed.
 func (s *Subscription) SetTriggering(triggeringItemID uint32, add, remove []uint32) (*ua.SetTriggeringResponse, error) {
 	return s.SetTriggeringWithContext(context.Background(), triggeringItemID, add, remove)
 }
+
+// Note: Starting with v0.5 this method is superseded by the non 'WithContext' method.
 func (s *Subscription) SetTriggeringWithContext(ctx context.Context, triggeringItemID uint32, add, remove []uint32) (*ua.SetTriggeringResponse, error) {
 	stats.Subscription().Add("SetTriggering", 1)
 
