@@ -16,7 +16,15 @@ import (
 // Subscribe creates a Subscription with given parameters.
 // Parameters that have not been set are set to their default values.
 // See opcua.DefaultSubscription* constants
+//
+// Note: Starting with v0.5 this method will require a context
+// and the corresponding XXXWithContext(ctx) method will be removed.
 func (c *Client) Subscribe(params *SubscriptionParameters, notifyCh chan<- *PublishNotificationData) (*Subscription, error) {
+	return c.SubscribeWithContext(context.Background(), params, notifyCh)
+}
+
+// Note: Starting with v0.5 this method is superseded by the non 'WithContext' method.
+func (c *Client) SubscribeWithContext(ctx context.Context, params *SubscriptionParameters, notifyCh chan<- *PublishNotificationData) (*Subscription, error) {
 	stats.Client().Add("Subscribe", 1)
 
 	if params == nil {
@@ -34,7 +42,7 @@ func (c *Client) Subscribe(params *SubscriptionParameters, notifyCh chan<- *Publ
 	}
 
 	var res *ua.CreateSubscriptionResponse
-	err := c.Send(req, func(v interface{}) error {
+	err := c.SendWithContext(ctx, req, func(v interface{}) error {
 		return safeAssign(v, &res)
 	})
 	if err != nil {
@@ -99,14 +107,14 @@ func (c *Client) recreateSubscription(ctx context.Context, id uint32) error {
 
 // transferSubscriptions ask the server to transfer the given subscriptions
 // of the previous session to the current one.
-func (c *Client) transferSubscriptions(ids []uint32) (*ua.TransferSubscriptionsResponse, error) {
+func (c *Client) transferSubscriptions(ctx context.Context, ids []uint32) (*ua.TransferSubscriptionsResponse, error) {
 	req := &ua.TransferSubscriptionsRequest{
 		SubscriptionIDs:   ids,
 		SendInitialValues: false,
 	}
 
 	var res *ua.TransferSubscriptionsResponse
-	err := c.Send(req, func(v interface{}) error {
+	err := c.SendWithContext(ctx, req, func(v interface{}) error {
 		return safeAssign(v, &res)
 	})
 	return res, err
