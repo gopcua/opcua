@@ -846,9 +846,14 @@ func (c *Client) DetachSession() (*Session, error) {
 // Send sends the request via the secure channel and registers a handler for
 // the response. If the client has an active session it injects the
 // authentication token.
+// Deprecated: Starting with v0.5 this method will require a context
+// and the corresponding XXXWithContext(ctx) method will be removed.
 func (c *Client) Send(req ua.Request, h func(interface{}) error) error {
 	return c.SendWithContext(context.Background(), req, h)
 }
+
+// Note: This method will be replaced by the non "WithContext()" version
+// of this method.
 func (c *Client) SendWithContext(ctx context.Context, req ua.Request, h func(interface{}) error) error {
 	stats.Client().Add("Send", 1)
 
@@ -878,9 +883,14 @@ func (c *Client) Node(id *ua.NodeID) *Node {
 	return &Node{ID: id, c: c}
 }
 
+// Deprecated: Starting with v0.5 this method will require a context
+// and the corresponding XXXWithContext(ctx) method will be removed.
 func (c *Client) GetEndpoints() (*ua.GetEndpointsResponse, error) {
 	return c.GetEndpointsWithContext(context.Background())
 }
+
+// Note: This method will be replaced by the non "WithContext()" version
+// of this method.
 func (c *Client) GetEndpointsWithContext(ctx context.Context) (*ua.GetEndpointsResponse, error) {
 	stats.Client().Add("GetEndpoints", 1)
 
@@ -918,9 +928,14 @@ func cloneReadRequest(req *ua.ReadRequest) *ua.ReadRequest {
 //
 // By default, the function requests the value of the nodes
 // in the default encoding of the server.
+// Deprecated: Starting with v0.5 this method will require a context
+// and the corresponding XXXWithContext(ctx) method will be removed.
 func (c *Client) Read(req *ua.ReadRequest) (*ua.ReadResponse, error) {
 	return c.ReadWithContext(context.Background(), req)
 }
+
+// Note: This method will be replaced by the non "WithContext()" version
+// of this method.
 func (c *Client) ReadWithContext(ctx context.Context, req *ua.ReadRequest) (*ua.ReadResponse, error) {
 	stats.Client().Add("Read", 1)
 	stats.Client().Add("NodesToRead", int64(len(req.NodesToRead)))
@@ -956,9 +971,14 @@ func (c *Client) ReadWithContext(ctx context.Context, req *ua.ReadRequest) (*ua.
 }
 
 // Write executes a synchronous write request.
+// Deprecated: Starting with v0.5 this method will require a context
+// and the corresponding XXXWithContext(ctx) method will be removed.
 func (c *Client) Write(req *ua.WriteRequest) (*ua.WriteResponse, error) {
 	return c.WriteWithContext(context.Background(), req)
 }
+
+// Note: This method will be replaced by the non "WithContext()" version
+// of this method.
 func (c *Client) WriteWithContext(ctx context.Context, req *ua.WriteRequest) (*ua.WriteResponse, error) {
 	stats.Client().Add("Write", 1)
 	stats.Client().Add("NodesToWrite", int64(len(req.NodesToWrite)))
@@ -995,9 +1015,14 @@ func cloneBrowseRequest(req *ua.BrowseRequest) *ua.BrowseRequest {
 }
 
 // Browse executes a synchronous browse request.
+// Deprecated: Starting with v0.5 this method will require a context
+// and the corresponding XXXWithContext(ctx) method will be removed.
 func (c *Client) Browse(req *ua.BrowseRequest) (*ua.BrowseResponse, error) {
 	return c.BrowseWithContext(context.Background(), req)
 }
+
+// Note: This method will be replaced by the non "WithContext()" version
+// of this method.
 func (c *Client) BrowseWithContext(ctx context.Context, req *ua.BrowseRequest) (*ua.BrowseResponse, error) {
 	stats.Client().Add("Browse", 1)
 	stats.Client().Add("NodesToBrowse", int64(len(req.NodesToBrowse)))
@@ -1014,9 +1039,14 @@ func (c *Client) BrowseWithContext(ctx context.Context, req *ua.BrowseRequest) (
 }
 
 // Call executes a synchronous call request for a single method.
+// Deprecated: Starting with v0.5 this method will require a context
+// and the corresponding XXXWithContext(ctx) method will be removed.
 func (c *Client) Call(req *ua.CallMethodRequest) (*ua.CallMethodResult, error) {
 	return c.CallWithContext(context.Background(), req)
 }
+
+// Note: This method will be replaced by the non "WithContext()" version
+// of this method.
 func (c *Client) CallWithContext(ctx context.Context, req *ua.CallMethodRequest) (*ua.CallMethodResult, error) {
 	stats.Client().Add("Call", 1)
 
@@ -1037,9 +1067,14 @@ func (c *Client) CallWithContext(ctx context.Context, req *ua.CallMethodRequest)
 }
 
 // BrowseNext executes a synchronous browse request.
+// Deprecated: Starting with v0.5 this method will require a context
+// and the corresponding XXXWithContext(ctx) method will be removed.
 func (c *Client) BrowseNext(req *ua.BrowseNextRequest) (*ua.BrowseNextResponse, error) {
 	return c.BrowseNextWithContext(context.Background(), req)
 }
+
+// Note: This method will be replaced by the non "WithContext()" version
+// of this method.
 func (c *Client) BrowseNextWithContext(ctx context.Context, req *ua.BrowseNextRequest) (*ua.BrowseNextResponse, error) {
 	stats.Client().Add("BrowseNext", 1)
 
@@ -1052,9 +1087,14 @@ func (c *Client) BrowseNextWithContext(ctx context.Context, req *ua.BrowseNextRe
 
 // RegisterNodes registers node ids for more efficient reads.
 // Part 4, Section 5.8.5
+// Deprecated: Starting with v0.5 this method will require a context
+// and the corresponding XXXWithContext(ctx) method will be removed.
 func (c *Client) RegisterNodes(req *ua.RegisterNodesRequest) (*ua.RegisterNodesResponse, error) {
 	return c.RegisterNodesWithContext(context.Background(), req)
 }
+
+// Note: This method will be replaced by the non "WithContext()" version
+// of this method.
 func (c *Client) RegisterNodesWithContext(ctx context.Context, req *ua.RegisterNodesRequest) (*ua.RegisterNodesResponse, error) {
 	stats.Client().Add("RegisterNodes", 1)
 	stats.Client().Add("NodesToRegister", int64(len(req.NodesToRegister)))
@@ -1068,9 +1108,14 @@ func (c *Client) RegisterNodesWithContext(ctx context.Context, req *ua.RegisterN
 
 // UnregisterNodes unregisters node ids previously registered with RegisterNodes.
 // Part 4, Section 5.8.6
+// Deprecated: Starting with v0.5 this method will require a context
+// and the corresponding XXXWithContext(ctx) method will be removed.
 func (c *Client) UnregisterNodes(req *ua.UnregisterNodesRequest) (*ua.UnregisterNodesResponse, error) {
 	return c.UnregisterNodesWithContext(context.Background(), req)
 }
+
+// Note: This method will be replaced by the non "WithContext()" version
+// of this method.
 func (c *Client) UnregisterNodesWithContext(ctx context.Context, req *ua.UnregisterNodesRequest) (*ua.UnregisterNodesResponse, error) {
 	stats.Client().Add("UnregisterNodes", 1)
 	stats.Client().Add("NodesToUnregister", int64(len(req.NodesToUnregister)))
@@ -1082,9 +1127,14 @@ func (c *Client) UnregisterNodesWithContext(ctx context.Context, req *ua.Unregis
 	return res, err
 }
 
+// Deprecated: Starting with v0.5 this method will require a context
+// and the corresponding XXXWithContext(ctx) method will be removed.
 func (c *Client) HistoryReadRawModified(nodes []*ua.HistoryReadValueID, details *ua.ReadRawModifiedDetails) (*ua.HistoryReadResponse, error) {
 	return c.HistoryReadRawModifiedWithContext(context.Background(), nodes, details)
 }
+
+// Note: This method will be replaced by the non "WithContext()" version
+// of this method.
 func (c *Client) HistoryReadRawModifiedWithContext(ctx context.Context, nodes []*ua.HistoryReadValueID, details *ua.ReadRawModifiedDetails) (*ua.HistoryReadResponse, error) {
 	stats.Client().Add("HistoryReadRawModified", 1)
 	stats.Client().Add("HistoryReadValueID", int64(len(nodes)))
