@@ -340,7 +340,9 @@ func (s *SecureChannel) receive(ctx context.Context) *response {
 func (s *SecureChannel) readChunk() (*MessageChunk, error) {
 	// read a full message from the underlying conn.
 	b, err := s.c.Receive()
-	if err == io.EOF || len(b) == 0 {
+
+	sliceIsEmpty := b != nil && len(b) == 0
+	if err == io.EOF || sliceIsEmpty {
 		return nil, io.EOF
 	}
 	// do not wrap this error since it hides conn error
