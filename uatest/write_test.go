@@ -1,3 +1,4 @@
+//go:build integration
 // +build integration
 
 package uatest
@@ -26,18 +27,20 @@ func TestWrite(t *testing.T) {
 		{ua.NewStringNodeID(2, "ro_bool"), false, ua.StatusBadUserAccessDenied},
 	}
 
+	ctx := context.Background()
+
 	srv := NewServer("rw_server.py")
 	defer srv.Close()
 
 	c := opcua.NewClient(srv.Endpoint, srv.Opts...)
-	if err := c.Connect(context.Background()); err != nil {
+	if err := c.Connect(ctx); err != nil {
 		t.Fatal(err)
 	}
-	defer c.Close()
+	defer c.CloseWithContext(ctx)
 
 	for _, tt := range tests {
 		t.Run(tt.id.String(), func(t *testing.T) {
-			testWrite(t, c, tt.status, &ua.WriteRequest{
+			testWrite(t, ctx, c, tt.status, &ua.WriteRequest{
 				NodesToWrite: []*ua.WriteValue{
 					&ua.WriteValue{
 						NodeID:      tt.id,
@@ -55,15 +58,15 @@ func TestWrite(t *testing.T) {
 				return
 			}
 
-			testRead(t, c, tt.v, tt.id)
+			testRead(t, ctx, c, tt.v, tt.id)
 		})
 	}
 }
 
-func testWrite(t *testing.T, c *opcua.Client, status ua.StatusCode, req *ua.WriteRequest) {
+func testWrite(t *testing.T, ctx context.Context, c *opcua.Client, status ua.StatusCode, req *ua.WriteRequest) {
 	t.Helper()
 
-	resp, err := c.Write(req)
+	resp, err := c.WriteWithContext(ctx, req)
 	if err != nil {
 		t.Fatalf("Write failed: %s", err)
 	}
