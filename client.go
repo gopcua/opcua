@@ -382,7 +382,7 @@ func (c *Client) monitor(ctx context.Context) {
 
 						dlog.Printf("trying to restore session")
 						if err := c.ActivateSessionWithContext(ctx, s); err != nil {
-							dlog.Printf("restore session failed")
+							dlog.Printf("restore session failed: %v", err)
 							action = recreateSession
 							continue
 						}
@@ -406,6 +406,8 @@ func (c *Client) monitor(ctx context.Context) {
 							action = createSecureChannel
 							continue
 						}
+						dlog.Print("session recreated")
+
 						action = transferSubscriptions
 
 					case transferSubscriptions:
