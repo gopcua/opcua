@@ -220,7 +220,7 @@ func (c *Client) Connect(ctx context.Context) (err error) {
 	// todo(fs): server. For the sake of simplicity we left the option out but
 	// todo(fs): see the discussion in https://github.com/gopcua/opcua/pull/512
 	// todo(fs): and you should find a commit that implements this option.
-	if err := c.UpdateNamespaces(); err != nil {
+	if err := c.UpdateNamespacesWithContext(ctx); err != nil {
 		c.Close()
 		stats.RecordError(err)
 
@@ -387,6 +387,16 @@ func (c *Client) monitor(ctx context.Context) {
 							continue
 						}
 						dlog.Printf("session restored")
+
+						// todo(fs): see comment about guarding this with an option in Connect()
+						dlog.Printf("trying to update namespaces")
+						if err := c.UpdateNamespacesWithContext(ctx); err != nil {
+							dlog.Printf("updating namespaces failed: %v", err)
+							action = createSecureChannel
+							continue
+						}
+						dlog.Printf("namespaces updated")
+
 						action = restoreSubscriptions
 
 					case recreateSession:
@@ -407,6 +417,15 @@ func (c *Client) monitor(ctx context.Context) {
 							continue
 						}
 						dlog.Print("session recreated")
+
+						// todo(fs): see comment about guarding this with an option in Connect()
+						dlog.Printf("trying to update namespaces")
+						if err := c.UpdateNamespacesWithContext(ctx); err != nil {
+							dlog.Printf("updating namespaces failed: %v", err)
+							action = createSecureChannel
+							continue
+						}
+						dlog.Printf("namespaces updated")
 
 						action = transferSubscriptions
 
