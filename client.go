@@ -643,9 +643,14 @@ type Session struct {
 // "Anonymous" wii be set if it's missing in response.
 //
 // See Part 4, 5.6.2
+//
+// Note: Starting with v0.5 this method will require a context
+// and the corresponding XXXWithContext(ctx) method will be removed.
 func (c *Client) CreateSession(cfg *uasc.SessionConfig) (*Session, error) {
 	return c.CreateSessionWithContext(context.Background(), cfg)
 }
+
+// Note: Starting with v0.5 this method is superseded by the non 'WithContext' method.
 func (c *Client) CreateSessionWithContext(ctx context.Context, cfg *uasc.SessionConfig) (*Session, error) {
 	if c.SecureChannel() == nil {
 		return nil, ua.StatusBadServerNotConnected
@@ -730,10 +735,14 @@ func anonymousPolicyID(endpoints []*ua.EndpointDescription) string {
 // session call DetachSession.
 //
 // See Part 4, 5.6.3
-
+//
+// Note: Starting with v0.5 this method will require a context
+// and the corresponding XXXWithContext(ctx) method will be removed.
 func (c *Client) ActivateSession(s *Session) error {
 	return c.ActivateSessionWithContext(context.Background(), s)
 }
+
+// Note: Starting with v0.5 this method is superseded by the non 'WithContext' method.
 func (c *Client) ActivateSessionWithContext(ctx context.Context, s *Session) error {
 	if c.SecureChannel() == nil {
 		return ua.StatusBadServerNotConnected
@@ -809,9 +818,14 @@ func (c *Client) ActivateSessionWithContext(ctx context.Context, s *Session) err
 // CloseSession closes the current session.
 //
 // See Part 4, 5.6.4
+//
+// Note: Starting with v0.5 this method will require a context
+// and the corresponding XXXWithContext(ctx) method will be removed.
 func (c *Client) CloseSession() error {
 	return c.CloseSessionWithContext(context.Background())
 }
+
+// Note: Starting with v0.5 this method is superseded by the non 'WithContext' method.
 func (c *Client) CloseSessionWithContext(ctx context.Context) error {
 	stats.Client().Add("CloseSession", 1)
 	if err := c.closeSession(ctx, c.Session()); err != nil {
