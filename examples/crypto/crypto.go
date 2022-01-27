@@ -65,7 +65,7 @@ func main() {
 	if err := c.Connect(ctx); err != nil {
 		log.Fatal(err)
 	}
-	defer c.CloseSessionWithContext(ctx)
+	defer c.CloseWithContext(ctx)
 
 	// Use our connection (read the server's time)
 	v, err := c.Node(ua.NewNumericNodeID(0, 2258)).ValueWithContext(ctx)

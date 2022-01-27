@@ -59,7 +59,7 @@ func main() {
 	if err := c.Connect(ctx); err != nil {
 		log.Fatal(err)
 	}
-	defer c.CloseSessionWithContext(ctx)
+	defer c.CloseWithContext(ctx)
 
 	v, err := c.Node(id).ValueWithContext(ctx)
 	switch {
