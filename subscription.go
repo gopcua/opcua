@@ -289,13 +289,21 @@ func (s *Subscription) notify(ctx context.Context, data *PublishNotificationData
 }
 
 // Stats returns a diagnostic struct with metadata about the current subscription
+//
+// Note: Starting with v0.5 this method will require a context
+// and the corresponding XXXWithContext(ctx) method will be removed.
 func (s *Subscription) Stats() (*ua.SubscriptionDiagnosticsDataType, error) {
+	return s.StatsWithContext(context.Background())
+}
+
+// Note: Starting with v0.5 this method is superseded by the non 'WithContext' method.
+func (s *Subscription) StatsWithContext(ctx context.Context) (*ua.SubscriptionDiagnosticsDataType, error) {
 	// TODO(kung-foo): once browsing feature is merged, attempt to get direct access to the
 	// diagnostics node. for example, Prosys lists them like:
 	// i=2290/ns=1;g=918ee6f4-2d25-4506-980d-e659441c166d
 	// maybe cache the nodeid to speed up future stats queries
 	node := s.c.Node(ua.NewNumericNodeID(0, id.Server_ServerDiagnostics_SubscriptionDiagnosticsArray))
-	v, err := node.Value()
+	v, err := node.ValueWithContext(ctx)
 	if err != nil {
 		return nil, err
 	}

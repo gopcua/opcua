@@ -552,12 +552,20 @@ func (c *Client) Dial(ctx context.Context) error {
 }
 
 // Close closes the session and the secure channel.
+//
+// Note: Starting with v0.5 this method will require a context
+// and the corresponding XXXWithContext(ctx) method will be removed.
 func (c *Client) Close() error {
+	return c.CloseWithContext(context.Background())
+}
+
+// Note: Starting with v0.5 this method is superseded by the non 'WithContext' method.
+func (c *Client) CloseWithContext(ctx context.Context) error {
 	stats.Client().Add("Close", 1)
 
 	// try to close the session but ignore any error
 	// so that we close the underlying channel and connection.
-	c.CloseSession()
+	c.CloseSessionWithContext(ctx)
 	c.setState(Closed)
 
 	if c.mcancel != nil {
