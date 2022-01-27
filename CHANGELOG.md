@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.3.1 (27 Jan 2022)
+
+* Refresh cached namespaces on reconnect (#552)
+
+* Add more `WithContext(ctx)` methods and use context in more places (#555)
+
 ## v0.3.0 (21 Jan 2022)
 
 * Add `WithContext(ctx)` variants to all methods of `Client` and `Node` and migrate existing methods
