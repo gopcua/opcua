@@ -7,9 +7,10 @@ import (
 	"context"
 	"testing"
 
+	"github.com/pascaldekloe/goe/verify"
+
 	"github.com/gopcua/opcua"
 	"github.com/gopcua/opcua/ua"
-	"github.com/pascaldekloe/goe/verify"
 )
 
 // TestRead performs an integration test to read values
@@ -27,31 +28,33 @@ func TestRead(t *testing.T) {
 		{ua.NewStringNodeID(2, "2d_array_int32"), [][]int32{{1}, {2}, {3}}},
 	}
 
+	ctx := context.Background()
+
 	srv := NewServer("rw_server.py")
 	defer srv.Close()
 
 	c := opcua.NewClient(srv.Endpoint, srv.Opts...)
-	if err := c.Connect(context.Background()); err != nil {
+	if err := c.Connect(ctx); err != nil {
 		t.Fatal(err)
 	}
-	defer c.Close()
+	defer c.CloseWithContext(ctx)
 
 	for _, tt := range tests {
 		t.Run(tt.id.String(), func(t *testing.T) {
 			t.Run("Read", func(t *testing.T) {
-				testRead(t, c, tt.v, tt.id)
+				testRead(t, ctx, c, tt.v, tt.id)
 			})
 			t.Run("RegisteredRead", func(t *testing.T) {
-				testRegisteredRead(t, c, tt.v, tt.id)
+				testRegisteredRead(t, ctx, c, tt.v, tt.id)
 			})
 		})
 	}
 }
 
-func testRead(t *testing.T, c *opcua.Client, v interface{}, id *ua.NodeID) {
+func testRead(t *testing.T, ctx context.Context, c *opcua.Client, v interface{}, id *ua.NodeID) {
 	t.Helper()
 
-	resp, err := c.Read(&ua.ReadRequest{
+	resp, err := c.ReadWithContext(ctx, &ua.ReadRequest{
 		NodesToRead: []*ua.ReadValueID{
 			&ua.ReadValueID{NodeID: id},
 		},
@@ -68,23 +71,23 @@ func testRead(t *testing.T, c *opcua.Client, v interface{}, id *ua.NodeID) {
 	}
 }
 
-func testRegisteredRead(t *testing.T, c *opcua.Client, v interface{}, id *ua.NodeID) {
+func testRegisteredRead(t *testing.T, ctx context.Context, c *opcua.Client, v interface{}, id *ua.NodeID) {
 	t.Helper()
 
-	resp, err := c.RegisterNodes(&ua.RegisterNodesRequest{
+	resp, err := c.RegisterNodesWithContext(ctx, &ua.RegisterNodesRequest{
 		NodesToRegister: []*ua.NodeID{id},
 	})
 	if err != nil {
 		t.Fatalf("RegisterNodes failed: %s", err)
 	}
 
-	testRead(t, c, v, resp.RegisteredNodeIDs[0])
-	testRead(t, c, v, resp.RegisteredNodeIDs[0])
-	testRead(t, c, v, resp.RegisteredNodeIDs[0])
-	testRead(t, c, v, resp.RegisteredNodeIDs[0])
-	testRead(t, c, v, resp.RegisteredNodeIDs[0])
+	testRead(t, ctx, c, v, resp.RegisteredNodeIDs[0])
+	testRead(t, ctx, c, v, resp.RegisteredNodeIDs[0])
+	testRead(t, ctx, c, v, resp.RegisteredNodeIDs[0])
+	testRead(t, ctx, c, v, resp.RegisteredNodeIDs[0])
+	testRead(t, ctx, c, v, resp.RegisteredNodeIDs[0])
 
-	_, err = c.UnregisterNodes(&ua.UnregisterNodesRequest{
+	_, err = c.UnregisterNodesWithContext(ctx, &ua.UnregisterNodesRequest{
 		NodesToUnregister: []*ua.NodeID{id},
 	})
 	if err != nil {

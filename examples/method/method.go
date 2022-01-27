@@ -28,7 +28,7 @@ func main() {
 	if err := c.Connect(ctx); err != nil {
 		log.Fatal(err)
 	}
-	defer c.CloseSessionWithContext(ctx)
+	defer c.CloseWithContext(ctx)
 
 	in := int64(12)
 	req := &ua.CallMethodRequest{

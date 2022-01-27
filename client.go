@@ -34,7 +34,7 @@ func GetEndpoints(ctx context.Context, endpoint string, opts ...Option) ([]*ua.E
 	if err := c.Dial(ctx); err != nil {
 		return nil, err
 	}
-	defer c.Close()
+	defer c.CloseWithContext(ctx)
 	res, err := c.GetEndpointsWithContext(ctx)
 	if err != nil {
 		return nil, err
@@ -195,14 +195,14 @@ func (c *Client) Connect(ctx context.Context) (err error) {
 
 	s, err := c.CreateSessionWithContext(ctx, c.cfg.session)
 	if err != nil {
-		c.Close()
+		c.CloseWithContext(ctx)
 		stats.RecordError(err)
 
 		return err
 	}
 
 	if err := c.ActivateSessionWithContext(ctx, s); err != nil {
-		c.Close()
+		c.CloseWithContext(ctx)
 		stats.RecordError(err)
 
 		return err
@@ -221,7 +221,7 @@ func (c *Client) Connect(ctx context.Context) (err error) {
 	// todo(fs): see the discussion in https://github.com/gopcua/opcua/pull/512
 	// todo(fs): and you should find a commit that implements this option.
 	if err := c.UpdateNamespacesWithContext(ctx); err != nil {
-		c.Close()
+		c.CloseWithContext(ctx)
 		stats.RecordError(err)
 
 		return err
@@ -552,12 +552,20 @@ func (c *Client) Dial(ctx context.Context) error {
 }
 
 // Close closes the session and the secure channel.
+//
+// Note: Starting with v0.5 this method will require a context
+// and the corresponding XXXWithContext(ctx) method will be removed.
 func (c *Client) Close() error {
+	return c.CloseWithContext(context.Background())
+}
+
+// Note: Starting with v0.5 this method is superseded by the non 'WithContext' method.
+func (c *Client) CloseWithContext(ctx context.Context) error {
 	stats.Client().Add("Close", 1)
 
 	// try to close the session but ignore any error
 	// so that we close the underlying channel and connection.
-	c.CloseSession()
+	c.CloseSessionWithContext(ctx)
 	c.setState(Closed)
 
 	if c.mcancel != nil {

@@ -22,22 +22,23 @@ const (
 // TestAutoReconnection performs an integration test the auto reconnection
 // from an OPC/UA server.
 func TestAutoReconnection(t *testing.T) {
+	ctx := context.Background()
 
 	srv := NewServer("reconnection_server.py")
 	defer srv.Close()
 
 	c := opcua.NewClient(srv.Endpoint, srv.Opts...)
-	if err := c.Connect(context.Background()); err != nil {
+	if err := c.Connect(ctx); err != nil {
 		t.Fatal(err)
 	}
-	defer c.Close()
+	defer c.CloseWithContext(ctx)
 
 	m, err := monitor.NewNodeMonitor(c)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	tests := []struct {
@@ -102,7 +103,7 @@ func TestAutoReconnection(t *testing.T) {
 
 			downC := make(chan struct{}, 1)
 			dTimeout := time.NewTimer(disconnectTimeout)
-			go c.Call(tt.req)
+			go c.CallWithContext(ctx, tt.req)
 
 			ctx, cancel := context.WithCancel(context.Background())
 			go func() {

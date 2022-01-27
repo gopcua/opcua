@@ -16,12 +16,12 @@ import (
 	"strings"
 	"syscall"
 
+	"golang.org/x/crypto/ssh/terminal"
+
 	"github.com/gopcua/opcua"
 	"github.com/gopcua/opcua/debug"
 	"github.com/gopcua/opcua/errors"
 	"github.com/gopcua/opcua/ua"
-
-	"golang.org/x/crypto/ssh/terminal"
 )
 
 var (
@@ -65,10 +65,10 @@ func main() {
 	if err := c.Connect(ctx); err != nil {
 		log.Fatal(err)
 	}
-	defer c.CloseSessionWithContext(ctx)
+	defer c.CloseWithContext(ctx)
 
 	// Use our connection (read the server's time)
-	v, err := c.Node(ua.NewNumericNodeID(0, 2258)).Value()
+	v, err := c.Node(ua.NewNumericNodeID(0, 2258)).ValueWithContext(ctx)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -79,7 +79,7 @@ func main() {
 	}
 
 	// Detach our session and try re-establish it on a different secure channel
-	s, err := c.DetachSession()
+	s, err := c.DetachSessionWithContext(ctx)
 	if err != nil {
 		log.Fatalf("Error detaching session: %s", err)
 	}
@@ -88,16 +88,16 @@ func main() {
 
 	// Create a channel only and do not activate it automatically
 	d.Dial(ctx)
-	defer d.Close()
+	defer d.CloseWithContext(ctx)
 
 	// Activate the previous session on the new channel
-	err = d.ActivateSession(s)
+	err = d.ActivateSessionWithContext(ctx, s)
 	if err != nil {
 		log.Fatalf("Error reactivating session: %s", err)
 	}
 
 	// Read the time again to prove our session is still OK
-	v, err = d.Node(ua.NewNumericNodeID(0, 2258)).Value()
+	v, err = d.Node(ua.NewNumericNodeID(0, 2258)).ValueWithContext(ctx)
 	if err != nil {
 		log.Fatal(err)
 	}

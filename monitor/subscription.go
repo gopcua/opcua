@@ -88,7 +88,7 @@ func NewNodeMonitor(client *opcua.Client) (*NodeMonitor, error) {
 	return m, nil
 }
 
-func newSubscription(m *NodeMonitor, params *opcua.SubscriptionParameters, notifyChanLength int, nodes ...string) (*Subscription, error) {
+func newSubscription(ctx context.Context, m *NodeMonitor, params *opcua.SubscriptionParameters, notifyChanLength int, nodes ...string) (*Subscription, error) {
 	if params == nil {
 		params = &opcua.SubscriptionParameters{}
 	}
@@ -102,11 +102,11 @@ func newSubscription(m *NodeMonitor, params *opcua.SubscriptionParameters, notif
 	}
 
 	var err error
-	if s.sub, err = m.client.Subscribe(params, s.internalNotifyCh); err != nil {
+	if s.sub, err = m.client.SubscribeWithContext(ctx, params, s.internalNotifyCh); err != nil {
 		return nil, err
 	}
 
-	if err = s.AddNodes(nodes...); err != nil {
+	if err = s.AddNodesWithContext(ctx, nodes...); err != nil {
 		return nil, err
 	}
 
@@ -122,7 +122,7 @@ func (m *NodeMonitor) SetErrorHandler(cb ErrHandler) {
 // The caller must call `Unsubscribe` to stop and clean up resources. Canceling the context
 // will also cause the subscription to stop, but `Unsubscribe` must still be called.
 func (m *NodeMonitor) Subscribe(ctx context.Context, params *opcua.SubscriptionParameters, cb MsgHandler, nodes ...string) (*Subscription, error) {
-	sub, err := newSubscription(m, params, DefaultCallbackBufferLen, nodes...)
+	sub, err := newSubscription(ctx, m, params, DefaultCallbackBufferLen, nodes...)
 	if err != nil {
 		return nil, err
 	}
@@ -138,7 +138,7 @@ func (m *NodeMonitor) Subscribe(ctx context.Context, params *opcua.SubscriptionP
 // The caller must call `Unsubscribe` to stop and clean up resources. Canceling the context
 // will also cause the subscription to stop, but `Unsubscribe` must still be called.
 func (m *NodeMonitor) ChanSubscribe(ctx context.Context, params *opcua.SubscriptionParameters, ch chan<- *DataChangeMessage, nodes ...string) (*Subscription, error) {
-	sub, err := newSubscription(m, params, 16, nodes...)
+	sub, err := newSubscription(ctx, m, params, 16, nodes...)
 	if err != nil {
 		return nil, err
 	}
@@ -254,17 +254,32 @@ func (s *Subscription) Dropped() uint64 {
 }
 
 // AddNodes adds nodes defined by their string representation
+//
+// Note: Starting with v0.5 this method will require a context
+// and the corresponding XXXWithContext(ctx) method will be removed.
 func (s *Subscription) AddNodes(nodes ...string) error {
+	return s.AddNodesWithContext(context.Background(), nodes...)
+}
 
+// Note: Starting with v0.5 this method is superseded by the non 'WithContext' method.
+func (s *Subscription) AddNodesWithContext(ctx context.Context, nodes ...string) error {
 	nodeIDs, err := parseNodeSlice(nodes...)
 	if err != nil {
 		return err
 	}
-	return s.AddNodeIDs(nodeIDs...)
+	return s.AddNodeIDsWithContext(ctx, nodeIDs...)
 }
 
 // AddNodeIDs adds nodes
+//
+// Note: Starting with v0.5 this method will require a context
+// and the corresponding XXXWithContext(ctx) method will be removed.
 func (s *Subscription) AddNodeIDs(nodes ...*ua.NodeID) error {
+	return s.AddNodeIDsWithContext(context.Background(), nodes...)
+}
+
+// Note: Starting with v0.5 this method is superseded by the non 'WithContext' method.
+func (s *Subscription) AddNodeIDsWithContext(ctx context.Context, nodes ...*ua.NodeID) error {
 	requests := make([]Request, len(nodes))
 
 	for i, node := range nodes {
@@ -273,12 +288,20 @@ func (s *Subscription) AddNodeIDs(nodes ...*ua.NodeID) error {
 			MonitoringMode: ua.MonitoringModeReporting,
 		}
 	}
-	_, err := s.AddMonitorItems(requests...)
+	_, err := s.AddMonitorItemsWithContext(ctx, requests...)
 	return err
 }
 
 // AddMonitorItems adds nodes with monitoring parameters to the subscription
+//
+// Note: Starting with v0.5 this method will require a context
+// and the corresponding XXXWithContext(ctx) method will be removed.
 func (s *Subscription) AddMonitorItems(nodes ...Request) ([]Item, error) {
+	return s.AddMonitorItemsWithContext(context.Background(), nodes...)
+}
+
+// Note: Starting with v0.5 this method is superseded by the non 'WithContext' method.
+func (s *Subscription) AddMonitorItemsWithContext(ctx context.Context, nodes ...Request) ([]Item, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -305,7 +328,7 @@ func (s *Subscription) AddMonitorItems(nodes ...Request) ([]Item, error) {
 		}
 		toAdd = append(toAdd, request)
 	}
-	resp, err := s.sub.Monitor(ua.TimestampsToReturnBoth, toAdd...)
+	resp, err := s.sub.MonitorWithContext(ctx, ua.TimestampsToReturnBoth, toAdd...)
 	if err != nil {
 		return nil, err
 	}
@@ -335,22 +358,37 @@ func (s *Subscription) AddMonitorItems(nodes ...Request) ([]Item, error) {
 }
 
 // RemoveNodes removes nodes defined by their string representation
+//
+// Note: Starting with v0.5 this method will require a context
+// and the corresponding XXXWithContext(ctx) method will be removed.
 func (s *Subscription) RemoveNodes(nodes ...string) error {
+	return s.RemoveNodesWithContext(context.Background(), nodes...)
+}
+
+// Note: Starting with v0.5 this method is superseded by the non 'WithContext' method.
+func (s *Subscription) RemoveNodesWithContext(ctx context.Context, nodes ...string) error {
 	nodeIDs, err := parseNodeSlice(nodes...)
 	if err != nil {
 		return err
 	}
-	return s.RemoveNodeIDs(nodeIDs...)
+	return s.RemoveNodeIDsWithContext(ctx, nodeIDs...)
 }
 
 // RemoveNodeIDs removes nodes
+//
+// Note: Starting with v0.5 this method will require a context
+// and the corresponding XXXWithContext(ctx) method will be removed.
 func (s *Subscription) RemoveNodeIDs(nodes ...*ua.NodeID) error {
+	return s.RemoveNodeIDsWithContext(context.Background(), nodes...)
+}
+
+// Note: Starting with v0.5 this method is superseded by the non 'WithContext' method.
+func (s *Subscription) RemoveNodeIDsWithContext(ctx context.Context, nodes ...*ua.NodeID) error {
 	if len(nodes) == 0 {
 		return nil
 	}
 
 	var toRemove []Item
-
 	for _, node := range nodes {
 		for _, item := range s.itemLookup {
 			if item.nodeID.String() == node.String() {
@@ -360,11 +398,19 @@ func (s *Subscription) RemoveNodeIDs(nodes ...*ua.NodeID) error {
 		}
 	}
 
-	return s.RemoveMonitorItems(toRemove...)
+	return s.RemoveMonitorItemsWithContext(ctx, toRemove...)
 }
 
 // RemoveMonitorItems removes nodes
+//
+// Note: Starting with v0.5 this method will require a context
+// and the corresponding XXXWithContext(ctx) method will be removed.
 func (s *Subscription) RemoveMonitorItems(items ...Item) error {
+	return s.RemoveMonitorItemsWithContext(context.Background())
+}
+
+// Note: Starting with v0.5 this method is superseded by the non 'WithContext' method.
+func (s *Subscription) RemoveMonitorItemsWithContext(ctx context.Context, items ...Item) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -373,9 +419,7 @@ func (s *Subscription) RemoveMonitorItems(items ...Item) error {
 	}
 
 	var toRemove []uint32
-
 	for _, item := range items {
-
 		_, ok := s.itemLookup[item.id]
 		if !ok {
 			return errors.Errorf("item not found: %s", item.id)
@@ -385,7 +429,7 @@ func (s *Subscription) RemoveMonitorItems(items ...Item) error {
 		toRemove = append(toRemove, item.id)
 	}
 
-	resp, err := s.sub.Unmonitor(toRemove...)
+	resp, err := s.sub.UnmonitorWithContext(ctx, toRemove...)
 	if err != nil {
 		return err
 	}
@@ -408,8 +452,16 @@ func (s *Subscription) RemoveMonitorItems(items ...Item) error {
 }
 
 // Stats returns statistics for the subscription
+//
+// Note: Starting with v0.5 this method will require a context
+// and the corresponding XXXWithContext(ctx) method will be removed.
 func (s *Subscription) Stats() (*ua.SubscriptionDiagnosticsDataType, error) {
-	return s.sub.Stats()
+	return s.StatsWithContext(context.Background())
+}
+
+// Note: Starting with v0.5 this method is superseded by the non 'WithContext' method.
+func (s *Subscription) StatsWithContext(ctx context.Context) (*ua.SubscriptionDiagnosticsDataType, error) {
+	return s.sub.StatsWithContext(ctx)
 }
 
 func parseNodeSlice(nodes ...string) ([]*ua.NodeID, error) {

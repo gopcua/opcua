@@ -54,18 +54,20 @@ func TestCallMethod(t *testing.T) {
 		},
 	}
 
+	ctx := context.Background()
+
 	srv := NewServer("method_server.py")
 	defer srv.Close()
 
 	c := opcua.NewClient(srv.Endpoint, srv.Opts...)
-	if err := c.Connect(context.Background()); err != nil {
+	if err := c.Connect(ctx); err != nil {
 		t.Fatal(err)
 	}
-	defer c.Close()
+	defer c.CloseWithContext(ctx)
 
 	for _, tt := range tests {
 		t.Run(tt.req.ObjectID.String(), func(t *testing.T) {
-			resp, err := c.Call(tt.req)
+			resp, err := c.CallWithContext(ctx, tt.req)
 			if err != nil {
 				t.Fatal(err)
 			}
