@@ -34,7 +34,7 @@ func GetEndpoints(ctx context.Context, endpoint string, opts ...Option) ([]*ua.E
 	if err := c.Dial(ctx); err != nil {
 		return nil, err
 	}
-	defer c.Close()
+	defer c.CloseWithContext(ctx)
 	res, err := c.GetEndpointsWithContext(ctx)
 	if err != nil {
 		return nil, err
@@ -195,14 +195,14 @@ func (c *Client) Connect(ctx context.Context) (err error) {
 
 	s, err := c.CreateSessionWithContext(ctx, c.cfg.session)
 	if err != nil {
-		c.Close()
+		c.CloseWithContext(ctx)
 		stats.RecordError(err)
 
 		return err
 	}
 
 	if err := c.ActivateSessionWithContext(ctx, s); err != nil {
-		c.Close()
+		c.CloseWithContext(ctx)
 		stats.RecordError(err)
 
 		return err
@@ -221,7 +221,7 @@ func (c *Client) Connect(ctx context.Context) (err error) {
 	// todo(fs): see the discussion in https://github.com/gopcua/opcua/pull/512
 	// todo(fs): and you should find a commit that implements this option.
 	if err := c.UpdateNamespacesWithContext(ctx); err != nil {
-		c.Close()
+		c.CloseWithContext(ctx)
 		stats.RecordError(err)
 
 		return err
