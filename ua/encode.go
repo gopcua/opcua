@@ -83,6 +83,8 @@ func encode(val reflect.Value, name string) ([]byte, error) {
 			return writeStruct(val, name)
 		case reflect.Slice:
 			return writeSlice(val, name)
+		case reflect.Array:
+			return writeArray(val, name)
 		default:
 			return nil, errors.Errorf("unsupported type: %s", val.Type())
 		}
@@ -124,6 +126,27 @@ func writeSlice(val reflect.Value, name string) ([]byte, error) {
 		buf.Write(val.Bytes())
 		return buf.Bytes(), buf.Error()
 	}
+
+	// loop over elements
+	for i := 0; i < val.Len(); i++ {
+		ename := fmt.Sprintf("%s[%d]", name, i)
+		b, err := encode(val.Index(i), ename)
+		if err != nil {
+			return nil, err
+		}
+		buf.Write(b)
+	}
+	return buf.Bytes(), buf.Error()
+}
+
+func writeArray(val reflect.Value, name string) ([]byte, error) {
+	buf := NewBuffer(nil)
+
+	if val.Len() > math.MaxInt32 {
+		return nil, errors.Errorf("array too large")
+	}
+
+	buf.WriteUint32(uint32(val.Len()))
 
 	// loop over elements
 	for i := 0; i < val.Len(); i++ {
