@@ -249,9 +249,8 @@ func (c *Client) updatePublishTimeout() {
 	c.setPublishTimeout(maxTimeout)
 }
 
+// we need to hold the subMux lock already
 func (c *Client) notifySubscriptionsOfError(ctx context.Context, subID uint32, err error) {
-	// we need to hold the subMux lock already
-
 	subsToNotify := c.subs
 	if subID != 0 {
 		subsToNotify = map[uint32]*Subscription{
@@ -430,6 +429,8 @@ func (c *Client) publish(ctx context.Context) error {
 	case err != nil && res != nil:
 		// irrecoverable error
 		// todo(fs): do we need to stop and forget the subscription?
+		c.subMux.Lock()
+		defer c.subMux.Unlock()
 		c.notifySubscriptionsOfError(ctx, res.SubscriptionID, err)
 		dlog.Printf("error: %s", err)
 		return err
