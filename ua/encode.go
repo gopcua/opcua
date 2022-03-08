@@ -149,6 +149,7 @@ func writeArray(val reflect.Value, name string) ([]byte, error) {
 	buf.WriteUint32(uint32(val.Len()))
 
 	// loop over elements
+	// we write all the elements, also the zero values
 	for i := 0; i < val.Len(); i++ {
 		ename := fmt.Sprintf("%s[%d]", name, i)
 		b, err := encode(val.Index(i), ename)
