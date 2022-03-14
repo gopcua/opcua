@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.3.2 (14 Mar 2022)
+
+* Add support for arrays (#564)
+
 ## v0.3.1 (27 Jan 2022)
 
 * Refresh cached namespaces on reconnect (#552)
