@@ -190,6 +190,13 @@ func decodeArray(b []byte, val reflect.Value, name string) (int, error) {
 	elemType := val.Type().Elem()
 	// fmt.Println("elemType: ", elemType.String())
 
+	// fast path for []byte
+	if elemType.Kind() == reflect.Uint8 {
+		// fmt.Println("decode: []byte fast path")
+		reflect.Copy(val, reflect.ValueOf(buf.ReadN(int(n))))
+		return buf.Pos(), buf.Error()
+	}
+
 	pos := buf.Pos()
 	// a is a pointer to an array [n]*Foo, where n is know at compile time
 	a := reflect.New(val.Type()).Elem()

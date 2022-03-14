@@ -148,6 +148,15 @@ func writeArray(val reflect.Value, name string) ([]byte, error) {
 
 	buf.WriteUint32(uint32(val.Len()))
 
+	// fast path for []byte
+	if val.Type().Elem().Kind() == reflect.Uint8 {
+		// fmt.Println("encode: []byte fast path")
+		b := make([]byte, val.Len())
+		reflect.Copy(reflect.ValueOf(b), val)
+		buf.Write(b)
+		return buf.Bytes(), buf.Error()
+	}
+
 	// loop over elements
 	// we write all the elements, also the zero values
 	for i := 0; i < val.Len(); i++ {
