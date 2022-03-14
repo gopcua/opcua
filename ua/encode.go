@@ -83,6 +83,8 @@ func encode(val reflect.Value, name string) ([]byte, error) {
 			return writeStruct(val, name)
 		case reflect.Slice:
 			return writeSlice(val, name)
+		case reflect.Array:
+			return writeArray(val, name)
 		default:
 			return nil, errors.Errorf("unsupported type: %s", val.Type())
 		}
@@ -126,6 +128,37 @@ func writeSlice(val reflect.Value, name string) ([]byte, error) {
 	}
 
 	// loop over elements
+	for i := 0; i < val.Len(); i++ {
+		ename := fmt.Sprintf("%s[%d]", name, i)
+		b, err := encode(val.Index(i), ename)
+		if err != nil {
+			return nil, err
+		}
+		buf.Write(b)
+	}
+	return buf.Bytes(), buf.Error()
+}
+
+func writeArray(val reflect.Value, name string) ([]byte, error) {
+	buf := NewBuffer(nil)
+
+	if val.Len() > math.MaxInt32 {
+		return nil, errors.Errorf("array too large: %d > %d", val.Len(), math.MaxInt32)
+	}
+
+	buf.WriteUint32(uint32(val.Len()))
+
+	// fast path for []byte
+	if val.Type().Elem().Kind() == reflect.Uint8 {
+		// fmt.Println("encode: []byte fast path")
+		b := make([]byte, val.Len())
+		reflect.Copy(reflect.ValueOf(b), val)
+		buf.Write(b)
+		return buf.Bytes(), buf.Error()
+	}
+
+	// loop over elements
+	// we write all the elements, also the zero values
 	for i := 0; i < val.Len(); i++ {
 		ename := fmt.Sprintf("%s[%d]", name, i)
 		b, err := encode(val.Index(i), ename)

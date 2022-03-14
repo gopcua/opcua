@@ -79,6 +79,8 @@ func decode(b []byte, val reflect.Value, name string) (n int, err error) {
 			val.SetString(buf.ReadString())
 		case reflect.Slice:
 			return decodeSlice(b, val, name)
+		case reflect.Array:
+			return decodeArray(b, val, name)
 		case reflect.Ptr:
 			return decode(b, val.Elem(), name)
 		case reflect.Struct:
@@ -126,7 +128,7 @@ func decodeSlice(b []byte, val reflect.Value, name string) (int, error) {
 	}
 
 	if n > math.MaxInt32 {
-		return buf.Pos(), errors.Errorf("array too large: %d", n)
+		return buf.Pos(), errors.Errorf("array too large: %d > %d", n, math.MaxInt32)
 	}
 
 	// elemType is the type of the slice elements
@@ -144,6 +146,60 @@ func decodeSlice(b []byte, val reflect.Value, name string) (int, error) {
 	pos := buf.Pos()
 	// a is a slice of []*Foo
 	a := reflect.MakeSlice(val.Type(), int(n), int(n))
+	for i := 0; i < int(n); i++ {
+
+		// if the slice elements are pointers we need to create
+		// them before we can marshal data into them.
+		if elemType.Kind() == reflect.Ptr {
+			a.Index(i).Set(reflect.New(elemType.Elem()))
+		}
+
+		ename := fmt.Sprintf("%s[%d]", name, i)
+		m, err := decode(b[pos:], a.Index(i), ename)
+		if err != nil {
+			return pos, err
+		}
+		pos += m
+	}
+	val.Set(a)
+
+	return pos, nil
+}
+
+func decodeArray(b []byte, val reflect.Value, name string) (int, error) {
+	buf := NewBuffer(b)
+	n := buf.ReadUint32()
+	if buf.Error() != nil {
+		return buf.Pos(), buf.Error()
+	}
+
+	if n == null {
+		return buf.Pos(), nil
+	}
+
+	if n > math.MaxInt32 {
+		return buf.Pos(), errors.Errorf("array too large: %d > %d", n, math.MaxInt32)
+	}
+
+	if n > uint32(val.Len()) {
+		return buf.Pos(), errors.Errorf("array too large: %d > %d", n, val.Len())
+	}
+
+	// elemType is the type of the slice elements
+	// e.g. *Foo for []*Foo
+	elemType := val.Type().Elem()
+	// fmt.Println("elemType: ", elemType.String())
+
+	// fast path for []byte
+	if elemType.Kind() == reflect.Uint8 {
+		// fmt.Println("decode: []byte fast path")
+		reflect.Copy(val, reflect.ValueOf(buf.ReadN(int(n))))
+		return buf.Pos(), buf.Error()
+	}
+
+	pos := buf.Pos()
+	// a is a pointer to an array [n]*Foo, where n is know at compile time
+	a := reflect.New(val.Type()).Elem()
 	for i := 0; i < int(n); i++ {
 
 		// if the slice elements are pointers we need to create
