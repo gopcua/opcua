@@ -128,7 +128,7 @@ func decodeSlice(b []byte, val reflect.Value, name string) (int, error) {
 	}
 
 	if n > math.MaxInt32 {
-		return buf.Pos(), errors.Errorf("array too large: %d", n)
+		return buf.Pos(), errors.Errorf("array too large: %d > %d", n, math.MaxInt32)
 	}
 
 	// elemType is the type of the slice elements
@@ -178,11 +178,11 @@ func decodeArray(b []byte, val reflect.Value, name string) (int, error) {
 	}
 
 	if n > math.MaxInt32 {
-		return buf.Pos(), errors.Errorf("array too large: %d", n)
+		return buf.Pos(), errors.Errorf("array too large: %d > %d", n, math.MaxInt32)
 	}
 
 	if n > uint32(val.Len()) {
-		return buf.Pos(), errors.Errorf("array too large, it does not fit into the type: encoded array len = %d, array len = %d", n, val.Len())
+		return buf.Pos(), errors.Errorf("array too large: %d > %d", n, val.Len())
 	}
 
 	// elemType is the type of the slice elements

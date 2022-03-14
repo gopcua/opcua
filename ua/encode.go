@@ -143,7 +143,7 @@ func writeArray(val reflect.Value, name string) ([]byte, error) {
 	buf := NewBuffer(nil)
 
 	if val.Len() > math.MaxInt32 {
-		return nil, errors.Errorf("array too large")
+		return nil, errors.Errorf("array too large: %d > %d", val.Len(), math.MaxInt32)
 	}
 
 	buf.WriteUint32(uint32(val.Len()))
