@@ -585,7 +585,11 @@ func (c *Client) CloseWithContext(ctx context.Context) error {
 
 	// close the connection but ignore the error since there isn't
 	// anything we can do about it anyway
-	c.conn.Close()
+	// c.conn can be nil when reconnecting to the server,
+	// see https://github.com/gopcua/opcua/issues/567
+	if c.conn != nil {
+		c.conn.Close()
+	}
 
 	return nil
 }
