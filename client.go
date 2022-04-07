@@ -585,7 +585,9 @@ func (c *Client) CloseWithContext(ctx context.Context) error {
 
 	// close the connection but ignore the error since there isn't
 	// anything we can do about it anyway
-	c.conn.Close()
+	if c.conn != nil {
+		c.conn.Close()
+	}
 
 	return nil
 }
