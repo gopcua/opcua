@@ -79,7 +79,7 @@ func (c *Client) SubscribeWithContext(ctx context.Context, params *SubscriptionP
 	}
 
 	c.subs[sub.SubscriptionID] = sub
-	c.updatePublishTimeout()
+	c.updatePublishTimeout_NeedsSubMuxRLock()
 	return sub, nil
 }
 
@@ -98,11 +98,14 @@ func (c *Client) SubscriptionIDs() []uint32 {
 // recreateSubscriptions creates new subscriptions
 // with the same parameters to replace the previous ones
 func (c *Client) recreateSubscription(ctx context.Context, id uint32) error {
+	c.subMux.Lock()
+	defer c.subMux.Unlock()
+
 	sub, ok := c.subs[id]
 	if !ok {
 		return ua.StatusBadSubscriptionIDInvalid
 	}
-	return sub.recreate(ctx)
+	return sub.recreate_NeedsSubMuxLock(ctx)
 }
 
 // transferSubscriptions ask the server to transfer the given subscriptions
@@ -123,10 +126,10 @@ func (c *Client) transferSubscriptions(ctx context.Context, ids []uint32) (*ua.T
 // republishSubscriptions sends republish requests for the given subscription id.
 func (c *Client) republishSubscription(ctx context.Context, id uint32, availableSeq []uint32) error {
 	c.subMux.RLock()
-	defer c.subMux.RUnlock()
+	sub := c.subs[id]
+	c.subMux.RUnlock()
 
-	sub, ok := c.subs[id]
-	if !ok {
+	if sub == nil {
 		return errors.Errorf("invalid subscription id %d", id)
 	}
 
@@ -208,11 +211,8 @@ func (c *Client) sendRepublishRequests(ctx context.Context, sub *Subscription, a
 	}
 }
 
-// registerSubscription register a subscription
-func (c *Client) registerSubscription(sub *Subscription) error {
-	c.subMux.Lock()
-	defer c.subMux.Unlock()
-
+// registerSubscription_NeedsSubMuxLock registers a subscription
+func (c *Client) registerSubscription_NeedsSubMuxLock(sub *Subscription) error {
 	if sub.SubscriptionID == 0 {
 		return ua.StatusBadSubscriptionIDInvalid
 	}
@@ -227,19 +227,23 @@ func (c *Client) registerSubscription(sub *Subscription) error {
 
 func (c *Client) forgetSubscription(ctx context.Context, id uint32) {
 	c.subMux.Lock()
-	delete(c.subs, id)
-	c.updatePublishTimeout()
+	c.forgetSubscription_NeedsSubMuxLock(ctx, id)
 	c.subMux.Unlock()
+}
+
+func (c *Client) forgetSubscription_NeedsSubMuxLock(ctx context.Context, id uint32) {
+	delete(c.subs, id)
+	c.updatePublishTimeout_NeedsSubMuxRLock()
 	stats.Subscription().Add("Count", -1)
 
 	if len(c.subs) == 0 {
+		// todo(fs): are we holding the lock too long here?
+		// todo(fs): consider running this as a go routine
 		c.pauseSubscriptions(ctx)
 	}
 }
 
-func (c *Client) updatePublishTimeout() {
-	// we need to hold the subMux lock already
-
+func (c *Client) updatePublishTimeout_NeedsSubMuxRLock() {
 	maxTimeout := uasc.MaxTimeout
 	for _, s := range c.subs {
 		if d := s.publishTimeout(); d < maxTimeout {
@@ -441,7 +445,7 @@ func (c *Client) publish(ctx context.Context) error {
 	default:
 		c.subMux.Lock()
 		// handle pending acks for all subscriptions
-		c.handleAcks(res.Results)
+		c.handleAcks_NeedsSubMuxLock(res.Results)
 
 		sub, ok := c.subs[res.SubscriptionID]
 		if !ok {
@@ -452,7 +456,7 @@ func (c *Client) publish(ctx context.Context) error {
 		}
 
 		// handle the publish response for a specific subscription
-		c.handleNotification(ctx, sub, res)
+		c.handleNotification_NeedsSubMuxLock(ctx, sub, res)
 		c.subMux.Unlock()
 
 		c.notifySubscription(ctx, sub, res.NotificationMessage)
@@ -462,7 +466,7 @@ func (c *Client) publish(ctx context.Context) error {
 	return nil
 }
 
-func (c *Client) handleAcks(res []ua.StatusCode) {
+func (c *Client) handleAcks_NeedsSubMuxLock(res []ua.StatusCode) {
 	dlog := debug.NewPrefixLogger("publish: ")
 
 	// we assume that the number of results in the response match
@@ -495,7 +499,7 @@ func (c *Client) handleAcks(res []ua.StatusCode) {
 	dlog.Printf("notAcked=%v", notAcked)
 }
 
-func (c *Client) handleNotification(ctx context.Context, sub *Subscription, res *ua.PublishResponse) {
+func (c *Client) handleNotification_NeedsSubMuxLock(ctx context.Context, sub *Subscription, res *ua.PublishResponse) {
 	dlog := debug.NewPrefixLogger("publish: sub %d: ", res.SubscriptionID)
 
 	// keep-alive message
