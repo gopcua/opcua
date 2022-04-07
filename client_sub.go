@@ -445,6 +445,7 @@ func (c *Client) publish(ctx context.Context) error {
 
 		sub, ok := c.subs[res.SubscriptionID]
 		if !ok {
+			c.subMux.Unlock()
 			// todo(fs): should we return an error here?
 			dlog.Printf("error: unknown subscription %d", res.SubscriptionID)
 			return nil
