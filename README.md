@@ -28,7 +28,7 @@ See [#538](https://github.com/gopcua/opcua/issues/538) for details.
 ## Quickstart
 
 ```sh
-# make sure you have go1.13 or higher
+# make sure you have go1.17 or higher
 
 # install library
 go get -u github.com/gopcua/opcua
