@@ -253,19 +253,25 @@ func (c *Client) updatePublishTimeout_NeedsSubMuxRLock() {
 	c.setPublishTimeout(maxTimeout)
 }
 
-func (c *Client) notifySubscriptionsOfError(ctx context.Context, subID uint32, err error) {
-	// we need to hold the subMux lock already
+func (c *Client) notifySubscriptionOfError(ctx context.Context, subID uint32, err error) {
+	c.subMux.RLock()
+	s := c.subs[subID]
+	c.subMux.RUnlock()
 
-	subsToNotify := c.subs
-	if subID != 0 {
-		subsToNotify = map[uint32]*Subscription{
-			subID: c.subs[subID],
-		}
+	if s == nil {
+		return
 	}
-	for _, sub := range subsToNotify {
+	go s.notify(ctx, &PublishNotificationData{Error: err})
+}
+
+func (c *Client) notifyAllSubscriptionsOfError(ctx context.Context, err error) {
+	c.subMux.RLock()
+	defer c.subMux.RUnlock()
+
+	for _, s := range c.subs {
 		go func(s *Subscription) {
 			s.notify(ctx, &PublishNotificationData{Error: err})
-		}(sub)
+		}(s)
 	}
 }
 
@@ -434,7 +440,11 @@ func (c *Client) publish(ctx context.Context) error {
 	case err != nil && res != nil:
 		// irrecoverable error
 		// todo(fs): do we need to stop and forget the subscription?
-		c.notifySubscriptionsOfError(ctx, res.SubscriptionID, err)
+		if res.SubscriptionID == 0 {
+			c.notifyAllSubscriptionsOfError(ctx, err)
+		} else {
+			c.notifySubscriptionOfError(ctx, res.SubscriptionID, err)
+		}
 		dlog.Printf("error: %s", err)
 		return err
 
