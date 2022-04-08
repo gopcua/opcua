@@ -12,7 +12,7 @@
 
 A native Go implementation of the OPC/UA Binary Protocol.
 
-You need go1.13 or higher. We test with the current and previous Go version. 
+You need go1.13 or higher. We test with the current and previous Go version.
 See below for a list of [Tested Platforms](#tested-platforms) and [Supported Features](#supported-features).
 
 [![GitHub](https://github.com/gopcua/opcua/workflows/gopuca/badge.svg)](https://github.com/gopcua/opcua/actions)
@@ -22,7 +22,7 @@ See below for a list of [Tested Platforms](#tested-platforms) and [Supported Fea
 
 ## Note
 
-`v0.2.4` and `v0.2.5` are broken and should not be used. Please upgrade to `v0.2.6` or later. 
+`v0.2.4` and `v0.2.5` are broken and should not be used. Please upgrade to `v0.2.6` or later.
 See [#538](https://github.com/gopcua/opcua/issues/538) for details.
 
 ## Quickstart
@@ -104,7 +104,7 @@ Also, if the library is already useful please spread the word as a motivation.
 
 ## Tested Platforms
 
-`gopcua` is run in production by several companies and with different equipment. 
+`gopcua` is run in production by several companies and with different equipment.
 The table below is an incomplete list of where and how `gopcua` is used to provide
 some guidance on the level of testing.
 
@@ -177,7 +177,7 @@ The current set of supported services is only for the high-level client.
 | Method Service Set          | Call                          | Yes       |              |
 | MonitoredItems Service Set  | CreateMonitoredItems          | Yes       |              |
 |                             | DeleteMonitoredItems          | Yes       |              |
-|                             | ModifyMonitoredItems          |           |              |
+|                             | ModifyMonitoredItems          | Yes       |              |
 |                             | SetMonitoringMode             |           |              |
 |                             | SetTriggering                 |           |              |
 | Subscription Service Set    | CreateSubscription            | Yes       |              |
