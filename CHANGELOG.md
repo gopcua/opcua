@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.3.3 (8 Apr 2022)
+
+* Don't panic on close (#562)
+* Set minimum Go version to go1.17 (#573)
+* Refactor the use of the `subMux` lock (#572)
+
 ## v0.3.2 (14 Mar 2022)
 
 * Add support for arrays (#564)
