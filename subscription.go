@@ -340,9 +340,9 @@ func (p *SubscriptionParameters) setDefaults() {
 	}
 }
 
-// recreate creates a new subscription based on the previous subscription
+// recreate_NeedsSubMuxLock creates a new subscription based on the previous subscription
 // parameters and monitored items.
-func (s *Subscription) recreate(ctx context.Context) error {
+func (s *Subscription) recreate_NeedsSubMuxLock(ctx context.Context) error {
 	dlog := debug.NewPrefixLogger("sub %d: recreate: ", s.SubscriptionID)
 
 	if s.SubscriptionID == terminatedSubscriptionID {
@@ -361,7 +361,7 @@ func (s *Subscription) recreate(ctx context.Context) error {
 		})
 		dlog.Print("subscription deleted")
 	}
-	s.c.forgetSubscription(ctx, s.SubscriptionID)
+	s.c.forgetSubscription_NeedsSubMuxLock(ctx, s.SubscriptionID)
 	dlog.Printf("subscription forgotton")
 
 	req := &ua.CreateSubscriptionRequest{
@@ -394,7 +394,7 @@ func (s *Subscription) recreate(ctx context.Context) error {
 	s.lastSeq = 0
 	s.nextSeq = 1
 
-	if err := s.c.registerSubscription(s); err != nil {
+	if err := s.c.registerSubscription_NeedsSubMuxLock(s); err != nil {
 		return err
 	}
 	dlog.Printf("subscription registered")
