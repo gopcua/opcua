@@ -153,6 +153,9 @@ func (g *GUID) Decode(b []byte) (int, error) {
 }
 
 func (g *GUID) Encode() ([]byte, error) {
+	if g == nil {
+		g = &GUID{Data1: 0, Data2: 0, Data3: 0, Data4: make([]byte, 8)}
+	}
 	buf := NewBuffer(nil)
 	buf.WriteUint32(g.Data1)
 	buf.WriteUint16(g.Data2)
@@ -228,6 +231,9 @@ func (l *LocalizedText) Decode(b []byte) (int, error) {
 }
 
 func (l *LocalizedText) Encode() ([]byte, error) {
+	if l == nil {
+		l = &LocalizedText{}
+	}
 	buf := NewBuffer(nil)
 	buf.WriteUint8(l.EncodingMask)
 	if l.Has(LocalizedTextLocale) {
