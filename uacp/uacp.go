@@ -169,6 +169,11 @@ func (e *Error) Error() string {
 	return ua.StatusCode(e.ErrorCode).Error()
 }
 
+// Unwrap returns the wrapped error code.
+func (e *Error) Unwrap() error {
+	return ua.StatusCode(e.ErrorCode)
+}
+
 type Message struct {
 	Data []byte
 }

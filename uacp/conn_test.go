@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gopcua/opcua/errors"
 	"github.com/pascaldekloe/goe/verify"
 )
 
@@ -56,7 +57,8 @@ func TestConn(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
 		_, err := Dial(ctx, ep)
-		if !err.(*net.OpError).Timeout() {
+		var operr *net.OpError
+		if errors.As(err, &operr) && !operr.Timeout() {
 			t.Error(err)
 		}
 	})

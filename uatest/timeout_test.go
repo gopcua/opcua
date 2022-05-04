@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gopcua/opcua"
+	"github.com/gopcua/opcua/errors"
 )
 
 const (
@@ -44,12 +45,14 @@ func connectAndValidate(t *testing.T, c *opcua.Client, ctx context.Context, d ti
 
 	elapsed := time.Since(start)
 
-	if oe, ok := err.(*net.OpError); ok {
-		if !oe.Timeout() {
-			t.Fatalf("got %#v, wanted net.timeoutError", oe.Unwrap())
-		}
-	} else {
-		t.Fatalf("got %T, wanted %T", err, net.OpError{})
+	var oe *net.OpError
+	switch {
+	case errors.As(err, &oe) && !oe.Timeout():
+		t.Fatalf("got %#v, wanted net.timeoutError", oe.Unwrap())
+	case errors.As(err, &oe):
+		// ignore
+	default:
+		t.Fatalf("got %T, wanted %T", err, &net.OpError{})
 	}
 
 	pct := 0.05

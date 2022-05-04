@@ -135,18 +135,15 @@ func (c *Client) republishSubscription(ctx context.Context, id uint32, available
 
 	debug.Printf("republishing subscription %d", sub.SubscriptionID)
 	if err := c.sendRepublishRequests(ctx, sub, availableSeq); err != nil {
-		status, ok := err.(ua.StatusCode)
-		if !ok {
-			return err
-		}
-
-		switch status {
-		case ua.StatusBadSessionIDInvalid:
+		switch {
+		case errors.Is(err, ua.StatusBadSessionIDInvalid):
 			return nil
-		case ua.StatusBadSubscriptionIDInvalid:
+		case errors.Is(err, ua.StatusBadSubscriptionIDInvalid):
 			// todo(fs): do we need to forget the subscription id in this case?
 			debug.Printf("republish failed since subscription %d is invalid", sub.SubscriptionID)
 			return errors.Errorf("republish failed since subscription %d is invalid", sub.SubscriptionID)
+		default:
+			return err
 		}
 	}
 	return nil
