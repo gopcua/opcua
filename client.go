@@ -268,44 +268,34 @@ func (c *Client) monitor(ctx context.Context) {
 
 			dlog.Print("auto-reconnecting")
 
-			switch err {
-			case io.EOF:
+			switch {
+			case errors.Is(err, io.EOF):
 				// the connection has been closed
 				action = createSecureChannel
 
-			case syscall.ECONNREFUSED:
+			case errors.Is(err, syscall.ECONNREFUSED):
 				// the connection has been refused by the server
 				action = abortReconnect
 
+			case errors.Is(err, ua.StatusBadSecureChannelIDInvalid):
+				// the secure channel has been rejected by the server
+				action = createSecureChannel
+
+			case errors.Is(err, ua.StatusBadSessionIDInvalid):
+				// the session has been rejected by the server
+				action = recreateSession
+
+			case errors.Is(err, ua.StatusBadSubscriptionIDInvalid):
+				// the subscription has been rejected by the server
+				action = transferSubscriptions
+
+			case errors.Is(err, ua.StatusBadCertificateInvalid):
+				// todo(unknownet): recreate server certificate
+				fallthrough
+
 			default:
-				switch x := err.(type) {
-				case *uacp.Error:
-					switch ua.StatusCode(x.ErrorCode) {
-					case ua.StatusBadSecureChannelIDInvalid:
-						// the secure channel has been rejected by the server
-						action = createSecureChannel
-
-					case ua.StatusBadSessionIDInvalid:
-						// the session has been rejected by the server
-						action = recreateSession
-
-					case ua.StatusBadSubscriptionIDInvalid:
-						// the subscription has been rejected by the server
-						action = transferSubscriptions
-
-					case ua.StatusBadCertificateInvalid:
-						// todo(unknownet): recreate server certificate
-						fallthrough
-
-					default:
-						// unknown error has occured
-						action = createSecureChannel
-					}
-
-				default:
-					// unknown error has occured
-					action = createSecureChannel
-				}
+				// unknown error has occured
+				action = createSecureChannel
 			}
 
 			c.setState(Disconnected)

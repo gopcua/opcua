@@ -344,7 +344,8 @@ func (s *SecureChannel) readChunk() (*MessageChunk, error) {
 		return nil, io.EOF
 	}
 	// do not wrap this error since it hides conn error
-	if _, ok := err.(*uacp.Error); ok {
+	var uacperr *uacp.Error
+	if errors.As(err, &uacperr) {
 		return nil, err
 	}
 	if err != nil {

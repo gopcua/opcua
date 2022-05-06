@@ -4,6 +4,7 @@
 package stats
 
 import (
+	"errors"
 	"expvar"
 	"io"
 	"reflect"
@@ -45,22 +46,20 @@ func (s *Stats) RecordError(err error) {
 	if err == nil {
 		return
 	}
-	switch err {
-	case io.EOF:
+	var code ua.StatusCode
+	switch {
+	case errors.Is(err, io.EOF):
 		s.Error.Add("io.EOF", 1)
-	case ua.StatusOK:
+	case errors.Is(err, ua.StatusOK):
 		s.Error.Add("ua.StatusOK", 1)
-	case ua.StatusBad:
+	case errors.Is(err, ua.StatusBad):
 		s.Error.Add("ua.StatusBad", 1)
-	case ua.StatusUncertain:
+	case errors.Is(err, ua.StatusUncertain):
 		s.Error.Add("ua.StatusUncertain", 1)
+	case errors.As(err, &code):
+		s.Error.Add("ua."+ua.StatusCodes[code].Name, 1)
 	default:
-		switch x := err.(type) {
-		case ua.StatusCode:
-			s.Error.Add("ua."+ua.StatusCodes[x].Name, 1)
-		default:
-			s.Error.Add(reflect.TypeOf(err).String(), 1)
-		}
+		s.Error.Add(reflect.TypeOf(err).String(), 1)
 	}
 }
 
