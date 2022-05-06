@@ -70,7 +70,7 @@ func (r *TypeRegistry) Lookup(v interface{}) *NodeID {
 
 // Register adds a new type to the registry.
 //
-// If the id is already registered the function returns an error.
+// If the id is already registered as a different type the function returns an error.
 //
 // Register panics if id is nil.
 func (r *TypeRegistry) Register(id *NodeID, v interface{}) error {
@@ -84,8 +84,8 @@ func (r *TypeRegistry) Register(id *NodeID, v interface{}) error {
 	typ := reflect.TypeOf(v)
 	ids := id.String()
 
-	if r.types[ids] != nil {
-		return errors.Errorf("%s is already registered", id)
+	if cur := r.types[ids]; cur != nil && cur != typ {
+		return errors.Errorf("%s is already registered as %v", id, cur)
 	}
 	r.types[ids] = typ
 
