@@ -3,3 +3,4 @@ vendor/
 build/
 dist/
 __pycache__/
+.vscode/
