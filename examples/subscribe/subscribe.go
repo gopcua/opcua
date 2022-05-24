@@ -66,7 +66,7 @@ func main() {
 
 	notifyCh := make(chan *opcua.PublishNotificationData)
 
-	sub, err := c.Subscribe(&opcua.SubscriptionParameters{
+	sub, err := c.SubscribeWithContext(ctx, &opcua.SubscriptionParameters{
 		Interval: *interval,
 	}, notifyCh)
 	if err != nil {
