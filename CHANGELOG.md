@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.3.5 (15 Jun 2022)
+
+* Change encryption URI for aes128Sha256RsaOaep to w3.org (#585)
+
+## v0.3.4 (6 May 2022)
+
+* ua: do not panic if the same extension object is registered multiple times (#579)
+* use errors.Is and errors.As (#578)
+* ua: log unknown extension object type id (#576)
+
 ## v0.3.3 (8 Apr 2022)
 
 * Don't panic on close (#562)
