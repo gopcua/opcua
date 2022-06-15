@@ -115,7 +115,7 @@ func newAes128Sha256RsaOaepAsymmetric(localKey *rsa.PrivateKey, remoteKey *rsa.P
 		nonceLength:           nonceLength,
 		signatureLength:       localKeySize,
 		remoteSignatureLength: remoteKeySize,
-		encryptionURI:         "http://opcfoundation.org/ua/security/rsa-oaep-sha1",
+		encryptionURI:         "http://www.w3.org/2001/04/xmlenc#rsa-oaep",
 		signatureURI:          "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256",
 	}, nil
 }
