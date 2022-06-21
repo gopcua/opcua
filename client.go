@@ -1175,6 +1175,36 @@ func (c *Client) UnregisterNodesWithContext(ctx context.Context, req *ua.Unregis
 
 // Note: Starting with v0.5 this method will require a context
 // and the corresponding XXXWithContext(ctx) method will be removed.
+func (c *Client) HistoryReadEvent(nodes []*ua.HistoryReadValueID, details *ua.ReadEventDetails) (*ua.HistoryReadResponse, error) {
+	return c.HistoryReadEventWithContext(context.Background(), nodes, details)
+}
+
+// Note: Starting with v0.5 this method is superseded by the non 'WithContext' method.
+func (c *Client) HistoryReadEventWithContext(ctx context.Context, nodes []*ua.HistoryReadValueID, details *ua.ReadEventDetails) (*ua.HistoryReadResponse, error) {
+	stats.Client().Add("HistoryReadEvent", 1)
+	stats.Client().Add("HistoryReadValueID", int64(len(nodes)))
+
+	// Part 4, 5.10.3 HistoryRead
+	req := &ua.HistoryReadRequest{
+		TimestampsToReturn: ua.TimestampsToReturnBoth,
+		NodesToRead:        nodes,
+		// Part 11, 6.4 HistoryReadDetails parameters
+		HistoryReadDetails: &ua.ExtensionObject{
+			TypeID:       ua.NewFourByteExpandedNodeID(0, id.ReadEventDetails_Encoding_DefaultBinary),
+			EncodingMask: ua.ExtensionObjectBinary,
+			Value:        details,
+		},
+	}
+
+	var res *ua.HistoryReadResponse
+	err := c.SendWithContext(ctx, req, func(v interface{}) error {
+		return safeAssign(v, &res)
+	})
+	return res, err
+}
+
+// Note: Starting with v0.5 this method will require a context
+// and the corresponding XXXWithContext(ctx) method will be removed.
 func (c *Client) HistoryReadRawModified(nodes []*ua.HistoryReadValueID, details *ua.ReadRawModifiedDetails) (*ua.HistoryReadResponse, error) {
 	return c.HistoryReadRawModifiedWithContext(context.Background(), nodes, details)
 }
@@ -1191,6 +1221,66 @@ func (c *Client) HistoryReadRawModifiedWithContext(ctx context.Context, nodes []
 		// Part 11, 6.4 HistoryReadDetails parameters
 		HistoryReadDetails: &ua.ExtensionObject{
 			TypeID:       ua.NewFourByteExpandedNodeID(0, id.ReadRawModifiedDetails_Encoding_DefaultBinary),
+			EncodingMask: ua.ExtensionObjectBinary,
+			Value:        details,
+		},
+	}
+
+	var res *ua.HistoryReadResponse
+	err := c.SendWithContext(ctx, req, func(v interface{}) error {
+		return safeAssign(v, &res)
+	})
+	return res, err
+}
+
+// Note: Starting with v0.5 this method will require a context
+// and the corresponding XXXWithContext(ctx) method will be removed.
+func (c *Client) HistoryReadProcessed(nodes []*ua.HistoryReadValueID, details *ua.ReadProcessedDetails) (*ua.HistoryReadResponse, error) {
+	return c.HistoryReadProcessedWithContext(context.Background(), nodes, details)
+}
+
+// Note: Starting with v0.5 this method is superseded by the non 'WithContext' method.
+func (c *Client) HistoryReadProcessedWithContext(ctx context.Context, nodes []*ua.HistoryReadValueID, details *ua.ReadProcessedDetails) (*ua.HistoryReadResponse, error) {
+	stats.Client().Add("HistoryReadProcessed", 1)
+	stats.Client().Add("HistoryReadValueID", int64(len(nodes)))
+
+	// Part 4, 5.10.3 HistoryRead
+	req := &ua.HistoryReadRequest{
+		TimestampsToReturn: ua.TimestampsToReturnBoth,
+		NodesToRead:        nodes,
+		// Part 11, 6.4 HistoryReadDetails parameters
+		HistoryReadDetails: &ua.ExtensionObject{
+			TypeID:       ua.NewFourByteExpandedNodeID(0, id.ReadProcessedDetails_Encoding_DefaultBinary),
+			EncodingMask: ua.ExtensionObjectBinary,
+			Value:        details,
+		},
+	}
+
+	var res *ua.HistoryReadResponse
+	err := c.SendWithContext(ctx, req, func(v interface{}) error {
+		return safeAssign(v, &res)
+	})
+	return res, err
+}
+
+// Note: Starting with v0.5 this method will require a context
+// and the corresponding XXXWithContext(ctx) method will be removed.
+func (c *Client) HistoryReadAtTime(nodes []*ua.HistoryReadValueID, details *ua.ReadAtTimeDetails) (*ua.HistoryReadResponse, error) {
+	return c.HistoryReadAtTimeWithContext(context.Background(), nodes, details)
+}
+
+// Note: Starting with v0.5 this method is superseded by the non 'WithContext' method.
+func (c *Client) HistoryReadAtTimeWithContext(ctx context.Context, nodes []*ua.HistoryReadValueID, details *ua.ReadAtTimeDetails) (*ua.HistoryReadResponse, error) {
+	stats.Client().Add("HistoryReadAtTime", 1)
+	stats.Client().Add("HistoryReadValueID", int64(len(nodes)))
+
+	// Part 4, 5.10.3 HistoryRead
+	req := &ua.HistoryReadRequest{
+		TimestampsToReturn: ua.TimestampsToReturnBoth,
+		NodesToRead:        nodes,
+		//Part 11, 6.4.5 ReadAtTimeDetails parameters
+		HistoryReadDetails: &ua.ExtensionObject{
+			TypeID:       ua.NewFourByteExpandedNodeID(0, id.ReadAtTimeDetails_Encoding_DefaultBinary),
 			EncodingMask: ua.ExtensionObjectBinary,
 			Value:        details,
 		},
