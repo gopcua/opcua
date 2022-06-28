@@ -1269,6 +1269,71 @@ func (c *Client) UpdateNamespacesWithContext(ctx context.Context) error {
 	return nil
 }
 
+//Register a complex data type node.
+//Returns map[string]interface{} of the structure registered
+func (c *Client) RegisterExtensionObjectMap(nodeID *ua.NodeID) (map[string]interface{}, error) {
+	node := c.Node(nodeID)
+	dataType, err := node.Attributes(ua.AttributeIDDataType)
+	if err != nil {
+		return nil, err
+	}
+	if dataType[0] == nil {
+		return nil, errors.New("Data Type empty")
+	}
+	if err != nil {
+		return nil, err
+	}
+	if dataType[0].Value == nil {
+		return nil, errors.New("Data Type empty")
+	}
+	nodeType := dataType[0].Value.NodeID()
+	switch dataType := nodeType.Type(); dataType {
+	case ua.NodeIDTypeString:
+		mytype := c.GetTypeDefinition(nodeType)
+		v, err := node.Value()
+		if err != nil {
+			return nil, err
+		}
+		typeid := v.ExtensionObject().TypeID.NodeID
+		ua.RegisterExtensionObjectMap(typeid, mytype)
+		return mytype, nil
+	}
+
+	return nil, errors.New("Type is not complex")
+}
+
+//Returns map of complex type
+func (c *Client) GetTypeDefinition(nodeID *ua.NodeID) map[string]interface{} {
+	newMap := make(map[string]interface{})
+	node := c.Node(nodeID)
+	v, err := node.Attribute(ua.AttributeIDDataTypeDefinition)
+	if err != nil {
+		return newMap
+	}
+	if eo, ok := v.Value().(*ua.ExtensionObject); ok {
+		if sd, ok := eo.Value.(*ua.StructureDefinition); ok {
+			for _, item := range sd.Fields {
+				switch dataType := item.DataType.Type(); dataType {
+				case ua.NodeIDTypeNumeric:
+					newMap[item.Name] = float32(0.0)
+				case ua.NodeIDTypeString:
+					if item.DataType.Namespace() != 0 {
+						newMap[item.Name] = c.GetTypeDefinition(item.DataType)
+					} else {
+						newMap[item.Name] = ""
+					}
+				case ua.NodeIDTypeTwoByte:
+					newMap[item.Name] = false
+				default:
+					item.DataType.StringID()
+				}
+
+			}
+		}
+	}
+	return newMap
+}
+
 // safeAssign implements a type-safe assign from T to *T.
 func safeAssign(t, ptrT interface{}) error {
 	if reflect.TypeOf(t) != reflect.TypeOf(ptrT).Elem() {
