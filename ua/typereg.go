@@ -56,6 +56,22 @@ func (r *TypeRegistry) New(id *NodeID) interface{} {
 	return reflect.New(typ.Elem()).Interface()
 }
 
+//Lookup Custom Data type map
+func (r *TypeRegistry) NewMap(id *NodeID) map[string]interface{} {
+	if id == nil {
+		panic("opcua: missing id in call to TypeRegistry.New")
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	value, ok := r.values[id.String()]
+	if !ok {
+		return nil
+	}
+	return value
+}
+
 // Lookup returns the id of the type of v or nil if
 // the type is not registered.
 //
@@ -96,6 +112,7 @@ func (r *TypeRegistry) Register(id *NodeID, v interface{}) error {
 	}
 	return nil
 }
+
 func (r *TypeRegistry) RegisterMap(id *NodeID, v map[string]interface{}) error {
 	if id == nil {
 		panic("opcua: missing id in call to TypeRegistry.Register")

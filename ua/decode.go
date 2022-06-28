@@ -34,6 +34,7 @@ func Decode(b []byte, v interface{}) (int, error) {
 	val := reflect.ValueOf(v)
 	return decode(b, val, val.Type().String())
 }
+
 func DecodeMap(b []byte, v interface{}) (int, error) {
 	val := reflect.ValueOf(&v).Elem()
 	return decodeMap(b, val, val.Type().String())
@@ -87,6 +88,8 @@ func decode(b []byte, val reflect.Value, name string) (n int, err error) {
 			return decodeArray(b, val, name)
 		case reflect.Ptr:
 			return decode(b, val.Elem(), name)
+		case reflect.Map:
+			return decodeMap(b, val, name)
 		case reflect.Struct:
 			return decodeStruct(b, val, name)
 		default:
@@ -96,6 +99,7 @@ func decode(b []byte, val reflect.Value, name string) (n int, err error) {
 	return buf.Pos(), buf.Error()
 }
 func decodeMap(b []byte, val reflect.Value, name string) (int, error) {
+	// valt := val.Type()
 	buf := NewBuffer(b)
 	if val.Kind() == reflect.Map {
 		for _, item := range val.MapKeys() {
@@ -127,6 +131,7 @@ func decodeMap(b []byte, val reflect.Value, name string) (int, error) {
 				}
 			default:
 				fmt.Println("not found")
+
 			}
 		}
 	}
@@ -144,7 +149,7 @@ func decodeStruct(b []byte, val reflect.Value, name string) (int, error) {
 		f := val.Field(i)
 		if f.Type().Kind() == reflect.Ptr {
 			f.Set(reflect.New(f.Type().Elem()))
-			// fmt.Printf("decode: %s has type %v and has new value %#v\n", fname, f.Type(), f.Interface())
+			//fmt.Printf("decode: %s has type %v and has new value %#v\n", fname, f.Type(), f.Interface())
 		}
 
 		n, err := decode(b[pos:], f, fname)

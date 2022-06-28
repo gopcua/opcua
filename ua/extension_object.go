@@ -12,6 +12,8 @@ import (
 // eotypes contains all known extension objects.
 var eotypes = NewTypeRegistry()
 
+// var eomaptypes =
+
 // RegisterExtensionObject registers a new extension object type.
 // It panics if the type or the id is already registered.
 func RegisterExtensionObject(typeID *NodeID, v interface{}) {
@@ -19,8 +21,6 @@ func RegisterExtensionObject(typeID *NodeID, v interface{}) {
 		panic("Extension object " + err.Error())
 	}
 }
-
-//RegisterExtensionObject
 func RegisterExtensionObjectMap(typeID *NodeID, v map[string]interface{}) {
 	if err := eotypes.RegisterMap(typeID, v); err != nil {
 		panic("Extension object " + err.Error())
@@ -93,8 +93,11 @@ func (e *ExtensionObject) Decode(b []byte) (int, error) {
 	typeID := e.TypeID.NodeID
 	e.Value = eotypes.New(typeID)
 	if e.Value == nil {
-		debug.Printf("ua: unknown extension object %s", typeID)
-		return buf.Pos(), buf.Error()
+		e.Value = eotypes.NewMap(typeID)
+		if e.Value == nil {
+			debug.Printf("ua: unknown extension object %s", typeID)
+			return buf.Pos(), buf.Error()
+		}
 	}
 
 	body.ReadStruct(e.Value)
