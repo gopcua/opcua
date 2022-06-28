@@ -21,16 +21,18 @@ import (
 //
 // The implementation is safe for concurrent use.
 type TypeRegistry struct {
-	mu    sync.Mutex
-	types map[string]reflect.Type
-	ids   map[reflect.Type]string
+	mu     sync.Mutex
+	types  map[string]reflect.Type
+	values map[string]map[string]interface{}
+	ids    map[reflect.Type]string
 }
 
 // NewTypeRegistry returns a new type registry.
 func NewTypeRegistry() *TypeRegistry {
 	return &TypeRegistry{
-		types: make(map[string]reflect.Type),
-		ids:   make(map[reflect.Type]string),
+		types:  make(map[string]reflect.Type),
+		ids:    make(map[reflect.Type]string),
+		values: make(map[string]map[string]interface{}),
 	}
 }
 
@@ -92,5 +94,22 @@ func (r *TypeRegistry) Register(id *NodeID, v interface{}) error {
 	if _, exists := r.ids[typ]; !exists {
 		r.ids[typ] = ids
 	}
+	return nil
+}
+func (r *TypeRegistry) RegisterMap(id *NodeID, v map[string]interface{}) error {
+	if id == nil {
+		panic("opcua: missing id in call to TypeRegistry.Register")
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	ids := id.String()
+
+	if cur := r.values[ids]; cur != nil && !reflect.DeepEqual(cur, v) {
+		return errors.Errorf("%s is already registered as %v", id, cur)
+	}
+	r.values[ids] = v
+
 	return nil
 }

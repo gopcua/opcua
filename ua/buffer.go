@@ -169,7 +169,12 @@ func (b *Buffer) ReadStruct(r interface{}) {
 	case BinaryDecoder:
 		n, err = x.Decode(b.buf[b.pos:])
 	default:
-		n, err = Decode(b.buf[b.pos:], r)
+		value, ok := r.(map[string]interface{})
+		if ok {
+			n, err = DecodeMap(b.buf[b.pos:], value)
+		} else {
+			n, err = Decode(b.buf[b.pos:], r)
+		}
 	}
 	if err != nil {
 		b.err = err
