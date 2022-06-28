@@ -20,6 +20,23 @@ func RegisterExtensionObject(typeID *NodeID, v interface{}) {
 	}
 }
 
+//RegisterExtensionObject
+func RegisterExtensionObjectMap(typeID *NodeID, v map[string]interface{}) {
+	if err := eotypes.RegisterMap(typeID, v); err != nil {
+		panic("Extension object " + err.Error())
+	}
+}
+
+//Decodes extension object interface into map
+func DecodeExtensionObjectMap(value interface{}) map[string]interface{} {
+	if eo, ok := value.(ExtensionObject); ok {
+		if rv, ok := eo.Value.(map[string]interface{}); ok {
+			return rv
+		}
+	}
+	return nil
+}
+
 // These flags define the value type of an ExtensionObject.
 // They cannot be combined.
 const (
