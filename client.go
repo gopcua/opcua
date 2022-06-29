@@ -1271,7 +1271,7 @@ func (c *Client) UpdateNamespacesWithContext(ctx context.Context) error {
 
 //Register a complex data type node.
 //Returns map[string]interface{} of the structure registered
-func (c *Client) RegisterExtensionObjectMap(nodeID *ua.NodeID) (map[string]interface{}, error) {
+func (c *Client) RegisterExtensionObjectMap(nodeID *ua.NodeID) ([]ua.DataTypeReadStructure, error) {
 	node := c.Node(nodeID)
 	dataType, err := node.Attributes(ua.AttributeIDDataType)
 	if err != nil {
@@ -1302,36 +1302,42 @@ func (c *Client) RegisterExtensionObjectMap(nodeID *ua.NodeID) (map[string]inter
 	return nil, errors.New("Type is not complex")
 }
 
-//Returns map of complex type
-func (c *Client) GetTypeDefinition(nodeID *ua.NodeID) map[string]interface{} {
-	newMap := make(map[string]interface{})
+//Returns DataTypeReadStructure of complex type
+func (c *Client) GetTypeDefinition(nodeID *ua.NodeID) []ua.DataTypeReadStructure {
+	var dataTypeStruct []ua.DataTypeReadStructure
 	node := c.Node(nodeID)
 	v, err := node.Attribute(ua.AttributeIDDataTypeDefinition)
 	if err != nil {
-		return newMap
+		return nil
 	}
 	if eo, ok := v.Value().(*ua.ExtensionObject); ok {
 		if sd, ok := eo.Value.(*ua.StructureDefinition); ok {
+			var value ua.DataTypeReadStructure
 			for _, item := range sd.Fields {
-				switch dataType := item.DataType.Type(); dataType {
-				case ua.NodeIDTypeNumeric:
-					newMap[item.Name] = float32(0.0)
-				case ua.NodeIDTypeString:
+				switch dataType := item.DataType.IntID(); dataType {
+				case 2:
+					value = ua.DataTypeReadStructure{Name: item.Name, Value: byte(0)}
+				case 4:
+					value = ua.DataTypeReadStructure{Name: item.Name, Value: int16(0)}
+				case 10:
+					value = ua.DataTypeReadStructure{Name: item.Name, Value: float32(0.0)}
+				case 0:
 					if item.DataType.Namespace() != 0 {
-						newMap[item.Name] = c.GetTypeDefinition(item.DataType)
+						value = ua.DataTypeReadStructure{Name: item.Name, Value: c.GetTypeDefinition(item.DataType)}
 					} else {
-						newMap[item.Name] = ""
+						value = ua.DataTypeReadStructure{Name: item.Name, Value: ""}
 					}
-				case ua.NodeIDTypeTwoByte:
-					newMap[item.Name] = false
+				case 1:
+					value = ua.DataTypeReadStructure{Name: item.Name, Value: false}
 				default:
 					item.DataType.StringID()
 				}
+				dataTypeStruct = append(dataTypeStruct, value)
 
 			}
 		}
 	}
-	return newMap
+	return dataTypeStruct
 }
 
 // safeAssign implements a type-safe assign from T to *T.

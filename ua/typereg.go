@@ -23,7 +23,7 @@ import (
 type TypeRegistry struct {
 	mu     sync.Mutex
 	types  map[string]reflect.Type
-	values map[string]map[string]interface{}
+	values map[string][]DataTypeReadStructure
 	ids    map[reflect.Type]string
 }
 
@@ -32,7 +32,7 @@ func NewTypeRegistry() *TypeRegistry {
 	return &TypeRegistry{
 		types:  make(map[string]reflect.Type),
 		ids:    make(map[reflect.Type]string),
-		values: make(map[string]map[string]interface{}),
+		values: make(map[string][]DataTypeReadStructure),
 	}
 }
 
@@ -113,7 +113,7 @@ func (r *TypeRegistry) Register(id *NodeID, v interface{}) error {
 	return nil
 }
 
-func (r *TypeRegistry) RegisterMap(id *NodeID, v map[string]interface{}) error {
+func (r *TypeRegistry) RegisterMap(id *NodeID, v []DataTypeReadStructure) error {
 	if id == nil {
 		panic("opcua: missing id in call to TypeRegistry.Register")
 	}

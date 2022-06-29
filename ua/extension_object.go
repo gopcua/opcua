@@ -21,7 +21,7 @@ func RegisterExtensionObject(typeID *NodeID, v interface{}) {
 		panic("Extension object " + err.Error())
 	}
 }
-func RegisterExtensionObjectMap(typeID *NodeID, v map[string]interface{}) {
+func RegisterExtensionObjectMap(typeID *NodeID, v []DataTypeReadStructure) {
 	if err := eotypes.RegisterMap(typeID, v); err != nil {
 		panic("Extension object " + err.Error())
 	}
@@ -53,6 +53,10 @@ type ExtensionObject struct {
 	EncodingMask uint8
 	TypeID       *ExpandedNodeID
 	Value        interface{}
+}
+type DataTypeReadStructure struct {
+	Name  string
+	Value interface{}
 }
 
 func NewExtensionObject(value interface{}) *ExtensionObject {

@@ -36,7 +36,7 @@ func Decode(b []byte, v interface{}) (int, error) {
 }
 
 func DecodeMap(b []byte, v interface{}) (int, error) {
-	val := reflect.ValueOf(&v).Elem()
+	val := reflect.ValueOf(v)
 	return decodeMap(b, val, val.Type().String())
 }
 
@@ -99,44 +99,19 @@ func decode(b []byte, val reflect.Value, name string) (n int, err error) {
 	return buf.Pos(), buf.Error()
 }
 func decodeMap(b []byte, val reflect.Value, name string) (int, error) {
-	// valt := val.Type()
 	buf := NewBuffer(b)
-	if val.Kind() == reflect.Map {
-		for _, item := range val.MapKeys() {
-			v := val.MapIndex(item)
-			switch t := v.Interface().(type) {
-			case float64:
-				floatValue := reflect.ValueOf(buf.ReadFloat32())
-				val.SetMapIndex(item, floatValue)
-			case string:
-				fmt.Println(t)
-			case bool:
-				boolValue := reflect.ValueOf(buf.ReadBool())
-				val.SetMapIndex(item, boolValue)
-			case map[string]interface{}:
-				for _, subItem := range val.MapKeys() {
-					vSub := val.MapIndex(item)
-					switch vSub.Interface().(type) {
-					case float64:
-						floatValue := reflect.ValueOf(buf.ReadFloat32())
-						val.SetMapIndex(subItem, floatValue)
-					case string:
-						fmt.Println(t)
-						stringValue := reflect.ValueOf(buf.ReadString())
-						val.SetMapIndex(subItem, stringValue)
-					case bool:
-						boolValue := reflect.ValueOf(buf.ReadBool())
-						val.SetMapIndex(subItem, boolValue)
-					}
-				}
-			default:
-				fmt.Println("not found")
-
-			}
+	for i := 0; i < val.Len(); i++ {
+		v := val.Index(i).FieldByName("Value")
+		switch v.Kind() {
+		case reflect.Slice:
+			decodeMap(b, v, name)
+		default:
+			decode(b, v, name)
 		}
 	}
 	return buf.Pos(), buf.Error()
 }
+
 func decodeStruct(b []byte, val reflect.Value, name string) (int, error) {
 	pos := 0
 	valt := val.Type()
