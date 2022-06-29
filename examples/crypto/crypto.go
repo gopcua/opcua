@@ -17,7 +17,7 @@ import (
 	"syscall"
 	"time"
 
-	"golang.org/x/crypto/ssh/terminal"
+	"golang.org/x/term"
 
 	"github.com/gopcua/opcua"
 	"github.com/gopcua/opcua/debug"
@@ -271,7 +271,7 @@ func authFromFlags(cert []byte) (ua.UserTokenType, opcua.Option) {
 
 		if passPrompt {
 			fmt.Print("Enter password: ")
-			passInput, err := terminal.ReadPassword(int(syscall.Stdin))
+			passInput, err := term.ReadPassword(int(syscall.Stdin))
 			if err != nil {
 				log.Fatalf("Error reading password: %s", err)
 			}
