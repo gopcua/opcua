@@ -57,7 +57,7 @@ func (r *TypeRegistry) New(id *NodeID) interface{} {
 }
 
 //Lookup Custom Data type map
-func (r *TypeRegistry) NewMap(id *NodeID) map[string]interface{} {
+func (r *TypeRegistry) NewMap(id *NodeID) []DataTypeReadStructure {
 	if id == nil {
 		panic("opcua: missing id in call to TypeRegistry.New")
 	}
