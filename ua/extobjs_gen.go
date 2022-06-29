@@ -18,6 +18,8 @@ type Response interface {
 	SetHeader(*ResponseHeader)
 }
 
+type Union struct{}
+
 type KeyValuePair struct {
 	Key   *QualifiedName
 	Value *Variant
@@ -39,9 +41,52 @@ type EndpointType struct {
 	TransportProfileURI string
 }
 
+type RationalNumber struct {
+	Numerator   int32
+	Denominator uint32
+}
+
+type Vector struct{}
+
+type ThreeDVector struct {
+	X float64
+	Y float64
+	Z float64
+}
+
+type CartesianCoordinates struct{}
+
+type ThreeDCartesianCoordinates struct {
+	X float64
+	Y float64
+	Z float64
+}
+
+type Orientation struct{}
+
+type ThreeDOrientation struct {
+	A float64
+	B float64
+	C float64
+}
+
+type Frame struct{}
+
+type ThreeDFrame struct {
+	CartesianCoordinates *ThreeDCartesianCoordinates
+	Orientation          *ThreeDOrientation
+}
+
 type IdentityMappingRuleType struct {
 	CriteriaType IdentityCriteriaType
 	Criteria     string
+}
+
+type CurrencyUnitType struct {
+	NumericCode    int16
+	Exponent       int8
+	AlphabeticCode string
+	Currency       *LocalizedText
 }
 
 type TrustListDataType struct {
@@ -97,6 +142,21 @@ type UABinaryFileDataType struct {
 	SchemaLocation     string
 	FileHeader         []*KeyValuePair
 	Body               *Variant
+}
+
+type PortableQualifiedName struct {
+	NamespaceURI string
+	Name         string
+}
+
+type PortableNodeID struct {
+	NamespaceURI string
+	IDentifier   *NodeID
+}
+
+type UnsignedRationalNumber struct {
+	Numerator   uint32
+	Denominator uint32
 }
 
 type DataSetMetaDataType struct {
@@ -158,6 +218,10 @@ type PublishedEventsDataType struct {
 	EventNotifier  *NodeID
 	SelectedFields []*SimpleAttributeOperand
 	Filter         *ContentFilter
+}
+
+type PublishedDataSetCustomSourceDataType struct {
+	CyclicDataSet bool
 }
 
 type DataSetWriterDataType struct {
@@ -300,6 +364,54 @@ type PubSubConfigurationDataType struct {
 	Enabled           bool
 }
 
+type StandaloneSubscribedDataSetRefDataType struct {
+	DataSetName string
+}
+
+type StandaloneSubscribedDataSetDataType struct {
+	Name              string
+	DataSetFolder     []string
+	DataSetMetaData   *DataSetMetaDataType
+	SubscribedDataSet *ExtensionObject
+}
+
+type SecurityGroupDataType struct {
+	Name                string
+	SecurityGroupFolder []string
+	KeyLifetime         float64
+	SecurityPolicyURI   string
+	MaxFutureKeyCount   uint32
+	MaxPastKeyCount     uint32
+	SecurityGroupID     string
+	RolePermissions     []*RolePermissionType
+	GroupProperties     []*KeyValuePair
+}
+
+type PubSubKeyPushTargetDataType struct {
+	ApplicationURI       string
+	PushTargetFolder     []string
+	EndpointURL          string
+	SecurityPolicyURI    string
+	UserTokenType        *UserTokenPolicy
+	RequestedKeyCount    uint16
+	RetryInterval        float64
+	PushTargetProperties []*KeyValuePair
+	SecurityGroups       []string
+}
+
+type PubSubConfiguration2DataType struct {
+	PublishedDataSets          []*PublishedDataSetDataType
+	Connections                []*PubSubConnectionDataType
+	Enabled                    bool
+	SubscribedDataSets         []*StandaloneSubscribedDataSetDataType
+	DataSetClasses             []*DataSetMetaDataType
+	DefaultSecurityKeyServices []*EndpointDescription
+	SecurityGroups             []*SecurityGroupDataType
+	PubSubKeyPushTargets       []*PubSubKeyPushTargetDataType
+	ConfigurationVersion       uint32
+	ConfigurationProperties    []*KeyValuePair
+}
+
 type UADPWriterGroupMessageDataType struct {
 	GroupVersion              uint32
 	DataSetOrdering           DataSetOrderingType
@@ -340,13 +452,52 @@ type JSONDataSetReaderMessageDataType struct {
 	DataSetMessageContentMask JSONDataSetMessageContentMask
 }
 
+type QosDataType struct{}
+
+type TransmitQosDataType struct{}
+
+type TransmitQosPriorityDataType struct {
+	PriorityLabel string
+}
+
+type ReceiveQosDataType struct{}
+
+type ReceiveQosPriorityDataType struct {
+	PriorityLabel string
+}
+
 type DatagramConnectionTransportDataType struct {
 	DiscoveryAddress *ExtensionObject
+}
+
+type DatagramConnectionTransport2DataType struct {
+	DiscoveryAddress        *ExtensionObject
+	DiscoveryAnnounceRate   uint32
+	DiscoveryMaxMessageSize uint32
+	QosCategory             string
+	DatagramQos             []*ExtensionObject
 }
 
 type DatagramWriterGroupTransportDataType struct {
 	MessageRepeatCount uint8
 	MessageRepeatDelay float64
+}
+
+type DatagramWriterGroupTransport2DataType struct {
+	MessageRepeatCount    uint8
+	MessageRepeatDelay    float64
+	Address               *ExtensionObject
+	QosCategory           string
+	DatagramQos           []*ExtensionObject
+	DiscoveryAnnounceRate uint32
+	Topic                 string
+}
+
+type DatagramDataSetReaderTransportDataType struct {
+	Address     *ExtensionObject
+	QosCategory string
+	DatagramQos []*ExtensionObject
+	Topic       string
 }
 
 type BrokerConnectionTransportDataType struct {
@@ -378,10 +529,43 @@ type BrokerDataSetReaderTransportDataType struct {
 	MetaDataQueueName          string
 }
 
+type PubSubConfigurationRefDataType struct {
+	ConfigurationMask PubSubConfigurationRefMask
+	ElementIndex      uint16
+	ConnectionIndex   uint16
+	GroupIndex        uint16
+}
+
+type PubSubConfigurationValueDataType struct {
+	ConfigurationElement *PubSubConfigurationRefDataType
+	Name                 string
+	IDentifier           *Variant
+}
+
+type AliasNameDataType struct {
+	AliasName       *QualifiedName
+	ReferencedNodes []*ExpandedNodeID
+}
+
+type UserManagementDataType struct {
+	UserName          string
+	UserConfiguration UserConfigurationMask
+	Description       string
+}
+
+type PriorityMappingEntryType struct {
+	MappingURI         string
+	PriorityLabel      string
+	PriorityValue_PCP  uint8
+	PriorityValue_DSCP uint32
+}
+
 type RolePermissionType struct {
 	RoleID      *NodeID
 	Permissions PermissionType
 }
+
+type DataTypeDefinition struct{}
 
 type StructureField struct {
 	Name            string
@@ -615,8 +799,6 @@ type OptionSet struct {
 	ValidBits []byte
 }
 
-type Union struct{}
-
 type TimeZoneDataType struct {
 	Offset                 int16
 	DaylightSavingInOffset bool
@@ -664,7 +846,7 @@ func (t *ServiceFault) SetHeader(h *ResponseHeader) {
 }
 
 type SessionlessInvokeRequestType struct {
-	URIsVersion   []uint32
+	URIsVersion   uint32
 	NamespaceURIs []string
 	ServerURIs    []string
 	LocaleIDs     []string
@@ -1757,6 +1939,10 @@ type ReadAtTimeDetails struct {
 	UseSimpleBounds bool
 }
 
+type ReadAnnotationDataDetails struct {
+	ReqTimes []time.Time
+}
+
 type HistoryData struct {
 	DataValues []*DataValue
 }
@@ -2658,7 +2844,7 @@ type ProgramDiagnostic2DataType struct {
 	LastMethodInputValues     []*Variant
 	LastMethodOutputValues    []*Variant
 	LastMethodCallTime        time.Time
-	LastMethodReturnStatus    *StatusResult
+	LastMethodReturnStatus    StatusCode
 }
 
 type Annotation struct {
