@@ -27,14 +27,36 @@ func RegisterExtensionObjectMap(typeID *NodeID, v []DataTypeReadStructure) {
 	}
 }
 
-//Decodes extension object interface into map
+//Decodes extension object with array of Read Structures into a map of interfaces
 func DecodeExtensionObjectMap(value interface{}) map[string]interface{} {
-	if eo, ok := value.(ExtensionObject); ok {
-		if rv, ok := eo.Value.(map[string]interface{}); ok {
-			return rv
+	var eo ExtensionObject
+	var match bool
+	if eoRef, ok := value.(*ExtensionObject); ok {
+		eo = *eoRef
+		match = true
+	} else {
+		if eo, ok = value.(ExtensionObject); ok {
+			match = true
+		}
+	}
+	if match {
+		if rv, ok := eo.Value.([]DataTypeReadStructure); ok {
+			newmap := DecodeDataTypeReadStructure(rv)
+			return newmap
 		}
 	}
 	return nil
+}
+func DecodeDataTypeReadStructure(value []DataTypeReadStructure) map[string]interface{} {
+	newmap := make(map[string]interface{})
+	for _, item := range value {
+		if subitem, ok := item.Value.([]DataTypeReadStructure); ok {
+			newmap[item.Name] = DecodeDataTypeReadStructure(subitem)
+		} else {
+			newmap[item.Name] = item.Value
+		}
+	}
+	return newmap
 }
 
 // These flags define the value type of an ExtensionObject.
@@ -103,7 +125,6 @@ func (e *ExtensionObject) Decode(b []byte) (int, error) {
 			return buf.Pos(), buf.Error()
 		}
 	}
-
 	body.ReadStruct(e.Value)
 	return buf.Pos(), body.Error()
 }

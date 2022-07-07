@@ -169,9 +169,9 @@ func (b *Buffer) ReadStruct(r interface{}) {
 	case BinaryDecoder:
 		n, err = x.Decode(b.buf[b.pos:])
 	default:
-		value, ok := r.(map[string]interface{})
+		_, ok := r.([]DataTypeReadStructure)
 		if ok {
-			n, err = DecodeMap(b.buf[b.pos:], value)
+			n, err = DecodeMap(b.buf[b.pos:], r)
 		} else {
 			n, err = Decode(b.buf[b.pos:], r)
 		}

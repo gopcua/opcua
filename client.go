@@ -1291,7 +1291,7 @@ func (c *Client) RegisterExtensionObjectMap(nodeID *ua.NodeID) ([]ua.DataTypeRea
 	case ua.NodeIDTypeString:
 		mytype := c.GetTypeDefinition(nodeType)
 		v, err := node.Value()
-		if err != nil {
+		if v == nil {
 			return nil, err
 		}
 		typeid := v.ExtensionObject().TypeID.NodeID
@@ -1315,11 +1315,17 @@ func (c *Client) GetTypeDefinition(nodeID *ua.NodeID) []ua.DataTypeReadStructure
 			var value ua.DataTypeReadStructure
 			for _, item := range sd.Fields {
 				switch dataType := item.DataType.IntID(); dataType {
-				case 2:
+				case id.Byte:
 					value = ua.DataTypeReadStructure{Name: item.Name, Value: byte(0)}
-				case 4:
+				case id.SByte:
+					value = ua.DataTypeReadStructure{Name: item.Name, Value: int8(0)}
+				case id.Int16:
 					value = ua.DataTypeReadStructure{Name: item.Name, Value: int16(0)}
-				case 10:
+				case id.Int32:
+					value = ua.DataTypeReadStructure{Name: item.Name, Value: int32(0)}
+				case id.UInt16:
+					value = ua.DataTypeReadStructure{Name: item.Name, Value: uint16(0)}
+				case id.Float:
 					value = ua.DataTypeReadStructure{Name: item.Name, Value: float32(0.0)}
 				case 0:
 					if item.DataType.Namespace() != 0 {
@@ -1327,10 +1333,10 @@ func (c *Client) GetTypeDefinition(nodeID *ua.NodeID) []ua.DataTypeReadStructure
 					} else {
 						value = ua.DataTypeReadStructure{Name: item.Name, Value: ""}
 					}
-				case 1:
+				case id.Boolean:
 					value = ua.DataTypeReadStructure{Name: item.Name, Value: false}
 				default:
-					item.DataType.StringID()
+					fmt.Print(id.Name(dataType))
 				}
 				dataTypeStruct = append(dataTypeStruct, value)
 
