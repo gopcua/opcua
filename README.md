@@ -118,6 +118,7 @@ We would be happy if you can add your equipment to the list. Just open a PR :)
 | Kepware 6.x                                             | v0.1.x, v0.2.x    | production  | Intelecy     |
 | Cogent DataHub 9.x                                      | v0.1.x, v0.2.x    | production  | Intelecy     |
 | ABB Ability EdgeInsight 1.8.X                           | v0.1.x, v0.2.x    | production  | Intelecy     |
+| GE Digital Historian 2022 HDA Server                    | v0.3.x            | production  | Intelecy     |
 | InfluxDB Telegraf plugin                                | v0.3.x            | ?           | Community    |
 
 ## Supported Features
