@@ -123,9 +123,9 @@ func (r *TypeRegistry) RegisterMap(id *NodeID, v []DataTypeReadStructure) error 
 
 	ids := id.String()
 
-	if cur := r.values[ids]; cur != nil && !reflect.DeepEqual(cur, v) {
-		return errors.Errorf("%s is already registered as %v", id, cur)
-	}
+	// if cur := r.values[ids]; cur != nil && !reflect.DeepEqual(cur, v) {
+	// 	return errors.Errorf("%s is already registered as %v", id, cur)
+	// }
 	r.values[ids] = v
 
 	return nil
