@@ -45,7 +45,7 @@ func TestStats(t *testing.T) {
 		"Send":             newExpVarInt(2),
 		"Close":            newExpVarInt(1),
 		"CloseSession":     newExpVarInt(2),
-		"SecureChannel":    newExpVarInt(2),
+		"SecureChannel":    newExpVarInt(3),
 		"Session":          newExpVarInt(4),
 		"State":            newExpVarInt(0),
 	}
