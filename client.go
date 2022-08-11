@@ -563,6 +563,7 @@ func (c *Client) CloseWithContext(ctx context.Context) error {
 	}
 	if c.SecureChannel() != nil {
 		c.SecureChannel().Close()
+		c.setSecureChannel(nil)
 	}
 
 	// https://github.com/gopcua/opcua/pull/462
