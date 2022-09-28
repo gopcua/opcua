@@ -86,6 +86,9 @@ func (m *Variant) EncodingMask() byte {
 
 // Type returns the type id of the value.
 func (m *Variant) Type() TypeID {
+	if m == nil {
+		return 0
+	}
 	return TypeID(m.mask & 0x3f)
 }
 
@@ -101,6 +104,9 @@ func (m *Variant) Has(mask byte) bool {
 // ArrayLength returns the total number of elements for one and multi-dimensional
 // array values.
 func (m *Variant) ArrayLength() int32 {
+	if m == nil {
+		return 0
+	}
 	return m.arrayLength
 }
 
