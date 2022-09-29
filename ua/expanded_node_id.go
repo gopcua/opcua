@@ -141,14 +141,12 @@ func ParseExpandedNodeID(s string, ns []string) (*ExpandedNodeID, error) {
 
 	var nsval, idval string
 
-	p := strings.SplitN(s, ";", 3)
+	p := strings.SplitN(s, ";", 2)
 	switch len(p) {
 	case 1:
 		nsval, idval = "ns=0", p[0]
 	case 2:
 		nsval, idval = p[0], p[1]
-	default:
-		return nil, errors.Errorf("invalid node id: %s", s)
 	}
 
 	// parse namespace
