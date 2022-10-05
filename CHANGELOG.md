@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.3.7 (05 Oct 2022)
+
+* Stop uasc token expiration timer. Resource leak (#608)
+
+## v0.3.6 (29 Sep 2022)
+
+* Relax node id parser (#607)
+
 ## v0.3.5 (15 Jun 2022)
 
 * Change encryption URI for aes128Sha256RsaOaep to w3.org (#585)
