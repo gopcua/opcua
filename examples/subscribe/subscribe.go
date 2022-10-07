@@ -37,6 +37,7 @@ func main() {
 	d := 60 * time.Second
 	ctx, cancel := context.WithTimeout(context.Background(), d)
 	defer cancel()
+	log.Printf("Subscription will stop after %s for demonstration purposes", d)
 
 	endpoints, err := opcua.GetEndpoints(ctx, *endpoint)
 	if err != nil {
