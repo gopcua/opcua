@@ -174,9 +174,11 @@ func decodeTypeStructure(b []byte, val reflect.Value) (int, error) {
 	// case interface{}:
 	//decodeMap(b, &val, name)
 	default:
-		fmt.Printf("Value not in list %s", val.Elem().Kind())
+		return buf.Pos(), errors.New(fmt.Sprintf("Value not in list %s", val.Elem().Kind()))
+
+		//fmt.Printf("Value not in list %s", val.Elem().Kind())
 		// value = DataTypeReadStructure{Name: value.Name, Value: nil}
-		//fmt.Print(errors.Errorf("unsupported type %s", item.Value.(type)))
+		//fmt.Print(errors.Errorf("unsupported type %s", val.(type)))
 	}
 	if value != nil {
 		field := reflect.New(reflect.TypeOf(value))
