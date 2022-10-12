@@ -64,7 +64,7 @@ type Variant struct {
 func NewVariant(v interface{}) (*Variant, error) {
 	va := &Variant{}
 	if !isBuiltinType(v) {
-		return nil, fmt.Errorf("trying to create a variant from a type that it is not suppoted: %s", reflect.ValueOf(v).Type().Name())
+		return nil, fmt.Errorf("trying to create a variant from a type that it is not supported: %s", reflect.ValueOf(v).Type().Name())
 	}
 	if err := va.set(v); err != nil {
 		return nil, err
