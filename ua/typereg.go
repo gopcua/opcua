@@ -23,7 +23,7 @@ import (
 type TypeRegistry struct {
 	mu     sync.Mutex
 	types  map[string]reflect.Type
-	values map[string]map[string]interface{}
+	values map[string][]DataTypeReadStructure
 	ids    map[reflect.Type]string
 }
 
@@ -32,7 +32,7 @@ func NewTypeRegistry() *TypeRegistry {
 	return &TypeRegistry{
 		types:  make(map[string]reflect.Type),
 		ids:    make(map[reflect.Type]string),
-		values: make(map[string]map[string]interface{}),
+		values: make(map[string][]DataTypeReadStructure),
 	}
 }
 
@@ -54,6 +54,22 @@ func (r *TypeRegistry) New(id *NodeID) interface{} {
 		return nil
 	}
 	return reflect.New(typ.Elem()).Interface()
+}
+
+//Lookup Custom Data type map
+func (r *TypeRegistry) NewMap(id *NodeID) []DataTypeReadStructure {
+	if id == nil {
+		panic("opcua: missing id in call to TypeRegistry.NewMap")
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	value, ok := r.values[id.String()]
+	if !ok {
+		return nil
+	}
+	return value
 }
 
 // Lookup returns the id of the type of v or nil if
@@ -96,7 +112,8 @@ func (r *TypeRegistry) Register(id *NodeID, v interface{}) error {
 	}
 	return nil
 }
-func (r *TypeRegistry) RegisterMap(id *NodeID, v map[string]interface{}) error {
+
+func (r *TypeRegistry) RegisterMap(id *NodeID, v []DataTypeReadStructure) error {
 	if id == nil {
 		panic("opcua: missing id in call to TypeRegistry.Register")
 	}
@@ -106,9 +123,9 @@ func (r *TypeRegistry) RegisterMap(id *NodeID, v map[string]interface{}) error {
 
 	ids := id.String()
 
-	if cur := r.values[ids]; cur != nil && !reflect.DeepEqual(cur, v) {
-		return errors.Errorf("%s is already registered as %v", id, cur)
-	}
+	// if cur := r.values[ids]; cur != nil && !reflect.DeepEqual(cur, v) {
+	// 	return errors.Errorf("%s is already registered as %v", id, cur)
+	// }
 	r.values[ids] = v
 
 	return nil

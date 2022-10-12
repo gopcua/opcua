@@ -1269,6 +1269,83 @@ func (c *Client) UpdateNamespacesWithContext(ctx context.Context) error {
 	return nil
 }
 
+//Register a complex data type node.
+//Returns map[string]interface{} of the structure registered
+func (c *Client) RegisterExtensionObjectMap(nodeID *ua.NodeID) ([]ua.DataTypeReadStructure, error) {
+	node := c.Node(nodeID)
+	dataType, err := node.Attributes(ua.AttributeIDDataType)
+	if err != nil {
+		return nil, err
+	}
+	if dataType[0] == nil {
+		return nil, errors.New("Data Type empty")
+	}
+	if err != nil {
+		return nil, err
+	}
+	if dataType[0].Value == nil {
+		return nil, errors.New("Data Type empty")
+	}
+	nodeType := dataType[0].Value.NodeID()
+	switch dataType := nodeType.Type(); dataType {
+	case ua.NodeIDTypeString:
+		mytype := c.GetTypeDefinition(nodeType)
+		v, err := node.Value()
+		if v == nil {
+			return nil, err
+		}
+		typeid := v.ExtensionObject().TypeID.NodeID
+		ua.RegisterExtensionObjectMap(typeid, mytype)
+		return mytype, nil
+	}
+
+	return nil, errors.New("Type is not complex")
+}
+
+//Returns DataTypeReadStructure of complex type
+func (c *Client) GetTypeDefinition(nodeID *ua.NodeID) []ua.DataTypeReadStructure {
+	var dataTypeStruct []ua.DataTypeReadStructure
+	node := c.Node(nodeID)
+	v, err := node.Attribute(ua.AttributeIDDataTypeDefinition)
+	if err != nil {
+		return nil
+	}
+	if eo, ok := v.Value().(*ua.ExtensionObject); ok {
+		if sd, ok := eo.Value.(*ua.StructureDefinition); ok {
+			var value ua.DataTypeReadStructure
+			for _, item := range sd.Fields {
+				switch dataType := item.DataType.IntID(); dataType {
+				case id.Byte:
+					value = ua.DataTypeReadStructure{Name: item.Name, Value: byte(0)}
+				case id.SByte:
+					value = ua.DataTypeReadStructure{Name: item.Name, Value: int8(0)}
+				case id.Int16:
+					value = ua.DataTypeReadStructure{Name: item.Name, Value: int16(0)}
+				case id.Int32:
+					value = ua.DataTypeReadStructure{Name: item.Name, Value: int32(0)}
+				case id.UInt16:
+					value = ua.DataTypeReadStructure{Name: item.Name, Value: uint16(0)}
+				case id.Float:
+					value = ua.DataTypeReadStructure{Name: item.Name, Value: float32(0.0)}
+				case 0:
+					if item.DataType.Namespace() != 0 {
+						value = ua.DataTypeReadStructure{Name: item.Name, Value: c.GetTypeDefinition(item.DataType)}
+					} else {
+						value = ua.DataTypeReadStructure{Name: item.Name, Value: ""}
+					}
+				case id.Boolean:
+					value = ua.DataTypeReadStructure{Name: item.Name, Value: false}
+				default:
+					fmt.Print(id.Name(dataType))
+				}
+				dataTypeStruct = append(dataTypeStruct, value)
+
+			}
+		}
+	}
+	return dataTypeStruct
+}
+
 // safeAssign implements a type-safe assign from T to *T.
 func safeAssign(t, ptrT interface{}) error {
 	if reflect.TypeOf(t) != reflect.TypeOf(ptrT).Elem() {

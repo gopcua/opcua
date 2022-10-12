@@ -12,6 +12,8 @@ import (
 // eotypes contains all known extension objects.
 var eotypes = NewTypeRegistry()
 
+// var eomaptypes =
+
 // RegisterExtensionObject registers a new extension object type.
 // It panics if the type or the id is already registered.
 func RegisterExtensionObject(typeID *NodeID, v interface{}) {
@@ -19,22 +21,42 @@ func RegisterExtensionObject(typeID *NodeID, v interface{}) {
 		panic("Extension object " + err.Error())
 	}
 }
-
-//RegisterExtensionObject
-func RegisterExtensionObjectMap(typeID *NodeID, v map[string]interface{}) {
+func RegisterExtensionObjectMap(typeID *NodeID, v []DataTypeReadStructure) {
 	if err := eotypes.RegisterMap(typeID, v); err != nil {
 		panic("Extension object " + err.Error())
 	}
 }
 
-//Decodes extension object interface into map
+//Decodes extension object with array of Read Structures into a map of interfaces
 func DecodeExtensionObjectMap(value interface{}) map[string]interface{} {
-	if eo, ok := value.(ExtensionObject); ok {
-		if rv, ok := eo.Value.(map[string]interface{}); ok {
-			return rv
+	var eo ExtensionObject
+	var match bool
+	if eoRef, ok := value.(*ExtensionObject); ok {
+		eo = *eoRef
+		match = true
+	} else {
+		if eo, ok = value.(ExtensionObject); ok {
+			match = true
+		}
+	}
+	if match {
+		if rv, ok := eo.Value.([]DataTypeReadStructure); ok {
+			newmap := DecodeDataTypeReadStructure(rv)
+			return newmap
 		}
 	}
 	return nil
+}
+func DecodeDataTypeReadStructure(value []DataTypeReadStructure) map[string]interface{} {
+	newmap := make(map[string]interface{})
+	for _, item := range value {
+		if subitem, ok := item.Value.([]DataTypeReadStructure); ok {
+			newmap[item.Name] = DecodeDataTypeReadStructure(subitem)
+		} else {
+			newmap[item.Name] = item.Value
+		}
+	}
+	return newmap
 }
 
 // These flags define the value type of an ExtensionObject.
@@ -53,6 +75,10 @@ type ExtensionObject struct {
 	EncodingMask uint8
 	TypeID       *ExpandedNodeID
 	Value        interface{}
+}
+type DataTypeReadStructure struct {
+	Name  string
+	Value interface{}
 }
 
 func NewExtensionObject(value interface{}) *ExtensionObject {
@@ -93,10 +119,12 @@ func (e *ExtensionObject) Decode(b []byte) (int, error) {
 	typeID := e.TypeID.NodeID
 	e.Value = eotypes.New(typeID)
 	if e.Value == nil {
-		debug.Printf("ua: unknown extension object %s", typeID)
-		return buf.Pos(), buf.Error()
+		e.Value = eotypes.NewMap(typeID)
+		if e.Value == nil {
+			debug.Printf("ua: unknown extension object %s", typeID)
+			return buf.Pos(), buf.Error()
+		}
 	}
-
 	body.ReadStruct(e.Value)
 	return buf.Pos(), body.Error()
 }

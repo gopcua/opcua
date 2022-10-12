@@ -152,10 +152,14 @@ func TestParseNodeID(t *testing.T) {
 		{s: "ns=1;b=YWJj", n: NewByteStringNodeID(1, []byte{'a', 'b', 'c'})},
 		{s: "ns=1;s=a", n: NewStringNodeID(1, "a")},
 		{s: "ns=1;a", n: NewStringNodeID(1, "a")},
+		{s: "ns=1;s=foo;bar;", n: NewStringNodeID(1, "foo;bar;")},
+
+		// from https://github.com/Azure-Samples/iot-edge-opc-plc
+		{s: "ns=5;s=Special_\"!§$%&/()=?`´\\\\+~*\\'#_-:.;,<>|@^°€µ{[]}", n: NewStringNodeID(5, "Special_\"!§$%&/()=?`´\\\\+~*\\'#_-:.;,<>|@^°€µ{[]}")},
 
 		// error flows
 		{s: "abc=0;i=2", err: errors.New("invalid node id: abc=0;i=2")},
-		{s: "ns=0;i=1;s=2", err: errors.New("invalid node id: ns=0;i=1;s=2")},
+		{s: "ns=0;i=1;s=2", err: errors.New("invalid numeric id: ns=0;i=1;s=2")},
 		{s: "ns=0", err: errors.New("invalid node id: ns=0")},
 		{s: "nsu=abc;i=1", err: errors.New("namespace urls require a server NamespaceArray")},
 		{s: "ns=65536;i=1", err: errors.New("namespace id out of range (0..65535): ns=65536;i=1")},

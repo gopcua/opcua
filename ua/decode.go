@@ -34,9 +34,18 @@ func Decode(b []byte, v interface{}) (int, error) {
 	val := reflect.ValueOf(v)
 	return decode(b, val, val.Type().String())
 }
+
 func DecodeMap(b []byte, v interface{}) (int, error) {
-	val := reflect.ValueOf(&v).Elem()
-	return decodeMap(b, val, val.Type().String())
+	if _, ok := v.([]DataTypeReadStructure); ok {
+		saveVal := reflect.ValueOf(&v).Elem()
+		pos, err := decodeMap(b, saveVal)
+		if err != nil {
+			return 0, nil
+		}
+		return pos, nil
+	} else {
+		return 0, nil
+	}
 }
 
 func decode(b []byte, val reflect.Value, name string) (n int, err error) {
@@ -87,6 +96,8 @@ func decode(b []byte, val reflect.Value, name string) (n int, err error) {
 			return decodeArray(b, val, name)
 		case reflect.Ptr:
 			return decode(b, val.Elem(), name)
+		case reflect.Map:
+			//return decodeMap(b, val, name)
 		case reflect.Struct:
 			return decodeStruct(b, val, name)
 		default:
@@ -95,43 +106,97 @@ func decode(b []byte, val reflect.Value, name string) (n int, err error) {
 	}
 	return buf.Pos(), buf.Error()
 }
-func decodeMap(b []byte, val reflect.Value, name string) (int, error) {
+func decodeMap(b []byte, val reflect.Value) (int, error) {
+
+	pos := 0
+	// valt := val.Type()
+	kind := val.Elem().Kind()
+	if kind == reflect.Slice {
+		s := val.Elem()
+		for i := 0; i < s.Len(); i++ {
+			item := s.Index(i)
+			v := reflect.Indirect(item)
+			sValue := v.FieldByName("Value")
+			newPos, err := decodeTypeStructure(b[pos:], sValue)
+			pos = newPos + pos
+			if err != nil {
+				return 0, err
+			}
+			// 	ft := valt.Field(i)
+
+			// for _, item := range v {
+			// 	newPos, err, newValue := decodeTypeStructure(b[pos:], item)
+			// 	pos = newPos + pos
+			// 	dataTypeReadArray = append(dataTypeReadArray, newValue)
+			// 	if err != nil {
+			// 		return 0, err, nil
+			// 	}
+			// }
+		}
+		return pos, nil
+	}
+	return 0, nil
+}
+func decodeTypeStructure(b []byte, val reflect.Value) (int, error) {
 	buf := NewBuffer(b)
-	if val.Kind() == reflect.Map {
-		for _, item := range val.MapKeys() {
-			v := val.MapIndex(item)
-			switch t := v.Interface().(type) {
-			case float64:
-				floatValue := reflect.ValueOf(buf.ReadFloat32())
-				val.SetMapIndex(item, floatValue)
-			case string:
-				fmt.Println(t)
-			case bool:
-				boolValue := reflect.ValueOf(buf.ReadBool())
-				val.SetMapIndex(item, boolValue)
-			case map[string]interface{}:
-				for _, subItem := range val.MapKeys() {
-					vSub := val.MapIndex(item)
-					switch vSub.Interface().(type) {
-					case float64:
-						floatValue := reflect.ValueOf(buf.ReadFloat32())
-						val.SetMapIndex(subItem, floatValue)
-					case string:
-						fmt.Println(t)
-						stringValue := reflect.ValueOf(buf.ReadString())
-						val.SetMapIndex(subItem, stringValue)
-					case bool:
-						boolValue := reflect.ValueOf(buf.ReadBool())
-						val.SetMapIndex(subItem, boolValue)
-					}
-				}
-			default:
-				fmt.Println("not found")
+	var value interface{}
+	switch val.Elem().Kind() {
+	case reflect.Bool:
+		value = buf.ReadBool()
+	case reflect.Int8:
+		value = buf.ReadInt8()
+	case reflect.Uint8:
+		value = buf.ReadByte()
+	case reflect.Int16:
+		value = buf.ReadInt16()
+	case reflect.Uint16:
+		value = buf.ReadUint16()
+	case reflect.Int32:
+		value = buf.ReadInt32()
+	case reflect.Uint32:
+		value = buf.ReadUint32()
+	case reflect.Int64:
+		value = buf.ReadInt64()
+	case reflect.Uint64:
+		value = buf.ReadUint64()
+	case reflect.Float32:
+		value = buf.ReadFloat32()
+	case reflect.Float64:
+		value = buf.ReadFloat64()
+	case reflect.String:
+		value = buf.ReadString()
+	case reflect.Struct:
+		return decodeMap(b, val)
+	case reflect.Ptr:
+		return decodeTypeStructure(b, val.Elem())
+	case reflect.Slice:
+		return decodeMap(b, val)
+	// case interface{}:
+	//decodeMap(b, &val, name)
+	default:
+		return buf.Pos(), errors.New(fmt.Sprintf("Value not in list %s", val.Elem().Kind()))
+
+		//fmt.Printf("Value not in list %s", val.Elem().Kind())
+		// value = DataTypeReadStructure{Name: value.Name, Value: nil}
+		//fmt.Print(errors.Errorf("unsupported type %s", val.(type)))
+	}
+	if value != nil {
+		field := reflect.New(reflect.TypeOf(value))
+		field.Elem().Set(reflect.ValueOf(value))
+		if val.CanSet() {
+			val.Set(field)
+		} else {
+			valSet := val.Elem()
+			if valSet.CanSet() {
+				valSet.Set(field.Elem())
+			} else {
+				fmt.Printf("Can't set element %s:%s", valSet, field)
 			}
 		}
 	}
-	return buf.Pos(), buf.Error()
+	return buf.Pos(), nil
 }
+
 func decodeStruct(b []byte, val reflect.Value, name string) (int, error) {
 	pos := 0
 	valt := val.Type()
@@ -144,7 +209,7 @@ func decodeStruct(b []byte, val reflect.Value, name string) (int, error) {
 		f := val.Field(i)
 		if f.Type().Kind() == reflect.Ptr {
 			f.Set(reflect.New(f.Type().Elem()))
-			// fmt.Printf("decode: %s has type %v and has new value %#v\n", fname, f.Type(), f.Interface())
+			//fmt.Printf("decode: %s has type %v and has new value %#v\n", fname, f.Type(), f.Interface())
 		}
 
 		n, err := decode(b[pos:], f, fname)
