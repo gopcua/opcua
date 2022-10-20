@@ -147,6 +147,10 @@ func ParseExpandedNodeID(s string, ns []string) (*ExpandedNodeID, error) {
 		nsval, idval = "ns=0", p[0]
 	case 2:
 		nsval, idval = p[0], p[1]
+	case 3:
+		nsval, idval = p[0], p[2]
+	default:
+		nsval, idval = p[0], p[1]
 	}
 
 	// parse namespace
