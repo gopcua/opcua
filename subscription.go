@@ -308,6 +308,10 @@ func (s *Subscription) StatsWithContext(ctx context.Context) (*ua.SubscriptionDi
 		return nil, err
 	}
 
+	if v == nil {
+		return nil, errors.Errorf("empty SubscriptionDiagnostics for sub=%d", s.SubscriptionID)
+	}
+
 	for _, eo := range v.Value().([]*ua.ExtensionObject) {
 		stat := eo.Value.(*ua.SubscriptionDiagnosticsDataType)
 
