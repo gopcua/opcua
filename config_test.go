@@ -4,6 +4,7 @@ import (
 	"crypto/rsa"
 	"crypto/tls"
 	"encoding/pem"
+	"errors"
 	"io/ioutil"
 	"net"
 	"os"
@@ -11,12 +12,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/pascaldekloe/goe/verify"
+
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uacp"
 	"github.com/gopcua/opcua/uapolicy"
 	"github.com/gopcua/opcua/uasc"
-
-	"github.com/pascaldekloe/goe/verify"
 )
 
 // test certificate generated with
@@ -284,6 +285,13 @@ func TestOptions(t *testing.T) {
 			},
 		},
 		{
+			name: `CertificateFile() error`,
+			opt:  CertificateFile("x"),
+			cfg: &Config{
+				err: errors.New("opcua: Failed to load certificate: open x: no such file or directory"),
+			},
+		},
+		{
 			name: `Lifetime(10ms)`,
 			opt:  Lifetime(10 * time.Millisecond),
 			cfg: &Config{
@@ -336,6 +344,13 @@ func TestOptions(t *testing.T) {
 					c.LocalKey = cert.PrivateKey.(*rsa.PrivateKey)
 					return c
 				}(),
+			},
+		},
+		{
+			name: `PrivateKeyFile() error`,
+			opt:  PrivateKeyFile("x"),
+			cfg: &Config{
+				err: errors.New("opcua: Failed to load private key: open x: no such file or directory"),
 			},
 		},
 		{
@@ -402,6 +417,13 @@ func TestOptions(t *testing.T) {
 					c.RemoteCertificate = certDER
 					return c
 				}(),
+			},
+		},
+		{
+			name: `RemoteCertificateFile() error`,
+			opt:  RemoteCertificateFile("x"),
+			cfg: &Config{
+				err: errors.New("opcua: Failed to load certificate: open x: no such file or directory"),
 			},
 		},
 		{
@@ -764,8 +786,24 @@ func TestOptions(t *testing.T) {
 				tt.cfg.session = DefaultSessionConfig()
 			}
 
+			errstr := func(err error) string {
+				if err != nil {
+					return err.Error()
+				}
+				return ""
+			}
+
 			cfg := ApplyConfig(tt.opt)
-			verify.Values(t, "", cfg, tt.cfg)
+			if got, want := errstr(cfg.Error()), errstr(tt.cfg.err); got != "" || want != "" {
+				if got != want {
+					t.Fatalf("got error %q want %q", got, want)
+				}
+				return
+			}
+			if !verify.Values(t, "", cfg, tt.cfg) {
+				t.Logf("got %#v", cfg)
+				t.Logf("want %#v", tt.cfg)
+			}
 		})
 	}
 }

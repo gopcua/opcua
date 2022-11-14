@@ -56,6 +56,18 @@ type Config struct {
 	dialer  *uacp.Dialer
 	sechan  *uasc.Config
 	session *uasc.SessionConfig
+	err     error
+}
+
+func (cfg *Config) setError(err error) {
+	if cfg.err != nil {
+		return
+	}
+	cfg.err = err
+}
+
+func (cfg *Config) Error() error {
+	return cfg.err
 }
 
 // NewDialer creates a uacp.Dialer from the config options
@@ -68,6 +80,8 @@ func NewDialer(cfg *Config) *uacp.Dialer {
 
 // ApplyConfig applies the config options to the default configuration.
 // todo(fs): Can we find a better name?
+//
+// Note: Starting with v0.5 this function will will return an error.
 func ApplyConfig(opts ...Option) *Config {
 	cfg := &Config{
 		sechan:  DefaultClientConfig(),
@@ -162,7 +176,8 @@ func RemoteCertificateFile(filename string) Option {
 	return func(cfg *Config) {
 		cert, err := loadCertificate(filename)
 		if err != nil {
-			log.Fatal(err)
+			cfg.setError(err)
+			return
 		}
 		cfg.sechan.RemoteCertificate = cert
 	}
@@ -220,7 +235,8 @@ func PrivateKeyFile(filename string) Option {
 		}
 		key, err := loadPrivateKey(filename)
 		if err != nil {
-			log.Fatal(err)
+			cfg.setError(err)
+			return
 		}
 		cfg.sechan.LocalKey = key
 	}
@@ -267,7 +283,8 @@ func CertificateFile(filename string) Option {
 
 		cert, err := loadCertificate(filename)
 		if err != nil {
-			log.Fatal(err)
+			cfg.setError(err)
+			return
 		}
 		setCertificate(cert, cfg)
 	}
