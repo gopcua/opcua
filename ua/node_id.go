@@ -302,39 +302,42 @@ func (n *NodeID) String() string {
 
 func (n *NodeID) Decode(b []byte) (int, error) {
 	buf := NewBuffer(b)
-
-	n.mask = NodeIDType(buf.ReadByte())
-	typ := n.mask & 0xf
+	encoding := buf.ReadByte()
+	typ := NodeIDType(encoding & 0b00111111)
 
 	switch typ {
 	case NodeIDTypeTwoByte:
 		n.nid = uint32(buf.ReadByte())
-		return buf.Pos(), buf.Error()
 
 	case NodeIDTypeFourByte:
 		n.ns = uint16(buf.ReadByte())
 		n.nid = uint32(buf.ReadUint16())
-		return buf.Pos(), buf.Error()
 
 	case NodeIDTypeNumeric:
 		n.ns = buf.ReadUint16()
 		n.nid = buf.ReadUint32()
-		return buf.Pos(), buf.Error()
 
 	case NodeIDTypeGUID:
 		n.ns = buf.ReadUint16()
 		n.gid = &GUID{}
 		buf.ReadStruct(n.gid)
-		return buf.Pos(), buf.Error()
 
 	case NodeIDTypeByteString, NodeIDTypeString:
 		n.ns = buf.ReadUint16()
 		n.bid = buf.ReadBytes()
-		return buf.Pos(), buf.Error()
-
 	default:
 		return 0, errors.Errorf("invalid node id type %v", typ)
 	}
+	n.mask = typ
+	if encoding&(1<<7) != 0 {
+		//namespaceUri = buf.ReadBytes()
+		_ = buf.ReadBytes()
+	}
+	if encoding&(1<<6) != 0 {
+		//ServerIndex = buf.ReadUint32()
+		_ = buf.ReadUint32()
+	}
+	return buf.Pos(), buf.Error()
 }
 
 func (n *NodeID) Encode() ([]byte, error) {
