@@ -381,3 +381,8 @@ func (n *NodeID) UnmarshalJSON(b []byte) error {
 	*n = *nid
 	return nil
 }
+
+// RemoveExpandedFlag remove expanded flag NamespaceURI and ServerIndex.
+func (n *NodeID) RemoveExpandedFlag() {
+	n.mask &= 0b00111111
+}

@@ -264,6 +264,7 @@ func (n *Node) ReferencedNodesWithContext(ctx context.Context, refs uint32, dir 
 		return nil, err
 	}
 	for _, r := range res {
+		r.NodeID.NodeID.RemoveExpandedFlag()
 		nodes = append(nodes, n.c.Node(r.NodeID.NodeID))
 	}
 	return nodes, nil
@@ -374,6 +375,7 @@ func (n *Node) TranslateBrowsePathsToNodeIDsWithContext(ctx context.Context, pat
 			if len(resp.Results[0].Targets) == 0 {
 				return ua.StatusBadUnexpectedError
 			}
+			resp.Results[0].Targets[0].TargetID.NodeID.RemoveExpandedFlag()
 			nodeID = resp.Results[0].Targets[0].TargetID.NodeID
 			return nil
 		}
