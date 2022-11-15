@@ -4,11 +4,12 @@ import (
 	"crypto/rsa"
 	"crypto/tls"
 	"encoding/pem"
-	"errors"
+	"fmt"
 	"io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -141,6 +142,16 @@ func TestOptions(t *testing.T) {
 		keyDERFile  = filepath.Join(d, "key.der")
 		keyPEMFile  = filepath.Join(d, "key.pem")
 	)
+
+	// the error message for "file not found" is platform dependent.
+	notFoundError := func(msg, name string) error {
+		switch runtime.GOOS {
+		case "windows":
+			return fmt.Errorf("opcua: Failed to load %s: open %s: The system cannot find the file specified.", msg, name)
+		default:
+			return fmt.Errorf("opcua: Failed to load %s: open %s: no such file or directory", msg, name)
+		}
+	}
 
 	if err := ioutil.WriteFile(certDERFile, certDER, 0644); err != nil {
 		t.Fatal(err)
@@ -288,7 +299,7 @@ func TestOptions(t *testing.T) {
 			name: `CertificateFile() error`,
 			opt:  CertificateFile("x"),
 			cfg: &Config{
-				err: errors.New("opcua: Failed to load certificate: open x: no such file or directory"),
+				err: notFoundError("certificate", "x"),
 			},
 		},
 		{
@@ -350,7 +361,7 @@ func TestOptions(t *testing.T) {
 			name: `PrivateKeyFile() error`,
 			opt:  PrivateKeyFile("x"),
 			cfg: &Config{
-				err: errors.New("opcua: Failed to load private key: open x: no such file or directory"),
+				err: notFoundError("private key", "x"),
 			},
 		},
 		{
@@ -423,7 +434,7 @@ func TestOptions(t *testing.T) {
 			name: `RemoteCertificateFile() error`,
 			opt:  RemoteCertificateFile("x"),
 			cfg: &Config{
-				err: errors.New("opcua: Failed to load certificate: open x: no such file or directory"),
+				err: notFoundError("certificate", "x"),
 			},
 		},
 		{
