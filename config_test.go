@@ -4,19 +4,21 @@ import (
 	"crypto/rsa"
 	"crypto/tls"
 	"encoding/pem"
+	"fmt"
 	"io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
+
+	"github.com/pascaldekloe/goe/verify"
 
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uacp"
 	"github.com/gopcua/opcua/uapolicy"
 	"github.com/gopcua/opcua/uasc"
-
-	"github.com/pascaldekloe/goe/verify"
 )
 
 // test certificate generated with
@@ -140,6 +142,16 @@ func TestOptions(t *testing.T) {
 		keyDERFile  = filepath.Join(d, "key.der")
 		keyPEMFile  = filepath.Join(d, "key.pem")
 	)
+
+	// the error message for "file not found" is platform dependent.
+	notFoundError := func(msg, name string) error {
+		switch runtime.GOOS {
+		case "windows":
+			return fmt.Errorf("opcua: Failed to load %s: open %s: The system cannot find the file specified.", msg, name)
+		default:
+			return fmt.Errorf("opcua: Failed to load %s: open %s: no such file or directory", msg, name)
+		}
+	}
 
 	if err := ioutil.WriteFile(certDERFile, certDER, 0644); err != nil {
 		t.Fatal(err)
@@ -284,6 +296,13 @@ func TestOptions(t *testing.T) {
 			},
 		},
 		{
+			name: `CertificateFile() error`,
+			opt:  CertificateFile("x"),
+			cfg: &Config{
+				err: notFoundError("certificate", "x"),
+			},
+		},
+		{
 			name: `Lifetime(10ms)`,
 			opt:  Lifetime(10 * time.Millisecond),
 			cfg: &Config{
@@ -336,6 +355,13 @@ func TestOptions(t *testing.T) {
 					c.LocalKey = cert.PrivateKey.(*rsa.PrivateKey)
 					return c
 				}(),
+			},
+		},
+		{
+			name: `PrivateKeyFile() error`,
+			opt:  PrivateKeyFile("x"),
+			cfg: &Config{
+				err: notFoundError("private key", "x"),
 			},
 		},
 		{
@@ -402,6 +428,13 @@ func TestOptions(t *testing.T) {
 					c.RemoteCertificate = certDER
 					return c
 				}(),
+			},
+		},
+		{
+			name: `RemoteCertificateFile() error`,
+			opt:  RemoteCertificateFile("x"),
+			cfg: &Config{
+				err: notFoundError("certificate", "x"),
 			},
 		},
 		{
@@ -764,8 +797,24 @@ func TestOptions(t *testing.T) {
 				tt.cfg.session = DefaultSessionConfig()
 			}
 
+			errstr := func(err error) string {
+				if err != nil {
+					return err.Error()
+				}
+				return ""
+			}
+
 			cfg := ApplyConfig(tt.opt)
-			verify.Values(t, "", cfg, tt.cfg)
+			if got, want := errstr(cfg.Error()), errstr(tt.cfg.err); got != "" || want != "" {
+				if got != want {
+					t.Fatalf("got error %q want %q", got, want)
+				}
+				return
+			}
+			if !verify.Values(t, "", cfg, tt.cfg) {
+				t.Logf("got %#v", cfg)
+				t.Logf("want %#v", tt.cfg)
+			}
 		})
 	}
 }
