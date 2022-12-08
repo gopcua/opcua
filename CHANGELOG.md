@@ -3,7 +3,8 @@
 ## v0.3.8 (08 Dec 2022)
 
 * Fix nil subscription stats to return error (#602)
-* log.Fatal called when a certificate fails to load (#616)
+* `log.Fatal` called when a certificate fails to load (#616)
+* Bump go version to 1.19
 
 ## v0.3.7 (05 Oct 2022)
 
@@ -36,7 +37,6 @@
 ## v0.3.1 (27 Jan 2022)
 
 * Refresh cached namespaces on reconnect (#552)
-
 * Add more `WithContext(ctx)` methods and use context in more places (#555)
 
 ## v0.3.0 (21 Jan 2022)
