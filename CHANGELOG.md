@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.3.8 (08 Dec 2022)
+
+* Fix nil subscription stats to return error (#602)
+* log.Fatal called when a certificate fails to load (#616)
+
 ## v0.3.7 (05 Oct 2022)
 
 * Stop uasc token expiration timer. Resource leak (#608)
