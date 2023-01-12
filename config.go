@@ -174,6 +174,10 @@ func RemoteCertificate(cert []byte) Option {
 // in PEM or DER encoding.
 func RemoteCertificateFile(filename string) Option {
 	return func(cfg *Config) {
+		if filename == "" {
+			return
+		}
+
 		cert, err := loadCertificate(filename)
 		if err != nil {
 			cfg.setError(err)
