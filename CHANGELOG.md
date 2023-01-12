@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.3.9 (12 Jan 2023)
+
+* Ignore empty filename in RemoteCertificateFile (#626)
+
 ## v0.3.8 (08 Dec 2022)
 
 * Fix nil subscription stats to return error (#602)
