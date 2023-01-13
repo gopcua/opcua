@@ -5,8 +5,8 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
+	"os"
 	"os/exec"
 	"path"
 	"strings"
@@ -80,7 +80,7 @@ func write(src []byte, filename string) {
 
 	b.Write(src)
 
-	if err := ioutil.WriteFile(filename, b.Bytes(), 0644); err != nil {
+	if err := os.WriteFile(filename, b.Bytes(), 0644); err != nil {
 		log.Fatalf("Failed to write %s: %v", filename, err)
 	}
 

@@ -9,7 +9,6 @@ import (
 	"encoding/csv"
 	"flag"
 	"go/format"
-	"io/ioutil"
 	"log"
 	"os"
 	"strings"
@@ -55,7 +54,7 @@ func main() {
 		log.Fatalf("Error formatting code: %v", err)
 	}
 
-	if err := ioutil.WriteFile(*out, bfmt, 0644); err != nil {
+	if err := os.WriteFile(*out, bfmt, 0644); err != nil {
 		log.Fatalf("Error writing %s: %v", *out, err)
 	}
 	log.Printf("Wrote %s", *out)
