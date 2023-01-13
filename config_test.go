@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"encoding/pem"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"path/filepath"
@@ -130,7 +129,7 @@ func TestOptions(t *testing.T) {
 	randomRequestID = func() uint32 { return 125 }
 	defer func() { randomRequestID = nil }()
 
-	d, err := ioutil.TempDir("", "gopcua")
+	d, err := os.MkdirTemp("", "gopcua")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -153,16 +152,16 @@ func TestOptions(t *testing.T) {
 		}
 	}
 
-	if err := ioutil.WriteFile(certDERFile, certDER, 0644); err != nil {
+	if err := os.WriteFile(certDERFile, certDER, 0644); err != nil {
 		t.Fatal(err)
 	}
-	if err := ioutil.WriteFile(certPEMFile, certPEM, 0644); err != nil {
+	if err := os.WriteFile(certPEMFile, certPEM, 0644); err != nil {
 		t.Fatal(err)
 	}
-	if err := ioutil.WriteFile(keyDERFile, keyDER, 0644); err != nil {
+	if err := os.WriteFile(keyDERFile, keyDER, 0644); err != nil {
 		t.Fatal(err)
 	}
-	if err := ioutil.WriteFile(keyPEMFile, keyPEM, 0644); err != nil {
+	if err := os.WriteFile(keyPEMFile, keyPEM, 0644); err != nil {
 		t.Fatal(err)
 	}
 	defer os.Remove(keyPEMFile)

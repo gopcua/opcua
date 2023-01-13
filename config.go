@@ -8,10 +8,10 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
-	"io/ioutil"
 	"log"
 	"math/rand"
 	"net"
+	"os"
 	"strings"
 	"time"
 
@@ -247,7 +247,7 @@ func PrivateKeyFile(filename string) Option {
 }
 
 func loadPrivateKey(filename string) (*rsa.PrivateKey, error) {
-	b, err := ioutil.ReadFile(filename)
+	b, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, errors.Errorf("Failed to load private key: %s", err)
 	}
@@ -295,7 +295,7 @@ func CertificateFile(filename string) Option {
 }
 
 func loadCertificate(filename string) ([]byte, error) {
-	b, err := ioutil.ReadFile(filename)
+	b, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, errors.Errorf("Failed to load certificate: %s", err)
 	}
