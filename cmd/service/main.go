@@ -140,12 +140,12 @@ func Enums(dict *TypeDictionary) []Type {
 func ExtObjects(dict *TypeDictionary) []Type {
 	baseTypes := map[string]*Type{
 		// Extensionobject is the base class for all extension objects.
-		"ua:ExtensionObject": &Type{Name: "ExtensionObject"},
+		"ua:ExtensionObject": {Name: "ExtensionObject"},
 
 		// DataTypeDefinition is referenced in Opc.Ua.Types.bsd but not defined there
 		// From what I can tell it is an abstract base class without any fields.
 		// We define it here to be able to generate code for derived classes.
-		"tns:DataTypeDefinition": &Type{Name: "DataTypeDefinition"},
+		"tns:DataTypeDefinition": {Name: "DataTypeDefinition"},
 	}
 
 	var objects []Type
