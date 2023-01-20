@@ -2,12 +2,11 @@ package monitor
 
 import (
 	"context"
-	"sync"
-	"sync/atomic"
-
 	"github.com/gopcua/opcua"
 	"github.com/gopcua/opcua/errors"
 	"github.com/gopcua/opcua/ua"
+	"sync"
+	"sync/atomic"
 )
 
 var (
@@ -311,12 +310,12 @@ func (s *Subscription) AddMonitorItemsWithContext(ctx context.Context, nodes ...
 		return nil, nil
 	}
 
-	toAdd := make([]*ua.MonitoredItemCreateRequest, 0)
+	toAdd := make([]*ua.MonitoredItemCreateRequest, len(nodes))
 
 	// Add handles and make requests
 	for i, node := range nodes {
 		handle := atomic.AddUint32(&s.monitor.nextClientHandle, 1)
-		s.handles[handle] = nodes[i].NodeID
+
 		nodes[i].handle = handle
 
 		request := opcua.NewMonitoredItemCreateRequestWithDefaults(node.NodeID, ua.AttributeIDValue, handle)
@@ -326,7 +325,8 @@ func (s *Subscription) AddMonitorItemsWithContext(ctx context.Context, nodes ...
 			request.RequestedParameters = node.MonitoringParameters
 			request.RequestedParameters.ClientHandle = handle
 		}
-		toAdd = append(toAdd, request)
+
+		toAdd[i] = request
 	}
 	resp, err := s.sub.MonitorWithContext(ctx, ua.TimestampsToReturnBoth, toAdd...)
 	if err != nil {
@@ -337,13 +337,17 @@ func (s *Subscription) AddMonitorItemsWithContext(ctx context.Context, nodes ...
 		return nil, resp.ResponseHeader.ServiceResult
 	}
 
+	// https://reference.opcfoundation.org/Core/Part4/v105/docs/5.12.2.2#_Ref104715274
+	// The request len _must_ match the result len.
 	if len(resp.Results) != len(toAdd) {
 		return nil, errors.Errorf("monitor items response length mismatch")
 	}
+
 	var monitoredItems []Item
 	for i, res := range resp.Results {
 		if res.StatusCode != ua.StatusOK {
-			return nil, res.StatusCode
+			// TODO(kung-foo): decide what to do here...
+			continue
 		}
 		mn := Item{
 			id:     res.MonitoredItemID,
@@ -352,6 +356,7 @@ func (s *Subscription) AddMonitorItemsWithContext(ctx context.Context, nodes ...
 		}
 		s.itemLookup[res.MonitoredItemID] = mn
 		monitoredItems = append(monitoredItems, mn)
+		s.handles[nodes[i].handle] = nodes[i].NodeID
 	}
 
 	return monitoredItems, nil
