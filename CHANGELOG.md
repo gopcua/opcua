@@ -2,6 +2,7 @@
 
 ## v0.3.10 (25 Jan 2023)
 
+* drop io/ioutil (#627)
 * uacp: honor the context deadline during the handshake (#629)
 
 ## v0.3.9 (12 Jan 2023)
