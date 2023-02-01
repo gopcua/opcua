@@ -25,7 +25,10 @@ type C struct {
 	B [2]byte
 }
 
+type Timestamp time.Time
+
 func TestCodec(t *testing.T) {
+
 	tests := []struct {
 		name string
 		v    interface{}
@@ -203,6 +206,16 @@ func TestCodec(t *testing.T) {
 		{
 			name: "DateTimeZero",
 			v:    &struct{ V time.Time }{time.Time{}},
+			b:    []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+		},
+		{
+			name: "DateTime as Timestamp",
+			v:    &struct{ V Timestamp }{Timestamp(time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC))},
+			b:    []byte{0x00, 0x98, 0x67, 0xdd, 0xfd, 0x30, 0xd4, 0x01},
+		},
+		{
+			name: "DateTimeZero as Timestamp",
+			v:    &struct{ V Timestamp }{Timestamp{}},
 			b:    []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
 		},
 		{
