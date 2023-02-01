@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.3.11 (1 Feb 2023)
+
+* Decoder fails to decode type which converts to time.Time (#633)
+
 ## v0.3.10 (25 Jan 2023)
 
 * drop io/ioutil (#627)
