@@ -449,28 +449,30 @@ func (c *Client) monitor(ctx context.Context) {
 						subsToRecreate = nil
 						subsToRepublish = nil
 
-						// try to transfer all subscriptions to the new session and
-						// recreate them all if that fails.
-						res, err := c.transferSubscriptions(ctx, subIDs)
-						switch {
-						case err != nil:
-							dlog.Printf("transfer subscriptions failed. Recreating all subscriptions: %v", err)
-							subsToRepublish = nil
-							subsToRecreate = subIDs
+						if len(subIDs) > 0 {
+							// try to transfer all subscriptions to the new session and
+							// recreate them all if that fails.
+							res, err := c.transferSubscriptions(ctx, subIDs)
+							switch {
+							case err != nil:
+								dlog.Printf("transfer subscriptions failed. Recreating all subscriptions: %v", err)
+								subsToRepublish = nil
+								subsToRecreate = subIDs
 
-						default:
-							// otherwise, try a republish for the subscriptions that were transferred
-							// and recreate the rest.
-							for i := range res.Results {
-								transferResult := res.Results[i]
-								switch transferResult.StatusCode {
-								case ua.StatusBadSubscriptionIDInvalid:
-									dlog.Printf("sub %d: transfer subscription failed", subIDs[i])
-									subsToRecreate = append(subsToRecreate, subIDs[i])
+							default:
+								// otherwise, try a republish for the subscriptions that were transferred
+								// and recreate the rest.
+								for i := range res.Results {
+									transferResult := res.Results[i]
+									switch transferResult.StatusCode {
+									case ua.StatusBadSubscriptionIDInvalid:
+										dlog.Printf("sub %d: transfer subscription failed", subIDs[i])
+										subsToRecreate = append(subsToRecreate, subIDs[i])
 
-								default:
-									subsToRepublish = append(subsToRepublish, subIDs[i])
-									availableSeqs[subIDs[i]] = transferResult.AvailableSequenceNumbers
+									default:
+										subsToRepublish = append(subsToRepublish, subIDs[i])
+										availableSeqs[subIDs[i]] = transferResult.AvailableSequenceNumbers
+									}
 								}
 							}
 						}
