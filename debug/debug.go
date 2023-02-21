@@ -8,7 +8,7 @@ package debug
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"os"
 	"strings"
@@ -16,7 +16,7 @@ import (
 
 // Flags contains the debug flags set by OPC_DEBUG.
 //
-//  * codec : print detailed debugging information when encoding/decoding
+//   - codec : print detailed debugging information when encoding/decoding
 var Flags = os.Getenv("OPC_DEBUG")
 
 // Enable controls whether debug logging is enabled. It is disabled by default.
@@ -29,7 +29,7 @@ var Logger = log.New(os.Stderr, "debug: ", 0)
 // Otherwise, a discarding logger is returned.
 func NewPrefixLogger(format string, args ...interface{}) *log.Logger {
 	if !Enable {
-		return log.New(ioutil.Discard, "", 0)
+		return log.New(io.Discard, "", 0)
 	}
 	return log.New(os.Stderr, "debug: "+fmt.Sprintf(format, args...), 0)
 }

@@ -11,6 +11,7 @@ import (
 	"net"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/gopcua/opcua/debug"
 	"github.com/gopcua/opcua/errors"
@@ -89,7 +90,7 @@ func (d *Dialer) Dial(ctx context.Context, endpoint string) (*Conn, error) {
 	}
 
 	debug.Printf("uacp %d: start HEL/ACK handshake", conn.id)
-	if err := conn.Handshake(endpoint); err != nil {
+	if err := conn.Handshake(ctx, endpoint); err != nil {
 		debug.Printf("uacp %d: HEL/ACK handshake failed: %s", conn.id, err)
 		conn.Close()
 		return nil, err
@@ -217,7 +218,7 @@ func (c *Conn) close() error {
 	return c.TCPConn.Close()
 }
 
-func (c *Conn) Handshake(endpoint string) error {
+func (c *Conn) Handshake(ctx context.Context, endpoint string) error {
 	hel := &Hello{
 		Version:        c.ack.Version,
 		ReceiveBufSize: c.ack.ReceiveBufSize,
@@ -225,6 +226,11 @@ func (c *Conn) Handshake(endpoint string) error {
 		MaxMessageSize: c.ack.MaxMessageSize,
 		MaxChunkCount:  c.ack.MaxChunkCount,
 		EndpointURL:    endpoint,
+	}
+
+	// set a deadline if there is one
+	if dl, ok := ctx.Deadline(); ok {
+		c.SetDeadline(dl)
 	}
 
 	if err := c.Send("HELF", hel); err != nil {
@@ -235,6 +241,9 @@ func (c *Conn) Handshake(endpoint string) error {
 	if err != nil {
 		return err
 	}
+
+	// clear the deadline
+	c.SetDeadline(time.Time{})
 
 	msgtyp := string(b[:4])
 	switch msgtyp {

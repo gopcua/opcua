@@ -133,6 +133,15 @@ type Client struct {
 
 	// monitorOnce ensures only one connection monitor is running
 	monitorOnce sync.Once
+
+	// cfgerr contains an error that was captured in ApplyConfig.
+	// Since the API does not allow to bubble the error up in NewClient
+	// and we don't want to break existing code right away we carry the
+	// error here and bubble it up during Dial and Connect.
+	//
+	// Note: Starting with v0.5 NewClient will return the error and this
+	// variable needs to be removed.
+	cfgerr error
 }
 
 // NewClient creates a new Client.
@@ -146,6 +155,8 @@ type Client struct {
 // #Option for details.
 //
 // https://godoc.org/github.com/gopcua/opcua#Option
+//
+// Note: Starting with v0.5 this function will will return an error.
 func NewClient(endpoint string, opts ...Option) *Client {
 	cfg := ApplyConfig(opts...)
 	c := Client{
@@ -156,6 +167,7 @@ func NewClient(endpoint string, opts ...Option) *Client {
 		pendingAcks: make([]*ua.SubscriptionAcknowledgement, 0),
 		pausech:     make(chan struct{}, 2),
 		resumech:    make(chan struct{}, 2),
+		cfgerr:      cfg.Error(), // todo(fs): remove with v0.5.0 and return the error
 	}
 	c.pauseSubscriptions(context.Background())
 	c.setPublishTimeout(uasc.MaxTimeout)
@@ -182,6 +194,11 @@ const (
 
 // Connect establishes a secure channel and creates a new session.
 func (c *Client) Connect(ctx context.Context) (err error) {
+	// todo(fs): remove with v0.5.0
+	if c.cfgerr != nil {
+		return c.cfgerr
+	}
+
 	if c.SecureChannel() != nil {
 		return errors.Errorf("already connected")
 	}
@@ -513,6 +530,11 @@ func (c *Client) monitor(ctx context.Context) {
 
 // Dial establishes a secure channel.
 func (c *Client) Dial(ctx context.Context) error {
+	// todo(fs): remove with v0.5.0
+	if c.cfgerr != nil {
+		return c.cfgerr
+	}
+
 	stats.Client().Add("Dial", 1)
 
 	if c.SecureChannel() != nil {
@@ -663,7 +685,7 @@ type Session struct {
 // that the server sent in Create Session Response. The default PolicyID
 // "Anonymous" wii be set if it's missing in response.
 //
-// See Part 4, 5.6.2
+// # See Part 4, 5.6.2
 //
 // Note: Starting with v0.5 this method will require a context
 // and the corresponding XXXWithContext(ctx) method will be removed.
@@ -755,7 +777,7 @@ func anonymousPolicyID(endpoints []*ua.EndpointDescription) string {
 // the client already has a session it will be closed. To retain the current
 // session call DetachSession.
 //
-// See Part 4, 5.6.3
+// # See Part 4, 5.6.3
 //
 // Note: Starting with v0.5 this method will require a context
 // and the corresponding XXXWithContext(ctx) method will be removed.
@@ -838,7 +860,7 @@ func (c *Client) ActivateSessionWithContext(ctx context.Context, s *Session) err
 
 // CloseSession closes the current session.
 //
-// See Part 4, 5.6.4
+// # See Part 4, 5.6.4
 //
 // Note: Starting with v0.5 this method will require a context
 // and the corresponding XXXWithContext(ctx) method will be removed.
@@ -1131,7 +1153,7 @@ func (c *Client) BrowseNextWithContext(ctx context.Context, req *ua.BrowseNextRe
 
 // RegisterNodes registers node ids for more efficient reads.
 //
-// Part 4, Section 5.8.5
+// # Part 4, Section 5.8.5
 //
 // Note: Starting with v0.5 this method will require a context
 // and the corresponding XXXWithContext(ctx) method will be removed.
@@ -1153,7 +1175,7 @@ func (c *Client) RegisterNodesWithContext(ctx context.Context, req *ua.RegisterN
 
 // UnregisterNodes unregisters node ids previously registered with RegisterNodes.
 //
-// Part 4, Section 5.8.6
+// # Part 4, Section 5.8.6
 //
 // Note: Starting with v0.5 this method will require a context
 // and the corresponding XXXWithContext(ctx) method will be removed.

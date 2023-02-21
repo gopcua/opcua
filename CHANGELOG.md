@@ -1,5 +1,32 @@
 # Changelog
 
+## v0.3.11 (1 Feb 2023)
+
+* Decoder fails to decode type which converts to time.Time (#633)
+
+## v0.3.10 (25 Jan 2023)
+
+* drop io/ioutil (#627)
+* uacp: honor the context deadline during the handshake (#629)
+
+## v0.3.9 (12 Jan 2023)
+
+* Ignore empty filename in RemoteCertificateFile (#626)
+
+## v0.3.8 (08 Dec 2022)
+
+* Fix nil subscription stats to return error (#602)
+* `log.Fatal` called when a certificate fails to load (#616)
+* Bump go version to 1.19
+
+## v0.3.7 (05 Oct 2022)
+
+* Stop uasc token expiration timer. Resource leak (#608)
+
+## v0.3.6 (29 Sep 2022)
+
+* Relax node id parser (#607)
+
 ## v0.3.5 (15 Jun 2022)
 
 * Change encryption URI for aes128Sha256RsaOaep to w3.org (#585)
@@ -23,7 +50,6 @@
 ## v0.3.1 (27 Jan 2022)
 
 * Refresh cached namespaces on reconnect (#552)
-
 * Add more `WithContext(ctx)` methods and use context in more places (#555)
 
 ## v0.3.0 (21 Jan 2022)

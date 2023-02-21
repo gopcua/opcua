@@ -8,10 +8,10 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
-	"io/ioutil"
 	"log"
 	"math/rand"
 	"net"
+	"os"
 	"strings"
 	"time"
 
@@ -56,6 +56,18 @@ type Config struct {
 	dialer  *uacp.Dialer
 	sechan  *uasc.Config
 	session *uasc.SessionConfig
+	err     error
+}
+
+func (cfg *Config) setError(err error) {
+	if cfg.err != nil {
+		return
+	}
+	cfg.err = err
+}
+
+func (cfg *Config) Error() error {
+	return cfg.err
 }
 
 // NewDialer creates a uacp.Dialer from the config options
@@ -68,6 +80,8 @@ func NewDialer(cfg *Config) *uacp.Dialer {
 
 // ApplyConfig applies the config options to the default configuration.
 // todo(fs): Can we find a better name?
+//
+// Note: Starting with v0.5 this function will will return an error.
 func ApplyConfig(opts ...Option) *Config {
 	cfg := &Config{
 		sechan:  DefaultClientConfig(),
@@ -160,9 +174,14 @@ func RemoteCertificate(cert []byte) Option {
 // in PEM or DER encoding.
 func RemoteCertificateFile(filename string) Option {
 	return func(cfg *Config) {
+		if filename == "" {
+			return
+		}
+
 		cert, err := loadCertificate(filename)
 		if err != nil {
-			log.Fatal(err)
+			cfg.setError(err)
+			return
 		}
 		cfg.sechan.RemoteCertificate = cert
 	}
@@ -220,14 +239,15 @@ func PrivateKeyFile(filename string) Option {
 		}
 		key, err := loadPrivateKey(filename)
 		if err != nil {
-			log.Fatal(err)
+			cfg.setError(err)
+			return
 		}
 		cfg.sechan.LocalKey = key
 	}
 }
 
 func loadPrivateKey(filename string) (*rsa.PrivateKey, error) {
-	b, err := ioutil.ReadFile(filename)
+	b, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, errors.Errorf("Failed to load private key: %s", err)
 	}
@@ -267,14 +287,15 @@ func CertificateFile(filename string) Option {
 
 		cert, err := loadCertificate(filename)
 		if err != nil {
-			log.Fatal(err)
+			cfg.setError(err)
+			return
 		}
 		setCertificate(cert, cfg)
 	}
 }
 
 func loadCertificate(filename string) ([]byte, error) {
-	b, err := ioutil.ReadFile(filename)
+	b, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, errors.Errorf("Failed to load certificate: %s", err)
 	}
