@@ -1025,9 +1025,10 @@ func (c *Client) ReadWithContext(ctx context.Context, req *ua.ReadRequest) (*ua.
 					continue
 				}
 				val := dv.Value.Value()
-				if eo, ok := val.(*ua.ExtensionObject); ok && eo.Value == nil {
+				eo, ok := val.(*ua.ExtensionObject)
+				if ok && eo.Value == nil {
 					dv.Status = ua.StatusBadDataTypeIDUnknown
-				} else if ua.DecodeExtensionObjectMap(val) == nil {
+				} else if ok && len(ua.DecodeExtensionObjectMap(val)) == 0 {
 					dv.Status = ua.StatusBadDataTypeIDUnknown
 				}
 			}
