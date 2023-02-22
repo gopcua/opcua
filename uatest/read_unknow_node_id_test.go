@@ -38,7 +38,7 @@ func TestReadUnknowNodeID(t *testing.T) {
 		t.Fatal(err)
 	}
 	//This test is no longer valid, because a known type is returned
-	if got, want := resp.Results[0].Status, ua.StatusOK; got != want {
+	if got, want := resp.Results[0].Status, ua.StatusBadDataTypeIDUnknown; got != want {
 		t.Errorf("got status %v want %v for a node with an unknown type", got, want)
 	}
 
