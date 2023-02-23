@@ -17,17 +17,17 @@ const (
 	// this _must_ be a "host" that will silently eat SYNs (no RSTs)
 	// 203.0.113.0/24 is IETF TEST-NET-3
 	tcpNoRstTestServer   = "opc.tcp://203.0.113.0:4840"
-	forceTimeoutDuration = time.Second * 5
+	forceTimeoutDuration = time.Second * 1
 )
 
 func TestClientTimeoutViaOptions(t *testing.T) {
-	c := opcua.NewClient(tcpNoRstTestServer, opcua.DialTimeout(forceTimeoutDuration))
+	c := opcua.NewClient(tcpNoRstTestServer, opcua.DialTimeout(forceTimeoutDuration), opcua.AutoReconnect(false))
 
 	connectAndValidate(t, c, context.Background(), forceTimeoutDuration)
 }
 
 func TestClientTimeoutViaContext(t *testing.T) {
-	c := opcua.NewClient(tcpNoRstTestServer)
+	c := opcua.NewClient(tcpNoRstTestServer, opcua.AutoReconnect(false))
 
 	ctx, cancel := context.WithTimeout(context.Background(), forceTimeoutDuration)
 	defer cancel()

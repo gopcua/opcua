@@ -244,6 +244,28 @@ func (c *Client) Connect(ctx context.Context) (err error) {
 		return err
 	}
 
+	if c.cfg.sechan.AutoReconnect {
+		notifCh := make(chan *PublishNotificationData)
+		sub, err := c.SubscribeWithContext(ctx, &SubscriptionParameters{Interval: time.Duration(time.Millisecond)}, notifCh)
+		if err != nil {
+			return err
+		}
+
+		id, err := ua.ParseNodeID("i=2258")
+		if err != nil {
+			return err
+		}
+		monitorReq := NewMonitoredItemCreateRequestWithDefaults(id, ua.AttributeIDValue, uint32(42))
+		res, err := sub.Monitor(ua.TimestampsToReturnBoth, monitorReq)
+		if err != nil || res.Results[0].StatusCode != ua.StatusOK {
+			return err
+		}
+
+		go func() {
+			for range notifCh {
+			}
+		}()
+	}
 	return nil
 }
 
@@ -445,6 +467,7 @@ func (c *Client) monitor(ctx context.Context) {
 
 						subIDs := c.SubscriptionIDs()
 
+						dlog.Printf("subIDs %d", len(subIDs))
 						availableSeqs = map[uint32][]uint32{}
 						subsToRecreate = nil
 						subsToRepublish = nil
@@ -484,7 +507,7 @@ func (c *Client) monitor(ctx context.Context) {
 						// otherwise restore them.
 						// Assume that subsToRecreate and subsToRepublish have been
 						// populated in the previous step.
-
+						dlog.Printf("subsToRepublish %d", len(subsToRepublish))
 						for _, id := range subsToRepublish {
 							if err := c.republishSubscription(ctx, id, availableSeqs[id]); err != nil {
 								dlog.Printf("republish of subscription %d failed", id)
@@ -492,6 +515,7 @@ func (c *Client) monitor(ctx context.Context) {
 							}
 						}
 
+						dlog.Printf("subsToRecreate %d", len(subsToRecreate))
 						for _, id := range subsToRecreate {
 							if err := c.recreateSubscription(ctx, id); err != nil {
 								dlog.Printf("recreate subscripitions failed: %v", err)
@@ -503,6 +527,7 @@ func (c *Client) monitor(ctx context.Context) {
 						c.setState(Connected)
 						action = none
 
+						dlog.Print("subscriptions restored")
 					case abortReconnect:
 						dlog.Printf("action: abortReconnect")
 
