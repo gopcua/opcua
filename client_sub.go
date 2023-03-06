@@ -376,6 +376,9 @@ publish:
 
 		default:
 			// send publish request and handle response
+			//
+			// publish() blocks until a PublishResponse
+			// is received or the context is cancelled.
 			if err := c.publish(ctx); err != nil {
 				dlog.Print("error: ", err.Error())
 				c.pauseSubscriptions(ctx)
