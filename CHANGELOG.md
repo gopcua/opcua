@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.3.12 (22 Mar 2023)
+
+* set SecureChannel nil in Close() method (#596)
+* Revise error message (#643)
+* dependabot: bump golang.org/x/crypto (#644)
+* If no subscriptions -> monitor infinite loop of reconnections (#597)
+* skip StatusBadNoSubscription in monitor loop (#599)
+* Trigger resumeSubscriptions only if there are subscriptions (#641)
+
 ## v0.3.11 (1 Feb 2023)
 
 * Decoder fails to decode type which converts to time.Time (#633)
