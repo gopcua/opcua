@@ -272,6 +272,12 @@ func (c *Client) monitor(ctx context.Context) {
 				return
 			}
 
+			// the subscriptions don't exist for session.
+			// skip this error and continue monitor loop
+			if errors.Is(err, ua.StatusBadNoSubscription) {
+				continue
+			}
+
 			// tell the handler the connection is disconnected
 			c.setState(Disconnected)
 			dlog.Print("disconnected")
