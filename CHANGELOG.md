@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.3.13 (23 Mar 2023)
+
+* go1.20 (#645)
+* Add missing HistoryRead methods (#586)
+
 ## v0.3.12 (22 Mar 2023)
 
 * set SecureChannel nil in Close() method (#596)
