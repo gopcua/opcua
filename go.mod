@@ -1,6 +1,6 @@
 module github.com/gopcua/opcua
 
-go 1.19
+go 1.20
 
 require (
 	github.com/pascaldekloe/goe v0.1.0
