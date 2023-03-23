@@ -508,6 +508,12 @@ func ReadTimeout(d time.Duration) Option {
 		cfg.dialer.ReadTimeout = d
 	}
 }
+
+// WriteTimeout sets the timeout for every write operation.
+func WriteTimeout(d time.Duration) Option {
+	return func(cfg *Config) {
+		initDialer(cfg)
+		cfg.dialer.WriteTimeout = d
 	}
 }
 
