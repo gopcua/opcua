@@ -235,8 +235,10 @@ var (
 	StatusGoodDataIgnored                                                 StatusCode = 0x00D90000
 	StatusBadRequestNotAllowed                                            StatusCode = 0x80E40000
 	StatusBadRequestNotComplete                                           StatusCode = 0x81130000
+	StatusBadTransactionPending                                           StatusCode = 0x80E80000
 	StatusBadTicketRequired                                               StatusCode = 0x811F0000
 	StatusBadTicketInvalid                                                StatusCode = 0x81200000
+	StatusBadLocked                                                       StatusCode = 0x80E90000
 	StatusGoodEdited                                                      StatusCode = 0x00DC0000
 	StatusGoodPostActionFailed                                            StatusCode = 0x00DD0000
 	StatusUncertainDominantValueChanged                                   StatusCode = 0x40DE0000
@@ -501,7 +503,7 @@ var StatusCodes = map[StatusCode]StatusCodeDesc{
 	StatusGoodEntryReplaced:                                        {Name: "StatusGoodEntryReplaced", Text: "The data or event field was successfully replaced in the historical database."},
 	StatusUncertainDataSubNormal:                                   {Name: "StatusUncertainDataSubNormal", Text: "The value is derived from multiple values and has less than the required number of Good values."},
 	StatusGoodNoData:                                               {Name: "StatusGoodNoData", Text: "No data exists for the requested time range or event filter."},
-	StatusGoodMoreData:                                             {Name: "StatusGoodMoreData", Text: "The data or event field was successfully replaced in the historical database."},
+	StatusGoodMoreData:                                             {Name: "StatusGoodMoreData", Text: "More data is available in the time range beyond the number of values requested."},
 	StatusBadAggregateListMismatch:                                 {Name: "StatusBadAggregateListMismatch", Text: "The requested number of Aggregates does not match the requested number of NodeIds."},
 	StatusBadAggregateNotSupported:                                 {Name: "StatusBadAggregateNotSupported", Text: "The requested Aggregate is not support by the server."},
 	StatusBadAggregateInvalidInputs:                                {Name: "StatusBadAggregateInvalidInputs", Text: "The aggregate value could not be derived due to invalid data inputs."},
@@ -509,8 +511,10 @@ var StatusCodes = map[StatusCode]StatusCodeDesc{
 	StatusGoodDataIgnored:                                          {Name: "StatusGoodDataIgnored", Text: "The request specifies fields which are not valid for the EventType or cannot be saved by the historian."},
 	StatusBadRequestNotAllowed:                                     {Name: "StatusBadRequestNotAllowed", Text: "The request was rejected by the server because it did not meet the criteria set by the server."},
 	StatusBadRequestNotComplete:                                    {Name: "StatusBadRequestNotComplete", Text: "The request has not been processed by the server yet."},
+	StatusBadTransactionPending:                                    {Name: "StatusBadTransactionPending", Text: "The operation is not allowed because a transaction is in progress."},
 	StatusBadTicketRequired:                                        {Name: "StatusBadTicketRequired", Text: "The device identity needs a ticket before it can be accepted."},
 	StatusBadTicketInvalid:                                         {Name: "StatusBadTicketInvalid", Text: "The device identity needs a ticket before it can be accepted."},
+	StatusBadLocked:                                                {Name: "StatusBadLocked", Text: "The requested operation is not allowed, because the Node is locked by a different application."},
 	StatusGoodEdited:                                               {Name: "StatusGoodEdited", Text: "The value does not come from the real source and has been edited by the server."},
 	StatusGoodPostActionFailed:                                     {Name: "StatusGoodPostActionFailed", Text: "There was an error in execution of these post-actions."},
 	StatusUncertainDominantValueChanged:                            {Name: "StatusUncertainDominantValueChanged", Text: "The related EngineeringUnit has been changed but the Variable Value is still provided based on the previous unit."},

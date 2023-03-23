@@ -117,6 +117,66 @@ const (
 	IdentityCriteriaTypeX509Subject       IdentityCriteriaType = 8
 )
 
+type AlarmMask uint16
+
+func AlarmMaskFromString(s string) AlarmMask {
+	switch s {
+	case "None":
+		return 0
+	case "Active":
+		return 1
+	case "Unacknowledged":
+		return 2
+	case "Unconfirmed":
+		return 4
+	default:
+		return 0
+	}
+}
+
+const (
+	AlarmMaskNone           AlarmMask = 0
+	AlarmMaskActive         AlarmMask = 1
+	AlarmMaskUnacknowledged AlarmMask = 2
+	AlarmMaskUnconfirmed    AlarmMask = 4
+)
+
+type TrustListValidationOptions uint32
+
+func TrustListValidationOptionsFromString(s string) TrustListValidationOptions {
+	switch s {
+	case "None":
+		return 0
+	case "SuppressCertificateExpired":
+		return 1
+	case "SuppressHostNameInvalid":
+		return 2
+	case "SuppressRevocationStatusUnknown":
+		return 4
+	case "SuppressIssuerCertificateExpired":
+		return 8
+	case "SuppressIssuerRevocationStatusUnknown":
+		return 16
+	case "CheckRevocationStatusOnline":
+		return 32
+	case "CheckRevocationStatusOffline":
+		return 64
+	default:
+		return 0
+	}
+}
+
+const (
+	TrustListValidationOptionsNone                                  TrustListValidationOptions = 0
+	TrustListValidationOptionsSuppressCertificateExpired            TrustListValidationOptions = 1
+	TrustListValidationOptionsSuppressHostNameInvalid               TrustListValidationOptions = 2
+	TrustListValidationOptionsSuppressRevocationStatusUnknown       TrustListValidationOptions = 4
+	TrustListValidationOptionsSuppressIssuerCertificateExpired      TrustListValidationOptions = 8
+	TrustListValidationOptionsSuppressIssuerRevocationStatusUnknown TrustListValidationOptions = 16
+	TrustListValidationOptionsCheckRevocationStatusOnline           TrustListValidationOptions = 32
+	TrustListValidationOptionsCheckRevocationStatusOffline          TrustListValidationOptions = 64
+)
+
 type TrustListMasks uint32
 
 func TrustListMasksFromString(s string) TrustListMasks {

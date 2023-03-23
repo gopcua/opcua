@@ -97,9 +97,10 @@ type TrustListDataType struct {
 	IssuerCrls          [][]byte
 }
 
-type DecimalDataType struct {
-	Scale int16
-	Value []byte
+type TransactionErrorType struct {
+	TargetID *NodeID
+	Error    StatusCode
+	Message  *LocalizedText
 }
 
 type DataTypeSchemaHeader struct {
@@ -560,6 +561,19 @@ type PriorityMappingEntryType struct {
 	PriorityValue_DSCP uint32
 }
 
+type ReferenceDescriptionDataType struct {
+	SourceNode    *NodeID
+	ReferenceType *NodeID
+	IsForward     bool
+	TargetNode    *ExpandedNodeID
+}
+
+type ReferenceListEntryDataType struct {
+	ReferenceType *NodeID
+	IsForward     bool
+	TargetNode    *ExpandedNodeID
+}
+
 type RolePermissionType struct {
 	RoleID      *NodeID
 	Permissions PermissionType
@@ -586,191 +600,6 @@ type StructureDefinition struct {
 
 type EnumDefinition struct {
 	Fields []*EnumField
-}
-
-type Node struct {
-	NodeID              *NodeID
-	NodeClass           NodeClass
-	BrowseName          *QualifiedName
-	DisplayName         *LocalizedText
-	Description         *LocalizedText
-	WriteMask           uint32
-	UserWriteMask       uint32
-	RolePermissions     []*RolePermissionType
-	UserRolePermissions []*RolePermissionType
-	AccessRestrictions  uint16
-	References          []*ReferenceNode
-}
-
-type InstanceNode struct {
-	NodeID              *NodeID
-	NodeClass           NodeClass
-	BrowseName          *QualifiedName
-	DisplayName         *LocalizedText
-	Description         *LocalizedText
-	WriteMask           uint32
-	UserWriteMask       uint32
-	RolePermissions     []*RolePermissionType
-	UserRolePermissions []*RolePermissionType
-	AccessRestrictions  uint16
-	References          []*ReferenceNode
-}
-
-type TypeNode struct {
-	NodeID              *NodeID
-	NodeClass           NodeClass
-	BrowseName          *QualifiedName
-	DisplayName         *LocalizedText
-	Description         *LocalizedText
-	WriteMask           uint32
-	UserWriteMask       uint32
-	RolePermissions     []*RolePermissionType
-	UserRolePermissions []*RolePermissionType
-	AccessRestrictions  uint16
-	References          []*ReferenceNode
-}
-
-type ObjectNode struct {
-	NodeID              *NodeID
-	NodeClass           NodeClass
-	BrowseName          *QualifiedName
-	DisplayName         *LocalizedText
-	Description         *LocalizedText
-	WriteMask           uint32
-	UserWriteMask       uint32
-	RolePermissions     []*RolePermissionType
-	UserRolePermissions []*RolePermissionType
-	AccessRestrictions  uint16
-	References          []*ReferenceNode
-	EventNotifier       uint8
-}
-
-type ObjectTypeNode struct {
-	NodeID              *NodeID
-	NodeClass           NodeClass
-	BrowseName          *QualifiedName
-	DisplayName         *LocalizedText
-	Description         *LocalizedText
-	WriteMask           uint32
-	UserWriteMask       uint32
-	RolePermissions     []*RolePermissionType
-	UserRolePermissions []*RolePermissionType
-	AccessRestrictions  uint16
-	References          []*ReferenceNode
-	IsAbstract          bool
-}
-
-type VariableNode struct {
-	NodeID                  *NodeID
-	NodeClass               NodeClass
-	BrowseName              *QualifiedName
-	DisplayName             *LocalizedText
-	Description             *LocalizedText
-	WriteMask               uint32
-	UserWriteMask           uint32
-	RolePermissions         []*RolePermissionType
-	UserRolePermissions     []*RolePermissionType
-	AccessRestrictions      uint16
-	References              []*ReferenceNode
-	Value                   *Variant
-	DataType                *NodeID
-	ValueRank               int32
-	ArrayDimensions         []uint32
-	AccessLevel             uint8
-	UserAccessLevel         uint8
-	MinimumSamplingInterval float64
-	Historizing             bool
-	AccessLevelEx           uint32
-}
-
-type VariableTypeNode struct {
-	NodeID              *NodeID
-	NodeClass           NodeClass
-	BrowseName          *QualifiedName
-	DisplayName         *LocalizedText
-	Description         *LocalizedText
-	WriteMask           uint32
-	UserWriteMask       uint32
-	RolePermissions     []*RolePermissionType
-	UserRolePermissions []*RolePermissionType
-	AccessRestrictions  uint16
-	References          []*ReferenceNode
-	Value               *Variant
-	DataType            *NodeID
-	ValueRank           int32
-	ArrayDimensions     []uint32
-	IsAbstract          bool
-}
-
-type ReferenceTypeNode struct {
-	NodeID              *NodeID
-	NodeClass           NodeClass
-	BrowseName          *QualifiedName
-	DisplayName         *LocalizedText
-	Description         *LocalizedText
-	WriteMask           uint32
-	UserWriteMask       uint32
-	RolePermissions     []*RolePermissionType
-	UserRolePermissions []*RolePermissionType
-	AccessRestrictions  uint16
-	References          []*ReferenceNode
-	IsAbstract          bool
-	Symmetric           bool
-	InverseName         *LocalizedText
-}
-
-type MethodNode struct {
-	NodeID              *NodeID
-	NodeClass           NodeClass
-	BrowseName          *QualifiedName
-	DisplayName         *LocalizedText
-	Description         *LocalizedText
-	WriteMask           uint32
-	UserWriteMask       uint32
-	RolePermissions     []*RolePermissionType
-	UserRolePermissions []*RolePermissionType
-	AccessRestrictions  uint16
-	References          []*ReferenceNode
-	Executable          bool
-	UserExecutable      bool
-}
-
-type ViewNode struct {
-	NodeID              *NodeID
-	NodeClass           NodeClass
-	BrowseName          *QualifiedName
-	DisplayName         *LocalizedText
-	Description         *LocalizedText
-	WriteMask           uint32
-	UserWriteMask       uint32
-	RolePermissions     []*RolePermissionType
-	UserRolePermissions []*RolePermissionType
-	AccessRestrictions  uint16
-	References          []*ReferenceNode
-	ContainsNoLoops     bool
-	EventNotifier       uint8
-}
-
-type DataTypeNode struct {
-	NodeID              *NodeID
-	NodeClass           NodeClass
-	BrowseName          *QualifiedName
-	DisplayName         *LocalizedText
-	Description         *LocalizedText
-	WriteMask           uint32
-	UserWriteMask       uint32
-	RolePermissions     []*RolePermissionType
-	UserRolePermissions []*RolePermissionType
-	AccessRestrictions  uint16
-	References          []*ReferenceNode
-	IsAbstract          bool
-	DataTypeDefinition  *ExtensionObject
-}
-
-type ReferenceNode struct {
-	ReferenceTypeID *NodeID
-	IsInverse       bool
-	TargetID        *ExpandedNodeID
 }
 
 type Argument struct {
