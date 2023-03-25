@@ -78,6 +78,19 @@ We would also like to list organizations which use `gopcua` in production. Pleas
    </a>
 </p>
 
+<p align="left">
+   <a href="https://umh.docs.umh.app">
+      <img alt="united manufacturing hub" width="10%" src="logo/united-manufacturing-hub.jpg">
+   </a>
+</p>
+
+### Projects using gopcua
+
+`gopcua` is not only utilized in production environments, but it also serves as a critical component in other larger projects. Here are some projects that rely on `gopcua` for their functionality:
+
+- [Telegraf](https://github.com/influxdata/telegraf): This plugin-driven server agent is used for collecting and sending metrics. It leverages `gopcua` to extract data from OPC-UA servers and insert it into InfluxDB. Telegraf supports both polling and subscribing methods for data acquisition.
+- [benthos-umh](https://github.com/united-manufacturing-hub/benthos-umh): This project is built upon the [benthos](https://github.com/benthosdev/benthos) stream-processing framework. It utilizes `gopcua` to extract data from OPC-UA servers and forwards the information to MQTT or Kafka brokers. benthos-umh currently supports polling for data collection.
+
 ## Disclaimer
 
 We are still actively working on this project and the APIs will change.
