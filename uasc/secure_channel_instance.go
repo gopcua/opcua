@@ -170,10 +170,20 @@ func (c *channelInstance) signAndEncrypt(m *Message, b []byte) ([]byte, error) {
 	var encryptedLength int
 	if c.sc.cfg.SecurityMode == ua.MessageSecurityModeSignAndEncrypt || isAsymmetric {
 		plaintextBlockSize := c.algo.PlaintextBlockSize()
-		paddingLength := plaintextBlockSize - ((len(b[headerLength:]) + c.algo.SignatureLength() + 1) % plaintextBlockSize)
+		extraPadding := c.algo.RemoteSignatureLength() > 256
+		var paddingBytes int
+		if extraPadding {
+			paddingBytes = 2
+		} else {
+			paddingBytes = 1
+		}
+		paddingLength := plaintextBlockSize - ((len(b[headerLength:]) + c.algo.SignatureLength() + paddingBytes) % plaintextBlockSize)
 
 		for i := 0; i <= paddingLength; i++ {
 			b = append(b, byte(paddingLength))
+		}
+		if extraPadding {
+			b = append(b, byte(paddingLength>>8))
 		}
 		encryptedLength = ((len(b[headerLength:]) + c.algo.SignatureLength()) / plaintextBlockSize) * c.algo.BlockSize()
 	} else { // MessageSecurityModeSign
@@ -235,7 +245,13 @@ func (c *channelInstance) verifyAndDecrypt(m *MessageChunk, r []byte) ([]byte, e
 
 	var paddingLength int
 	if c.sc.cfg.SecurityMode == ua.MessageSecurityModeSignAndEncrypt || isAsymmetric {
-		paddingLength = int(messageToVerify[len(messageToVerify)-1]) + 1
+		paddingLength = int(messageToVerify[len(messageToVerify)-1])
+		if c.algo.SignatureLength() > 256 {
+			paddingLength <<= 8
+			paddingLength += int(messageToVerify[len(messageToVerify)-2])
+			paddingLength += 1
+		}
+		paddingLength += 1
 	}
 
 	b = messageToVerify[headerLength : len(messageToVerify)-paddingLength]
