@@ -46,7 +46,7 @@ func encode(val reflect.Value, name string) ([]byte, error) {
 		return v.Encode()
 
 	case isTime(val):
-		buf.WriteTime(val.Interface().(time.Time))
+		buf.WriteTime(val.Convert(timeType).Interface().(time.Time))
 
 	default:
 		switch val.Kind() {

@@ -133,6 +133,15 @@ type Client struct {
 
 	// monitorOnce ensures only one connection monitor is running
 	monitorOnce sync.Once
+
+	// cfgerr contains an error that was captured in ApplyConfig.
+	// Since the API does not allow to bubble the error up in NewClient
+	// and we don't want to break existing code right away we carry the
+	// error here and bubble it up during Dial and Connect.
+	//
+	// Note: Starting with v0.5 NewClient will return the error and this
+	// variable needs to be removed.
+	cfgerr error
 }
 
 // NewClient creates a new Client.
@@ -146,6 +155,8 @@ type Client struct {
 // #Option for details.
 //
 // https://godoc.org/github.com/gopcua/opcua#Option
+//
+// Note: Starting with v0.5 this function will will return an error.
 func NewClient(endpoint string, opts ...Option) *Client {
 	cfg := ApplyConfig(opts...)
 	c := Client{
@@ -156,6 +167,7 @@ func NewClient(endpoint string, opts ...Option) *Client {
 		pendingAcks: make([]*ua.SubscriptionAcknowledgement, 0),
 		pausech:     make(chan struct{}, 2),
 		resumech:    make(chan struct{}, 2),
+		cfgerr:      cfg.Error(), // todo(fs): remove with v0.5.0 and return the error
 	}
 	c.pauseSubscriptions(context.Background())
 	c.setPublishTimeout(uasc.MaxTimeout)
@@ -182,6 +194,11 @@ const (
 
 // Connect establishes a secure channel and creates a new session.
 func (c *Client) Connect(ctx context.Context) (err error) {
+	// todo(fs): remove with v0.5.0
+	if c.cfgerr != nil {
+		return c.cfgerr
+	}
+
 	if c.SecureChannel() != nil {
 		return errors.Errorf("already connected")
 	}
@@ -255,6 +272,12 @@ func (c *Client) monitor(ctx context.Context) {
 				return
 			}
 
+			// the subscriptions don't exist for session.
+			// skip this error and continue monitor loop
+			if errors.Is(err, ua.StatusBadNoSubscription) {
+				continue
+			}
+
 			// tell the handler the connection is disconnected
 			c.setState(Disconnected)
 			dlog.Print("disconnected")
@@ -303,9 +326,10 @@ func (c *Client) monitor(ctx context.Context) {
 			c.pauseSubscriptions(ctx)
 
 			var (
-				subsToRepublish []uint32 // subscription ids for which to send republish requests
-				subsToRecreate  []uint32 // subscription ids which need to be recreated as new subscriptions
-				availableSeqs   map[uint32][]uint32
+				subsToRepublish []uint32            // subscription ids for which to send republish requests
+				subsToRecreate  []uint32            // subscription ids which need to be recreated as new subscriptions
+				availableSeqs   map[uint32][]uint32 // available sequence numbers per subscription
+				activeSubs      int                 // number of active subscriptions to resume/recreate
 			)
 
 			for action != none {
@@ -468,11 +492,13 @@ func (c *Client) monitor(ctx context.Context) {
 						// Assume that subsToRecreate and subsToRepublish have been
 						// populated in the previous step.
 
+						activeSubs = 0
 						for _, id := range subsToRepublish {
 							if err := c.republishSubscription(ctx, id, availableSeqs[id]); err != nil {
 								dlog.Printf("republish of subscription %d failed", id)
 								subsToRecreate = append(subsToRecreate, id)
 							}
+							activeSubs++
 						}
 
 						for _, id := range subsToRecreate {
@@ -481,6 +507,7 @@ func (c *Client) monitor(ctx context.Context) {
 								action = recreateSession
 								continue
 							}
+							activeSubs++
 						}
 
 						c.setState(Connected)
@@ -504,15 +531,25 @@ func (c *Client) monitor(ctx context.Context) {
 				<-c.sechanErr
 			}
 
-			dlog.Printf("resuming subscriptions")
-			c.resumeSubscriptions(ctx)
-			dlog.Printf("resumed subscriptions")
+			switch {
+			case activeSubs > 0:
+				dlog.Printf("resuming %d subscriptions", activeSubs)
+				c.resumeSubscriptions(ctx)
+				dlog.Printf("resumed %d subscriptions", activeSubs)
+			default:
+				dlog.Printf("no subscriptions to resume")
+			}
 		}
 	}
 }
 
 // Dial establishes a secure channel.
 func (c *Client) Dial(ctx context.Context) error {
+	// todo(fs): remove with v0.5.0
+	if c.cfgerr != nil {
+		return c.cfgerr
+	}
+
 	stats.Client().Add("Dial", 1)
 
 	if c.SecureChannel() != nil {
@@ -563,6 +600,7 @@ func (c *Client) CloseWithContext(ctx context.Context) error {
 	}
 	if c.SecureChannel() != nil {
 		c.SecureChannel().Close()
+		c.setSecureChannel(nil)
 	}
 
 	// https://github.com/gopcua/opcua/pull/462
@@ -663,7 +701,7 @@ type Session struct {
 // that the server sent in Create Session Response. The default PolicyID
 // "Anonymous" wii be set if it's missing in response.
 //
-// See Part 4, 5.6.2
+// # See Part 4, 5.6.2
 //
 // Note: Starting with v0.5 this method will require a context
 // and the corresponding XXXWithContext(ctx) method will be removed.
@@ -755,7 +793,7 @@ func anonymousPolicyID(endpoints []*ua.EndpointDescription) string {
 // the client already has a session it will be closed. To retain the current
 // session call DetachSession.
 //
-// See Part 4, 5.6.3
+// # See Part 4, 5.6.3
 //
 // Note: Starting with v0.5 this method will require a context
 // and the corresponding XXXWithContext(ctx) method will be removed.
@@ -838,7 +876,7 @@ func (c *Client) ActivateSessionWithContext(ctx context.Context, s *Session) err
 
 // CloseSession closes the current session.
 //
-// See Part 4, 5.6.4
+// # See Part 4, 5.6.4
 //
 // Note: Starting with v0.5 this method will require a context
 // and the corresponding XXXWithContext(ctx) method will be removed.
@@ -1131,7 +1169,7 @@ func (c *Client) BrowseNextWithContext(ctx context.Context, req *ua.BrowseNextRe
 
 // RegisterNodes registers node ids for more efficient reads.
 //
-// Part 4, Section 5.8.5
+// # Part 4, Section 5.8.5
 //
 // Note: Starting with v0.5 this method will require a context
 // and the corresponding XXXWithContext(ctx) method will be removed.
@@ -1153,7 +1191,7 @@ func (c *Client) RegisterNodesWithContext(ctx context.Context, req *ua.RegisterN
 
 // UnregisterNodes unregisters node ids previously registered with RegisterNodes.
 //
-// Part 4, Section 5.8.6
+// # Part 4, Section 5.8.6
 //
 // Note: Starting with v0.5 this method will require a context
 // and the corresponding XXXWithContext(ctx) method will be removed.
@@ -1167,6 +1205,36 @@ func (c *Client) UnregisterNodesWithContext(ctx context.Context, req *ua.Unregis
 	stats.Client().Add("NodesToUnregister", int64(len(req.NodesToUnregister)))
 
 	var res *ua.UnregisterNodesResponse
+	err := c.SendWithContext(ctx, req, func(v interface{}) error {
+		return safeAssign(v, &res)
+	})
+	return res, err
+}
+
+// Note: Starting with v0.5 this method will require a context
+// and the corresponding XXXWithContext(ctx) method will be removed.
+func (c *Client) HistoryReadEvent(nodes []*ua.HistoryReadValueID, details *ua.ReadEventDetails) (*ua.HistoryReadResponse, error) {
+	return c.HistoryReadEventWithContext(context.Background(), nodes, details)
+}
+
+// Note: Starting with v0.5 this method is superseded by the non 'WithContext' method.
+func (c *Client) HistoryReadEventWithContext(ctx context.Context, nodes []*ua.HistoryReadValueID, details *ua.ReadEventDetails) (*ua.HistoryReadResponse, error) {
+	stats.Client().Add("HistoryReadEvent", 1)
+	stats.Client().Add("HistoryReadValueID", int64(len(nodes)))
+
+	// Part 4, 5.10.3 HistoryRead
+	req := &ua.HistoryReadRequest{
+		TimestampsToReturn: ua.TimestampsToReturnBoth,
+		NodesToRead:        nodes,
+		// Part 11, 6.4 HistoryReadDetails parameters
+		HistoryReadDetails: &ua.ExtensionObject{
+			TypeID:       ua.NewFourByteExpandedNodeID(0, id.ReadEventDetails_Encoding_DefaultBinary),
+			EncodingMask: ua.ExtensionObjectBinary,
+			Value:        details,
+		},
+	}
+
+	var res *ua.HistoryReadResponse
 	err := c.SendWithContext(ctx, req, func(v interface{}) error {
 		return safeAssign(v, &res)
 	})
@@ -1191,6 +1259,66 @@ func (c *Client) HistoryReadRawModifiedWithContext(ctx context.Context, nodes []
 		// Part 11, 6.4 HistoryReadDetails parameters
 		HistoryReadDetails: &ua.ExtensionObject{
 			TypeID:       ua.NewFourByteExpandedNodeID(0, id.ReadRawModifiedDetails_Encoding_DefaultBinary),
+			EncodingMask: ua.ExtensionObjectBinary,
+			Value:        details,
+		},
+	}
+
+	var res *ua.HistoryReadResponse
+	err := c.SendWithContext(ctx, req, func(v interface{}) error {
+		return safeAssign(v, &res)
+	})
+	return res, err
+}
+
+// Note: Starting with v0.5 this method will require a context
+// and the corresponding XXXWithContext(ctx) method will be removed.
+func (c *Client) HistoryReadProcessed(nodes []*ua.HistoryReadValueID, details *ua.ReadProcessedDetails) (*ua.HistoryReadResponse, error) {
+	return c.HistoryReadProcessedWithContext(context.Background(), nodes, details)
+}
+
+// Note: Starting with v0.5 this method is superseded by the non 'WithContext' method.
+func (c *Client) HistoryReadProcessedWithContext(ctx context.Context, nodes []*ua.HistoryReadValueID, details *ua.ReadProcessedDetails) (*ua.HistoryReadResponse, error) {
+	stats.Client().Add("HistoryReadProcessed", 1)
+	stats.Client().Add("HistoryReadValueID", int64(len(nodes)))
+
+	// Part 4, 5.10.3 HistoryRead
+	req := &ua.HistoryReadRequest{
+		TimestampsToReturn: ua.TimestampsToReturnBoth,
+		NodesToRead:        nodes,
+		// Part 11, 6.4 HistoryReadDetails parameters
+		HistoryReadDetails: &ua.ExtensionObject{
+			TypeID:       ua.NewFourByteExpandedNodeID(0, id.ReadProcessedDetails_Encoding_DefaultBinary),
+			EncodingMask: ua.ExtensionObjectBinary,
+			Value:        details,
+		},
+	}
+
+	var res *ua.HistoryReadResponse
+	err := c.SendWithContext(ctx, req, func(v interface{}) error {
+		return safeAssign(v, &res)
+	})
+	return res, err
+}
+
+// Note: Starting with v0.5 this method will require a context
+// and the corresponding XXXWithContext(ctx) method will be removed.
+func (c *Client) HistoryReadAtTime(nodes []*ua.HistoryReadValueID, details *ua.ReadAtTimeDetails) (*ua.HistoryReadResponse, error) {
+	return c.HistoryReadAtTimeWithContext(context.Background(), nodes, details)
+}
+
+// Note: Starting with v0.5 this method is superseded by the non 'WithContext' method.
+func (c *Client) HistoryReadAtTimeWithContext(ctx context.Context, nodes []*ua.HistoryReadValueID, details *ua.ReadAtTimeDetails) (*ua.HistoryReadResponse, error) {
+	stats.Client().Add("HistoryReadAtTime", 1)
+	stats.Client().Add("HistoryReadValueID", int64(len(nodes)))
+
+	// Part 4, 5.10.3 HistoryRead
+	req := &ua.HistoryReadRequest{
+		TimestampsToReturn: ua.TimestampsToReturnBoth,
+		NodesToRead:        nodes,
+		//Part 11, 6.4.5 ReadAtTimeDetails parameters
+		HistoryReadDetails: &ua.ExtensionObject{
+			TypeID:       ua.NewFourByteExpandedNodeID(0, id.ReadAtTimeDetails_Encoding_DefaultBinary),
 			EncodingMask: ua.ExtensionObjectBinary,
 			Value:        details,
 		},

@@ -23,7 +23,7 @@ func isBinaryDecoder(val reflect.Value) bool {
 }
 
 func isTime(val reflect.Value) bool {
-	return val.Type() == timeType
+	return val.CanConvert(timeType)
 }
 
 type BinaryDecoder interface {
@@ -49,7 +49,7 @@ func decode(b []byte, val reflect.Value, name string) (n int, err error) {
 		v := val.Interface().(BinaryDecoder)
 		return v.Decode(b)
 	case isTime(val):
-		val.Set(reflect.ValueOf(buf.ReadTime()))
+		val.Set(reflect.ValueOf(buf.ReadTime()).Convert(val.Type()))
 	default:
 		// fmt.Printf("decode: %s is a %s\n", name, val.Kind())
 		switch val.Kind() {

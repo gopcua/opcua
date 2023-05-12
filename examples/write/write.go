@@ -57,7 +57,7 @@ func main() {
 
 	resp, err := c.WriteWithContext(ctx, req)
 	if err != nil {
-		log.Fatalf("Read failed: %s", err)
+		log.Fatalf("Write failed: %s", err)
 	}
 	log.Printf("%v", resp.Results[0])
 }
