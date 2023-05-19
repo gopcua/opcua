@@ -62,7 +62,9 @@ func (c *conditionLocker) unlock() {
 func (c *conditionLocker) waitIfLock() {
 	c.lockMu.Lock()
 	for c.bLock {
+		c.lockMu.Unlock()
 		c.lockCnd.Wait()
+		c.lockMu.Lock()
 	}
 	c.lockMu.Unlock()
 }
@@ -671,6 +673,8 @@ func (s *SecureChannel) sendRequestWithTimeout(
 	ch, err := s.sendAsyncWithTimeout(ctx, req, reqID, instance, authToken, respRequired, timeout)
 	s.pendingReq.Done()
 	if err != nil {
+		// todo(do): what about EOF?
+		// or any other sync error from socket write ???
 		return err
 	}
 
