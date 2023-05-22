@@ -43,11 +43,10 @@ func (s *Stats) Reset() {
 
 // RecordError updates the metric for an error by one.
 func (s *Stats) RecordError(err error) {
-	if err == nil {
-		return
-	}
 	var code ua.StatusCode
 	switch {
+	case err == nil:
+		return
 	case errors.Is(err, io.EOF):
 		s.Error.Add("io.EOF", 1)
 	case errors.Is(err, ua.StatusOK):
