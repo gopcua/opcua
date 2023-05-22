@@ -193,7 +193,7 @@ const (
 )
 
 // Connect establishes a secure channel and creates a new session.
-func (c *Client) Connect(ctx context.Context) (err error) {
+func (c *Client) Connect(ctx context.Context) error {
 	// todo(fs): remove with v0.5.0
 	if c.cfgerr != nil {
 		return c.cfgerr
