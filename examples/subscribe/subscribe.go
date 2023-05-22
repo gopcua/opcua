@@ -47,6 +47,7 @@ func main() {
 	if ep == nil {
 		log.Fatal("Failed to find suitable endpoint")
 	}
+	ep.EndpointURL = *endpoint
 
 	fmt.Println("*", ep.SecurityPolicyURI, ep.SecurityMode)
 
