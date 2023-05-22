@@ -321,8 +321,6 @@ func (c *Client) monitor(ctx context.Context) {
 				action = createSecureChannel
 			}
 
-			c.setState(Disconnected)
-
 			c.pauseSubscriptions(ctx)
 
 			var (
