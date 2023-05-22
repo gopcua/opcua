@@ -697,6 +697,15 @@ type Session struct {
 	// Session response. Used to generate the signatures for the ActivateSessionRequest
 	// and User Authorization
 	serverNonce []byte
+
+	// revisedTimeout is the actual maximum time that a Session shall remain open without activity.
+	revisedTimeout time.Duration
+}
+
+// RevisedTimeout return actual maximum time that a Session shall remain open without activity.
+// This value is provided by the server in response to CreateSession.
+func (s *Session) RevisedTimeout() time.Duration {
+	return s.revisedTimeout
 }
 
 // CreateSession creates a new session which is not yet activated and not
@@ -771,6 +780,7 @@ func (c *Client) CreateSessionWithContext(ctx context.Context, cfg *uasc.Session
 			resp:              res,
 			serverNonce:       res.ServerNonce,
 			serverCertificate: res.ServerCertificate,
+			revisedTimeout:    time.Duration(res.RevisedSessionTimeout) * time.Millisecond,
 		}
 
 		return nil
