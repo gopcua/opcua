@@ -1029,7 +1029,6 @@ func (c *Client) ReadWithContext(ctx context.Context, req *ua.ReadRequest) (*ua.
 	var res *ua.ReadResponse
 	err := c.SendWithContext(ctx, req, func(v interface{}) error {
 		err := safeAssign(v, &res)
-
 		if err != nil {
 			return err
 		}
