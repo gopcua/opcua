@@ -193,7 +193,7 @@ const (
 )
 
 // Connect establishes a secure channel and creates a new session.
-func (c *Client) Connect(ctx context.Context) (err error) {
+func (c *Client) Connect(ctx context.Context) error {
 	// todo(fs): remove with v0.5.0
 	if c.cfgerr != nil {
 		return c.cfgerr
@@ -321,8 +321,6 @@ func (c *Client) monitor(ctx context.Context) {
 				action = createSecureChannel
 			}
 
-			c.setState(Disconnected)
-
 			c.pauseSubscriptions(ctx)
 
 			var (
@@ -387,6 +385,8 @@ func (c *Client) monitor(ctx context.Context) {
 						// This only works if the session is still open on the server
 						// otherwise recreate it
 
+						c.setState(Reconnecting)
+
 						s := c.Session()
 						if s == nil {
 							dlog.Printf("no session to restore")
@@ -416,6 +416,7 @@ func (c *Client) monitor(ctx context.Context) {
 					case recreateSession:
 						dlog.Printf("action: recreateSession")
 
+						c.setState(Reconnecting)
 						// create a new session to replace the previous one
 
 						dlog.Printf("trying to recreate session")
@@ -460,6 +461,12 @@ func (c *Client) monitor(ctx context.Context) {
 						// recreate them all if that fails.
 						res, err := c.transferSubscriptions(ctx, subIDs)
 						switch {
+
+						case errors.Is(err, ua.StatusBadServiceUnsupported):
+							dlog.Printf("transfer subscriptions not supported. Recreating all subscriptions: %v", err)
+							subsToRepublish = nil
+							subsToRecreate = subIDs
+
 						case err != nil:
 							dlog.Printf("transfer subscriptions failed. Recreating all subscriptions: %v", err)
 							subsToRepublish = nil
@@ -690,6 +697,15 @@ type Session struct {
 	// Session response. Used to generate the signatures for the ActivateSessionRequest
 	// and User Authorization
 	serverNonce []byte
+
+	// revisedTimeout is the actual maximum time that a Session shall remain open without activity.
+	revisedTimeout time.Duration
+}
+
+// RevisedTimeout return actual maximum time that a Session shall remain open without activity.
+// This value is provided by the server in response to CreateSession.
+func (s *Session) RevisedTimeout() time.Duration {
+	return s.revisedTimeout
 }
 
 // CreateSession creates a new session which is not yet activated and not
@@ -764,6 +780,7 @@ func (c *Client) CreateSessionWithContext(ctx context.Context, cfg *uasc.Session
 			resp:              res,
 			serverNonce:       res.ServerNonce,
 			serverCertificate: res.ServerCertificate,
+			revisedTimeout:    time.Duration(res.RevisedSessionTimeout) * time.Millisecond,
 		}
 
 		return nil

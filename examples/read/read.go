@@ -6,8 +6,11 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
+	"io"
 	"log"
+	"time"
 
 	"github.com/gopcua/opcua"
 	"github.com/gopcua/opcua/debug"
@@ -44,12 +47,44 @@ func main() {
 		TimestampsToReturn: ua.TimestampsToReturnBoth,
 	}
 
-	resp, err := c.ReadWithContext(ctx, req)
-	if err != nil {
-		log.Fatalf("Read failed: %s", err)
+	var resp *ua.ReadResponse
+	for {
+		resp, err = c.ReadWithContext(ctx, req)
+		if err == nil {
+			break
+		}
+
+		// Following switch contains known errors that can be retried by the user.
+		// Best practice is to do it on read operations.
+		switch {
+		case err == io.EOF && c.State() != opcua.Closed:
+			// has to be retried unless user closed the connection
+			time.After(1 * time.Second)
+			continue
+
+		case errors.Is(err, ua.StatusBadSessionIDInvalid):
+			// Session is not activated has to be retried. Session will be recreated internally.
+			time.After(1 * time.Second)
+			continue
+
+		case errors.Is(err, ua.StatusBadSessionNotActivated):
+			// Session is invalid has to be retried. Session will be recreated internally.
+			time.After(1 * time.Second)
+			continue
+
+		case errors.Is(err, ua.StatusBadSecureChannelIDInvalid):
+			// secure channel will be recreated internally.
+			time.After(1 * time.Second)
+			continue
+
+		default:
+			log.Fatalf("Read failed: %s", err)
+		}
 	}
-	if resp.Results[0].Status != ua.StatusOK {
+
+	if resp != nil && resp.Results[0].Status != ua.StatusOK {
 		log.Fatalf("Status not OK: %v", resp.Results[0].Status)
 	}
+
 	log.Printf("%#v", resp.Results[0].Value.Value())
 }
