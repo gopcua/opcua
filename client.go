@@ -385,6 +385,8 @@ func (c *Client) monitor(ctx context.Context) {
 						// This only works if the session is still open on the server
 						// otherwise recreate it
 
+						c.setState(Reconnecting)
+
 						s := c.Session()
 						if s == nil {
 							dlog.Printf("no session to restore")
@@ -414,6 +416,7 @@ func (c *Client) monitor(ctx context.Context) {
 					case recreateSession:
 						dlog.Printf("action: recreateSession")
 
+						c.setState(Reconnecting)
 						// create a new session to replace the previous one
 
 						dlog.Printf("trying to recreate session")
