@@ -408,6 +408,10 @@ func (c *Client) publish(ctx context.Context) error {
 		dlog.Printf("error: session not active. pausing publish loop")
 		return err
 
+	case err == ua.StatusBadSessionIDInvalid:
+		dlog.Printf("error: session not valid. pausing publish loop")
+		return err
+
 	case err == ua.StatusBadServerNotConnected:
 		dlog.Printf("error: no connection. pausing publish loop")
 		return err
