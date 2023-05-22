@@ -461,6 +461,12 @@ func (c *Client) monitor(ctx context.Context) {
 						// recreate them all if that fails.
 						res, err := c.transferSubscriptions(ctx, subIDs)
 						switch {
+
+						case errors.Is(err, ua.StatusBadServiceUnsupported):
+							dlog.Printf("transfer subscriptions not supported. Recreating all subscriptions: %v", err)
+							subsToRepublish = nil
+							subsToRecreate = subIDs
+
 						case err != nil:
 							dlog.Printf("transfer subscriptions failed. Recreating all subscriptions: %v", err)
 							subsToRepublish = nil
