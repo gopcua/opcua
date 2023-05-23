@@ -171,11 +171,9 @@ func (c *channelInstance) signAndEncrypt(m *Message, b []byte) ([]byte, error) {
 	if c.sc.cfg.SecurityMode == ua.MessageSecurityModeSignAndEncrypt || isAsymmetric {
 		plaintextBlockSize := c.algo.PlaintextBlockSize()
 		extraPadding := c.algo.RemoteSignatureLength() > 256
-		var paddingBytes int
+		paddingBytes := 1
 		if extraPadding {
 			paddingBytes = 2
-		} else {
-			paddingBytes = 1
 		}
 		paddingLength := plaintextBlockSize - ((len(b[headerLength:]) + c.algo.SignatureLength() + paddingBytes) % plaintextBlockSize)
 
