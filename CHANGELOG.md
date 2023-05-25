@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.3.15 (25 May 2023)
+
+* Panic in secure_channel.go (#640)
+
 ## v0.3.14 (22 May 2023)
 
 * Remove 'if err == nil' anti-pattern (#652)
