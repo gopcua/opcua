@@ -171,14 +171,21 @@ func (c *Client) sendRepublishRequests(ctx context.Context, sub *Subscription, a
 			req.RetransmitSequenceNumber,
 		)
 
-		if c.sessionClosed() {
+		s := c.Session()
+		if s == nil {
 			debug.Printf("Republishing subscription %d aborted", req.SubscriptionID)
 			return ua.StatusBadSessionClosed
 		}
 
+		sc := c.SecureChannel()
+		if sc == nil {
+			debug.Printf("Republishing subscription %d aborted", req.SubscriptionID)
+			return ua.StatusBadNotConnected
+		}
+
 		debug.Printf("RepublishRequest: req=%s", debug.ToJSON(req))
 		var res *ua.RepublishResponse
-		err := c.SecureChannel().SendRequestWithContext(ctx, req, c.Session().resp.AuthenticationToken, func(v interface{}) error {
+		err := sc.SendRequestWithContext(ctx, req, s.resp.AuthenticationToken, func(v interface{}) error {
 			return safeAssign(v, &res)
 		})
 		debug.Printf("RepublishResponse: res=%s err=%v", debug.ToJSON(res), err)
