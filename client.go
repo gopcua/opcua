@@ -660,6 +660,8 @@ func (c *Client) setPublishTimeout(d time.Duration) {
 }
 
 // SecureChannel returns the active secure channel.
+// During reconnect this value can change.
+// Make sure to capture the value in a method before using it.
 func (c *Client) SecureChannel() *uasc.SecureChannel {
 	return c.atomicSechan.Load().(*uasc.SecureChannel)
 }
@@ -670,6 +672,8 @@ func (c *Client) setSecureChannel(sc *uasc.SecureChannel) {
 }
 
 // Session returns the active session.
+// During reconnect this value can change.
+// Make sure to capture the value in a method before using it.
 func (c *Client) Session() *Session {
 	return c.atomicSession.Load().(*Session)
 }
