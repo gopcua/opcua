@@ -222,7 +222,7 @@ func (c *Client) Connect(ctx context.Context) error {
 	}
 
 	if err := c.ActivateSessionWithContext(ctx, s); err != nil {
-		c.setSession(s)
+		c.closeSession(ctx, s) // ignore error since we cannot handle it anyway
 		c.CloseWithContext(ctx)
 		stats.RecordError(err)
 
