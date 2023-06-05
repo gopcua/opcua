@@ -889,7 +889,7 @@ func (c *Client) ActivateSessionWithContext(ctx context.Context, s *Session) err
 		// We decided not to check the error of CloseSession() since we
 		// can't do much about it anyway and it creates a race in the
 		// re-connection logic.
-		c.CloseSession()
+		c.CloseSessionWithContext(ctx)
 
 		c.setSession(s)
 		return nil
