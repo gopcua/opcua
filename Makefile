@@ -22,7 +22,7 @@ install-py-opcua:
 	pip3 install opcua
 
 gen:
-	go get -d golang.org/x/tools/cmd/stringer
+	go install golang.org/x/tools/cmd/stringer@latest
 	go generate ./...
 	go mod tidy
 

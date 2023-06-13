@@ -94,9 +94,6 @@ func (n StatusCode) Error() string {
 
 var (
 	StatusOK StatusCode = 0x0
-    StatusUncertain StatusCode = 0x40000000
-    StatusBad StatusCode = 0x80000000
-
 	{{range .}}{{index . 0}} StatusCode = {{index . 1}}
 	{{end}}
 )
@@ -111,7 +108,7 @@ var StatusCodes = map[StatusCode]StatusCodeDesc{
 	StatusOK: {Name: "OK", Text: ""},
 	StatusUncertain: {Name: "Uncertain", Text: ""},
 	StatusBad: {Name: "Bad", Text: ""},
-	{{range .}}{{index . 0}}: { Name: "{{index . 0}}", Text: "{{index . 2}}" },
+	{{range .}}{{index . 0}}: { Name: "{{index . 0}}", Text: {{index . 2}} },
 	{{end}}
 }
 `))

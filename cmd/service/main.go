@@ -108,6 +108,9 @@ import "time"
 func Enums(dict *TypeDictionary) []Type {
 	var enums []Type
 	for _, t := range dict.Enums {
+		if len(t.Values) == 0 {
+			continue
+		}
 		e := Type{
 			Name: goname.Format(t.Name),
 			Kind: KindEnum,
