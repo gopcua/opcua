@@ -12,6 +12,8 @@ import (
 	"log"
 	"os"
 	"strings"
+
+	"golang.org/x/exp/slices"
 )
 
 // Flags contains the debug flags set by OPC_DEBUG.
@@ -58,14 +60,5 @@ func ToJSON(v interface{}) string {
 // FlagSet returns true if the OPCUA_DEBUG environment variable contains the
 // given flag.
 func FlagSet(name string) bool {
-	return stringSliceContains(name, strings.Fields(Flags))
-}
-
-func stringSliceContains(s string, vals []string) bool {
-	for _, v := range vals {
-		if s == v {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(strings.Fields(Flags), name)
 }
