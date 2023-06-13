@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+* fix: handle extra padding if key length > 2048 (#648)
+
 ## v0.4.0 (13 Jun 2023)
 
 * Bugfix: Close session properly if activation fails (#657)
