@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+* Update the schema to v1.05.02-2022-11-01 and regenerate code (#589)
 * fix: handle extra padding if key length > 2048 (#648)
 
 ## v0.4.0 (13 Jun 2023)
