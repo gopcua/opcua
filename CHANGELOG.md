@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.4.0 (13 Jun 2023)
+
+* Bugfix: Close session properly if activation fails (#657)
+* v0.4.0 preparation (#662)
+
 ## v0.3.15 (25 May 2023)
 
 * Panic in secure_channel.go (#640)
