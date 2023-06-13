@@ -26,7 +26,7 @@ import (
 	"time"
 )
 
-func GenerateRSACert(host string, rsaBits int, validFor time.Duration) (certPEM, keyPEM []byte, err error) {
+func GenerateCert(host string, rsaBits int, validFor time.Duration) (certPEM, keyPEM []byte, err error) {
 	if len(host) == 0 {
 		return nil, nil, fmt.Errorf("missing required host parameter")
 	}

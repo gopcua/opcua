@@ -154,18 +154,19 @@ func TestNewRequestMessage(t *testing.T) {
 }
 
 func TestSignAndEncryptVerifyAndDecrypt(t *testing.T) {
-
 	buildSecPolicy := func(bits int, uri string) *uapolicy.EncryptionAlgorithm {
-		certb, keyb := uatest.Generate_cert("localhost", bits)
-		block, _ := pem.Decode(keyb)
+		t.Helper()
+
+		certPEM, keyPEM, err := uatest.GenerateCert("localhost", bits, 24*time.Hour)
+		block, _ := pem.Decode(keyPEM)
 		pk, err := x509.ParsePKCS1PrivateKey(block.Bytes)
 		if err != nil {
-			fmt.Printf("err: %v\n", err)
+			t.Fatal(err)
 		}
-		certblock, _ := pem.Decode(certb)
+		certblock, _ := pem.Decode(certPEM)
 		remoteX509Cert, err := x509.ParseCertificate(certblock.Bytes)
 		if err != nil {
-			fmt.Printf("err: %v\n", err)
+			t.Fatal(err)
 		}
 		remoteKey := remoteX509Cert.PublicKey.(*rsa.PublicKey)
 		alg, _ := uapolicy.Asymmetric(uri, pk, remoteKey)
