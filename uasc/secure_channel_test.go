@@ -174,6 +174,8 @@ func TestSignAndEncryptVerifyAndDecrypt(t *testing.T) {
 	}
 
 	getConfig := func(uri string) *Config {
+		t.Helper()
+
 		if uri == ua.SecurityPolicyURINone {
 			return &Config{SecurityMode: ua.MessageSecurityModeNone}
 		}
@@ -278,7 +280,6 @@ func TestSignAndEncryptVerifyAndDecrypt(t *testing.T) {
 					// RequestedLifetime
 					0x80, 0x8d, 0x5b, 0x00,
 				}})
-
 		}
 	}
 
