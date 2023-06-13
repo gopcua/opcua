@@ -11,6 +11,7 @@ import (
 	"github.com/gopcua/opcua/stats"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uasc"
+	"golang.org/x/exp/slices"
 )
 
 // Subscribe creates a Subscription with given parameters.
@@ -156,7 +157,7 @@ func (c *Client) sendRepublishRequests(ctx context.Context, sub *Subscription, a
 	// todo(fs): check if sub.nextSeq is in the available sequence numbers
 	// todo(fs): if not then we need to decide whether we fail b/c of data loss
 	// todo(fs): or whether we log it and continue.
-	if len(availableSeq) > 0 && !uint32SliceContains(sub.nextSeq, availableSeq) {
+	if len(availableSeq) > 0 && !slices.Contains(availableSeq, sub.nextSeq) {
 		log.Printf("sub %d: next sequence number %d not in retransmission buffer %v", sub.SubscriptionID, sub.nextSeq, availableSeq)
 	}
 

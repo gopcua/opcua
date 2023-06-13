@@ -12,7 +12,7 @@
 
 A native Go implementation of the OPC/UA Binary Protocol.
 
-You need go1.13 or higher. We test with the current and previous Go version.
+We support the current and previous major Go release.
 See below for a list of [Tested Platforms](#tested-platforms) and [Supported Features](#supported-features).
 
 [![GitHub](https://github.com/gopcua/opcua/workflows/gopuca/badge.svg)](https://github.com/gopcua/opcua/actions)
@@ -20,16 +20,9 @@ See below for a list of [Tested Platforms](#tested-platforms) and [Supported Fea
 [![License](https://img.shields.io/github/license/mashape/apistatus.svg)](https://github.com/gopcua/opcua/blob/master/LICENSE)
 [![Version](https://img.shields.io/github/tag/gopcua/opcua.svg?color=blue&label=version)](https://github.com/gopcua/opcua/releases)
 
-## Note
-
-`v0.2.4` and `v0.2.5` are broken and should not be used. Please upgrade to `v0.2.6` or later.
-See [#538](https://github.com/gopcua/opcua/issues/538) for details.
-
 ## Quickstart
 
 ```sh
-# make sure you have go1.17 or higher
-
 # install library
 go get -u github.com/gopcua/opcua
 
@@ -95,11 +88,9 @@ We would also like to list organizations which use `gopcua` in production. Pleas
 
 We are still actively working on this project and the APIs will change.
 
-We have started to tag the code to support go modules and reproducible builds
-but there is still no guarantee of API stability.
-
 However, you can safely assume that we are aiming to make the APIs as
-stable as possible. :)
+stable as possible since the code is in use in several large scale
+production environments.
 
 The [Current State](https://github.com/gopcua/opcua/wiki/Current-State) was moved
 to the [Wiki](https://github.com/gopcua/opcua/wiki).

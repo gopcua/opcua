@@ -1431,15 +1431,6 @@ func safeAssign(t, ptrT interface{}) error {
 	return nil
 }
 
-func uint32SliceContains(n uint32, a []uint32) bool {
-	for _, v := range a {
-		if n == v {
-			return true
-		}
-	}
-	return false
-}
-
 type InvalidResponseTypeError struct {
 	got, want interface{}
 }
