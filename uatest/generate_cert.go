@@ -5,6 +5,7 @@
 // Generate a self-signed X.509 certificate for a TLS server. Outputs to
 // 'cert.pem' and 'key.pem' and will overwrite existing files.
 
+// Based on src/crypto/tls/generate_cert.go from the Go SDK
 // Modified by the Gopcua Authors for use in creating an OPC-UA compliant client certificate
 
 package uatest
@@ -17,7 +18,6 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
-	"log"
 	"math/big"
 	"net"
 	"net/url"
@@ -26,10 +26,9 @@ import (
 	"time"
 )
 
-func Generate_cert(host string, rsaBits int) (cert, key []byte) {
-
+func GenerateRSACert(host string, rsaBits int, validFor time.Duration) (certPEM, keyPEM []byte, err error) {
 	if len(host) == 0 {
-		log.Fatalf("Missing required host parameter")
+		return nil, nil, fmt.Errorf("missing required host parameter")
 	}
 	if rsaBits == 0 {
 		rsaBits = 2048
@@ -37,16 +36,16 @@ func Generate_cert(host string, rsaBits int) (cert, key []byte) {
 
 	priv, err := rsa.GenerateKey(rand.Reader, rsaBits)
 	if err != nil {
-		log.Fatalf("failed to generate private key: %s", err)
+		return nil, nil, fmt.Errorf("failed to generate private key: %s", err)
 	}
 
 	notBefore := time.Now()
-	notAfter := notBefore.Add(365 * 24 * time.Hour) // 1 year
+	notAfter := notBefore.Add(validFor)
 
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
 	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
 	if err != nil {
-		log.Fatalf("failed to generate serial number: %s", err)
+		return nil, nil, fmt.Errorf("failed to generate serial number: %s", err)
 	}
 
 	template := x509.Certificate{
@@ -76,11 +75,10 @@ func Generate_cert(host string, rsaBits int) (cert, key []byte) {
 
 	derBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, publicKey(priv), priv)
 	if err != nil {
-		log.Fatalf("Failed to create certificate: %s", err)
+		return nil, nil, fmt.Errorf("Failed to create certificate: %s", err)
 	}
 
-	return pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: derBytes}), pem.EncodeToMemory(pemBlockForKey(priv))
-
+	return pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: derBytes}), pem.EncodeToMemory(pemBlockForKey(priv)), nil
 }
 
 func publicKey(priv interface{}) interface{} {
