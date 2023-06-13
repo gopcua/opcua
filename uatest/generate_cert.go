@@ -5,9 +5,10 @@
 // Generate a self-signed X.509 certificate for a TLS server. Outputs to
 // 'cert.pem' and 'key.pem' and will overwrite existing files.
 
+// Based on src/crypto/tls/generate_cert.go from the Go SDK
 // Modified by the Gopcua Authors for use in creating an OPC-UA compliant client certificate
 
-package main
+package uatest
 
 import (
 	"crypto/ecdsa"
@@ -17,7 +18,6 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
-	"log"
 	"math/big"
 	"net"
 	"net/url"
@@ -26,33 +26,26 @@ import (
 	"time"
 )
 
-func generate_cert(host string, rsaBits int, certFile, keyFile string) {
-
+func GenerateCert(host string, rsaBits int, validFor time.Duration) (certPEM, keyPEM []byte, err error) {
 	if len(host) == 0 {
-		log.Fatalf("Missing required host parameter")
+		return nil, nil, fmt.Errorf("missing required host parameter")
 	}
 	if rsaBits == 0 {
 		rsaBits = 2048
 	}
-	if len(certFile) == 0 {
-		certFile = "cert.pem"
-	}
-	if len(keyFile) == 0 {
-		keyFile = "key.pem"
-	}
 
 	priv, err := rsa.GenerateKey(rand.Reader, rsaBits)
 	if err != nil {
-		log.Fatalf("failed to generate private key: %s", err)
+		return nil, nil, fmt.Errorf("failed to generate private key: %s", err)
 	}
 
 	notBefore := time.Now()
-	notAfter := notBefore.Add(365 * 24 * time.Hour) // 1 year
+	notAfter := notBefore.Add(validFor)
 
 	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
 	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
 	if err != nil {
-		log.Fatalf("failed to generate serial number: %s", err)
+		return nil, nil, fmt.Errorf("failed to generate serial number: %s", err)
 	}
 
 	template := x509.Certificate{
@@ -82,34 +75,10 @@ func generate_cert(host string, rsaBits int, certFile, keyFile string) {
 
 	derBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, publicKey(priv), priv)
 	if err != nil {
-		log.Fatalf("Failed to create certificate: %s", err)
+		return nil, nil, fmt.Errorf("Failed to create certificate: %s", err)
 	}
 
-	certOut, err := os.Create(certFile)
-	if err != nil {
-		log.Fatalf("failed to open %s for writing: %s", certFile, err)
-	}
-	if err := pem.Encode(certOut, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes}); err != nil {
-		log.Fatalf("failed to write data to %s: %s", certFile, err)
-	}
-	if err := certOut.Close(); err != nil {
-		log.Fatalf("error closing %s: %s", certFile, err)
-	}
-	log.Printf("wrote %s\n", certFile)
-
-	keyOut, err := os.OpenFile(keyFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
-	if err != nil {
-		log.Printf("failed to open %s for writing: %s", keyFile, err)
-		return
-	}
-	if err := pem.Encode(keyOut, pemBlockForKey(priv)); err != nil {
-		log.Fatalf("failed to write data to %s: %s", keyFile, err)
-	}
-	if err := keyOut.Close(); err != nil {
-		log.Fatalf("error closing %s: %s", keyFile, err)
-	}
-	log.Printf("wrote %s\n", keyFile)
-
+	return pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: derBytes}), pem.EncodeToMemory(pemBlockForKey(priv)), nil
 }
 
 func publicKey(priv interface{}) interface{} {

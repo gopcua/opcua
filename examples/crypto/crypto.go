@@ -15,6 +15,7 @@ import (
 	"os"
 	"strings"
 	"syscall"
+	"time"
 
 	"golang.org/x/crypto/ssh/terminal"
 
@@ -22,6 +23,7 @@ import (
 	"github.com/gopcua/opcua/debug"
 	"github.com/gopcua/opcua/errors"
 	"github.com/gopcua/opcua/ua"
+	"github.com/gopcua/opcua/uatest"
 )
 
 var (
@@ -119,7 +121,16 @@ func clientOptsFromFlags(endpoints []*ua.EndpointDescription) []opcua.Option {
 	var cert []byte
 	if *gencert || (*certfile != "" && *keyfile != "") {
 		if *gencert {
-			generate_cert(*appuri, 2048, *certfile, *keyfile)
+			certPEM, keyPEM, err := uatest.GenerateCert(*appuri, 2048, 24*time.Hour)
+			if err != nil {
+				log.Fatalf("failed to generate cert: %v", err)
+			}
+			if err := os.WriteFile(*certfile, certPEM, 0644); err != nil {
+				log.Fatalf("failed to write %s: %v", *certfile, err)
+			}
+			if err := os.WriteFile(*keyfile, keyPEM, 0644); err != nil {
+				log.Fatalf("failed to write %s: %v", *keyfile, err)
+			}
 		}
 		debug.Printf("Loading cert/key from %s/%s", *certfile, *keyfile)
 		c, err := tls.LoadX509KeyPair(*certfile, *keyfile)
