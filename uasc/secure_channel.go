@@ -129,19 +129,17 @@ func NewSecureChannel(endpoint string, c *uacp.Conn, cfg *Config, errCh chan<- e
 		return nil, errors.Errorf("no secure channel config")
 	}
 
-	if cfg.SecurityPolicyURI != ua.SecurityPolicyURINone {
-		if cfg.SecurityMode == ua.MessageSecurityModeNone {
-			return nil, errors.Errorf("invalid channel config: Security policy '%s' cannot be used with '%s'", cfg.SecurityPolicyURI, cfg.SecurityMode)
-		}
-		if cfg.LocalKey == nil {
-			return nil, errors.Errorf("invalid channel config: Security policy '%s' requires a private key", cfg.SecurityPolicyURI)
-		}
+	if errCh == nil {
+		return nil, errors.Errorf("no error channel")
 	}
 
-	// Force the security mode to None if the policy is also None
-	// TODO: I don't like that a SecureChannel changes the incoming config
-	if cfg.SecurityPolicyURI == ua.SecurityPolicyURINone {
-		cfg.SecurityMode = ua.MessageSecurityModeNone
+	switch {
+	case cfg.SecurityPolicyURI == ua.SecurityPolicyURINone && cfg.SecurityMode != ua.MessageSecurityModeNone:
+		return nil, errors.Errorf("invalid channel config: Security policy '%s' cannot be used with '%s'", cfg.SecurityPolicyURI, cfg.SecurityMode)
+	case cfg.SecurityPolicyURI != ua.SecurityPolicyURINone && cfg.SecurityMode == ua.MessageSecurityModeNone:
+		return nil, errors.Errorf("invalid channel config: Security policy '%s' cannot be used with '%s'", cfg.SecurityPolicyURI, cfg.SecurityMode)
+	case cfg.SecurityPolicyURI != ua.SecurityPolicyURINone && cfg.LocalKey == nil:
+		return nil, errors.Errorf("invalid channel config: Security policy '%s' requires a private key", cfg.SecurityPolicyURI)
 	}
 
 	s := &SecureChannel{
