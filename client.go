@@ -156,7 +156,7 @@ type Client struct {
 //
 // https://godoc.org/github.com/gopcua/opcua#Option
 //
-// Note: Starting with v0.5 this function will will return an error.
+// Note: Starting with v0.5 this function will return an error.
 func NewClient(endpoint string, opts ...Option) *Client {
 	cfg := ApplyConfig(opts...)
 	c := Client{
