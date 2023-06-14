@@ -156,7 +156,7 @@ type Client struct {
 //
 // https://godoc.org/github.com/gopcua/opcua#Option
 //
-// Note: Starting with v0.5 this function will will return an error.
+// Note: Starting with v0.5 this function will return an error.
 func NewClient(endpoint string, opts ...Option) *Client {
 	cfg := ApplyConfig(opts...)
 	c := Client{
@@ -193,12 +193,15 @@ const (
 )
 
 // Connect establishes a secure channel and creates a new session.
-func (c *Client) Connect(ctx context.Context) (err error) {
+func (c *Client) Connect(ctx context.Context) error {
 	// todo(fs): remove with v0.5.0
 	if c.cfgerr != nil {
 		return c.cfgerr
 	}
 
+	// todo(fs): the secure channel is 'nil' during a re-connect
+	// todo(fs): but we expect this method to be called once during startup
+	// todo(fs): so this is probably safe
 	if c.SecureChannel() != nil {
 		return errors.Errorf("already connected")
 	}
@@ -219,6 +222,7 @@ func (c *Client) Connect(ctx context.Context) (err error) {
 	}
 
 	if err := c.ActivateSessionWithContext(ctx, s); err != nil {
+		c.closeSession(ctx, s) // ignore error since we cannot handle it anyway
 		c.CloseWithContext(ctx)
 		stats.RecordError(err)
 
@@ -321,8 +325,6 @@ func (c *Client) monitor(ctx context.Context) {
 				action = createSecureChannel
 			}
 
-			c.setState(Disconnected)
-
 			c.pauseSubscriptions(ctx)
 
 			var (
@@ -387,6 +389,8 @@ func (c *Client) monitor(ctx context.Context) {
 						// This only works if the session is still open on the server
 						// otherwise recreate it
 
+						c.setState(Reconnecting)
+
 						s := c.Session()
 						if s == nil {
 							dlog.Printf("no session to restore")
@@ -416,6 +420,7 @@ func (c *Client) monitor(ctx context.Context) {
 					case recreateSession:
 						dlog.Printf("action: recreateSession")
 
+						c.setState(Reconnecting)
 						// create a new session to replace the previous one
 
 						dlog.Printf("trying to recreate session")
@@ -460,6 +465,12 @@ func (c *Client) monitor(ctx context.Context) {
 						// recreate them all if that fails.
 						res, err := c.transferSubscriptions(ctx, subIDs)
 						switch {
+
+						case errors.Is(err, ua.StatusBadServiceUnsupported):
+							dlog.Printf("transfer subscriptions not supported. Recreating all subscriptions: %v", err)
+							subsToRepublish = nil
+							subsToRecreate = subIDs
+
 						case err != nil:
 							dlog.Printf("transfer subscriptions failed. Recreating all subscriptions: %v", err)
 							subsToRepublish = nil
@@ -598,8 +609,8 @@ func (c *Client) CloseWithContext(ctx context.Context) error {
 	if c.mcancel != nil {
 		c.mcancel()
 	}
-	if c.SecureChannel() != nil {
-		c.SecureChannel().Close()
+	if sc := c.SecureChannel(); sc != nil {
+		sc.Close()
 		c.setSecureChannel(nil)
 	}
 
@@ -650,6 +661,8 @@ func (c *Client) setPublishTimeout(d time.Duration) {
 }
 
 // SecureChannel returns the active secure channel.
+// During reconnect this value can change.
+// Make sure to capture the value in a method before using it.
 func (c *Client) SecureChannel() *uasc.SecureChannel {
 	return c.atomicSechan.Load().(*uasc.SecureChannel)
 }
@@ -660,6 +673,8 @@ func (c *Client) setSecureChannel(sc *uasc.SecureChannel) {
 }
 
 // Session returns the active session.
+// During reconnect this value can change.
+// Make sure to capture the value in a method before using it.
 func (c *Client) Session() *Session {
 	return c.atomicSession.Load().(*Session)
 }
@@ -667,11 +682,6 @@ func (c *Client) Session() *Session {
 func (c *Client) setSession(s *Session) {
 	c.atomicSession.Store(s)
 	stats.Client().Add("Session", 1)
-}
-
-// sessionClosed returns true when there is no session.
-func (c *Client) sessionClosed() bool {
-	return c.Session() == nil
 }
 
 // Session is a OPC/UA session as described in Part 4, 5.6.
@@ -690,6 +700,15 @@ type Session struct {
 	// Session response. Used to generate the signatures for the ActivateSessionRequest
 	// and User Authorization
 	serverNonce []byte
+
+	// revisedTimeout is the actual maximum time that a Session shall remain open without activity.
+	revisedTimeout time.Duration
+}
+
+// RevisedTimeout return actual maximum time that a Session shall remain open without activity.
+// This value is provided by the server in response to CreateSession.
+func (s *Session) RevisedTimeout() time.Duration {
+	return s.revisedTimeout
 }
 
 // CreateSession creates a new session which is not yet activated and not
@@ -711,7 +730,8 @@ func (c *Client) CreateSession(cfg *uasc.SessionConfig) (*Session, error) {
 
 // Note: Starting with v0.5 this method is superseded by the non 'WithContext' method.
 func (c *Client) CreateSessionWithContext(ctx context.Context, cfg *uasc.SessionConfig) (*Session, error) {
-	if c.SecureChannel() == nil {
+	sc := c.SecureChannel()
+	if sc == nil {
 		return nil, ua.StatusBadServerNotConnected
 	}
 
@@ -736,14 +756,14 @@ func (c *Client) CreateSessionWithContext(ctx context.Context, cfg *uasc.Session
 
 	var s *Session
 	// for the CreateSessionRequest the authToken is always nil.
-	// use c.SecureChannel().SendRequest() to enforce this.
-	err := c.SecureChannel().SendRequestWithContext(ctx, req, nil, func(v interface{}) error {
+	// use sc.SendRequest() to enforce this.
+	err := sc.SendRequestWithContext(ctx, req, nil, func(v interface{}) error {
 		var res *ua.CreateSessionResponse
 		if err := safeAssign(v, &res); err != nil {
 			return err
 		}
 
-		err := c.SecureChannel().VerifySessionSignature(res.ServerCertificate, nonce, res.ServerSignature.Signature)
+		err := sc.VerifySessionSignature(res.ServerCertificate, nonce, res.ServerSignature.Signature)
 		if err != nil {
 			log.Printf("error verifying session signature: %s", err)
 			return nil
@@ -764,6 +784,7 @@ func (c *Client) CreateSessionWithContext(ctx context.Context, cfg *uasc.Session
 			resp:              res,
 			serverNonce:       res.ServerNonce,
 			serverCertificate: res.ServerCertificate,
+			revisedTimeout:    time.Duration(res.RevisedSessionTimeout) * time.Millisecond,
 		}
 
 		return nil
@@ -803,11 +824,12 @@ func (c *Client) ActivateSession(s *Session) error {
 
 // Note: Starting with v0.5 this method is superseded by the non 'WithContext' method.
 func (c *Client) ActivateSessionWithContext(ctx context.Context, s *Session) error {
-	if c.SecureChannel() == nil {
+	sc := c.SecureChannel()
+	if sc == nil {
 		return ua.StatusBadServerNotConnected
 	}
 	stats.Client().Add("ActivateSession", 1)
-	sig, sigAlg, err := c.SecureChannel().NewSessionSignature(s.serverCertificate, s.serverNonce)
+	sig, sigAlg, err := sc.NewSessionSignature(s.serverCertificate, s.serverNonce)
 	if err != nil {
 		log.Printf("error creating session signature: %s", err)
 		return nil
@@ -818,7 +840,7 @@ func (c *Client) ActivateSessionWithContext(ctx context.Context, s *Session) err
 		// nothing to do
 
 	case *ua.UserNameIdentityToken:
-		pass, passAlg, err := c.SecureChannel().EncryptUserPassword(s.cfg.AuthPolicyURI, s.cfg.AuthPassword, s.serverCertificate, s.serverNonce)
+		pass, passAlg, err := sc.EncryptUserPassword(s.cfg.AuthPolicyURI, s.cfg.AuthPassword, s.serverCertificate, s.serverNonce)
 		if err != nil {
 			log.Printf("error encrypting user password: %s", err)
 			return err
@@ -827,7 +849,7 @@ func (c *Client) ActivateSessionWithContext(ctx context.Context, s *Session) err
 		tok.EncryptionAlgorithm = passAlg
 
 	case *ua.X509IdentityToken:
-		tokSig, tokSigAlg, err := c.SecureChannel().NewUserTokenSignature(s.cfg.AuthPolicyURI, s.serverCertificate, s.serverNonce)
+		tokSig, tokSigAlg, err := sc.NewUserTokenSignature(s.cfg.AuthPolicyURI, s.serverCertificate, s.serverNonce)
 		if err != nil {
 			log.Printf("error creating session signature: %s", err)
 			return err
@@ -851,7 +873,7 @@ func (c *Client) ActivateSessionWithContext(ctx context.Context, s *Session) err
 		UserIdentityToken:          ua.NewExtensionObject(s.cfg.UserIdentityToken),
 		UserTokenSignature:         s.cfg.UserTokenSignature,
 	}
-	return c.SecureChannel().SendRequestWithContext(ctx, req, s.resp.AuthenticationToken, func(v interface{}) error {
+	return sc.SendRequestWithContext(ctx, req, s.resp.AuthenticationToken, func(v interface{}) error {
 		var res *ua.ActivateSessionResponse
 		if err := safeAssign(v, &res); err != nil {
 			return err
@@ -867,7 +889,7 @@ func (c *Client) ActivateSessionWithContext(ctx context.Context, s *Session) err
 		// We decided not to check the error of CloseSession() since we
 		// can't do much about it anyway and it creates a race in the
 		// re-connection logic.
-		c.CloseSession()
+		c.CloseSessionWithContext(ctx)
 
 		c.setSession(s)
 		return nil
@@ -948,14 +970,15 @@ func (c *Client) SendWithContext(ctx context.Context, req ua.Request, h func(int
 // the response. If the client has an active session it injects the
 // authentication token.
 func (c *Client) sendWithTimeout(ctx context.Context, req ua.Request, timeout time.Duration, h func(interface{}) error) error {
-	if c.SecureChannel() == nil {
+	sc := c.SecureChannel()
+	if sc == nil {
 		return ua.StatusBadServerNotConnected
 	}
 	var authToken *ua.NodeID
 	if s := c.Session(); s != nil {
 		authToken = s.resp.AuthenticationToken
 	}
-	return c.SecureChannel().SendRequestWithTimeoutWithContext(ctx, req, authToken, timeout, h)
+	return sc.SendRequestWithTimeoutWithContext(ctx, req, authToken, timeout, h)
 }
 
 // Node returns a node object which accesses its attributes
@@ -1029,25 +1052,25 @@ func (c *Client) ReadWithContext(ctx context.Context, req *ua.ReadRequest) (*ua.
 	var res *ua.ReadResponse
 	err := c.SendWithContext(ctx, req, func(v interface{}) error {
 		err := safeAssign(v, &res)
+		if err != nil {
+			return err
+		}
 
 		// If the client cannot decode an extension object then its
 		// value will be nil. However, since the EO was known to the
 		// server the StatusCode for that data value will be OK. We
 		// therefore check for extension objects with nil values and set
 		// the status code to StatusBadDataTypeIDUnknown.
-		if err == nil {
-			for _, dv := range res.Results {
-				if dv.Value == nil {
-					continue
-				}
-				val := dv.Value.Value()
-				if eo, ok := val.(*ua.ExtensionObject); ok && eo.Value == nil {
-					dv.Status = ua.StatusBadDataTypeIDUnknown
-				}
+		for _, dv := range res.Results {
+			if dv.Value == nil {
+				continue
+			}
+			val := dv.Value.Value()
+			if eo, ok := val.(*ua.ExtensionObject); ok && eo.Value == nil {
+				dv.Status = ua.StatusBadDataTypeIDUnknown
 			}
 		}
-
-		return err
+		return nil
 	})
 	return res, err
 }
@@ -1406,15 +1429,6 @@ func safeAssign(t, ptrT interface{}) error {
 	// this is *ptrT = t
 	reflect.ValueOf(ptrT).Elem().Set(reflect.ValueOf(t))
 	return nil
-}
-
-func uint32SliceContains(n uint32, a []uint32) bool {
-	for _, v := range a {
-		if n == v {
-			return true
-		}
-	}
-	return false
 }
 
 type InvalidResponseTypeError struct {

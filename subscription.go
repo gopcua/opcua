@@ -173,17 +173,18 @@ func (s *Subscription) UnmonitorWithContext(ctx context.Context, monitoredItemID
 	err := s.c.SendWithContext(ctx, req, func(v interface{}) error {
 		return safeAssign(v, &res)
 	})
-
-	if err == nil {
-		// remove monitored items
-		s.itemsMu.Lock()
-		for _, id := range monitoredItemIDs {
-			delete(s.items, id)
-		}
-		s.itemsMu.Unlock()
+	if err != nil {
+		return nil, err
 	}
 
-	return res, err
+	// remove monitored items
+	s.itemsMu.Lock()
+	for _, id := range monitoredItemIDs {
+		delete(s.items, id)
+	}
+	s.itemsMu.Unlock()
+
+	return res, nil
 }
 
 // Note: Starting with v0.5 this method will require a context

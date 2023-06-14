@@ -22,11 +22,11 @@ install-py-opcua:
 	pip3 install opcua
 
 gen:
-	go get -d golang.org/x/tools/cmd/stringer
+	go install golang.org/x/tools/cmd/stringer@latest
 	go generate ./...
 	go mod tidy
 
 release:
-	GITHUB_TOKEN=$$(security find-generic-password -gs GITHUB_TOKEN -w) goreleaser --rm-dist
+	GITHUB_TOKEN=$$(security find-generic-password -gs GITHUB_TOKEN -w) goreleaser --clean
 
 .PHONY: all examples gen integration test release

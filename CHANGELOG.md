@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased
+
+* Update the schema to v1.05.02-2022-11-01 and regenerate code (#589)
+* fix: handle extra padding if key length > 2048 (#648)
+
+## v0.4.0 (13 Jun 2023)
+
+* Bugfix: Close session properly if activation fails (#657)
+* v0.4.0 preparation (#662)
+
+## v0.3.15 (25 May 2023)
+
+* Panic in secure_channel.go (#640)
+
+## v0.3.14 (22 May 2023)
+
+* Remove 'if err == nil' anti-pattern (#652)
+* Improve error handling (#653)
+* Add United Manufacturing Hub as user (#647)
+
 ## v0.3.13 (23 Mar 2023)
 
 * go1.20 (#645)

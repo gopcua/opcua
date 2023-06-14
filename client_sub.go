@@ -11,6 +11,7 @@ import (
 	"github.com/gopcua/opcua/stats"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uasc"
+	"golang.org/x/exp/slices"
 )
 
 // Subscribe creates a Subscription with given parameters.
@@ -156,7 +157,7 @@ func (c *Client) sendRepublishRequests(ctx context.Context, sub *Subscription, a
 	// todo(fs): check if sub.nextSeq is in the available sequence numbers
 	// todo(fs): if not then we need to decide whether we fail b/c of data loss
 	// todo(fs): or whether we log it and continue.
-	if len(availableSeq) > 0 && !uint32SliceContains(sub.nextSeq, availableSeq) {
+	if len(availableSeq) > 0 && !slices.Contains(availableSeq, sub.nextSeq) {
 		log.Printf("sub %d: next sequence number %d not in retransmission buffer %v", sub.SubscriptionID, sub.nextSeq, availableSeq)
 	}
 
@@ -171,14 +172,21 @@ func (c *Client) sendRepublishRequests(ctx context.Context, sub *Subscription, a
 			req.RetransmitSequenceNumber,
 		)
 
-		if c.sessionClosed() {
+		s := c.Session()
+		if s == nil {
 			debug.Printf("Republishing subscription %d aborted", req.SubscriptionID)
 			return ua.StatusBadSessionClosed
 		}
 
+		sc := c.SecureChannel()
+		if sc == nil {
+			debug.Printf("Republishing subscription %d aborted", req.SubscriptionID)
+			return ua.StatusBadNotConnected
+		}
+
 		debug.Printf("RepublishRequest: req=%s", debug.ToJSON(req))
 		var res *ua.RepublishResponse
-		err := c.SecureChannel().SendRequestWithContext(ctx, req, c.Session().resp.AuthenticationToken, func(v interface{}) error {
+		err := sc.SendRequestWithContext(ctx, req, s.resp.AuthenticationToken, func(v interface{}) error {
 			return safeAssign(v, &res)
 		})
 		debug.Printf("RepublishResponse: res=%s err=%v", debug.ToJSON(res), err)
@@ -406,6 +414,10 @@ func (c *Client) publish(ctx context.Context) error {
 
 	case err == ua.StatusBadSessionNotActivated:
 		dlog.Printf("error: session not active. pausing publish loop")
+		return err
+
+	case err == ua.StatusBadSessionIDInvalid:
+		dlog.Printf("error: session not valid. pausing publish loop")
 		return err
 
 	case err == ua.StatusBadServerNotConnected:

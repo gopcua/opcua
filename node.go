@@ -31,7 +31,7 @@ func (n *Node) String() string {
 // Note: Starting with v0.5 this method will require a context
 // and the corresponding XXXWithContext(ctx) method will be removed.
 func (n *Node) NodeClass(ctx context.Context) (ua.NodeClass, error) {
-	return n.NodeClassWithContext(context.Background())
+	return n.NodeClassWithContext(ctx)
 }
 
 // Note: Starting with v0.5 this method is superseded by the non 'WithContext' method.

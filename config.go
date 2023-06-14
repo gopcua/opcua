@@ -81,7 +81,7 @@ func NewDialer(cfg *Config) *uacp.Dialer {
 // ApplyConfig applies the config options to the default configuration.
 // todo(fs): Can we find a better name?
 //
-// Note: Starting with v0.5 this function will will return an error.
+// Note: Starting with v0.5 this function will return an error.
 func ApplyConfig(opts ...Option) *Config {
 	cfg := &Config{
 		sechan:  DefaultClientConfig(),
