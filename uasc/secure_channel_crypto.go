@@ -100,7 +100,13 @@ func (s *SecureChannel) EncryptUserPassword(policyURI, password string, cert, no
 }
 
 // NewUserTokenSignature issues a new signature for the client to send in ActivateSessionRequest
+// The security policy for the SecureChannel is used if policyURI value is null or empty
+// https://reference.opcfoundation.org/Core/Part4/v104/docs/7.37
 func (s *SecureChannel) NewUserTokenSignature(policyURI string, cert, nonce []byte) ([]byte, string, error) {
+	if policyURI == "" {
+		policyURI = s.cfg.SecurityPolicyURI
+	}
+
 	if policyURI == ua.SecurityPolicyURINone {
 		return nil, "", nil
 	}
