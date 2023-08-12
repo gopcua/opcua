@@ -28,7 +28,7 @@ func main() {
 	if err := c.Connect(ctx); err != nil {
 		log.Fatal(err)
 	}
-	defer c.CloseWithContext(ctx)
+	defer c.Close(ctx)
 
 	id, err := ua.ParseNodeID(*nodeID)
 	if err != nil {
@@ -54,7 +54,7 @@ func main() {
 		// Reset old nodes
 		nodesToRequest = make([]*ua.HistoryReadValueID, 0)
 
-		data, err := c.HistoryReadRawModifiedWithContext(ctx, nodes, &ua.ReadRawModifiedDetails{
+		data, err := c.HistoryReadRawModified(ctx, nodes, &ua.ReadRawModifiedDetails{
 			IsReadModified: false,
 			StartTime:      time.Now().UTC().AddDate(0, -1, 0),
 			EndTime:        time.Now().UTC().AddDate(0, 1, 0),

@@ -17,15 +17,7 @@ import (
 // Subscribe creates a Subscription with given parameters.
 // Parameters that have not been set are set to their default values.
 // See opcua.DefaultSubscription* constants
-//
-// Note: Starting with v0.5 this method will require a context
-// and the corresponding XXXWithContext(ctx) method will be removed.
-func (c *Client) Subscribe(params *SubscriptionParameters, notifyCh chan<- *PublishNotificationData) (*Subscription, error) {
-	return c.SubscribeWithContext(context.Background(), params, notifyCh)
-}
-
-// Note: Starting with v0.5 this method is superseded by the non 'WithContext' method.
-func (c *Client) SubscribeWithContext(ctx context.Context, params *SubscriptionParameters, notifyCh chan<- *PublishNotificationData) (*Subscription, error) {
+func (c *Client) Subscribe(ctx context.Context, params *SubscriptionParameters, notifyCh chan<- *PublishNotificationData) (*Subscription, error) {
 	stats.Client().Add("Subscribe", 1)
 
 	if params == nil {
@@ -43,7 +35,7 @@ func (c *Client) SubscribeWithContext(ctx context.Context, params *SubscriptionP
 	}
 
 	var res *ua.CreateSubscriptionResponse
-	err := c.SendWithContext(ctx, req, func(v interface{}) error {
+	err := c.Send(ctx, req, func(v interface{}) error {
 		return safeAssign(v, &res)
 	})
 	if err != nil {
@@ -118,7 +110,7 @@ func (c *Client) transferSubscriptions(ctx context.Context, ids []uint32) (*ua.T
 	}
 
 	var res *ua.TransferSubscriptionsResponse
-	err := c.SendWithContext(ctx, req, func(v interface{}) error {
+	err := c.Send(ctx, req, func(v interface{}) error {
 		return safeAssign(v, &res)
 	})
 	return res, err
@@ -186,7 +178,7 @@ func (c *Client) sendRepublishRequests(ctx context.Context, sub *Subscription, a
 
 		debug.Printf("RepublishRequest: req=%s", debug.ToJSON(req))
 		var res *ua.RepublishResponse
-		err := sc.SendRequestWithContext(ctx, req, s.resp.AuthenticationToken, func(v interface{}) error {
+		err := c.SecureChannel().SendRequest(ctx, req, c.Session().resp.AuthenticationToken, func(v interface{}) error {
 			return safeAssign(v, &res)
 		})
 		debug.Printf("RepublishResponse: res=%s err=%v", debug.ToJSON(res), err)

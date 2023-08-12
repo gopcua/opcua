@@ -4,14 +4,15 @@ import (
 	"context"
 	"testing"
 
+	"github.com/pascaldekloe/goe/verify"
+
 	"github.com/gopcua/opcua/id"
 	"github.com/gopcua/opcua/ua"
-	"github.com/pascaldekloe/goe/verify"
 )
 
 func TestClient_Send_DoesNotPanicWhenDisconnected(t *testing.T) {
 	c := NewClient("opc.tcp://example.com:4840")
-	err := c.SendWithContext(context.Background(), &ua.ReadRequest{}, func(i interface{}) error {
+	err := c.Send(context.Background(), &ua.ReadRequest{}, func(i interface{}) error {
 		return nil
 	})
 	verify.Values(t, "", err, ua.StatusBadServerNotConnected)

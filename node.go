@@ -27,16 +27,8 @@ func (n *Node) String() string {
 }
 
 // NodeClass returns the node class attribute.
-//
-// Note: Starting with v0.5 this method will require a context
-// and the corresponding XXXWithContext(ctx) method will be removed.
 func (n *Node) NodeClass(ctx context.Context) (ua.NodeClass, error) {
-	return n.NodeClassWithContext(ctx)
-}
-
-// Note: Starting with v0.5 this method is superseded by the non 'WithContext' method.
-func (n *Node) NodeClassWithContext(ctx context.Context) (ua.NodeClass, error) {
-	v, err := n.AttributeWithContext(ctx, ua.AttributeIDNodeClass)
+	v, err := n.Attribute(ctx, ua.AttributeIDNodeClass)
 	if err != nil {
 		return 0, err
 	}
@@ -44,16 +36,8 @@ func (n *Node) NodeClassWithContext(ctx context.Context) (ua.NodeClass, error) {
 }
 
 // BrowseName returns the browse name of the node.
-//
-// Note: Starting with v0.5 this method will require a context
-// and the corresponding XXXWithContext(ctx) method will be removed.
-func (n *Node) BrowseName() (*ua.QualifiedName, error) {
-	return n.BrowseNameWithContext(context.Background())
-}
-
-// Note: Starting with v0.5 this method is superseded by the non 'WithContext' method.
-func (n *Node) BrowseNameWithContext(ctx context.Context) (*ua.QualifiedName, error) {
-	v, err := n.AttributeWithContext(ctx, ua.AttributeIDBrowseName)
+func (n *Node) BrowseName(ctx context.Context) (*ua.QualifiedName, error) {
+	v, err := n.Attribute(ctx, ua.AttributeIDBrowseName)
 	if err != nil {
 		return nil, err
 	}
@@ -61,16 +45,8 @@ func (n *Node) BrowseNameWithContext(ctx context.Context) (*ua.QualifiedName, er
 }
 
 // Description returns the description of the node.
-//
-// Note: Starting with v0.5 this method will require a context
-// and the corresponding XXXWithContext(ctx) method will be removed.
-func (n *Node) Description() (*ua.LocalizedText, error) {
-	return n.DescriptionWithContext(context.Background())
-}
-
-// Note: Starting with v0.5 this method is superseded by the non 'WithContext' method.
-func (n *Node) DescriptionWithContext(ctx context.Context) (*ua.LocalizedText, error) {
-	v, err := n.AttributeWithContext(ctx, ua.AttributeIDDescription)
+func (n *Node) Description(ctx context.Context) (*ua.LocalizedText, error) {
+	v, err := n.Attribute(ctx, ua.AttributeIDDescription)
 	if err != nil {
 		return nil, err
 	}
@@ -78,16 +54,8 @@ func (n *Node) DescriptionWithContext(ctx context.Context) (*ua.LocalizedText, e
 }
 
 // DisplayName returns the display name of the node.
-//
-// Note: Starting with v0.5 this method will require a context
-// and the corresponding XXXWithContext(ctx) method will be removed.
-func (n *Node) DisplayName() (*ua.LocalizedText, error) {
-	return n.DisplayNameWithContext(context.Background())
-}
-
-// Note: Starting with v0.5 this method is superseded by the non 'WithContext' method.
-func (n *Node) DisplayNameWithContext(ctx context.Context) (*ua.LocalizedText, error) {
-	v, err := n.AttributeWithContext(ctx, ua.AttributeIDDisplayName)
+func (n *Node) DisplayName(ctx context.Context) (*ua.LocalizedText, error) {
+	v, err := n.Attribute(ctx, ua.AttributeIDDisplayName)
 	if err != nil {
 		return nil, err
 	}
@@ -97,16 +65,8 @@ func (n *Node) DisplayNameWithContext(ctx context.Context) (*ua.LocalizedText, e
 // AccessLevel returns the access level of the node.
 // The returned value is a mask where multiple values can be
 // set, e.g. read and write.
-//
-// Note: Starting with v0.5 this method will require a context
-// and the corresponding XXXWithContext(ctx) method will be removed.
-func (n *Node) AccessLevel() (ua.AccessLevelType, error) {
-	return n.AccessLevelWithContext(context.Background())
-}
-
-// Note: Starting with v0.5 this method is superseded by the non 'WithContext' method.
-func (n *Node) AccessLevelWithContext(ctx context.Context) (ua.AccessLevelType, error) {
-	v, err := n.AttributeWithContext(ctx, ua.AttributeIDAccessLevel)
+func (n *Node) AccessLevel(ctx context.Context) (ua.AccessLevelType, error) {
+	v, err := n.Attribute(ctx, ua.AttributeIDAccessLevel)
 	if err != nil {
 		return 0, err
 	}
@@ -115,16 +75,8 @@ func (n *Node) AccessLevelWithContext(ctx context.Context) (ua.AccessLevelType, 
 
 // HasAccessLevel returns true if all bits from mask are
 // set in the access level mask of the node.
-//
-// Note: Starting with v0.5 this method will require a context
-// and the corresponding XXXWithContext(ctx) method will be removed.
-func (n *Node) HasAccessLevel(mask ua.AccessLevelType) (bool, error) {
-	return n.HasAccessLevelWithContext(context.Background(), mask)
-}
-
-// Note: Starting with v0.5 this method is superseded by the non 'WithContext' method.
-func (n *Node) HasAccessLevelWithContext(ctx context.Context, mask ua.AccessLevelType) (bool, error) {
-	v, err := n.AccessLevelWithContext(ctx)
+func (n *Node) HasAccessLevel(ctx context.Context, mask ua.AccessLevelType) (bool, error) {
+	v, err := n.AccessLevel(ctx)
 	if err != nil {
 		return false, err
 	}
@@ -132,16 +84,8 @@ func (n *Node) HasAccessLevelWithContext(ctx context.Context, mask ua.AccessLeve
 }
 
 // UserAccessLevel returns the access level of the node.
-//
-// Note: Starting with v0.5 this method will require a context
-// and the corresponding XXXWithContext(ctx) method will be removed.
-func (n *Node) UserAccessLevel() (ua.AccessLevelType, error) {
-	return n.UserAccessLevelWithContext(context.Background())
-}
-
-// Note: Starting with v0.5 this method is superseded by the non 'WithContext' method.
-func (n *Node) UserAccessLevelWithContext(ctx context.Context) (ua.AccessLevelType, error) {
-	v, err := n.AttributeWithContext(ctx, ua.AttributeIDUserAccessLevel)
+func (n *Node) UserAccessLevel(ctx context.Context) (ua.AccessLevelType, error) {
+	v, err := n.Attribute(ctx, ua.AttributeIDUserAccessLevel)
 	if err != nil {
 		return 0, err
 	}
@@ -150,16 +94,8 @@ func (n *Node) UserAccessLevelWithContext(ctx context.Context) (ua.AccessLevelTy
 
 // HasUserAccessLevel returns true if all bits from mask are
 // set in the user access level mask of the node.
-//
-// Note: Starting with v0.5 this method will require a context
-// and the corresponding XXXWithContext(ctx) method will be removed.
-func (n *Node) HasUserAccessLevel(mask ua.AccessLevelType) (bool, error) {
-	return n.HasUserAccessLevelWithContext(context.Background(), mask)
-}
-
-// Note: Starting with v0.5 this method is superseded by the non 'WithContext' method.
-func (n *Node) HasUserAccessLevelWithContext(ctx context.Context, mask ua.AccessLevelType) (bool, error) {
-	v, err := n.UserAccessLevelWithContext(ctx)
+func (n *Node) HasUserAccessLevel(ctx context.Context, mask ua.AccessLevelType) (bool, error) {
+	v, err := n.UserAccessLevel(ctx)
 	if err != nil {
 		return false, err
 	}
@@ -167,31 +103,15 @@ func (n *Node) HasUserAccessLevelWithContext(ctx context.Context, mask ua.Access
 }
 
 // Value returns the value of the node.
-//
-// Note: Starting with v0.5 this method will require a context
-// and the corresponding XXXWithContext(ctx) method will be removed.
-func (n *Node) Value() (*ua.Variant, error) {
-	return n.ValueWithContext(context.Background())
-}
-
-// Note: Starting with v0.5 this method is superseded by the non 'WithContext' method.
-func (n *Node) ValueWithContext(ctx context.Context) (*ua.Variant, error) {
-	return n.AttributeWithContext(ctx, ua.AttributeIDValue)
+func (n *Node) Value(ctx context.Context) (*ua.Variant, error) {
+	return n.Attribute(ctx, ua.AttributeIDValue)
 }
 
 // Attribute returns the attribute of the node. with the given id.
-//
-// Note: Starting with v0.5 this method will require a context
-// and the corresponding XXXWithContext(ctx) method will be removed.
-func (n *Node) Attribute(attrID ua.AttributeID) (*ua.Variant, error) {
-	return n.AttributeWithContext(context.Background(), attrID)
-}
-
-// Note: Starting with v0.5 this method is superseded by the non 'WithContext' method.
-func (n *Node) AttributeWithContext(ctx context.Context, attrID ua.AttributeID) (*ua.Variant, error) {
+func (n *Node) Attribute(ctx context.Context, attrID ua.AttributeID) (*ua.Variant, error) {
 	rv := &ua.ReadValueID{NodeID: n.ID, AttributeID: attrID}
 	req := &ua.ReadRequest{NodesToRead: []*ua.ReadValueID{rv}}
-	res, err := n.c.ReadWithContext(ctx, req)
+	res, err := n.c.Read(ctx, req)
 	if err != nil {
 		return nil, err
 	}
@@ -208,21 +128,13 @@ func (n *Node) AttributeWithContext(ctx context.Context, attrID ua.AttributeID) 
 }
 
 // Attributes returns the given node attributes.
-//
-// Note: Starting with v0.5 this method will require a context
-// and the corresponding XXXWithContext(ctx) method will be removed.
-func (n *Node) Attributes(attrID ...ua.AttributeID) ([]*ua.DataValue, error) {
-	return n.AttributesWithContext(context.Background(), attrID...)
-}
-
-// Note: Starting with v0.5 this method is superseded by the non 'WithContext' method.
-func (n *Node) AttributesWithContext(ctx context.Context, attrID ...ua.AttributeID) ([]*ua.DataValue, error) {
+func (n *Node) Attributes(ctx context.Context, attrID ...ua.AttributeID) ([]*ua.DataValue, error) {
 	req := &ua.ReadRequest{}
 	for _, id := range attrID {
 		rv := &ua.ReadValueID{NodeID: n.ID, AttributeID: id}
 		req.NodesToRead = append(req.NodesToRead, rv)
 	}
-	res, err := n.c.ReadWithContext(ctx, req)
+	res, err := n.c.Read(ctx, req)
 	if err != nil {
 		return nil, err
 	}
@@ -230,36 +142,20 @@ func (n *Node) AttributesWithContext(ctx context.Context, attrID ...ua.Attribute
 }
 
 // Children returns the child nodes which match the node class mask.
-//
-// Note: Starting with v0.5 this method will require a context
-// and the corresponding XXXWithContext(ctx) method will be removed.
-func (n *Node) Children(refs uint32, mask ua.NodeClass) ([]*Node, error) {
-	return n.ChildrenWithContext(context.Background(), refs, mask)
-}
-
-// Note: Starting with v0.5 this method is superseded by the non 'WithContext' method.
-func (n *Node) ChildrenWithContext(ctx context.Context, refs uint32, mask ua.NodeClass) ([]*Node, error) {
+func (n *Node) Children(ctx context.Context, refs uint32, mask ua.NodeClass) ([]*Node, error) {
 	if refs == 0 {
 		refs = id.HierarchicalReferences
 	}
-	return n.ReferencedNodesWithContext(ctx, refs, ua.BrowseDirectionForward, mask, true)
+	return n.ReferencedNodes(ctx, refs, ua.BrowseDirectionForward, mask, true)
 }
 
 // ReferencedNodes returns the nodes referenced by this node.
-//
-// Note: Starting with v0.5 this method will require a context
-// and the corresponding XXXWithContext(ctx) method will be removed.
-func (n *Node) ReferencedNodes(refs uint32, dir ua.BrowseDirection, mask ua.NodeClass, includeSubtypes bool) ([]*Node, error) {
-	return n.ReferencedNodesWithContext(context.Background(), refs, dir, mask, includeSubtypes)
-}
-
-// Note: Starting with v0.5 this method is superseded by the non 'WithContext' method.
-func (n *Node) ReferencedNodesWithContext(ctx context.Context, refs uint32, dir ua.BrowseDirection, mask ua.NodeClass, includeSubtypes bool) ([]*Node, error) {
+func (n *Node) ReferencedNodes(ctx context.Context, refs uint32, dir ua.BrowseDirection, mask ua.NodeClass, includeSubtypes bool) ([]*Node, error) {
 	if refs == 0 {
 		refs = id.References
 	}
 	var nodes []*Node
-	res, err := n.ReferencesWithContext(ctx, refs, dir, mask, includeSubtypes)
+	res, err := n.References(ctx, refs, dir, mask, includeSubtypes)
 	if err != nil {
 		return nil, err
 	}
@@ -271,17 +167,9 @@ func (n *Node) ReferencedNodesWithContext(ctx context.Context, refs uint32, dir 
 
 // References returns all references for the node.
 //
-// Note: Starting with v0.5 this method will require a context
-// and the corresponding XXXWithContext(ctx) method will be removed.
-//
 // todo(fs): this is not complete since it only returns the
 // todo(fs): top-level reference at this point.
-func (n *Node) References(refType uint32, dir ua.BrowseDirection, mask ua.NodeClass, includeSubtypes bool) ([]*ua.ReferenceDescription, error) {
-	return n.ReferencesWithContext(context.Background(), refType, dir, mask, includeSubtypes)
-}
-
-// Note: Starting with v0.5 this method is superseded by the non 'WithContext' method.
-func (n *Node) ReferencesWithContext(ctx context.Context, refType uint32, dir ua.BrowseDirection, mask ua.NodeClass, includeSubtypes bool) ([]*ua.ReferenceDescription, error) {
+func (n *Node) References(ctx context.Context, refType uint32, dir ua.BrowseDirection, mask ua.NodeClass, includeSubtypes bool) ([]*ua.ReferenceDescription, error) {
 	if refType == 0 {
 		refType = id.References
 	}
@@ -306,7 +194,7 @@ func (n *Node) ReferencesWithContext(ctx context.Context, refType uint32, dir ua
 		NodesToBrowse:                 []*ua.BrowseDescription{desc},
 	}
 
-	resp, err := n.c.BrowseWithContext(ctx, req)
+	resp, err := n.c.Browse(ctx, req)
 	if err != nil {
 		return nil, err
 	}
@@ -320,7 +208,7 @@ func (n *Node) browseNext(ctx context.Context, results []*ua.BrowseResult) ([]*u
 			ContinuationPoints:        [][]byte{results[0].ContinuationPoint},
 			ReleaseContinuationPoints: false,
 		}
-		resp, err := n.c.BrowseNextWithContext(ctx, req)
+		resp, err := n.c.BrowseNext(ctx, req)
 		if err != nil {
 			return nil, err
 		}
@@ -331,15 +219,7 @@ func (n *Node) browseNext(ctx context.Context, results []*ua.BrowseResult) ([]*u
 }
 
 // TranslateBrowsePathsToNodeIDs translates an array of browseName segments to NodeIDs.
-//
-// Note: Starting with v0.5 this method will require a context
-// and the corresponding XXXWithContext(ctx) method will be removed.
-func (n *Node) TranslateBrowsePathsToNodeIDs(pathNames []*ua.QualifiedName) (*ua.NodeID, error) {
-	return n.TranslateBrowsePathsToNodeIDsWithContext(context.Background(), pathNames)
-}
-
-// Note: Starting with v0.5 this method is superseded by the non 'WithContext' method.
-func (n *Node) TranslateBrowsePathsToNodeIDsWithContext(ctx context.Context, pathNames []*ua.QualifiedName) (*ua.NodeID, error) {
+func (n *Node) TranslateBrowsePathsToNodeIDs(ctx context.Context, pathNames []*ua.QualifiedName) (*ua.NodeID, error) {
 	req := ua.TranslateBrowsePathsToNodeIDsRequest{
 		BrowsePaths: []*ua.BrowsePath{
 			{
@@ -361,7 +241,7 @@ func (n *Node) TranslateBrowsePathsToNodeIDsWithContext(ctx context.Context, pat
 	}
 
 	var nodeID *ua.NodeID
-	err := n.c.SendWithContext(ctx, &req, func(i interface{}) error {
+	err := n.c.Send(ctx, &req, func(i interface{}) error {
 		if resp, ok := i.(*ua.TranslateBrowsePathsToNodeIDsResponse); ok {
 			if len(resp.Results) == 0 {
 				return ua.StatusBadUnexpectedError
@@ -383,20 +263,12 @@ func (n *Node) TranslateBrowsePathsToNodeIDsWithContext(ctx context.Context, pat
 }
 
 // TranslateBrowsePathInNamespaceToNodeID translates a browseName to a NodeID within the same namespace.
-//
-// Note: Starting with v0.5 this method will require a context
-// and the corresponding XXXWithContext(ctx) method will be removed.
-func (n *Node) TranslateBrowsePathInNamespaceToNodeID(ns uint16, browsePath string) (*ua.NodeID, error) {
-	return n.TranslateBrowsePathInNamespaceToNodeIDWithContext(context.Background(), ns, browsePath)
-}
-
-// Note: Starting with v0.5 this method is superseded by the non 'WithContext' method.
-func (n *Node) TranslateBrowsePathInNamespaceToNodeIDWithContext(ctx context.Context, ns uint16, browsePath string) (*ua.NodeID, error) {
+func (n *Node) TranslateBrowsePathInNamespaceToNodeID(ctx context.Context, ns uint16, browsePath string) (*ua.NodeID, error) {
 	segments := strings.Split(browsePath, ".")
 	var names []*ua.QualifiedName
 	for _, segment := range segments {
 		qn := &ua.QualifiedName{NamespaceIndex: ns, Name: segment}
 		names = append(names, qn)
 	}
-	return n.TranslateBrowsePathsToNodeIDsWithContext(ctx, names)
+	return n.TranslateBrowsePathsToNodeIDs(ctx, names)
 }

@@ -67,10 +67,10 @@ func main() {
 	if err := c.Connect(ctx); err != nil {
 		log.Fatal(err)
 	}
-	defer c.CloseWithContext(ctx)
+	defer c.Close(ctx)
 
 	// Use our connection (read the server's time)
-	v, err := c.Node(ua.NewNumericNodeID(0, 2258)).ValueWithContext(ctx)
+	v, err := c.Node(ua.NewNumericNodeID(0, 2258)).Value(ctx)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -81,7 +81,7 @@ func main() {
 	}
 
 	// Detach our session and try re-establish it on a different secure channel
-	s, err := c.DetachSessionWithContext(ctx)
+	s, err := c.DetachSession(ctx)
 	if err != nil {
 		log.Fatalf("Error detaching session: %s", err)
 	}
@@ -90,16 +90,16 @@ func main() {
 
 	// Create a channel only and do not activate it automatically
 	d.Dial(ctx)
-	defer d.CloseWithContext(ctx)
+	defer d.Close(ctx)
 
 	// Activate the previous session on the new channel
-	err = d.ActivateSessionWithContext(ctx, s)
+	err = d.ActivateSession(ctx, s)
 	if err != nil {
 		log.Fatalf("Error reactivating session: %s", err)
 	}
 
 	// Read the time again to prove our session is still OK
-	v, err = d.Node(ua.NewNumericNodeID(0, 2258)).ValueWithContext(ctx)
+	v, err = d.Node(ua.NewNumericNodeID(0, 2258)).Value(ctx)
 	if err != nil {
 		log.Fatal(err)
 	}

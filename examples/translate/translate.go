@@ -31,10 +31,10 @@ func main() {
 	if err := c.Connect(ctx); err != nil {
 		log.Fatal(err)
 	}
-	defer c.CloseWithContext(ctx)
+	defer c.Close(ctx)
 
 	root := c.Node(ua.NewTwoByteNodeID(id.ObjectsFolder))
-	nodeID, err := root.TranslateBrowsePathInNamespaceToNodeIDWithContext(ctx, uint16(*ns), *nodePath)
+	nodeID, err := root.TranslateBrowsePathInNamespaceToNodeID(ctx, uint16(*ns), *nodePath)
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -28,7 +28,7 @@ func main() {
 	if err := c.Connect(ctx); err != nil {
 		log.Fatal(err)
 	}
-	defer c.CloseWithContext(ctx)
+	defer c.Close(ctx)
 
 	in := int64(12)
 	req := &ua.CallMethodRequest{
@@ -37,7 +37,7 @@ func main() {
 		InputArguments: []*ua.Variant{ua.MustVariant(in)},
 	}
 
-	resp, err := c.CallWithContext(ctx, req)
+	resp, err := c.Call(ctx, req)
 	if err != nil {
 		log.Fatal(err)
 	}

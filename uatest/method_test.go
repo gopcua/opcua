@@ -7,9 +7,10 @@ import (
 	"context"
 	"testing"
 
+	"github.com/pascaldekloe/goe/verify"
+
 	"github.com/gopcua/opcua"
 	"github.com/gopcua/opcua/ua"
-	"github.com/pascaldekloe/goe/verify"
 )
 
 type Complex struct {
@@ -64,11 +65,11 @@ func TestCallMethod(t *testing.T) {
 	if err := c.Connect(ctx); err != nil {
 		t.Fatal(err)
 	}
-	defer c.CloseWithContext(ctx)
+	defer c.Close(ctx)
 
 	for _, tt := range tests {
 		t.Run(tt.req.ObjectID.String(), func(t *testing.T) {
-			resp, err := c.CallWithContext(ctx, tt.req)
+			resp, err := c.Call(ctx, tt.req)
 			if err != nil {
 				t.Fatal(err)
 			}
