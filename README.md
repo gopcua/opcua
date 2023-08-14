@@ -20,6 +20,24 @@ See below for a list of [Tested Platforms](#tested-platforms) and [Supported Fea
 [![License](https://img.shields.io/github/license/mashape/apistatus.svg)](https://github.com/gopcua/opcua/blob/master/LICENSE)
 [![Version](https://img.shields.io/github/tag/gopcua/opcua.svg?color=blue&label=version)](https://github.com/gopcua/opcua/releases)
 
+## NOTE: v0.5.0 BREAKING CHANGE: All cleint methods now require a context
+
+With the release of `v0.5.0` on 14 Aug 2023 we now require all client 
+methods to have a context. 
+
+In `v0.3.0` on 21 Jan 2022 release we added `WithContext` variants for all methods
+to avoid a breaking change. All existing methods without a context had a disclaimer
+that with `v0.5.0` their signature would change to include the context
+and that the `WithContext` method would be removed. 
+
+This time has now come and `v0.5.0` has been released on 14 Aug 2023.
+
+Please update your code and let us know if there are any issue!
+
+Thank you!
+
+Your GOPCUA Team
+
 ## Quickstart
 
 ```sh

@@ -1,9 +1,15 @@
 # Changelog
 
-## Unreleased
+## v0.5.0 (14 Aug 2023)
+
+* Drop WithContext methods and require all methods to have a context (#554)
+
+## v0.4.1 (14 Aug 2023)
 
 * Update the schema to v1.05.02-2022-11-01 and regenerate code (#589)
 * fix: handle extra padding if key length > 2048 (#648)
+* uasc: return an error for invalid uri/mode combinations with None (#664)
+* go1.21 and python3.11 (for testing)
 
 ## v0.4.0 (13 Jun 2023)
 
