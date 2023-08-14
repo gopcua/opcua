@@ -20,10 +20,10 @@ See below for a list of [Tested Platforms](#tested-platforms) and [Supported Fea
 [![License](https://img.shields.io/github/license/mashape/apistatus.svg)](https://github.com/gopcua/opcua/blob/master/LICENSE)
 [![Version](https://img.shields.io/github/tag/gopcua/opcua.svg?color=blue&label=version)](https://github.com/gopcua/opcua/releases)
 
-## NOTE: v0.5.0 BREAKING CHANGE: All cleint methods now require a context
+## v0.5.0 BREAKING CHANGE: All client methods now require a context
 
 With the release of `v0.5.0` on 14 Aug 2023 we now require all client 
-methods to have a context. 
+methods to have a context.
 
 In `v0.3.0` on 21 Jan 2022 release we added `WithContext` variants for all methods
 to avoid a breaking change. All existing methods without a context had a disclaimer

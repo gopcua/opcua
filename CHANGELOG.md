@@ -8,6 +8,7 @@
 
 * Update the schema to v1.05.02-2022-11-01 and regenerate code (#589)
 * fix: handle extra padding if key length > 2048 (#648)
+* Add B&R Automation PC 3100 to the list of equipments (#663)
 * uasc: return an error for invalid uri/mode combinations with None (#664)
 * go1.21 and python3.11 (for testing)
 
