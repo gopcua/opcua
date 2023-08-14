@@ -36,7 +36,7 @@ func TestWrite(t *testing.T) {
 	if err := c.Connect(ctx); err != nil {
 		t.Fatal(err)
 	}
-	defer c.CloseWithContext(ctx)
+	defer c.Close(ctx)
 
 	for _, tt := range tests {
 		t.Run(tt.id.String(), func(t *testing.T) {
@@ -66,7 +66,7 @@ func TestWrite(t *testing.T) {
 func testWrite(t *testing.T, ctx context.Context, c *opcua.Client, status ua.StatusCode, req *ua.WriteRequest) {
 	t.Helper()
 
-	resp, err := c.WriteWithContext(ctx, req)
+	resp, err := c.Write(ctx, req)
 	if err != nil {
 		t.Fatalf("Write failed: %s", err)
 	}

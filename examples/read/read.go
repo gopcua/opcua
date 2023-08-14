@@ -32,7 +32,7 @@ func main() {
 	if err := c.Connect(ctx); err != nil {
 		log.Fatal(err)
 	}
-	defer c.CloseWithContext(ctx)
+	defer c.Close(ctx)
 
 	id, err := ua.ParseNodeID(*nodeID)
 	if err != nil {
@@ -49,7 +49,7 @@ func main() {
 
 	var resp *ua.ReadResponse
 	for {
-		resp, err = c.ReadWithContext(ctx, req)
+		resp, err = c.Read(ctx, req)
 		if err == nil {
 			break
 		}

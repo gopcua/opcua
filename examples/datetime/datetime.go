@@ -51,9 +51,9 @@ func main() {
 	if err := c.Connect(ctx); err != nil {
 		log.Fatal(err)
 	}
-	defer c.CloseWithContext(ctx)
+	defer c.Close(ctx)
 
-	v, err := c.Node(ua.NewNumericNodeID(0, 2258)).ValueWithContext(ctx)
+	v, err := c.Node(ua.NewNumericNodeID(0, 2258)).Value(ctx)
 	switch {
 	case err != nil:
 		log.Fatal(err)

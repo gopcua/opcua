@@ -59,9 +59,9 @@ func main() {
 	if err := c.Connect(ctx); err != nil {
 		log.Fatal(err)
 	}
-	defer c.CloseWithContext(ctx)
+	defer c.Close(ctx)
 
-	v, err := c.Node(id).ValueWithContext(ctx)
+	v, err := c.Node(id).Value(ctx)
 	switch {
 	case err != nil:
 		log.Fatal(err)

@@ -29,7 +29,7 @@ func main() {
 	if err := c.Connect(ctx); err != nil {
 		log.Fatal(err)
 	}
-	defer c.CloseWithContext(ctx)
+	defer c.Close(ctx)
 
 	id, err := ua.ParseNodeID(*nodeID)
 	if err != nil {
@@ -37,19 +37,19 @@ func main() {
 	}
 
 	n := c.Node(id)
-	accessLevel, err := n.AccessLevelWithContext(ctx)
+	accessLevel, err := n.AccessLevel(ctx)
 	if err != nil {
 		log.Fatal(err)
 	}
 	log.Print("AccessLevel: ", accessLevel)
 
-	userAccessLevel, err := n.UserAccessLevelWithContext(ctx)
+	userAccessLevel, err := n.UserAccessLevel(ctx)
 	if err != nil {
 		log.Fatal(err)
 	}
 	log.Print("UserAccessLevel: ", userAccessLevel)
 
-	v, err := n.ValueWithContext(ctx)
+	v, err := n.Value(ctx)
 	switch {
 	case err != nil:
 		log.Fatal(err)

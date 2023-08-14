@@ -29,14 +29,14 @@ func main() {
 	if err := c.Connect(ctx); err != nil {
 		log.Fatal(err)
 	}
-	defer c.CloseWithContext(ctx)
+	defer c.Close(ctx)
 
 	id, err := ua.ParseNodeID(*nodeID)
 	if err != nil {
 		log.Fatalf("invalid node id: %v", err)
 	}
 
-	regResp, err := c.RegisterNodesWithContext(ctx, &ua.RegisterNodesRequest{
+	regResp, err := c.RegisterNodes(ctx, &ua.RegisterNodesRequest{
 		NodesToRegister: []*ua.NodeID{id},
 	})
 	if err != nil {
@@ -51,7 +51,7 @@ func main() {
 		TimestampsToReturn: ua.TimestampsToReturnBoth,
 	}
 
-	resp, err := c.ReadWithContext(ctx, req)
+	resp, err := c.Read(ctx, req)
 	if err != nil {
 		log.Fatalf("Read failed: %s", err)
 	}
@@ -60,7 +60,7 @@ func main() {
 	}
 	log.Print(resp.Results[0].Value.Value())
 
-	_, err = c.UnregisterNodesWithContext(ctx, &ua.UnregisterNodesRequest{
+	_, err = c.UnregisterNodes(ctx, &ua.UnregisterNodesRequest{
 		NodesToUnregister: []*ua.NodeID{id},
 	})
 	if err != nil {

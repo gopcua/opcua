@@ -32,8 +32,7 @@ func TestStats(t *testing.T) {
 	if err := c.Connect(ctx); err != nil {
 		t.Fatal(err)
 	}
-
-	c.CloseWithContext(ctx)
+	c.Close(ctx)
 
 	want := map[string]*expvar.Int{
 		"Dial":             newExpVarInt(1),
