@@ -27,6 +27,36 @@ import (
 	"github.com/gopcua/opcua/uasc"
 )
 
+// FindServers returns the servers known to a server or discovery server.
+func FindServers(ctx context.Context, endpoint string, opts ...Option) ([]*ua.ApplicationDescription, error) {
+	opts = append(opts, AutoReconnect(false))
+	c := NewClient(endpoint, opts...)
+	if err := c.Dial(ctx); err != nil {
+		return nil, err
+	}
+	c.Close(ctx)
+	res, err := c.FindServers(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return res.Servers, nil
+}
+
+// FindServersOnNetwork returns the servers known to a server or discovery server. Unlike FindServers, this service is only implemented by discovery servers.
+func FindServersOnNetwork(ctx context.Context, endpoint string, opts ...Option) ([]*ua.ServerOnNetwork, error) {
+	opts = append(opts, AutoReconnect(false))
+	c := NewClient(endpoint, opts...)
+	if err := c.Dial(ctx); err != nil {
+		return nil, err
+	}
+	c.Close(ctx)
+	res, err := c.FindServersOnNetwork(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return res.Servers, nil
+}
+
 // GetEndpoints returns the available endpoint descriptions for the server.
 func GetEndpoints(ctx context.Context, endpoint string, opts ...Option) ([]*ua.EndpointDescription, error) {
 	opts = append(opts, AutoReconnect(false))
@@ -924,6 +954,32 @@ func (c *Client) sendWithTimeout(ctx context.Context, req ua.Request, timeout ti
 // through this client connection.
 func (c *Client) Node(id *ua.NodeID) *Node {
 	return &Node{ID: id, c: c}
+}
+
+// FindServers finds the servers available at an endpoint
+func (c *Client) FindServers(ctx context.Context) (*ua.FindServersResponse, error) {
+	stats.Client().Add("FindServers", 1)
+
+	req := &ua.FindServersRequest{
+		EndpointURL: c.endpointURL,
+	}
+	var res *ua.FindServersResponse
+	err := c.Send(ctx, req, func(v interface{}) error {
+		return safeAssign(v, &res)
+	})
+	return res, err
+}
+
+// FindServersOnNetwork finds the servers available at an endpoint
+func (c *Client) FindServersOnNetwork(ctx context.Context) (*ua.FindServersOnNetworkResponse, error) {
+	stats.Client().Add("FindServersOnNetwork", 1)
+
+	req := &ua.FindServersOnNetworkRequest{}
+	var res *ua.FindServersOnNetworkResponse
+	err := c.Send(ctx, req, func(v interface{}) error {
+		return safeAssign(v, &res)
+	})
+	return res, err
 }
 
 // GetEndpoints returns the list of available endpoints of the server.

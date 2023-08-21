@@ -172,8 +172,8 @@ Here is the current set of supported services. For low-level access use the clie
 
 | Service Set                 | Service                       | Client | Notes        |
 |-----------------------------|-------------------------------|--------|--------------|
-| Discovery Service Set       | FindServers                   |        |              |
-|                             | FindServersOnNetwork          |        |              |
+| Discovery Service Set       | FindServers                   | Yes    |              |
+|                             | FindServersOnNetwork          | Yes    |              |
 |                             | GetEndpoints                  | Yes    |              |
 |                             | RegisterServer                |        |              |
 |                             | RegisterServer2               |        |              |
