@@ -11,8 +11,11 @@ import (
 )
 
 func TestClient_Send_DoesNotPanicWhenDisconnected(t *testing.T) {
-	c := NewClient("opc.tcp://example.com:4840")
-	err := c.Send(context.Background(), &ua.ReadRequest{}, func(i interface{}) error {
+	c, err := NewClient("opc.tcp://example.com:4840")
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = c.Send(context.Background(), &ua.ReadRequest{}, func(i interface{}) error {
 		return nil
 	})
 	verify.Values(t, "", err, ua.StatusBadServerNotConnected)

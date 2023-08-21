@@ -20,7 +20,10 @@ func TestReadUnknowNodeID(t *testing.T) {
 	srv := NewServer("read_unknow_node_id_server.py")
 	defer srv.Close()
 
-	c := opcua.NewClient(srv.Endpoint, srv.Opts...)
+	c, err := opcua.NewClient(srv.Endpoint, srv.Opts...)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := c.Connect(ctx); err != nil {
 		t.Fatal(err)
 	}

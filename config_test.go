@@ -170,6 +170,7 @@ func TestOptions(t *testing.T) {
 		name string
 		opt  Option
 		cfg  *Config
+		err  error
 	}{
 		{
 			name: `ApplicationName("a")`,
@@ -297,9 +298,8 @@ func TestOptions(t *testing.T) {
 		{
 			name: `CertificateFile() error`,
 			opt:  CertificateFile("x"),
-			cfg: &Config{
-				err: notFoundError("certificate", "x"),
-			},
+			cfg:  &Config{},
+			err:  notFoundError("certificate", "x"),
 		},
 		{
 			name: `Lifetime(10ms)`,
@@ -359,9 +359,8 @@ func TestOptions(t *testing.T) {
 		{
 			name: `PrivateKeyFile() error`,
 			opt:  PrivateKeyFile("x"),
-			cfg: &Config{
-				err: notFoundError("private key", "x"),
-			},
+			cfg:  &Config{},
+			err:  notFoundError("private key", "x"),
 		},
 		{
 			name: `ProductURI("a")`,
@@ -432,9 +431,8 @@ func TestOptions(t *testing.T) {
 		{
 			name: `RemoteCertificateFile() error`,
 			opt:  RemoteCertificateFile("x"),
-			cfg: &Config{
-				err: notFoundError("certificate", "x"),
-			},
+			cfg:  &Config{},
+			err:  notFoundError("certificate", "x"),
 		},
 		{
 			name: `RequestTimeout(5s)`,
@@ -803,8 +801,8 @@ func TestOptions(t *testing.T) {
 				return ""
 			}
 
-			cfg := ApplyConfig(tt.opt)
-			if got, want := errstr(cfg.Error()), errstr(tt.cfg.err); got != "" || want != "" {
+			cfg, err := ApplyConfig(tt.opt)
+			if got, want := errstr(err), errstr(tt.err); got != "" || want != "" {
 				if got != want {
 					t.Fatalf("got error %q want %q", got, want)
 				}
