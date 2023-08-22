@@ -20,19 +20,20 @@ See below for a list of [Tested Platforms](#tested-platforms) and [Supported Fea
 [![License](https://img.shields.io/github/license/mashape/apistatus.svg)](https://github.com/gopcua/opcua/blob/master/LICENSE)
 [![Version](https://img.shields.io/github/tag/gopcua/opcua.svg?color=blue&label=version)](https://github.com/gopcua/opcua/releases)
 
-## v0.5.0 BREAKING CHANGE: All client methods now require a context
+## v0.5.x BREAKING CHANGES
 
-With the release of `v0.5.0` on 14 Aug 2023 we now require all client 
-methods to have a context.
+* `v0.5.0` released on 14 Aug 2023: all `Client` methods must have a context
+* `v0.5.1` released on 22 Aug 2023: the `NewClient` function returns an error
 
 In `v0.3.0` on 21 Jan 2022 release we added `WithContext` variants for all methods
 to avoid a breaking change. All existing methods without a context had a disclaimer
 that with `v0.5.0` their signature would change to include the context
 and that the `WithContext` method would be removed. 
 
-This time has now come and `v0.5.0` has been released on 14 Aug 2023.
+We missed to update the `NewClient` function in `v0.5.0` which was fixed
+in `v0.5.1`.
 
-Please update your code and let us know if there are any issue!
+Please update your code and let us know if there are any issues!
 
 Thank you!
 

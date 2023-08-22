@@ -1,5 +1,12 @@
 # Changelog
 
+## v0.5.1 (22 Aug 2023)
+
+* refactor: make NewClient return an error (#674)
+* feat: add support for FindServers and FindServersOnNetwork (#675)
+* Readme: adjust Services section (#676)
+* Update github actions (#677)
+
 ## v0.5.0 (14 Aug 2023)
 
 * Drop WithContext methods and require all methods to have a context (#554)
