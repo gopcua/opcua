@@ -21,17 +21,20 @@ func main() {
 
 	ctx := context.Background()
 
-	findServersOnNetwork(ctx, *endpoint)
+	if err := findServersOnNetwork(ctx, *endpoint); err != nil {
+		log.Print(err)
+	}
 
-	findServers(ctx, *endpoint)
+	if err := findServers(ctx, *endpoint); err != nil {
+		log.Fatal(err)
+	}
 }
 
-func findServersOnNetwork(ctx context.Context, endpoint string) {
+func findServersOnNetwork(ctx context.Context, endpoint string) error {
 	log.Println("Finding servers on network")
 	servers, err := opcua.FindServersOnNetwork(ctx, endpoint)
 	if err != nil {
-		log.Printf("Error calling find servers on network: %v", err)
-		return
+		return err
 	}
 	for i, server := range servers {
 		fmt.Printf("%d Server on network:\n", i)
@@ -40,13 +43,14 @@ func findServersOnNetwork(ctx context.Context, endpoint string) {
 		fmt.Printf("  -- DiscoveryURL: %v\n", server.DiscoveryURL)
 		fmt.Printf("  -- ServerCapabilities: %v\n", server.ServerCapabilities)
 	}
+	return nil
 }
 
-func findServers(ctx context.Context, endpoint string) {
+func findServers(ctx context.Context, endpoint string) error {
 	log.Println("Finding servers")
 	servers, err := opcua.FindServers(ctx, endpoint)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	for i, server := range servers {
 		fmt.Printf("%dth Server:\n", i+1)
@@ -58,4 +62,5 @@ func findServers(ctx context.Context, endpoint string) {
 		fmt.Printf("  -- DiscoveryProfileURI: %v\n", server.DiscoveryProfileURI)
 		fmt.Printf("  -- DiscoveryURLs: %v\n", server.DiscoveryURLs)
 	}
+	return nil
 }
