@@ -30,7 +30,10 @@ import (
 // GetEndpoints returns the available endpoint descriptions for the server.
 func GetEndpoints(ctx context.Context, endpoint string, opts ...Option) ([]*ua.EndpointDescription, error) {
 	opts = append(opts, AutoReconnect(false))
-	c := NewClient(endpoint, opts...)
+	c, err := NewClient(endpoint, opts...)
+	if err != nil {
+		return nil, err
+	}
 	if err := c.Dial(ctx); err != nil {
 		return nil, err
 	}
@@ -133,15 +136,6 @@ type Client struct {
 
 	// monitorOnce ensures only one connection monitor is running
 	monitorOnce sync.Once
-
-	// cfgerr contains an error that was captured in ApplyConfig.
-	// Since the API does not allow to bubble the error up in NewClient
-	// and we don't want to break existing code right away we carry the
-	// error here and bubble it up during Dial and Connect.
-	//
-	// Note: Starting with v0.5 NewClient will return the error and this
-	// variable needs to be removed.
-	cfgerr error
 }
 
 // NewClient creates a new Client.
@@ -155,10 +149,11 @@ type Client struct {
 // #Option for details.
 //
 // https://godoc.org/github.com/gopcua/opcua#Option
-//
-// Note: Starting with v0.5 this function will return an error.
-func NewClient(endpoint string, opts ...Option) *Client {
-	cfg := ApplyConfig(opts...)
+func NewClient(endpoint string, opts ...Option) (*Client, error) {
+	cfg, err := ApplyConfig(opts...)
+	if err != nil {
+		return nil, err
+	}
 	c := Client{
 		endpointURL: endpoint,
 		cfg:         cfg,
@@ -167,7 +162,6 @@ func NewClient(endpoint string, opts ...Option) *Client {
 		pendingAcks: make([]*ua.SubscriptionAcknowledgement, 0),
 		pausech:     make(chan struct{}, 2),
 		resumech:    make(chan struct{}, 2),
-		cfgerr:      cfg.Error(), // todo(fs): remove with v0.5.0 and return the error
 	}
 	c.pauseSubscriptions(context.Background())
 	c.setPublishTimeout(uasc.MaxTimeout)
@@ -175,7 +169,7 @@ func NewClient(endpoint string, opts ...Option) *Client {
 	c.setSecureChannel(nil)
 	c.setSession(nil)
 	c.setNamespaces([]string{})
-	return &c
+	return &c, nil
 }
 
 // reconnectAction is a list of actions for the client reconnection logic.
@@ -194,11 +188,6 @@ const (
 
 // Connect establishes a secure channel and creates a new session.
 func (c *Client) Connect(ctx context.Context) error {
-	// todo(fs): remove with v0.5.0
-	if c.cfgerr != nil {
-		return c.cfgerr
-	}
-
 	// todo(fs): the secure channel is 'nil' during a re-connect
 	// todo(fs): but we expect this method to be called once during startup
 	// todo(fs): so this is probably safe
@@ -503,16 +492,16 @@ func (c *Client) monitor(ctx context.Context) {
 						// populated in the previous step.
 
 						activeSubs = 0
-						for _, id := range subsToRepublish {
-							if err := c.republishSubscription(ctx, id, availableSeqs[id]); err != nil {
-								dlog.Printf("republish of subscription %d failed", id)
-								subsToRecreate = append(subsToRecreate, id)
+						for _, subID := range subsToRepublish {
+							if err := c.republishSubscription(ctx, subID, availableSeqs[subID]); err != nil {
+								dlog.Printf("republish of subscription %d failed", subID)
+								subsToRecreate = append(subsToRecreate, subID)
 							}
 							activeSubs++
 						}
 
-						for _, id := range subsToRecreate {
-							if err := c.recreateSubscription(ctx, id); err != nil {
+						for _, subID := range subsToRecreate {
+							if err := c.recreateSubscription(ctx, subID); err != nil {
 								dlog.Printf("recreate subscripitions failed: %v", err)
 								action = recreateSession
 								continue
@@ -555,11 +544,6 @@ func (c *Client) monitor(ctx context.Context) {
 
 // Dial establishes a secure channel.
 func (c *Client) Dial(ctx context.Context) error {
-	// todo(fs): remove with v0.5.0
-	if c.cfgerr != nil {
-		return c.cfgerr
-	}
-
 	stats.Client().Add("Dial", 1)
 
 	if c.SecureChannel() != nil {
@@ -754,10 +738,16 @@ func (c *Client) CreateSession(ctx context.Context, cfg *uasc.SessionConfig) (*S
 		// Ensure we have a valid identity token that the server will accept before trying to activate a session
 		if c.cfg.session.UserIdentityToken == nil {
 			opt := AuthAnonymous()
+			// todo(sr): opt returns an error but we concluded that this call cannot
+			// todo(sr): fail and that we do not want to stop creating the session
+			// todo(sr): hence we ignore it.
 			opt(c.cfg)
 
 			p := anonymousPolicyID(res.ServerEndpoints)
 			opt = AuthPolicyID(p)
+			// todo(sr): opt returns an error but we concluded that this call cannot
+			// todo(sr): fail and that we do not want to stop creating the session
+			// todo(sr): hence we ignore it.
 			opt(c.cfg)
 		}
 

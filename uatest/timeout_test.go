@@ -21,13 +21,19 @@ const (
 )
 
 func TestClientTimeoutViaOptions(t *testing.T) {
-	c := opcua.NewClient(tcpNoRstTestServer, opcua.DialTimeout(forceTimeoutDuration))
+	c, err := opcua.NewClient(tcpNoRstTestServer, opcua.DialTimeout(forceTimeoutDuration))
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	connectAndValidate(t, c, context.Background(), forceTimeoutDuration)
 }
 
 func TestClientTimeoutViaContext(t *testing.T) {
-	c := opcua.NewClient(tcpNoRstTestServer)
+	c, err := opcua.NewClient(tcpNoRstTestServer)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), forceTimeoutDuration)
 	defer cancel()

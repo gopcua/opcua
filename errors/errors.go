@@ -34,6 +34,11 @@ func Unwrap(err error) error {
 	return errors.Unwrap(err)
 }
 
+// Join wraps errors.Join
+func Join(errs ...error) error {
+	return errors.Join(errs...)
+}
+
 // Equal returns true if the two errors have the same error message.
 //
 // todo(fs): the reason we need this function and cannot just use

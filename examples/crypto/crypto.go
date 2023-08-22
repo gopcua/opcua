@@ -63,7 +63,10 @@ func main() {
 	opts := clientOptsFromFlags(endpoints)
 
 	// Create a Client with the selected options
-	c := opcua.NewClient(*endpoint, opts...)
+	c, err := opcua.NewClient(*endpoint, opts...)
+	if err != nil {
+		log.Fatal(err)
+	}
 	if err := c.Connect(ctx); err != nil {
 		log.Fatal(err)
 	}
@@ -86,7 +89,10 @@ func main() {
 		log.Fatalf("Error detaching session: %s", err)
 	}
 
-	d := opcua.NewClient(*endpoint, opts...)
+	d, err := opcua.NewClient(*endpoint, opts...)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	// Create a channel only and do not activate it automatically
 	d.Dial(ctx)

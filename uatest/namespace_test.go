@@ -18,7 +18,10 @@ func TestNamespace(t *testing.T) {
 	srv := NewServer("rw_server.py")
 	defer srv.Close()
 
-	c := opcua.NewClient(srv.Endpoint, srv.Opts...)
+	c, err := opcua.NewClient(srv.Endpoint, srv.Opts...)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := c.Connect(ctx); err != nil {
 		t.Fatal(err)
 	}

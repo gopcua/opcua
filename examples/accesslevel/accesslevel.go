@@ -25,7 +25,10 @@ func main() {
 
 	ctx := context.Background()
 
-	c := opcua.NewClient(*endpoint)
+	c, err := opcua.NewClient(*endpoint)
+	if err != nil {
+		log.Fatal(err)
+	}
 	if err := c.Connect(ctx); err != nil {
 		log.Fatal(err)
 	}
