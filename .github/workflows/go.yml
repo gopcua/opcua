@@ -1,5 +1,13 @@
 name: gopuca
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - '**.md'
+  pull_request:
+    paths-ignore:
+      - '**.md'
 jobs:
   test:
     name: Test ${{ matrix.os }} go${{ matrix.go }}
