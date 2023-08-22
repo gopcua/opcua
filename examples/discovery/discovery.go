@@ -21,37 +21,41 @@ func main() {
 
 	ctx := context.Background()
 
-	{
-		log.Println("Finding servers on network")
-		servers, err := opcua.FindServersOnNetwork(ctx, *endpoint)
-		if err != nil {
-			log.Printf("Error calling find servers on network: %v", err)
-		} else {
-			for i, server := range servers {
-				fmt.Printf("%d Server on network:\n", i)
-				fmt.Printf("  -- RecordID: %v\n", server.RecordID)
-				fmt.Printf("  -- ServerName: %v\n", server.ServerName)
-				fmt.Printf("  -- DiscoveryURL: %v\n", server.DiscoveryURL)
-				fmt.Printf("  -- ServerCapabilities: %v\n", server.ServerCapabilities)
-			}
-		}
-	}
+	findServersOnNetwork(ctx, *endpoint)
 
-	{
-		log.Println("Finding servers")
-		servers, err := opcua.FindServers(ctx, *endpoint)
-		if err != nil {
-			log.Fatal(err)
-		}
-		for i, server := range servers {
-			fmt.Printf("%dth Server:\n", i+1)
-			fmt.Printf("  -- ApplicationURI: %v\n", server.ApplicationURI)
-			fmt.Printf("  -- ProductURI: %v\n", server.ProductURI)
-			fmt.Printf("  -- ApplicationName: %v\n", server.ApplicationName)
-			fmt.Printf("  -- ApplicationType: %v\n", server.ApplicationType)
-			fmt.Printf("  -- GatewayServerURI: %v\n", server.GatewayServerURI)
-			fmt.Printf("  -- DiscoveryProfileURI: %v\n", server.DiscoveryProfileURI)
-			fmt.Printf("  -- DiscoveryURLs: %v\n", server.DiscoveryURLs)
-		}
+	findServers(ctx, *endpoint)
+}
+
+func findServersOnNetwork(ctx context.Context, endpoint string) {
+	log.Println("Finding servers on network")
+	servers, err := opcua.FindServersOnNetwork(ctx, endpoint)
+	if err != nil {
+		log.Printf("Error calling find servers on network: %v", err)
+		return
+	}
+	for i, server := range servers {
+		fmt.Printf("%d Server on network:\n", i)
+		fmt.Printf("  -- RecordID: %v\n", server.RecordID)
+		fmt.Printf("  -- ServerName: %v\n", server.ServerName)
+		fmt.Printf("  -- DiscoveryURL: %v\n", server.DiscoveryURL)
+		fmt.Printf("  -- ServerCapabilities: %v\n", server.ServerCapabilities)
+	}
+}
+
+func findServers(ctx context.Context, endpoint string) {
+	log.Println("Finding servers")
+	servers, err := opcua.FindServers(ctx, endpoint)
+	if err != nil {
+		log.Fatal(err)
+	}
+	for i, server := range servers {
+		fmt.Printf("%dth Server:\n", i+1)
+		fmt.Printf("  -- ApplicationURI: %v\n", server.ApplicationURI)
+		fmt.Printf("  -- ProductURI: %v\n", server.ProductURI)
+		fmt.Printf("  -- ApplicationName: %v\n", server.ApplicationName)
+		fmt.Printf("  -- ApplicationType: %v\n", server.ApplicationType)
+		fmt.Printf("  -- GatewayServerURI: %v\n", server.GatewayServerURI)
+		fmt.Printf("  -- DiscoveryProfileURI: %v\n", server.DiscoveryProfileURI)
+		fmt.Printf("  -- DiscoveryURLs: %v\n", server.DiscoveryURLs)
 	}
 }
