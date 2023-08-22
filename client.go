@@ -37,7 +37,7 @@ func FindServers(ctx context.Context, endpoint string, opts ...Option) ([]*ua.Ap
 	if err := c.Dial(ctx); err != nil {
 		return nil, err
 	}
-	c.Close(ctx)
+	defer c.Close(ctx)
 	res, err := c.FindServers(ctx)
 	if err != nil {
 		return nil, err
@@ -55,7 +55,7 @@ func FindServersOnNetwork(ctx context.Context, endpoint string, opts ...Option) 
 	if err := c.Dial(ctx); err != nil {
 		return nil, err
 	}
-	c.Close(ctx)
+	defer c.Close(ctx)
 	res, err := c.FindServersOnNetwork(ctx)
 	if err != nil {
 		return nil, err
