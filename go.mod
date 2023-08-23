@@ -5,6 +5,7 @@ go 1.22.0
 require (
 	github.com/google/uuid v1.3.0
 	github.com/pascaldekloe/goe v0.1.1
+	golang.org/x/exp v0.0.0-20241204233417-43b7b7cde48d
 	golang.org/x/term v0.8.0
 )
 
