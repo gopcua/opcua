@@ -44,7 +44,7 @@ func encode(val reflect.Value, name string) ([]byte, error) {
 	switch {
 	case isBinaryEncoder(val):
 		v := val.Interface().(BinaryEncoder)
-		return logIntercept(v.Encode())
+		return dump(v.Encode())
 
 	case isTime(val):
 		buf.WriteTime(val.Convert(timeType).Interface().(time.Time))
@@ -79,25 +79,25 @@ func encode(val reflect.Value, name string) ([]byte, error) {
 			if val.IsNil() {
 				return nil, nil
 			}
-			return logIntercept(encode(val.Elem(), name))
+			return dump(encode(val.Elem(), name))
 		case reflect.Struct:
-			return logIntercept(writeStruct(val, name))
+			return dump(writeStruct(val, name))
 		case reflect.Slice:
-			return logIntercept(writeSlice(val, name))
+			return dump(writeSlice(val, name))
 		case reflect.Array:
-			return logIntercept(writeArray(val, name))
+			return dump(writeArray(val, name))
 		default:
 			return nil, errors.Errorf("unsupported type: %s", val.Type())
 		}
 	}
-	return logIntercept(buf.Bytes(), buf.Error())
+	return dump(buf.Bytes(), buf.Error())
 }
 
-func logIntercept(bytes []byte, err error) ([]byte, error) {
+func dump(b []byte, err error) ([]byte, error) {
 	if debugCodec {
-		fmt.Printf("Wrote:\n%s\n", hex.Dump(bytes))
+		fmt.Printf("Wrote:\n%s\n", hex.Dump(b))
 	}
-	return bytes, err
+	return b, err
 }
 
 func writeStruct(val reflect.Value, name string) ([]byte, error) {
