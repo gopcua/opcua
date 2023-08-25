@@ -95,7 +95,7 @@ func encode(val reflect.Value, name string) ([]byte, error) {
 
 func dump(b []byte, err error) ([]byte, error) {
 	if debugCodec {
-		fmt.Printf("Wrote:\n%s\n", hex.Dump(b))
+		fmt.Printf("%s---\n", hex.Dump(b))
 	}
 	return b, err
 }
