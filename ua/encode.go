@@ -5,6 +5,7 @@
 package ua
 
 import (
+	"encoding/hex"
 	"fmt"
 	"math"
 	"reflect"
@@ -43,7 +44,7 @@ func encode(val reflect.Value, name string) ([]byte, error) {
 	switch {
 	case isBinaryEncoder(val):
 		v := val.Interface().(BinaryEncoder)
-		return v.Encode()
+		return logIntercept(v.Encode())
 
 	case isTime(val):
 		buf.WriteTime(val.Convert(timeType).Interface().(time.Time))
@@ -78,18 +79,25 @@ func encode(val reflect.Value, name string) ([]byte, error) {
 			if val.IsNil() {
 				return nil, nil
 			}
-			return encode(val.Elem(), name)
+			return logIntercept(encode(val.Elem(), name))
 		case reflect.Struct:
-			return writeStruct(val, name)
+			return logIntercept(writeStruct(val, name))
 		case reflect.Slice:
-			return writeSlice(val, name)
+			return logIntercept(writeSlice(val, name))
 		case reflect.Array:
-			return writeArray(val, name)
+			return logIntercept(writeArray(val, name))
 		default:
 			return nil, errors.Errorf("unsupported type: %s", val.Type())
 		}
 	}
-	return buf.Bytes(), buf.Error()
+	return logIntercept(buf.Bytes(), buf.Error())
+}
+
+func logIntercept(bytes []byte, err error) ([]byte, error) {
+	if debugCodec {
+		fmt.Printf("Wrote:\n%s\n", hex.Dump(bytes))
+	}
+	return bytes, err
 }
 
 func writeStruct(val reflect.Value, name string) ([]byte, error) {
