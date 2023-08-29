@@ -6,7 +6,6 @@ package opcua
 
 import (
 	"context"
-	"encoding/base64"
 	"strings"
 
 	"github.com/gopcua/opcua/id"
@@ -161,23 +160,7 @@ func (n *Node) ReferencedNodes(ctx context.Context, refs uint32, dir ua.BrowseDi
 		return nil, err
 	}
 	for _, r := range res {
-		nodeID := r.NodeID.NodeID
-		switch nodeID.Type() {
-		case ua.NodeIDTypeTwoByte:
-			nodeID = ua.NewTwoByteNodeID(uint8(nodeID.IntID()))
-		case ua.NodeIDTypeFourByte:
-			nodeID = ua.NewFourByteNodeID(uint8(nodeID.Namespace()), uint16(nodeID.IntID()))
-		case ua.NodeIDTypeNumeric:
-			nodeID = ua.NewNumericNodeID(nodeID.Namespace(), nodeID.IntID())
-		case ua.NodeIDTypeString:
-			nodeID = ua.NewStringNodeID(nodeID.Namespace(), nodeID.StringID())
-		case ua.NodeIDTypeGUID:
-			nodeID = ua.NewGUIDNodeID(nodeID.Namespace(), nodeID.String())
-		case ua.NodeIDTypeByteString:
-			bytes, _ := base64.StdEncoding.DecodeString(nodeID.String())
-			nodeID = ua.NewByteStringNodeID(nodeID.Namespace(), bytes)
-		}
-		nodes = append(nodes, n.c.Node(nodeID))
+		nodes = append(nodes, n.c.NodeFromExpandedNodeID(r.NodeID))
 	}
 	return nodes, nil
 }

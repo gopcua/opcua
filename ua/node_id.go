@@ -78,6 +78,17 @@ func NewByteStringNodeID(ns uint16, id []byte) *NodeID {
 	}
 }
 
+// NewNodeIDFromExpandedNodeID returns a new NodeID derived from ExpandedNodeID
+func NewNodeIDFromExpandedNodeID(id *ExpandedNodeID) *NodeID {
+	return &NodeID{
+		mask: id.NodeID.mask & 0b00111111, // expanded flag NamespaceURI and ServerIndex need to be unset
+		ns:   id.NodeID.ns,
+		nid:  id.NodeID.nid,
+		bid:  id.NodeID.bid,
+		gid:  id.NodeID.gid,
+	}
+}
+
 // MustParseNodeID returns a node id from a string definition
 // if it is parseable by ParseNodeID. Otherwise, the function
 // panics.
