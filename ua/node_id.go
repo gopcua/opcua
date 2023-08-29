@@ -82,6 +82,9 @@ func NewByteStringNodeID(ns uint16, id []byte) *NodeID {
 func NewNodeIDFromExpandedNodeID(id *ExpandedNodeID) *NodeID {
 	bid := make([]byte, len(id.NodeID.bid))
 	copy(bid, id.NodeID.bid)
+	if len(bid) == 0 {
+		bid = nil
+	}
 	var gid *GUID
 	if egid := id.NodeID.gid; egid != nil {
 		var ngid GUID
@@ -90,6 +93,9 @@ func NewNodeIDFromExpandedNodeID(id *ExpandedNodeID) *NodeID {
 		ngid.Data3 = egid.Data3
 		ngid.Data4 = make([]byte, len(egid.Data4))
 		copy(ngid.Data4, egid.Data4)
+		if len(ngid.Data4) == 0 {
+			ngid.Data4 = nil
+		}
 		gid = &ngid
 	}
 	return &NodeID{
