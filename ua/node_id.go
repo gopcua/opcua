@@ -80,12 +80,24 @@ func NewByteStringNodeID(ns uint16, id []byte) *NodeID {
 
 // NewNodeIDFromExpandedNodeID returns a new NodeID derived from ExpandedNodeID
 func NewNodeIDFromExpandedNodeID(id *ExpandedNodeID) *NodeID {
+	bid := make([]byte, len(id.NodeID.bid))
+	copy(bid, id.NodeID.bid)
+	var gid *GUID
+	if egid := id.NodeID.gid; egid != nil {
+		var ngid GUID
+		ngid.Data1 = egid.Data1
+		ngid.Data2 = egid.Data2
+		ngid.Data3 = egid.Data3
+		ngid.Data4 = make([]byte, len(egid.Data4))
+		copy(ngid.Data4, egid.Data4)
+		gid = &ngid
+	}
 	return &NodeID{
 		mask: id.NodeID.mask & 0b00111111, // expanded flag NamespaceURI and ServerIndex need to be unset
 		ns:   id.NodeID.ns,
 		nid:  id.NodeID.nid,
-		bid:  id.NodeID.bid,
-		gid:  id.NodeID.gid,
+		bid:  bid,
+		gid:  gid,
 	}
 }
 
