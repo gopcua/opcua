@@ -160,7 +160,7 @@ func (n *Node) ReferencedNodes(ctx context.Context, refs uint32, dir ua.BrowseDi
 		return nil, err
 	}
 	for _, r := range res {
-		nodes = append(nodes, n.c.Node(r.NodeID.NodeID))
+		nodes = append(nodes, n.c.NodeFromExpandedNodeID(r.NodeID))
 	}
 	return nodes, nil
 }

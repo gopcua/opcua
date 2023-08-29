@@ -516,3 +516,71 @@ func TestNodeIDToString(t *testing.T) {
 		})
 	}
 }
+
+func TestNewNodeIDFromExpandedNodeID(t *testing.T) {
+	type args struct {
+		id *ExpandedNodeID
+	}
+	tests := []struct {
+		name string
+		args args
+		want *NodeID
+	}{
+		{
+			name: "NewExpandedNodeID",
+			args: args{
+				id: NewExpandedNodeID(NewTwoByteNodeID(42), "someUri", 42),
+			},
+			want: NewTwoByteNodeID(42),
+		},
+		{
+			name: "NewTwoByteExpandedNodeID",
+			args: args{
+				id: NewTwoByteExpandedNodeID(42),
+			},
+			want: NewTwoByteNodeID(42),
+		},
+		{
+			name: "NewFourByteExpandedNodeID",
+			args: args{
+				NewFourByteExpandedNodeID(42, 24),
+			},
+			want: NewFourByteNodeID(42, 24),
+		},
+		{
+			name: "NewNumericExpandedNodeID",
+			args: args{
+				NewNumericExpandedNodeID(42, 24),
+			},
+			want: NewNumericNodeID(42, 24),
+		},
+		{
+			name: "NewStringExpandedNodeID",
+			args: args{
+				NewStringExpandedNodeID(42, "42"),
+			},
+			want: NewStringNodeID(42, "42"),
+		},
+		{
+			name: "NewGUIDExpandedNodeID",
+			args: args{
+				NewGUIDExpandedNodeID(42, "42"),
+			},
+			want: NewGUIDNodeID(42, "42"),
+		},
+		{
+			name: "NewByteStringExpandedNodeID",
+			args: args{
+				NewByteStringExpandedNodeID(42, []byte{0xAF, 0xFE}),
+			},
+			want: NewByteStringNodeID(42, []byte{0xAF, 0xFE}),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := NewNodeIDFromExpandedNodeID(tt.args.id); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("NewNodeIDFromExpandedNodeID() = %#v, want %#v", got, tt.want)
+			}
+		})
+	}
+}
