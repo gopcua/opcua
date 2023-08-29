@@ -527,6 +527,13 @@ func TestNewNodeIDFromExpandedNodeID(t *testing.T) {
 		want *NodeID
 	}{
 		{
+			name: "NewExpandedNodeID",
+			args: args{
+				id: NewExpandedNodeID(NewTwoByteNodeID(42), "someUri", 42),
+			},
+			want: NewTwoByteNodeID(42),
+		},
+		{
 			name: "NewTwoByteExpandedNodeID",
 			args: args{
 				id: NewTwoByteExpandedNodeID(42),
