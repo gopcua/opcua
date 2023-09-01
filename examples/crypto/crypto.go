@@ -125,6 +125,7 @@ func clientOptsFromFlags(endpoints []*ua.EndpointDescription) []opcua.Option {
 	}
 
 	var cert []byte
+	var privateKey *rsa.PrivateKey
 	if *gencert || (*certfile != "" && *keyfile != "") {
 		if *gencert {
 			certPEM, keyPEM, err := uatest.GenerateCert(*appuri, 2048, 24*time.Hour)
@@ -148,6 +149,7 @@ func clientOptsFromFlags(endpoints []*ua.EndpointDescription) []opcua.Option {
 				log.Fatalf("Invalid private key")
 			}
 			cert = c.Certificate[0]
+			privateKey = pk
 			opts = append(opts, opcua.PrivateKey(pk), opcua.Certificate(cert))
 		}
 	}
@@ -167,8 +169,8 @@ func clientOptsFromFlags(endpoints []*ua.EndpointDescription) []opcua.Option {
 	}
 
 	// Select the most appropriate authentication mode from server capabilities and user input
-	authMode, authOption := authFromFlags(cert)
-	opts = append(opts, authOption)
+	authMode, authOptions := authFromFlags(cert, privateKey)
+	opts = append(opts, authOptions...)
 
 	var secMode ua.MessageSecurityMode
 	switch strings.ToLower(*mode) {
@@ -246,15 +248,15 @@ func clientOptsFromFlags(endpoints []*ua.EndpointDescription) []opcua.Option {
 	return opts
 }
 
-func authFromFlags(cert []byte) (ua.UserTokenType, opcua.Option) {
+func authFromFlags(cert []byte, pk *rsa.PrivateKey) (ua.UserTokenType, []opcua.Option) {
 	var err error
 
 	var authMode ua.UserTokenType
-	var authOption opcua.Option
+	var authOptions []opcua.Option
 	switch strings.ToLower(*auth) {
 	case "anonymous":
 		authMode = ua.UserTokenTypeAnonymous
-		authOption = opcua.AuthAnonymous()
+		authOptions = append(authOptions, opcua.AuthAnonymous())
 
 	case "username":
 		authMode = ua.UserTokenTypeUserName
@@ -284,25 +286,28 @@ func authFromFlags(cert []byte) (ua.UserTokenType, opcua.Option) {
 			*password = string(passInput)
 			fmt.Print("\n")
 		}
-		authOption = opcua.AuthUsername(*username, *password)
+		authOptions = append(authOptions, opcua.AuthUsername(*username, *password))
 
 	case "certificate":
 		authMode = ua.UserTokenTypeCertificate
-		authOption = opcua.AuthCertificate(cert)
+		// Note: You should still use these two Config options to load the auth certificate and private key
+		// separately from the secure channel configuration even if the same certificate is used for both purposes
+		authOptions = append(authOptions, opcua.AuthCertificate(cert))
+		authOptions = append(authOptions, opcua.AuthPrivateKey(pk))
 
 	case "issuedtoken":
 		// todo: this is unsupported, fail here or fail in the opcua package?
 		authMode = ua.UserTokenTypeIssuedToken
-		authOption = opcua.AuthIssuedToken([]byte(nil))
+		authOptions = append(authOptions, opcua.AuthIssuedToken([]byte(nil)))
 
 	default:
 		log.Printf("unknown auth-mode, defaulting to Anonymous")
 		authMode = ua.UserTokenTypeAnonymous
-		authOption = opcua.AuthAnonymous()
+		authOptions = append(authOptions, opcua.AuthAnonymous())
 
 	}
 
-	return authMode, authOption
+	return authMode, authOptions
 }
 
 func validateEndpointConfig(endpoints []*ua.EndpointDescription, secPolicy string, secMode ua.MessageSecurityMode, authMode ua.UserTokenType) error {
