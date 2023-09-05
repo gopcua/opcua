@@ -33,6 +33,10 @@ type Config struct {
 	// messages.  It is the key associated with Certificate
 	LocalKey *rsa.PrivateKey
 
+	// UserKey is a RSA Private Key which will be used to sign the UserTokenSignature.
+	// It is the key associated with AuthCertificate
+	UserKey *rsa.PrivateKey
+
 	// Thumbprint is the thumbprint of the X.509 v3 Certificate assigned to the receiving
 	// application Instance.
 	// The thumbprint is the CertificateDigest of the DER encoded form of the

@@ -467,6 +467,16 @@ func AuthCertificate(cert []byte) Option {
 	}
 }
 
+// AuthPrivateKey sets the client's authentication RSA private key
+// Note: PolicyID still needs to be set outside of this method, typically through
+// the SecurityFromEndpoint() Option
+func AuthPrivateKey(key *rsa.PrivateKey) Option {
+	return func(cfg *Config) error {
+		cfg.sechan.UserKey = key
+		return nil
+	}
+}
+
 // AuthIssuedToken sets the client's authentication data based on an externally-issued token
 // Note: PolicyID still needs to be set outside of this method, typically through
 // the SecurityFromEndpoint() Option

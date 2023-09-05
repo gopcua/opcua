@@ -219,6 +219,17 @@ func TestOptions(t *testing.T) {
 			},
 		},
 		{
+			name: `AuthPrivateKey()`,
+			opt:  AuthPrivateKey(cert.PrivateKey.(*rsa.PrivateKey)),
+			cfg: &Config{
+				sechan: func() *uasc.Config {
+					c := DefaultClientConfig()
+					c.UserKey = cert.PrivateKey.(*rsa.PrivateKey)
+					return c
+				}(),
+			},
+		},
+		{
 			name: `AuthIssuedToken()`,
 			opt:  AuthIssuedToken([]byte("a")),
 			cfg: &Config{

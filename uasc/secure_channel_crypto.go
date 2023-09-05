@@ -117,7 +117,7 @@ func (s *SecureChannel) NewUserTokenSignature(policyURI string, cert, nonce []by
 	}
 	remoteKey := remoteX509Cert.PublicKey.(*rsa.PublicKey)
 
-	enc, err := uapolicy.Asymmetric(policyURI, s.cfg.LocalKey, remoteKey)
+	enc, err := uapolicy.Asymmetric(policyURI, s.cfg.UserKey, remoteKey)
 	if err != nil {
 		return nil, "", err
 	}
