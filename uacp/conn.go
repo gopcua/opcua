@@ -367,7 +367,10 @@ func (c *Conn) Receive() ([]byte, error) {
 	}
 
 	if h.MessageSize > c.ack.ReceiveBufSize {
-		return nil, errors.Errorf("uacp: message too large: %d > %d bytes", h.MessageSize, c.ack.ReceiveBufSize)
+		return nil, errors.Errorf("uacp: message too large: %d > %d bytes. MsgType=%s, ChunkType=%c", h.MessageSize, c.ack.ReceiveBufSize, h.MessageType, h.ChunkType)
+	}
+	if h.MessageSize < hdrlen {
+		return nil, errors.Errorf("uacp: message too small: %d bytes. MsgType=%s, ChunkType=%c.", h.MessageSize, h.MessageType, h.ChunkType)
 	}
 
 	if _, err := io.ReadFull(c, b[hdrlen:h.MessageSize]); err != nil {
