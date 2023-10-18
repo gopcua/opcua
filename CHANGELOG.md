@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.5.2 (18 Oct 2023)
+
+* feat(encode): print written hex on debugCodec flag (#685)
+* fix: ReferenceNodes usage with mask set (#683)
+* Empty policyURI fallback on SecureChannel SecurityPolicyURI (#669)
+* feat: add support for AuthPrivateKey (#681)
+* Fixed panic if h.MessageSize < hdrlen bytes. (#692)
+* Problem with using ReferencedNodes (#682)
+* Running examples/browse.go returns EOF error (#550)
+* Empty session policyURI (#668)
+* Failed to open a secure channel with AuthCertificate and different certificates (#671)
+
 ## v0.5.1 (22 Aug 2023)
 
 * refactor: make NewClient return an error (#674)
