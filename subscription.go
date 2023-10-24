@@ -276,8 +276,16 @@ func (s *Subscription) Stats(ctx context.Context) (*ua.SubscriptionDiagnosticsDa
 		return nil, errors.Errorf("empty SubscriptionDiagnostics for sub=%d", s.SubscriptionID)
 	}
 
-	for _, eo := range v.Value().([]*ua.ExtensionObject) {
-		stat := eo.Value.(*ua.SubscriptionDiagnosticsDataType)
+	eos, ok := v.Value().([]*ua.ExtensionObject)
+	if !ok {
+		return nil, errors.Errorf("invalid type for SubscriptionDiagnosticsArray. Want []*ua.ExtensionObject. subID=%d nodeID=%s type=%T", s.SubscriptionID, node.String(), v.Value())
+	}
+
+	for _, eo := range eos {
+		stat, ok := eo.Value.(*ua.SubscriptionDiagnosticsDataType)
+		if !ok {
+			continue
+		}
 
 		if stat.SubscriptionID == s.SubscriptionID {
 			return stat, nil
