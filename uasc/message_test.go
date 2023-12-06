@@ -24,7 +24,7 @@ func TestMessage(t *testing.T) {
 					},
 				}
 				instance := &channelInstance{
-					sc: s,
+					sc:              s,
 					sequenceNumber:  0,
 					securityTokenID: 0,
 				}
@@ -42,13 +42,13 @@ func TestMessage(t *testing.T) {
 						SecurityMode:          ua.MessageSecurityModeNone,
 						RequestedLifetime:     6000000,
 					},
-					id.OpenSecureChannelRequest_Encoding_DefaultBinary,
 					s.nextRequestID(),
 				)
 
 				// set message size manually, since it is computed in Encode
 				// otherwise, the decode tests failed.
 				m.Header.MessageSize = 131
+				m.TypeID = ua.NewFourByteExpandedNodeID(0, id.OpenSecureChannelRequest_Encoding_DefaultBinary)
 
 				return m
 			}(),
@@ -123,7 +123,7 @@ func TestMessage(t *testing.T) {
 					},
 				}
 				instance := &channelInstance{
-					sc: s,
+					sc:              s,
 					sequenceNumber:  0,
 					securityTokenID: 0,
 				}
@@ -138,13 +138,13 @@ func TestMessage(t *testing.T) {
 						},
 						EndpointURL: "opc.tcp://wow.its.easy:11111/UA/Server",
 					},
-					id.GetEndpointsRequest_Encoding_DefaultBinary,
 					s.nextRequestID(),
 				)
 
 				// set message size manually, since it is computed in Encode
 				// otherwise, the decode tests failed.
 				m.Header.MessageSize = 107
+				m.TypeID = ua.NewFourByteExpandedNodeID(0, id.GetEndpointsRequest_Encoding_DefaultBinary)
 
 				return m
 			}(),
@@ -194,7 +194,7 @@ func TestMessage(t *testing.T) {
 					},
 				}
 				instance := &channelInstance{
-					sc: s,
+					sc:              s,
 					sequenceNumber:  0,
 					securityTokenID: 0,
 				}
@@ -208,13 +208,13 @@ func TestMessage(t *testing.T) {
 							AdditionalHeader:    ua.NewExtensionObject(nil),
 						},
 					},
-					id.CloseSecureChannelRequest_Encoding_DefaultBinary,
 					s.nextRequestID(),
 				)
 
 				// set message size manually, since it is computed in Encode
 				// otherwise, the decode tests failed.
 				m.Header.MessageSize = 57
+				m.TypeID = ua.NewFourByteExpandedNodeID(0, id.CloseSecureChannelRequest_Encoding_DefaultBinary)
 
 				return m
 			}(),

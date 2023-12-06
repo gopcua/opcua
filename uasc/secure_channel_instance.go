@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/gopcua/opcua/errors"
-	"github.com/gopcua/opcua/id"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uapolicy"
 )
@@ -59,8 +58,7 @@ func (c *channelInstance) nextSequenceNumber() uint32 {
 }
 
 func (c *channelInstance) newRequestMessage(req ua.Request, reqID uint32, authToken *ua.NodeID, timeout time.Duration) (*Message, error) {
-	typeID := ua.ServiceTypeID(req)
-	if typeID == 0 {
+	if ua.ServiceTypeID(req) == 0 {
 		return nil, errors.Errorf("unknown service %T. Did you call register?", req)
 	}
 	if authToken == nil {
@@ -80,14 +78,14 @@ func (c *channelInstance) newRequestMessage(req ua.Request, reqID uint32, authTo
 	req.SetHeader(reqHdr)
 
 	// encode the message
-	return c.newMessage(req, typeID, reqID), nil
+	return c.newMessage(req, reqID), nil
 }
 
-func (c *channelInstance) newMessage(srv interface{}, typeID uint16, requestID uint32) *Message {
+func (c *channelInstance) newMessage(srv interface{}, requestID uint32) *Message {
 	sequenceNumber := c.nextSequenceNumber()
 
-	switch typeID {
-	case id.OpenSecureChannelRequest_Encoding_DefaultBinary, id.OpenSecureChannelResponse_Encoding_DefaultBinary:
+	switch srv.(type) {
+	case *ua.OpenSecureChannelRequest, *ua.OpenSecureChannelResponse:
 		// Do not send the thumbprint for security mode None
 		// even if we have a certificate.
 		//
@@ -103,18 +101,18 @@ func (c *channelInstance) newMessage(srv interface{}, typeID uint16, requestID u
 				AsymmetricSecurityHeader: NewAsymmetricSecurityHeader(c.sc.cfg.SecurityPolicyURI, c.sc.cfg.Certificate, thumbprint),
 				SequenceHeader:           NewSequenceHeader(sequenceNumber, requestID),
 			},
-			TypeID:  ua.NewFourByteExpandedNodeID(0, typeID),
+			TypeID:  ua.NewFourByteExpandedNodeID(0, ua.ServiceTypeID(srv)),
 			Service: srv,
 		}
 
-	case id.CloseSecureChannelRequest_Encoding_DefaultBinary, id.CloseSecureChannelResponse_Encoding_DefaultBinary:
+	case *ua.CloseSecureChannelRequest, *ua.CloseSecureChannelResponse:
 		return &Message{
 			MessageHeader: &MessageHeader{
 				Header:                  NewHeader(MessageTypeCloseSecureChannel, ChunkTypeFinal, c.secureChannelID),
 				SymmetricSecurityHeader: NewSymmetricSecurityHeader(c.securityTokenID),
 				SequenceHeader:          NewSequenceHeader(sequenceNumber, requestID),
 			},
-			TypeID:  ua.NewFourByteExpandedNodeID(0, typeID),
+			TypeID:  ua.NewFourByteExpandedNodeID(0, ua.ServiceTypeID(srv)),
 			Service: srv,
 		}
 
@@ -125,7 +123,7 @@ func (c *channelInstance) newMessage(srv interface{}, typeID uint16, requestID u
 				SymmetricSecurityHeader: NewSymmetricSecurityHeader(c.securityTokenID),
 				SequenceHeader:          NewSequenceHeader(sequenceNumber, requestID),
 			},
-			TypeID:  ua.NewFourByteExpandedNodeID(0, typeID),
+			TypeID:  ua.NewFourByteExpandedNodeID(0, ua.ServiceTypeID(srv)),
 			Service: srv,
 		}
 	}

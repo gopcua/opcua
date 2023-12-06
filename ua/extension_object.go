@@ -160,6 +160,7 @@ func ExtensionObjectTypeID(v interface{}) *ExpandedNodeID {
 	case *ServerStatusDataType:
 		return NewFourByteExpandedNodeID(0, id.ServerStatusDataType_Encoding_DefaultBinary)
 	default:
+		// TODO
 		//if id := eotypes.Lookup(v); id != nil {
 		//return &ExpandedNodeID{NodeID: id}
 		//}
