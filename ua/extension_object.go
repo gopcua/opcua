@@ -147,6 +147,7 @@ func (e *ExtensionObject) UpdateMask() {
 	}
 }
 
+// TODO, I believe this was only used by service hacks?
 func ExtensionObjectTypeID(v interface{}) *ExpandedNodeID {
 	switch v.(type) {
 	case *AnonymousIdentityToken:
@@ -160,10 +161,6 @@ func ExtensionObjectTypeID(v interface{}) *ExpandedNodeID {
 	case *ServerStatusDataType:
 		return NewFourByteExpandedNodeID(0, id.ServerStatusDataType_Encoding_DefaultBinary)
 	default:
-		// TODO
-		//if id := eotypes.Lookup(v); id != nil {
-		//return &ExpandedNodeID{NodeID: id}
-		//}
 		return NewTwoByteExpandedNodeID(0)
 	}
 }

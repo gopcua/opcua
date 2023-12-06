@@ -8,8 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gopcua/opcua/id"
-
 	"github.com/gopcua/opcua/ua"
 )
 
@@ -48,7 +46,6 @@ func TestMessage(t *testing.T) {
 				// set message size manually, since it is computed in Encode
 				// otherwise, the decode tests failed.
 				m.Header.MessageSize = 131
-				m.TypeID = ua.NewFourByteExpandedNodeID(0, id.OpenSecureChannelRequest_Encoding_DefaultBinary)
 
 				return m
 			}(),
@@ -144,7 +141,6 @@ func TestMessage(t *testing.T) {
 				// set message size manually, since it is computed in Encode
 				// otherwise, the decode tests failed.
 				m.Header.MessageSize = 107
-				m.TypeID = ua.NewFourByteExpandedNodeID(0, id.GetEndpointsRequest_Encoding_DefaultBinary)
 
 				return m
 			}(),
@@ -214,7 +210,6 @@ func TestMessage(t *testing.T) {
 				// set message size manually, since it is computed in Encode
 				// otherwise, the decode tests failed.
 				m.Header.MessageSize = 57
-				m.TypeID = ua.NewFourByteExpandedNodeID(0, id.CloseSecureChannelRequest_Encoding_DefaultBinary)
 
 				return m
 			}(),
