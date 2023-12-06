@@ -9,7 +9,6 @@ import (
 	"reflect"
 
 	"github.com/gopcua/opcua/debug"
-	"github.com/gopcua/opcua/id"
 )
 
 // eotypes contains all known extension objects.
@@ -66,9 +65,9 @@ type ExtensionObject struct {
 	Value        interface{}
 }
 
-func NewExtensionObject(value interface{}) *ExtensionObject {
+func NewExtensionObject(value interface{}, typeID *ExpandedNodeID) *ExtensionObject {
 	e := &ExtensionObject{
-		TypeID: ExtensionObjectTypeID(value),
+		TypeID: typeID,
 		Value:  value,
 	}
 	e.UpdateMask()
@@ -144,23 +143,5 @@ func (e *ExtensionObject) UpdateMask() {
 		e.EncodingMask = ExtensionObjectXML
 	} else {
 		e.EncodingMask = ExtensionObjectBinary
-	}
-}
-
-// TODO, I believe this was only used by service hacks?
-func ExtensionObjectTypeID(v interface{}) *ExpandedNodeID {
-	switch v.(type) {
-	case *AnonymousIdentityToken:
-		return NewFourByteExpandedNodeID(0, id.AnonymousIdentityToken_Encoding_DefaultBinary)
-	case *UserNameIdentityToken:
-		return NewFourByteExpandedNodeID(0, id.UserNameIdentityToken_Encoding_DefaultBinary)
-	case *X509IdentityToken:
-		return NewFourByteExpandedNodeID(0, id.X509IdentityToken_Encoding_DefaultBinary)
-	case *IssuedIdentityToken:
-		return NewFourByteExpandedNodeID(0, id.IssuedIdentityToken_Encoding_DefaultBinary)
-	case *ServerStatusDataType:
-		return NewFourByteExpandedNodeID(0, id.ServerStatusDataType_Encoding_DefaultBinary)
-	default:
-		return NewTwoByteExpandedNodeID(0)
 	}
 }

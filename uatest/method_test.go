@@ -18,7 +18,8 @@ type Complex struct {
 }
 
 func TestCallMethod(t *testing.T) {
-	ua.RegisterExtensionObject(ua.NewStringNodeID(2, "ComplexType"), new(Complex))
+	complexNodeID := ua.NewStringNodeID(2, "ComplexType")
+	ua.RegisterExtensionObject(complexNodeID, new(Complex))
 
 	tests := []struct {
 		req *ua.CallMethodRequest
@@ -49,7 +50,7 @@ func TestCallMethod(t *testing.T) {
 				ObjectID: ua.NewStringNodeID(2, "main"),
 				MethodID: ua.NewStringNodeID(2, "sumOfSquare"),
 				InputArguments: []*ua.Variant{
-					ua.MustVariant(ua.NewExtensionObject(&Complex{3, 8})),
+					ua.MustVariant(ua.NewExtensionObject(&Complex{3, 8}, &ua.ExpandedNodeID{NodeID:complexNodeID})),
 				},
 			},
 			out: []*ua.Variant{ua.MustVariant(int64(9 + 64))},

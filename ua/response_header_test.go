@@ -13,7 +13,7 @@ func NewNullResponseHeader() *ResponseHeader {
 	return &ResponseHeader{
 		Timestamp:          time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC),
 		ServiceDiagnostics: &DiagnosticInfo{},
-		AdditionalHeader:   NewExtensionObject(nil),
+		AdditionalHeader:   NewExtensionObject(nil, NewTwoByteExpandedNodeID(0)),
 	}
 }
 

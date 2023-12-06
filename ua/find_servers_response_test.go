@@ -19,7 +19,7 @@ func TestFindServersResponse(t *testing.T) {
 					RequestHandle:      1,
 					ServiceDiagnostics: &DiagnosticInfo{},
 					StringTable:        []string{},
-					AdditionalHeader:   NewExtensionObject(nil),
+					AdditionalHeader:   NewExtensionObject(nil, NewTwoByteExpandedNodeID(0)),
 				},
 				Servers: []*ApplicationDescription{
 					{

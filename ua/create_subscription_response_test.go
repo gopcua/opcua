@@ -19,7 +19,7 @@ func TestCreateSubscriptionResponse(t *testing.T) {
 					RequestHandle:      1,
 					ServiceDiagnostics: &DiagnosticInfo{},
 					StringTable:        []string{},
-					AdditionalHeader:   NewExtensionObject(nil),
+					AdditionalHeader:   NewExtensionObject(nil, NewTwoByteExpandedNodeID(0)),
 				},
 				SubscriptionID:            1,
 				RevisedPublishingInterval: 1000,

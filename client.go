@@ -869,7 +869,7 @@ func (c *Client) ActivateSession(ctx context.Context, s *Session) error {
 		},
 		ClientSoftwareCertificates: nil,
 		LocaleIDs:                  s.cfg.LocaleIDs,
-		UserIdentityToken:          ua.NewExtensionObject(s.cfg.UserIdentityToken),
+		UserIdentityToken:          ua.NewExtensionObject(s.cfg.UserIdentityToken, extensionObjectTypeID(s.cfg.UserIdentityToken)),
 		UserTokenSignature:         s.cfg.UserTokenSignature,
 	}
 	return c.SecureChannel().SendRequest(ctx, req, s.resp.AuthenticationToken, func(v interface{}) error {
@@ -893,6 +893,23 @@ func (c *Client) ActivateSession(ctx context.Context, s *Session) error {
 		c.setSession(s)
 		return nil
 	})
+}
+
+func extensionObjectTypeID(v interface{}) *ua.ExpandedNodeID {
+	switch v.(type) {
+	case *ua.AnonymousIdentityToken:
+		return ua.NewFourByteExpandedNodeID(0, id.AnonymousIdentityToken_Encoding_DefaultBinary)
+	case *ua.UserNameIdentityToken:
+		return ua.NewFourByteExpandedNodeID(0, id.UserNameIdentityToken_Encoding_DefaultBinary)
+	case *ua.X509IdentityToken:
+		return ua.NewFourByteExpandedNodeID(0, id.X509IdentityToken_Encoding_DefaultBinary)
+	case *ua.IssuedIdentityToken:
+		return ua.NewFourByteExpandedNodeID(0, id.IssuedIdentityToken_Encoding_DefaultBinary)
+	case *ua.ServerStatusDataType:
+		return ua.NewFourByteExpandedNodeID(0, id.ServerStatusDataType_Encoding_DefaultBinary)
+	default:
+		return ua.NewTwoByteExpandedNodeID(0)
+	}
 }
 
 // CloseSession closes the current session.

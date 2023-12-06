@@ -6,6 +6,8 @@ package ua
 
 import (
 	"testing"
+
+	"github.com/gopcua/opcua/id"
 )
 
 func TestActivateSessionRequest(t *testing.T) {
@@ -17,7 +19,7 @@ func TestActivateSessionRequest(t *testing.T) {
 				ClientSignature:            &SignatureData{},
 				ClientSoftwareCertificates: nil,
 				LocaleIDs:                  nil,
-				UserIdentityToken:          NewExtensionObject(&AnonymousIdentityToken{PolicyID: "anonymous"}),
+				UserIdentityToken:          NewExtensionObject(&AnonymousIdentityToken{PolicyID: "anonymous"}, NewFourByteExpandedNodeID(0, id.AnonymousIdentityToken_Encoding_DefaultBinary)),
 				UserTokenSignature:         &SignatureData{},
 			},
 			Bytes: flatten(

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gopcua/opcua/errors"
+	"github.com/gopcua/opcua/id"
 
 	"github.com/pascaldekloe/goe/verify"
 )
@@ -259,7 +260,7 @@ func TestVariant(t *testing.T) {
 		{
 			Name: "ExtensionObject",
 			Struct: MustVariant(NewExtensionObject(
-				&AnonymousIdentityToken{PolicyID: "anonymous"},
+				&AnonymousIdentityToken{PolicyID: "anonymous"}, NewFourByteExpandedNodeID(0, id.AnonymousIdentityToken_Encoding_DefaultBinary),
 			)),
 			Bytes: []byte{
 				// variant encoding mask
@@ -291,7 +292,7 @@ func TestVariant(t *testing.T) {
 					},
 					SecondsTillShutdown: 0,
 					ShutdownReason:      NewLocalizedText(""),
-				},
+				}, NewFourByteExpandedNodeID(0, id.ServerStatusDataType_Encoding_DefaultBinary),
 			)),
 			Bytes: []byte{
 				// variant encoding mask

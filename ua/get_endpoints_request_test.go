@@ -21,7 +21,7 @@ func TestGetEndpointsRequest(t *testing.T) {
 					}),
 					Timestamp:        time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
 					RequestHandle:    1,
-					AdditionalHeader: NewExtensionObject(nil),
+					AdditionalHeader: NewExtensionObject(nil, NewTwoByteExpandedNodeID(0)),
 				},
 				EndpointURL: "opc.tcp://wow.its.easy:11111/UA/Server",
 			},

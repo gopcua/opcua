@@ -19,7 +19,7 @@ func TestFindServersOnNetworkResponse(t *testing.T) {
 					RequestHandle:      1,
 					ServiceDiagnostics: &DiagnosticInfo{},
 					StringTable:        []string{},
-					AdditionalHeader:   NewExtensionObject(nil),
+					AdditionalHeader:   NewExtensionObject(nil, NewTwoByteExpandedNodeID(0)),
 				},
 				LastCounterResetTime: time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
 				Servers: []*ServerOnNetwork{
@@ -72,7 +72,7 @@ func TestFindServersOnNetworkResponse(t *testing.T) {
 					RequestHandle:      1,
 					ServiceDiagnostics: &DiagnosticInfo{},
 					StringTable:        []string{},
-					AdditionalHeader:   NewExtensionObject(nil),
+					AdditionalHeader:   NewExtensionObject(nil, NewTwoByteExpandedNodeID(0)),
 				},
 				LastCounterResetTime: time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC),
 				Servers: []*ServerOnNetwork{

@@ -6,13 +6,15 @@ package ua
 
 import (
 	"testing"
+
+	"github.com/gopcua/opcua/id"
 )
 
 func TestExtensionObject(t *testing.T) {
 	cases := []CodecTestCase{
 		{
 			Name:   "anonymous-user-identity-token",
-			Struct: NewExtensionObject(&AnonymousIdentityToken{PolicyID: "anonymous"}),
+			Struct: NewExtensionObject(&AnonymousIdentityToken{PolicyID: "anonymous"}, NewFourByteExpandedNodeID(0, id.AnonymousIdentityToken_Encoding_DefaultBinary)),
 			Bytes: []byte{
 				// TypeID
 				0x01, 0x00, 0x41, 0x01,

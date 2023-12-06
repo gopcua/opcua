@@ -19,7 +19,7 @@ func TestCreateSessionResponse(t *testing.T) {
 					RequestHandle:      1,
 					ServiceDiagnostics: &DiagnosticInfo{},
 					StringTable:        []string{},
-					AdditionalHeader:   NewExtensionObject(nil),
+					AdditionalHeader:   NewExtensionObject(nil, NewTwoByteExpandedNodeID(0)),
 				},
 				SessionID: NewNumericNodeID(0, 1),
 				AuthenticationToken: NewByteStringNodeID(0, []byte{
