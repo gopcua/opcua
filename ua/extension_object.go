@@ -20,6 +20,7 @@ var eotypes = NewFuncRegistry()
 func RegisterExtensionObject(typeID *NodeID, v interface{}) {
 	ef := func(vv interface{}) ([]byte, error) {
 		// TODO check/ensure vv is of type v ?
+		// TODO
 		return Encode(vv)
 	}
 	df := func(b []byte, vv interface{}) error {

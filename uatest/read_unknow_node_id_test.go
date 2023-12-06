@@ -5,6 +5,8 @@ package uatest
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -83,7 +85,24 @@ func TestReadUnknowNodeIDWithDecodeFunc(t *testing.T) {
 		// decode into map[string]interface, which means
 		// decode into dynamically generated go type
 		// then json marshal/unmarshal :)
-		// TODO
+		rv := reflect.ValueOf(v)
+		if rv.Kind() != reflect.Pointer || rv.IsNil() {
+			return fmt.Errorf("incorrect type to decode into")
+		}
+		r := &struct {
+			I int64 `json:"i"`
+		}{} // TODO generate dynamically
+		buf := ua.NewBuffer(b)
+		buf.ReadStruct(r)
+		out := map[string]interface{}{}
+		b, err := json.Marshal(r)
+		if err != nil {
+			return err
+		}
+		if err := json.Unmarshal(b, &out); err != nil {
+			return err
+		}
+		reflect.Indirect(rv).Set(reflect.ValueOf(out))
 		return nil
 	}
 	// note: encodefunc is nil
@@ -98,9 +117,9 @@ func TestReadUnknowNodeIDWithDecodeFunc(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	want := struct{ I int64 }{I: 0}
-	if got := resp.Results[0].Value; !reflect.DeepEqual(got, want) {
-		t.Errorf("got %v want %v for a node with an unknown type", got, want)
+	want := map[string]interface{}{"i": float64(0)} // TODO: float64? yay json!
+	if got := resp.Results[0].Value.Value().(*ua.ExtensionObject).Value; !reflect.DeepEqual(got, want) {
+		t.Errorf("got %#v want %#v for a node with an unknown type", got, want)
 	}
 
 	// check that the connection is still usable by reading another node.
