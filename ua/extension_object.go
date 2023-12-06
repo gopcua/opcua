@@ -5,17 +5,41 @@
 package ua
 
 import (
+	"fmt"
+	"reflect"
+
 	"github.com/gopcua/opcua/debug"
 	"github.com/gopcua/opcua/id"
 )
 
 // eotypes contains all known extension objects.
-var eotypes = NewTypeRegistry()
+var eotypes = NewFuncRegistry()
 
 // RegisterExtensionObject registers a new extension object type.
 // It panics if the type or the id is already registered.
 func RegisterExtensionObject(typeID *NodeID, v interface{}) {
-	if err := eotypes.Register(typeID, v); err != nil {
+	ef := func(vv interface{}) ([]byte, error) {
+		// TODO check/ensure vv is of type v ?
+		return Encode(vv)
+	}
+	df := func(b []byte, vv interface{}) error {
+		rv := reflect.ValueOf(vv)
+		if rv.Kind() != reflect.Pointer || rv.IsNil() {
+			return fmt.Errorf("incorrect type to decode into")
+		}
+		r := reflect.New(reflect.TypeOf(v).Elem()).Interface()
+		buf := NewBuffer(b)
+		buf.ReadStruct(r)
+		reflect.Indirect(rv).Set(reflect.ValueOf(r))
+		return nil
+	}
+	RegisterExtensionObjectFunc(typeID, ef, df)
+}
+
+// RegisterExtensionObjectFunc registers a new extension object type using encode and decode functions
+// It panics if the type or the id is already registered.
+func RegisterExtensionObjectFunc(typeID *NodeID, ef encodefunc, df decodefunc) {
+	if err := eotypes.Register(typeID, ef, df); err != nil {
 		panic("Extension object " + err.Error())
 	}
 }
@@ -27,6 +51,9 @@ const (
 	ExtensionObjectBinary = 1
 	ExtensionObjectXML    = 2
 )
+
+type encodefunc func(v interface{}) ([]byte, error)
+type decodefunc func(b []byte, v interface{}) error
 
 // ExtensionObject is encoded as sequence of bytes prefixed by the NodeId of its DataTypeEncoding
 // and the number of bytes encoded.
@@ -74,13 +101,17 @@ func (e *ExtensionObject) Decode(b []byte) (int, error) {
 	}
 
 	typeID := e.TypeID.NodeID
-	e.Value = eotypes.New(typeID)
-	if e.Value == nil {
+	decode := eotypes.DecodeFunc(typeID)
+	if decode == nil {
 		debug.Printf("ua: unknown extension object %s", typeID)
 		return buf.Pos(), buf.Error()
 	}
-
-	body.ReadStruct(e.Value)
+	err := decode(body.Bytes(), &e.Value)
+	if err != nil {
+		// TODO: we are losing Pos by creating new buf in decode?
+		return buf.Pos(), err
+	}
+	// TODO: we are losing Pos by creating new buf in decode?
 	return buf.Pos(), body.Error()
 }
 
@@ -128,9 +159,9 @@ func ExtensionObjectTypeID(v interface{}) *ExpandedNodeID {
 	case *ServerStatusDataType:
 		return NewFourByteExpandedNodeID(0, id.ServerStatusDataType_Encoding_DefaultBinary)
 	default:
-		if id := eotypes.Lookup(v); id != nil {
-			return &ExpandedNodeID{NodeID: id}
-		}
+		//if id := eotypes.Lookup(v); id != nil {
+		//return &ExpandedNodeID{NodeID: id}
+		//}
 		return NewTwoByteExpandedNodeID(0)
 	}
 }

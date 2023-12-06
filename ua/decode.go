@@ -43,6 +43,7 @@ func decode(b []byte, val reflect.Value, name string) (n int, err error) {
 		}()
 	}
 
+	// fmt.Printf("decode: %s is a %s\n", name, val.Kind())
 	buf := NewBuffer(b)
 	switch {
 	case isBinaryDecoder(val):
@@ -51,7 +52,6 @@ func decode(b []byte, val reflect.Value, name string) (n int, err error) {
 	case isTime(val):
 		val.Set(reflect.ValueOf(buf.ReadTime()).Convert(val.Type()))
 	default:
-		// fmt.Printf("decode: %s is a %s\n", name, val.Kind())
 		switch val.Kind() {
 		case reflect.Bool:
 			val.SetBool(buf.ReadBool())

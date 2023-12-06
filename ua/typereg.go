@@ -5,92 +5,87 @@
 package ua
 
 import (
-	"reflect"
 	"sync"
 
 	"github.com/gopcua/opcua/errors"
 )
 
-// TypeRegistry provides a registry for Go types.
-//
-// Each type is registered with a unique identifier
-// which cannot be changed for the lifetime of the component.
-//
-// Types can be registered multiple times under different
-// identifiers.
-//
-// The implementation is safe for concurrent use.
-type TypeRegistry struct {
-	mu    sync.Mutex
-	types map[string]reflect.Type
-	ids   map[reflect.Type]string
+type FuncRegistry struct {
+	mu          sync.Mutex
+	encodeFuncs map[string]encodefunc
+	decodeFuncs map[string]decodefunc
 }
 
-// NewTypeRegistry returns a new type registry.
-func NewTypeRegistry() *TypeRegistry {
-	return &TypeRegistry{
-		types: make(map[string]reflect.Type),
-		ids:   make(map[reflect.Type]string),
+// NewFuncRegistry returns a new func registry.
+func NewFuncRegistry() *FuncRegistry {
+	return &FuncRegistry{
+		encodeFuncs: make(map[string]encodefunc),
+		decodeFuncs: make(map[string]decodefunc),
 	}
 }
 
-// New returns a new instance of the type with the given id.
+// EncodeFunc returns the function registered to encode Node with ID id
 //
 // If the id is not known the function returns nil.
 //
 // New panics if id is nil.
-func (r *TypeRegistry) New(id *NodeID) interface{} {
+func (r *FuncRegistry) EncodeFunc(id *NodeID) encodefunc {
 	if id == nil {
-		panic("opcua: missing id in call to TypeRegistry.New")
+		panic("opcua: missing id in call to FuncRegistry.New")
 	}
 
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	typ, ok := r.types[id.String()]
+	f, ok := r.encodeFuncs[id.String()]
 	if !ok {
 		return nil
 	}
-	return reflect.New(typ.Elem()).Interface()
+	return f
 }
 
-// Lookup returns the id of the type of v or nil if
-// the type is not registered.
+// DecodeFunc returns the function registered to decode Node with ID id
 //
-// If the type was registered multiple times the first
-// registered id for this type is returned.
-func (r *TypeRegistry) Lookup(v interface{}) *NodeID {
+// If the id is not known the function returns nil.
+//
+// New panics if id is nil.
+func (r *FuncRegistry) DecodeFunc(id *NodeID) decodefunc {
+	if id == nil {
+		panic("opcua: missing id in call to FuncRegistry.New")
+	}
+
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if id, ok := r.ids[reflect.TypeOf(v)]; ok {
-		return MustParseNodeID(id)
+
+	f, ok := r.decodeFuncs[id.String()]
+	if !ok {
+		return nil
 	}
-	return nil
+	return f
 }
 
-// Register adds a new type to the registry.
+// Register adds a new node to the registry.
 //
-// If the id is already registered as a different type the function returns an error.
+// If the id is already registered the function returns an error.
 //
 // Register panics if id is nil.
-func (r *TypeRegistry) Register(id *NodeID, v interface{}) error {
+func (r *FuncRegistry) Register(id *NodeID, ef encodefunc, df decodefunc) error {
 	if id == nil {
-		panic("opcua: missing id in call to TypeRegistry.Register")
+		panic("opcua: missing id in call to FuncRegistry.Register")
 	}
 
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	typ := reflect.TypeOf(v)
 	ids := id.String()
 
-	if cur := r.types[ids]; cur != nil && cur != typ {
-		return errors.Errorf("%s is already registered as %v", id, cur)
+	if cur := r.encodeFuncs[ids]; cur != nil {
+		return errors.Errorf("%s is already registered", id)
 	}
-	r.types[ids] = typ
+	r.encodeFuncs[ids] = ef
 
-	if _, exists := r.ids[typ]; !exists {
-		r.ids[typ] = ids
+	if _, exists := r.decodeFuncs[ids]; !exists {
+		r.decodeFuncs[ids] = df
 	}
 	return nil
 }

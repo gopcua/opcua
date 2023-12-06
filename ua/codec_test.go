@@ -21,8 +21,7 @@ type CodecTestCase struct {
 	Bytes  []byte
 }
 
-// RunCodecTest tests encoding, decoding and length calclulation for the given
-// object.
+// RunCodecTest tests encoding, decoding and length calculation for the given object.
 func RunCodecTest(t *testing.T, cases []CodecTestCase) {
 	t.Helper()
 
