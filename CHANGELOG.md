@@ -1,5 +1,10 @@
 # Changelog
 
+## v0.5.3 (07 Dec 2023)
+
+* Fix unchecked type assertion in Subscription Stats (#693)
+* setSession to nil in recreateSession action to avoid unnecessary CloseSession (#700)
+
 ## v0.5.2 (18 Oct 2023)
 
 * feat(encode): print written hex on debugCodec flag (#685)
