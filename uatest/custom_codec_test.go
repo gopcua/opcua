@@ -91,9 +91,10 @@ func TestCallMethodWithEncodeFunc(t *testing.T) {
 		if !ok {
 			return nil, fmt.Errorf("expected extensionobject")
 		}
+		// if we have ExtensionObjects for both ExtraComplex and Complex objects sharing the same nodeID,
+		// then this function will get called for both. Hence the if-statement
 		if ec, ok := e.Value.(*ExtraComplex); ok {
 			e.Value = &Complex{ec.i, ec.j}
-			return e.Encode()
 		}
 		return ua.DefaultEncodeExtensionObject(e)
 	}
