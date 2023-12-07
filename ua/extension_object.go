@@ -17,23 +17,7 @@ var eotypes = NewFuncRegistry()
 // RegisterExtensionObject registers a new extension object type.
 // It panics if the type or the id is already registered.
 func RegisterExtensionObject(typeID *NodeID, v interface{}) {
-	ef := func(vv interface{}) ([]byte, error) {
-		// TODO check/ensure vv is of type v ?
-		// TODO
-		return Encode(vv)
-	}
-	df := func(b []byte, vv interface{}) error {
-		rv := reflect.ValueOf(vv)
-		if rv.Kind() != reflect.Pointer || rv.IsNil() {
-			return fmt.Errorf("incorrect type to decode into")
-		}
-		r := reflect.New(reflect.TypeOf(v).Elem()).Interface()
-		buf := NewBuffer(b)
-		buf.ReadStruct(r)
-		reflect.Indirect(rv).Set(reflect.ValueOf(r))
-		return nil
-	}
-	RegisterExtensionObjectFunc(typeID, ef, df)
+	RegisterExtensionObjectFunc(typeID, DefaultEncodeExtensionObject, DefaultDecodeExtensionObject(v))
 }
 
 // RegisterExtensionObjectFunc registers a new extension object type using encode and decode functions
@@ -42,6 +26,10 @@ func RegisterExtensionObjectFunc(typeID *NodeID, ef encodefunc, df decodefunc) {
 	if err := eotypes.Register(typeID, ef, df); err != nil {
 		panic("Extension object " + err.Error())
 	}
+}
+
+func Deregister(typeID *NodeID) {
+	eotypes.Deregister(typeID)
 }
 
 // These flags define the value type of an ExtensionObject.
@@ -74,6 +62,7 @@ func NewExtensionObject(value interface{}, typeID *ExpandedNodeID) *ExtensionObj
 	return e
 }
 
+// Decode fails if there is no decode func registered for e
 func (e *ExtensionObject) Decode(b []byte) (int, error) {
 	buf := NewBuffer(b)
 	e.TypeID = new(ExpandedNodeID)
@@ -115,11 +104,43 @@ func (e *ExtensionObject) Decode(b []byte) (int, error) {
 	return buf.Pos(), body.Error()
 }
 
+// Encode falls back to defaultencode if there is no encode func registered for e
 func (e *ExtensionObject) Encode() ([]byte, error) {
-	buf := NewBuffer(nil)
 	if e == nil {
 		e = &ExtensionObject{TypeID: NewTwoByteExpandedNodeID(0), EncodingMask: ExtensionObjectEmpty}
 	}
+
+	typeID := e.TypeID.NodeID
+	encode := eotypes.EncodeFunc(typeID)
+	if encode == nil {
+		debug.Printf("ua: unknown extension object %s", typeID)
+		return DefaultEncodeExtensionObject(e)
+	}
+	return encode(e)
+}
+
+// DefaultDecode creates a new instance of v and decodes into it
+func DefaultDecodeExtensionObject(v interface{}) func([]byte, interface{}) error {
+	return func(b []byte, vv interface{}) error {
+		rv := reflect.ValueOf(vv)
+		if rv.Kind() != reflect.Pointer || rv.IsNil() {
+			return fmt.Errorf("incorrect type to decode into")
+		}
+		r := reflect.New(reflect.TypeOf(v).Elem()).Interface()
+		buf := NewBuffer(b)
+		buf.ReadStruct(r)
+		reflect.Indirect(rv).Set(reflect.ValueOf(r))
+		return nil
+	}
+}
+
+// DefaultEncode encodes into bytes based on the go struct
+func DefaultEncodeExtensionObject(v interface{}) ([]byte, error) {
+	e, ok := v.(*ExtensionObject)
+	if !ok {
+		return nil, fmt.Errorf("expected ExtensionObject")
+	}
+	buf := NewBuffer(nil)
 	buf.WriteStruct(e.TypeID)
 	buf.WriteByte(e.EncodingMask)
 	if e.EncodingMask == ExtensionObjectEmpty {

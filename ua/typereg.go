@@ -89,3 +89,17 @@ func (r *FuncRegistry) Register(id *NodeID, ef encodefunc, df decodefunc) error 
 	}
 	return nil
 }
+
+// Deregister removes a node from the registry
+func (r *FuncRegistry) Deregister(id *NodeID) {
+	if id == nil {
+		panic("opcua: missing id in call to FuncRegistry.Register")
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	ids := id.String()
+	delete(r.encodeFuncs, ids)
+	delete(r.decodeFuncs, ids)
+}
