@@ -447,6 +447,10 @@ func (c *Client) monitor(ctx context.Context) {
 						c.setState(Reconnecting)
 						// create a new session to replace the previous one
 
+						// clear any previous session as we know the server has closed it
+						// this also prevents any unnecessary calls to CloseSession
+						c.setSession(nil)
+
 						dlog.Printf("trying to recreate session")
 						s, err := c.CreateSession(ctx, c.cfg.session)
 						if err != nil {
