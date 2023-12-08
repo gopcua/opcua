@@ -4,6 +4,7 @@
 
 * Fix unchecked type assertion in Subscription Stats (#693)
 * setSession to nil in recreateSession action to avoid unnecessary CloseSession (#700)
+* StatusBadSessionNotActivated in updateNamespaces call during recreateSession action while reconnecting (#673)
 
 ## v0.5.2 (18 Oct 2023)
 
