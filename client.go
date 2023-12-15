@@ -923,6 +923,57 @@ func (c *Client) closeSession(ctx context.Context, s *Session) error {
 	})
 }
 
+func (c *Client) RegisterExtensionObjectFromServer(ctx context.Context, ids ...*ua.NodeID) error {
+	nodesToRead := []*ua.ReadValueID{}
+	for _, id := range ids {
+		nodesToRead = append(nodesToRead, &ua.ReadValueID{NodeID: id, AttributeID: ua.AttributeIDDataType})
+	}
+	resp, err := c.Read(ctx, &ua.ReadRequest{
+		NodesToRead: nodesToRead,
+	})
+	if err != nil {
+		return err
+	}
+
+	datatypes := []*ua.NodeID{}
+	for i, r := range resp.Results {
+		if r.Value == nil {
+			return fmt.Errorf("failed to find node %s", ids[i].String())
+		}
+		v := r.Value.Value()
+		n, ok := v.(*ua.NodeID)
+		if !ok {
+			return fmt.Errorf("failed to find datatype node for node %s, found %T instead", ids[i].String(), v)
+		}
+		datatypes = append(datatypes, n)
+	}
+
+	types := map[string]*ua.StructureDefinition{}
+	nodesToRead = []*ua.ReadValueID{}
+	for _, dt := range datatypes {
+		nodesToRead = append(nodesToRead, &ua.ReadValueID{NodeID: dt})
+	}
+	resp, err = c.Read(ctx, &ua.ReadRequest{
+		NodesToRead: nodesToRead,
+	})
+	if err != nil {
+		return err
+	}
+
+	for i, r := range resp.Results {
+		if r.Value == nil {
+			return fmt.Errorf("failed to find structuredefinition for node %s", ids[i].String())
+		}
+		v := r.Value.Value()
+		sd, ok := v.(*ua.StructureDefinition)
+		if !ok {
+			return fmt.Errorf("failed to find structuredefinition for node %s, found %T instead", ids[i].String(), v)
+		}
+		types[ids[i].String()] = sd
+	}
+	return ua.RegisterExtensionObjectFromStructure(types)
+}
+
 // DetachSession removes the session from the client without closing it. The
 // caller is responsible to close or re-activate the session. If the client
 // does not have an active session the function returns no error.

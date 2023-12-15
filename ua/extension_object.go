@@ -5,6 +5,8 @@
 package ua
 
 import (
+	"reflect"
+
 	"github.com/gopcua/opcua/debug"
 	"github.com/gopcua/opcua/id"
 )
@@ -18,6 +20,27 @@ func RegisterExtensionObject(typeID *NodeID, v interface{}) {
 	if err := eotypes.Register(typeID, v); err != nil {
 		panic("Extension object " + err.Error())
 	}
+}
+
+/*
+func RegisterExtensionObjectFromJSON(r io.Reader) error {
+	var types map[string]*StructureDefinition
+	if err := json.NewDecoder(r).Decode(&types); err != nil {
+		return err
+	}
+	return RegisterExtensionObjectFromStructure(types)
+}
+*/
+
+func RegisterExtensionObjectFromStructure(types map[string]*StructureDefinition) error {
+	for id := range types {
+		gotype, err := UAType(id, types)
+		if err != nil {
+			return err
+		}
+		RegisterExtensionObject(MustParseNodeID(id), reflect.New(gotype))
+	}
+	return nil
 }
 
 // These flags define the value type of an ExtensionObject.
@@ -81,6 +104,14 @@ func (e *ExtensionObject) Decode(b []byte) (int, error) {
 	}
 
 	body.ReadStruct(e.Value)
+
+	// if e.Value is an anonymous type (maybe reflect.Type(e.Value).Name() == "") then convert to map[string]interface{}
+	// encode e.Value to JSON and decode back to map[string]interface{}
+	// quick, robust but maybe not super efficient
+	// if there is no type def make e.Value a []byte
+	// this way the read never fails but you may not be able to interpret the result
+	// TODO
+
 	return buf.Pos(), body.Error()
 }
 
@@ -89,6 +120,12 @@ func (e *ExtensionObject) Encode() ([]byte, error) {
 	if e == nil {
 		e = &ExtensionObject{TypeID: NewTwoByteExpandedNodeID(0), EncodingMask: ExtensionObjectEmpty}
 	}
+
+	// lookup type id, if anonymous type do the json dance
+	// v := eotypes.New(typeID)
+	// encode value to JSON and decode JSON into v
+	// TODO
+
 	buf.WriteStruct(e.TypeID)
 	buf.WriteByte(e.EncodingMask)
 	if e.EncodingMask == ExtensionObjectEmpty {
