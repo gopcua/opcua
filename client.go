@@ -923,7 +923,8 @@ func (c *Client) closeSession(ctx context.Context, s *Session) error {
 	})
 }
 
-func (c *Client) RegisterExtensionObjectFromServer(ctx context.Context, ids ...*ua.NodeID) error {
+func (c *Client) RegisterExtensionObjectSuperSmart(ctx context.Context, ids ...*ua.NodeID) error {
+	// check if the node is a data type or some variable/method argument that has a data type
 	nodesToRead := []*ua.ReadValueID{}
 	for _, id := range ids {
 		nodesToRead = append(nodesToRead, &ua.ReadValueID{NodeID: id, AttributeID: ua.AttributeIDDataType})
@@ -935,41 +936,47 @@ func (c *Client) RegisterExtensionObjectFromServer(ctx context.Context, ids ...*
 		return err
 	}
 
+	// now find the list of data type nodes
+	// if the result has a data type attribute then it was a variable
+	// otherwise already is the data type node
 	datatypes := []*ua.NodeID{}
 	for i, r := range resp.Results {
 		if r.Value == nil {
-			return fmt.Errorf("failed to find node %s", ids[i].String())
+			return fmt.Errorf("failed to read data type attribute for node %s", ids[i].String())
 		}
 		v := r.Value.Value()
-		n, ok := v.(*ua.NodeID)
-		if !ok {
-			return fmt.Errorf("failed to find datatype node for node %s, found %T instead", ids[i].String(), v)
+		if did, ok := v.(*ua.NodeID); ok {
+			datatypes = append(datatypes, did)
+		} else {
+			datatypes = append(datatypes, ids[i]) // here we assume that v == nil
 		}
-		datatypes = append(datatypes, n)
 	}
+	return c.RegisterExtensionObjectFromServer(ctx, datatypes...)
+}
 
-	types := map[string]*ua.StructureDefinition{}
-	nodesToRead = []*ua.ReadValueID{}
-	for _, dt := range datatypes {
-		nodesToRead = append(nodesToRead, &ua.ReadValueID{NodeID: dt})
+func (c *Client) RegisterExtensionObjectFromServer(ctx context.Context, dataTypeIDs ...*ua.NodeID) error {
+	typedefs := []*ua.ReadValueID{}
+	for _, id := range dataTypeIDs {
+		typedefs = append(typedefs, &ua.ReadValueID{NodeID: id, AttributeID: ua.AttributeIDDataTypeDefinition})
 	}
-	resp, err = c.Read(ctx, &ua.ReadRequest{
-		NodesToRead: nodesToRead,
+	resp, err := c.Read(ctx, &ua.ReadRequest{
+		NodesToRead: typedefs,
 	})
 	if err != nil {
 		return err
 	}
 
+	types := map[string]*ua.StructureDefinition{}
 	for i, r := range resp.Results {
 		if r.Value == nil {
-			return fmt.Errorf("failed to find structuredefinition for node %s", ids[i].String())
+			return fmt.Errorf("failed to find structure definition for node %s", dataTypeIDs[i].String())
 		}
 		v := r.Value.Value()
 		sd, ok := v.(*ua.StructureDefinition)
 		if !ok {
-			return fmt.Errorf("failed to find structuredefinition for node %s, found %T instead", ids[i].String(), v)
+			return fmt.Errorf("failed to find structure definition for node %s, found %T instead", dataTypeIDs[i].String(), v)
 		}
-		types[ids[i].String()] = sd
+		types[dataTypeIDs[i].String()] = sd
 	}
 	return ua.RegisterExtensionObjectFromStructure(types)
 }

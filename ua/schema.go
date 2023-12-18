@@ -8,7 +8,7 @@ import (
 	"github.com/pascaldekloe/name"
 )
 
-// Serializable checks if the Go struct t can be serialized into the UA type name.
+// Serializable checks if the Go struct can be serialized into the UA type name.
 func Serializable(t reflect.Type, id string, types map[string]*StructureDefinition) error {
 	uatyp, err := UAType(id, types)
 	if err != nil {

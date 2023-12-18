@@ -21,6 +21,7 @@ func main() {
 	var (
 		endpoint = flag.String("endpoint", "opc.tcp://localhost:4840", "OPC UA Endpoint URL")
 		nodeID   = flag.String("node", "", "NodeID to read")
+		attrID   = flag.Int("attr", int(ua.AttributeIDValue), "attribute to read (default to value)")
 	)
 	flag.BoolVar(&debug.Enable, "debug", false, "enable debug logging")
 	flag.Parse()
@@ -45,7 +46,7 @@ func main() {
 	req := &ua.ReadRequest{
 		MaxAge: 2000,
 		NodesToRead: []*ua.ReadValueID{
-			{NodeID: id},
+			{NodeID: id, AttributeID: ua.AttributeID(*attrID)},
 		},
 		TimestampsToReturn: ua.TimestampsToReturnBoth,
 	}
@@ -89,5 +90,15 @@ func main() {
 		log.Fatalf("Status not OK: %v", resp.Results[0].Status)
 	}
 
-	log.Printf("%#v", resp.Results[0].Value.Value())
+	switch v := resp.Results[0].Value.Value().(type) {
+	case *ua.NodeID:
+		log.Print(v.String())
+		if err := c.RegisterExtensionObjectFromServer(ctx, v); err != nil {
+			log.Fatalf("%v", err)
+		}
+		log.Print("registered ", v.String())
+	default:
+		log.Printf("%#v", v)
+	}
+
 }
