@@ -11,6 +11,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/gopcua/opcua"
 	"github.com/gopcua/opcua/debug"
@@ -76,7 +77,10 @@ func browse(ctx context.Context, n *opcua.Node, path string, level int) ([]NodeD
 
 	switch err := attrs[2].Status; err {
 	case ua.StatusOK:
-		def.Description = attrs[2].Value.String()
+		// Not everyone input description
+		if attrs[2].Value != nil {
+			def.Description = attrs[2].Value.String()
+		}
 	case ua.StatusBadAttributeIDInvalid:
 		// ignore
 	default:
@@ -146,7 +150,20 @@ func browse(ctx context.Context, n *opcua.Node, path string, level int) ([]NodeD
 		for _, rn := range refs {
 			children, err := browse(ctx, rn, def.Path, level+1)
 			if err != nil {
-				return errors.Errorf("browse children: %s", err)
+				//Handling the errors of bad node id
+				if err == ua.StatusBadNodeIDUnknown {
+					browseName := strings.Split(rn.String(), def.BrowseName+".")[1]
+					children := NodeDef{
+						BrowseName:  browseName,
+						Path:        join(def.Path, browseName),
+						NodeID:      ua.NewStringNodeID(rn.ID.Namespace(), "BadNodeIdUnknown (0x80340000)"),
+						Description: "BadNodeIdUnknown (0x80340000)",
+						Writable:    false,
+					}
+
+					nodes = append(nodes, children)
+				}
+				continue
 			}
 			nodes = append(nodes, children...)
 		}
