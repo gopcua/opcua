@@ -83,18 +83,29 @@ The `gopcua` project is sponsored by the following organizations by supporting t
 
 ### Users
 
-We would also like to list organizations which use `gopcua` in production. Please open a PR to include your logo below.
-<p align="left">
-   <a href="https://strateos.com">
-      <img alt="strtaeos" width="10%" src="https://avatars1.githubusercontent.com/u/50255519?s=400&u=3c18028de0bd1a28b604d34d6b239d7a593a7e49&v=4">
-   </a>
-</p>
-
-<p align="left">
-   <a href="https://umh.docs.umh.app">
-      <img alt="united manufacturing hub" width="10%" src="logo/united-manufacturing-hub.jpg">
-   </a>
-</p>
+We would also like to list organizations which use `gopcua` in production:
+<table border="0">
+  <tr valign="middle">
+    <td width="20%">
+      <a href="https://strateos.com">
+        <img alt="strateos" src="logo/strateos.png">
+      </a>
+    </td>
+    <td width="20%">
+      <a href="https://umh.docs.umh.app">
+        <img alt="united manufacturing hub" src="logo/united-manufacturing-hub.jpg">
+      </a>
+    </td>
+    <td width="20%">
+      <a href="https://wolframmfg.com">
+        <img alt="Wolfram Manufacturing Technologies" src="logo/wolfram-manufacturing.png">
+      </a>
+    </td>
+    <td width="40%">
+        Please open a PR to include your logo here.
+    </td>
+  </tr>
+</table>
 
 ### Projects using gopcua
 
