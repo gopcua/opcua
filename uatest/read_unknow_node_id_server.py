@@ -26,8 +26,9 @@ if __name__ == "__main__":
     server.set_endpoint("opc.tcp://0.0.0.0:4840/")
 
     ns = server.register_namespace("http://gopcua.com/")
-
+    
     uatypes.register_extension_object('IntVal', ua.StringNodeId("IntValType", ns), IntVal)
+    
 
     # definitely not clear why this is needed, but without it does not work
     setattr(ua.ObjectIds, 'IntVal', 'IntValType')
