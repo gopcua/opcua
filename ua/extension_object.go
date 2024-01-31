@@ -61,21 +61,20 @@ func (e *ExtensionObject) Decode(b []byte) (int, error) {
 	if length == 0 || length == 0xffffffff || buf.Error() != nil {
 		return buf.Pos(), buf.Error()
 	}
-
-	body := NewBuffer(buf.ReadN(int(length)))
+	raw := buf.ReadN(int(length))
+	body := NewBuffer(raw)
 	if buf.Error() != nil {
 		return buf.Pos(), buf.Error()
 	}
-
 	if e.EncodingMask == ExtensionObjectXML {
-		e.Value = new(XMLElement)
-		body.ReadStruct(e.Value)
+		e.Value = XMLElement(raw)
 		return buf.Pos(), body.Error()
 	}
 
 	typeID := e.TypeID.NodeID
 	e.Value = eotypes.New(typeID)
 	if e.Value == nil {
+		e.Value = raw
 		debug.Printf("ua: unknown extension object %s", typeID)
 		return buf.Pos(), buf.Error()
 	}
