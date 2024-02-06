@@ -220,6 +220,34 @@ func (s *Subscription) ModifyMonitoredItems(ctx context.Context, ts ua.Timestamp
 	return res, nil
 }
 
+func (s *Subscription) SetMonitoringMode(ctx context.Context, monitoringMode ua.MonitoringMode, monitoredItemIDs ...uint32) (*ua.SetMonitoringModeResponse, error) {
+	stats.Subscription().Add("SetMonitoringMode", 1)
+	stats.Subscription().Add("SetMonitoringModeMonitoredItems", int64(len(monitoredItemIDs)))
+
+	s.itemsMu.Lock()
+	for _, id := range monitoredItemIDs {
+		if _, exists := s.items[id]; !exists {
+			return nil, fmt.Errorf("sub %d: cannot set monitoring mode for unknown monitored item id: %d", s.SubscriptionID, id)
+		}
+	}
+	s.itemsMu.Unlock()
+
+	req := &ua.SetMonitoringModeRequest{
+		SubscriptionID:   s.SubscriptionID,
+		MonitoringMode:   monitoringMode,
+		MonitoredItemIDs: monitoredItemIDs,
+	}
+	var res *ua.SetMonitoringModeResponse
+	err := s.c.Send(ctx, req, func(v interface{}) error {
+		return safeAssign(v, &res)
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return res, nil
+}
+
 // SetTriggering sends a request to the server to add and/or remove triggering links from a triggering item.
 // To add links from a triggering item to an item to report provide the server assigned ID(s) in the `add` argument.
 // To remove links from a triggering item to an item to report provide the server assigned ID(s) in the `remove` argument.
