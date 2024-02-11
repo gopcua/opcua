@@ -9,13 +9,9 @@ if __name__ == "__main__":
   ns = server.register_namespace("http://gopcua.com/")
   simulations = server.nodes.objects.add_object(ua.NodeId("simulations", ns), "simulations")
 
-  # Create a UserTokenPolicy
-  policy = ua.UserTokenPolicy()
-  policy.TokenType = ua.UserTokenType.UserName
-  policy.PolicyId = "username"
-
   # Add the policy to the server
   server.set_security_policy([ua.SecurityPolicyType.NoSecurity])
-  
+  # server.set_security_IDs(["Anonymous"])
+  server.set_security_IDs(["Username"])
   # Start the server
   server.start()
