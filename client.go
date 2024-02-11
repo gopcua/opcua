@@ -803,7 +803,7 @@ func (c *Client) CreateSession(ctx context.Context, cfg *uasc.SessionConfig) (*S
 		}
 
 		if cfg.AuthPolicyURI == "" {
-			return errors.Errorf("No AuthPolicyURI set")
+			return errors.Errorf("No AuthPolicyURI set in session configuration")
 		}
 
 		s = &Session{
