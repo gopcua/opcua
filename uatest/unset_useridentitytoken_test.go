@@ -28,8 +28,6 @@ func TestUnsetUserIdentityTokenConnect(t *testing.T) {
 	opts := []opcua.Option{
 		opcua.SecurityPolicy("None"),
 		opcua.SecurityModeString("None"),
-		//opcua.CertificateFile(*certFile),
-		//opcua.PrivateKeyFile(*keyFile),
 		opcua.AuthUsername("user", "pass"),
 		opcua.SecurityFromEndpoint(ep, ua.UserTokenTypeUserName),
 	}
