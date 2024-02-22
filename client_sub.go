@@ -272,6 +272,8 @@ func (c *Client) notifyAllSubscriptionsOfError(ctx context.Context, err error) {
 	}
 }
 
+var ErrNoNotifs = errors.New("no notifications in publish response")
+
 func (c *Client) notifySubscription(ctx context.Context, sub *Subscription, notif *ua.NotificationMessage) {
 	// todo(fs): response.Results contains the status codes of which messages were
 	// todo(fs): were successfully removed from the transmission queue on the server.
@@ -284,6 +286,14 @@ func (c *Client) notifySubscription(ctx context.Context, sub *Subscription, noti
 		sub.notify(ctx, &PublishNotificationData{
 			SubscriptionID: sub.SubscriptionID,
 			Error:          errors.Errorf("empty NotificationMessage"),
+		})
+		return
+	}
+
+	if len(notif.NotificationData) == 0 {
+		sub.notify(ctx, &PublishNotificationData{
+			SubscriptionID: sub.SubscriptionID,
+			Error:          ErrNoNotifs,
 		})
 		return
 	}
