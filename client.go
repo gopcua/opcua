@@ -306,6 +306,10 @@ func (c *Client) monitor(ctx context.Context) {
 				continue
 			}
 
+			if errors.Is(err, ua.StatusBadTooManyOperations) {
+				continue
+			}
+
 			// tell the handler the connection is disconnected
 			c.setState(Disconnected)
 			dlog.Print("disconnected")
