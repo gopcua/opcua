@@ -321,7 +321,7 @@ func validateEndpointConfig(endpoints []*ua.EndpointDescription, secPolicy strin
 		}
 	}
 
-	err := errors.Errorf("server does not support an endpoint with security : %s , %s", secPolicy, secMode)
+	err := errors.Errorf("server does not support an endpoint with security : %s , %s, %s", secPolicy, secMode, authMode)
 	printEndpointOptions(endpoints)
 	return err
 }
