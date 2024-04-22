@@ -177,14 +177,20 @@ func (s *Subscription) ModifyMonitoredItems(ctx context.Context, ts ua.Timestamp
 	stats.Subscription().Add("ModifyMonitoredItems", 1)
 	stats.Subscription().Add("ModifiedMonitoredItems", int64(len(items)))
 
+	var err error
 	s.itemsMu.Lock()
 	for _, item := range items {
 		id := item.MonitoredItemID
 		if _, exists := s.items[id]; !exists {
-			return nil, fmt.Errorf("sub %d: cannot modify unknown monitored item id: %d", s.SubscriptionID, id)
+			err = fmt.Errorf("sub %d: cannot modify unknown monitored item id: %d", s.SubscriptionID, id)
+			break
 		}
 	}
 	s.itemsMu.Unlock()
+
+	if err != nil {
+		return nil, err
+	}
 
 	req := &ua.ModifyMonitoredItemsRequest{
 		SubscriptionID:     s.SubscriptionID,
@@ -192,7 +198,7 @@ func (s *Subscription) ModifyMonitoredItems(ctx context.Context, ts ua.Timestamp
 		ItemsToModify:      items,
 	}
 	var res *ua.ModifyMonitoredItemsResponse
-	err := s.c.Send(ctx, req, func(v interface{}) error {
+	err = s.c.Send(ctx, req, func(v interface{}) error {
 		return safeAssign(v, &res)
 	})
 	if err != nil {
@@ -216,6 +222,40 @@ func (s *Subscription) ModifyMonitoredItems(ctx context.Context, ts ua.Timestamp
 		item.res.FilterResult = res.FilterResult
 	}
 	s.itemsMu.Unlock()
+
+	return res, nil
+}
+
+func (s *Subscription) SetMonitoringMode(ctx context.Context, monitoringMode ua.MonitoringMode, monitoredItemIDs ...uint32) (*ua.SetMonitoringModeResponse, error) {
+	stats.Subscription().Add("SetMonitoringMode", 1)
+	stats.Subscription().Add("SetMonitoringModeMonitoredItems", int64(len(monitoredItemIDs)))
+
+	var err error
+	s.itemsMu.Lock()
+	for _, id := range monitoredItemIDs {
+		if _, exists := s.items[id]; !exists {
+			err = fmt.Errorf("sub %d: cannot set monitoring mode for unknown monitored item id: %d", s.SubscriptionID, id)
+			break
+		}
+	}
+	s.itemsMu.Unlock()
+
+	if err != nil {
+		return nil, err
+	}
+
+	req := &ua.SetMonitoringModeRequest{
+		SubscriptionID:   s.SubscriptionID,
+		MonitoringMode:   monitoringMode,
+		MonitoredItemIDs: monitoredItemIDs,
+	}
+	var res *ua.SetMonitoringModeResponse
+	err = s.c.Send(ctx, req, func(v interface{}) error {
+		return safeAssign(v, &res)
+	})
+	if err != nil {
+		return nil, err
+	}
 
 	return res, nil
 }

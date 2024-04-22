@@ -214,7 +214,7 @@ Here is the current set of supported services. For low-level access use the clie
 | MonitoredItems Service Set  | CreateMonitoredItems          | Yes    |              |
 |                             | DeleteMonitoredItems          | Yes    |              |
 |                             | ModifyMonitoredItems          | Yes    |              |
-|                             | SetMonitoringMode             |        |              |
+|                             | SetMonitoringMode             | Yes    |              |
 |                             | SetTriggering                 |        |              |
 | Subscription Service Set    | CreateSubscription            | Yes    |              |
 |                             | ModifySubscription            |        |              |
