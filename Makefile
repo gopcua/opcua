@@ -1,6 +1,6 @@
 # go test -count=1 disables the test cache so that all tests are run every time.
 
-all: test integration examples
+all: test integration selfintegration examples
 
 test:
 	go test -count=1 -race ./...
@@ -10,6 +10,9 @@ lint:
 
 integration:
 	go test -count=1 -race -v -tags=integration ./uatest/...
+
+selfintegration:
+	go test -count=1 -race -v -tags=integration ./uatest2/...
 
 examples:
 	go build -o build/ ./examples/...
@@ -22,9 +25,9 @@ install-py-opcua:
 	pip3 install opcua
 
 gen:
-	go install golang.org/x/tools/cmd/stringer@latest
+	which stringer || go install golang.org/x/tools/cmd/stringer@latest
+	find . -name '*_gen.go' -delete
 	go generate ./...
-	go mod tidy
 
 release:
 	GITHUB_TOKEN=$$(security find-generic-password -gs GITHUB_TOKEN -w) goreleaser --clean

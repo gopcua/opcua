@@ -11,6 +11,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"runtime"
 	"strings"
 
 	"golang.org/x/exp/slices"
@@ -41,7 +42,26 @@ func Printf(format string, args ...interface{}) {
 	if !Enable {
 		return
 	}
-	Logger.Printf(format, args...)
+
+	_, file, line, ok := runtime.Caller(1)
+	if !ok {
+		file = "???"
+		line = 0
+	}
+
+	short := file
+	for i := len(file) - 1; i > 0; i-- {
+		if file[i] == '/' {
+			short = file[i+1:]
+			break
+		}
+	}
+	file = short
+
+	prefix := fmt.Sprintf(" %v:%v ", file, line)
+	Logger.Printf(prefix+format, args...)
+
+	//Logger.Printf(format, args...)
 }
 
 // ToJSON returns the JSON representation of v when debug logging
@@ -57,7 +77,7 @@ func ToJSON(v interface{}) string {
 	return string(b)
 }
 
-// FlagSet returns true if the OPCUA_DEBUG environment variable contains the
+// FlagSet returns true if the OPC_DEBUG environment variable contains the
 // given flag.
 func FlagSet(name string) bool {
 	return slices.Contains(strings.Fields(Flags), name)
