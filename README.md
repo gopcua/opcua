@@ -92,7 +92,7 @@ We would also like to list organizations which use `gopcua` in production:
       </a>
     </td>
     <td width="20%">
-      <a href="https://umh.docs.umh.app">
+      <a href="https://www.umh.app">
         <img alt="united manufacturing hub" src="logo/united-manufacturing-hub.jpg">
       </a>
     </td>
@@ -144,17 +144,21 @@ some guidance on the level of testing.
 
 We would be happy if you can add your equipment to the list. Just open a PR :)
 
-| Device                                                  | gopcua version    | Environment | By           |
-|---------------------------------------------------------|-------------------|-------------|--------------|
-| Siemens S7-1500                                         | v0.1.x..latest    | production  | Northvolt    |
-| Beckhoff C6015-0010,C6030-0060 on OPC/UA server 4.3.x   | v0.1.x..latest    | production  | Northvolt    |
-| Kepware 6.x                                             | v0.1.x..latest    | production  | Northvolt    |
-| Kepware 6.x                                             | v0.1.x, v0.2.x    | production  | Intelecy     |
-| Cogent DataHub 9.x                                      | v0.1.x, v0.2.x    | production  | Intelecy     |
-| ABB Ability EdgeInsight 1.8.X                           | v0.1.x, v0.2.x    | production  | Intelecy     |
-| GE Digital Historian 2022 HDA Server                    | v0.3.x            | production  | Intelecy     |
-| B&R Automation PC 3100                                  | v0.3.x            | production  | ACS          |
-| InfluxDB Telegraf plugin                                | v0.3.x            | ?           | Community    |
+| Device                                                                                                 | gopcua version | Environment                                                                                          | By                         |
+|--------------------------------------------------------------------------------------------------------|----------------|------------------------------------------------------------------------------------------------------|----------------------------|
+| Siemens S7-1500                                                                                        | v0.1.x..latest | production                                                                                           | Northvolt                  |
+| Beckhoff C6015-0010,C6030-0060 on OPC/UA server 4.3.x                                                  | v0.1.x..latest | production                                                                                           | Northvolt                  |
+| Kepware 6.x                                                                                            | v0.1.x..latest | production                                                                                           | Northvolt                  |
+| Kepware 6.x                                                                                            | v0.1.x, v0.2.x | production                                                                                           | Intelecy                   |
+| Cogent DataHub 9.x                                                                                     | v0.1.x, v0.2.x | production                                                                                           | Intelecy                   |
+| ABB Ability EdgeInsight 1.8.X                                                                          | v0.1.x, v0.2.x | production                                                                                           | Intelecy                   |
+| GE Digital Historian 2022 HDA Server                                                                   | v0.3.x         | production                                                                                           | Intelecy                   |
+| B&R Automation PC 3100                                                                                 | v0.3.x         | production                                                                                           | ACS                        |
+| Siemens S7-1200                                                                                        | v0.3.x         | [CI/CD testing](https://github.com/united-manufacturing-hub/benthos-umh?tab=readme-ov-file#testing)  | [UMH](https://www.umh.app) |
+| WAGO 750-8101                                                                                          | v0.3.x         | [CI/CD testing](https://github.com/united-manufacturing-hub/benthos-umh?tab=readme-ov-file#testing)  | [UMH](https://www.umh.app) |
+| [Microsoft OPC UA simulator v2.9.11](https://github.com/Azure-Samples/iot-edge-opc-plc)                | v0.3.x         | [CI/CD testing](https://github.com/united-manufacturing-hub/benthos-umh?tab=readme-ov-file#testing)  | [UMH](https://www.umh.app) |
+| [Prosys OPC UA Simulation Server v5.4.6-148](https://prosysopc.com/products/opc-ua-simulation-server/) | v0.3.x         | [manual testing](https://github.com/united-manufacturing-hub/benthos-umh?tab=readme-ov-file#testing) | [UMH](https://www.umh.app) |
+| InfluxDB Telegraf plugin                                                                               | v0.3.x         | ?                                                                                                    | Community                  |
 
 ## Supported Features
 
