@@ -111,6 +111,51 @@ func (s *Subscription) delete(ctx context.Context) error {
 	}
 }
 
+func (s *Subscription) ModifySubscription(ctx context.Context, params SubscriptionParameters) (*ua.ModifySubscriptionResponse, error) {
+	stats.Subscription().Add("ModifySubscription", 1)
+
+	params.setDefaults()
+	req := &ua.ModifySubscriptionRequest{
+		SubscriptionID:              s.SubscriptionID,
+		RequestedPublishingInterval: float64(params.Interval.Milliseconds()),
+		RequestedLifetimeCount:      params.LifetimeCount,
+		RequestedMaxKeepAliveCount:  params.MaxKeepAliveCount,
+		MaxNotificationsPerPublish:  params.MaxNotificationsPerPublish,
+		Priority:                    params.Priority,
+	}
+
+	var res *ua.ModifySubscriptionResponse
+	err := s.c.Send(ctx, req, func(v interface{}) error {
+		return safeAssign(v, &res)
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	// recreate a new subscription with new parameters
+	s.itemsMu.Lock()
+	sub := &Subscription{
+		SubscriptionID:            s.SubscriptionID,
+		RevisedPublishingInterval: time.Duration(res.RevisedPublishingInterval) * time.Millisecond,
+		RevisedLifetimeCount:      res.RevisedLifetimeCount,
+		RevisedMaxKeepAliveCount:  res.RevisedMaxKeepAliveCount,
+		Notifs:                    s.Notifs,
+		items:                     s.items,
+		params:                    &params,
+		nextSeq:                   s.nextSeq,
+		c:                         s.c,
+	}
+	s.itemsMu.Unlock()
+
+	err = sub.recreate_NeedsSubMuxLock(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return res, nil
+}
+
 func (s *Subscription) Monitor(ctx context.Context, ts ua.TimestampsToReturn, items ...*ua.MonitoredItemCreateRequest) (*ua.CreateMonitoredItemsResponse, error) {
 	stats.Subscription().Add("Monitor", 1)
 	stats.Subscription().Add("MonitoredItems", int64(len(items)))
