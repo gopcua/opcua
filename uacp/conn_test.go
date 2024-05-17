@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gopcua/opcua/errors"
+	"github.com/gopcua/opcua/ua"
 	"github.com/pascaldekloe/goe/verify"
 )
 
@@ -120,10 +121,12 @@ NEXT:
 	}
 	got = got[hdrlen:]
 
-	want, err := msg.Encode()
+	s := ua.NewStream(ua.DefaultBufSize)
+	err = msg.Encode(s)
 	if err != nil {
 		t.Fatal(err)
 	}
+	want := s.Bytes()
 	verify.Values(t, "", got, want)
 }
 

@@ -366,29 +366,28 @@ func (n *NodeID) Decode(b []byte) (int, error) {
 	}
 }
 
-func (n *NodeID) Encode() ([]byte, error) {
-	buf := NewBuffer(nil)
-	buf.WriteByte(byte(n.mask))
+func (n *NodeID) Encode(s *Stream) error {
+	s.WriteByte(byte(n.mask))
 
 	switch n.Type() {
 	case NodeIDTypeTwoByte:
-		buf.WriteByte(byte(n.nid))
+		s.WriteByte(byte(n.nid))
 	case NodeIDTypeFourByte:
-		buf.WriteByte(byte(n.ns))
-		buf.WriteUint16(uint16(n.nid))
+		s.WriteByte(byte(n.ns))
+		s.WriteUint16(uint16(n.nid))
 	case NodeIDTypeNumeric:
-		buf.WriteUint16(n.ns)
-		buf.WriteUint32(n.nid)
+		s.WriteUint16(n.ns)
+		s.WriteUint32(n.nid)
 	case NodeIDTypeGUID:
-		buf.WriteUint16(n.ns)
-		buf.WriteStruct(n.gid)
+		s.WriteUint16(n.ns)
+		s.WriteStruct(n.gid)
 	case NodeIDTypeByteString, NodeIDTypeString:
-		buf.WriteUint16(n.ns)
-		buf.WriteByteString(n.bid)
+		s.WriteUint16(n.ns)
+		s.WriteByteString(n.bid)
 	default:
-		return nil, errors.Errorf("invalid node id type %v", n.Type())
+		return errors.Errorf("invalid node id type %v", n.Type())
 	}
-	return buf.Bytes(), buf.Error()
+	return s.Error()
 }
 
 func (n *NodeID) MarshalJSON() ([]byte, error) {

@@ -84,25 +84,25 @@ func (e *ExtensionObject) Decode(b []byte) (int, error) {
 	return buf.Pos(), body.Error()
 }
 
-func (e *ExtensionObject) Encode() ([]byte, error) {
-	buf := NewBuffer(nil)
+func (e *ExtensionObject) Encode(s *Stream) error {
 	if e == nil {
 		e = &ExtensionObject{TypeID: NewTwoByteExpandedNodeID(0), EncodingMask: ExtensionObjectEmpty}
 	}
-	buf.WriteStruct(e.TypeID)
-	buf.WriteByte(e.EncodingMask)
+	s.WriteStruct(e.TypeID)
+	s.WriteByte(e.EncodingMask)
 	if e.EncodingMask == ExtensionObjectEmpty {
-		return buf.Bytes(), buf.Error()
+		return s.Error()
 	}
 
-	body := NewBuffer(nil)
+	// TODO: use pool?
+	body := NewStream(DefaultBufSize)
 	body.WriteStruct(e.Value)
 	if body.Error() != nil {
-		return nil, body.Error()
+		return body.Error()
 	}
-	buf.WriteUint32(uint32(body.Len()))
-	buf.Write(body.Bytes())
-	return buf.Bytes(), buf.Error()
+	s.WriteUint32(uint32(body.Len()))
+	s.Write(body.Bytes())
+	return s.Error()
 }
 
 func (e *ExtensionObject) UpdateMask() {

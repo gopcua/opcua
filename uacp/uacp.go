@@ -45,15 +45,14 @@ func (h *Header) Decode(b []byte) (int, error) {
 	return buf.Pos(), buf.Error()
 }
 
-func (h *Header) Encode() ([]byte, error) {
-	buf := ua.NewBuffer(nil)
+func (h *Header) Encode(s *ua.Stream) error {
 	if len(h.MessageType) != 3 {
-		return nil, errors.Errorf("invalid message type: %q", h.MessageType)
+		return errors.Errorf("invalid message type: %q", h.MessageType)
 	}
-	buf.Write([]byte(h.MessageType))
-	buf.WriteByte(h.ChunkType)
-	buf.WriteUint32(h.MessageSize)
-	return buf.Bytes(), buf.Error()
+	s.Write([]byte(h.MessageType))
+	s.WriteByte(h.ChunkType)
+	s.WriteUint32(h.MessageSize)
+	return s.Error()
 }
 
 // Hello represents a OPC UA Hello.
@@ -79,15 +78,14 @@ func (h *Hello) Decode(b []byte) (int, error) {
 	return buf.Pos(), buf.Error()
 }
 
-func (h *Hello) Encode() ([]byte, error) {
-	buf := ua.NewBuffer(nil)
-	buf.WriteUint32(h.Version)
-	buf.WriteUint32(h.ReceiveBufSize)
-	buf.WriteUint32(h.SendBufSize)
-	buf.WriteUint32(h.MaxMessageSize)
-	buf.WriteUint32(h.MaxChunkCount)
-	buf.WriteString(h.EndpointURL)
-	return buf.Bytes(), buf.Error()
+func (h *Hello) Encode(s *ua.Stream) error {
+	s.WriteUint32(h.Version)
+	s.WriteUint32(h.ReceiveBufSize)
+	s.WriteUint32(h.SendBufSize)
+	s.WriteUint32(h.MaxMessageSize)
+	s.WriteUint32(h.MaxChunkCount)
+	s.WriteString(h.EndpointURL)
+	return s.Error()
 }
 
 // Acknowledge represents a OPC UA Acknowledge.
@@ -111,14 +109,13 @@ func (a *Acknowledge) Decode(b []byte) (int, error) {
 	return buf.Pos(), buf.Error()
 }
 
-func (a *Acknowledge) Encode() ([]byte, error) {
-	buf := ua.NewBuffer(nil)
-	buf.WriteUint32(a.Version)
-	buf.WriteUint32(a.ReceiveBufSize)
-	buf.WriteUint32(a.SendBufSize)
-	buf.WriteUint32(a.MaxMessageSize)
-	buf.WriteUint32(a.MaxChunkCount)
-	return buf.Bytes(), buf.Error()
+func (a *Acknowledge) Encode(s *ua.Stream) error {
+	s.WriteUint32(a.Version)
+	s.WriteUint32(a.ReceiveBufSize)
+	s.WriteUint32(a.SendBufSize)
+	s.WriteUint32(a.MaxMessageSize)
+	s.WriteUint32(a.MaxChunkCount)
+	return s.Error()
 }
 
 // ReverseHello represents a OPC UA ReverseHello.
@@ -136,11 +133,10 @@ func (r *ReverseHello) Decode(b []byte) (int, error) {
 	return buf.Pos(), buf.Error()
 }
 
-func (r *ReverseHello) Encode() ([]byte, error) {
-	buf := ua.NewBuffer(nil)
-	buf.WriteString(r.ServerURI)
-	buf.WriteString(r.EndpointURL)
-	return buf.Bytes(), buf.Error()
+func (r *ReverseHello) Encode(s *ua.Stream) error {
+	s.WriteString(r.ServerURI)
+	s.WriteString(r.EndpointURL)
+	return s.Error()
 }
 
 // Error represents a OPC UA Error.
@@ -158,11 +154,10 @@ func (e *Error) Decode(b []byte) (int, error) {
 	return buf.Pos(), buf.Error()
 }
 
-func (e *Error) Encode() ([]byte, error) {
-	buf := ua.NewBuffer(nil)
-	buf.WriteUint32(e.ErrorCode)
-	buf.WriteString(e.Reason)
-	return buf.Bytes(), buf.Error()
+func (e *Error) Encode(s *ua.Stream) error {
+	s.WriteUint32(e.ErrorCode)
+	s.WriteString(e.Reason)
+	return s.Error()
 }
 
 func (e *Error) Error() string {
@@ -183,6 +178,7 @@ func (m *Message) Decode(b []byte) (int, error) {
 	return len(b), nil
 }
 
-func (m *Message) Encode() ([]byte, error) {
-	return m.Data, nil
+func (m *Message) Encode(s *ua.Stream) error {
+	s.Write(m.Data)
+	return nil
 }

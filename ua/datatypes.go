@@ -61,29 +61,27 @@ func (d *DataValue) Decode(b []byte) (int, error) {
 	return buf.Pos(), buf.Error()
 }
 
-func (d *DataValue) Encode() ([]byte, error) {
-	buf := NewBuffer(nil)
-	buf.WriteUint8(d.EncodingMask)
+func (d *DataValue) Encode(s *Stream) {
+	s.WriteUint8(d.EncodingMask)
 
 	if d.Has(DataValueValue) {
-		buf.WriteStruct(d.Value)
+		s.WriteStruct(d.Value)
 	}
 	if d.Has(DataValueStatusCode) {
-		buf.WriteUint32(uint32(d.Status))
+		s.WriteUint32(uint32(d.Status))
 	}
 	if d.Has(DataValueSourceTimestamp) {
-		buf.WriteTime(d.SourceTimestamp)
+		s.WriteTime(d.SourceTimestamp)
 	}
 	if d.Has(DataValueSourcePicoseconds) {
-		buf.WriteUint16(d.SourcePicoseconds)
+		s.WriteUint16(d.SourcePicoseconds)
 	}
 	if d.Has(DataValueServerTimestamp) {
-		buf.WriteTime(d.ServerTimestamp)
+		s.WriteTime(d.ServerTimestamp)
 	}
 	if d.Has(DataValueServerPicoseconds) {
-		buf.WriteUint16(d.ServerPicoseconds)
+		s.WriteUint16(d.ServerPicoseconds)
 	}
-	return buf.Bytes(), buf.Error()
 }
 
 func (d *DataValue) Has(mask byte) bool {
@@ -152,13 +150,11 @@ func (g *GUID) Decode(b []byte) (int, error) {
 	return buf.Pos(), buf.Error()
 }
 
-func (g *GUID) Encode() ([]byte, error) {
-	buf := NewBuffer(nil)
-	buf.WriteUint32(g.Data1)
-	buf.WriteUint16(g.Data2)
-	buf.WriteUint16(g.Data3)
-	buf.Write(g.Data4)
-	return buf.Bytes(), buf.Error()
+func (g *GUID) Encode(s *Stream) {
+	s.WriteUint32(g.Data1)
+	s.WriteUint16(g.Data2)
+	s.WriteUint16(g.Data3)
+	s.Write(g.Data4)
 }
 
 // String returns GUID in human-readable string.
@@ -227,16 +223,15 @@ func (l *LocalizedText) Decode(b []byte) (int, error) {
 	return buf.Pos(), buf.Error()
 }
 
-func (l *LocalizedText) Encode() ([]byte, error) {
-	buf := NewBuffer(nil)
-	buf.WriteUint8(l.EncodingMask)
+func (l *LocalizedText) Encode(s *Stream) error {
+	s.WriteUint8(l.EncodingMask)
 	if l.Has(LocalizedTextLocale) {
-		buf.WriteString(l.Locale)
+		s.WriteString(l.Locale)
 	}
 	if l.Has(LocalizedTextText) {
-		buf.WriteString(l.Text)
+		s.WriteString(l.Text)
 	}
-	return buf.Bytes(), buf.Error()
+	return s.Error()
 }
 
 func (l *LocalizedText) Has(mask byte) bool {

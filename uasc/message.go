@@ -74,11 +74,10 @@ func (m *MessageAbort) Decode(b []byte) (int, error) {
 	return buf.Pos(), buf.Error()
 }
 
-func (m *MessageAbort) Encode() ([]byte, error) {
-	buf := ua.NewBuffer(nil)
-	buf.WriteUint32(m.ErrorCode)
-	buf.WriteString(m.Reason)
-	return buf.Bytes(), buf.Error()
+func (m *MessageAbort) Encode(s *ua.Stream) error {
+	s.WriteUint32(m.ErrorCode)
+	s.WriteString(m.Reason)
+	return s.Error()
 }
 
 func (m *MessageAbort) MessageAbort() string {
@@ -112,16 +111,17 @@ func (m *Message) Decode(b []byte) (int, error) {
 	return len(b), err
 }
 
-func (m *Message) Encode() ([]byte, error) {
+func (m *Message) Encode(s *ua.Stream) error {
 	chunks, err := m.EncodeChunks(math.MaxUint32)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return chunks[0], nil
+	s.Write(chunks[0])
+	return nil
 }
 
 func (m *Message) EncodeChunks(maxBodySize uint32) ([][]byte, error) {
-	dataBody := ua.NewBuffer(nil)
+	dataBody := ua.NewStream(ua.DefaultBufSize)
 	dataBody.WriteStruct(m.TypeID)
 	dataBody.WriteStruct(m.Service)
 
@@ -134,7 +134,7 @@ func (m *Message) EncodeChunks(maxBodySize uint32) ([][]byte, error) {
 
 	switch m.Header.MessageType {
 	case "OPN":
-		partialHeader := ua.NewBuffer(nil)
+		partialHeader := ua.NewStream(ua.DefaultBufSize)
 		partialHeader.WriteStruct(m.AsymmetricSecurityHeader)
 		partialHeader.WriteStruct(m.SequenceHeader)
 
@@ -143,7 +143,7 @@ func (m *Message) EncodeChunks(maxBodySize uint32) ([][]byte, error) {
 		}
 
 		m.Header.MessageSize = uint32(12 + partialHeader.Len() + dataBody.Len())
-		buf := ua.NewBuffer(nil)
+		buf := ua.NewStream(ua.DefaultBufSize)
 		buf.WriteStruct(m.Header)
 		buf.Write(partialHeader.Bytes())
 		buf.Write(dataBody.Bytes())
@@ -155,7 +155,7 @@ func (m *Message) EncodeChunks(maxBodySize uint32) ([][]byte, error) {
 		for i := uint32(0); i < nrChunks-1; i++ {
 			m.Header.MessageSize = maxBodySize + 24
 			m.Header.ChunkType = ChunkTypeIntermediate
-			chunk := ua.NewBuffer(nil)
+			chunk := ua.NewStream(ua.DefaultBufSize)
 			chunk.WriteStruct(m.Header)
 			chunk.WriteStruct(m.SymmetricSecurityHeader)
 			chunk.WriteStruct(m.SequenceHeader)
@@ -169,7 +169,7 @@ func (m *Message) EncodeChunks(maxBodySize uint32) ([][]byte, error) {
 
 		m.Header.ChunkType = ChunkTypeFinal
 		m.Header.MessageSize = uint32(24 + dataBody.Len())
-		chunk := ua.NewBuffer(nil)
+		chunk := ua.NewStream(ua.DefaultBufSize)
 		chunk.WriteStruct(m.Header)
 		chunk.WriteStruct(m.SymmetricSecurityHeader)
 		chunk.WriteStruct(m.SequenceHeader)

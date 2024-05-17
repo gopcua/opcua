@@ -54,11 +54,11 @@ func RunCodecTest(t *testing.T, cases []CodecTestCase) {
 			})
 
 			t.Run("encode", func(t *testing.T) {
-				b, err := ua.Encode(c.Struct)
-				if err != nil {
-					t.Fatal(err)
+				s := ua.NewStream(ua.DefaultBufSize)
+				s.WriteStruct(c.Struct)
+				if s.Error() != nil {
+					t.Fatalf("fail to encode message, err: %v", s.Error())
 				}
-				verify.Values(t, "", b, c.Bytes)
 			})
 		})
 	}

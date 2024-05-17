@@ -58,31 +58,30 @@ func (d *DiagnosticInfo) Decode(b []byte) (int, error) {
 	return buf.Pos(), buf.Error()
 }
 
-func (d *DiagnosticInfo) Encode() ([]byte, error) {
-	buf := NewBuffer(nil)
-	buf.WriteByte(d.EncodingMask)
+func (d *DiagnosticInfo) Encode(s *Stream) error {
+	s.WriteByte(d.EncodingMask)
 	if d.Has(DiagnosticInfoSymbolicID) {
-		buf.WriteInt32(d.SymbolicID)
+		s.WriteInt32(d.SymbolicID)
 	}
 	if d.Has(DiagnosticInfoNamespaceURI) {
-		buf.WriteInt32(d.NamespaceURI)
+		s.WriteInt32(d.NamespaceURI)
 	}
 	if d.Has(DiagnosticInfoLocale) {
-		buf.WriteInt32(d.Locale)
+		s.WriteInt32(d.Locale)
 	}
 	if d.Has(DiagnosticInfoLocalizedText) {
-		buf.WriteInt32(d.LocalizedText)
+		s.WriteInt32(d.LocalizedText)
 	}
 	if d.Has(DiagnosticInfoAdditionalInfo) {
-		buf.WriteString(d.AdditionalInfo)
+		s.WriteString(d.AdditionalInfo)
 	}
 	if d.Has(DiagnosticInfoInnerStatusCode) {
-		buf.WriteUint32(uint32(d.InnerStatusCode))
+		s.WriteUint32(uint32(d.InnerStatusCode))
 	}
 	if d.Has(DiagnosticInfoInnerDiagnosticInfo) {
-		buf.WriteStruct(d.InnerDiagnosticInfo)
+		s.WriteStruct(d.InnerDiagnosticInfo)
 	}
-	return buf.Bytes(), buf.Error()
+	return s.Error()
 }
 
 func (d *DiagnosticInfo) Has(mask byte) bool {

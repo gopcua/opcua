@@ -396,27 +396,29 @@ func (c *Conn) Send(typ string, msg interface{}) error {
 		return errors.Errorf("invalid msg type: %s", typ)
 	}
 
-	body, err := ua.Encode(msg)
-	if err != nil {
-		return errors.Errorf("encode msg failed: %s", err)
+	bodyStream := ua.NewStream(ua.DefaultBufSize)
+	bodyStream.WriteStruct(msg)
+	if bodyStream.Error() != nil {
+		return errors.Errorf("encode msg failed: %s", bodyStream.Error())
 	}
 
 	h := Header{
 		MessageType: typ[:3],
 		ChunkType:   typ[3],
-		MessageSize: uint32(len(body) + hdrlen),
+		MessageSize: uint32(bodyStream.Len() + hdrlen),
 	}
 
 	if h.MessageSize > c.ack.SendBufSize {
 		return errors.Errorf("send packet too large: %d > %d bytes", h.MessageSize, c.ack.SendBufSize)
 	}
 
-	hdr, err := h.Encode()
+	headerStream := ua.NewStream(ua.DefaultBufSize)
+	err := h.Encode(headerStream)
 	if err != nil {
 		return errors.Errorf("encode hdr failed: %s", err)
 	}
 
-	b := append(hdr, body...)
+	b := append(headerStream.Bytes(), bodyStream.Bytes()...)
 	if _, err := c.Write(b); err != nil {
 		return errors.Errorf("write failed: %s", err)
 	}

@@ -15,6 +15,16 @@ import (
 	"github.com/gopcua/opcua/errors"
 )
 
+type ValEncoder interface {
+	Encode(s *Stream) error
+}
+
+var valEncoder = reflect.TypeOf((*ValEncoder)(nil)).Elem()
+
+func isValEncoder(val reflect.Value) bool {
+	return val.Type().Implements(valEncoder)
+}
+
 // debugCodec enables printing of debug messages in the opcua codec.
 var debugCodec = debug.FlagSet("codec")
 

@@ -28,10 +28,9 @@ func (h *SymmetricSecurityHeader) Decode(b []byte) (int, error) {
 	return buf.Pos(), buf.Error()
 }
 
-func (h *SymmetricSecurityHeader) Encode() ([]byte, error) {
-	buf := ua.NewBuffer(nil)
-	buf.WriteUint32(h.TokenID)
-	return buf.Bytes(), buf.Error()
+func (h *SymmetricSecurityHeader) Encode(s *ua.Stream) error {
+	s.WriteUint32(h.TokenID)
+	return s.Error()
 }
 
 // String returns Header in string.

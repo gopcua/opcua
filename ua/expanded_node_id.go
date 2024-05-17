@@ -102,17 +102,15 @@ func (e *ExpandedNodeID) Decode(b []byte) (int, error) {
 	return buf.Pos(), buf.Error()
 }
 
-func (e *ExpandedNodeID) Encode() ([]byte, error) {
-	buf := NewBuffer(nil)
-	buf.WriteStruct(e.NodeID)
+func (e *ExpandedNodeID) Encode(s *Stream) error {
+	s.WriteStruct(e.NodeID)
 	if e.HasNamespaceURI() {
-		buf.WriteString(e.NamespaceURI)
+		s.WriteString(e.NamespaceURI)
 	}
 	if e.HasServerIndex() {
-		buf.WriteUint32(e.ServerIndex)
+		s.WriteUint32(e.ServerIndex)
 	}
-	return buf.Bytes(), buf.Error()
-
+	return s.Error()
 }
 
 // HasNamespaceURI checks if an ExpandedNodeID has NamespaceURI Flag.

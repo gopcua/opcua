@@ -51,16 +51,15 @@ func (h *Header) Decode(b []byte) (int, error) {
 	return buf.Pos(), buf.Error()
 }
 
-func (h *Header) Encode() ([]byte, error) {
-	buf := ua.NewBuffer(nil)
+func (h *Header) Encode(s *ua.Stream) error {
 	if len(h.MessageType) != 3 {
-		return nil, errors.Errorf("invalid message type: %q", h.MessageType)
+		return errors.Errorf("invalid message type: %q", h.MessageType)
 	}
-	buf.Write([]byte(h.MessageType))
-	buf.WriteByte(h.ChunkType)
-	buf.WriteUint32(h.MessageSize)
-	buf.WriteUint32(h.SecureChannelID)
-	return buf.Bytes(), buf.Error()
+	s.Write([]byte(h.MessageType))
+	s.WriteByte(h.ChunkType)
+	s.WriteUint32(h.MessageSize)
+	s.WriteUint32(h.SecureChannelID)
+	return s.Error()
 }
 
 // String returns Header in string.
