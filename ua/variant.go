@@ -383,29 +383,29 @@ func (m *Variant) encodeValue(s *Stream, v interface{}) {
 	case time.Time:
 		s.WriteTime(x)
 	case *GUID:
-		s.WriteStruct(x)
+		s.WriteAny(x)
 	case []byte:
 		s.WriteByteString(x)
 	case XMLElement:
 		s.WriteString(string(x))
 	case *NodeID:
-		s.WriteStruct(x)
+		s.WriteAny(x)
 	case *ExpandedNodeID:
-		s.WriteStruct(x)
+		s.WriteAny(x)
 	case StatusCode:
 		s.WriteUint32(uint32(x))
 	case *QualifiedName:
-		s.WriteStruct(x)
+		s.WriteAny(x)
 	case *LocalizedText:
-		s.WriteStruct(x)
+		s.WriteAny(x)
 	case *ExtensionObject:
-		s.WriteStruct(x)
+		s.WriteAny(x)
 	case *DataValue:
-		s.WriteStruct(x)
+		s.WriteAny(x)
 	case *Variant:
-		s.WriteStruct(x)
+		s.WriteAny(x)
 	case *DiagnosticInfo:
-		s.WriteStruct(x)
+		s.WriteAny(x)
 	}
 }
 

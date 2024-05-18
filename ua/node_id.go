@@ -380,7 +380,7 @@ func (n *NodeID) Encode(s *Stream) error {
 		s.WriteUint32(n.nid)
 	case NodeIDTypeGUID:
 		s.WriteUint16(n.ns)
-		s.WriteStruct(n.gid)
+		s.WriteAny(n.gid)
 	case NodeIDTypeByteString, NodeIDTypeString:
 		s.WriteUint16(n.ns)
 		s.WriteByteString(n.bid)

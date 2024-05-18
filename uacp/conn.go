@@ -397,7 +397,7 @@ func (c *Conn) Send(typ string, msg interface{}) error {
 	}
 
 	bodyStream := ua.NewStream(ua.DefaultBufSize)
-	bodyStream.WriteStruct(msg)
+	bodyStream.WriteAny(msg)
 	if bodyStream.Error() != nil {
 		return errors.Errorf("encode msg failed: %s", bodyStream.Error())
 	}

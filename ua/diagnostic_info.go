@@ -79,7 +79,7 @@ func (d *DiagnosticInfo) Encode(s *Stream) error {
 		s.WriteUint32(uint32(d.InnerStatusCode))
 	}
 	if d.Has(DiagnosticInfoInnerDiagnosticInfo) {
-		s.WriteStruct(d.InnerDiagnosticInfo)
+		s.WriteAny(d.InnerDiagnosticInfo)
 	}
 	return s.Error()
 }

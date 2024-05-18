@@ -103,7 +103,7 @@ func (e *ExpandedNodeID) Decode(b []byte) (int, error) {
 }
 
 func (e *ExpandedNodeID) Encode(s *Stream) error {
-	s.WriteStruct(e.NodeID)
+	s.WriteAny(e.NodeID)
 	if e.HasNamespaceURI() {
 		s.WriteString(e.NamespaceURI)
 	}

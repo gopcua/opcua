@@ -88,15 +88,14 @@ func (e *ExtensionObject) Encode(s *Stream) error {
 	if e == nil {
 		e = &ExtensionObject{TypeID: NewTwoByteExpandedNodeID(0), EncodingMask: ExtensionObjectEmpty}
 	}
-	s.WriteStruct(e.TypeID)
+	s.WriteAny(e.TypeID)
 	s.WriteByte(e.EncodingMask)
 	if e.EncodingMask == ExtensionObjectEmpty {
 		return s.Error()
 	}
 
-	// TODO: use pool?
 	body := NewStream(DefaultBufSize)
-	body.WriteStruct(e.Value)
+	body.WriteAny(e.Value)
 	if body.Error() != nil {
 		return body.Error()
 	}

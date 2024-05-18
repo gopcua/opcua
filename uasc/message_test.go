@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gopcua/opcua/id"
+	"github.com/pascaldekloe/goe/verify"
 
 	"github.com/gopcua/opcua/ua"
 )
@@ -487,10 +488,11 @@ func BenchmarkEncodeMessage(b *testing.B) {
 	s := ua.NewStream(ua.DefaultBufSize)
 	for i := 0; i < b.N; i++ {
 		for _, tc := range cases {
-			s.WriteStruct(tc.Struct)
+			s.WriteAny(tc.Struct)
 			if s.Error() != nil {
 				b.Fatalf("fail to encode message, err: %v", s.Error())
 			}
+			verify.Values(b, "", s.Bytes(), tc.Bytes)
 			s.Reset()
 		}
 	}

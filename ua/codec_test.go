@@ -53,11 +53,12 @@ func RunCodecTest(t *testing.T, cases []CodecTestCase) {
 			})
 
 			t.Run("encode", func(t *testing.T) {
-				b, err := Encode(c.Struct)
-				if err != nil {
-					t.Fatal(err)
+				s := NewStream(DefaultBufSize)
+				s.WriteAny(c.Struct)
+				if s.Error() != nil {
+					t.Fatal(s.Error())
 				}
-				verify.Values(t, "", b, c.Bytes)
+				verify.Values(t, "", s.Bytes(), c.Bytes)
 			})
 		})
 	}

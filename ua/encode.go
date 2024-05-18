@@ -5,7 +5,6 @@
 package ua
 
 import (
-	"encoding/hex"
 	"fmt"
 	"math"
 	"reflect"
@@ -15,23 +14,13 @@ import (
 	"github.com/gopcua/opcua/errors"
 )
 
-type ValEncoder interface {
-	Encode(s *Stream) error
-}
-
-var valEncoder = reflect.TypeOf((*ValEncoder)(nil)).Elem()
-
-func isValEncoder(val reflect.Value) bool {
-	return val.Type().Implements(valEncoder)
-}
-
 // debugCodec enables printing of debug messages in the opcua codec.
 var debugCodec = debug.FlagSet("codec")
 
 // BinaryEncoder is the interface implemented by an object that can
 // marshal itself into a binary OPC/UA representation.
 type BinaryEncoder interface {
-	Encode() ([]byte, error)
+	Encode(s *Stream) error
 }
 
 var binaryEncoder = reflect.TypeOf((*BinaryEncoder)(nil)).Elem()
@@ -40,150 +29,142 @@ func isBinaryEncoder(val reflect.Value) bool {
 	return val.Type().Implements(binaryEncoder)
 }
 
-func Encode(v interface{}) ([]byte, error) {
-	val := reflect.ValueOf(v)
-	return encode(val, val.Type().String())
+func (s *Stream) WriteAny(w interface{}) {
+	if s.err != nil {
+		return
+	}
+	val := reflect.ValueOf(w)
+	switch x := w.(type) {
+	case BinaryEncoder:
+		s.err = x.Encode(s)
+	default:
+		s.err = s.encode(val, val.Type().String())
+	}
 }
 
-func encode(val reflect.Value, name string) ([]byte, error) {
+func (s *Stream) encode(val reflect.Value, name string) error {
 	if debugCodec {
 		fmt.Printf("encode: %s has type %s and is a %s\n", name, val.Type(), val.Type().Kind())
 	}
 
-	buf := NewBuffer(nil)
 	switch {
 	case isBinaryEncoder(val):
 		v := val.Interface().(BinaryEncoder)
-		return dump(v.Encode())
+		return v.Encode(s)
 
 	case isTime(val):
-		buf.WriteTime(val.Convert(timeType).Interface().(time.Time))
+		s.WriteTime(val.Convert(timeType).Interface().(time.Time))
 
 	default:
 		switch val.Kind() {
 		case reflect.Bool:
-			buf.WriteBool(val.Bool())
+			s.WriteBool(val.Bool())
 		case reflect.Int8:
-			buf.WriteInt8(int8(val.Int()))
+			s.WriteInt8(int8(val.Int()))
 		case reflect.Uint8:
-			buf.WriteUint8(uint8(val.Uint()))
+			s.WriteUint8(uint8(val.Uint()))
 		case reflect.Int16:
-			buf.WriteInt16(int16(val.Int()))
+			s.WriteInt16(int16(val.Int()))
 		case reflect.Uint16:
-			buf.WriteUint16(uint16(val.Uint()))
+			s.WriteUint16(uint16(val.Uint()))
 		case reflect.Int32:
-			buf.WriteInt32(int32(val.Int()))
+			s.WriteInt32(int32(val.Int()))
 		case reflect.Uint32:
-			buf.WriteUint32(uint32(val.Uint()))
+			s.WriteUint32(uint32(val.Uint()))
 		case reflect.Int64:
-			buf.WriteInt64(int64(val.Int()))
+			s.WriteInt64(int64(val.Int()))
 		case reflect.Uint64:
-			buf.WriteUint64(uint64(val.Uint()))
+			s.WriteUint64(uint64(val.Uint()))
 		case reflect.Float32:
-			buf.WriteFloat32(float32(val.Float()))
+			s.WriteFloat32(float32(val.Float()))
 		case reflect.Float64:
-			buf.WriteFloat64(float64(val.Float()))
+			s.WriteFloat64(float64(val.Float()))
 		case reflect.String:
-			buf.WriteString(val.String())
+			s.WriteString(val.String())
 		case reflect.Ptr:
 			if val.IsNil() {
-				return nil, nil
+				return nil
 			}
-			return dump(encode(val.Elem(), name))
+			return s.encode(val.Elem(), name)
 		case reflect.Struct:
-			return dump(writeStruct(val, name))
+			return s.writeStruct(val, name)
 		case reflect.Slice:
-			return dump(writeSlice(val, name))
+			return s.writeSlice(val, name)
 		case reflect.Array:
-			return dump(writeArray(val, name))
+			return s.writeArray(val, name)
 		default:
-			return nil, errors.Errorf("unsupported type: %s", val.Type())
+			return errors.Errorf("unsupported type: %s", val.Type())
 		}
 	}
-	return dump(buf.Bytes(), buf.Error())
+	return s.Error()
 }
 
-func dump(b []byte, err error) ([]byte, error) {
-	if debugCodec {
-		fmt.Printf("%s---\n", hex.Dump(b))
-	}
-	return b, err
-}
-
-func writeStruct(val reflect.Value, name string) ([]byte, error) {
-	var buf []byte
+func (s *Stream) writeStruct(val reflect.Value, name string) error {
 	valt := val.Type()
 	for i := 0; i < val.NumField(); i++ {
 		ft := valt.Field(i)
 		fname := name + "." + ft.Name
-		b, err := encode(val.Field(i), fname)
-		if err != nil {
-			return nil, err
+		if err := s.encode(val.Field(i), fname); err != nil {
+			return err
 		}
-		buf = append(buf, b...)
 	}
-	return buf, nil
+	return nil
 }
 
-func writeSlice(val reflect.Value, name string) ([]byte, error) {
-	buf := NewBuffer(nil)
+func (s *Stream) writeSlice(val reflect.Value, name string) error {
 	if val.IsNil() {
-		buf.WriteUint32(null)
-		return buf.Bytes(), buf.Error()
+		s.WriteUint32(null)
+		return s.Error()
 	}
 
 	if val.Len() > math.MaxInt32 {
-		return nil, errors.Errorf("array too large")
+		return errors.Errorf("array too large")
 	}
 
-	buf.WriteUint32(uint32(val.Len()))
+	s.WriteUint32(uint32(val.Len()))
 
 	// fast path for []byte
 	if val.Type().Elem().Kind() == reflect.Uint8 {
 		// fmt.Println("[]byte fast path")
-		buf.Write(val.Bytes())
-		return buf.Bytes(), buf.Error()
+		s.Write(val.Bytes())
+		return s.Error()
 	}
 
 	// loop over elements
 	for i := 0; i < val.Len(); i++ {
 		ename := fmt.Sprintf("%s[%d]", name, i)
-		b, err := encode(val.Index(i), ename)
-		if err != nil {
-			return nil, err
+		s.encode(val.Index(i), ename)
+		if s.Error() != nil {
+			return s.Error()
 		}
-		buf.Write(b)
 	}
-	return buf.Bytes(), buf.Error()
+	return s.Error()
 }
 
-func writeArray(val reflect.Value, name string) ([]byte, error) {
-	buf := NewBuffer(nil)
-
+func (s *Stream) writeArray(val reflect.Value, name string) error {
 	if val.Len() > math.MaxInt32 {
-		return nil, errors.Errorf("array too large: %d > %d", val.Len(), math.MaxInt32)
+		return errors.Errorf("array too large: %d > %d", val.Len(), math.MaxInt32)
 	}
 
-	buf.WriteUint32(uint32(val.Len()))
+	s.WriteUint32(uint32(val.Len()))
 
 	// fast path for []byte
 	if val.Type().Elem().Kind() == reflect.Uint8 {
 		// fmt.Println("encode: []byte fast path")
 		b := make([]byte, val.Len())
 		reflect.Copy(reflect.ValueOf(b), val)
-		buf.Write(b)
-		return buf.Bytes(), buf.Error()
+		s.Write(b)
+		return s.Error()
 	}
 
 	// loop over elements
 	// we write all the elements, also the zero values
 	for i := 0; i < val.Len(); i++ {
 		ename := fmt.Sprintf("%s[%d]", name, i)
-		b, err := encode(val.Index(i), ename)
-		if err != nil {
-			return nil, err
+		s.encode(val.Index(i), ename)
+		if s.Error() != nil {
+			return s.Error()
 		}
-		buf.Write(b)
 	}
-	return buf.Bytes(), buf.Error()
+	return s.Error()
 }

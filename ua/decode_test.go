@@ -403,11 +403,12 @@ func TestCodec(t *testing.T) {
 				}
 			})
 			t.Run("encode", func(t *testing.T) {
-				b, err := Encode(tt.v)
-				if err != nil {
-					t.Fatal(err)
+				s := NewStream(DefaultBufSize)
+				s.WriteAny(tt.v)
+				if s.Error() != nil {
+					t.Fatal(s.Error())
 				}
-				if got, want := b, tt.b; !bytes.Equal(got, want) {
+				if got, want := s.Bytes(), tt.b; !bytes.Equal(got, want) {
 					t.Fatalf("\ngot  %#v\nwant %#v", got, want)
 				}
 			})

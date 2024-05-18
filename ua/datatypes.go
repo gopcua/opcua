@@ -61,11 +61,11 @@ func (d *DataValue) Decode(b []byte) (int, error) {
 	return buf.Pos(), buf.Error()
 }
 
-func (d *DataValue) Encode(s *Stream) {
+func (d *DataValue) Encode(s *Stream) error {
 	s.WriteUint8(d.EncodingMask)
 
 	if d.Has(DataValueValue) {
-		s.WriteStruct(d.Value)
+		s.WriteAny(d.Value)
 	}
 	if d.Has(DataValueStatusCode) {
 		s.WriteUint32(uint32(d.Status))
@@ -82,6 +82,7 @@ func (d *DataValue) Encode(s *Stream) {
 	if d.Has(DataValueServerPicoseconds) {
 		s.WriteUint16(d.ServerPicoseconds)
 	}
+	return s.Error()
 }
 
 func (d *DataValue) Has(mask byte) bool {
@@ -150,11 +151,12 @@ func (g *GUID) Decode(b []byte) (int, error) {
 	return buf.Pos(), buf.Error()
 }
 
-func (g *GUID) Encode(s *Stream) {
+func (g *GUID) Encode(s *Stream) error {
 	s.WriteUint32(g.Data1)
 	s.WriteUint16(g.Data2)
 	s.WriteUint16(g.Data3)
 	s.Write(g.Data4)
+	return s.Error()
 }
 
 // String returns GUID in human-readable string.

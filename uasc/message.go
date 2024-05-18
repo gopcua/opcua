@@ -122,8 +122,8 @@ func (m *Message) Encode(s *ua.Stream) error {
 
 func (m *Message) EncodeChunks(maxBodySize uint32) ([][]byte, error) {
 	dataBody := ua.NewStream(ua.DefaultBufSize)
-	dataBody.WriteStruct(m.TypeID)
-	dataBody.WriteStruct(m.Service)
+	dataBody.WriteAny(m.TypeID)
+	dataBody.WriteAny(m.Service)
 
 	if dataBody.Error() != nil {
 		return nil, dataBody.Error()
@@ -135,8 +135,8 @@ func (m *Message) EncodeChunks(maxBodySize uint32) ([][]byte, error) {
 	switch m.Header.MessageType {
 	case "OPN":
 		partialHeader := ua.NewStream(ua.DefaultBufSize)
-		partialHeader.WriteStruct(m.AsymmetricSecurityHeader)
-		partialHeader.WriteStruct(m.SequenceHeader)
+		partialHeader.WriteAny(m.AsymmetricSecurityHeader)
+		partialHeader.WriteAny(m.SequenceHeader)
 
 		if partialHeader.Error() != nil {
 			return nil, partialHeader.Error()
@@ -144,11 +144,12 @@ func (m *Message) EncodeChunks(maxBodySize uint32) ([][]byte, error) {
 
 		m.Header.MessageSize = uint32(12 + partialHeader.Len() + dataBody.Len())
 		buf := ua.NewStream(ua.DefaultBufSize)
-		buf.WriteStruct(m.Header)
+		buf.WriteAny(m.Header)
 		buf.Write(partialHeader.Bytes())
 		buf.Write(dataBody.Bytes())
 
-		return [][]byte{buf.Bytes()}, buf.Error()
+		b := append([]byte(nil), buf.Bytes()...)
+		return [][]byte{b}, buf.Error()
 
 	case "CLO", "MSG":
 
@@ -156,29 +157,29 @@ func (m *Message) EncodeChunks(maxBodySize uint32) ([][]byte, error) {
 			m.Header.MessageSize = maxBodySize + 24
 			m.Header.ChunkType = ChunkTypeIntermediate
 			chunk := ua.NewStream(ua.DefaultBufSize)
-			chunk.WriteStruct(m.Header)
-			chunk.WriteStruct(m.SymmetricSecurityHeader)
-			chunk.WriteStruct(m.SequenceHeader)
+			chunk.WriteAny(m.Header)
+			chunk.WriteAny(m.SymmetricSecurityHeader)
+			chunk.WriteAny(m.SequenceHeader)
 			chunk.Write(dataBody.ReadN(int(maxBodySize)))
 			if chunk.Error() != nil {
 				return nil, chunk.Error()
 			}
 
-			chunks[i] = chunk.Bytes()
+			chunks[i] = append(chunks[i], chunk.Bytes()...)
 		}
 
 		m.Header.ChunkType = ChunkTypeFinal
 		m.Header.MessageSize = uint32(24 + dataBody.Len())
 		chunk := ua.NewStream(ua.DefaultBufSize)
-		chunk.WriteStruct(m.Header)
-		chunk.WriteStruct(m.SymmetricSecurityHeader)
-		chunk.WriteStruct(m.SequenceHeader)
+		chunk.WriteAny(m.Header)
+		chunk.WriteAny(m.SymmetricSecurityHeader)
+		chunk.WriteAny(m.SequenceHeader)
 		chunk.Write(dataBody.Bytes())
 		if chunk.Error() != nil {
 			return nil, chunk.Error()
 		}
 
-		chunks[nrChunks-1] = chunk.Bytes()
+		chunks[nrChunks-1] = append(chunks[nrChunks-1], chunk.Bytes()...)
 		return chunks, nil
 	default:
 		return nil, errors.Errorf("invalid message type %q", m.Header.MessageType)
