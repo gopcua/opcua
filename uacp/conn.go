@@ -396,7 +396,8 @@ func (c *Conn) Send(typ string, msg interface{}) error {
 		return errors.Errorf("invalid msg type: %s", typ)
 	}
 
-	bodyStream := ua.NewStream(ua.DefaultBufSize)
+	bodyStream := ua.BorrowStream()
+	ua.ReturnStream(bodyStream)
 	bodyStream.WriteAny(msg)
 	if bodyStream.Error() != nil {
 		return errors.Errorf("encode msg failed: %s", bodyStream.Error())
@@ -412,7 +413,8 @@ func (c *Conn) Send(typ string, msg interface{}) error {
 		return errors.Errorf("send packet too large: %d > %d bytes", h.MessageSize, c.ack.SendBufSize)
 	}
 
-	headerStream := ua.NewStream(ua.DefaultBufSize)
+	headerStream := ua.BorrowStream()
+	defer ua.ReturnStream(headerStream)
 	err := h.Encode(headerStream)
 	if err != nil {
 		return errors.Errorf("encode hdr failed: %s", err)

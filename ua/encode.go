@@ -8,11 +8,28 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+	"sync"
 	"time"
 
 	"github.com/gopcua/opcua/debug"
 	"github.com/gopcua/opcua/errors"
 )
+
+var streamPool sync.Pool
+
+func BorrowStream() *Stream {
+	v, ok := streamPool.Get().(*Stream)
+	if ok {
+		v.Reset()
+		return v
+	}
+
+	return NewStream(DefaultBufSize)
+}
+
+func ReturnStream(s *Stream) {
+	streamPool.Put(s)
+}
 
 // debugCodec enables printing of debug messages in the opcua codec.
 var debugCodec = debug.FlagSet("codec")
