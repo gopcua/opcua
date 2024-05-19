@@ -397,7 +397,7 @@ func (c *Conn) Send(typ string, msg interface{}) error {
 	}
 
 	bodyStream := ua.BorrowStream()
-	ua.ReturnStream(bodyStream)
+	defer ua.ReturnStream(bodyStream)
 	bodyStream.WriteAny(msg)
 	if bodyStream.Error() != nil {
 		return errors.Errorf("encode msg failed: %s", bodyStream.Error())

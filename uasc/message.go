@@ -146,12 +146,12 @@ func (m *Message) EncodeChunks(maxBodySize uint32) ([][]byte, error) {
 
 		m.Header.MessageSize = uint32(12 + partialHeader.Len() + dataBody.Len())
 		buf := ua.BorrowStream()
-		ua.ReturnStream(buf)
 		buf.WriteAny(m.Header)
 		buf.Write(partialHeader.Bytes())
 		buf.Write(dataBody.Bytes())
 
 		b := append([]byte(nil), buf.Bytes()...)
+		ua.ReturnStream(buf)
 		return [][]byte{b}, buf.Error()
 
 	case "CLO", "MSG":
