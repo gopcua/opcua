@@ -38,6 +38,7 @@ func (s *Stream) Len() int {
 func (s *Stream) Reset() {
 	s.buf = s.buf[:0]
 	s.pos = 0
+	s.err = nil
 }
 
 func (s *Stream) Bytes() []byte {

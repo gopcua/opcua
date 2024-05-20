@@ -94,8 +94,7 @@ func (e *ExtensionObject) Encode(s *Stream) {
 		return
 	}
 
-	body := BorrowStream()
-	defer ReturnStream(body)
+	body := NewStream(DefaultBufSize)
 	body.WriteAny(e.Value)
 	if body.Error() != nil {
 		s.WrapError(body.Error())

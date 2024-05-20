@@ -119,8 +119,7 @@ func (m *Message) Encode(s *ua.Stream) {
 }
 
 func (m *Message) EncodeChunks(maxBodySize uint32) ([][]byte, error) {
-	dataBody := ua.BorrowStream()
-	defer ua.ReturnStream(dataBody)
+	dataBody := ua.NewStream(ua.DefaultBufSize)
 	dataBody.WriteAny(m.TypeID)
 	dataBody.WriteAny(m.Service)
 	if dataBody.Error() != nil {
@@ -132,8 +131,7 @@ func (m *Message) EncodeChunks(maxBodySize uint32) ([][]byte, error) {
 
 	switch m.Header.MessageType {
 	case "OPN":
-		partialHeader := ua.BorrowStream()
-		defer ua.ReturnStream(dataBody)
+		partialHeader := ua.NewStream(ua.DefaultBufSize)
 		partialHeader.WriteAny(m.AsymmetricSecurityHeader)
 		partialHeader.WriteAny(m.SequenceHeader)
 		if partialHeader.Error() != nil {
