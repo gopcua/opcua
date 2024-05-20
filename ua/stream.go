@@ -23,6 +23,10 @@ func NewStream(size int) *Stream {
 	}
 }
 
+func (s *Stream) WrapError(err error) {
+	s.err = errors.Join(err)
+}
+
 func (s *Stream) Error() error {
 	return s.err
 }

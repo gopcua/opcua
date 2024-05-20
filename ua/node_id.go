@@ -366,7 +366,7 @@ func (n *NodeID) Decode(b []byte) (int, error) {
 	}
 }
 
-func (n *NodeID) Encode(s *Stream) error {
+func (n *NodeID) Encode(s *Stream) {
 	s.WriteByte(byte(n.mask))
 
 	switch n.Type() {
@@ -385,9 +385,8 @@ func (n *NodeID) Encode(s *Stream) error {
 		s.WriteUint16(n.ns)
 		s.WriteByteString(n.bid)
 	default:
-		return errors.Errorf("invalid node id type %v", n.Type())
+		s.err = errors.Errorf("invalid node id type %v", n.Type())
 	}
-	return s.Error()
 }
 
 func (n *NodeID) MarshalJSON() ([]byte, error) {

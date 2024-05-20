@@ -84,25 +84,25 @@ func (e *ExtensionObject) Decode(b []byte) (int, error) {
 	return buf.Pos(), body.Error()
 }
 
-func (e *ExtensionObject) Encode(s *Stream) error {
+func (e *ExtensionObject) Encode(s *Stream) {
 	if e == nil {
 		e = &ExtensionObject{TypeID: NewTwoByteExpandedNodeID(0), EncodingMask: ExtensionObjectEmpty}
 	}
 	s.WriteAny(e.TypeID)
 	s.WriteByte(e.EncodingMask)
 	if e.EncodingMask == ExtensionObjectEmpty {
-		return s.Error()
+		return
 	}
 
 	body := BorrowStream()
 	defer ReturnStream(body)
 	body.WriteAny(e.Value)
 	if body.Error() != nil {
-		return body.Error()
+		s.WrapError(body.Error())
+		return
 	}
 	s.WriteUint32(uint32(body.Len()))
 	s.Write(body.Bytes())
-	return s.Error()
 }
 
 func (e *ExtensionObject) UpdateMask() {

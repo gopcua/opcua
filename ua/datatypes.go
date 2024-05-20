@@ -61,7 +61,7 @@ func (d *DataValue) Decode(b []byte) (int, error) {
 	return buf.Pos(), buf.Error()
 }
 
-func (d *DataValue) Encode(s *Stream) error {
+func (d *DataValue) Encode(s *Stream) {
 	s.WriteUint8(d.EncodingMask)
 
 	if d.Has(DataValueValue) {
@@ -82,7 +82,6 @@ func (d *DataValue) Encode(s *Stream) error {
 	if d.Has(DataValueServerPicoseconds) {
 		s.WriteUint16(d.ServerPicoseconds)
 	}
-	return s.Error()
 }
 
 func (d *DataValue) Has(mask byte) bool {
@@ -151,12 +150,11 @@ func (g *GUID) Decode(b []byte) (int, error) {
 	return buf.Pos(), buf.Error()
 }
 
-func (g *GUID) Encode(s *Stream) error {
+func (g *GUID) Encode(s *Stream) {
 	s.WriteUint32(g.Data1)
 	s.WriteUint16(g.Data2)
 	s.WriteUint16(g.Data3)
 	s.Write(g.Data4)
-	return s.Error()
 }
 
 // String returns GUID in human-readable string.
@@ -225,7 +223,7 @@ func (l *LocalizedText) Decode(b []byte) (int, error) {
 	return buf.Pos(), buf.Error()
 }
 
-func (l *LocalizedText) Encode(s *Stream) error {
+func (l *LocalizedText) Encode(s *Stream) {
 	s.WriteUint8(l.EncodingMask)
 	if l.Has(LocalizedTextLocale) {
 		s.WriteString(l.Locale)
@@ -233,7 +231,6 @@ func (l *LocalizedText) Encode(s *Stream) error {
 	if l.Has(LocalizedTextText) {
 		s.WriteString(l.Text)
 	}
-	return s.Error()
 }
 
 func (l *LocalizedText) Has(mask byte) bool {

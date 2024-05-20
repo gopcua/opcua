@@ -45,14 +45,14 @@ func (h *Header) Decode(b []byte) (int, error) {
 	return buf.Pos(), buf.Error()
 }
 
-func (h *Header) Encode(s *ua.Stream) error {
+func (h *Header) Encode(s *ua.Stream) {
 	if len(h.MessageType) != 3 {
-		return errors.Errorf("invalid message type: %q", h.MessageType)
+		s.WrapError(errors.Errorf("invalid message type: %q", h.MessageType))
+		return
 	}
 	s.Write([]byte(h.MessageType))
 	s.WriteByte(h.ChunkType)
 	s.WriteUint32(h.MessageSize)
-	return s.Error()
 }
 
 // Hello represents a OPC UA Hello.
@@ -78,14 +78,13 @@ func (h *Hello) Decode(b []byte) (int, error) {
 	return buf.Pos(), buf.Error()
 }
 
-func (h *Hello) Encode(s *ua.Stream) error {
+func (h *Hello) Encode(s *ua.Stream) {
 	s.WriteUint32(h.Version)
 	s.WriteUint32(h.ReceiveBufSize)
 	s.WriteUint32(h.SendBufSize)
 	s.WriteUint32(h.MaxMessageSize)
 	s.WriteUint32(h.MaxChunkCount)
 	s.WriteString(h.EndpointURL)
-	return s.Error()
 }
 
 // Acknowledge represents a OPC UA Acknowledge.
@@ -109,13 +108,12 @@ func (a *Acknowledge) Decode(b []byte) (int, error) {
 	return buf.Pos(), buf.Error()
 }
 
-func (a *Acknowledge) Encode(s *ua.Stream) error {
+func (a *Acknowledge) Encode(s *ua.Stream) {
 	s.WriteUint32(a.Version)
 	s.WriteUint32(a.ReceiveBufSize)
 	s.WriteUint32(a.SendBufSize)
 	s.WriteUint32(a.MaxMessageSize)
 	s.WriteUint32(a.MaxChunkCount)
-	return s.Error()
 }
 
 // ReverseHello represents a OPC UA ReverseHello.
@@ -133,10 +131,9 @@ func (r *ReverseHello) Decode(b []byte) (int, error) {
 	return buf.Pos(), buf.Error()
 }
 
-func (r *ReverseHello) Encode(s *ua.Stream) error {
+func (r *ReverseHello) Encode(s *ua.Stream) {
 	s.WriteString(r.ServerURI)
 	s.WriteString(r.EndpointURL)
-	return s.Error()
 }
 
 // Error represents a OPC UA Error.
@@ -154,10 +151,9 @@ func (e *Error) Decode(b []byte) (int, error) {
 	return buf.Pos(), buf.Error()
 }
 
-func (e *Error) Encode(s *ua.Stream) error {
+func (e *Error) Encode(s *ua.Stream) {
 	s.WriteUint32(e.ErrorCode)
 	s.WriteString(e.Reason)
-	return s.Error()
 }
 
 func (e *Error) Error() string {
@@ -178,7 +174,6 @@ func (m *Message) Decode(b []byte) (int, error) {
 	return len(b), nil
 }
 
-func (m *Message) Encode(s *ua.Stream) error {
+func (m *Message) Encode(s *ua.Stream) {
 	s.Write(m.Data)
-	return nil
 }

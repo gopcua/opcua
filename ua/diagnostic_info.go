@@ -58,7 +58,7 @@ func (d *DiagnosticInfo) Decode(b []byte) (int, error) {
 	return buf.Pos(), buf.Error()
 }
 
-func (d *DiagnosticInfo) Encode(s *Stream) error {
+func (d *DiagnosticInfo) Encode(s *Stream) {
 	s.WriteByte(d.EncodingMask)
 	if d.Has(DiagnosticInfoSymbolicID) {
 		s.WriteInt32(d.SymbolicID)
@@ -81,7 +81,6 @@ func (d *DiagnosticInfo) Encode(s *Stream) error {
 	if d.Has(DiagnosticInfoInnerDiagnosticInfo) {
 		s.WriteAny(d.InnerDiagnosticInfo)
 	}
-	return s.Error()
 }
 
 func (d *DiagnosticInfo) Has(mask byte) bool {

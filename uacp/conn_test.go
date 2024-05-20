@@ -122,9 +122,9 @@ NEXT:
 	got = got[hdrlen:]
 
 	s := ua.NewStream(ua.DefaultBufSize)
-	err = msg.Encode(s)
-	if err != nil {
-		t.Fatal(err)
+	msg.Encode(s)
+	if s.Error() != nil {
+		t.Fatal(s.Error())
 	}
 	want := s.Bytes()
 	verify.Values(t, "", got, want)

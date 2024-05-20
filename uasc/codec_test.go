@@ -54,7 +54,8 @@ func RunCodecTest(t *testing.T, cases []CodecTestCase) {
 			})
 
 			t.Run("encode", func(t *testing.T) {
-				s := ua.NewStream(ua.DefaultBufSize)
+				s := ua.BorrowStream()
+				defer ua.ReturnStream(s)
 				s.WriteAny(c.Struct)
 				if s.Error() != nil {
 					t.Fatal(s.Error())

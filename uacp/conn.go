@@ -415,12 +415,14 @@ func (c *Conn) Send(typ string, msg interface{}) error {
 
 	headerStream := ua.BorrowStream()
 	defer ua.ReturnStream(headerStream)
-	err := h.Encode(headerStream)
-	if err != nil {
-		return errors.Errorf("encode hdr failed: %s", err)
+	h.Encode(headerStream)
+	if headerStream.Error() != nil {
+		return errors.Errorf("encode hdr failed: %s", headerStream.Error())
 	}
 
-	b := append(headerStream.Bytes(), bodyStream.Bytes()...)
+	b := make([]byte, 0, headerStream.Len()+bodyStream.Len())
+	b = append(b, headerStream.Bytes()...)
+	b = append(b, bodyStream.Bytes()...)
 	if _, err := c.Write(b); err != nil {
 		return errors.Errorf("write failed: %s", err)
 	}

@@ -318,12 +318,12 @@ func (m *Variant) decodeValue(buf *Buffer) interface{} {
 }
 
 // Encode implements the codec interface.
-func (m *Variant) Encode(s *Stream) error {
+func (m *Variant) Encode(s *Stream) {
 	s.WriteByte(m.mask)
 
 	// a null value specifies that no other fields are encoded
 	if m.Type() == TypeIDNull {
-		return s.Error()
+		return
 	}
 
 	if m.Has(VariantArrayValues) {
@@ -338,8 +338,6 @@ func (m *Variant) Encode(s *Stream) error {
 			s.WriteInt32(m.arrayDimensions[i])
 		}
 	}
-
-	return s.Error()
 }
 
 // encode recursively writes the values to the buffer.

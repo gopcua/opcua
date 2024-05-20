@@ -15,16 +15,16 @@ import (
 	"github.com/gopcua/opcua/errors"
 )
 
-var streamPool sync.Pool
+var streamPool sync.Pool = sync.Pool{
+	New: func() interface{} {
+		return NewStream(DefaultBufSize)
+	},
+}
 
 func BorrowStream() *Stream {
-	v, ok := streamPool.Get().(*Stream)
-	if ok {
-		v.Reset()
-		return v
-	}
-
-	return NewStream(DefaultBufSize)
+	v := streamPool.Get().(*Stream)
+	v.Reset()
+	return v
 }
 
 func ReturnStream(s *Stream) {
@@ -37,7 +37,7 @@ var debugCodec = debug.FlagSet("codec")
 // BinaryEncoder is the interface implemented by an object that can
 // marshal itself into a binary OPC/UA representation.
 type BinaryEncoder interface {
-	Encode(s *Stream) error
+	Encode(s *Stream)
 }
 
 var binaryEncoder = reflect.TypeOf((*BinaryEncoder)(nil)).Elem()
@@ -53,13 +53,13 @@ func (s *Stream) WriteAny(w interface{}) {
 	val := reflect.ValueOf(w)
 	switch x := w.(type) {
 	case BinaryEncoder:
-		s.err = x.Encode(s)
+		x.Encode(s)
 	default:
-		s.err = s.encode(val, val.Type().String())
+		s.encode(val, val.Type().String())
 	}
 }
 
-func (s *Stream) encode(val reflect.Value, name string) error {
+func (s *Stream) encode(val reflect.Value, name string) {
 	if debugCodec {
 		fmt.Printf("encode: %s has type %s and is a %s\n", name, val.Type(), val.Type().Kind())
 	}
@@ -67,7 +67,7 @@ func (s *Stream) encode(val reflect.Value, name string) error {
 	switch {
 	case isBinaryEncoder(val):
 		v := val.Interface().(BinaryEncoder)
-		return v.Encode(s)
+		v.Encode(s)
 
 	case isTime(val):
 		s.WriteTime(val.Convert(timeType).Interface().(time.Time))
@@ -100,42 +100,41 @@ func (s *Stream) encode(val reflect.Value, name string) error {
 			s.WriteString(val.String())
 		case reflect.Ptr:
 			if val.IsNil() {
-				return nil
+				return
 			}
-			return s.encode(val.Elem(), name)
+			s.encode(val.Elem(), name)
 		case reflect.Struct:
-			return s.writeStruct(val, name)
+			s.writeStruct(val, name)
 		case reflect.Slice:
-			return s.writeSlice(val, name)
+			s.writeSlice(val, name)
 		case reflect.Array:
-			return s.writeArray(val, name)
+			s.writeArray(val, name)
 		default:
-			return errors.Errorf("unsupported type: %s", val.Type())
+			s.WrapError(errors.Errorf("unsupported type: %s", val.Type()))
 		}
 	}
-	return s.Error()
 }
 
-func (s *Stream) writeStruct(val reflect.Value, name string) error {
+func (s *Stream) writeStruct(val reflect.Value, name string) {
 	valt := val.Type()
 	for i := 0; i < val.NumField(); i++ {
 		ft := valt.Field(i)
 		fname := name + "." + ft.Name
-		if err := s.encode(val.Field(i), fname); err != nil {
-			return err
+		if s.encode(val.Field(i), fname); s.err != nil {
+			return
 		}
 	}
-	return nil
 }
 
-func (s *Stream) writeSlice(val reflect.Value, name string) error {
+func (s *Stream) writeSlice(val reflect.Value, name string) {
 	if val.IsNil() {
 		s.WriteUint32(null)
-		return s.Error()
+		return
 	}
 
 	if val.Len() > math.MaxInt32 {
-		return errors.Errorf("array too large")
+		s.WrapError(errors.Errorf("array too large"))
+		return
 	}
 
 	s.WriteUint32(uint32(val.Len()))
@@ -144,7 +143,7 @@ func (s *Stream) writeSlice(val reflect.Value, name string) error {
 	if val.Type().Elem().Kind() == reflect.Uint8 {
 		// fmt.Println("[]byte fast path")
 		s.Write(val.Bytes())
-		return s.Error()
+		return
 	}
 
 	// loop over elements
@@ -152,10 +151,9 @@ func (s *Stream) writeSlice(val reflect.Value, name string) error {
 		ename := fmt.Sprintf("%s[%d]", name, i)
 		s.encode(val.Index(i), ename)
 		if s.Error() != nil {
-			return s.Error()
+			return
 		}
 	}
-	return s.Error()
 }
 
 func (s *Stream) writeArray(val reflect.Value, name string) error {

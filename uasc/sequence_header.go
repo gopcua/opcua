@@ -31,10 +31,9 @@ func (h *SequenceHeader) Decode(b []byte) (int, error) {
 	return buf.Pos(), buf.Error()
 }
 
-func (h *SequenceHeader) Encode(s *ua.Stream) error {
+func (h *SequenceHeader) Encode(s *ua.Stream) {
 	s.WriteUint32(h.SequenceNumber)
 	s.WriteUint32(h.RequestID)
-	return s.Error()
 }
 
 // String returns Header in string.

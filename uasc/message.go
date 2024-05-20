@@ -74,10 +74,9 @@ func (m *MessageAbort) Decode(b []byte) (int, error) {
 	return buf.Pos(), buf.Error()
 }
 
-func (m *MessageAbort) Encode(s *ua.Stream) error {
+func (m *MessageAbort) Encode(s *ua.Stream) {
 	s.WriteUint32(m.ErrorCode)
 	s.WriteString(m.Reason)
-	return s.Error()
 }
 
 func (m *MessageAbort) MessageAbort() string {
@@ -111,13 +110,12 @@ func (m *Message) Decode(b []byte) (int, error) {
 	return len(b), err
 }
 
-func (m *Message) Encode(s *ua.Stream) error {
+func (m *Message) Encode(s *ua.Stream) {
 	chunks, err := m.EncodeChunks(math.MaxUint32)
 	if err != nil {
-		return err
+		return
 	}
 	s.Write(chunks[0])
-	return nil
 }
 
 func (m *Message) EncodeChunks(maxBodySize uint32) ([][]byte, error) {
@@ -125,9 +123,8 @@ func (m *Message) EncodeChunks(maxBodySize uint32) ([][]byte, error) {
 	defer ua.ReturnStream(dataBody)
 	dataBody.WriteAny(m.TypeID)
 	dataBody.WriteAny(m.Service)
-
 	if dataBody.Error() != nil {
-		return nil, dataBody.Error()
+		return nil, errors.Errorf("failed to encode databody: %s", dataBody.Error())
 	}
 
 	nrChunks := uint32(dataBody.Len())/(maxBodySize) + 1
@@ -136,53 +133,49 @@ func (m *Message) EncodeChunks(maxBodySize uint32) ([][]byte, error) {
 	switch m.Header.MessageType {
 	case "OPN":
 		partialHeader := ua.BorrowStream()
-		defer ua.ReturnStream(partialHeader)
+		defer ua.ReturnStream(dataBody)
 		partialHeader.WriteAny(m.AsymmetricSecurityHeader)
 		partialHeader.WriteAny(m.SequenceHeader)
-
 		if partialHeader.Error() != nil {
-			return nil, partialHeader.Error()
+			return nil, errors.Errorf("failed to encode partial header: %s", partialHeader.Error())
 		}
 
 		m.Header.MessageSize = uint32(12 + partialHeader.Len() + dataBody.Len())
-		buf := ua.BorrowStream()
+		buf := ua.NewStream(ua.DefaultBufSize)
 		buf.WriteAny(m.Header)
 		buf.Write(partialHeader.Bytes())
 		buf.Write(dataBody.Bytes())
-
-		b := append([]byte(nil), buf.Bytes()...)
-		ua.ReturnStream(buf)
-		return [][]byte{b}, buf.Error()
+		if buf.Error() != nil {
+			return nil, errors.Errorf("failed to encode chunk: %s", buf.Error())
+		}
+		return [][]byte{buf.Bytes()}, nil
 
 	case "CLO", "MSG":
-
+		chunk := ua.NewStream(ua.DefaultBufSize)
 		for i := uint32(0); i < nrChunks-1; i++ {
+			chunk.Reset()
 			m.Header.MessageSize = maxBodySize + 24
 			m.Header.ChunkType = ChunkTypeIntermediate
-			chunk := ua.BorrowStream()
 			chunk.WriteAny(m.Header)
 			chunk.WriteAny(m.SymmetricSecurityHeader)
 			chunk.WriteAny(m.SequenceHeader)
 			chunk.Write(dataBody.ReadN(int(maxBodySize)))
 			if chunk.Error() != nil {
-				ua.ReturnStream(chunk)
-				return nil, chunk.Error()
+				return nil, errors.Errorf("failed to encode chunk: %s", chunk.Error())
 			}
 
 			chunks[i] = append(chunks[i], chunk.Bytes()...)
-			ua.ReturnStream(chunk)
 		}
 
 		m.Header.ChunkType = ChunkTypeFinal
 		m.Header.MessageSize = uint32(24 + dataBody.Len())
-		chunk := ua.BorrowStream()
-		defer ua.ReturnStream(chunk)
+		chunk.Reset()
 		chunk.WriteAny(m.Header)
 		chunk.WriteAny(m.SymmetricSecurityHeader)
 		chunk.WriteAny(m.SequenceHeader)
 		chunk.Write(dataBody.Bytes())
 		if chunk.Error() != nil {
-			return nil, chunk.Error()
+			return nil, errors.Errorf("failed to encode chunk: %s", chunk.Error())
 		}
 
 		chunks[nrChunks-1] = append(chunks[nrChunks-1], chunk.Bytes()...)
