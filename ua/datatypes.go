@@ -5,11 +5,14 @@
 package ua
 
 import (
+	"bytes"
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/gopcua/opcua/codec"
 )
 
 // These flags define which fields of a DataValue are set.
@@ -82,6 +85,36 @@ func (d *DataValue) Encode(s *Stream) {
 	if d.Has(DataValueServerPicoseconds) {
 		s.WriteUint16(d.ServerPicoseconds)
 	}
+}
+
+func (d *DataValue) MarshalOPCUA() ([]byte, error) {
+	var buf bytes.Buffer
+	var err error
+	var b []byte
+
+	buf.WriteByte(d.EncodingMask)
+	if d.Has(DataValueValue) {
+		b, err = codec.Marshal(d.Value)
+		buf.Write(b)
+	}
+	if d.Has(DataValueStatusCode) {
+		buf.Write([]byte{byte(d.Status), byte(d.Status >> 8), byte(d.Status >> 16), byte(d.Status >> 24)})
+	}
+	if d.Has(DataValueSourceTimestamp) {
+		b, err = codec.Marshal(d.SourceTimestamp)
+		buf.Write(b)
+	}
+	if d.Has(DataValueSourcePicoseconds) {
+		buf.Write([]byte{byte(d.SourcePicoseconds), byte(d.SourcePicoseconds >> 8)})
+	}
+	if d.Has(DataValueServerTimestamp) {
+		b, err = codec.Marshal(d.ServerTimestamp)
+		buf.Write(b)
+	}
+	if d.Has(DataValueServerPicoseconds) {
+		buf.Write([]byte{byte(d.ServerPicoseconds), byte(d.ServerPicoseconds >> 8)})
+	}
+	return buf.Bytes(), err
 }
 
 func (d *DataValue) Has(mask byte) bool {
@@ -231,6 +264,32 @@ func (l *LocalizedText) Encode(s *Stream) {
 	if l.Has(LocalizedTextText) {
 		s.WriteString(l.Text)
 	}
+}
+
+func (l *LocalizedText) MarshalOPCUA() ([]byte, error) {
+	var buf bytes.Buffer
+	var err error
+
+	buf.WriteByte(l.EncodingMask)
+	if l.Has(LocalizedTextLocale) {
+		n := len(l.Locale)
+		if n == 0 {
+			buf.Write([]byte{0xff, 0xff, 0xff, 0xff})
+		} else {
+			buf.Write([]byte{byte(n), byte(n >> 8), byte(n >> 16), byte(n >> 24)})
+			buf.Write([]byte(l.Locale))
+		}
+	}
+	if l.Has(LocalizedTextText) {
+		n := len(l.Text)
+		if n == 0 {
+			buf.Write([]byte{0xff, 0xff, 0xff, 0xff})
+		} else {
+			buf.Write([]byte{byte(n), byte(n >> 8), byte(n >> 16), byte(n >> 24)})
+			buf.Write([]byte(l.Text))
+		}
+	}
+	return buf.Bytes(), err
 }
 
 func (l *LocalizedText) Has(mask byte) bool {

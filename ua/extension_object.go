@@ -5,6 +5,9 @@
 package ua
 
 import (
+	"bytes"
+
+	"github.com/gopcua/opcua/codec"
 	"github.com/gopcua/opcua/debug"
 	"github.com/gopcua/opcua/id"
 )
@@ -102,6 +105,25 @@ func (e *ExtensionObject) Encode(s *Stream) {
 	}
 	s.WriteUint32(uint32(body.Len()))
 	s.Write(body.Bytes())
+}
+
+func (e *ExtensionObject) MarshalJSON() ([]byte, error) {
+	var buf bytes.Buffer
+	b, err := codec.Marshal(e.TypeID)
+	buf.Write(b)
+	buf.WriteByte(e.EncodingMask)
+	if e.EncodingMask == ExtensionObjectEmpty {
+		return buf.Bytes(), err
+	}
+
+	body, err := codec.Marshal(e.Value)
+	if err != nil {
+		return buf.Bytes(), err
+	}
+	n := uint32(len(body))
+	buf.Write([]byte{byte(n), byte(n >> 8), byte(n >> 16), byte(n >> 24)})
+	buf.Write(body)
+	return buf.Bytes(), err
 }
 
 func (e *ExtensionObject) UpdateMask() {

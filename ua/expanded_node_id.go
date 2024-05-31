@@ -5,11 +5,13 @@
 package ua
 
 import (
+	"bytes"
 	"encoding/base64"
 	"math"
 	"strconv"
 	"strings"
 
+	"github.com/gopcua/opcua/codec"
 	"github.com/gopcua/opcua/errors"
 )
 
@@ -110,6 +112,22 @@ func (e *ExpandedNodeID) Encode(s *Stream) {
 	if e.HasServerIndex() {
 		s.WriteUint32(e.ServerIndex)
 	}
+}
+
+func (e *ExpandedNodeID) MarshalOPCUA() ([]byte, error) {
+	var buf bytes.Buffer
+	b, err := e.NodeID.MarshalOPCUA()
+	buf.Write(b)
+
+	if e.HasNamespaceURI() {
+		b, err = codec.Marshal(e.NamespaceURI)
+		buf.Write(b)
+	}
+	if e.HasServerIndex() {
+		b, err = codec.Marshal(e.ServerIndex)
+		buf.Write(b)
+	}
+	return buf.Bytes(), err
 }
 
 // HasNamespaceURI checks if an ExpandedNodeID has NamespaceURI Flag.

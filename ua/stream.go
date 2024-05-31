@@ -9,7 +9,7 @@ import (
 	"github.com/gopcua/opcua/errors"
 )
 
-const DefaultBufSize = 1024
+const DefaultBufSize = 256
 
 type Stream struct {
 	buf []byte

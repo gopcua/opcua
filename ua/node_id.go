@@ -5,11 +5,13 @@
 package ua
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"math"
 
+	"github.com/gopcua/opcua/codec"
 	"github.com/gopcua/opcua/errors"
 )
 
@@ -387,6 +389,36 @@ func (n *NodeID) Encode(s *Stream) {
 	default:
 		s.err = errors.Errorf("invalid node id type %v", n.Type())
 	}
+}
+
+func (n *NodeID) MarshalOPCUA() ([]byte, error) {
+	var buf bytes.Buffer
+	buf.WriteByte(byte(n.mask))
+	switch n.Type() {
+	case NodeIDTypeTwoByte:
+		buf.WriteByte(byte(n.nid))
+	case NodeIDTypeFourByte:
+		buf.WriteByte(byte(n.ns))
+		buf.Write([]byte{byte(n.nid), byte(n.nid >> 8)})
+	case NodeIDTypeNumeric:
+		buf.Write([]byte{byte(n.ns), byte(n.ns >> 8), byte(n.nid), byte(n.nid >> 8), byte(n.nid >> 16), byte(n.nid >> 24)})
+	case NodeIDTypeGUID:
+		buf.Write([]byte{byte(n.ns), byte(n.ns >> 8)})
+		b, _ := codec.Marshal(n.gid)
+		buf.Write(b)
+	case NodeIDTypeByteString, NodeIDTypeString:
+		buf.Write([]byte{byte(n.ns), byte(n.ns >> 8)})
+		l := uint32(len(n.bid))
+		if l == 0 {
+			buf.Write([]byte{0xff, 0xff, 0xff, 0xff})
+		} else {
+			buf.Write([]byte{byte(l), byte(l >> 8), byte(l >> 16), byte(l >> 24)})
+			buf.Write(n.bid)
+		}
+	default:
+		return nil, fmt.Errorf("invalid node id type: %d", n.mask)
+	}
+	return buf.Bytes(), nil
 }
 
 func (n *NodeID) MarshalJSON() ([]byte, error) {

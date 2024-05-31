@@ -5,6 +5,9 @@
 package uacp
 
 import (
+	"bytes"
+	"encoding/binary"
+
 	"github.com/gopcua/opcua/errors"
 	"github.com/gopcua/opcua/ua"
 )
@@ -55,6 +58,18 @@ func (h *Header) Encode(s *ua.Stream) {
 	s.WriteUint32(h.MessageSize)
 }
 
+func (h *Header) MarshalOPCUA() ([]byte, error) {
+	if len(h.MessageType) != 3 {
+		return nil, errors.Errorf("invalid message type: %q", h.MessageType)
+	}
+
+	var buf bytes.Buffer
+	buf.Write([]byte(h.MessageType))
+	buf.WriteByte(h.ChunkType)
+	buf.Write([]byte{byte(h.MessageSize), byte(h.MessageSize >> 8), byte(h.MessageSize >> 16), byte(h.MessageSize >> 24)})
+	return buf.Bytes(), nil
+}
+
 // Hello represents a OPC UA Hello.
 //
 // Specification: Part6, 7.1.2.3
@@ -87,6 +102,23 @@ func (h *Hello) Encode(s *ua.Stream) {
 	s.WriteString(h.EndpointURL)
 }
 
+func (h *Hello) MarshalOPCUA() ([]byte, error) {
+	var buf bytes.Buffer
+	buf.Write([]byte{byte(h.Version), byte(h.Version >> 8), byte(h.Version >> 16), byte(h.Version >> 24)})
+	buf.Write([]byte{byte(h.ReceiveBufSize), byte(h.ReceiveBufSize >> 8), byte(h.ReceiveBufSize >> 16), byte(h.ReceiveBufSize >> 24)})
+	buf.Write([]byte{byte(h.SendBufSize), byte(h.SendBufSize >> 8), byte(h.SendBufSize >> 16), byte(h.SendBufSize >> 24)})
+	buf.Write([]byte{byte(h.MaxMessageSize), byte(h.MaxMessageSize >> 8), byte(h.MaxMessageSize >> 16), byte(h.MaxMessageSize >> 24)})
+	buf.Write([]byte{byte(h.MaxChunkCount), byte(h.MaxChunkCount >> 8), byte(h.MaxChunkCount >> 16), byte(h.MaxChunkCount >> 24)})
+	if len(h.EndpointURL) == 0 {
+		buf.Write([]byte{0xff, 0xff, 0xff, 0xff})
+	} else {
+		n := len(h.EndpointURL)
+		buf.Write([]byte{byte(n), byte(n >> 8), byte(n >> 16), byte(n >> 24)})
+		buf.WriteString(h.EndpointURL)
+	}
+	return buf.Bytes(), nil
+}
+
 // Acknowledge represents a OPC UA Acknowledge.
 //
 // Specification: Part6, 7.1.2.4
@@ -114,6 +146,16 @@ func (a *Acknowledge) Encode(s *ua.Stream) {
 	s.WriteUint32(a.SendBufSize)
 	s.WriteUint32(a.MaxMessageSize)
 	s.WriteUint32(a.MaxChunkCount)
+}
+
+func (a *Acknowledge) MarshalOPCUA() ([]byte, error) {
+	buf := make([]byte, 0, 160)
+	binary.LittleEndian.AppendUint32(buf, a.Version)
+	binary.LittleEndian.AppendUint32(buf, a.ReceiveBufSize)
+	binary.LittleEndian.AppendUint32(buf, a.SendBufSize)
+	binary.LittleEndian.AppendUint32(buf, a.MaxMessageSize)
+	binary.LittleEndian.AppendUint32(buf, a.MaxChunkCount)
+	return buf, nil
 }
 
 // ReverseHello represents a OPC UA ReverseHello.

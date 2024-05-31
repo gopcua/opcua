@@ -5,8 +5,10 @@
 package uasc
 
 import (
+	"fmt"
 	"math"
 
+	"github.com/gopcua/opcua/codec"
 	"github.com/gopcua/opcua/errors"
 	"github.com/gopcua/opcua/ua"
 )
@@ -146,6 +148,10 @@ func (m *Message) EncodeChunks(maxBodySize uint32) ([][]byte, error) {
 		if buf.Error() != nil {
 			return nil, errors.Errorf("failed to encode chunk: %s", buf.Error())
 		}
+		for _, v := range buf.Bytes() {
+			fmt.Printf("0x%02x,", v)
+		}
+		fmt.Println()
 		return [][]byte{buf.Bytes()}, nil
 
 	case "CLO", "MSG":
@@ -177,6 +183,98 @@ func (m *Message) EncodeChunks(maxBodySize uint32) ([][]byte, error) {
 		}
 
 		chunks[nrChunks-1] = append(chunks[nrChunks-1], chunk.Bytes()...)
+		return chunks, nil
+	default:
+		return nil, errors.Errorf("invalid message type %q", m.Header.MessageType)
+	}
+}
+
+func (m *Message) MarshalOPCUA() ([]byte, error) {
+	chunks, err := m.MarshalChunks(math.MaxUint32)
+	if err != nil {
+		return nil, err
+	}
+
+	return chunks[0], nil
+}
+
+func (m *Message) MarshalChunks(maxBodySize uint32) ([][]byte, error) {
+	typeID, err := codec.Marshal(m.TypeID)
+	if err != nil {
+		return nil, errors.Errorf("failed to encode typeid: %s", err)
+	}
+	service, err := codec.Marshal(m.Service)
+	if err != nil {
+		return nil, errors.Errorf("failed to encode service: %s", err)
+	}
+
+	dataBody := make([]byte, len(typeID)+len(service))
+	copy(dataBody, typeID)
+	copy(dataBody[len(typeID):], service)
+
+	nrChunks := uint32(len(dataBody))/(maxBodySize) + 1
+	chunks := make([][]byte, nrChunks)
+
+	switch m.Header.MessageType {
+	case "OPN":
+		asymmetricSecurityHeader, err := codec.Marshal(m.AsymmetricSecurityHeader)
+		if err != nil {
+			return nil, errors.Errorf("failed to encode asymmetric security header: %s", err)
+		}
+		sequenceHeader, err := codec.Marshal(m.SequenceHeader)
+		if err != nil {
+			return nil, errors.Errorf("failed to encode sequence header: %s", err)
+		}
+
+		m.Header.MessageSize = uint32(12 + len(asymmetricSecurityHeader) + len(sequenceHeader) + len(dataBody))
+		header, err := codec.Marshal(m.Header)
+		if err != nil {
+			return nil, errors.Errorf("failed to encode header: %s", err)
+		}
+		chunks[0] = append(chunks[0], header...)
+		chunks[0] = append(chunks[0], asymmetricSecurityHeader...)
+		chunks[0] = append(chunks[0], sequenceHeader...)
+		chunks[0] = append(chunks[0], dataBody...)
+		return chunks, nil
+
+	case "CLO", "MSG":
+		symmetricSecurityHeader, err := codec.Marshal(m.SymmetricSecurityHeader)
+		if err != nil {
+			return nil, errors.Errorf("failed to encode symmetric security header: %s", err)
+		}
+		sequenceHeader, err := codec.Marshal(m.SequenceHeader)
+		if err != nil {
+			return nil, errors.Errorf("failed to encode sequence header: %s", err)
+		}
+
+		start, end := 0, int(maxBodySize)
+		for i := uint32(0); i < nrChunks-1; i++ {
+			m.Header.MessageSize = maxBodySize + 24
+			m.Header.ChunkType = ChunkTypeIntermediate
+
+			header, err := codec.Marshal(m.Header)
+			if err != nil {
+				return nil, errors.Errorf("failed to encode header: %s", err)
+			}
+
+			chunks[i] = append(chunks[i], header...)
+			chunks[i] = append(chunks[i], symmetricSecurityHeader...)
+			chunks[i] = append(chunks[i], sequenceHeader...)
+			chunks[i] = append(chunks[i], dataBody[start:end]...)
+			start, end = end, end+int(maxBodySize)
+		}
+
+		m.Header.ChunkType = ChunkTypeFinal
+		m.Header.MessageSize = uint32(24 + len(dataBody))
+
+		header, err := codec.Marshal(m.Header)
+		if err != nil {
+			return nil, err
+		}
+		chunks[nrChunks-1] = append(chunks[nrChunks-1], header...)
+		chunks[nrChunks-1] = append(chunks[nrChunks-1], symmetricSecurityHeader...)
+		chunks[nrChunks-1] = append(chunks[nrChunks-1], sequenceHeader...)
+		chunks[nrChunks-1] = append(chunks[nrChunks-1], dataBody...)
 		return chunks, nil
 	default:
 		return nil, errors.Errorf("invalid message type %q", m.Header.MessageType)

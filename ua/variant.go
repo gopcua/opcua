@@ -5,10 +5,12 @@
 package ua
 
 import (
+	"bytes"
 	"fmt"
 	"reflect"
 	"time"
 
+	"github.com/gopcua/opcua/codec"
 	"github.com/gopcua/opcua/errors"
 )
 
@@ -338,6 +340,34 @@ func (m *Variant) Encode(s *Stream) {
 			s.WriteInt32(m.arrayDimensions[i])
 		}
 	}
+}
+
+func (m *Variant) MarshalOPCUA() ([]byte, error) {
+	var buf bytes.Buffer
+	buf.WriteByte(m.mask)
+
+	// a null value specifies that no other fields are encoded
+	if m.Type() == TypeIDNull {
+		return buf.Bytes(), nil
+	}
+
+	if m.Has(VariantArrayValues) {
+		buf.Write([]byte{byte(m.arrayLength), byte(m.arrayLength >> 8), byte(m.arrayLength >> 16), byte(m.arrayLength >> 24)})
+	}
+
+	b, err := codec.Marshal(m.value)
+	if err != nil {
+		return buf.Bytes(), err
+	}
+	buf.Write(b)
+
+	if m.Has(VariantArrayDimensions) {
+		buf.Write([]byte{byte(m.arrayDimensionsLength), byte(m.arrayDimensionsLength >> 8), byte(m.arrayDimensionsLength >> 16), byte(m.arrayDimensionsLength >> 24)})
+		for _, v := range m.arrayDimensions {
+			buf.Write([]byte{byte(v), byte(v >> 8), byte(v >> 16), byte(v >> 24)})
+		}
+	}
+	return buf.Bytes(), nil
 }
 
 // encode recursively writes the values to the buffer.

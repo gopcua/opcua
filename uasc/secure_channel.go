@@ -771,7 +771,7 @@ func (s *SecureChannel) sendAsyncWithTimeout(
 		s.handlersMu.Unlock()
 	}
 
-	chunks, err := m.EncodeChunks(instance.maxBodySize)
+	chunks, err := m.MarshalChunks(instance.maxBodySize)
 	if err != nil {
 		return nil, err
 	}

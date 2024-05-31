@@ -5,3 +5,4 @@ dist/
 __pycache__/
 .vscode/
 .idea/
+uasc/*.txt

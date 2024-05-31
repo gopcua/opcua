@@ -5,6 +5,7 @@
 package uasc
 
 import (
+	"bytes"
 	"fmt"
 
 	"github.com/gopcua/opcua/errors"
@@ -60,6 +61,19 @@ func (h *Header) Encode(s *ua.Stream) {
 	s.WriteByte(h.ChunkType)
 	s.WriteUint32(h.MessageSize)
 	s.WriteUint32(h.SecureChannelID)
+}
+
+func (h *Header) MarshalOPCUA() ([]byte, error) {
+	if len(h.MessageType) != 3 {
+		return nil, errors.Errorf("invalid message type: %q", h.MessageType)
+	}
+
+	var buf bytes.Buffer
+	buf.WriteString(h.MessageType)
+	buf.WriteByte(h.ChunkType)
+	buf.Write([]byte{byte(h.MessageSize), byte(h.MessageSize >> 8), byte(h.MessageSize >> 16), byte(h.MessageSize >> 24)})
+	buf.Write([]byte{byte(h.SecureChannelID), byte(h.SecureChannelID >> 8), byte(h.SecureChannelID >> 16), byte(h.SecureChannelID >> 24)})
+	return buf.Bytes(), nil
 }
 
 // String returns Header in string.
