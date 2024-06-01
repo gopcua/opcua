@@ -64,31 +64,6 @@ func (d *DiagnosticInfo) Decode(b []byte) (int, error) {
 	return buf.Pos(), buf.Error()
 }
 
-func (d *DiagnosticInfo) Encode(s *Stream) {
-	s.WriteByte(d.EncodingMask)
-	if d.Has(DiagnosticInfoSymbolicID) {
-		s.WriteInt32(d.SymbolicID)
-	}
-	if d.Has(DiagnosticInfoNamespaceURI) {
-		s.WriteInt32(d.NamespaceURI)
-	}
-	if d.Has(DiagnosticInfoLocale) {
-		s.WriteInt32(d.Locale)
-	}
-	if d.Has(DiagnosticInfoLocalizedText) {
-		s.WriteInt32(d.LocalizedText)
-	}
-	if d.Has(DiagnosticInfoAdditionalInfo) {
-		s.WriteString(d.AdditionalInfo)
-	}
-	if d.Has(DiagnosticInfoInnerStatusCode) {
-		s.WriteUint32(uint32(d.InnerStatusCode))
-	}
-	if d.Has(DiagnosticInfoInnerDiagnosticInfo) {
-		s.WriteAny(d.InnerDiagnosticInfo)
-	}
-}
-
 func (d *DiagnosticInfo) MarshalOPCUA() ([]byte, error) {
 	var buf bytes.Buffer
 	buf.WriteByte(d.EncodingMask)

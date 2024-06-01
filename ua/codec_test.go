@@ -10,7 +10,9 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/gopcua/opcua/codec"
 	"github.com/pascaldekloe/goe/verify"
+	"github.com/stretchr/testify/assert"
 )
 
 // CodecTestCase describes a test case for a encoding and decoding an
@@ -53,12 +55,12 @@ func RunCodecTest(t *testing.T, cases []CodecTestCase) {
 			})
 
 			t.Run("encode", func(t *testing.T) {
-				s := NewStream(DefaultBufSize)
-				s.WriteAny(c.Struct)
-				if s.Error() != nil {
-					t.Fatal(s.Error())
+				b, err := codec.Marshal(c.Struct)
+				if err != nil {
+					t.Fatalf("failed to marshal message: %v", err)
 				}
-				verify.Values(t, "", s.Bytes(), c.Bytes)
+				assert.Equal(t, c.Bytes, b)
+				// verify.Values(t, "", b, c.Bytes)
 			})
 		})
 	}

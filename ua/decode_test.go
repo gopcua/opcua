@@ -9,6 +9,8 @@ import (
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/gopcua/opcua/codec"
 )
 
 type A struct {
@@ -403,12 +405,11 @@ func TestCodec(t *testing.T) {
 				}
 			})
 			t.Run("encode", func(t *testing.T) {
-				s := NewStream(DefaultBufSize)
-				s.WriteAny(tt.v)
-				if s.Error() != nil {
-					t.Fatal(s.Error())
+				b, err := codec.Marshal(tt.v)
+				if err != nil {
+					t.Fatal(err)
 				}
-				if got, want := s.Bytes(), tt.b; !bytes.Equal(got, want) {
+				if got, want := b, tt.b; !bytes.Equal(got, want) {
 					t.Fatalf("\ngot  %#v\nwant %#v", got, want)
 				}
 			})

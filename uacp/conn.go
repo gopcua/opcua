@@ -13,6 +13,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/gopcua/opcua/codec"
 	"github.com/gopcua/opcua/debug"
 	"github.com/gopcua/opcua/errors"
 	"github.com/gopcua/opcua/ua"
@@ -396,31 +397,27 @@ func (c *Conn) Send(typ string, msg interface{}) error {
 		return errors.Errorf("invalid msg type: %s", typ)
 	}
 
-	bodyStream := ua.NewStream(ua.DefaultBufSize)
-	bodyStream.WriteAny(msg)
-	if bodyStream.Error() != nil {
-		return errors.Errorf("encode msg failed: %s", bodyStream.Error())
+	body, err := codec.Marshal(msg)
+	if err != nil {
+		return errors.Errorf("encode msg failed: %v", err)
 	}
 
 	h := Header{
 		MessageType: typ[:3],
 		ChunkType:   typ[3],
-		MessageSize: uint32(bodyStream.Len() + hdrlen),
+		MessageSize: uint32(len(body) + hdrlen),
 	}
 
 	if h.MessageSize > c.ack.SendBufSize {
 		return errors.Errorf("send packet too large: %d > %d bytes", h.MessageSize, c.ack.SendBufSize)
 	}
 
-	headerStream := ua.NewStream(ua.DefaultBufSize)
-	h.Encode(headerStream)
-	if headerStream.Error() != nil {
-		return errors.Errorf("encode hdr failed: %s", headerStream.Error())
+	hdr, err := h.MarshalOPCUA()
+	if err != nil {
+		return errors.Errorf("encode hdr failed: %v", err)
 	}
 
-	b := make([]byte, 0, headerStream.Len()+bodyStream.Len())
-	b = append(b, headerStream.Bytes()...)
-	b = append(b, bodyStream.Bytes()...)
+	b := append(hdr, body...)
 	if _, err := c.Write(b); err != nil {
 		return errors.Errorf("write failed: %s", err)
 	}

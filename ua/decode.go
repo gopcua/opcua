@@ -10,6 +10,7 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/gopcua/opcua/debug"
 	"github.com/gopcua/opcua/errors"
 )
 
@@ -34,6 +35,9 @@ func Decode(b []byte, v interface{}) (int, error) {
 	val := reflect.ValueOf(v)
 	return decode(b, val, val.Type().String())
 }
+
+// debugCodec enables printing of debug messages in the opcua codec.
+var debugCodec = debug.FlagSet("codec")
 
 func decode(b []byte, val reflect.Value, name string) (n int, err error) {
 	if debugCodec {

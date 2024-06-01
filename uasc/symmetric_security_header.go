@@ -28,10 +28,6 @@ func (h *SymmetricSecurityHeader) Decode(b []byte) (int, error) {
 	return buf.Pos(), buf.Error()
 }
 
-func (h *SymmetricSecurityHeader) Encode(s *ua.Stream) {
-	s.WriteUint32(h.TokenID)
-}
-
 // String returns Header in string.
 func (h *SymmetricSecurityHeader) String() string {
 	return fmt.Sprintf(

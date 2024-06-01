@@ -104,16 +104,6 @@ func (e *ExpandedNodeID) Decode(b []byte) (int, error) {
 	return buf.Pos(), buf.Error()
 }
 
-func (e *ExpandedNodeID) Encode(s *Stream) {
-	s.WriteAny(e.NodeID)
-	if e.HasNamespaceURI() {
-		s.WriteString(e.NamespaceURI)
-	}
-	if e.HasServerIndex() {
-		s.WriteUint32(e.ServerIndex)
-	}
-}
-
 func (e *ExpandedNodeID) MarshalOPCUA() ([]byte, error) {
 	var buf bytes.Buffer
 	b, err := e.NodeID.MarshalOPCUA()

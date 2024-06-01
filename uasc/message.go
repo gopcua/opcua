@@ -5,7 +5,6 @@
 package uasc
 
 import (
-	"fmt"
 	"math"
 
 	"github.com/gopcua/opcua/codec"
@@ -76,11 +75,6 @@ func (m *MessageAbort) Decode(b []byte) (int, error) {
 	return buf.Pos(), buf.Error()
 }
 
-func (m *MessageAbort) Encode(s *ua.Stream) {
-	s.WriteUint32(m.ErrorCode)
-	s.WriteString(m.Reason)
-}
-
 func (m *MessageAbort) MessageAbort() string {
 	return ua.StatusCode(m.ErrorCode).Error()
 }
@@ -110,83 +104,6 @@ func (m *Message) Decode(b []byte) (int, error) {
 
 	m.TypeID, m.Service, err = ua.DecodeService(b[pos:])
 	return len(b), err
-}
-
-func (m *Message) Encode(s *ua.Stream) {
-	chunks, err := m.EncodeChunks(math.MaxUint32)
-	if err != nil {
-		return
-	}
-	s.Write(chunks[0])
-}
-
-func (m *Message) EncodeChunks(maxBodySize uint32) ([][]byte, error) {
-	dataBody := ua.NewStream(ua.DefaultBufSize)
-	dataBody.WriteAny(m.TypeID)
-	dataBody.WriteAny(m.Service)
-	if dataBody.Error() != nil {
-		return nil, errors.Errorf("failed to encode databody: %s", dataBody.Error())
-	}
-
-	nrChunks := uint32(dataBody.Len())/(maxBodySize) + 1
-	chunks := make([][]byte, nrChunks)
-
-	switch m.Header.MessageType {
-	case "OPN":
-		partialHeader := ua.NewStream(ua.DefaultBufSize)
-		partialHeader.WriteAny(m.AsymmetricSecurityHeader)
-		partialHeader.WriteAny(m.SequenceHeader)
-		if partialHeader.Error() != nil {
-			return nil, errors.Errorf("failed to encode partial header: %s", partialHeader.Error())
-		}
-
-		m.Header.MessageSize = uint32(12 + partialHeader.Len() + dataBody.Len())
-		buf := ua.NewStream(ua.DefaultBufSize)
-		buf.WriteAny(m.Header)
-		buf.Write(partialHeader.Bytes())
-		buf.Write(dataBody.Bytes())
-		if buf.Error() != nil {
-			return nil, errors.Errorf("failed to encode chunk: %s", buf.Error())
-		}
-		for _, v := range buf.Bytes() {
-			fmt.Printf("0x%02x,", v)
-		}
-		fmt.Println()
-		return [][]byte{buf.Bytes()}, nil
-
-	case "CLO", "MSG":
-		chunk := ua.NewStream(ua.DefaultBufSize)
-		for i := uint32(0); i < nrChunks-1; i++ {
-			chunk.Reset()
-			m.Header.MessageSize = maxBodySize + 24
-			m.Header.ChunkType = ChunkTypeIntermediate
-			chunk.WriteAny(m.Header)
-			chunk.WriteAny(m.SymmetricSecurityHeader)
-			chunk.WriteAny(m.SequenceHeader)
-			chunk.Write(dataBody.ReadN(int(maxBodySize)))
-			if chunk.Error() != nil {
-				return nil, errors.Errorf("failed to encode chunk: %s", chunk.Error())
-			}
-
-			chunks[i] = append(chunks[i], chunk.Bytes()...)
-		}
-
-		m.Header.ChunkType = ChunkTypeFinal
-		m.Header.MessageSize = uint32(24 + dataBody.Len())
-		chunk.Reset()
-		chunk.WriteAny(m.Header)
-		chunk.WriteAny(m.SymmetricSecurityHeader)
-		chunk.WriteAny(m.SequenceHeader)
-		chunk.Write(dataBody.Bytes())
-		if chunk.Error() != nil {
-			return nil, errors.Errorf("failed to encode chunk: %s", chunk.Error())
-		}
-
-		chunks[nrChunks-1] = append(chunks[nrChunks-1], chunk.Bytes()...)
-		return chunks, nil
-	default:
-		return nil, errors.Errorf("invalid message type %q", m.Header.MessageType)
-	}
 }
 
 func (m *Message) MarshalOPCUA() ([]byte, error) {

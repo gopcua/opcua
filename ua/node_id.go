@@ -368,29 +368,6 @@ func (n *NodeID) Decode(b []byte) (int, error) {
 	}
 }
 
-func (n *NodeID) Encode(s *Stream) {
-	s.WriteByte(byte(n.mask))
-
-	switch n.Type() {
-	case NodeIDTypeTwoByte:
-		s.WriteByte(byte(n.nid))
-	case NodeIDTypeFourByte:
-		s.WriteByte(byte(n.ns))
-		s.WriteUint16(uint16(n.nid))
-	case NodeIDTypeNumeric:
-		s.WriteUint16(n.ns)
-		s.WriteUint32(n.nid)
-	case NodeIDTypeGUID:
-		s.WriteUint16(n.ns)
-		s.WriteAny(n.gid)
-	case NodeIDTypeByteString, NodeIDTypeString:
-		s.WriteUint16(n.ns)
-		s.WriteByteString(n.bid)
-	default:
-		s.err = errors.Errorf("invalid node id type %v", n.Type())
-	}
-}
-
 func (n *NodeID) MarshalOPCUA() ([]byte, error) {
 	var buf bytes.Buffer
 	buf.WriteByte(byte(n.mask))

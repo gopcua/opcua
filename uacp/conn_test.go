@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gopcua/opcua/codec"
 	"github.com/gopcua/opcua/errors"
-	"github.com/gopcua/opcua/ua"
 	"github.com/pascaldekloe/goe/verify"
 )
 
@@ -121,12 +121,10 @@ NEXT:
 	}
 	got = got[hdrlen:]
 
-	s := ua.NewStream(ua.DefaultBufSize)
-	msg.Encode(s)
-	if s.Error() != nil {
-		t.Fatal(s.Error())
+	want, err := codec.Marshal(msg)
+	if err != nil {
+		t.Fatal(err)
 	}
-	want := s.Bytes()
 	verify.Values(t, "", got, want)
 }
 

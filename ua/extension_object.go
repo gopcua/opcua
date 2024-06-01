@@ -87,27 +87,7 @@ func (e *ExtensionObject) Decode(b []byte) (int, error) {
 	return buf.Pos(), body.Error()
 }
 
-func (e *ExtensionObject) Encode(s *Stream) {
-	if e == nil {
-		e = &ExtensionObject{TypeID: NewTwoByteExpandedNodeID(0), EncodingMask: ExtensionObjectEmpty}
-	}
-	s.WriteAny(e.TypeID)
-	s.WriteByte(e.EncodingMask)
-	if e.EncodingMask == ExtensionObjectEmpty {
-		return
-	}
-
-	body := NewStream(DefaultBufSize)
-	body.WriteAny(e.Value)
-	if body.Error() != nil {
-		s.WrapError(body.Error())
-		return
-	}
-	s.WriteUint32(uint32(body.Len()))
-	s.Write(body.Bytes())
-}
-
-func (e *ExtensionObject) MarshalJSON() ([]byte, error) {
+func (e *ExtensionObject) MarshalOPCUA() ([]byte, error) {
 	var buf bytes.Buffer
 	b, err := codec.Marshal(e.TypeID)
 	buf.Write(b)

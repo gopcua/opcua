@@ -276,9 +276,9 @@ func (e *encodeState) writeUint64(n uint64) {
 func boolEncoder(e *encodeState, v reflect.Value) {
 	val := v.Bool()
 	if val {
-		e.WriteByte('1')
+		e.WriteByte(1)
 	} else {
-		e.WriteByte('0')
+		e.WriteByte(0)
 	}
 }
 
@@ -566,17 +566,26 @@ type field struct {
 func typeFields(t reflect.Type) structFields {
 	var fields []field
 
+	// Visit the fields of the given type.
 	visitField := func(f reflect.StructField) {
 		t := f.Type
-		// time.Time is special because it has embedded structs that use timeEncoder.
-		if t == timeType || (t.Kind() == reflect.Pointer && t.Elem() == timeType) {
-			fields = append(fields, field{name: f.Name, nameBytes: []byte(f.Name), index: f.Index, typ: t, encoder: timeEncoder})
-			return
-		}
-		// 如果t实现了Marshaler接口，则使用Marshaler的MarshalOPCUA方法
+		// return marshalerEncoder directly, if it implements Marshaler.
 		if t.Implements(marshalerType) {
 			fields = append(fields, field{name: f.Name, nameBytes: []byte(f.Name), index: f.Index, typ: t, encoder: marshalerEncoder})
 			return
+		}
+
+		// time.Time is special because it has embedded structs that use timeEncoder.
+		if t.AssignableTo(timeType) || (t.Kind() == reflect.Pointer && t.Elem().AssignableTo(timeType)) {
+			fields = append(fields, field{name: f.Name, nameBytes: []byte(f.Name), index: f.Index, typ: t, encoder: timeEncoder})
+			return
+		}
+		if t.ConvertibleTo(timeType) {
+			converted := reflect.New(t).Elem().Convert(timeType)
+			if _, ok := converted.Interface().(time.Time); ok {
+				fields = append(fields, field{name: f.Name, nameBytes: []byte(f.Name), index: f.Index, typ: t, encoder: timeEncoder})
+				return
+			}
 		}
 
 		// Check for anonymous fields (embedded structs).

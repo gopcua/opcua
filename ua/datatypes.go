@@ -64,29 +64,6 @@ func (d *DataValue) Decode(b []byte) (int, error) {
 	return buf.Pos(), buf.Error()
 }
 
-func (d *DataValue) Encode(s *Stream) {
-	s.WriteUint8(d.EncodingMask)
-
-	if d.Has(DataValueValue) {
-		s.WriteAny(d.Value)
-	}
-	if d.Has(DataValueStatusCode) {
-		s.WriteUint32(uint32(d.Status))
-	}
-	if d.Has(DataValueSourceTimestamp) {
-		s.WriteTime(d.SourceTimestamp)
-	}
-	if d.Has(DataValueSourcePicoseconds) {
-		s.WriteUint16(d.SourcePicoseconds)
-	}
-	if d.Has(DataValueServerTimestamp) {
-		s.WriteTime(d.ServerTimestamp)
-	}
-	if d.Has(DataValueServerPicoseconds) {
-		s.WriteUint16(d.ServerPicoseconds)
-	}
-}
-
 func (d *DataValue) MarshalOPCUA() ([]byte, error) {
 	var buf bytes.Buffer
 	var err error
@@ -183,11 +160,13 @@ func (g *GUID) Decode(b []byte) (int, error) {
 	return buf.Pos(), buf.Error()
 }
 
-func (g *GUID) Encode(s *Stream) {
-	s.WriteUint32(g.Data1)
-	s.WriteUint16(g.Data2)
-	s.WriteUint16(g.Data3)
-	s.Write(g.Data4)
+func (g *GUID) MarshalOPCUA() ([]byte, error) {
+	buf := make([]byte, 0, 8+len(g.Data4))
+	buf = binary.LittleEndian.AppendUint32(buf, g.Data1)
+	buf = binary.LittleEndian.AppendUint16(buf, g.Data2)
+	buf = binary.LittleEndian.AppendUint16(buf, g.Data3)
+	buf = append(buf, g.Data4...)
+	return buf, nil
 }
 
 // String returns GUID in human-readable string.
@@ -254,16 +233,6 @@ func (l *LocalizedText) Decode(b []byte) (int, error) {
 		l.Text = buf.ReadString()
 	}
 	return buf.Pos(), buf.Error()
-}
-
-func (l *LocalizedText) Encode(s *Stream) {
-	s.WriteUint8(l.EncodingMask)
-	if l.Has(LocalizedTextLocale) {
-		s.WriteString(l.Locale)
-	}
-	if l.Has(LocalizedTextText) {
-		s.WriteString(l.Text)
-	}
 }
 
 func (l *LocalizedText) MarshalOPCUA() ([]byte, error) {

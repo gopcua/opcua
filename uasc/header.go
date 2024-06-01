@@ -52,17 +52,6 @@ func (h *Header) Decode(b []byte) (int, error) {
 	return buf.Pos(), buf.Error()
 }
 
-func (h *Header) Encode(s *ua.Stream) {
-	if len(h.MessageType) != 3 {
-		s.WrapError(errors.Errorf("invalid message type: %q", h.MessageType))
-		return
-	}
-	s.Write([]byte(h.MessageType))
-	s.WriteByte(h.ChunkType)
-	s.WriteUint32(h.MessageSize)
-	s.WriteUint32(h.SecureChannelID)
-}
-
 func (h *Header) MarshalOPCUA() ([]byte, error) {
 	if len(h.MessageType) != 3 {
 		return nil, errors.Errorf("invalid message type: %q", h.MessageType)

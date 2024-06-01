@@ -319,29 +319,6 @@ func (m *Variant) decodeValue(buf *Buffer) interface{} {
 	}
 }
 
-// Encode implements the codec interface.
-func (m *Variant) Encode(s *Stream) {
-	s.WriteByte(m.mask)
-
-	// a null value specifies that no other fields are encoded
-	if m.Type() == TypeIDNull {
-		return
-	}
-
-	if m.Has(VariantArrayValues) {
-		s.WriteInt32(m.arrayLength)
-	}
-
-	m.encode(s, reflect.ValueOf(m.value))
-
-	if m.Has(VariantArrayDimensions) {
-		s.WriteInt32(m.arrayDimensionsLength)
-		for i := 0; i < int(m.arrayDimensionsLength); i++ {
-			s.WriteInt32(m.arrayDimensions[i])
-		}
-	}
-}
-
 func (m *Variant) MarshalOPCUA() ([]byte, error) {
 	var buf bytes.Buffer
 	buf.WriteByte(m.mask)
@@ -354,12 +331,7 @@ func (m *Variant) MarshalOPCUA() ([]byte, error) {
 	if m.Has(VariantArrayValues) {
 		buf.Write([]byte{byte(m.arrayLength), byte(m.arrayLength >> 8), byte(m.arrayLength >> 16), byte(m.arrayLength >> 24)})
 	}
-
-	b, err := codec.Marshal(m.value)
-	if err != nil {
-		return buf.Bytes(), err
-	}
-	buf.Write(b)
+	m.encode(&buf, reflect.ValueOf(m.value))
 
 	if m.Has(VariantArrayDimensions) {
 		buf.Write([]byte{byte(m.arrayDimensionsLength), byte(m.arrayDimensionsLength >> 8), byte(m.arrayDimensionsLength >> 16), byte(m.arrayDimensionsLength >> 24)})
@@ -371,69 +343,14 @@ func (m *Variant) MarshalOPCUA() ([]byte, error) {
 }
 
 // encode recursively writes the values to the buffer.
-func (m *Variant) encode(s *Stream, val reflect.Value) {
+func (m *Variant) encode(buf *bytes.Buffer, val reflect.Value) {
 	if val.Kind() != reflect.Slice || m.Type() == TypeIDByteString {
-		m.encodeValue(s, val.Interface())
+		b, _ := codec.Marshal(val.Interface())
+		buf.Write(b)
 		return
 	}
 	for i := 0; i < val.Len(); i++ {
-		m.encode(s, val.Index(i))
-	}
-}
-
-// encodeValue writes a single value of the base type to the buffer.
-func (m *Variant) encodeValue(s *Stream, v interface{}) {
-	switch x := v.(type) {
-	case bool:
-		s.WriteBool(x)
-	case int8:
-		s.WriteInt8(x)
-	case byte:
-		s.WriteByte(x)
-	case int16:
-		s.WriteInt16(x)
-	case uint16:
-		s.WriteUint16(x)
-	case int32:
-		s.WriteInt32(x)
-	case uint32:
-		s.WriteUint32(x)
-	case int64:
-		s.WriteInt64(x)
-	case uint64:
-		s.WriteUint64(x)
-	case float32:
-		s.WriteFloat32(x)
-	case float64:
-		s.WriteFloat64(x)
-	case string:
-		s.WriteString(x)
-	case time.Time:
-		s.WriteTime(x)
-	case *GUID:
-		s.WriteAny(x)
-	case []byte:
-		s.WriteByteString(x)
-	case XMLElement:
-		s.WriteString(string(x))
-	case *NodeID:
-		s.WriteAny(x)
-	case *ExpandedNodeID:
-		s.WriteAny(x)
-	case StatusCode:
-		s.WriteUint32(uint32(x))
-	case *QualifiedName:
-		s.WriteAny(x)
-	case *LocalizedText:
-		s.WriteAny(x)
-	case *ExtensionObject:
-		s.WriteAny(x)
-	case *DataValue:
-		s.WriteAny(x)
-	case *Variant:
-		s.WriteAny(x)
-	case *DiagnosticInfo:
-		s.WriteAny(x)
+		m.encode(buf, val.Index(i))
 	}
 }
 
