@@ -815,7 +815,6 @@ func (s *SecureChannel) sendAsyncWithTimeout(
 		m.MessageHeader.SequenceHeader = sh
 
 	case id.CloseSecureChannelRequest_Encoding_DefaultBinary, id.CloseSecureChannelResponse_Encoding_DefaultBinary:
-
 		h.MessageType = MessageTypeCloseSecureChannel
 		h.ChunkType = ChunkTypeFinal
 		h.SecureChannelID = instance.secureChannelID
@@ -828,7 +827,6 @@ func (s *SecureChannel) sendAsyncWithTimeout(
 		m.MessageHeader.SequenceHeader = sh
 
 	default:
-
 		h.MessageType = MessageTypeMessage
 		h.ChunkType = ChunkTypeFinal
 		h.SecureChannelID = instance.secureChannelID
