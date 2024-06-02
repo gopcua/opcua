@@ -17,6 +17,7 @@ import (
 
 	"github.com/gopcua/opcua/debug"
 	"github.com/gopcua/opcua/errors"
+	"github.com/gopcua/opcua/id"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uacp"
 	"github.com/gopcua/opcua/uapolicy"
@@ -591,8 +592,8 @@ func (s *SecureChannel) scheduleRenewal(instance *channelInstance) {
 
 	debug.Printf("uasc %d: security token is refreshed at %s (%s). channelID=%d tokenID=%d", s.c.ID(), time.Now().UTC().Add(when).Format(time.RFC3339), when, instance.secureChannelID, instance.securityTokenID)
 
-	t := time.NewTimer(when)
-	defer t.Stop()
+	t := AcquireTimer(when)
+	defer ReleaseTimer(t)
 
 	select {
 	case <-s.closing:
@@ -623,8 +624,8 @@ func (s *SecureChannel) scheduleExpiration(instance *channelInstance) {
 
 	debug.Printf("uasc %d: security token expires at %s. channelID=%d tokenID=%d", s.c.ID(), when.UTC().Format(time.RFC3339), instance.secureChannelID, instance.securityTokenID)
 
-	t := time.NewTimer(time.Until(when))
-	defer t.Stop()
+	t := AcquireTimer(time.Until(when))
+	defer ReleaseTimer(t)
 
 	select {
 	case <-s.closing:
@@ -677,8 +678,8 @@ func (s *SecureChannel) sendRequestWithTimeout(
 	}
 
 	// `+ timeoutLeniency` to give the server a chance to respond to TimeoutHint
-	timer := time.NewTimer(timeout + timeoutLeniency)
-	defer timer.Stop()
+	timer := AcquireTimer(timeout + timeoutLeniency)
+	defer ReleaseTimer(timer)
 
 	select {
 	case <-ctx.Done():
@@ -749,9 +750,95 @@ func (s *SecureChannel) sendAsyncWithTimeout(
 	instance.Lock()
 	defer instance.Unlock()
 
-	m, err := instance.newRequestMessage(req, reqID, authToken, timeout)
-	if err != nil {
-		return nil, err
+	m := acquireMessage()
+	defer releaseMessage(m)
+
+	typeID := ua.ServiceTypeID(req)
+	if typeID == 0 {
+		return nil, errors.Errorf("unknown service %T. Did you call register?", req)
+	}
+	if authToken == nil {
+		authToken = ua.NewTwoByteNodeID(0)
+	}
+
+	reqHdr := &ua.RequestHeader{
+		AuthenticationToken: authToken,
+		Timestamp:           instance.sc.timeNow(),
+		RequestHandle:       reqID, // TODO: can I cheat like this?
+		AdditionalHeader:    ua.NewExtensionObject(nil),
+	}
+
+	if timeout > 0 && timeout < instance.sc.cfg.RequestTimeout {
+		timeout = instance.sc.cfg.RequestTimeout
+	}
+	reqHdr.TimeoutHint = uint32(timeout / time.Millisecond)
+	req.SetHeader(reqHdr)
+
+	h := acquireHeader()
+	ash := acquireAsymmetricSecurityHeader()
+	sh := acquireSequenceHeader()
+	ssh := acquireSymmetricSecurityHeader()
+
+	defer func() {
+		releaseHeader(h)
+		releaseAsymmetricSecurityHeader(ash)
+		releaseSequenceHeader(sh)
+		releaseSymmetricSecurityHeader(ssh)
+	}()
+
+	m.reset(ua.NewFourByteExpandedNodeID(0, typeID), req)
+	sequenceNumber := instance.nextSequenceNumber()
+	switch typeID {
+	case id.OpenSecureChannelRequest_Encoding_DefaultBinary, id.OpenSecureChannelResponse_Encoding_DefaultBinary:
+		// Do not send the thumbprint for security mode None
+		// even if we have a certificate.
+		//
+		// See https://github.com/gopcua/opcua/issues/259
+		thumbprint := instance.sc.cfg.Thumbprint
+		if instance.sc.cfg.SecurityMode == ua.MessageSecurityModeNone {
+			thumbprint = nil
+		}
+
+		h.MessageType = MessageTypeOpenSecureChannel
+		h.ChunkType = ChunkTypeFinal
+		h.SecureChannelID = instance.secureChannelID
+
+		ash.SecurityPolicyURI = instance.sc.cfg.SecurityPolicyURI
+		ash.SenderCertificate = instance.sc.cfg.Certificate
+		ash.ReceiverCertificateThumbprint = thumbprint
+
+		sh.SequenceNumber = sequenceNumber
+		sh.RequestID = reqID
+
+		m.MessageHeader.Header = h
+		m.MessageHeader.AsymmetricSecurityHeader = ash
+		m.MessageHeader.SequenceHeader = sh
+
+	case id.CloseSecureChannelRequest_Encoding_DefaultBinary, id.CloseSecureChannelResponse_Encoding_DefaultBinary:
+
+		h.MessageType = MessageTypeCloseSecureChannel
+		h.ChunkType = ChunkTypeFinal
+		h.SecureChannelID = instance.secureChannelID
+		ssh.TokenID = instance.securityTokenID
+		sh.SequenceNumber = sequenceNumber
+		sh.RequestID = reqID
+
+		m.MessageHeader.Header = h
+		m.MessageHeader.SymmetricSecurityHeader = ssh
+		m.MessageHeader.SequenceHeader = sh
+
+	default:
+
+		h.MessageType = MessageTypeMessage
+		h.ChunkType = ChunkTypeFinal
+		h.SecureChannelID = instance.secureChannelID
+		ssh.TokenID = instance.securityTokenID
+		sh.SequenceNumber = sequenceNumber
+		sh.RequestID = reqID
+
+		m.MessageHeader.Header = h
+		m.MessageHeader.SymmetricSecurityHeader = ssh
+		m.MessageHeader.SequenceHeader = sh
 	}
 
 	var resp chan *response

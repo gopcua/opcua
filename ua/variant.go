@@ -5,7 +5,6 @@
 package ua
 
 import (
-	"bytes"
 	"fmt"
 	"reflect"
 	"time"
@@ -319,19 +318,19 @@ func (m *Variant) decodeValue(buf *Buffer) interface{} {
 	}
 }
 
-func (m *Variant) MarshalOPCUA() ([]byte, error) {
-	var buf bytes.Buffer
+func (m *Variant) EncodeOPCUA(buf *codec.Stream) error {
+	// var buf bytes.Buffer
 	buf.WriteByte(m.mask)
 
 	// a null value specifies that no other fields are encoded
 	if m.Type() == TypeIDNull {
-		return buf.Bytes(), nil
+		return nil
 	}
 
 	if m.Has(VariantArrayValues) {
 		buf.Write([]byte{byte(m.arrayLength), byte(m.arrayLength >> 8), byte(m.arrayLength >> 16), byte(m.arrayLength >> 24)})
 	}
-	m.encode(&buf, reflect.ValueOf(m.value))
+	m.encode(buf, reflect.ValueOf(m.value))
 
 	if m.Has(VariantArrayDimensions) {
 		buf.Write([]byte{byte(m.arrayDimensionsLength), byte(m.arrayDimensionsLength >> 8), byte(m.arrayDimensionsLength >> 16), byte(m.arrayDimensionsLength >> 24)})
@@ -339,11 +338,11 @@ func (m *Variant) MarshalOPCUA() ([]byte, error) {
 			buf.Write([]byte{byte(v), byte(v >> 8), byte(v >> 16), byte(v >> 24)})
 		}
 	}
-	return buf.Bytes(), nil
+	return nil
 }
 
 // encode recursively writes the values to the buffer.
-func (m *Variant) encode(buf *bytes.Buffer, val reflect.Value) {
+func (m *Variant) encode(buf *codec.Stream, val reflect.Value) {
 	if val.Kind() != reflect.Slice || m.Type() == TypeIDByteString {
 		b, _ := codec.Marshal(val.Interface())
 		buf.Write(b)

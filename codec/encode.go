@@ -1,7 +1,6 @@
 package codec
 
 import (
-	"bytes"
 	"fmt"
 	"math"
 	"reflect"
@@ -23,10 +22,10 @@ func Marshal(v any) ([]byte, error) {
 	return buf, nil
 }
 
-// Marshaler is the interface implemented by types that
+// Encoder is the interface implemented by types that
 // can marshal themselves into valid OPCUA.
-type Marshaler interface {
-	MarshalOPCUA() ([]byte, error)
+type Encoder interface {
+	EncodeOPCUA(s *Stream) error
 }
 
 // An UnsupportedTypeError is returned by [Marshal] when attempting
@@ -51,7 +50,7 @@ func (e *UnsupportedValueError) Error() string {
 }
 
 // A MarshalerError represents an error from calling a
-// [Marshaler.MarshalOPCUA] method.
+// [Encoder.EncodeOPCUA] method.
 type MarshalerError struct {
 	Type       reflect.Type
 	Err        error
@@ -61,7 +60,7 @@ type MarshalerError struct {
 func (e *MarshalerError) Error() string {
 	srcFunc := e.sourceFunc
 	if srcFunc == "" {
-		srcFunc = "MarshalOPCUA"
+		srcFunc = "EncodeOPCUA"
 	}
 	return "opcua: error calling " + srcFunc +
 		" for type " + e.Type.String() +
@@ -69,7 +68,7 @@ func (e *MarshalerError) Error() string {
 }
 
 type encodeState struct {
-	bytes.Buffer
+	Stream
 
 	ptrLevel uint
 	ptrSeen  map[any]struct{}
@@ -89,7 +88,10 @@ func newEncodeState() *encodeState {
 		e.ptrLevel = 0
 		return e
 	}
-	return &encodeState{ptrSeen: make(map[any]struct{})}
+	return &encodeState{
+		Stream:  Stream{buf: make([]byte, 0, 256)},
+		ptrSeen: make(map[any]struct{}),
+	}
 }
 
 // codecError is an error wrapper type for internal use only.
@@ -161,7 +163,7 @@ func typeEncoder(t reflect.Type) encoderFunc {
 	return f
 }
 
-var marshalerType = reflect.TypeFor[Marshaler]()
+var encoderType = reflect.TypeFor[Encoder]()
 
 // newTypeEncoder constructs an encoderFunc for a type.
 // The returned encoder only checks CanAddr when allowAddr is true.
@@ -171,10 +173,10 @@ func newTypeEncoder(t reflect.Type, allowAddr bool) encoderFunc {
 	// Marshaler with a value receiver, then we're better off taking
 	// the address of the value - otherwise we end up with an
 	// allocation as we cast the value to an interface.
-	if kind != reflect.Pointer && allowAddr && reflect.PointerTo(t).Implements(marshalerType) {
+	if kind != reflect.Pointer && allowAddr && reflect.PointerTo(t).Implements(encoderType) {
 		return newCondAddrEncoder(addrMarshalerEncoder, newTypeEncoder(t, false))
 	}
-	if t.Implements(marshalerType) {
+	if t.Implements(encoderType) {
 		return marshalerEncoder
 	}
 
@@ -226,38 +228,26 @@ func marshalerEncoder(e *encodeState, v reflect.Value) {
 	if v.Kind() == reflect.Pointer && v.IsNil() {
 		return
 	}
-	m, ok := v.Interface().(Marshaler)
+	m, ok := v.Interface().(Encoder)
 	if !ok {
 		return
 	}
-	b, err := m.MarshalOPCUA()
-	if err == nil {
-		e.Grow(len(b))
-		out := e.AvailableBuffer()
-		out = append(out, b...)
-		e.Buffer.Write(out)
-	}
+	err := m.EncodeOPCUA(&e.Stream)
 	if err != nil {
-		e.error(&MarshalerError{v.Type(), err, "MarshalOPCUA"})
+		e.error(&MarshalerError{v.Type(), err, "EncodeOPCUA"})
 	}
 }
 
 func addrMarshalerEncoder(e *encodeState, v reflect.Value) {
 	va := v.Addr()
 	if va.IsNil() {
-		e.WriteString("null")
+		e.Write(null)
 		return
 	}
-	m := va.Interface().(Marshaler)
-	b, err := m.MarshalOPCUA()
-	if err == nil {
-		e.Grow(len(b))
-		out := e.AvailableBuffer()
-		out = append(out, b...)
-		e.Buffer.Write(out)
-	}
+	m := va.Interface().(Encoder)
+	err := m.EncodeOPCUA(&e.Stream)
 	if err != nil {
-		e.error(&MarshalerError{v.Type(), err, "MarshalOPCUA"})
+		e.error(&MarshalerError{v.Type(), err, "EncodeOPCUA"})
 	}
 }
 
@@ -467,7 +457,7 @@ func newSliceEncoder(t reflect.Type) encoderFunc {
 	// Byte slices get special treatment; arrays don't.
 	if t.Elem().Kind() == reflect.Uint8 {
 		p := reflect.PointerTo(t.Elem())
-		if !p.Implements(marshalerType) {
+		if !p.Implements(encoderType) {
 			return encodeByteSlice
 		}
 	}
@@ -570,7 +560,7 @@ func typeFields(t reflect.Type) structFields {
 	visitField := func(f reflect.StructField) {
 		t := f.Type
 		// return marshalerEncoder directly, if it implements Marshaler.
-		if t.Implements(marshalerType) {
+		if t.Implements(encoderType) {
 			fields = append(fields, field{name: f.Name, nameBytes: []byte(f.Name), index: f.Index, typ: t, encoder: marshalerEncoder})
 			return
 		}

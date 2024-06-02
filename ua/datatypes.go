@@ -5,7 +5,6 @@
 package ua
 
 import (
-	"bytes"
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
@@ -64,34 +63,33 @@ func (d *DataValue) Decode(b []byte) (int, error) {
 	return buf.Pos(), buf.Error()
 }
 
-func (d *DataValue) MarshalOPCUA() ([]byte, error) {
-	var buf bytes.Buffer
+func (d *DataValue) EncodeOPCUA(s *codec.Stream) error {
 	var err error
 	var b []byte
 
-	buf.WriteByte(d.EncodingMask)
+	s.WriteByte(d.EncodingMask)
 	if d.Has(DataValueValue) {
 		b, err = codec.Marshal(d.Value)
-		buf.Write(b)
+		s.Write(b)
 	}
 	if d.Has(DataValueStatusCode) {
-		buf.Write([]byte{byte(d.Status), byte(d.Status >> 8), byte(d.Status >> 16), byte(d.Status >> 24)})
+		s.Write([]byte{byte(d.Status), byte(d.Status >> 8), byte(d.Status >> 16), byte(d.Status >> 24)})
 	}
 	if d.Has(DataValueSourceTimestamp) {
 		b, err = codec.Marshal(d.SourceTimestamp)
-		buf.Write(b)
+		s.Write(b)
 	}
 	if d.Has(DataValueSourcePicoseconds) {
-		buf.Write([]byte{byte(d.SourcePicoseconds), byte(d.SourcePicoseconds >> 8)})
+		s.Write([]byte{byte(d.SourcePicoseconds), byte(d.SourcePicoseconds >> 8)})
 	}
 	if d.Has(DataValueServerTimestamp) {
 		b, err = codec.Marshal(d.ServerTimestamp)
-		buf.Write(b)
+		s.Write(b)
 	}
 	if d.Has(DataValueServerPicoseconds) {
-		buf.Write([]byte{byte(d.ServerPicoseconds), byte(d.ServerPicoseconds >> 8)})
+		s.Write([]byte{byte(d.ServerPicoseconds), byte(d.ServerPicoseconds >> 8)})
 	}
-	return buf.Bytes(), err
+	return err
 }
 
 func (d *DataValue) Has(mask byte) bool {
@@ -160,13 +158,14 @@ func (g *GUID) Decode(b []byte) (int, error) {
 	return buf.Pos(), buf.Error()
 }
 
-func (g *GUID) MarshalOPCUA() ([]byte, error) {
+func (g *GUID) EncodeOPCUA(s *codec.Stream) error {
 	buf := make([]byte, 0, 8+len(g.Data4))
 	buf = binary.LittleEndian.AppendUint32(buf, g.Data1)
 	buf = binary.LittleEndian.AppendUint16(buf, g.Data2)
 	buf = binary.LittleEndian.AppendUint16(buf, g.Data3)
 	buf = append(buf, g.Data4...)
-	return buf, nil
+	s.Write(buf)
+	return nil
 }
 
 // String returns GUID in human-readable string.
@@ -235,30 +234,27 @@ func (l *LocalizedText) Decode(b []byte) (int, error) {
 	return buf.Pos(), buf.Error()
 }
 
-func (l *LocalizedText) MarshalOPCUA() ([]byte, error) {
-	var buf bytes.Buffer
-	var err error
-
-	buf.WriteByte(l.EncodingMask)
+func (l *LocalizedText) EncodeOPCUA(s *codec.Stream) error {
+	s.WriteByte(l.EncodingMask)
 	if l.Has(LocalizedTextLocale) {
 		n := len(l.Locale)
 		if n == 0 {
-			buf.Write([]byte{0xff, 0xff, 0xff, 0xff})
+			s.Write([]byte{0xff, 0xff, 0xff, 0xff})
 		} else {
-			buf.Write([]byte{byte(n), byte(n >> 8), byte(n >> 16), byte(n >> 24)})
-			buf.Write([]byte(l.Locale))
+			s.Write([]byte{byte(n), byte(n >> 8), byte(n >> 16), byte(n >> 24)})
+			s.Write([]byte(l.Locale))
 		}
 	}
 	if l.Has(LocalizedTextText) {
 		n := len(l.Text)
 		if n == 0 {
-			buf.Write([]byte{0xff, 0xff, 0xff, 0xff})
+			s.Write([]byte{0xff, 0xff, 0xff, 0xff})
 		} else {
-			buf.Write([]byte{byte(n), byte(n >> 8), byte(n >> 16), byte(n >> 24)})
-			buf.Write([]byte(l.Text))
+			s.Write([]byte{byte(n), byte(n >> 8), byte(n >> 16), byte(n >> 24)})
+			s.Write([]byte(l.Text))
 		}
 	}
-	return buf.Bytes(), err
+	return nil
 }
 
 func (l *LocalizedText) Has(mask byte) bool {

@@ -6,6 +6,7 @@ package uasc
 
 import (
 	"math"
+	"sync"
 
 	"github.com/gopcua/opcua/codec"
 	"github.com/gopcua/opcua/errors"
@@ -17,6 +18,13 @@ type MessageHeader struct {
 	*AsymmetricSecurityHeader
 	*SymmetricSecurityHeader
 	*SequenceHeader
+}
+
+func (m *MessageHeader) reset() {
+	m.Header = nil
+	m.AsymmetricSecurityHeader = nil
+	m.SymmetricSecurityHeader = nil
+	m.SequenceHeader = nil
 }
 
 func (m *MessageHeader) Decode(b []byte) (int, error) {
@@ -79,11 +87,35 @@ func (m *MessageAbort) MessageAbort() string {
 	return ua.StatusCode(m.ErrorCode).Error()
 }
 
+func acquireMessage() *Message {
+	m := messagePool.Get()
+	if m == nil {
+		return &Message{
+			MessageHeader: &MessageHeader{},
+		}
+	}
+	return m.(*Message)
+}
+
+func releaseMessage(m *Message) {
+	m.TypeID = nil
+	m.Service = nil
+	m.MessageHeader.reset()
+	messagePool.Put(m)
+}
+
+var messagePool sync.Pool
+
 // Message represents a OPC UA Secure Conversation message.
 type Message struct {
 	*MessageHeader
 	TypeID  *ua.ExpandedNodeID
 	Service interface{}
+}
+
+func (m *Message) reset(typeID *ua.ExpandedNodeID, service interface{}) {
+	m.TypeID = typeID
+	m.Service = service
 }
 
 func (m *Message) Decode(b []byte) (int, error) {
@@ -106,13 +138,14 @@ func (m *Message) Decode(b []byte) (int, error) {
 	return len(b), err
 }
 
-func (m *Message) MarshalOPCUA() ([]byte, error) {
+func (m *Message) EncodeOPCUA(s *codec.Stream) error {
 	chunks, err := m.MarshalChunks(math.MaxUint32)
 	if err != nil {
-		return nil, err
+		return err
 	}
+	s.Write(chunks[0])
 
-	return chunks[0], nil
+	return nil
 }
 
 func (m *Message) MarshalChunks(maxBodySize uint32) ([][]byte, error) {

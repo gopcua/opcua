@@ -412,12 +412,14 @@ func (c *Conn) Send(typ string, msg interface{}) error {
 		return errors.Errorf("send packet too large: %d > %d bytes", h.MessageSize, c.ack.SendBufSize)
 	}
 
-	hdr, err := h.MarshalOPCUA()
+	hdr, err := codec.Marshal(&h)
 	if err != nil {
 		return errors.Errorf("encode hdr failed: %v", err)
 	}
 
-	b := append(hdr, body...)
+	b := make([]byte, len(hdr)+len(body))
+	copy(b, hdr)
+	copy(b[len(hdr):], body)
 	if _, err := c.Write(b); err != nil {
 		return errors.Errorf("write failed: %s", err)
 	}

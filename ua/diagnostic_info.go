@@ -5,8 +5,6 @@
 package ua
 
 import (
-	"bytes"
-
 	"github.com/gopcua/opcua/codec"
 )
 
@@ -64,8 +62,8 @@ func (d *DiagnosticInfo) Decode(b []byte) (int, error) {
 	return buf.Pos(), buf.Error()
 }
 
-func (d *DiagnosticInfo) MarshalOPCUA() ([]byte, error) {
-	var buf bytes.Buffer
+func (d *DiagnosticInfo) EncodeOPCUA(buf *codec.Stream) error {
+	// var buf bytes.Buffer
 	buf.WriteByte(d.EncodingMask)
 
 	if d.Has(DiagnosticInfoSymbolicID) {
@@ -90,12 +88,12 @@ func (d *DiagnosticInfo) MarshalOPCUA() ([]byte, error) {
 	if d.Has(DiagnosticInfoInnerDiagnosticInfo) {
 		b, err := codec.Marshal(d.InnerDiagnosticInfo)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		buf.Write(b)
 	}
 
-	return buf.Bytes(), nil
+	return nil
 }
 
 func (d *DiagnosticInfo) Has(mask byte) bool {

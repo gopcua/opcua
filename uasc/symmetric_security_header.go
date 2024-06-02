@@ -6,9 +6,25 @@ package uasc
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/gopcua/opcua/ua"
 )
+
+func acquireSymmetricSecurityHeader() *SymmetricSecurityHeader {
+	v := symmetricSecurityHeaderPool.Get()
+	if v == nil {
+		return &SymmetricSecurityHeader{}
+	}
+	return v.(*SymmetricSecurityHeader)
+}
+
+func releaseSymmetricSecurityHeader(h *SymmetricSecurityHeader) {
+	h.TokenID = 0
+	symmetricSecurityHeaderPool.Put(h)
+}
+
+var symmetricSecurityHeaderPool sync.Pool
 
 // SymmetricSecurityHeader represents a Symmetric Algorithm Security Header in OPC UA Secure Conversation.
 type SymmetricSecurityHeader struct {

@@ -6,9 +6,27 @@ package uasc
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/gopcua/opcua/ua"
 )
+
+func acquireAsymmetricSecurityHeader() *AsymmetricSecurityHeader {
+	v := asymmetricSecurityHeaderPool.Get()
+	if v == nil {
+		return &AsymmetricSecurityHeader{}
+	}
+	return v.(*AsymmetricSecurityHeader)
+}
+
+func releaseAsymmetricSecurityHeader(h *AsymmetricSecurityHeader) {
+	h.SecurityPolicyURI = ""
+	h.SenderCertificate = h.SenderCertificate[:0]
+	h.ReceiverCertificateThumbprint = h.ReceiverCertificateThumbprint[:0]
+	asymmetricSecurityHeaderPool.Put(h)
+}
+
+var asymmetricSecurityHeaderPool sync.Pool
 
 // AsymmetricSecurityHeader represents a Asymmetric Algorithm Security Header in OPC UA Secure Conversation.
 type AsymmetricSecurityHeader struct {

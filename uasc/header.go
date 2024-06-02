@@ -5,9 +5,10 @@
 package uasc
 
 import (
-	"bytes"
 	"fmt"
+	"sync"
 
+	"github.com/gopcua/opcua/codec"
 	"github.com/gopcua/opcua/errors"
 	"github.com/gopcua/opcua/ua"
 )
@@ -25,6 +26,23 @@ const (
 	ChunkTypeFinal        = 'F'
 	ChunkTypeError        = 'A'
 )
+
+func acquireHeader() *Header {
+	v := headerPool.Get()
+	if v == nil {
+		return &Header{}
+	}
+	return v.(*Header)
+}
+
+func releaseHeader(h *Header) {
+	h.MessageType = ""
+	h.MessageSize = 0
+	h.SecureChannelID = 0
+	headerPool.Put(h)
+}
+
+var headerPool sync.Pool
 
 // Header represents a OPC UA Secure Conversation Header.
 type Header struct {
@@ -52,17 +70,17 @@ func (h *Header) Decode(b []byte) (int, error) {
 	return buf.Pos(), buf.Error()
 }
 
-func (h *Header) MarshalOPCUA() ([]byte, error) {
+func (h *Header) EncodeOPCUA(buf *codec.Stream) error {
 	if len(h.MessageType) != 3 {
-		return nil, errors.Errorf("invalid message type: %q", h.MessageType)
+		return errors.Errorf("invalid message type: %q", h.MessageType)
 	}
 
-	var buf bytes.Buffer
+	// var buf bytes.Buffer
 	buf.WriteString(h.MessageType)
 	buf.WriteByte(h.ChunkType)
 	buf.Write([]byte{byte(h.MessageSize), byte(h.MessageSize >> 8), byte(h.MessageSize >> 16), byte(h.MessageSize >> 24)})
 	buf.Write([]byte{byte(h.SecureChannelID), byte(h.SecureChannelID >> 8), byte(h.SecureChannelID >> 16), byte(h.SecureChannelID >> 24)})
-	return buf.Bytes(), nil
+	return nil
 }
 
 // String returns Header in string.

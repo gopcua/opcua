@@ -5,7 +5,6 @@
 package ua
 
 import (
-	"bytes"
 	"encoding/base64"
 	"math"
 	"strconv"
@@ -104,20 +103,20 @@ func (e *ExpandedNodeID) Decode(b []byte) (int, error) {
 	return buf.Pos(), buf.Error()
 }
 
-func (e *ExpandedNodeID) MarshalOPCUA() ([]byte, error) {
-	var buf bytes.Buffer
-	b, err := e.NodeID.MarshalOPCUA()
-	buf.Write(b)
+func (e *ExpandedNodeID) EncodeOPCUA(buf *codec.Stream) error {
+	// var buf bytes.Buffer
+	err := e.NodeID.EncodeOPCUA(buf)
+	// buf.Write(b)
 
 	if e.HasNamespaceURI() {
-		b, err = codec.Marshal(e.NamespaceURI)
+		b, _ := codec.Marshal(e.NamespaceURI)
 		buf.Write(b)
 	}
 	if e.HasServerIndex() {
-		b, err = codec.Marshal(e.ServerIndex)
+		b, _ := codec.Marshal(e.ServerIndex)
 		buf.Write(b)
 	}
-	return buf.Bytes(), err
+	return err
 }
 
 // HasNamespaceURI checks if an ExpandedNodeID has NamespaceURI Flag.

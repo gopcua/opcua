@@ -5,7 +5,6 @@
 package ua
 
 import (
-	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -368,8 +367,8 @@ func (n *NodeID) Decode(b []byte) (int, error) {
 	}
 }
 
-func (n *NodeID) MarshalOPCUA() ([]byte, error) {
-	var buf bytes.Buffer
+func (n *NodeID) EncodeOPCUA(buf *codec.Stream) error {
+	// var buf bytes.Buffer
 	buf.WriteByte(byte(n.mask))
 	switch n.Type() {
 	case NodeIDTypeTwoByte:
@@ -393,9 +392,9 @@ func (n *NodeID) MarshalOPCUA() ([]byte, error) {
 			buf.Write(n.bid)
 		}
 	default:
-		return nil, fmt.Errorf("invalid node id type: %d", n.mask)
+		return fmt.Errorf("invalid node id type: %d", n.mask)
 	}
-	return buf.Bytes(), nil
+	return nil
 }
 
 func (n *NodeID) MarshalJSON() ([]byte, error) {
