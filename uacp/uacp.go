@@ -5,9 +5,6 @@
 package uacp
 
 import (
-	"bytes"
-	"encoding/binary"
-
 	"github.com/gopcua/opcua/codec"
 	"github.com/gopcua/opcua/errors"
 	"github.com/gopcua/opcua/ua"
@@ -49,15 +46,14 @@ func (h *Header) Decode(b []byte) (int, error) {
 	return buf.Pos(), buf.Error()
 }
 
-func (h *Header) EncodeOPCUA(buf *codec.Stream) error {
+func (h *Header) EncodeOPCUA(s *codec.Stream) error {
 	if len(h.MessageType) != 3 {
 		return errors.Errorf("invalid message type: %q", h.MessageType)
 	}
 
-	// var buf bytes.Buffer
-	buf.Write([]byte(h.MessageType))
-	buf.WriteByte(h.ChunkType)
-	buf.Write([]byte{byte(h.MessageSize), byte(h.MessageSize >> 8), byte(h.MessageSize >> 16), byte(h.MessageSize >> 24)})
+	s.WriteString(h.MessageType)
+	s.WriteByte(h.ChunkType)
+	s.WriteUint32(h.MessageSize)
 	return nil
 }
 
@@ -85,20 +81,17 @@ func (h *Hello) Decode(b []byte) (int, error) {
 }
 
 func (h *Hello) EncodeOPCUA(s *codec.Stream) error {
-	var buf bytes.Buffer
-	buf.Write([]byte{byte(h.Version), byte(h.Version >> 8), byte(h.Version >> 16), byte(h.Version >> 24)})
-	buf.Write([]byte{byte(h.ReceiveBufSize), byte(h.ReceiveBufSize >> 8), byte(h.ReceiveBufSize >> 16), byte(h.ReceiveBufSize >> 24)})
-	buf.Write([]byte{byte(h.SendBufSize), byte(h.SendBufSize >> 8), byte(h.SendBufSize >> 16), byte(h.SendBufSize >> 24)})
-	buf.Write([]byte{byte(h.MaxMessageSize), byte(h.MaxMessageSize >> 8), byte(h.MaxMessageSize >> 16), byte(h.MaxMessageSize >> 24)})
-	buf.Write([]byte{byte(h.MaxChunkCount), byte(h.MaxChunkCount >> 8), byte(h.MaxChunkCount >> 16), byte(h.MaxChunkCount >> 24)})
+	s.WriteUint32(h.Version)
+	s.WriteUint32(h.ReceiveBufSize)
+	s.WriteUint32(h.SendBufSize)
+	s.WriteUint32(h.MaxMessageSize)
+	s.WriteUint32(h.MaxChunkCount)
 	if len(h.EndpointURL) == 0 {
-		buf.Write([]byte{0xff, 0xff, 0xff, 0xff})
+		s.WriteUint32(codec.NULL)
 	} else {
-		n := len(h.EndpointURL)
-		buf.Write([]byte{byte(n), byte(n >> 8), byte(n >> 16), byte(n >> 24)})
-		buf.WriteString(h.EndpointURL)
+		s.WriteUint32(uint32(len(h.EndpointURL)))
+		s.WriteString(h.EndpointURL)
 	}
-	s.Write(buf.Bytes())
 	return nil
 }
 
@@ -124,13 +117,11 @@ func (a *Acknowledge) Decode(b []byte) (int, error) {
 }
 
 func (a *Acknowledge) EncodeOPCUA(s *codec.Stream) error {
-	buf := make([]byte, 0, 160)
-	buf = binary.LittleEndian.AppendUint32(buf, a.Version)
-	buf = binary.LittleEndian.AppendUint32(buf, a.ReceiveBufSize)
-	buf = binary.LittleEndian.AppendUint32(buf, a.SendBufSize)
-	buf = binary.LittleEndian.AppendUint32(buf, a.MaxMessageSize)
-	buf = binary.LittleEndian.AppendUint32(buf, a.MaxChunkCount)
-	s.Write(buf)
+	s.WriteUint32(a.Version)
+	s.WriteUint32(a.ReceiveBufSize)
+	s.WriteUint32(a.SendBufSize)
+	s.WriteUint32(a.MaxMessageSize)
+	s.WriteUint32(a.MaxChunkCount)
 	return nil
 }
 

@@ -1,5 +1,7 @@
 package codec
 
+import "encoding/binary"
+
 type Stream struct {
 	buf []byte
 }
@@ -29,4 +31,16 @@ func (s *Stream) Reset() {
 
 func (s *Stream) Bytes() []byte {
 	return s.buf[:len(s.buf)]
+}
+
+func (s *Stream) WriteUint16(n uint16) {
+	s.buf = binary.LittleEndian.AppendUint16(s.buf, n)
+}
+
+func (s *Stream) WriteUint32(n uint32) {
+	s.buf = binary.LittleEndian.AppendUint32(s.buf, n)
+}
+
+func (s *Stream) WriteUint64(n uint64) {
+	s.buf = binary.LittleEndian.AppendUint64(s.buf, n)
 }

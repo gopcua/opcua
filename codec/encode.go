@@ -241,7 +241,7 @@ func marshalerEncoder(e *encodeState, v reflect.Value) {
 func addrMarshalerEncoder(e *encodeState, v reflect.Value) {
 	va := v.Addr()
 	if va.IsNil() {
-		e.Write(null)
+		e.WriteUint32(NULL)
 		return
 	}
 	m := va.Interface().(Encoder)
@@ -249,18 +249,6 @@ func addrMarshalerEncoder(e *encodeState, v reflect.Value) {
 	if err != nil {
 		e.error(&MarshalerError{v.Type(), err, "EncodeOPCUA"})
 	}
-}
-
-func (e *encodeState) writeUint16(n uint16) {
-	e.Write([]byte{byte(n), byte(n >> 8)})
-}
-
-func (e *encodeState) writeUint32(n uint32) {
-	e.Write([]byte{byte(n), byte(n >> 8), byte(n >> 16), byte(n >> 24)})
-}
-
-func (e *encodeState) writeUint64(n uint64) {
-	e.Write([]byte{byte(n), byte(n >> 8), byte(n >> 16), byte(n >> 24), byte(n >> 32), byte(n >> 40), byte(n >> 48), byte(n >> 56)})
 }
 
 func boolEncoder(e *encodeState, v reflect.Value) {
@@ -284,67 +272,61 @@ func uint8Encoder(e *encodeState, v reflect.Value) {
 
 func int16Encoder(e *encodeState, v reflect.Value) {
 	val := uint16(v.Int())
-	e.writeUint16(val)
+	e.WriteUint16(val)
 }
 
 func uint16Encoder(e *encodeState, v reflect.Value) {
 	val := uint16(v.Uint())
-	e.writeUint16(val)
+	e.WriteUint16(val)
 }
 
 func int32Encoder(e *encodeState, v reflect.Value) {
 	val := uint32(v.Int())
-	e.writeUint32(val)
+	e.WriteUint32(val)
 }
 
 func uint32Encoder(e *encodeState, v reflect.Value) {
 	val := uint32(v.Uint())
-	e.writeUint32(val)
+	e.WriteUint32(val)
 }
 
 func int64Encoder(e *encodeState, v reflect.Value) {
 	val := uint64(v.Int())
-	e.writeUint64(val)
+	e.WriteUint64(val)
 }
 
 func uint64Encoder(e *encodeState, v reflect.Value) {
 	val := v.Uint()
-	e.writeUint64(val)
+	e.WriteUint64(val)
 }
-
-var (
-	null    = []byte{0xff, 0xff, 0xff, 0xff}
-	f32qnan = []byte{0x00, 0x00, 0xff, 0xc0}
-	f64qnan = []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf8, 0xff}
-)
 
 func float32Encoder(e *encodeState, v reflect.Value) {
 	if math.IsNaN(v.Float()) {
-		e.Write(f32qnan)
+		e.WriteUint32(F32QNAN)
 	} else {
 		val := math.Float32bits((float32)(v.Float()))
-		e.writeUint32(val)
+		e.WriteUint32(val)
 	}
 }
 
 func float64Encoder(e *encodeState, v reflect.Value) {
 	if math.IsNaN(v.Float()) {
-		e.Write(f64qnan)
+		e.WriteUint64(F64QNAN)
 	} else {
 		val := math.Float64bits(v.Float())
-		e.writeUint64(val)
+		e.WriteUint64(val)
 	}
 }
 
 func stringEncoder(e *encodeState, v reflect.Value) {
 	s := v.String()
 	if s == "" {
-		e.Write(null)
+		e.WriteUint32(NULL)
 		return
 	}
 
 	l := len(s)
-	e.writeUint32(uint32(l))
+	e.WriteUint32(uint32(l))
 	e.Write([]byte(s))
 }
 
@@ -357,7 +339,7 @@ func timeEncoder(e *encodeState, v reflect.Value) {
 		// encode time in "100 nanosecond intervals since January 1, 1601"
 		ts = uint64(val.UTC().UnixNano()/100 + 116444736000000000)
 	}
-	e.writeUint64(ts)
+	e.WriteUint64(ts)
 }
 
 func interfaceEncoder(e *encodeState, v reflect.Value) {
@@ -407,12 +389,12 @@ func newStructEncoder(t reflect.Type) encoderFunc {
 
 func encodeByteSlice(e *encodeState, v reflect.Value) {
 	if v.IsNil() {
-		e.Write(null)
+		e.WriteUint32(NULL)
 		return
 	}
 
 	n := v.Len()
-	e.writeUint32(uint32(n))
+	e.WriteUint32(uint32(n))
 
 	b := make([]byte, n)
 	reflect.Copy(reflect.ValueOf(b), v)
@@ -426,7 +408,7 @@ type sliceEncoder struct {
 
 func (se sliceEncoder) encode(e *encodeState, v reflect.Value) {
 	if v.IsNil() {
-		e.Write(null)
+		e.WriteUint32(NULL)
 		return
 	}
 
@@ -471,7 +453,7 @@ type arrayEncoder struct {
 
 func (ae arrayEncoder) encode(e *encodeState, v reflect.Value) {
 	n := v.Len()
-	e.writeUint32(uint32(n))
+	e.WriteUint32(uint32(n))
 
 	// fast path for []byte
 	if v.Type().Elem().Kind() == reflect.Uint8 {

@@ -318,9 +318,8 @@ func (m *Variant) decodeValue(buf *Buffer) interface{} {
 	}
 }
 
-func (m *Variant) EncodeOPCUA(buf *codec.Stream) error {
-	// var buf bytes.Buffer
-	buf.WriteByte(m.mask)
+func (m *Variant) EncodeOPCUA(s *codec.Stream) error {
+	s.WriteByte(m.mask)
 
 	// a null value specifies that no other fields are encoded
 	if m.Type() == TypeIDNull {
@@ -328,14 +327,14 @@ func (m *Variant) EncodeOPCUA(buf *codec.Stream) error {
 	}
 
 	if m.Has(VariantArrayValues) {
-		buf.Write([]byte{byte(m.arrayLength), byte(m.arrayLength >> 8), byte(m.arrayLength >> 16), byte(m.arrayLength >> 24)})
+		s.WriteUint32(uint32(m.arrayLength))
 	}
-	m.encode(buf, reflect.ValueOf(m.value))
+	m.encode(s, reflect.ValueOf(m.value))
 
 	if m.Has(VariantArrayDimensions) {
-		buf.Write([]byte{byte(m.arrayDimensionsLength), byte(m.arrayDimensionsLength >> 8), byte(m.arrayDimensionsLength >> 16), byte(m.arrayDimensionsLength >> 24)})
+		s.Write([]byte{byte(m.arrayDimensionsLength), byte(m.arrayDimensionsLength >> 8), byte(m.arrayDimensionsLength >> 16), byte(m.arrayDimensionsLength >> 24)})
 		for _, v := range m.arrayDimensions {
-			buf.Write([]byte{byte(v), byte(v >> 8), byte(v >> 16), byte(v >> 24)})
+			s.WriteUint32(uint32(v))
 		}
 	}
 	return nil

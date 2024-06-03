@@ -73,21 +73,21 @@ func (d *DataValue) EncodeOPCUA(s *codec.Stream) error {
 		s.Write(b)
 	}
 	if d.Has(DataValueStatusCode) {
-		s.Write([]byte{byte(d.Status), byte(d.Status >> 8), byte(d.Status >> 16), byte(d.Status >> 24)})
+		s.WriteUint32(uint32(d.Status))
 	}
 	if d.Has(DataValueSourceTimestamp) {
 		b, err = codec.Marshal(d.SourceTimestamp)
 		s.Write(b)
 	}
 	if d.Has(DataValueSourcePicoseconds) {
-		s.Write([]byte{byte(d.SourcePicoseconds), byte(d.SourcePicoseconds >> 8)})
+		s.WriteUint16(d.SourcePicoseconds)
 	}
 	if d.Has(DataValueServerTimestamp) {
 		b, err = codec.Marshal(d.ServerTimestamp)
 		s.Write(b)
 	}
 	if d.Has(DataValueServerPicoseconds) {
-		s.Write([]byte{byte(d.ServerPicoseconds), byte(d.ServerPicoseconds >> 8)})
+		s.WriteUint16(d.ServerPicoseconds)
 	}
 	return err
 }
@@ -159,12 +159,10 @@ func (g *GUID) Decode(b []byte) (int, error) {
 }
 
 func (g *GUID) EncodeOPCUA(s *codec.Stream) error {
-	buf := make([]byte, 0, 8+len(g.Data4))
-	buf = binary.LittleEndian.AppendUint32(buf, g.Data1)
-	buf = binary.LittleEndian.AppendUint16(buf, g.Data2)
-	buf = binary.LittleEndian.AppendUint16(buf, g.Data3)
-	buf = append(buf, g.Data4...)
-	s.Write(buf)
+	s.WriteUint32(g.Data1)
+	s.WriteUint16(g.Data2)
+	s.WriteUint16(g.Data3)
+	s.Write(g.Data4)
 	return nil
 }
 
@@ -239,19 +237,19 @@ func (l *LocalizedText) EncodeOPCUA(s *codec.Stream) error {
 	if l.Has(LocalizedTextLocale) {
 		n := len(l.Locale)
 		if n == 0 {
-			s.Write([]byte{0xff, 0xff, 0xff, 0xff})
+			s.WriteUint32(codec.NULL)
 		} else {
-			s.Write([]byte{byte(n), byte(n >> 8), byte(n >> 16), byte(n >> 24)})
-			s.Write([]byte(l.Locale))
+			s.WriteUint32(uint32(n))
+			s.WriteString(l.Locale)
 		}
 	}
 	if l.Has(LocalizedTextText) {
 		n := len(l.Text)
 		if n == 0 {
-			s.Write([]byte{0xff, 0xff, 0xff, 0xff})
+			s.WriteUint32(codec.NULL)
 		} else {
-			s.Write([]byte{byte(n), byte(n >> 8), byte(n >> 16), byte(n >> 24)})
-			s.Write([]byte(l.Text))
+			s.WriteUint32(uint32(n))
+			s.WriteString(l.Text)
 		}
 	}
 	return nil

@@ -62,35 +62,34 @@ func (d *DiagnosticInfo) Decode(b []byte) (int, error) {
 	return buf.Pos(), buf.Error()
 }
 
-func (d *DiagnosticInfo) EncodeOPCUA(buf *codec.Stream) error {
-	// var buf bytes.Buffer
-	buf.WriteByte(d.EncodingMask)
+func (d *DiagnosticInfo) EncodeOPCUA(s *codec.Stream) error {
+	s.WriteByte(d.EncodingMask)
 
 	if d.Has(DiagnosticInfoSymbolicID) {
-		buf.Write([]byte{byte(d.SymbolicID), byte(d.SymbolicID >> 8), byte(d.SymbolicID >> 16), byte(d.SymbolicID >> 24)})
+		s.WriteUint32(uint32(d.SymbolicID))
 	}
 	if d.Has(DiagnosticInfoNamespaceURI) {
-		buf.Write([]byte{byte(d.NamespaceURI), byte(d.NamespaceURI >> 8), byte(d.NamespaceURI >> 16), byte(d.NamespaceURI >> 24)})
+		s.WriteUint32(uint32(d.NamespaceURI))
 	}
 	if d.Has(DiagnosticInfoLocale) {
-		buf.Write([]byte{byte(d.Locale), byte(d.Locale >> 8), byte(d.Locale >> 16), byte(d.Locale >> 24)})
+		s.WriteUint32(uint32(d.Locale))
 	}
 	if d.Has(DiagnosticInfoLocalizedText) {
-		buf.Write([]byte{byte(d.LocalizedText), byte(d.LocalizedText >> 8), byte(d.LocalizedText >> 16), byte(d.LocalizedText >> 24)})
+		s.WriteUint32(uint32(d.LocalizedText))
 	}
 	if d.Has(DiagnosticInfoAdditionalInfo) {
 		b, _ := codec.Marshal(d.AdditionalInfo)
-		buf.Write(b)
+		s.Write(b)
 	}
 	if d.Has(DiagnosticInfoInnerStatusCode) {
-		buf.Write([]byte{byte(d.InnerStatusCode), byte(d.InnerStatusCode >> 8), byte(d.InnerStatusCode >> 16), byte(d.InnerStatusCode >> 24)})
+		s.WriteUint32(uint32(d.InnerStatusCode))
 	}
 	if d.Has(DiagnosticInfoInnerDiagnosticInfo) {
 		b, err := codec.Marshal(d.InnerDiagnosticInfo)
 		if err != nil {
 			return err
 		}
-		buf.Write(b)
+		s.Write(b)
 	}
 
 	return nil

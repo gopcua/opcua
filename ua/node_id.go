@@ -367,29 +367,29 @@ func (n *NodeID) Decode(b []byte) (int, error) {
 	}
 }
 
-func (n *NodeID) EncodeOPCUA(buf *codec.Stream) error {
-	// var buf bytes.Buffer
-	buf.WriteByte(byte(n.mask))
+func (n *NodeID) EncodeOPCUA(s *codec.Stream) error {
+	s.WriteByte(byte(n.mask))
 	switch n.Type() {
 	case NodeIDTypeTwoByte:
-		buf.WriteByte(byte(n.nid))
+		s.WriteByte(byte(n.nid))
 	case NodeIDTypeFourByte:
-		buf.WriteByte(byte(n.ns))
-		buf.Write([]byte{byte(n.nid), byte(n.nid >> 8)})
+		s.WriteByte(byte(n.ns))
+		s.WriteUint16(uint16(n.nid))
 	case NodeIDTypeNumeric:
-		buf.Write([]byte{byte(n.ns), byte(n.ns >> 8), byte(n.nid), byte(n.nid >> 8), byte(n.nid >> 16), byte(n.nid >> 24)})
+		s.WriteUint16(n.ns)
+		s.WriteUint32(n.nid)
 	case NodeIDTypeGUID:
-		buf.Write([]byte{byte(n.ns), byte(n.ns >> 8)})
+		s.WriteUint16(n.ns)
 		b, _ := codec.Marshal(n.gid)
-		buf.Write(b)
+		s.Write(b)
 	case NodeIDTypeByteString, NodeIDTypeString:
-		buf.Write([]byte{byte(n.ns), byte(n.ns >> 8)})
+		s.WriteUint16(n.ns)
 		l := uint32(len(n.bid))
 		if l == 0 {
-			buf.Write([]byte{0xff, 0xff, 0xff, 0xff})
+			s.WriteUint32(codec.NULL)
 		} else {
-			buf.Write([]byte{byte(l), byte(l >> 8), byte(l >> 16), byte(l >> 24)})
-			buf.Write(n.bid)
+			s.WriteUint32(l)
+			s.Write(n.bid)
 		}
 	default:
 		return fmt.Errorf("invalid node id type: %d", n.mask)

@@ -70,16 +70,15 @@ func (h *Header) Decode(b []byte) (int, error) {
 	return buf.Pos(), buf.Error()
 }
 
-func (h *Header) EncodeOPCUA(buf *codec.Stream) error {
+func (h *Header) EncodeOPCUA(s *codec.Stream) error {
 	if len(h.MessageType) != 3 {
 		return errors.Errorf("invalid message type: %q", h.MessageType)
 	}
 
-	// var buf bytes.Buffer
-	buf.WriteString(h.MessageType)
-	buf.WriteByte(h.ChunkType)
-	buf.Write([]byte{byte(h.MessageSize), byte(h.MessageSize >> 8), byte(h.MessageSize >> 16), byte(h.MessageSize >> 24)})
-	buf.Write([]byte{byte(h.SecureChannelID), byte(h.SecureChannelID >> 8), byte(h.SecureChannelID >> 16), byte(h.SecureChannelID >> 24)})
+	s.WriteString(h.MessageType)
+	s.WriteByte(h.ChunkType)
+	s.WriteUint32(h.MessageSize)
+	s.WriteUint32(h.SecureChannelID)
 	return nil
 }
 
