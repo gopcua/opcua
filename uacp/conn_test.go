@@ -114,7 +114,9 @@ NEXT:
 		t.Fatal(err)
 	}
 
-	got, err := srvConn.Receive()
+	buf := AllocBuffer(int(srvConn.ack.ReceiveBufSize))
+	defer FreeBuffer(buf)
+	got, err := srvConn.Receive(buf.Bytes())
 	if err != nil {
 		t.Fatal(err)
 	}
