@@ -12,7 +12,6 @@ import (
 
 	"github.com/gopcua/opcua/codec"
 	"github.com/pascaldekloe/goe/verify"
-	"github.com/stretchr/testify/assert"
 )
 
 // CodecTestCase describes a test case for a encoding and decoding an
@@ -59,8 +58,7 @@ func RunCodecTest(t *testing.T, cases []CodecTestCase) {
 				if err != nil {
 					t.Fatalf("failed to marshal message: %v", err)
 				}
-				assert.Equal(t, c.Bytes, b)
-				// verify.Values(t, "", b, c.Bytes)
+				verify.Values(t, "", b, c.Bytes)
 			})
 		})
 	}

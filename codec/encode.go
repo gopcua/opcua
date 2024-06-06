@@ -523,8 +523,7 @@ func newCondAddrEncoder(canAddrEnc, elseEnc encoderFunc) encoderFunc {
 
 // A field represents a single field found in a struct.
 type field struct {
-	name      string
-	nameBytes []byte // []byte(name)
+	name string
 
 	index []int
 	typ   reflect.Type
@@ -543,19 +542,19 @@ func typeFields(t reflect.Type) structFields {
 		t := f.Type
 		// return marshalerEncoder directly, if it implements Marshaler.
 		if t.Implements(encoderType) {
-			fields = append(fields, field{name: f.Name, nameBytes: []byte(f.Name), index: f.Index, typ: t, encoder: marshalerEncoder})
+			fields = append(fields, field{name: f.Name, index: f.Index, typ: t, encoder: marshalerEncoder})
 			return
 		}
 
 		// time.Time is special because it has embedded structs that use timeEncoder.
 		if t.AssignableTo(timeType) || (t.Kind() == reflect.Pointer && t.Elem().AssignableTo(timeType)) {
-			fields = append(fields, field{name: f.Name, nameBytes: []byte(f.Name), index: f.Index, typ: t, encoder: timeEncoder})
+			fields = append(fields, field{name: f.Name, index: f.Index, typ: t, encoder: timeEncoder})
 			return
 		}
 		if t.ConvertibleTo(timeType) {
 			converted := reflect.New(t).Elem().Convert(timeType)
 			if _, ok := converted.Interface().(time.Time); ok {
-				fields = append(fields, field{name: f.Name, nameBytes: []byte(f.Name), index: f.Index, typ: t, encoder: timeEncoder})
+				fields = append(fields, field{name: f.Name, index: f.Index, typ: t, encoder: timeEncoder})
 				return
 			}
 		}
@@ -568,7 +567,7 @@ func typeFields(t reflect.Type) structFields {
 			fields = append(fields, typeFields(t).list...)
 		}
 
-		fields = append(fields, field{name: f.Name, nameBytes: []byte(f.Name), index: f.Index, typ: f.Type, encoder: typeEncoder(f.Type)})
+		fields = append(fields, field{name: f.Name, index: f.Index, typ: f.Type, encoder: typeEncoder(f.Type)})
 	}
 
 	// Process all fields in the root struct.
