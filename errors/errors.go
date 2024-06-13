@@ -2,21 +2,20 @@ package errors
 
 import (
 	"errors"
-
-	pkg_errors "github.com/pkg/errors"
+	"fmt"
 )
 
 // Prefix is the default error string prefix
 const Prefix = "opcua: "
 
-// Errorf wraps github.com/pig/errors#Errorf`
+// Errorf wraps fmt.Errorf
 func Errorf(format string, a ...interface{}) error {
-	return pkg_errors.Errorf(Prefix+format, a...)
+	return fmt.Errorf(Prefix+format, a...)
 }
 
-// New wraps github.com/pkg/errors#New
+// New wraps errors.New
 func New(text string) error {
-	return pkg_errors.New(Prefix + text)
+	return errors.New(Prefix + text)
 }
 
 // Is wraps errors.Is
