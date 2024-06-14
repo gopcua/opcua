@@ -71,6 +71,7 @@ func (c *channelInstance) newRequestMessage(req ua.Request, reqID uint32, authTo
 		AuthenticationToken: authToken,
 		Timestamp:           c.sc.timeNow(),
 		RequestHandle:       reqID, // TODO: can I cheat like this?
+		AdditionalHeader:    ua.NewExtensionObject(nil),
 	}
 
 	if timeout > 0 && timeout < c.sc.cfg.RequestTimeout {

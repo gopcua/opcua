@@ -31,13 +31,6 @@ func (h *SequenceHeader) Decode(b []byte) (int, error) {
 	return buf.Pos(), buf.Error()
 }
 
-func (h *SequenceHeader) Encode() ([]byte, error) {
-	buf := ua.NewBuffer(nil)
-	buf.WriteUint32(h.SequenceNumber)
-	buf.WriteUint32(h.RequestID)
-	return buf.Bytes(), buf.Error()
-}
-
 // String returns Header in string.
 func (s *SequenceHeader) String() string {
 	return fmt.Sprintf(

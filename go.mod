@@ -8,7 +8,7 @@ require (
 	golang.org/x/term v0.8.0
 )
 
-require golang.org/x/sys v0.8.0 // indirect
+require golang.org/x/sys v0.18.0 // indirect
 
 retract (
 	v0.2.5 // https://github.com/gopcua/opcua/issues/538

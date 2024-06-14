@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gopcua/opcua/codec"
 	"github.com/gopcua/opcua/errors"
 	"github.com/pascaldekloe/goe/verify"
 )
@@ -120,7 +121,7 @@ NEXT:
 	}
 	got = got[hdrlen:]
 
-	want, err := msg.Encode()
+	want, err := codec.Marshal(msg)
 	if err != nil {
 		t.Fatal(err)
 	}

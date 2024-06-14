@@ -10,6 +10,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/gopcua/opcua/codec"
 	"github.com/pascaldekloe/goe/verify"
 )
 
@@ -53,9 +54,9 @@ func RunCodecTest(t *testing.T, cases []CodecTestCase) {
 			})
 
 			t.Run("encode", func(t *testing.T) {
-				b, err := Encode(c.Struct)
+				b, err := codec.Marshal(c.Struct)
 				if err != nil {
-					t.Fatal(err)
+					t.Fatalf("failed to marshal message: %v", err)
 				}
 				verify.Values(t, "", b, c.Bytes)
 			})

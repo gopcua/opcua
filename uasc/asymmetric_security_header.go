@@ -34,14 +34,6 @@ func (h *AsymmetricSecurityHeader) Decode(b []byte) (int, error) {
 	return buf.Pos(), buf.Error()
 }
 
-func (h *AsymmetricSecurityHeader) Encode() ([]byte, error) {
-	buf := ua.NewBuffer(nil)
-	buf.WriteString(h.SecurityPolicyURI)
-	buf.WriteByteString(h.SenderCertificate)
-	buf.WriteByteString(h.ReceiverCertificateThumbprint)
-	return buf.Bytes(), buf.Error()
-}
-
 // String returns Header in string.
 func (a *AsymmetricSecurityHeader) String() string {
 	return fmt.Sprintf(
