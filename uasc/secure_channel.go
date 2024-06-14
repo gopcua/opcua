@@ -17,7 +17,6 @@ import (
 
 	"github.com/gopcua/opcua/debug"
 	"github.com/gopcua/opcua/errors"
-	"github.com/gopcua/opcua/id"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uacp"
 	"github.com/gopcua/opcua/uapolicy"
@@ -746,99 +745,6 @@ func (s *SecureChannel) sendAsyncWithTimeout(
 	respRequired bool,
 	timeout time.Duration,
 ) (<-chan *response, error) {
-
-	instance.Lock()
-	defer instance.Unlock()
-
-	m := acquireMessage()
-	defer releaseMessage(m)
-
-	typeID := ua.ServiceTypeID(req)
-	if typeID == 0 {
-		return nil, errors.Errorf("unknown service %T. Did you call register?", req)
-	}
-	if authToken == nil {
-		authToken = ua.NewTwoByteNodeID(0)
-	}
-
-	reqHdr := &ua.RequestHeader{
-		AuthenticationToken: authToken,
-		Timestamp:           instance.sc.timeNow(),
-		RequestHandle:       reqID, // TODO: can I cheat like this?
-		AdditionalHeader:    ua.NewExtensionObject(nil),
-	}
-
-	if timeout > 0 && timeout < instance.sc.cfg.RequestTimeout {
-		timeout = instance.sc.cfg.RequestTimeout
-	}
-	reqHdr.TimeoutHint = uint32(timeout / time.Millisecond)
-	req.SetHeader(reqHdr)
-
-	h := acquireHeader()
-	ash := acquireAsymmetricSecurityHeader()
-	sh := acquireSequenceHeader()
-	ssh := acquireSymmetricSecurityHeader()
-
-	defer func() {
-		releaseHeader(h)
-		releaseAsymmetricSecurityHeader(ash)
-		releaseSequenceHeader(sh)
-		releaseSymmetricSecurityHeader(ssh)
-	}()
-
-	m.reset(ua.NewFourByteExpandedNodeID(0, typeID), req)
-	sequenceNumber := instance.nextSequenceNumber()
-	switch typeID {
-	case id.OpenSecureChannelRequest_Encoding_DefaultBinary, id.OpenSecureChannelResponse_Encoding_DefaultBinary:
-		// Do not send the thumbprint for security mode None
-		// even if we have a certificate.
-		//
-		// See https://github.com/gopcua/opcua/issues/259
-		thumbprint := instance.sc.cfg.Thumbprint
-		if instance.sc.cfg.SecurityMode == ua.MessageSecurityModeNone {
-			thumbprint = nil
-		}
-
-		h.MessageType = MessageTypeOpenSecureChannel
-		h.ChunkType = ChunkTypeFinal
-		h.SecureChannelID = instance.secureChannelID
-
-		ash.SecurityPolicyURI = instance.sc.cfg.SecurityPolicyURI
-		ash.SenderCertificate = instance.sc.cfg.Certificate
-		ash.ReceiverCertificateThumbprint = thumbprint
-
-		sh.SequenceNumber = sequenceNumber
-		sh.RequestID = reqID
-
-		m.MessageHeader.Header = h
-		m.MessageHeader.AsymmetricSecurityHeader = ash
-		m.MessageHeader.SequenceHeader = sh
-
-	case id.CloseSecureChannelRequest_Encoding_DefaultBinary, id.CloseSecureChannelResponse_Encoding_DefaultBinary:
-		h.MessageType = MessageTypeCloseSecureChannel
-		h.ChunkType = ChunkTypeFinal
-		h.SecureChannelID = instance.secureChannelID
-		ssh.TokenID = instance.securityTokenID
-		sh.SequenceNumber = sequenceNumber
-		sh.RequestID = reqID
-
-		m.MessageHeader.Header = h
-		m.MessageHeader.SymmetricSecurityHeader = ssh
-		m.MessageHeader.SequenceHeader = sh
-
-	default:
-		h.MessageType = MessageTypeMessage
-		h.ChunkType = ChunkTypeFinal
-		h.SecureChannelID = instance.secureChannelID
-		ssh.TokenID = instance.securityTokenID
-		sh.SequenceNumber = sequenceNumber
-		sh.RequestID = reqID
-
-		m.MessageHeader.Header = h
-		m.MessageHeader.SymmetricSecurityHeader = ssh
-		m.MessageHeader.SequenceHeader = sh
-	}
-
 	var resp chan *response
 
 	if respRequired {
@@ -854,6 +760,14 @@ func (s *SecureChannel) sendAsyncWithTimeout(
 
 		s.handlers[reqID] = resp
 		s.handlersMu.Unlock()
+	}
+
+	instance.Lock()
+	defer instance.Unlock()
+
+	m, err := instance.newRequestMessage(req, reqID, authToken, timeout)
+	if err != nil {
+		return nil, err
 	}
 
 	chunks, err := m.MarshalChunks(instance.maxBodySize)

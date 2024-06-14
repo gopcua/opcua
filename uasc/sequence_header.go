@@ -6,25 +6,9 @@ package uasc
 
 import (
 	"fmt"
-	"sync"
 
 	"github.com/gopcua/opcua/ua"
 )
-
-func acquireSequenceHeader() *SequenceHeader {
-	if v, ok := sequenceHeaderPool.Get().(*SequenceHeader); ok {
-		return v
-	}
-	return &SequenceHeader{}
-}
-
-func releaseSequenceHeader(h *SequenceHeader) {
-	h.RequestID = 0
-	h.SequenceNumber = 0
-	sequenceHeaderPool.Put(h)
-}
-
-var sequenceHeaderPool sync.Pool
 
 // SequenceHeader represents a Sequence Header in OPC UA Secure Conversation.
 type SequenceHeader struct {

@@ -6,7 +6,6 @@ package uasc
 
 import (
 	"fmt"
-	"sync"
 
 	"github.com/gopcua/opcua/codec"
 	"github.com/gopcua/opcua/errors"
@@ -26,23 +25,6 @@ const (
 	ChunkTypeFinal        = 'F'
 	ChunkTypeError        = 'A'
 )
-
-func acquireHeader() *Header {
-	v := headerPool.Get()
-	if v == nil {
-		return &Header{}
-	}
-	return v.(*Header)
-}
-
-func releaseHeader(h *Header) {
-	h.MessageType = ""
-	h.MessageSize = 0
-	h.SecureChannelID = 0
-	headerPool.Put(h)
-}
-
-var headerPool sync.Pool
 
 // Header represents a OPC UA Secure Conversation Header.
 type Header struct {
