@@ -11,6 +11,7 @@ import (
 	"encoding/binary"
 	"io"
 	"math"
+	"net"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -118,6 +119,8 @@ type SecureChannel struct {
 	errCh chan<- error
 
 	closeOnce sync.Once
+
+	openSecureChannelRequestID atomic.Uint32
 }
 
 func NewSecureChannel(endpoint string, c *uacp.Conn, cfg *Config, errCh chan<- error) (*SecureChannel, error) {
@@ -204,6 +207,12 @@ func (s *SecureChannel) dispatcher() {
 				debug.Printf("uasc %d/%d: err: %v", s.c.ID(), resp.ReqID, resp.Err)
 			} else {
 				debug.Printf("uasc %d/%d: recv %T", s.c.ID(), resp.ReqID, resp.V)
+			}
+
+			// hack check connect error
+			openSecureChannelRequestID := s.openSecureChannelRequestID.Load()
+			if resp.Err != nil && resp.ReqID == 0 && openSecureChannelRequestID != 0 {
+				resp.ReqID = openSecureChannelRequestID
 			}
 
 			ch, ok := s.popHandler(resp.ReqID)
@@ -338,16 +347,20 @@ func (s *SecureChannel) receive(ctx context.Context) *response {
 func (s *SecureChannel) readChunk() (*MessageChunk, error) {
 	// read a full message from the underlying conn.
 	b, err := s.c.Receive()
-	if err == io.EOF || len(b) == 0 {
-		return nil, io.EOF
-	}
 	// do not wrap this error since it hides conn error
-	var uacperr *uacp.Error
-	if errors.As(err, &uacperr) {
-		return nil, err
-	}
 	if err != nil {
+		var opError *net.OpError
+		if errors.As(err, &opError) {
+			return nil, io.EOF
+		}
+		var uacperr *uacp.Error
+		if errors.As(err, &uacperr) {
+			return nil, err
+		}
 		return nil, errors.Errorf("sechan: read header failed: %s %#v", err, err)
+	}
+	if len(b) == 0 {
+		return nil, io.EOF
 	}
 
 	const hdrlen = 12 // TODO: move to pkg level const
@@ -537,6 +550,10 @@ func (s *SecureChannel) open(ctx context.Context, instance *channelInstance, req
 		RequestedLifetime:     s.cfg.Lifetime,
 	}
 
+	s.openSecureChannelRequestID.Store(reqID)
+	defer func() {
+		s.openSecureChannelRequestID.Store(0)
+	}()
 	return s.sendRequestWithTimeout(ctx, req, reqID, s.openingInstance, nil, s.cfg.RequestTimeout, func(v interface{}) error {
 		resp, ok := v.(*ua.OpenSecureChannelResponse)
 		if !ok {
