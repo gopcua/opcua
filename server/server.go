@@ -316,7 +316,7 @@ func (s *Server) acceptAndRegister(ctx context.Context, l *uacp.Listener) {
 
 			go s.cb.RegisterConn(ctx, c, s.cfg.certificate, s.cfg.privateKey)
 			if s.cfg.logger != nil {
-				s.cfg.logger.Info("registered connection: %s", c.LocalAddr())
+				s.cfg.logger.Info("registered connection: %s", c.RemoteAddr())
 			}
 		}
 	}
