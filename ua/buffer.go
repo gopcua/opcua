@@ -5,6 +5,7 @@
 package ua
 
 import (
+	"bytes"
 	"encoding/binary"
 	"io"
 	"math"
@@ -156,7 +157,7 @@ func (b *Buffer) ReadBytes() []byte {
 	if b.err != nil {
 		return nil
 	}
-	return d
+	return bytes.Clone(d)
 }
 
 func (b *Buffer) ReadStruct(r interface{}) {
