@@ -12,10 +12,10 @@ import (
 	"time"
 
 	"github.com/gopcua/opcua/id"
+	uatest "github.com/gopcua/opcua/tests/python"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uacp"
 	"github.com/gopcua/opcua/uapolicy"
-	"github.com/gopcua/opcua/uatest"
 	"github.com/pascaldekloe/goe/verify"
 )
 

@@ -160,7 +160,7 @@ We would be happy if you can add your equipment to the list. Just open a PR :)
 | [Prosys OPC UA Simulation Server v5.4.6-148](https://prosysopc.com/products/opc-ua-simulation-server/) | v0.3.x         | [manual testing](https://github.com/united-manufacturing-hub/benthos-umh?tab=readme-ov-file#testing) | [UMH](https://www.umh.app) |
 | InfluxDB Telegraf plugin                                                                               | v0.3.x         | ?                                                                                                    | Community                  |
 
-## Supported Features
+## Supported Client Features
 
 The current focus is on the OPC UA Binary protocol over TCP. No other protocols are supported at this point.
 
@@ -182,51 +182,78 @@ The current focus is on the OPC UA Binary protocol over TCP. No other protocols 
 |                | User Name Password               | Yes       |             |
 |                | X509 Certificate                 | Yes       |             |
 
+## Supported Server Features
+
+The current focus is on the OPC UA Binary protocol over TCP. No other protocols are supported at this point.
+
+| Categories     | Features                         | Supported | Notes       |
+|----------------|----------------------------------|-----------|-------------|
+| Encoding       | OPC UA Binary                    | Yes       |             |
+|                | OPC UA JSON                      |           | not planned |
+|                | OPC UA XML                       |           | not planned |
+| Transport      | UA-TCP UA-SC UA Binary           | Yes       |             |
+|                | OPC UA HTTPS                     |           | not planned |
+|                | SOAP-HTTP WS-SC UA Binary        |           | not planned |
+|                | SOAP-HTTP WS-SC UA XML           |           | not planned |
+|                | SOAP-HTTP WS-SC UA XML-UA Binary |           | not planned |
+| Encryption     | None                             | Yes       |             |
+|                | Basic128Rsa15                    | Untested  |             |
+|                | Basic256                         | Untested  |             |
+|                | Basic256Sha256                   | Untested  |             |
+| Authentication | Anonymous                        | Yes       |             |
+|                | User Name Password               | Untested  |             |
+|                | X509 Certificate                 | Untested  |             |
+
+
 ### Services
 
 Here is the current set of supported services. For low-level access use the client `Send` function directly.
 
-| Service Set                 | Service                       | Client | Notes        |
-|-----------------------------|-------------------------------|--------|--------------|
-| Discovery Service Set       | FindServers                   | Yes    |              |
-|                             | FindServersOnNetwork          | Yes    |              |
-|                             | GetEndpoints                  | Yes    |              |
-|                             | RegisterServer                |        |              |
-|                             | RegisterServer2               |        |              |
-| Secure Channel Service Set  | OpenSecureChannel             | Yes    |              |
-|                             | CloseSecureChannel            | Yes    |              |
-| Session Service Set         | CreateSession                 | Yes    |              |
-|                             | CloseSession                  | Yes    |              |
-|                             | ActivateSession               | Yes    |              |
-|                             | Cancel                        |        |              |
-| Node Management Service Set | AddNodes                      |        |              |
-|                             | AddReferences                 |        |              |
-|                             | DeleteNodes                   |        |              |
-|                             | DeleteReferences              |        |              |
-| View Service Set            | Browse                        | Yes    |              |
-|                             | BrowseNext                    | Yes    |              |
-|                             | TranslateBrowsePathsToNodeIds |        |              |
-|                             | RegisterNodes                 | Yes    |              |
-|                             | UnregisterNodes               | Yes    |              |
-| Query Service Set           | QueryFirst                    |        |              |
-|                             | QueryNext                     |        |              |
-| Attribute Service Set       | Read                          | Yes    |              |
-|                             | Write                         | Yes    |              |
-|                             | HistoryRead                   | Yes    |              |
-|                             | HistoryUpdate                 |        |              |
-| Method Service Set          | Call                          | Yes    |              |
-| MonitoredItems Service Set  | CreateMonitoredItems          | Yes    |              |
-|                             | DeleteMonitoredItems          | Yes    |              |
-|                             | ModifyMonitoredItems          | Yes    |              |
-|                             | SetMonitoringMode             | Yes    |              |
-|                             | SetTriggering                 |        |              |
-| Subscription Service Set    | CreateSubscription            | Yes    |              |
-|                             | ModifySubscription            |        |              |
-|                             | SetPublishingMode             |        |              |
-|                             | Publish                       | Yes    |              |
-|                             | Republish                     |        |              |
-|                             | DeleteSubscriptions           | Yes    |              |
-|                             | TransferSubscriptions         |        |              |
+
+| Service Set                 | Service                       | Client | Server | Notes        |
+|-----------------------------|-------------------------------|--------|--------|--------------|
+| Discovery Service Set       | FindServers                   | Yes    |        |              |
+|                             | FindServersOnNetwork          | Yes    |        |              |
+|                             | GetEndpoints                  | Yes    |        |              |
+|                             | RegisterServer                |        |        |              |
+|                             | RegisterServer2               |        |        |              |
+| Secure Channel Service Set  | OpenSecureChannel             | Yes    | Yes*   |              |
+|                             | CloseSecureChannel            | Yes    | Yes*   |              |
+| Session Service Set         | CreateSession                 | Yes    | Yes    |              |
+|                             | CloseSession                  | Yes    | Yes    |              |
+|                             | ActivateSession               | Yes    | Yes    |              |
+|                             | Cancel                        |        |        |              |
+| Node Management Service Set | AddNodes                      |        |        |              |
+|                             | AddReferences                 |        |        |              |
+|                             | DeleteNodes                   |        |        |              |
+|                             | DeleteReferences              |        |        |              |
+| View Service Set            | Browse                        | Yes    | Yes    |              |
+|                             | BrowseNext                    | Yes    |        |              |
+|                             | TranslateBrowsePathsToNodeIds |        |        |              |
+|                             | RegisterNodes                 | Yes    |        |              |
+|                             | UnregisterNodes               | Yes    |        |              |
+| Query Service Set           | QueryFirst                    |        |        |              |
+|                             | QueryNext                     |        |        |              |
+| Attribute Service Set       | Read                          | Yes    | Yes    |              |
+|                             | Write                         | Yes    | Yes    |              |
+|                             | HistoryRead                   | Yes    |        |              |
+|                             | HistoryUpdate                 |        |        |              |
+| Method Service Set          | Call                          | Yes    |        |              |
+| MonitoredItems Service Set  | CreateMonitoredItems          | Yes    | Yes    |              |
+|                             | DeleteMonitoredItems          | Yes    | Yes    |              |
+|                             | ModifyMonitoredItems          | Yes    | Yes    |              |
+|                             | SetMonitoringMode             | Yes    | Yes    |              |
+|                             | SetTriggering                 |        |        |              |
+| Subscription Service Set    | CreateSubscription            | Yes    | Yes    |              |
+|                             | ModifySubscription            |        |        |              |
+|                             | SetPublishingMode             |        |        |              |
+|                             | Publish                       | Yes    | Yes    |              |
+|                             | Republish                     |        |        |              |
+|                             | DeleteSubscriptions           | Yes    | Yes    |              |
+|                             | TransferSubscriptions         |        |        |              |
+
+* not all encryption schemes are fully functional at this time
+
 
 ## Authors
 

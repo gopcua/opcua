@@ -298,10 +298,12 @@ func (c *Conn) srvhandshake(endpoint string) error {
 			c.SendError(ua.StatusBadTCPInternalError)
 			return err
 		}
-		if hel.EndpointURL != endpoint {
-			c.SendError(ua.StatusBadTCPEndpointURLInvalid)
-			return errors.Errorf("uacp: invalid endpoint url %s", hel.EndpointURL)
-		}
+		// TODO (dh): Temporarily disabled until a proper fix can be implemented.
+		// Problem is that when listening on a random port, (eg. :0), this check fails
+		//if hel.EndpointURL != endpoint {
+		//	c.SendError(ua.StatusBadTCPEndpointURLInvalid)
+		//	return fmt.Errorf("uacp: invalid endpoint url %s", hel.EndpointURL)
+		//}
 		if err := c.Send("ACKF", c.ack); err != nil {
 			c.SendError(ua.StatusBadTCPInternalError)
 			return err
