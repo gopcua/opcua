@@ -15,7 +15,7 @@ func TestClient_Send_DoesNotPanicWhenDisconnected(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = c.Send(context.Background(), &ua.ReadRequest{}, func(i interface{}) error {
+	err = c.Send(context.Background(), &ua.ReadRequest{}, func(i ua.Response) error {
 		return nil
 	})
 	verify.Values(t, "", err, ua.StatusBadServerNotConnected)

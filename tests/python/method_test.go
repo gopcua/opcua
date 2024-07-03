@@ -58,7 +58,7 @@ func TestCallMethod(t *testing.T) {
 
 	ctx := context.Background()
 
-	srv := NewServer("method_server.py")
+	srv := NewPythonServer("method_server.py")
 	defer srv.Close()
 
 	c, err := opcua.NewClient(srv.Endpoint, srv.Opts...)

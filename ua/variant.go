@@ -505,6 +505,8 @@ func (m *Variant) String() string {
 		return m.value.(*LocalizedText).Text
 	case TypeIDQualifiedName:
 		return m.value.(*QualifiedName).Name
+	case TypeIDFloat:
+		return fmt.Sprintf("%f", m.value)
 	default:
 		return ""
 	}

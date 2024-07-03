@@ -7,6 +7,7 @@ package ua
 import (
 	"encoding/base64"
 	"encoding/json"
+	"encoding/xml"
 	"fmt"
 	"math"
 
@@ -290,8 +291,13 @@ func (n *NodeID) SetStringID(v string) error {
 // String returns the string representation of the NodeID
 // in the format described by ParseNodeID.
 func (n *NodeID) String() string {
+	if n == nil {
+		return ""
+	}
+
 	switch n.Type() {
 	case NodeIDTypeTwoByte:
+
 		return fmt.Sprintf("i=%d", n.nid)
 
 	case NodeIDTypeFourByte:
@@ -391,6 +397,10 @@ func (n *NodeID) Encode() ([]byte, error) {
 	return buf.Bytes(), buf.Error()
 }
 
+func (n *NodeID) Equal(o *NodeID) bool {
+	return n.String() == o.String()
+}
+
 func (n *NodeID) MarshalJSON() ([]byte, error) {
 	if n == nil {
 		return []byte(`null`), nil
@@ -408,5 +418,19 @@ func (n *NodeID) UnmarshalJSON(b []byte) error {
 		return err
 	}
 	*n = *nid
+	return nil
+}
+
+// todo(fs): not sure if this should exist here. Maybe there are multiple different xml formats?
+func (n *NodeID) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
+	var s string
+	if err := d.DecodeElement(&s, &start); err != nil {
+		return err
+	}
+	id, err := ParseNodeID(s)
+	if err != nil {
+		return err
+	}
+	*n = *id
 	return nil
 }

@@ -241,7 +241,7 @@ func (n *Node) TranslateBrowsePathsToNodeIDs(ctx context.Context, pathNames []*u
 	}
 
 	var nodeID *ua.NodeID
-	err := n.c.Send(ctx, &req, func(i interface{}) error {
+	err := n.c.Send(ctx, &req, func(i ua.Response) error {
 		if resp, ok := i.(*ua.TranslateBrowsePathsToNodeIDsResponse); ok {
 			if len(resp.Results) == 0 {
 				return ua.StatusBadUnexpectedError
