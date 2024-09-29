@@ -82,7 +82,7 @@ func TestAutoReconnection(t *testing.T) {
 		},
 	}
 
-	ch := make(chan *monitor.DataChangeMessage, 5)
+	ch := make(chan monitor.Message, 5)
 	sctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -99,9 +99,19 @@ func TestAutoReconnection(t *testing.T) {
 
 	for _, tt := range tests {
 		ok := t.Run(tt.name, func(t *testing.T) {
-
-			if msg := <-ch; msg.Error != nil {
-				t.Fatalf("No error expected for first value: %s", msg.Error)
+			// Wait for the first message
+			select {
+			case msg := <-ch:
+				switch v := msg.(type) {
+				case *monitor.DataChangeMessage:
+					if v.Error != nil {
+						t.Fatalf("No error expected for first value: %s", v.Error)
+					}
+				default:
+					t.Fatalf("Unexpected message type: %T", msg)
+				}
+			case <-time.After(5 * time.Second):
+				t.Fatal("Timeout waiting for first message")
 			}
 
 			downC := make(chan struct{}, 1)
@@ -146,8 +156,13 @@ func TestAutoReconnection(t *testing.T) {
 			case <-rTimeout.C:
 				t.Fatal("Timeout reached, reconnection failed")
 			case msg := <-ch:
-				if err := msg.Error; err != nil {
-					t.Fatal(err)
+				switch v := msg.(type) {
+				case *monitor.DataChangeMessage:
+					if v.Error != nil {
+						t.Fatal(v.Error)
+					}
+				default:
+					t.Fatalf("Unexpected message type: %T", msg)
 				}
 			}
 		})

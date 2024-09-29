@@ -2,12 +2,12 @@ package monitor
 
 import (
 	"context"
-	"sync"
-	"sync/atomic"
-
 	"github.com/gopcua/opcua"
 	"github.com/gopcua/opcua/errors"
 	"github.com/gopcua/opcua/ua"
+	"sync"
+	"sync/atomic"
+	"time"
 )
 
 var (
@@ -22,15 +22,27 @@ var (
 type ErrHandler func(*opcua.Client, *Subscription, error)
 
 // MsgHandler is a function that is called for each new DataValue
-type MsgHandler func(*Subscription, *DataChangeMessage)
+type MsgHandler func(*Subscription, Message)
 
-// DataChangeMessage represents the changed DataValue from the server. It also includes a reference
-// to the sending NodeID and error (if any)
+// Message is an interface that can represent either a DataChangeMessage or an EventMessage
+type Message interface {
+	isMessage()
+}
+
 type DataChangeMessage struct {
 	*ua.DataValue
 	Error  error
 	NodeID *ua.NodeID
 }
+
+func (DataChangeMessage) isMessage() {}
+
+type EventMessage struct {
+	EventFields []*ua.DataValue
+	Error       error
+}
+
+func (EventMessage) isMessage() {}
 
 // NodeMonitor creates new subscriptions
 type NodeMonitor struct {
@@ -137,7 +149,7 @@ func (m *NodeMonitor) Subscribe(ctx context.Context, params *opcua.SubscriptionP
 // via the monitor's `ErrHandler`.
 // The caller must call `Unsubscribe` to stop and clean up resources. Canceling the context
 // will also cause the subscription to stop, but `Unsubscribe` must still be called.
-func (m *NodeMonitor) ChanSubscribe(ctx context.Context, params *opcua.SubscriptionParameters, ch chan<- *DataChangeMessage, nodes ...string) (*Subscription, error) {
+func (m *NodeMonitor) ChanSubscribe(ctx context.Context, params *opcua.SubscriptionParameters, ch chan<- Message, nodes ...string) (*Subscription, error) {
 	sub, err := newSubscription(ctx, m, params, 16, nodes...)
 	if err != nil {
 		return nil, err
@@ -155,7 +167,7 @@ func (s *Subscription) sendError(err error) {
 }
 
 // internal func to read from internal channel and write to client provided channel
-func (s *Subscription) pump(ctx context.Context, notifyCh chan<- *DataChangeMessage, cb MsgHandler) {
+func (s *Subscription) pump(ctx context.Context, notifyCh chan<- Message, cb MsgHandler) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -215,6 +227,47 @@ func (s *Subscription) pump(ctx context.Context, notifyCh chan<- *DataChangeMess
 					} else {
 						panic("notifyCh or cb must be set")
 					}
+				}
+
+			case *ua.EventNotificationList:
+				for _, item := range v.Events {
+					s.mu.RLock()
+					_, ok := s.handles[item.ClientHandle]
+					s.mu.RUnlock()
+
+					out := &EventMessage{}
+
+					if !ok {
+						out.Error = errors.Errorf("handle %d not found", item.ClientHandle)
+						// TODO: should the error also propagate via the monitor callback?
+					} else {
+						for i, field := range item.EventFields {
+							// Create a new DataValue
+							dataValue := &ua.DataValue{
+								Value:           field,
+								Status:          ua.StatusOK,
+								SourceTimestamp: time.Now(),
+								ServerTimestamp: time.Now(),
+							}
+							out.EventFields[i] = dataValue
+						}
+					}
+
+					if notifyCh != nil {
+						select {
+						case notifyCh <- out:
+							atomic.AddUint64(&s.delivered, 1)
+						default:
+							atomic.AddUint64(&s.dropped, 1)
+							s.sendError(ErrSlowConsumer)
+						}
+					} else if cb != nil {
+						cb(s, out)
+						atomic.AddUint64(&s.delivered, 1)
+					} else {
+						panic("notifyCh or cb must be set")
+					}
+
 				}
 			default:
 				s.sendError(errors.Errorf("unknown message type: %T", msg.Value))

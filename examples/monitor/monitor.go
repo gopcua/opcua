@@ -101,11 +101,28 @@ func startCallbackSub(ctx context.Context, m *monitor.NodeMonitor, interval, lag
 		&opcua.SubscriptionParameters{
 			Interval: interval,
 		},
-		func(s *monitor.Subscription, msg *monitor.DataChangeMessage) {
-			if msg.Error != nil {
-				log.Printf("[callback] sub=%d error=%s", s.SubscriptionID(), msg.Error)
-			} else {
-				log.Printf("[callback] sub=%d ts=%s node=%s value=%v", s.SubscriptionID(), msg.SourceTimestamp.UTC().Format(time.RFC3339), msg.NodeID, msg.Value.Value())
+		func(s *monitor.Subscription, msg monitor.Message) {
+			switch v := msg.(type) {
+			case monitor.DataChangeMessage:
+				if v.Error != nil {
+					log.Printf("[callback] sub=%d error=%s", s.SubscriptionID(), v.Error)
+				} else {
+					log.Printf("[callback] sub=%d ts=%s node=%s value=%v",
+						s.SubscriptionID(),
+						v.SourceTimestamp.UTC().Format(time.RFC3339),
+						v.NodeID,
+						v.Value.Value())
+				}
+			case monitor.EventMessage:
+				if v.Error != nil {
+					log.Printf("[callback] sub=%d error=%s", s.SubscriptionID(), v.Error)
+				} else {
+					log.Printf("[callback] sub=%d event fields=%v",
+						s.SubscriptionID(),
+						v.EventFields)
+				}
+			default:
+				log.Printf("[callback] sub=%d unknown message type=%T", s.SubscriptionID(), msg)
 			}
 			time.Sleep(lag)
 		},
@@ -121,7 +138,7 @@ func startCallbackSub(ctx context.Context, m *monitor.NodeMonitor, interval, lag
 }
 
 func startChanSub(ctx context.Context, m *monitor.NodeMonitor, interval, lag time.Duration, wg *sync.WaitGroup, nodes ...string) {
-	ch := make(chan *monitor.DataChangeMessage, 16)
+	ch := make(chan monitor.Message, 16)
 	sub, err := m.ChanSubscribe(ctx, &opcua.SubscriptionParameters{Interval: interval}, ch, nodes...)
 
 	if err != nil {
@@ -135,10 +152,27 @@ func startChanSub(ctx context.Context, m *monitor.NodeMonitor, interval, lag tim
 		case <-ctx.Done():
 			return
 		case msg := <-ch:
-			if msg.Error != nil {
-				log.Printf("[channel ] sub=%d error=%s", sub.SubscriptionID(), msg.Error)
-			} else {
-				log.Printf("[channel ] sub=%d ts=%s node=%s value=%v", sub.SubscriptionID(), msg.SourceTimestamp.UTC().Format(time.RFC3339), msg.NodeID, msg.Value.Value())
+			switch v := msg.(type) {
+			case monitor.DataChangeMessage:
+				if v.Error != nil {
+					log.Printf("[channel] sub=%d error=%s", sub.SubscriptionID(), v.Error)
+				} else {
+					log.Printf("[channel] sub=%d ts=%s node=%s value=%v",
+						sub.SubscriptionID(),
+						v.SourceTimestamp.UTC().Format(time.RFC3339),
+						v.NodeID,
+						v.Value.Value())
+				}
+			case monitor.EventMessage:
+				if v.Error != nil {
+					log.Printf("[channel] sub=%d error=%s", sub.SubscriptionID(), v.Error)
+				} else {
+					log.Printf("[channel] sub=%d event fields=%v",
+						sub.SubscriptionID(),
+						v.EventFields)
+				}
+			default:
+				log.Printf("[channel] sub=%d unknown message type: %T", sub.SubscriptionID(), msg)
 			}
 			time.Sleep(lag)
 		}
