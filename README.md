@@ -101,11 +101,12 @@ We would also like to list organizations which use `gopcua` in production:
         <img alt="Wolfram Manufacturing Technologies" src="logo/wolfram-manufacturing.png">
       </a>
     </td>
-        <td width="20%">
+    <td width="20%">
       <a href="https://www.iotechsys.com/">
         <img alt="IOTech System" src="https://www.iotechsys.com/cmsfiles/image/IOTech_RGB_Main_logo.png">
       </a>
-    </td><td width="20%">
+    </td>
+    <td width="20%">
         Please open a PR to include your logo here.
     </td>
   </tr>
