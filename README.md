@@ -103,7 +103,7 @@ We would also like to list organizations which use `gopcua` in production:
     </td>
         <td width="20%">
       <a href="https://www.iotechsys.com/">
-        <img alt="IOTech System" src="https://www.edgexfoundry.org/cmsfiles/image/HomepageLogos/IOTech-logo---sq.jpg">
+        <img alt="IOTech System" src="https://www.iotechsys.com/cmsfiles/image/IOTech_RGB_Main_logo.png">
       </a>
     </td><td width="20%">
         Please open a PR to include your logo here.
