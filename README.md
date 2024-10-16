@@ -1,3 +1,4 @@
+
 <p align="center">
    <img width="25%" src="https://raw.githubusercontent.com/gopcua/opcua/master/gopher.png">
 </p>
@@ -101,7 +102,11 @@ We would also like to list organizations which use `gopcua` in production:
         <img alt="Wolfram Manufacturing Technologies" src="logo/wolfram-manufacturing.png">
       </a>
     </td>
-    <td width="40%">
+        <td width="20%">
+      <a href="https://www.iotechsys.com/">
+        <img alt="IOTech System" src="https://www.edgexfoundry.org/cmsfiles/image/HomepageLogos/IOTech-logo---sq.jpg">
+      </a>
+    </td><td width="20%">
         Please open a PR to include your logo here.
     </td>
   </tr>
@@ -158,6 +163,8 @@ We would be happy if you can add your equipment to the list. Just open a PR :)
 | WAGO 750-8101                                                                                          | v0.3.x         | [CI/CD testing](https://github.com/united-manufacturing-hub/benthos-umh?tab=readme-ov-file#testing)  | [UMH](https://www.umh.app) |
 | [Microsoft OPC UA simulator v2.9.11](https://github.com/Azure-Samples/iot-edge-opc-plc)                | v0.3.x         | [CI/CD testing](https://github.com/united-manufacturing-hub/benthos-umh?tab=readme-ov-file#testing)  | [UMH](https://www.umh.app) |
 | [Prosys OPC UA Simulation Server v5.4.6-148](https://prosysopc.com/products/opc-ua-simulation-server/) | v0.3.x         | [manual testing](https://github.com/united-manufacturing-hub/benthos-umh?tab=readme-ov-file#testing) | [UMH](https://www.umh.app) |
+| [Edge Connect OPC-UA Server](https://www.iotechsys.com/products/) |v0.3.x        | production |  [IOTech Systems](https://www.iotechsys.com/) |
+| Siemens S7-1200 |v0.3.x        | production |  [IOTech Systems](https://www.iotechsys.com/) |
 | InfluxDB Telegraf plugin                                                                               | v0.3.x         | ?                                                                                                    | Community                  |
 
 ## Supported Features
