@@ -165,6 +165,8 @@ We would be happy if you can add your equipment to the list. Just open a PR :)
 | [Prosys OPC UA Simulation Server v5.4.6-148](https://prosysopc.com/products/opc-ua-simulation-server/) | v0.3.x         | [manual testing](https://github.com/united-manufacturing-hub/benthos-umh?tab=readme-ov-file#testing) | [UMH](https://www.umh.app) |
 | [Edge Connect OPC-UA Server](https://www.iotechsys.com/products/) |v0.3.x        | production |  [IOTech Systems](https://www.iotechsys.com/) |
 | Siemens S7-1200 |v0.3.x        | production |  [IOTech Systems](https://www.iotechsys.com/) |
+| Siemens S7-1500 |v0.3.x        | production |  [IOTech Systems](https://www.iotechsys.com/) |
+| OMRON NX102-9020 |v0.3.x        | production |  [IOTech Systems](https://www.iotechsys.com/) |
 | InfluxDB Telegraf plugin                                                                               | v0.3.x         | ?                                                                                                    | Community                  |
 
 ## Supported Features
