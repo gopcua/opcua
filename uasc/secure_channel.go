@@ -591,8 +591,8 @@ func (s *SecureChannel) scheduleRenewal(instance *channelInstance) {
 
 	debug.Printf("uasc %d: security token is refreshed at %s (%s). channelID=%d tokenID=%d", s.c.ID(), time.Now().UTC().Add(when).Format(time.RFC3339), when, instance.secureChannelID, instance.securityTokenID)
 
-	t := time.NewTimer(when)
-	defer t.Stop()
+	t := AcquireTimer(when)
+	defer ReleaseTimer(t)
 
 	select {
 	case <-s.closing:
@@ -623,8 +623,8 @@ func (s *SecureChannel) scheduleExpiration(instance *channelInstance) {
 
 	debug.Printf("uasc %d: security token expires at %s. channelID=%d tokenID=%d", s.c.ID(), when.UTC().Format(time.RFC3339), instance.secureChannelID, instance.securityTokenID)
 
-	t := time.NewTimer(time.Until(when))
-	defer t.Stop()
+	t := AcquireTimer(time.Until(when))
+	defer ReleaseTimer(t)
 
 	select {
 	case <-s.closing:
@@ -677,8 +677,8 @@ func (s *SecureChannel) sendRequestWithTimeout(
 	}
 
 	// `+ timeoutLeniency` to give the server a chance to respond to TimeoutHint
-	timer := time.NewTimer(timeout + timeoutLeniency)
-	defer timer.Stop()
+	timer := AcquireTimer(timeout + timeoutLeniency)
+	defer ReleaseTimer(timer)
 
 	select {
 	case <-ctx.Done():
@@ -745,15 +745,6 @@ func (s *SecureChannel) sendAsyncWithTimeout(
 	respRequired bool,
 	timeout time.Duration,
 ) (<-chan *response, error) {
-
-	instance.Lock()
-	defer instance.Unlock()
-
-	m, err := instance.newRequestMessage(req, reqID, authToken, timeout)
-	if err != nil {
-		return nil, err
-	}
-
 	var resp chan *response
 
 	if respRequired {
@@ -771,7 +762,15 @@ func (s *SecureChannel) sendAsyncWithTimeout(
 		s.handlersMu.Unlock()
 	}
 
-	chunks, err := m.EncodeChunks(instance.maxBodySize)
+	instance.Lock()
+	defer instance.Unlock()
+
+	m, err := instance.newRequestMessage(req, reqID, authToken, timeout)
+	if err != nil {
+		return nil, err
+	}
+
+	chunks, err := m.MarshalChunks(instance.maxBodySize)
 	if err != nil {
 		return nil, err
 	}

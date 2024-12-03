@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/gopcua/opcua/codec"
 )
 
 // These flags define which fields of a DataValue are set.
@@ -61,29 +63,33 @@ func (d *DataValue) Decode(b []byte) (int, error) {
 	return buf.Pos(), buf.Error()
 }
 
-func (d *DataValue) Encode() ([]byte, error) {
-	buf := NewBuffer(nil)
-	buf.WriteUint8(d.EncodingMask)
+func (d *DataValue) EncodeOPCUA(s *codec.Stream) error {
+	var err error
+	var b []byte
 
+	s.WriteByte(d.EncodingMask)
 	if d.Has(DataValueValue) {
-		buf.WriteStruct(d.Value)
+		b, err = codec.Marshal(d.Value)
+		s.Write(b)
 	}
 	if d.Has(DataValueStatusCode) {
-		buf.WriteUint32(uint32(d.Status))
+		s.WriteUint32(uint32(d.Status))
 	}
 	if d.Has(DataValueSourceTimestamp) {
-		buf.WriteTime(d.SourceTimestamp)
+		b, err = codec.Marshal(d.SourceTimestamp)
+		s.Write(b)
 	}
 	if d.Has(DataValueSourcePicoseconds) {
-		buf.WriteUint16(d.SourcePicoseconds)
+		s.WriteUint16(d.SourcePicoseconds)
 	}
 	if d.Has(DataValueServerTimestamp) {
-		buf.WriteTime(d.ServerTimestamp)
+		b, err = codec.Marshal(d.ServerTimestamp)
+		s.Write(b)
 	}
 	if d.Has(DataValueServerPicoseconds) {
-		buf.WriteUint16(d.ServerPicoseconds)
+		s.WriteUint16(d.ServerPicoseconds)
 	}
-	return buf.Bytes(), buf.Error()
+	return err
 }
 
 func (d *DataValue) Has(mask byte) bool {
@@ -152,13 +158,12 @@ func (g *GUID) Decode(b []byte) (int, error) {
 	return buf.Pos(), buf.Error()
 }
 
-func (g *GUID) Encode() ([]byte, error) {
-	buf := NewBuffer(nil)
-	buf.WriteUint32(g.Data1)
-	buf.WriteUint16(g.Data2)
-	buf.WriteUint16(g.Data3)
-	buf.Write(g.Data4)
-	return buf.Bytes(), buf.Error()
+func (g *GUID) EncodeOPCUA(s *codec.Stream) error {
+	s.WriteUint32(g.Data1)
+	s.WriteUint16(g.Data2)
+	s.WriteUint16(g.Data3)
+	s.Write(g.Data4)
+	return nil
 }
 
 // String returns GUID in human-readable string.
@@ -227,16 +232,27 @@ func (l *LocalizedText) Decode(b []byte) (int, error) {
 	return buf.Pos(), buf.Error()
 }
 
-func (l *LocalizedText) Encode() ([]byte, error) {
-	buf := NewBuffer(nil)
-	buf.WriteUint8(l.EncodingMask)
+func (l *LocalizedText) EncodeOPCUA(s *codec.Stream) error {
+	s.WriteByte(l.EncodingMask)
 	if l.Has(LocalizedTextLocale) {
-		buf.WriteString(l.Locale)
+		n := len(l.Locale)
+		if n == 0 {
+			s.WriteUint32(codec.NULL)
+		} else {
+			s.WriteUint32(uint32(n))
+			s.WriteString(l.Locale)
+		}
 	}
 	if l.Has(LocalizedTextText) {
-		buf.WriteString(l.Text)
+		n := len(l.Text)
+		if n == 0 {
+			s.WriteUint32(codec.NULL)
+		} else {
+			s.WriteUint32(uint32(n))
+			s.WriteString(l.Text)
+		}
 	}
-	return buf.Bytes(), buf.Error()
+	return nil
 }
 
 func (l *LocalizedText) Has(mask byte) bool {

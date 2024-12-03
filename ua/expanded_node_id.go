@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/gopcua/opcua/codec"
 	"github.com/gopcua/opcua/errors"
 )
 
@@ -102,17 +103,18 @@ func (e *ExpandedNodeID) Decode(b []byte) (int, error) {
 	return buf.Pos(), buf.Error()
 }
 
-func (e *ExpandedNodeID) Encode() ([]byte, error) {
-	buf := NewBuffer(nil)
-	buf.WriteStruct(e.NodeID)
+func (e *ExpandedNodeID) EncodeOPCUA(s *codec.Stream) error {
+	err := e.NodeID.EncodeOPCUA(s)
+
 	if e.HasNamespaceURI() {
-		buf.WriteString(e.NamespaceURI)
+		b, _ := codec.Marshal(e.NamespaceURI)
+		s.Write(b)
 	}
 	if e.HasServerIndex() {
-		buf.WriteUint32(e.ServerIndex)
+		b, _ := codec.Marshal(e.ServerIndex)
+		s.Write(b)
 	}
-	return buf.Bytes(), buf.Error()
-
+	return err
 }
 
 // HasNamespaceURI checks if an ExpandedNodeID has NamespaceURI Flag.

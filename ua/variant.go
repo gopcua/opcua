@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"time"
 
+	"github.com/gopcua/opcua/codec"
 	"github.com/gopcua/opcua/errors"
 )
 
@@ -317,96 +318,37 @@ func (m *Variant) decodeValue(buf *Buffer) interface{} {
 	}
 }
 
-// Encode implements the codec interface.
-func (m *Variant) Encode() ([]byte, error) {
-	buf := NewBuffer(nil)
-	buf.WriteByte(m.mask)
+func (m *Variant) EncodeOPCUA(s *codec.Stream) error {
+	s.WriteByte(m.mask)
 
 	// a null value specifies that no other fields are encoded
 	if m.Type() == TypeIDNull {
-		return buf.Bytes(), buf.Error()
+		return nil
 	}
 
 	if m.Has(VariantArrayValues) {
-		buf.WriteInt32(m.arrayLength)
+		s.WriteUint32(uint32(m.arrayLength))
 	}
-
-	m.encode(buf, reflect.ValueOf(m.value))
+	m.encode(s, reflect.ValueOf(m.value))
 
 	if m.Has(VariantArrayDimensions) {
-		buf.WriteInt32(m.arrayDimensionsLength)
-		for i := 0; i < int(m.arrayDimensionsLength); i++ {
-			buf.WriteInt32(m.arrayDimensions[i])
+		s.Write([]byte{byte(m.arrayDimensionsLength), byte(m.arrayDimensionsLength >> 8), byte(m.arrayDimensionsLength >> 16), byte(m.arrayDimensionsLength >> 24)})
+		for _, v := range m.arrayDimensions {
+			s.WriteUint32(uint32(v))
 		}
 	}
-
-	return buf.Bytes(), buf.Error()
+	return nil
 }
 
 // encode recursively writes the values to the buffer.
-func (m *Variant) encode(buf *Buffer, val reflect.Value) {
+func (m *Variant) encode(buf *codec.Stream, val reflect.Value) {
 	if val.Kind() != reflect.Slice || m.Type() == TypeIDByteString {
-		m.encodeValue(buf, val.Interface())
+		b, _ := codec.Marshal(val.Interface())
+		buf.Write(b)
 		return
 	}
 	for i := 0; i < val.Len(); i++ {
 		m.encode(buf, val.Index(i))
-	}
-}
-
-// encodeValue writes a single value of the base type to the buffer.
-func (m *Variant) encodeValue(buf *Buffer, v interface{}) {
-	switch x := v.(type) {
-	case bool:
-		buf.WriteBool(x)
-	case int8:
-		buf.WriteInt8(x)
-	case byte:
-		buf.WriteByte(x)
-	case int16:
-		buf.WriteInt16(x)
-	case uint16:
-		buf.WriteUint16(x)
-	case int32:
-		buf.WriteInt32(x)
-	case uint32:
-		buf.WriteUint32(x)
-	case int64:
-		buf.WriteInt64(x)
-	case uint64:
-		buf.WriteUint64(x)
-	case float32:
-		buf.WriteFloat32(x)
-	case float64:
-		buf.WriteFloat64(x)
-	case string:
-		buf.WriteString(x)
-	case time.Time:
-		buf.WriteTime(x)
-	case *GUID:
-		buf.WriteStruct(x)
-	case []byte:
-		buf.WriteByteString(x)
-	case XMLElement:
-		buf.WriteString(string(x))
-	case *NodeID:
-		buf.WriteStruct(x)
-	case *ExpandedNodeID:
-		buf.WriteStruct(x)
-	case StatusCode:
-		buf.WriteUint32(uint32(x))
-	case *QualifiedName:
-		buf.WriteStruct(x)
-	case *LocalizedText:
-		buf.WriteStruct(x)
-	case *ExtensionObject:
-		buf.WriteStruct(x)
-	case *DataValue:
-		buf.WriteStruct(x)
-	case *Variant:
-		buf.WriteStruct(x)
-	case *DiagnosticInfo:
-		buf.WriteStruct(x)
 	}
 }
 

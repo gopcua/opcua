@@ -9,6 +9,8 @@ import (
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/gopcua/opcua/codec"
 )
 
 type A struct {
@@ -403,7 +405,7 @@ func TestCodec(t *testing.T) {
 				}
 			})
 			t.Run("encode", func(t *testing.T) {
-				b, err := Encode(tt.v)
+				b, err := codec.Marshal(tt.v)
 				if err != nil {
 					t.Fatal(err)
 				}

@@ -7,6 +7,7 @@ package uasc
 import (
 	"fmt"
 
+	"github.com/gopcua/opcua/codec"
 	"github.com/gopcua/opcua/errors"
 	"github.com/gopcua/opcua/ua"
 )
@@ -51,16 +52,16 @@ func (h *Header) Decode(b []byte) (int, error) {
 	return buf.Pos(), buf.Error()
 }
 
-func (h *Header) Encode() ([]byte, error) {
-	buf := ua.NewBuffer(nil)
+func (h *Header) EncodeOPCUA(s *codec.Stream) error {
 	if len(h.MessageType) != 3 {
-		return nil, errors.Errorf("invalid message type: %q", h.MessageType)
+		return errors.Errorf("invalid message type: %q", h.MessageType)
 	}
-	buf.Write([]byte(h.MessageType))
-	buf.WriteByte(h.ChunkType)
-	buf.WriteUint32(h.MessageSize)
-	buf.WriteUint32(h.SecureChannelID)
-	return buf.Bytes(), buf.Error()
+
+	s.WriteString(h.MessageType)
+	s.WriteByte(h.ChunkType)
+	s.WriteUint32(h.MessageSize)
+	s.WriteUint32(h.SecureChannelID)
+	return nil
 }
 
 // String returns Header in string.

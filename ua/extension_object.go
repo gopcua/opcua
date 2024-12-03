@@ -5,6 +5,7 @@
 package ua
 
 import (
+	"github.com/gopcua/opcua/codec"
 	"github.com/gopcua/opcua/debug"
 	"github.com/gopcua/opcua/id"
 )
@@ -84,25 +85,22 @@ func (e *ExtensionObject) Decode(b []byte) (int, error) {
 	return buf.Pos(), body.Error()
 }
 
-func (e *ExtensionObject) Encode() ([]byte, error) {
-	buf := NewBuffer(nil)
-	if e == nil {
-		e = &ExtensionObject{TypeID: NewTwoByteExpandedNodeID(0), EncodingMask: ExtensionObjectEmpty}
-	}
-	buf.WriteStruct(e.TypeID)
-	buf.WriteByte(e.EncodingMask)
+func (e *ExtensionObject) EncodeOPCUA(s *codec.Stream) error {
+	b, err := codec.Marshal(e.TypeID)
+	s.Write(b)
+	s.WriteByte(e.EncodingMask)
 	if e.EncodingMask == ExtensionObjectEmpty {
-		return buf.Bytes(), buf.Error()
+		return err
 	}
 
-	body := NewBuffer(nil)
-	body.WriteStruct(e.Value)
-	if body.Error() != nil {
-		return nil, body.Error()
+	body, err := codec.Marshal(e.Value)
+	if err != nil {
+		return err
 	}
-	buf.WriteUint32(uint32(body.Len()))
-	buf.Write(body.Bytes())
-	return buf.Bytes(), buf.Error()
+	n := uint32(len(body))
+	s.WriteUint32(n)
+	s.Write(body)
+	return err
 }
 
 func (e *ExtensionObject) UpdateMask() {

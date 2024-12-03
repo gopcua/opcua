@@ -4,6 +4,10 @@
 
 package ua
 
+import (
+	"github.com/gopcua/opcua/codec"
+)
+
 // These flags define which fields of a DiagnosticInfo are set.
 // Bits are or'ed together if multiple fields are set.
 const (
@@ -58,31 +62,37 @@ func (d *DiagnosticInfo) Decode(b []byte) (int, error) {
 	return buf.Pos(), buf.Error()
 }
 
-func (d *DiagnosticInfo) Encode() ([]byte, error) {
-	buf := NewBuffer(nil)
-	buf.WriteByte(d.EncodingMask)
+func (d *DiagnosticInfo) EncodeOPCUA(s *codec.Stream) error {
+	s.WriteByte(d.EncodingMask)
+
 	if d.Has(DiagnosticInfoSymbolicID) {
-		buf.WriteInt32(d.SymbolicID)
+		s.WriteUint32(uint32(d.SymbolicID))
 	}
 	if d.Has(DiagnosticInfoNamespaceURI) {
-		buf.WriteInt32(d.NamespaceURI)
+		s.WriteUint32(uint32(d.NamespaceURI))
 	}
 	if d.Has(DiagnosticInfoLocale) {
-		buf.WriteInt32(d.Locale)
+		s.WriteUint32(uint32(d.Locale))
 	}
 	if d.Has(DiagnosticInfoLocalizedText) {
-		buf.WriteInt32(d.LocalizedText)
+		s.WriteUint32(uint32(d.LocalizedText))
 	}
 	if d.Has(DiagnosticInfoAdditionalInfo) {
-		buf.WriteString(d.AdditionalInfo)
+		b, _ := codec.Marshal(d.AdditionalInfo)
+		s.Write(b)
 	}
 	if d.Has(DiagnosticInfoInnerStatusCode) {
-		buf.WriteUint32(uint32(d.InnerStatusCode))
+		s.WriteUint32(uint32(d.InnerStatusCode))
 	}
 	if d.Has(DiagnosticInfoInnerDiagnosticInfo) {
-		buf.WriteStruct(d.InnerDiagnosticInfo)
+		b, err := codec.Marshal(d.InnerDiagnosticInfo)
+		if err != nil {
+			return err
+		}
+		s.Write(b)
 	}
-	return buf.Bytes(), buf.Error()
+
+	return nil
 }
 
 func (d *DiagnosticInfo) Has(mask byte) bool {

@@ -13,6 +13,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/gopcua/opcua/codec"
 	"github.com/gopcua/opcua/debug"
 	"github.com/gopcua/opcua/errors"
 	"github.com/gopcua/opcua/ua"
@@ -396,9 +397,9 @@ func (c *Conn) Send(typ string, msg interface{}) error {
 		return errors.Errorf("invalid msg type: %s", typ)
 	}
 
-	body, err := ua.Encode(msg)
+	body, err := codec.Marshal(msg)
 	if err != nil {
-		return errors.Errorf("encode msg failed: %s", err)
+		return errors.Errorf("encode msg failed: %v", err)
 	}
 
 	h := Header{
@@ -411,12 +412,14 @@ func (c *Conn) Send(typ string, msg interface{}) error {
 		return errors.Errorf("send packet too large: %d > %d bytes", h.MessageSize, c.ack.SendBufSize)
 	}
 
-	hdr, err := h.Encode()
+	hdr, err := codec.Marshal(&h)
 	if err != nil {
-		return errors.Errorf("encode hdr failed: %s", err)
+		return errors.Errorf("encode hdr failed: %v", err)
 	}
 
-	b := append(hdr, body...)
+	b := make([]byte, len(hdr)+len(body))
+	copy(b, hdr)
+	copy(b[len(hdr):], body)
 	if _, err := c.Write(b); err != nil {
 		return errors.Errorf("write failed: %s", err)
 	}
