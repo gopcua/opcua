@@ -85,6 +85,7 @@ func (s *MonitoredItemService) DeleteMonitoredItem(id uint32) {
 func (s *MonitoredItemService) DeleteSub(id uint32) {
 	s.Mu.Lock()
 	items, ok := s.Subs[id]
+	delete(s.Subs, id)
 	s.Mu.Unlock()
 	if !ok {
 		return
