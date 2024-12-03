@@ -52,7 +52,7 @@ type monitoredItem struct {
 	ts  ua.TimestampsToReturn
 }
 
-func NewMonitoredItemCreateRequestWithDefaults(nodeID *ua.NodeID, attributeID ua.AttributeID, clientHandle uint32) *ua.MonitoredItemCreateRequest {
+func NewMonitoredItemCreateRequestWithDefaults(nodeID *ua.NodeID, attributeID ua.AttributeID, filter *ua.ExtensionObject, clientHandle uint32) *ua.MonitoredItemCreateRequest {
 	if attributeID == 0 {
 		attributeID = ua.AttributeIDValue
 	}
@@ -66,11 +66,30 @@ func NewMonitoredItemCreateRequestWithDefaults(nodeID *ua.NodeID, attributeID ua
 		RequestedParameters: &ua.MonitoringParameters{
 			ClientHandle:     clientHandle,
 			DiscardOldest:    true,
-			Filter:           nil,
+			Filter:           filter,
 			QueueSize:        10,
 			SamplingInterval: 0.0,
 		},
 	}
+}
+func NewMonitoredItemCreateRequestForEvents(nodeID *ua.NodeID, filter *ua.ExtensionObject, clientHandle uint32) *ua.MonitoredItemCreateRequest {
+	req := &ua.MonitoredItemCreateRequest{
+		ItemToMonitor: &ua.ReadValueID{
+			NodeID:       nodeID,
+			AttributeID:  ua.AttributeIDEventNotifier,
+			DataEncoding: &ua.QualifiedName{},
+		},
+		MonitoringMode: ua.MonitoringModeReporting,
+		RequestedParameters: &ua.MonitoringParameters{
+			ClientHandle:     clientHandle,
+			DiscardOldest:    true,
+			Filter:           filter,
+			QueueSize:        10,
+			SamplingInterval: 1.0,
+		},
+	}
+
+	return req
 }
 
 type PublishNotificationData struct {
@@ -141,6 +160,7 @@ func (s *Subscription) Monitor(ctx context.Context, ts ua.TimestampsToReturn, it
 			ts:  ts,
 		}
 	}
+
 	s.itemsMu.Unlock()
 
 	return res, err
