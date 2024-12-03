@@ -31,9 +31,9 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	ep := opcua.SelectEndpoint(endpoints, *policy, ua.MessageSecurityModeFromString(*mode))
-	if ep == nil {
-		log.Fatal("Failed to find suitable endpoint")
+	ep, err := opcua.SelectEndpoint(endpoints, *policy, ua.MessageSecurityModeFromString(*mode))
+	if err == nil {
+		log.Fatal(err)
 	}
 
 	fmt.Println("*", ep.SecurityPolicyURI, ep.SecurityMode)
