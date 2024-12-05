@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.6.0 (05 Dec 2024)
+
+* Add Wolfram Manufacturing to README (#707)
+* example/crypto: add auth-mode in error message (#720)
+* Connection refused with valid security options (#718)
+* subscription: add SetMonitoringMode functionality (#711,#712)
+* docs: add more targets to README (#725)
+* remove pkg dependency (#723,#731)
+* add IOTech to README (#747)
+* Add server implementation (#737)
+* use maps and slices from stdlib (#754)
+* Add error return to SelectEndpoint function (#753)
+
 ## v0.5.3 (07 Dec 2023)
 
 * Fix unchecked type assertion in Subscription Stats (#693)
