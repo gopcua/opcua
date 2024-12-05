@@ -30,7 +30,7 @@ func TestRead(t *testing.T) {
 
 	ctx := context.Background()
 
-	srv := NewServer("rw_server.py")
+	srv := NewPythonServer("rw_server.py")
 	defer srv.Close()
 
 	c, err := opcua.NewClient(srv.Endpoint, srv.Opts...)

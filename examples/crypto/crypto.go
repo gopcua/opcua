@@ -22,8 +22,8 @@ import (
 	"github.com/gopcua/opcua"
 	"github.com/gopcua/opcua/debug"
 	"github.com/gopcua/opcua/errors"
+	uatest "github.com/gopcua/opcua/tests/python"
 	"github.com/gopcua/opcua/ua"
-	"github.com/gopcua/opcua/uatest"
 )
 
 var (

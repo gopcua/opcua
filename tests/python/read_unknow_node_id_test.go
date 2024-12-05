@@ -17,7 +17,7 @@ import (
 func TestReadUnknowNodeID(t *testing.T) {
 	ctx := context.Background()
 
-	srv := NewServer("read_unknow_node_id_server.py")
+	srv := NewPythonServer("read_unknow_node_id_server.py")
 	defer srv.Close()
 
 	c, err := opcua.NewClient(srv.Endpoint, srv.Opts...)

@@ -24,7 +24,7 @@ const (
 func TestAutoReconnection(t *testing.T) {
 	ctx := context.Background()
 
-	srv := NewServer("reconnection_server.py")
+	srv := NewPythonServer("reconnection_server.py")
 	defer srv.Close()
 
 	c, err := opcua.NewClient(srv.Endpoint, srv.Opts...)

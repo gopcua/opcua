@@ -4,4 +4,9 @@ build/
 dist/
 __pycache__/
 .vscode/
+*.pem
+*.crt
+*.csr
+*.exe
 .idea/
+__debug*
