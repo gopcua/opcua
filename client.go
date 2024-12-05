@@ -85,9 +85,9 @@ func GetEndpoints(ctx context.Context, endpoint string, opts ...Option) ([]*ua.E
 // security policy and security mode. policy and mode can be omitted so that
 // only one of them has to match.
 // todo(fs): should this function return an error?
-func SelectEndpoint(endpoints []*ua.EndpointDescription, policy string, mode ua.MessageSecurityMode) *ua.EndpointDescription {
+func SelectEndpoint(endpoints []*ua.EndpointDescription, policy string, mode ua.MessageSecurityMode) (*ua.EndpointDescription, error) {
 	if len(endpoints) == 0 {
-		return nil
+		return nil, errors.Errorf("no endpoints available")
 	}
 
 	sort.Sort(sort.Reverse(bySecurityLevel(endpoints)))
@@ -95,26 +95,26 @@ func SelectEndpoint(endpoints []*ua.EndpointDescription, policy string, mode ua.
 
 	// don't care -> return highest security level
 	if policy == "" && mode == ua.MessageSecurityModeInvalid {
-		return endpoints[0]
+		return endpoints[0], nil
 	}
 
 	for _, p := range endpoints {
 		// match only security mode
 		if policy == "" && p.SecurityMode == mode {
-			return p
+			return p, nil
 		}
 
 		// match only security policy
 		if p.SecurityPolicyURI == policy && mode == ua.MessageSecurityModeInvalid {
-			return p
+			return p, nil
 		}
 
 		// match both
 		if p.SecurityPolicyURI == policy && p.SecurityMode == mode {
-			return p
+			return p, nil
 		}
 	}
-	return nil
+	return nil, errors.Errorf("no matching endpoint found for policy %s and mode %s", policy, mode)
 }
 
 type bySecurityLevel []*ua.EndpointDescription
