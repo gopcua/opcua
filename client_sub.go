@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"log"
+	"slices"
 	"time"
 
 	"github.com/gopcua/opcua/debug"
@@ -11,7 +12,6 @@ import (
 	"github.com/gopcua/opcua/stats"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uasc"
-	"golang.org/x/exp/slices"
 )
 
 // Subscribe creates a Subscription with given parameters.

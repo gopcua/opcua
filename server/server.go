@@ -11,11 +11,10 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"slices"
 	"strings"
 	"sync"
 	"time"
-
-	"golang.org/x/exp/slices"
 
 	"github.com/gopcua/opcua/id"
 	"github.com/gopcua/opcua/schema"

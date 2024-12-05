@@ -2,10 +2,9 @@ package server
 
 import (
 	"log"
+	"maps"
+	"slices"
 	"time"
-
-	"golang.org/x/exp/maps"
-	"golang.org/x/exp/slices"
 
 	"github.com/gopcua/opcua/id"
 	"github.com/gopcua/opcua/server/attrs"
