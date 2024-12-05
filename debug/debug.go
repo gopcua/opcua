@@ -12,9 +12,8 @@ import (
 	"log"
 	"os"
 	"runtime"
+	"slices"
 	"strings"
-
-	"golang.org/x/exp/slices"
 )
 
 // Flags contains the debug flags set by OPC_DEBUG.

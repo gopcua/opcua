@@ -1,9 +1,8 @@
 package server
 
 import (
+	"slices"
 	"time"
-
-	"golang.org/x/exp/slices"
 
 	"github.com/gopcua/opcua/id"
 	"github.com/gopcua/opcua/ua"

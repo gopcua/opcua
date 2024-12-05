@@ -2,13 +2,13 @@ package server
 
 import (
 	"errors"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uasc"
-	"golang.org/x/exp/slices"
 )
 
 // MonitoredItemService implements the MonitoredItem Service Set.
