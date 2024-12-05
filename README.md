@@ -20,25 +20,6 @@ See below for a list of [Tested Platforms](#tested-platforms) and [Supported Fea
 [![License](https://img.shields.io/github/license/mashape/apistatus.svg)](https://github.com/gopcua/opcua/blob/master/LICENSE)
 [![Version](https://img.shields.io/github/tag/gopcua/opcua.svg?color=blue&label=version)](https://github.com/gopcua/opcua/releases)
 
-## v0.5.x BREAKING CHANGES
-
-* `v0.5.0` released on 14 Aug 2023: all `Client` methods must have a context
-* `v0.5.1` released on 22 Aug 2023: the `NewClient` function returns an error
-
-In `v0.3.0` on 21 Jan 2022 release we added `WithContext` variants for all methods
-to avoid a breaking change. All existing methods without a context had a disclaimer
-that with `v0.5.0` their signature would change to include the context
-and that the `WithContext` method would be removed. 
-
-We missed to update the `NewClient` function in `v0.5.0` which was fixed
-in `v0.5.1`.
-
-Please update your code and let us know if there are any issues!
-
-Thank you!
-
-Your GOPCUA Team
-
 ## Quickstart
 
 ```sh
@@ -56,6 +37,12 @@ go run examples/crypto/*.go -endpoint opc.tcp://localhost:4840 -cert path/to/cer
 
 # checkout examples/ for more examples...
 ```
+
+## List of Breaking Changes
+
+* `v0.6.0`: The `SelectEndpoint` function in the client now returns an error (#753)
+* `v0.5.1`: the `NewClient` function returns an error
+* `v0.5.0`: all `Client` methods must have a context
 
 ## Sponsors
 
