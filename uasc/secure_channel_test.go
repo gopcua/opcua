@@ -16,7 +16,7 @@ import (
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uacp"
 	"github.com/gopcua/opcua/uapolicy"
-	"github.com/pascaldekloe/goe/verify"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewRequestMessage(t *testing.T) {
@@ -149,7 +149,7 @@ func TestNewRequestMessage(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			verify.Values(t, "", m, tt.m)
+			require.Equal(t, tt.m, m)
 		})
 	}
 }

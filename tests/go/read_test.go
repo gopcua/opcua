@@ -8,10 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pascaldekloe/goe/verify"
-
 	"github.com/gopcua/opcua"
 	"github.com/gopcua/opcua/ua"
+	"github.com/stretchr/testify/require"
 )
 
 // TestRead performs an integration test to read values
@@ -74,7 +73,7 @@ func testRead(t *testing.T, ctx context.Context, c *opcua.Client, v interface{},
 	if resp.Results[0].Status != ua.StatusOK {
 		t.Fatalf("Status not OK: %v", resp.Results[0].Status)
 	}
-	if got, want := resp.Results[0].Value.Value(), v; !verify.Values(t, "", got, want) {
+	if got, want := resp.Results[0].Value.Value(), v; !require.Equal(t, want, got) {
 		t.Fail()
 	}
 }

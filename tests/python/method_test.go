@@ -7,10 +7,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/pascaldekloe/goe/verify"
-
 	"github.com/gopcua/opcua"
 	"github.com/gopcua/opcua/ua"
+	"github.com/stretchr/testify/require"
 )
 
 type Complex struct {
@@ -79,7 +78,7 @@ func TestCallMethod(t *testing.T) {
 			if got, want := resp.StatusCode, ua.StatusOK; got != want {
 				t.Fatalf("got status %v want %v", got, want)
 			}
-			if got, want := resp.OutputArguments, tt.out; !verify.Values(t, "", got, want) {
+			if got, want := resp.OutputArguments, tt.out; !require.Equal(t, want, got) {
 				t.Fail()
 			}
 		})
