@@ -508,7 +508,7 @@ func TestArray(t *testing.T) {
 		if got, want := v.EncodingMask(), byte(TypeIDUint32|VariantArrayValues); got != want {
 			t.Fatalf("got mask %d want %d", got, want)
 		}
-		require.Equal(t, []int32{}, v.ArrayDimensions())
+		require.Equal(t, []int32(nil), v.ArrayDimensions())
 	})
 	t.Run("multi-dimension", func(t *testing.T) {
 		v := MustVariant([][]uint32{{1, 1}, {2, 2}, {3, 3}})
@@ -518,7 +518,7 @@ func TestArray(t *testing.T) {
 		if got, want := v.EncodingMask(), byte(TypeIDUint32|VariantArrayValues|VariantArrayDimensions); got != want {
 			t.Fatalf("got mask %d want %d", got, want)
 		}
-		require.Equal(t, []int{3, 2}, v.ArrayDimensions())
+		require.Equal(t, []int32{3, 2}, v.ArrayDimensions())
 	})
 	t.Run("unbalanced", func(t *testing.T) {
 		b := []byte{
