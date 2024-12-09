@@ -11,8 +11,7 @@ import (
 	"time"
 
 	"github.com/gopcua/opcua/errors"
-
-	"github.com/pascaldekloe/goe/verify"
+	"github.com/stretchr/testify/require"
 )
 
 func TestVariant(t *testing.T) {
@@ -519,7 +518,7 @@ func TestArray(t *testing.T) {
 		if got, want := v.EncodingMask(), byte(TypeIDUint32|VariantArrayValues); got != want {
 			t.Fatalf("got mask %d want %d", got, want)
 		}
-		verify.Values(t, "", v.ArrayDimensions(), []int32{})
+		require.Equal(t, []int32(nil), v.ArrayDimensions())
 	})
 	t.Run("multi-dimension", func(t *testing.T) {
 		v := MustVariant([][]uint32{{1, 1}, {2, 2}, {3, 3}})
@@ -529,7 +528,7 @@ func TestArray(t *testing.T) {
 		if got, want := v.EncodingMask(), byte(TypeIDUint32|VariantArrayValues|VariantArrayDimensions); got != want {
 			t.Fatalf("got mask %d want %d", got, want)
 		}
-		verify.Values(t, "", v.ArrayDimensions(), []int32{3, 2})
+		require.Equal(t, []int32{3, 2}, v.ArrayDimensions())
 	})
 	t.Run("unbalanced", func(t *testing.T) {
 		b := []byte{
@@ -728,11 +727,11 @@ func TestSet(t *testing.T) {
 			if got, want := err, tt.err; got != want {
 				t.Fatalf("got error %v want %v", got, want)
 			}
-			verify.Values(t, "variant.mask", va.mask, tt.va.mask)
-			verify.Values(t, "variant.arrayLength", va.arrayLength, tt.va.arrayLength)
-			verify.Values(t, "variant.arrayDimensionsLength", va.arrayDimensionsLength, tt.va.arrayDimensionsLength)
-			verify.Values(t, "variant.arrayDimensions", va.arrayDimensions, tt.va.arrayDimensions)
-			verify.Values(t, "variant.value", va.value, tt.va.value)
+			require.Equal(t, tt.va.mask, va.mask)
+			require.Equal(t, tt.va.arrayLength, va.arrayLength)
+			require.Equal(t, tt.va.arrayDimensionsLength, va.arrayDimensionsLength)
+			require.Equal(t, tt.va.arrayDimensions, va.arrayDimensions)
+			require.Equal(t, tt.va.value, va.value)
 		})
 	}
 }
@@ -1270,7 +1269,7 @@ func TestVariantValueHelpers(t *testing.T) {
 	for i, tt := range tests {
 		name := fmt.Sprintf("test-%d %T -> %T", i, tt.v, tt.want)
 		t.Run(name, func(t *testing.T) {
-			verify.Values(t, "", tt.fn(MustVariant(tt.v)), tt.want)
+			require.Equal(t, tt.want, tt.fn(MustVariant(tt.v)))
 		})
 	}
 }

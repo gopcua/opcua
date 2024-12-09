@@ -13,8 +13,7 @@ import (
 	"testing"
 
 	"github.com/gopcua/opcua/ua"
-
-	"github.com/pascaldekloe/goe/verify"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSupportedPolicies(t *testing.T) {
@@ -24,7 +23,7 @@ func TestSupportedPolicies(t *testing.T) {
 		want = append(want, k)
 	}
 	sort.Strings(want)
-	verify.Values(t, "", got, want)
+	require.Equal(t, want, got)
 }
 
 func TestGenerateKeysLength(t *testing.T) {
