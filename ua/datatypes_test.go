@@ -73,6 +73,26 @@ func TestDataValue(t *testing.T) {
 				0x80, 0x3b, 0xe8, 0xb3, 0x92, 0x4e, 0xd4, 0x01,
 			},
 		},
+		{
+			Name: "value with nil slice, source timestamp, server timestamp",
+			Struct: &DataValue{
+				EncodingMask:    0x0d,
+				Value:           MustVariant([]string(nil)),
+				SourceTimestamp: time.Date(2018, time.September, 17, 14, 28, 29, 112000000, time.UTC),
+				ServerTimestamp: time.Date(2018, time.September, 17, 14, 28, 29, 112000000, time.UTC),
+			},
+			Bytes: []byte{
+				// EncodingMask
+				0x0d,
+				// Value
+				0x8c,                   // type
+				0xff, 0xff, 0xff, 0xff, // value
+				// SourceTimestamp
+				0x80, 0x3b, 0xe8, 0xb3, 0x92, 0x4e, 0xd4, 0x01,
+				// SeverTimestamp
+				0x80, 0x3b, 0xe8, 0xb3, 0x92, 0x4e, 0xd4, 0x01,
+			},
+		},
 	}
 	RunCodecTest(t, cases)
 }
