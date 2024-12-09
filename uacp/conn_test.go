@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/gopcua/opcua/errors"
-	"github.com/pascaldekloe/goe/verify"
+	"github.com/stretchr/testify/require"
 )
 
 func TestConn(t *testing.T) {
@@ -124,7 +124,7 @@ NEXT:
 	if err != nil {
 		t.Fatal(err)
 	}
-	verify.Values(t, "", got, want)
+	require.Equal(t, want, got)
 }
 
 func TestServerWrite(t *testing.T) {
@@ -183,5 +183,5 @@ NEXT:
 		t.Fatal(err)
 	}
 	got = got[:n]
-	verify.Values(t, "", got, want)
+	require.Equal(t, want, got)
 }

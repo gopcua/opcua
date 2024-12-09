@@ -8,10 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pascaldekloe/goe/verify"
-
 	"github.com/gopcua/opcua"
 	"github.com/gopcua/opcua/ua"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNamespace(t *testing.T) {
@@ -41,7 +40,7 @@ func TestNamespace(t *testing.T) {
 			"NodeNamespace",
 			"http://gopcua.com/",
 		}
-		verify.Values(t, "", got, want)
+		require.Equal(t, want, got)
 	})
 	t.Run("FindNamespace", func(t *testing.T) {
 		ns, err := c.FindNamespace(ctx, "http://gopcua.com/")

@@ -12,12 +12,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pascaldekloe/goe/verify"
-
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uacp"
 	"github.com/gopcua/opcua/uapolicy"
 	"github.com/gopcua/opcua/uasc"
+	"github.com/stretchr/testify/require"
 )
 
 // test certificate generated with
@@ -819,10 +818,7 @@ func TestOptions(t *testing.T) {
 				}
 				return
 			}
-			if !verify.Values(t, "", cfg, tt.cfg) {
-				t.Logf("got %#v", cfg)
-				t.Logf("want %#v", tt.cfg)
-			}
+			require.Equal(t, tt.cfg, cfg)
 		})
 	}
 }

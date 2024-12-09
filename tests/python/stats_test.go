@@ -8,10 +8,9 @@ import (
 	"expvar"
 	"testing"
 
-	"github.com/pascaldekloe/goe/verify"
-
 	"github.com/gopcua/opcua"
 	"github.com/gopcua/opcua/stats"
+	"github.com/stretchr/testify/require"
 )
 
 func newExpVarInt(i int64) *expvar.Int {
@@ -67,7 +66,7 @@ func TestStats(t *testing.T) {
 
 	for k, ev := range want {
 		v := stats.Client().Get(k)
-		if !verify.Values(t, "", v, ev) {
+		if !require.Equal(t, ev, v) {
 			t.Errorf("got %s for %q, want %s", v.String(), k, ev.String())
 		}
 	}
