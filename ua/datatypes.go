@@ -39,8 +39,8 @@ type DataValue struct {
 func (d *DataValue) Decode(b []byte) (int, error) {
 	buf := NewBuffer(b)
 	d.EncodingMask = buf.ReadByte()
+	d.Value = new(Variant)
 	if d.Has(DataValueValue) {
-		d.Value = new(Variant)
 		buf.ReadStruct(d.Value)
 	}
 	if d.Has(DataValueStatusCode) {
