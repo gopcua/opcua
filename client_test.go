@@ -11,9 +11,8 @@ import (
 
 func TestClient_Send_DoesNotPanicWhenDisconnected(t *testing.T) {
 	c, err := NewClient("opc.tcp://example.com:4840")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err, "NewClient failed")
+
 	err = c.Send(context.Background(), &ua.ReadRequest{}, func(i ua.Response) error {
 		return nil
 	})
