@@ -39,26 +39,23 @@ func RunCodecTest(t *testing.T, cases []CodecTestCase) {
 				case reflect.Slice:
 					v = reflect.New(typ) // typ: []x, v: *[]x
 				default:
-					t.Fatalf("%T is not a pointer or a slice", c.Struct)
+					require.Fail(t, "%T is not a pointer or a slice", c.Struct)
 				}
 
-				if _, err := ua.Decode(c.Bytes, v.Interface()); err != nil {
-					t.Fatal(err)
-				}
+				_, err := ua.Decode(c.Bytes, v.Interface())
+				require.NoError(t, err, "Decode failed")
 
 				// if v is a *[]x we need to dereference it before comparing it.
 				if typ.Kind() == reflect.Slice {
 					v = v.Elem()
 				}
-				require.Equal(t, c.Struct, v.Interface())
+				require.Equal(t, c.Struct, v.Interface(), "Decoded payload not equal")
 			})
 
 			t.Run("encode", func(t *testing.T) {
 				b, err := ua.Encode(c.Struct)
-				if err != nil {
-					t.Fatal(err)
-				}
-				require.Equal(t, c.Bytes, b)
+				require.NoError(t, err, "Encode failed")
+				require.Equal(t, c.Bytes, b, "Encoded payload not equal")
 			})
 		})
 	}
