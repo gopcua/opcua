@@ -4,7 +4,6 @@ go 1.22.0
 
 require (
 	github.com/google/uuid v1.3.0
-	github.com/pascaldekloe/goe v0.1.1
 	github.com/stretchr/testify v1.10.0
 	golang.org/x/term v0.8.0
 )
