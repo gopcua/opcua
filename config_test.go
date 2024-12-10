@@ -128,11 +128,7 @@ func TestOptions(t *testing.T) {
 	randomRequestID = func() uint32 { return 125 }
 	defer func() { randomRequestID = nil }()
 
-	d, err := os.MkdirTemp("", "gopcua")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(d)
+	d := t.TempDir()
 
 	var (
 		certDERFile = filepath.Join(d, "cert.der")
@@ -151,18 +147,17 @@ func TestOptions(t *testing.T) {
 		}
 	}
 
-	if err := os.WriteFile(certDERFile, certDER, 0644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(certPEMFile, certPEM, 0644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(keyDERFile, keyDER, 0644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(keyPEMFile, keyPEM, 0644); err != nil {
-		t.Fatal(err)
-	}
+	err := os.WriteFile(certDERFile, certDER, 0644)
+	require.NoError(t, err, "WriteFile(certDERFile) failed")
+
+	err = os.WriteFile(certPEMFile, certPEM, 0644)
+	require.NoError(t, err, "WriteFile(certPEMFile) failed")
+
+	err = os.WriteFile(keyDERFile, keyDER, 0644)
+	require.NoError(t, err, "WriteFile(keyDERFile) failed")
+
+	err = os.WriteFile(keyPEMFile, keyPEM, 0644)
+	require.NoError(t, err, "WriteFile(keyPEMFile) failed")
 	defer os.Remove(keyPEMFile)
 
 	tests := []struct {
@@ -813,9 +808,7 @@ func TestOptions(t *testing.T) {
 
 			cfg, err := ApplyConfig(tt.opt)
 			if got, want := errstr(err), errstr(tt.err); got != "" || want != "" {
-				if got != want {
-					t.Fatalf("got error %q want %q", got, want)
-				}
+				require.Equal(t, want, got, "got error %q want %q", got, want)
 				return
 			}
 			require.Equal(t, tt.cfg, cfg)
