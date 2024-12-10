@@ -7,6 +7,8 @@ package uacp
 import (
 	"net"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestResolveEndpoint(t *testing.T) {
@@ -58,19 +60,11 @@ func TestResolveEndpoint(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		var errStr string
 		network, addr, err := ResolveEndpoint(c.input)
+		require.Equal(t, c.network, network, "network not equal")
+		require.Equal(t, c.addr.String(), addr.String(), "addr not equal")
 		if err != nil {
-			errStr = err.Error()
-		}
-		if got, want := network, c.network; got != want {
-			t.Fatalf("got network %q want %q", got, want)
-		}
-		if got, want := addr.String(), c.addr.String(); got != want {
-			t.Fatalf("got addr %q want %q", got, want)
-		}
-		if got, want := errStr, c.errStr; got != want {
-			t.Fatalf("got error %q want %q", got, want)
+			require.ErrorContains(t, err, c.errStr)
 		}
 	}
 }

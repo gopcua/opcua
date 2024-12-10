@@ -7,10 +7,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/pascaldekloe/goe/verify"
-
 	"github.com/gopcua/opcua"
 	"github.com/gopcua/opcua/ua"
+	"github.com/stretchr/testify/require"
 )
 
 type Complex struct {
@@ -62,26 +61,18 @@ func TestCallMethod(t *testing.T) {
 	defer srv.Close()
 
 	c, err := opcua.NewClient(srv.Endpoint, srv.Opts...)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := c.Connect(ctx); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err, "NewClient failed")
+
+	err = c.Connect(ctx)
+	require.NoError(t, err, "Connect failed")
 	defer c.Close(ctx)
 
 	for _, tt := range tests {
 		t.Run(tt.req.ObjectID.String(), func(t *testing.T) {
 			resp, err := c.Call(ctx, tt.req)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if got, want := resp.StatusCode, ua.StatusOK; got != want {
-				t.Fatalf("got status %v want %v", got, want)
-			}
-			if got, want := resp.OutputArguments, tt.out; !verify.Values(t, "", got, want) {
-				t.Fail()
-			}
+			require.NoError(t, err, "Call failed")
+			require.Equal(t, ua.StatusOK, resp.StatusCode, "StatusCode not equal")
+			require.Equal(t, tt.out, resp.OutputArguments, "OuptutArgs not equal")
 		})
 	}
 }
