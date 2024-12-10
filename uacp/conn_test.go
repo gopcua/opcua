@@ -67,9 +67,7 @@ func TestConn(t *testing.T) {
 func TestClientWrite(t *testing.T) {
 	ep := "opc.tcp://127.0.0.1:4840/foo/bar"
 	ln, err := Listen(ep, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err, "Listen failed")
 	defer ln.Close()
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -90,49 +88,40 @@ func TestClientWrite(t *testing.T) {
 	}()
 
 	cliConn, err := Dial(ctx, ep)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err, "Dial failed")
 
 	for {
 		select {
 		case _, ok := <-done:
-			if !ok {
-				t.Fatal("failed to setup secure channel")
-			}
+			require.True(t, ok, "failed to setup secure channel")
 			goto NEXT
 		case err := <-acceptErr:
-			t.Fatalf("accept fail: %v", err)
+			require.Fail(t, "accept fail: %v", err)
 		case <-time.After(time.Second):
-			t.Fatal("timed out")
+			require.Fail(t, "timed out")
 		}
 	}
 
 NEXT:
 	msg := &Message{Data: []byte{0xde, 0xad, 0xbe, 0xef}}
-	if err := cliConn.Send("MSGF", msg); err != nil {
-		t.Fatal(err)
-	}
+	err = cliConn.Send("MSGF", msg)
+	require.NoError(t, err, "Send failed")
 
 	got, err := srvConn.Receive()
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err, "Receive failed")
+
 	got = got[hdrlen:]
 
 	want, err := msg.Encode()
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err, "Encode failed")
+
 	require.Equal(t, want, got)
 }
 
 func TestServerWrite(t *testing.T) {
 	ep := "opc.tcp://127.0.0.1:4840/foo/bar"
 	ln, err := Listen(ep, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err, "Listen failed")
 	defer ln.Close()
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -153,35 +142,29 @@ func TestServerWrite(t *testing.T) {
 	}()
 
 	cliConn, err := Dial(ctx, ep)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err, "Dial failed")
 
 	for {
 		select {
 		case _, ok := <-done:
-			if !ok {
-				t.Fatal("failed to setup secure channel")
-			}
+			require.True(t, ok, "failed to setup secure channel")
 			goto NEXT
 		case err := <-acceptErr:
-			t.Fatalf("accept fail: %v", err)
+			require.Fail(t, "accept fail: %v", err)
 		case <-time.After(time.Second):
-			t.Fatal("timed out")
+			require.Fail(t, "timed out")
 		}
 	}
 
 NEXT:
 	want := []byte{0xde, 0xad, 0xbe, 0xef}
-	if _, err := srvConn.Write(want); err != nil {
-		t.Fatal(err)
-	}
+	_, err = srvConn.Write(want)
+	require.NoError(t, err, "Write failed")
 
 	got := make([]byte, cliConn.ReceiveBufSize())
 	n, err := cliConn.Read(got)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err, "Read failed")
+
 	got = got[:n]
 	require.Equal(t, want, got)
 }
