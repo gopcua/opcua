@@ -480,10 +480,8 @@ func sliceDim(val reflect.Value) (typ reflect.Type, dim []int32, count int32, er
 
 // set sets the value and updates the flags according to the type.
 func (m *Variant) set(v interface{}) error {
-	val := reflect.ValueOf(v)
-
 	// set array length and dimensions if value is a slice
-	et, dim, count, err := sliceDim(val)
+	et, dim, count, err := sliceDim(reflect.ValueOf(v))
 	if err != nil {
 		return err
 	}
