@@ -10,7 +10,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/pascaldekloe/goe/verify"
+	"github.com/stretchr/testify/require"
 )
 
 // CodecTestCase describes a test case for a encoding and decoding an
@@ -49,7 +49,7 @@ func RunCodecTest(t *testing.T, cases []CodecTestCase) {
 				if typ.Kind() == reflect.Slice {
 					v = v.Elem()
 				}
-				verify.Values(t, "", v.Interface(), c.Struct)
+				require.Equal(t, c.Struct, v.Interface())
 			})
 
 			t.Run("encode", func(t *testing.T) {
@@ -57,7 +57,7 @@ func RunCodecTest(t *testing.T, cases []CodecTestCase) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				verify.Values(t, "", b, c.Bytes)
+				require.Equal(t, c.Bytes, b)
 			})
 		})
 	}

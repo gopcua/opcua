@@ -477,6 +477,16 @@ func TestVariant(t *testing.T) {
 				0x01, 0x00, 0x00, 0x00,
 			},
 		},
+		{
+			Name:   "[]string(nil)",
+			Struct: MustVariant([]string(nil)),
+			Bytes: []byte{
+				// variant encoding mask
+				0x8c,
+				// array length
+				0xff, 0xff, 0xff, 0xff,
+			},
+		},
 	}
 	RunCodecTest(t, cases)
 }
@@ -540,19 +550,6 @@ func TestArray(t *testing.T) {
 
 		_, err := Decode(b, MustVariant([]uint32{0}))
 		if got, want := err, errUnbalancedSlice; !errors.Equal(got, want) {
-			t.Fatalf("got error %#v want %#v", got, want)
-		}
-	})
-	t.Run("length negative", func(t *testing.T) {
-		b := []byte{
-			// variant encoding mask
-			0x87,
-			// array length
-			0xff, 0xff, 0xff, 0xff, // -1
-		}
-
-		_, err := Decode(b, MustVariant([]uint32{0}))
-		if got, want := err, StatusBadEncodingLimitsExceeded; !errors.Equal(got, want) {
 			t.Fatalf("got error %#v want %#v", got, want)
 		}
 	})

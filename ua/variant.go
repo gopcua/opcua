@@ -141,19 +141,29 @@ func (m *Variant) Decode(b []byte) (int, error) {
 
 	// read flattened array elements
 	n := int(m.arrayLength)
-	if n < 0 || n > MaxVariantArrayLength {
+	if n > MaxVariantArrayLength {
 		return buf.Pos(), StatusBadEncodingLimitsExceeded
 	}
 
-	var vals reflect.Value
-	switch m.Type() {
-	case TypeIDByte:
-		vals = reflect.MakeSlice(reflect.TypeOf(ByteArray{}), n, n)
-	default:
-		vals = reflect.MakeSlice(reflect.SliceOf(typ), n, n)
+	// get the type for the slice
+	sliceType := reflect.SliceOf(typ)
+	if m.Type() == TypeIDByte {
+		sliceType = reflect.TypeOf(ByteArray{})
 	}
-	for i := 0; i < n; i++ {
-		vals.Index(i).Set(reflect.ValueOf(m.decodeValue(buf)))
+
+	var vals reflect.Value
+	switch {
+	// decode a nil slice
+	case n == -1:
+		vals = reflect.Zero(reflect.MakeSlice(sliceType, 0, 0).Type())
+		m.value = vals.Interface()
+
+	// decode a slice with values
+	default:
+		vals = reflect.MakeSlice(sliceType, n, n)
+		for i := 0; i < n; i++ {
+			vals.Index(i).Set(reflect.ValueOf(m.decodeValue(buf)))
+		}
 	}
 
 	// check for dimensions of multi-dimensional array
@@ -416,9 +426,11 @@ var errUnbalancedSlice = errors.New("unbalanced multi-dimensional array")
 
 // sliceDim determines the element type, dimensions and the total length
 // of a one or multi-dimensional slice.
-func sliceDim(v reflect.Value) (typ reflect.Type, dim []int32, count int32, err error) {
+//
+// If the value is a nil slice then count is -1.
+func sliceDim(val reflect.Value) (typ reflect.Type, dim []int32, count int32, err error) {
 	// null type
-	if v.Kind() == reflect.Invalid {
+	if val.Kind() == reflect.Invalid {
 		return nil, nil, 0, nil
 	}
 
@@ -430,35 +442,40 @@ func sliceDim(v reflect.Value) (typ reflect.Type, dim []int32, count int32, err 
 	// array of Byte.
 	//
 	// https://github.com/gopcua/opcua/issues/463
-	if v.Type() == reflect.TypeOf([]byte{}) && v.Type() != reflect.TypeOf(ByteArray{}) {
-		return v.Type(), nil, 1, nil
+	if val.Type() == reflect.TypeOf([]byte{}) && val.Type() != reflect.TypeOf(ByteArray{}) {
+		return val.Type(), nil, 1, nil
 	}
 
 	// element type
-	if v.Kind() != reflect.Slice {
-		return v.Type(), nil, 1, nil
+	if val.Kind() != reflect.Slice {
+		return val.Type(), nil, 1, nil
+	}
+
+	// nil array
+	if val.IsNil() {
+		return val.Type().Elem(), nil, -1, nil
 	}
 
 	// empty array
-	if v.Len() == 0 {
-		return v.Type().Elem(), append([]int32{0}, dim...), 0, nil
+	if val.Len() == 0 {
+		return val.Type().Elem(), append([]int32{0}, dim...), 0, nil
 	}
 
 	// check that inner slices all have the same length
-	if v.Index(0).Kind() == reflect.Slice {
-		for i := 0; i < v.Len(); i++ {
-			if v.Index(i).Len() != v.Index(0).Len() {
+	if val.Index(0).Kind() == reflect.Slice {
+		for i := 0; i < val.Len(); i++ {
+			if val.Index(i).Len() != val.Index(0).Len() {
 				return nil, nil, 0, errUnbalancedSlice
 			}
 		}
 	}
 
 	// recurse to inner slice or element type
-	typ, dim, count, err = sliceDim(v.Index(0))
+	typ, dim, count, err = sliceDim(val.Index(0))
 	if err != nil {
 		return nil, nil, 0, err
 	}
-	return typ, append([]int32{int32(v.Len())}, dim...), count * int32(v.Len()), nil
+	return typ, append([]int32{int32(val.Len())}, dim...), count * int32(val.Len()), nil
 }
 
 // set sets the value and updates the flags according to the type.
@@ -469,15 +486,18 @@ func (m *Variant) set(v interface{}) error {
 		return err
 	}
 
-	if len(dim) > 0 {
-		m.mask |= VariantArrayValues
+	switch {
+	case len(dim) > 1:
+		m.mask |= VariantArrayValues | VariantArrayDimensions
 		m.arrayLength = count
-	}
-
-	if len(dim) > 1 {
-		m.mask |= VariantArrayDimensions
 		m.arrayDimensionsLength = int32(len(dim))
 		m.arrayDimensions = dim
+
+	case len(dim) > 0 || count == -1:
+		m.mask |= VariantArrayValues
+		m.arrayLength = count
+		m.arrayDimensionsLength = 0
+		m.arrayDimensions = nil
 	}
 
 	typeid, ok := variantTypeToTypeID[et]
