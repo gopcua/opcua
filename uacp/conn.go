@@ -237,7 +237,9 @@ func (c *Conn) Handshake(ctx context.Context, endpoint string) error {
 		return err
 	}
 
-	b, err := c.Receive()
+	buf := AllocBuffer(int(c.ack.ReceiveBufSize))
+	defer FreeBuffer(buf)
+	b, err := c.Receive(buf.Bytes())
 	if err != nil {
 		return err
 	}
@@ -282,7 +284,9 @@ func (c *Conn) Handshake(ctx context.Context, endpoint string) error {
 }
 
 func (c *Conn) srvhandshake(endpoint string) error {
-	b, err := c.Receive()
+	buf := AllocBuffer(int(c.ack.ReceiveBufSize))
+	defer FreeBuffer(buf)
+	b, err := c.Receive(buf.Bytes())
 	if err != nil {
 		c.SendError(ua.StatusBadTCPInternalError)
 		return err
@@ -352,11 +356,7 @@ const hdrlen = 8
 // Receive reads a full UACP message from the underlying connection.
 // The size of b must be at least ReceiveBufSize. Otherwise,
 // the function returns an error.
-func (c *Conn) Receive() ([]byte, error) {
-	// TODO(kung-foo): allow user-specified buffer
-	// TODO(kung-foo): sync.Pool
-	b := make([]byte, c.ack.ReceiveBufSize)
-
+func (c *Conn) Receive(b []byte) ([]byte, error) {
 	if _, err := io.ReadFull(c, b[:hdrlen]); err != nil {
 		// todo(fs): do not wrap this error since it hides io.EOF
 		// todo(fs): use golang.org/x/xerrors
