@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.6.1 (11 Dec 2024)
+
+* Fix Variant to handle nil slices (#755,#678)
+* Set DataValue.Value to Variant(nil) for no value (#756,#722)
+* Split id_gen.go into smaller files (#680,#679)
+
 ## v0.6.0 (05 Dec 2024)
 
 * Add Wolfram Manufacturing to README (#707)
