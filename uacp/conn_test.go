@@ -18,9 +18,7 @@ func TestConn(t *testing.T) {
 	t.Run("server exists ", func(t *testing.T) {
 		ep := "opc.tcp://127.0.0.1:4840/foo/bar"
 		ln, err := Listen(ep, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		defer ln.Close()
 
 		ctx, cancel := context.WithCancel(context.Background())
@@ -45,9 +43,9 @@ func TestConn(t *testing.T) {
 		select {
 		case <-done:
 		case err := <-acceptErr:
-			t.Fatalf("accept fail: %v", err)
+			require.Fail(t, "accept fail: %v", err)
 		case <-time.After(time.Second):
-			t.Fatal("timed out")
+			require.Fail(t, "timed out")
 		}
 	})
 
