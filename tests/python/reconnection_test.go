@@ -92,7 +92,7 @@ func TestAutoReconnection(t *testing.T) {
 	defer sub.Unsubscribe(ctx)
 
 	for _, tt := range tests {
-		ok := t.Run(tt.name, func(t *testing.T) {
+		t.Run(tt.name, func(t *testing.T) {
 
 			msg := <-ch
 			require.NoError(t, msg.Error, "No error expected for first value")
@@ -142,9 +142,5 @@ func TestAutoReconnection(t *testing.T) {
 				require.NoError(t, msg.Error)
 			}
 		})
-
-		if !ok {
-			require.Fail(t)
-		}
 	}
 }
