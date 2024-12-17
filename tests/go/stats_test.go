@@ -5,11 +5,10 @@ import (
 	"expvar"
 	"testing"
 
-	"github.com/pascaldekloe/goe/verify"
-
 	"github.com/gopcua/opcua"
 	"github.com/gopcua/opcua/stats"
 	"github.com/gopcua/opcua/ua"
+	"github.com/stretchr/testify/require"
 )
 
 func newExpVarInt(i int64) *expvar.Int {
@@ -27,12 +26,10 @@ func TestStats(t *testing.T) {
 	defer srv.Close()
 
 	c, err := opcua.NewClient("opc.tcp://localhost:4840", opcua.SecurityMode(ua.MessageSecurityModeNone))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := c.Connect(ctx); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err, "NewClient failed")
+
+	err = c.Connect(ctx)
+	require.NoError(t, err, "Connect failed")
 	c.Close(ctx)
 
 	want := map[string]*expvar.Int{
@@ -53,20 +50,14 @@ func TestStats(t *testing.T) {
 	got := map[string]expvar.Var{}
 	stats.Client().Do(func(kv expvar.KeyValue) { got[kv.Key] = kv.Value })
 	for k := range got {
-		if _, ok := want[k]; !ok {
-			t.Fatalf("got unexpected key %q", k)
-		}
+		require.Contains(t, want, k, "got unexpected key %q", k)
 	}
 	for k := range want {
-		if _, ok := got[k]; !ok {
-			t.Fatalf("missing expected key %q", k)
-		}
+		require.Contains(t, got, k, "missing expected key %q", k)
 	}
 
 	for k, ev := range want {
 		v := stats.Client().Get(k)
-		if !verify.Values(t, "", v, ev) {
-			t.Errorf("got %s for %q, want %s", v.String(), k, ev.String())
-		}
+		require.Equal(t, ev, v)
 	}
 }

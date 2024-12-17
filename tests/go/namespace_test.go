@@ -8,10 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pascaldekloe/goe/verify"
-
 	"github.com/gopcua/opcua"
 	"github.com/gopcua/opcua/ua"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNamespace(t *testing.T) {
@@ -21,41 +20,32 @@ func TestNamespace(t *testing.T) {
 	defer srv.Close()
 
 	c, err := opcua.NewClient("opc.tcp://localhost:4840", opcua.SecurityMode(ua.MessageSecurityModeNone))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := c.Connect(ctx); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err, "NewClient failed")
+
+	err = c.Connect(ctx)
+	require.NoError(t, err, "Connect failed")
 	defer c.Close(ctx)
 
 	time.Sleep(2 * time.Second)
 
 	t.Run("NamespaceArray", func(t *testing.T) {
 		got, err := c.NamespaceArray(ctx)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err, "NamespaceArray failed")
+
 		want := []string{
 			"http://opcfoundation.org/UA/",
 			"NodeNamespace",
 			"http://gopcua.com/",
 		}
-		verify.Values(t, "", got, want)
+		require.Equal(t, want, got, "NamespaceArray not equal")
 	})
 	t.Run("FindNamespace", func(t *testing.T) {
 		ns, err := c.FindNamespace(ctx, "http://gopcua.com/")
-		if err != nil {
-			t.Fatal(err)
-		}
-		if got, want := ns, uint16(2); got != want {
-			t.Fatalf("got namespace id %d want %d", got, want)
-		}
+		require.NoError(t, err, "FindNamespace failed")
+		require.Equal(t, uint16(2), ns, "namespace id not equal")
 	})
 	t.Run("UpdateNamespaces", func(t *testing.T) {
 		err := c.UpdateNamespaces(ctx)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err, "UpdateNamespaces failed")
 	})
 }
