@@ -1,5 +1,4 @@
 //go:build integration
-// +build integration
 
 package uatest
 
@@ -9,6 +8,7 @@ import (
 
 	"github.com/gopcua/opcua"
 	"github.com/gopcua/opcua/ua"
+	"github.com/stretchr/testify/require"
 )
 
 // TestWrite performs an integration test to first write
@@ -33,12 +33,10 @@ func TestWrite(t *testing.T) {
 	defer srv.Close()
 
 	c, err := opcua.NewClient(srv.Endpoint, srv.Opts...)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := c.Connect(ctx); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err, "NewClient failed")
+
+	err = c.Connect(ctx)
+	require.NoError(t, err, "Connect failed")
 	defer c.Close(ctx)
 
 	for _, tt := range tests {
@@ -70,10 +68,6 @@ func testWrite(t *testing.T, ctx context.Context, c *opcua.Client, status ua.Sta
 	t.Helper()
 
 	resp, err := c.Write(ctx, req)
-	if err != nil {
-		t.Fatalf("Write failed: %s", err)
-	}
-	if got, want := resp.Results[0], status; got != want {
-		t.Fatalf("got status %v want %v", got, want)
-	}
+	require.NoError(t, err, "Write failed")
+	require.Equal(t, status, resp.Results[0], "Write result not equal")
 }
