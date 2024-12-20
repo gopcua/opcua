@@ -4,21 +4,19 @@ import (
 	"context"
 	"testing"
 
-	"github.com/pascaldekloe/goe/verify"
-
 	"github.com/gopcua/opcua/id"
 	"github.com/gopcua/opcua/ua"
+	"github.com/stretchr/testify/require"
 )
 
 func TestClient_Send_DoesNotPanicWhenDisconnected(t *testing.T) {
 	c, err := NewClient("opc.tcp://example.com:4840")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err, "NewClient failed")
+
 	err = c.Send(context.Background(), &ua.ReadRequest{}, func(i ua.Response) error {
 		return nil
 	})
-	verify.Values(t, "", err, ua.StatusBadServerNotConnected)
+	require.Equal(t, ua.StatusBadServerNotConnected, err)
 }
 
 func TestCloneReadRequest(t *testing.T) {
@@ -100,7 +98,7 @@ func TestCloneReadRequest(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := cloneReadRequest(tt.req)
-			verify.Values(t, "", got, tt.want)
+			require.Equal(t, tt.want, got)
 		})
 	}
 }
@@ -181,7 +179,7 @@ func TestCloneBrowseRequest(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := cloneBrowseRequest(tt.req)
-			verify.Values(t, "", got, tt.want)
+			require.Equal(t, tt.want, got)
 		})
 	}
 }

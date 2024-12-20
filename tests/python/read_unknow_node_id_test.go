@@ -1,5 +1,4 @@
 //go:build integration
-// +build integration
 
 package uatest
 
@@ -10,6 +9,7 @@ import (
 	"github.com/gopcua/opcua"
 	"github.com/gopcua/opcua/id"
 	"github.com/gopcua/opcua/ua"
+	"github.com/stretchr/testify/require"
 )
 
 // TestRead performs an integration test to read values
@@ -21,12 +21,10 @@ func TestReadUnknowNodeID(t *testing.T) {
 	defer srv.Close()
 
 	c, err := opcua.NewClient(srv.Endpoint, srv.Opts...)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := c.Connect(ctx); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err, "NewClient failed")
+
+	err = c.Connect(ctx)
+	require.NoError(t, err, "Connect failed")
 	defer c.Close(ctx)
 
 	// read node with unknown extension object
@@ -37,13 +35,9 @@ func TestReadUnknowNodeID(t *testing.T) {
 			{NodeID: nodeWithUnknownType},
 		},
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err, "Read failed")
 
-	if got, want := resp.Results[0].Status, ua.StatusBadDataTypeIDUnknown; got != want {
-		t.Errorf("got status %v want %v for a node with an unknown type", got, want)
-	}
+	require.Equal(t, ua.StatusBadDataTypeIDUnknown, resp.Results[0].Status, "got different status for a node with an unknown type")
 
 	// check that the connection is still usable by reading another node.
 	_, err = c.Read(ctx, &ua.ReadRequest{
@@ -53,7 +47,5 @@ func TestReadUnknowNodeID(t *testing.T) {
 			},
 		},
 	})
-	if err != nil {
-		t.Error(err)
-	}
+	require.NoError(t, err, "Read failed")
 }

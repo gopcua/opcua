@@ -5,10 +5,11 @@
 package ua
 
 import (
-	"bytes"
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 type A struct {
@@ -384,9 +385,7 @@ func TestCodec(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if reflect.ValueOf(tt.v).Kind() != reflect.Ptr {
-				t.Fatalf("%T is not a pointer", tt.v)
-			}
+			require.Equal(t, reflect.Ptr, reflect.ValueOf(tt.v).Kind(), "%T is not a pointer", tt.v)
 
 			t.Run("decode", func(t *testing.T) {
 				// create a new instance of the same type as tt.v
@@ -394,22 +393,14 @@ func TestCodec(t *testing.T) {
 				typ := reflect.ValueOf(tt.v).Type()
 				v := reflect.New(typ.Elem())
 
-				if _, err := Decode(tt.b, v.Interface()); err != nil {
-					t.Fatal(err)
-				}
-
-				if got, want := v.Interface(), tt.v; !reflect.DeepEqual(got, want) {
-					t.Fatalf("got %#v, want %#v", got, want)
-				}
+				_, err := Decode(tt.b, v.Interface())
+				require.NoError(t, err, "Decode failed")
+				require.Equal(t, tt.v, v.Interface(), "Decoded payload not equal")
 			})
 			t.Run("encode", func(t *testing.T) {
 				b, err := Encode(tt.v)
-				if err != nil {
-					t.Fatal(err)
-				}
-				if got, want := b, tt.b; !bytes.Equal(got, want) {
-					t.Fatalf("\ngot  %#v\nwant %#v", got, want)
-				}
+				require.NoError(t, err, "Encode failed")
+				require.Equal(t, tt.b, b, "Encoded payload not equal")
 			})
 		})
 	}
@@ -426,7 +417,5 @@ func TestFailDecodeArray(t *testing.T) {
 	}
 	var a [2]int32
 	_, err := Decode(b, &a)
-	if err == nil {
-		t.Fatalf("was expecting error for tryig to decode a stream of bytes with length 3 into an array of size 2")
-	}
+	require.Error(t, err, "was expecting error for tryig to decode a stream of bytes with length 3 into an array of size 2")
 }

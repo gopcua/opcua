@@ -1,5 +1,4 @@
 //go:build integration
-// +build integration
 
 package uatest
 
@@ -7,10 +6,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/pascaldekloe/goe/verify"
-
 	"github.com/gopcua/opcua"
 	"github.com/gopcua/opcua/ua"
+	"github.com/stretchr/testify/require"
 )
 
 // TestRead performs an integration test to read values
@@ -34,12 +32,10 @@ func TestRead(t *testing.T) {
 	defer srv.Close()
 
 	c, err := opcua.NewClient(srv.Endpoint, srv.Opts...)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := c.Connect(ctx); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err, "NewClient failed")
+
+	err = c.Connect(ctx)
+	require.NoError(t, err, "Connect failed")
 	defer c.Close(ctx)
 
 	for _, tt := range tests {
@@ -63,15 +59,9 @@ func testRead(t *testing.T, ctx context.Context, c *opcua.Client, v interface{},
 		},
 		TimestampsToReturn: ua.TimestampsToReturnBoth,
 	})
-	if err != nil {
-		t.Fatalf("Read failed: %s", err)
-	}
-	if resp.Results[0].Status != ua.StatusOK {
-		t.Fatalf("Status not OK: %v", resp.Results[0].Status)
-	}
-	if got, want := resp.Results[0].Value.Value(), v; !verify.Values(t, "", got, want) {
-		t.Fail()
-	}
+	require.NoError(t, err, "Read failed")
+	require.Equal(t, ua.StatusOK, resp.Results[0].Status, "Status not OK")
+	require.Equal(t, v, resp.Results[0].Value.Value(), "Results[0].Value not equal")
 }
 
 func testRegisteredRead(t *testing.T, ctx context.Context, c *opcua.Client, v interface{}, id *ua.NodeID) {
@@ -80,9 +70,7 @@ func testRegisteredRead(t *testing.T, ctx context.Context, c *opcua.Client, v in
 	resp, err := c.RegisterNodes(ctx, &ua.RegisterNodesRequest{
 		NodesToRegister: []*ua.NodeID{id},
 	})
-	if err != nil {
-		t.Fatalf("RegisterNodes failed: %s", err)
-	}
+	require.NoError(t, err, "RegisterNodes failed")
 
 	testRead(t, ctx, c, v, resp.RegisteredNodeIDs[0])
 	testRead(t, ctx, c, v, resp.RegisteredNodeIDs[0])
@@ -93,7 +81,5 @@ func testRegisteredRead(t *testing.T, ctx context.Context, c *opcua.Client, v in
 	_, err = c.UnregisterNodes(ctx, &ua.UnregisterNodesRequest{
 		NodesToUnregister: []*ua.NodeID{id},
 	})
-	if err != nil {
-		t.Fatalf("UnregisterNodes failed: %s", err)
-	}
+	require.NoError(t, err, "UnregisterNodes failed")
 }
