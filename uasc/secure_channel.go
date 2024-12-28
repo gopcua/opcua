@@ -1033,7 +1033,6 @@ func (s *SecureChannel) sendAsyncWithTimeout(
 		}
 		if i > 0 { // fix sequence number on subsequent chunks
 			number := instance.nextSequenceNumber()
-			log.Printf("burning sequence number %d", number)
 			binary.LittleEndian.PutUint32(chunk[16:], uint32(number))
 		}
 
