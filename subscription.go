@@ -31,6 +31,7 @@ type Subscription struct {
 	RevisedMaxKeepAliveCount  uint32
 	Notifs                    chan<- *PublishNotificationData
 	params                    *SubscriptionParameters
+	paramsMu                  sync.Mutex
 	items                     map[uint32]*monitoredItem
 	itemsMu                   sync.Mutex
 	lastSeq                   uint32
@@ -109,6 +110,40 @@ func (s *Subscription) delete(ctx context.Context) error {
 	default:
 		return res.Results[0]
 	}
+}
+
+func (s *Subscription) ModifySubscription(ctx context.Context, params SubscriptionParameters) (*ua.ModifySubscriptionResponse, error) {
+	stats.Subscription().Add("ModifySubscription", 1)
+
+	params.setDefaults()
+	req := &ua.ModifySubscriptionRequest{
+		SubscriptionID:              s.SubscriptionID,
+		RequestedPublishingInterval: float64(params.Interval.Milliseconds()),
+		RequestedLifetimeCount:      params.LifetimeCount,
+		RequestedMaxKeepAliveCount:  params.MaxKeepAliveCount,
+		MaxNotificationsPerPublish:  params.MaxNotificationsPerPublish,
+		Priority:                    params.Priority,
+	}
+
+	var res *ua.ModifySubscriptionResponse
+	err := s.c.Send(ctx, req, func(v ua.Response) error {
+		return safeAssign(v, &res)
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	// update subscription parameters
+	s.paramsMu.Lock()
+	s.params = &params
+	s.paramsMu.Unlock()
+	// update revised subscription parameters
+	s.RevisedPublishingInterval = time.Duration(res.RevisedPublishingInterval) * time.Millisecond
+	s.RevisedLifetimeCount = res.RevisedLifetimeCount
+	s.RevisedMaxKeepAliveCount = res.RevisedMaxKeepAliveCount
+
+	return res, nil
 }
 
 func (s *Subscription) Monitor(ctx context.Context, ts ua.TimestampsToReturn, items ...*ua.MonitoredItemCreateRequest) (*ua.CreateMonitoredItemsResponse, error) {
