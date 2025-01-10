@@ -8,6 +8,7 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
+	"fmt"
 	"log"
 	"math/rand"
 	"net"
@@ -276,8 +277,7 @@ func loadPrivateKey(filename string) (*rsa.PrivateKey, error) {
 // It also detects and sets the ApplicationURI from the URI within the certificate.
 func Certificate(cert []byte) Option {
 	return func(cfg *Config) error {
-		setCertificate(cert, cfg)
-		return nil
+		return setCertificate(cert, cfg)
 	}
 }
 
@@ -294,8 +294,7 @@ func CertificateFile(filename string) Option {
 		if err != nil {
 			return err
 		}
-		setCertificate(cert, cfg)
-		return nil
+		return setCertificate(cert, cfg)
 	}
 }
 
@@ -316,23 +315,23 @@ func loadCertificate(filename string) ([]byte, error) {
 	return block.Bytes, nil
 }
 
-func setCertificate(cert []byte, cfg *Config) {
+func setCertificate(cert []byte, cfg *Config) error {
 	cfg.sechan.Certificate = cert
 
 	// Extract the application URI from the certificate.
 	x509cert, err := x509.ParseCertificate(cert)
 	if err != nil {
-		log.Fatalf("Failed to parse certificate: %s", err)
-		return
+		return fmt.Errorf("failed to parse certificate: %s", err)
 	}
 	if len(x509cert.URIs) == 0 {
-		return
+		return nil
 	}
 	appURI := x509cert.URIs[0].String()
 	if appURI == "" {
-		return
+		return nil
 	}
 	cfg.session.ClientDescription.ApplicationURI = appURI
+	return nil
 }
 
 // SecurityFromEndpoint sets the server-related security parameters from
