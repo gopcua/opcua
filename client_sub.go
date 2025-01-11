@@ -89,7 +89,7 @@ func (c *Client) SubscriptionIDs() []uint32 {
 }
 
 // recreateSubscriptions creates new subscriptions
-// with the same parameters to replace the previous ones
+// with the same parameters to replace the previous one
 func (c *Client) recreateSubscription(ctx context.Context, id uint32) error {
 	c.subMux.Lock()
 	defer c.subMux.Unlock()
@@ -98,7 +98,10 @@ func (c *Client) recreateSubscription(ctx context.Context, id uint32) error {
 	if !ok {
 		return ua.StatusBadSubscriptionIDInvalid
 	}
-	return sub.recreate_NeedsSubMuxLock(ctx)
+
+	sub.recreate_delete(ctx)
+	c.forgetSubscription_NeedsSubMuxLock(ctx, id)
+	return sub.recreate_create(ctx)
 }
 
 // transferSubscriptions ask the server to transfer the given subscriptions
