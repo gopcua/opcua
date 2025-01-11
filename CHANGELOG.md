@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.6.2 (3 Jan 2025)
+
+* uasc: remove debug log (#761,#760)
+* Test with stretchr/verify (#757,#758)
+* fix: regression in examples introduced by #753 (#759)
+
 ## v0.6.1 (11 Dec 2024)
 
 * Fix Variant to handle nil slices (#755,#678)
