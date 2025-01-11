@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.6.3 (11 Jan 2025)
+
+* Remove calls to log.Fatal (#762,#763)
+
 ## v0.6.2 (3 Jan 2025)
 
 * uasc: remove debug log (#761,#760)
