@@ -72,7 +72,7 @@ func (c *Client) Subscribe(ctx context.Context, params *SubscriptionParameters, 
 	}
 
 	c.subs[sub.SubscriptionID] = sub
-	c.updatePublishTimeout_NeedsSubMuxRLock()
+	c.updatePublishTimeout_NeedsSubMuxLock()
 	return sub, nil
 }
 
@@ -230,7 +230,7 @@ func (c *Client) forgetSubscription(ctx context.Context, id uint32) {
 
 func (c *Client) forgetSubscription_NeedsSubMuxLock(ctx context.Context, id uint32) {
 	delete(c.subs, id)
-	c.updatePublishTimeout_NeedsSubMuxRLock()
+	c.updatePublishTimeout_NeedsSubMuxLock()
 	stats.Subscription().Add("Count", -1)
 
 	if len(c.subs) == 0 {
@@ -240,7 +240,7 @@ func (c *Client) forgetSubscription_NeedsSubMuxLock(ctx context.Context, id uint
 	}
 }
 
-func (c *Client) updatePublishTimeout_NeedsSubMuxRLock() {
+func (c *Client) updatePublishTimeout_NeedsSubMuxLock() {
 	maxTimeout := uasc.MaxTimeout
 	for _, s := range c.subs {
 		if d := s.publishTimeout(); d < maxTimeout {
