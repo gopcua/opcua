@@ -22,8 +22,6 @@ const (
 	DefaultSubscriptionPriority                   = 0
 )
 
-const terminatedSubscriptionID uint32 = 0xC0CAC01B
-
 type Subscription struct {
 	SubscriptionID            uint32
 	RevisedPublishingInterval time.Duration
