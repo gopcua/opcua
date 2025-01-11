@@ -109,9 +109,7 @@ func New(opts ...Option) *Server {
 		opt(cfg)
 	}
 	url := ""
-	if len(cfg.endpoints) == 0 {
-		log.Printf("No endpoints defined!")
-	} else {
+	if len(cfg.endpoints) != 0 {
 		url = cfg.endpoints[0]
 	}
 
