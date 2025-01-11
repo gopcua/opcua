@@ -470,7 +470,7 @@ func (c *Client) publish(ctx context.Context) error {
 		}
 
 		// handle the publish response for a specific subscription
-		c.handleNotification_NeedsSubMuxLock(ctx, sub, res)
+		c.handleNotification_NeedsSubMuxLock(sub, res)
 		c.subMux.Unlock()
 
 		c.notifySubscription(ctx, sub, res.NotificationMessage)
@@ -513,7 +513,7 @@ func (c *Client) handleAcks_NeedsSubMuxLock(res []ua.StatusCode) {
 	dlog.Printf("notAcked=%v", notAcked)
 }
 
-func (c *Client) handleNotification_NeedsSubMuxLock(ctx context.Context, sub *Subscription, res *ua.PublishResponse) {
+func (c *Client) handleNotification_NeedsSubMuxLock(sub *Subscription, res *ua.PublishResponse) {
 	dlog := debug.NewPrefixLogger("publish: sub %d: ", res.SubscriptionID)
 
 	// keep-alive message
