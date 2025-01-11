@@ -108,11 +108,13 @@ func New(opts ...Option) *Server {
 	for _, opt := range opts {
 		opt(cfg)
 	}
-	if len(cfg.endpoints) == 0 {
-		log.Fatalf("No endpoints defined!")
+	url := ""
+	if len(cfg.endpoints) != 0 {
+		url = cfg.endpoints[0]
 	}
+
 	s := &Server{
-		url:      cfg.endpoints[0],
+		url:      url,
 		cfg:      cfg,
 		cb:       newChannelBroker(cfg.logger),
 		sb:       newSessionBroker(cfg.logger),
@@ -148,7 +150,8 @@ func New(opts ...Option) *Server {
 	n0, ok := s.namespaces[0].(*NodeNameSpace)
 	n0.srv = s
 	if !ok {
-		log.Fatalf("not a node namespace!")
+		// this should never happen because we just set namespace 0 to be a node namespace
+		log.Panic("Namespace 0 is not a node namespace!")
 	}
 	s.ImportNodeSet(&nodes)
 
@@ -236,6 +239,10 @@ func (s *Server) URLs() []string {
 // to localhost:0 to let the OS select a random port
 func (s *Server) Start(ctx context.Context) error {
 	var err error
+
+	if len(s.cfg.endpoints) == 0 {
+		return fmt.Errorf("cannot start server: no endpoints defined")
+	}
 
 	// Register all service handlers
 	s.initHandlers()
