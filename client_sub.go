@@ -72,7 +72,7 @@ func (c *Client) Subscribe(ctx context.Context, params *SubscriptionParameters, 
 	}
 
 	c.subs[sub.SubscriptionID] = sub
-	c.updatePublishTimeout_NeedsSubMuxRLock()
+	c.updatePublishTimeout_NeedsSubMuxLock()
 	return sub, nil
 }
 
@@ -89,7 +89,7 @@ func (c *Client) SubscriptionIDs() []uint32 {
 }
 
 // recreateSubscriptions creates new subscriptions
-// with the same parameters to replace the previous ones
+// with the same parameters to replace the previous one
 func (c *Client) recreateSubscription(ctx context.Context, id uint32) error {
 	c.subMux.Lock()
 	defer c.subMux.Unlock()
@@ -98,7 +98,10 @@ func (c *Client) recreateSubscription(ctx context.Context, id uint32) error {
 	if !ok {
 		return ua.StatusBadSubscriptionIDInvalid
 	}
-	return sub.recreate_NeedsSubMuxLock(ctx)
+
+	sub.recreate_delete(ctx)
+	c.forgetSubscription_NeedsSubMuxLock(ctx, id)
+	return sub.recreate_create(ctx)
 }
 
 // transferSubscriptions ask the server to transfer the given subscriptions
@@ -230,7 +233,7 @@ func (c *Client) forgetSubscription(ctx context.Context, id uint32) {
 
 func (c *Client) forgetSubscription_NeedsSubMuxLock(ctx context.Context, id uint32) {
 	delete(c.subs, id)
-	c.updatePublishTimeout_NeedsSubMuxRLock()
+	c.updatePublishTimeout_NeedsSubMuxLock()
 	stats.Subscription().Add("Count", -1)
 
 	if len(c.subs) == 0 {
@@ -240,7 +243,7 @@ func (c *Client) forgetSubscription_NeedsSubMuxLock(ctx context.Context, id uint
 	}
 }
 
-func (c *Client) updatePublishTimeout_NeedsSubMuxRLock() {
+func (c *Client) updatePublishTimeout_NeedsSubMuxLock() {
 	maxTimeout := uasc.MaxTimeout
 	for _, s := range c.subs {
 		if d := s.publishTimeout(); d < maxTimeout {
@@ -470,7 +473,7 @@ func (c *Client) publish(ctx context.Context) error {
 		}
 
 		// handle the publish response for a specific subscription
-		c.handleNotification_NeedsSubMuxLock(ctx, sub, res)
+		c.handleNotification_NeedsSubMuxLock(sub, res)
 		c.subMux.Unlock()
 
 		c.notifySubscription(ctx, sub, res.NotificationMessage)
@@ -513,7 +516,7 @@ func (c *Client) handleAcks_NeedsSubMuxLock(res []ua.StatusCode) {
 	dlog.Printf("notAcked=%v", notAcked)
 }
 
-func (c *Client) handleNotification_NeedsSubMuxLock(ctx context.Context, sub *Subscription, res *ua.PublishResponse) {
+func (c *Client) handleNotification_NeedsSubMuxLock(sub *Subscription, res *ua.PublishResponse) {
 	dlog := debug.NewPrefixLogger("publish: sub %d: ", res.SubscriptionID)
 
 	// keep-alive message

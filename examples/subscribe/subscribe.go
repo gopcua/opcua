@@ -97,6 +97,14 @@ func main() {
 		log.Fatal(err)
 	}
 
+	// Uncomment the following to try modifying the subscription
+	//
+	// var params opcua.SubscriptionParameters
+	// params.Interval = time.Millisecond * 2000
+	// if _, err := sub.ModifySubscription(ctx, params); err != nil {
+	// 	log.Fatal(err)
+	// }
+
 	// read from subscription's notification channel until ctx is cancelled
 	for {
 		select {

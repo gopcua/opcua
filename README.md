@@ -241,7 +241,7 @@ Here is the current set of supported services. For low-level access use the clie
 |                             | SetMonitoringMode             | Yes    | Yes    |              |
 |                             | SetTriggering                 |        |        |              |
 | Subscription Service Set    | CreateSubscription            | Yes    | Yes    |              |
-|                             | ModifySubscription            |        |        |              |
+|                             | ModifySubscription            | Yes    |        |              |
 |                             | SetPublishingMode             |        |        |              |
 |                             | Publish                       | Yes    | Yes    |              |
 |                             | Republish                     |        |        |              |

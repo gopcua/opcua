@@ -22,8 +22,6 @@ const (
 	DefaultSubscriptionPriority                   = 0
 )
 
-const terminatedSubscriptionID uint32 = 0xC0CAC01B
-
 type Subscription struct {
 	SubscriptionID            uint32
 	RevisedPublishingInterval time.Duration
@@ -31,6 +29,7 @@ type Subscription struct {
 	RevisedMaxKeepAliveCount  uint32
 	Notifs                    chan<- *PublishNotificationData
 	params                    *SubscriptionParameters
+	paramsMu                  sync.Mutex
 	items                     map[uint32]*monitoredItem
 	itemsMu                   sync.Mutex
 	lastSeq                   uint32
@@ -109,6 +108,40 @@ func (s *Subscription) delete(ctx context.Context) error {
 	default:
 		return res.Results[0]
 	}
+}
+
+func (s *Subscription) ModifySubscription(ctx context.Context, params SubscriptionParameters) (*ua.ModifySubscriptionResponse, error) {
+	stats.Subscription().Add("ModifySubscription", 1)
+
+	params.setDefaults()
+	req := &ua.ModifySubscriptionRequest{
+		SubscriptionID:              s.SubscriptionID,
+		RequestedPublishingInterval: float64(params.Interval.Milliseconds()),
+		RequestedLifetimeCount:      params.LifetimeCount,
+		RequestedMaxKeepAliveCount:  params.MaxKeepAliveCount,
+		MaxNotificationsPerPublish:  params.MaxNotificationsPerPublish,
+		Priority:                    params.Priority,
+	}
+
+	var res *ua.ModifySubscriptionResponse
+	err := s.c.Send(ctx, req, func(v ua.Response) error {
+		return safeAssign(v, &res)
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	// update subscription parameters
+	s.paramsMu.Lock()
+	s.params = &params
+	s.paramsMu.Unlock()
+	// update revised subscription parameters
+	s.RevisedPublishingInterval = time.Duration(res.RevisedPublishingInterval) * time.Millisecond
+	s.RevisedLifetimeCount = res.RevisedLifetimeCount
+	s.RevisedMaxKeepAliveCount = res.RevisedMaxKeepAliveCount
+
+	return res, nil
 }
 
 func (s *Subscription) Monitor(ctx context.Context, ts ua.TimestampsToReturn, items ...*ua.MonitoredItemCreateRequest) (*ua.CreateMonitoredItemsResponse, error) {
@@ -358,29 +391,31 @@ func (p *SubscriptionParameters) setDefaults() {
 	}
 }
 
-// recreate_NeedsSubMuxLock creates a new subscription based on the previous subscription
-// parameters and monitored items.
-func (s *Subscription) recreate_NeedsSubMuxLock(ctx context.Context) error {
-	dlog := debug.NewPrefixLogger("sub %d: recreate: ", s.SubscriptionID)
-
-	if s.SubscriptionID == terminatedSubscriptionID {
-		dlog.Printf("subscription is not in a valid state")
-		return nil
+// recreate_delete is called by the client when it is trying to
+// recreate an existing subscription. This function deletes the
+// existing subscription from the server.
+func (s *Subscription) recreate_delete(ctx context.Context) error {
+	dlog := debug.NewPrefixLogger("sub %d: recreate_delete: ", s.SubscriptionID)
+	req := &ua.DeleteSubscriptionsRequest{
+		SubscriptionIDs: []uint32{s.SubscriptionID},
 	}
+	var res *ua.DeleteSubscriptionsResponse
+	_ = s.c.Send(ctx, req, func(v ua.Response) error {
+		return safeAssign(v, &res)
+	})
+	dlog.Print("subscription deleted")
+	return nil
+}
 
+// recreate_create is called by the client when it is trying to
+// recreate an existing subscription. This function creates a
+// new subscription with the same parameters as the previous one.
+func (s *Subscription) recreate_create(ctx context.Context) error {
+	dlog := debug.NewPrefixLogger("sub %d: recreate_create: ", s.SubscriptionID)
+
+	s.paramsMu.Lock()
 	params := s.params
-	{
-		req := &ua.DeleteSubscriptionsRequest{
-			SubscriptionIDs: []uint32{s.SubscriptionID},
-		}
-		var res *ua.DeleteSubscriptionsResponse
-		_ = s.c.Send(ctx, req, func(v ua.Response) error {
-			return safeAssign(v, &res)
-		})
-		dlog.Print("subscription deleted")
-	}
-	s.c.forgetSubscription_NeedsSubMuxLock(ctx, s.SubscriptionID)
-	dlog.Printf("subscription forgotton")
+	s.paramsMu.Unlock()
 
 	req := &ua.CreateSubscriptionRequest{
 		RequestedPublishingInterval: float64(params.Interval / time.Millisecond),
