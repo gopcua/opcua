@@ -418,26 +418,29 @@ func (s *Subscription) ModifyMonitorItems(ctx context.Context, nodes ...Request)
 		return nil
 	}
 
-	var toModify Item
-	toModifyReq := make([]*ua.MonitoredItemModifyRequest, 0)
+	toModify := make([]*ua.MonitoredItemModifyRequest, 0)
+
 	for _, node := range nodes {
 		for _, item := range s.itemLookup {
-			if item.nodeID.String() == node.NodeID.String() {
-				toModify = item
+			if item.nodeID.String() != node.NodeID.String() {
+				continue
+			}
+
+			if node.MonitoringParameters == nil {
 				break
 			}
+
+			request := &ua.MonitoredItemModifyRequest{
+				MonitoredItemID:     item.id,
+				RequestedParameters: node.MonitoringParameters,
+			}
+			request.RequestedParameters.ClientHandle = item.handle
+			toModify = append(toModify, request)
+			break
 		}
-		request := &ua.MonitoredItemModifyRequest{
-			MonitoredItemID: toModify.id,
-		}
-		if node.MonitoringParameters != nil {
-			request.RequestedParameters = node.MonitoringParameters
-			request.RequestedParameters.ClientHandle = toModify.handle
-		}
-		toModifyReq = append(toModifyReq, request)
 	}
 
-	resp, err := s.sub.ModifyMonitoredItems(ctx, ua.TimestampsToReturnBoth, toModifyReq...)
+	resp, err := s.sub.ModifyMonitoredItems(ctx, ua.TimestampsToReturnBoth, toModify...)
 	if err != nil {
 		return err
 	}
@@ -446,7 +449,7 @@ func (s *Subscription) ModifyMonitorItems(ctx context.Context, nodes ...Request)
 		return resp.ResponseHeader.ServiceResult
 	}
 
-	if len(resp.Results) != len(toModifyReq) {
+	if len(resp.Results) != len(toModify) {
 		return errors.Errorf("modify monitored items response length mismatch")
 	}
 
