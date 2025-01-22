@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.6.5 (22 Jan 2025)
+
+* monitor: add modification functionality (#764)
+
 ## v0.6.4 (14 Jan 2025)
 
 * subscription: add ModifySubscription functionality (#714)
