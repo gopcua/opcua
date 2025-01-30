@@ -57,13 +57,13 @@ func startServer() *server.Server {
 
 	// Create some nodes for it.
 	n := nodeNS.AddNewVariableStringNode("ro_bool", true)
-	n.SetAttribute(ua.AttributeIDUserAccessLevel, ua.DataValue{EncodingMask: ua.DataValueValue, Value: ua.MustVariant(uint32(1))})
+	n.SetAttribute(ua.AttributeIDUserAccessLevel, &ua.DataValue{EncodingMask: ua.DataValueValue, Value: ua.MustVariant(uint32(1))})
 	nns_obj.AddRef(n, id.HasComponent, true)
 	n = nodeNS.AddNewVariableStringNode("rw_bool", true)
 	nns_obj.AddRef(n, id.HasComponent, true)
 
 	n = nodeNS.AddNewVariableStringNode("ro_int32", int32(5))
-	n.SetAttribute(ua.AttributeIDUserAccessLevel, ua.DataValue{EncodingMask: ua.DataValueValue, Value: ua.MustVariant(uint32(1))})
+	n.SetAttribute(ua.AttributeIDUserAccessLevel, &ua.DataValue{EncodingMask: ua.DataValueValue, Value: ua.MustVariant(uint32(1))})
 	nns_obj.AddRef(n, id.HasComponent, true)
 	n = nodeNS.AddNewVariableStringNode("rw_int32", int32(5))
 	nns_obj.AddRef(n, id.HasComponent, true)

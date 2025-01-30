@@ -199,12 +199,12 @@ func main() {
 	// the parent node in the namespace if applicable.
 	var3 := server.NewNode(
 		ua.NewNumericNodeID(nodeNS.ID(), 12345), // you can use whatever node id you want here, whether it's numeric, string, guid, etc...
-		map[ua.AttributeID]*ua.Variant{
-			ua.AttributeIDBrowseName: ua.MustVariant(attrs.BrowseName("MyBrowseName")),
-			ua.AttributeIDNodeClass:  ua.MustVariant(uint32(ua.NodeClassVariable)),
+		map[ua.AttributeID]*ua.DataValue{
+			ua.AttributeIDBrowseName: server.DataValueFromValue(attrs.BrowseName("MyBrowseName")),
+			ua.AttributeIDNodeClass:  server.DataValueFromValue(uint32(ua.NodeClassVariable)),
 		},
 		nil,
-		func() *ua.Variant { return ua.MustVariant(12.34) },
+		func() *ua.DataValue { return server.DataValueFromValue(12.34) },
 	)
 	nodeNS.AddNode(var3)
 	nns_obj.AddRef(var3, id.HasComponent, true)
@@ -219,7 +219,7 @@ func main() {
 			num++
 
 			// get the current value of the variable
-			last_value := var1.Value().Value().(float32)
+			last_value := var1.Value().Value.Value().(float32)
 			// and change it
 			last_value += 1
 
@@ -229,7 +229,7 @@ func main() {
 				SourceTimestamp: time.Now(),
 				EncodingMask:    ua.DataValueValue | ua.DataValueSourceTimestamp,
 			}
-			var1.SetAttribute(ua.AttributeIDValue, val)
+			var1.SetAttribute(ua.AttributeIDValue, &val)
 
 			// we also need to let the node namespace know that the value has changed so it can trigger the change notification
 			// and send the updated value to any subscribed clients.
@@ -246,7 +246,7 @@ func main() {
 		for {
 			changed_id := <-nodeNS.ExternalNotification
 			node := nodeNS.Node(changed_id)
-			value := node.Value().Value()
+			value := node.Value().Value.Value()
 			log.Printf("%s changed to %v", changed_id.String(), value)
 		}
 	}()

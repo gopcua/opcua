@@ -159,12 +159,7 @@ func (ns *MapNamespace) Attribute(n *ua.NodeID, a ua.AttributeID) *ua.DataValue 
 			}
 		}
 
-		return &ua.DataValue{
-			EncodingMask:    ua.DataValueServerTimestamp | ua.DataValueStatusCode | ua.DataValueValue,
-			ServerTimestamp: time.Now(),
-			Status:          ua.StatusOK,
-			Value:           attrval.Value,
-		}
+		return attrval.Value
 
 	}
 
@@ -385,13 +380,13 @@ func (ns *MapNamespace) Objects() *Node {
 	//reftype := ua.NewTwoByteNodeID(uint8(id.HasComponent)) // folder
 	n := NewNode(
 		oid,
-		map[ua.AttributeID]*ua.Variant{
-			ua.AttributeIDNodeClass:     ua.MustVariant(int32(ua.NodeClassObject)),
-			ua.AttributeIDBrowseName:    ua.MustVariant(attrs.BrowseName(ns.name)),
-			ua.AttributeIDDisplayName:   ua.MustVariant(attrs.DisplayName(ns.name, ns.name)),
-			ua.AttributeIDDescription:   ua.MustVariant(uint32(ua.NodeClassObject)),
-			ua.AttributeIDDataType:      ua.MustVariant(typedef),
-			ua.AttributeIDEventNotifier: ua.MustVariant(int16(0)),
+		map[ua.AttributeID]*ua.DataValue{
+			ua.AttributeIDNodeClass:     DataValueFromValue(int32(ua.NodeClassObject)),
+			ua.AttributeIDBrowseName:    DataValueFromValue(attrs.BrowseName(ns.name)),
+			ua.AttributeIDDisplayName:   DataValueFromValue(attrs.DisplayName(ns.name, ns.name)),
+			ua.AttributeIDDescription:   DataValueFromValue(uint32(ua.NodeClassObject)),
+			ua.AttributeIDDataType:      DataValueFromValue(typedef),
+			ua.AttributeIDEventNotifier: DataValueFromValue(int16(0)),
 		},
 		[]*ua.ReferenceDescription{},
 		nil,
@@ -402,10 +397,10 @@ func (ns *MapNamespace) Objects() *Node {
 func (ns *MapNamespace) Root() *Node {
 	n := NewNode(
 		ua.NewNumericNodeID(ns.ID(), id.RootFolder),
-		map[ua.AttributeID]*ua.Variant{
-			ua.AttributeIDNodeClass:   ua.MustVariant(int32(ua.NodeClassObject)),
-			ua.AttributeIDBrowseName:  ua.MustVariant(attrs.BrowseName("Root")),
-			ua.AttributeIDDisplayName: ua.MustVariant(attrs.DisplayName("Root", "")),
+		map[ua.AttributeID]*ua.DataValue{
+			ua.AttributeIDNodeClass:   DataValueFromValue(int32(ua.NodeClassObject)),
+			ua.AttributeIDBrowseName:  DataValueFromValue(attrs.BrowseName("Root")),
+			ua.AttributeIDDisplayName: DataValueFromValue(attrs.DisplayName("Root", "")),
 		},
 		[]*ua.ReferenceDescription{},
 		nil,
