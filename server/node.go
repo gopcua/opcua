@@ -31,6 +31,7 @@ func DataValueFromValue(val any) *ua.DataValue {
 
 	v := ua.MustVariant(val)
 	return &ua.DataValue{
+		EncodingMask:    ua.DataValueValue,
 		Value:           v,
 		SourceTimestamp: time.Now(),
 	}
