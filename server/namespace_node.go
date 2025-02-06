@@ -47,13 +47,13 @@ func NewNodeNameSpace(srv *Server, name string) *NodeNameSpace {
 	//reftype := ua.NewTwoByteNodeID(uint8(id.HasComponent)) // folder
 	objectsNode := NewNode(
 		oid,
-		map[ua.AttributeID]*ua.Variant{
-			ua.AttributeIDNodeClass:     ua.MustVariant(uint32(ua.NodeClassObject)),
-			ua.AttributeIDBrowseName:    ua.MustVariant(attrs.BrowseName(ns.name)),
-			ua.AttributeIDDisplayName:   ua.MustVariant(attrs.DisplayName(ns.name, ns.name)),
-			ua.AttributeIDDescription:   ua.MustVariant(uint32(ua.NodeClassObject)),
-			ua.AttributeIDDataType:      ua.MustVariant(typedef),
-			ua.AttributeIDEventNotifier: ua.MustVariant(int16(0)),
+		map[ua.AttributeID]*ua.DataValue{
+			ua.AttributeIDNodeClass:     DataValueFromValue(uint32(ua.NodeClassObject)),
+			ua.AttributeIDBrowseName:    DataValueFromValue(attrs.BrowseName(ns.name)),
+			ua.AttributeIDDisplayName:   DataValueFromValue(attrs.DisplayName(ns.name, ns.name)),
+			ua.AttributeIDDescription:   DataValueFromValue(uint32(ua.NodeClassObject)),
+			ua.AttributeIDDataType:      DataValueFromValue(typedef),
+			ua.AttributeIDEventNotifier: DataValueFromValue(int16(0)),
 		},
 		[]*ua.ReferenceDescription{},
 		nil,
@@ -126,12 +126,12 @@ func (as *NodeNameSpace) Attribute(id *ua.NodeID, attr ua.AttributeID) *ua.DataV
 
 	switch attr {
 	case ua.AttributeIDNodeID:
-		a = &AttrValue{Value: ua.MustVariant(id)}
+		a = &AttrValue{Value: DataValueFromValue(id)}
 	case ua.AttributeIDEventNotifier:
 		// TODO: this is a hack to force the EventNotifier to false for everything.
 		// If at some point someone or something needs to use this, this will have to go away and be
 		// fixed properly.
-		a = &AttrValue{Value: ua.MustVariant(byte(0))}
+		a = &AttrValue{Value: DataValueFromValue(byte(0))}
 	case ua.AttributeIDNodeClass:
 		a, err = n.Attribute(attr)
 		if err != nil {
@@ -142,9 +142,9 @@ func (as *NodeNameSpace) Attribute(id *ua.NodeID, attr ua.AttributeID) *ua.DataV
 			}
 		}
 		// TODO: we need int32 instead of uint32 here.  this isn't the right place to fix it, but it is a bandaid
-		x, ok := a.Value.Value().(uint32)
+		x, ok := a.Value.Value.Value().(uint32)
 		if ok {
-			a.Value = ua.MustVariant(int32(x))
+			a.Value.Value = ua.MustVariant(int32(x))
 		}
 	default:
 		a, err = n.Attribute(attr)
@@ -157,12 +157,7 @@ func (as *NodeNameSpace) Attribute(id *ua.NodeID, attr ua.AttributeID) *ua.DataV
 			Status:          ua.StatusBadAttributeIDInvalid,
 		}
 	}
-	return &ua.DataValue{
-		EncodingMask:    ua.DataValueServerTimestamp | ua.DataValueStatusCode | ua.DataValueValue,
-		ServerTimestamp: time.Now(),
-		Status:          ua.StatusOK,
-		Value:           a.Value,
-	}
+	return a.Value
 }
 
 func (as *NodeNameSpace) Node(id *ua.NodeID) *Node {
@@ -258,12 +253,12 @@ func (as *NodeNameSpace) SetAttribute(id *ua.NodeID, attr ua.AttributeID, val *u
 
 	access, err := n.Attribute(ua.AttributeIDUserAccessLevel)
 	if err == nil {
-		x := access.Value.Value()
+		x := access.Value.Value.Value()
 		_ = x
 		return ua.StatusBadUserAccessDenied
 	}
 
-	err = n.SetAttribute(attr, *val)
+	err = n.SetAttribute(attr, val)
 	if err != nil {
 		return ua.StatusBadAttributeIDInvalid
 	}

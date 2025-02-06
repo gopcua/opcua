@@ -49,25 +49,25 @@ func (srv *Server) nodesImportNodeSet(nodes *schema.UANodeSet) error {
 
 		nid := ua.MustParseNodeID(rt.NodeIdAttr)
 
-		var attrs Attributes = make(map[ua.AttributeID]*ua.Variant)
-		attrs[ua.AttributeIDAccessRestrictions] = ua.MustVariant(rt.AccessRestrictionsAttr)
-		attrs[ua.AttributeIDBrowseName] = ua.MustVariant(&ua.QualifiedName{NamespaceIndex: nid.Namespace(), Name: rt.BrowseNameAttr})
-		attrs[ua.AttributeIDIsAbstract] = ua.MustVariant(rt.IsAbstractAttr)
-		attrs[ua.AttributeIDUserWriteMask] = ua.MustVariant(rt.UserWriteMaskAttr)
-		attrs[ua.AttributeIDSymmetric] = ua.MustVariant(rt.SymmetricAttr)
-		attrs[ua.AttributeIDWriteMask] = ua.MustVariant(rt.WriteMaskAttr)
+		var attrs Attributes = make(map[ua.AttributeID]*ua.DataValue)
+		attrs[ua.AttributeIDAccessRestrictions] = DataValueFromValue(rt.AccessRestrictionsAttr)
+		attrs[ua.AttributeIDBrowseName] = DataValueFromValue(&ua.QualifiedName{NamespaceIndex: nid.Namespace(), Name: rt.BrowseNameAttr})
+		attrs[ua.AttributeIDIsAbstract] = DataValueFromValue(rt.IsAbstractAttr)
+		attrs[ua.AttributeIDUserWriteMask] = DataValueFromValue(rt.UserWriteMaskAttr)
+		attrs[ua.AttributeIDSymmetric] = DataValueFromValue(rt.SymmetricAttr)
+		attrs[ua.AttributeIDWriteMask] = DataValueFromValue(rt.WriteMaskAttr)
 		if len(rt.DisplayName) > 0 {
-			attrs[ua.AttributeIDDisplayName] = ua.MustVariant(ua.NewLocalizedText(rt.DisplayName[0].Value))
+			attrs[ua.AttributeIDDisplayName] = DataValueFromValue(ua.NewLocalizedText(rt.DisplayName[0].Value))
 		}
 		if len(rt.InverseName) > 0 {
-			attrs[ua.AttributeIDInverseName] = ua.MustVariant(ua.NewLocalizedText(rt.InverseName[0].Value))
+			attrs[ua.AttributeIDInverseName] = DataValueFromValue(ua.NewLocalizedText(rt.InverseName[0].Value))
 		} else {
-			attrs[ua.AttributeIDInverseName] = ua.MustVariant(ua.NewLocalizedText(""))
+			attrs[ua.AttributeIDInverseName] = DataValueFromValue(ua.NewLocalizedText(""))
 		}
 		if len(rt.Description) > 0 {
-			attrs[ua.AttributeIDDescription] = ua.MustVariant(ua.NewLocalizedText(rt.Description[0].Value))
+			attrs[ua.AttributeIDDescription] = DataValueFromValue(ua.NewLocalizedText(rt.Description[0].Value))
 		}
-		attrs[ua.AttributeIDNodeClass] = ua.MustVariant(uint32(ua.NodeClassReferenceType))
+		attrs[ua.AttributeIDNodeClass] = DataValueFromValue(uint32(ua.NodeClassReferenceType))
 
 		var refs References = make([]*ua.ReferenceDescription, 0)
 
@@ -88,19 +88,19 @@ func (srv *Server) nodesImportNodeSet(nodes *schema.UANodeSet) error {
 		dt := nodes.UADataType[i]
 		nid := ua.MustParseNodeID(dt.NodeIdAttr)
 
-		var attrs Attributes = make(map[ua.AttributeID]*ua.Variant)
-		attrs[ua.AttributeIDAccessRestrictions] = ua.MustVariant(dt.AccessRestrictionsAttr)
-		attrs[ua.AttributeIDBrowseName] = ua.MustVariant(&ua.QualifiedName{NamespaceIndex: nid.Namespace(), Name: dt.BrowseNameAttr})
-		attrs[ua.AttributeIDIsAbstract] = ua.MustVariant(dt.IsAbstractAttr)
-		attrs[ua.AttributeIDUserWriteMask] = ua.MustVariant(dt.UserWriteMaskAttr)
-		attrs[ua.AttributeIDWriteMask] = ua.MustVariant(dt.WriteMaskAttr)
+		var attrs Attributes = make(map[ua.AttributeID]*ua.DataValue)
+		attrs[ua.AttributeIDAccessRestrictions] = DataValueFromValue(dt.AccessRestrictionsAttr)
+		attrs[ua.AttributeIDBrowseName] = DataValueFromValue(&ua.QualifiedName{NamespaceIndex: nid.Namespace(), Name: dt.BrowseNameAttr})
+		attrs[ua.AttributeIDIsAbstract] = DataValueFromValue(dt.IsAbstractAttr)
+		attrs[ua.AttributeIDUserWriteMask] = DataValueFromValue(dt.UserWriteMaskAttr)
+		attrs[ua.AttributeIDWriteMask] = DataValueFromValue(dt.WriteMaskAttr)
 		if len(dt.DisplayName) > 0 {
-			attrs[ua.AttributeIDDisplayName] = ua.MustVariant(ua.NewLocalizedText(dt.DisplayName[0].Value))
+			attrs[ua.AttributeIDDisplayName] = DataValueFromValue(ua.NewLocalizedText(dt.DisplayName[0].Value))
 		}
 		if len(dt.Description) > 0 {
-			attrs[ua.AttributeIDDescription] = ua.MustVariant(ua.NewLocalizedText(dt.Description[0].Value))
+			attrs[ua.AttributeIDDescription] = DataValueFromValue(ua.NewLocalizedText(dt.Description[0].Value))
 		}
-		attrs[ua.AttributeIDNodeClass] = ua.MustVariant(uint32(ua.NodeClassDataType))
+		attrs[ua.AttributeIDNodeClass] = DataValueFromValue(uint32(ua.NodeClassDataType))
 
 		var refs References = make([]*ua.ReferenceDescription, 0)
 
@@ -121,19 +121,19 @@ func (srv *Server) nodesImportNodeSet(nodes *schema.UANodeSet) error {
 	for i := range nodes.UAObjectType {
 		ot := nodes.UAObjectType[i]
 		nid := ua.MustParseNodeID(ot.NodeIdAttr)
-		var attrs Attributes = make(map[ua.AttributeID]*ua.Variant)
-		attrs[ua.AttributeIDAccessRestrictions] = ua.MustVariant(ot.AccessRestrictionsAttr)
-		attrs[ua.AttributeIDBrowseName] = ua.MustVariant(&ua.QualifiedName{NamespaceIndex: nid.Namespace(), Name: ot.BrowseNameAttr})
-		attrs[ua.AttributeIDIsAbstract] = ua.MustVariant(ot.IsAbstractAttr)
-		attrs[ua.AttributeIDUserWriteMask] = ua.MustVariant(ot.UserWriteMaskAttr)
-		attrs[ua.AttributeIDWriteMask] = ua.MustVariant(ot.WriteMaskAttr)
+		var attrs Attributes = make(map[ua.AttributeID]*ua.DataValue)
+		attrs[ua.AttributeIDAccessRestrictions] = DataValueFromValue(ot.AccessRestrictionsAttr)
+		attrs[ua.AttributeIDBrowseName] = DataValueFromValue(&ua.QualifiedName{NamespaceIndex: nid.Namespace(), Name: ot.BrowseNameAttr})
+		attrs[ua.AttributeIDIsAbstract] = DataValueFromValue(ot.IsAbstractAttr)
+		attrs[ua.AttributeIDUserWriteMask] = DataValueFromValue(ot.UserWriteMaskAttr)
+		attrs[ua.AttributeIDWriteMask] = DataValueFromValue(ot.WriteMaskAttr)
 		if len(ot.DisplayName) > 0 {
-			attrs[ua.AttributeIDDisplayName] = ua.MustVariant(ua.NewLocalizedText(ot.DisplayName[0].Value))
+			attrs[ua.AttributeIDDisplayName] = DataValueFromValue(ua.NewLocalizedText(ot.DisplayName[0].Value))
 		}
 		if len(ot.Description) > 0 {
-			attrs[ua.AttributeIDDescription] = ua.MustVariant(ua.NewLocalizedText(ot.Description[0].Value))
+			attrs[ua.AttributeIDDescription] = DataValueFromValue(ua.NewLocalizedText(ot.Description[0].Value))
 		}
-		attrs[ua.AttributeIDNodeClass] = ua.MustVariant(uint32(ua.NodeClassObjectType))
+		attrs[ua.AttributeIDNodeClass] = DataValueFromValue(uint32(ua.NodeClassObjectType))
 
 		var refs References = make([]*ua.ReferenceDescription, 0)
 
@@ -153,18 +153,18 @@ func (srv *Server) nodesImportNodeSet(nodes *schema.UANodeSet) error {
 	for i := range nodes.UAVariableType {
 		ot := nodes.UAVariableType[i]
 		nid := ua.MustParseNodeID(ot.NodeIdAttr)
-		var attrs Attributes = make(map[ua.AttributeID]*ua.Variant)
-		attrs[ua.AttributeIDAccessRestrictions] = ua.MustVariant(ot.AccessRestrictionsAttr)
-		attrs[ua.AttributeIDBrowseName] = ua.MustVariant(&ua.QualifiedName{NamespaceIndex: nid.Namespace(), Name: ot.BrowseNameAttr})
-		attrs[ua.AttributeIDUserWriteMask] = ua.MustVariant(ot.UserWriteMaskAttr)
-		attrs[ua.AttributeIDWriteMask] = ua.MustVariant(ot.WriteMaskAttr)
+		var attrs Attributes = make(map[ua.AttributeID]*ua.DataValue)
+		attrs[ua.AttributeIDAccessRestrictions] = DataValueFromValue(ot.AccessRestrictionsAttr)
+		attrs[ua.AttributeIDBrowseName] = DataValueFromValue(&ua.QualifiedName{NamespaceIndex: nid.Namespace(), Name: ot.BrowseNameAttr})
+		attrs[ua.AttributeIDUserWriteMask] = DataValueFromValue(ot.UserWriteMaskAttr)
+		attrs[ua.AttributeIDWriteMask] = DataValueFromValue(ot.WriteMaskAttr)
 		if len(ot.DisplayName) > 0 {
-			attrs[ua.AttributeIDDisplayName] = ua.MustVariant(ua.NewLocalizedText(ot.DisplayName[0].Value))
+			attrs[ua.AttributeIDDisplayName] = DataValueFromValue(ua.NewLocalizedText(ot.DisplayName[0].Value))
 		}
 		if len(ot.Description) > 0 {
-			attrs[ua.AttributeIDDescription] = ua.MustVariant(ua.NewLocalizedText(ot.Description[0].Value))
+			attrs[ua.AttributeIDDescription] = DataValueFromValue(ua.NewLocalizedText(ot.Description[0].Value))
 		}
-		attrs[ua.AttributeIDNodeClass] = ua.MustVariant(uint32(ua.NodeClassVariableType))
+		attrs[ua.AttributeIDNodeClass] = DataValueFromValue(uint32(ua.NodeClassVariableType))
 
 		var refs References = make([]*ua.ReferenceDescription, 0)
 
@@ -184,18 +184,18 @@ func (srv *Server) nodesImportNodeSet(nodes *schema.UANodeSet) error {
 	for i := range nodes.UAVariable {
 		ot := nodes.UAVariable[i]
 		nid := ua.MustParseNodeID(ot.NodeIdAttr)
-		var attrs Attributes = make(map[ua.AttributeID]*ua.Variant)
-		attrs[ua.AttributeIDAccessRestrictions] = ua.MustVariant(ot.AccessRestrictionsAttr)
-		attrs[ua.AttributeIDBrowseName] = ua.MustVariant(&ua.QualifiedName{NamespaceIndex: nid.Namespace(), Name: ot.BrowseNameAttr})
-		attrs[ua.AttributeIDUserWriteMask] = ua.MustVariant(ot.UserWriteMaskAttr)
-		attrs[ua.AttributeIDWriteMask] = ua.MustVariant(ot.WriteMaskAttr)
+		var attrs Attributes = make(map[ua.AttributeID]*ua.DataValue)
+		attrs[ua.AttributeIDAccessRestrictions] = DataValueFromValue(ot.AccessRestrictionsAttr)
+		attrs[ua.AttributeIDBrowseName] = DataValueFromValue(&ua.QualifiedName{NamespaceIndex: nid.Namespace(), Name: ot.BrowseNameAttr})
+		attrs[ua.AttributeIDUserWriteMask] = DataValueFromValue(ot.UserWriteMaskAttr)
+		attrs[ua.AttributeIDWriteMask] = DataValueFromValue(ot.WriteMaskAttr)
 		if len(ot.DisplayName) > 0 {
-			attrs[ua.AttributeIDDisplayName] = ua.MustVariant(ua.NewLocalizedText(ot.DisplayName[0].Value))
+			attrs[ua.AttributeIDDisplayName] = DataValueFromValue(ua.NewLocalizedText(ot.DisplayName[0].Value))
 		}
 		if len(ot.Description) > 0 {
-			attrs[ua.AttributeIDDescription] = ua.MustVariant(ua.NewLocalizedText(ot.Description[0].Value))
+			attrs[ua.AttributeIDDescription] = DataValueFromValue(ua.NewLocalizedText(ot.Description[0].Value))
 		}
-		attrs[ua.AttributeIDNodeClass] = ua.MustVariant(uint32(ua.NodeClassVariable))
+		attrs[ua.AttributeIDNodeClass] = DataValueFromValue(uint32(ua.NodeClassVariable))
 
 		var refs References = make([]*ua.ReferenceDescription, 0)
 
@@ -215,18 +215,18 @@ func (srv *Server) nodesImportNodeSet(nodes *schema.UANodeSet) error {
 	for i := range nodes.UAMethod {
 		ot := nodes.UAMethod[i]
 		nid := ua.MustParseNodeID(ot.NodeIdAttr)
-		var attrs Attributes = make(map[ua.AttributeID]*ua.Variant)
-		attrs[ua.AttributeIDAccessRestrictions] = ua.MustVariant(ot.AccessRestrictionsAttr)
-		attrs[ua.AttributeIDBrowseName] = ua.MustVariant(&ua.QualifiedName{NamespaceIndex: nid.Namespace(), Name: ot.BrowseNameAttr})
-		attrs[ua.AttributeIDUserWriteMask] = ua.MustVariant(ot.UserWriteMaskAttr)
-		attrs[ua.AttributeIDWriteMask] = ua.MustVariant(ot.WriteMaskAttr)
+		var attrs Attributes = make(map[ua.AttributeID]*ua.DataValue)
+		attrs[ua.AttributeIDAccessRestrictions] = DataValueFromValue(ot.AccessRestrictionsAttr)
+		attrs[ua.AttributeIDBrowseName] = DataValueFromValue(&ua.QualifiedName{NamespaceIndex: nid.Namespace(), Name: ot.BrowseNameAttr})
+		attrs[ua.AttributeIDUserWriteMask] = DataValueFromValue(ot.UserWriteMaskAttr)
+		attrs[ua.AttributeIDWriteMask] = DataValueFromValue(ot.WriteMaskAttr)
 		if len(ot.DisplayName) > 0 {
-			attrs[ua.AttributeIDDisplayName] = ua.MustVariant(ua.NewLocalizedText(ot.DisplayName[0].Value))
+			attrs[ua.AttributeIDDisplayName] = DataValueFromValue(ua.NewLocalizedText(ot.DisplayName[0].Value))
 		}
 		if len(ot.Description) > 0 {
-			attrs[ua.AttributeIDDescription] = ua.MustVariant(ua.NewLocalizedText(ot.Description[0].Value))
+			attrs[ua.AttributeIDDescription] = DataValueFromValue(ua.NewLocalizedText(ot.Description[0].Value))
 		}
-		attrs[ua.AttributeIDNodeClass] = ua.MustVariant(uint32(ua.NodeClassMethod))
+		attrs[ua.AttributeIDNodeClass] = DataValueFromValue(uint32(ua.NodeClassMethod))
 
 		var refs References = make([]*ua.ReferenceDescription, 0)
 
@@ -249,19 +249,19 @@ func (srv *Server) nodesImportNodeSet(nodes *schema.UANodeSet) error {
 		if ot.NodeIdAttr == "i=85" {
 			log.Printf("doing objects.")
 		}
-		var attrs Attributes = make(map[ua.AttributeID]*ua.Variant)
-		attrs[ua.AttributeIDAccessRestrictions] = ua.MustVariant(ot.AccessRestrictionsAttr)
-		attrs[ua.AttributeIDBrowseName] = ua.MustVariant(&ua.QualifiedName{NamespaceIndex: nid.Namespace(), Name: ot.BrowseNameAttr})
-		attrs[ua.AttributeIDUserWriteMask] = ua.MustVariant(ot.UserWriteMaskAttr)
-		attrs[ua.AttributeIDWriteMask] = ua.MustVariant(ot.WriteMaskAttr)
+		var attrs Attributes = make(map[ua.AttributeID]*ua.DataValue)
+		attrs[ua.AttributeIDAccessRestrictions] = DataValueFromValue(ot.AccessRestrictionsAttr)
+		attrs[ua.AttributeIDBrowseName] = DataValueFromValue(&ua.QualifiedName{NamespaceIndex: nid.Namespace(), Name: ot.BrowseNameAttr})
+		attrs[ua.AttributeIDUserWriteMask] = DataValueFromValue(ot.UserWriteMaskAttr)
+		attrs[ua.AttributeIDWriteMask] = DataValueFromValue(ot.WriteMaskAttr)
 		if len(ot.DisplayName) > 0 {
-			attrs[ua.AttributeIDDisplayName] = ua.MustVariant(ua.NewLocalizedText(ot.DisplayName[0].Value))
+			attrs[ua.AttributeIDDisplayName] = DataValueFromValue(ua.NewLocalizedText(ot.DisplayName[0].Value))
 		}
 		if len(ot.Description) > 0 {
-			attrs[ua.AttributeIDDescription] = ua.MustVariant(ua.NewLocalizedText(ot.Description[0].Value))
+			attrs[ua.AttributeIDDescription] = DataValueFromValue(ua.NewLocalizedText(ot.Description[0].Value))
 		}
 
-		attrs[ua.AttributeIDNodeClass] = ua.MustVariant(uint32(ua.NodeClassObject))
+		attrs[ua.AttributeIDNodeClass] = DataValueFromValue(uint32(ua.NodeClassObject))
 
 		var refs References = make([]*ua.ReferenceDescription, 0)
 
@@ -315,7 +315,7 @@ func (srv *Server) refsImportNodeSet(nodes *schema.UANodeSet) error {
 		rt.NodeIdAttr = aliases[alias]
 		isSymmetricValue, err := refnode.Attribute(ua.AttributeIDSymmetric)
 		if err == nil {
-			rt.SymmetricAttr = isSymmetricValue.Value.Value().(bool)
+			rt.SymmetricAttr = isSymmetricValue.Value.Value.Value().(bool)
 		}
 
 		_, ok := reftypes[alias]

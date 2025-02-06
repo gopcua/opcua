@@ -11,30 +11,30 @@ import (
 func CurrentTimeNode() *Node {
 	return NewNode(
 		ua.NewNumericNodeID(0, id.Server_ServerStatus_CurrentTime),
-		map[ua.AttributeID]*ua.Variant{
-			ua.AttributeIDBrowseName: ua.MustVariant(attrs.BrowseName("CurrentTime")),
-			ua.AttributeIDNodeClass:  ua.MustVariant(uint32(ua.NodeClassVariable)),
+		map[ua.AttributeID]*ua.DataValue{
+			ua.AttributeIDBrowseName: DataValueFromValue(attrs.BrowseName("CurrentTime")),
+			ua.AttributeIDNodeClass:  DataValueFromValue(uint32(ua.NodeClassVariable)),
 		},
 		nil,
-		func() *ua.Variant { return ua.MustVariant(time.Now()) },
+		func() *ua.DataValue { return DataValueFromValue(time.Now()) },
 	)
 }
 
 func NamespacesNode(s *Server) *Node {
 	return NewNode(
 		ua.NewNumericNodeID(0, id.Server_NamespaceArray),
-		map[ua.AttributeID]*ua.Variant{
-			ua.AttributeIDBrowseName: ua.MustVariant(attrs.BrowseName("Namespaces")),
-			ua.AttributeIDNodeClass:  ua.MustVariant(uint32(ua.NodeClassObject)),
+		map[ua.AttributeID]*ua.DataValue{
+			ua.AttributeIDBrowseName: DataValueFromValue(attrs.BrowseName("Namespaces")),
+			ua.AttributeIDNodeClass:  DataValueFromValue(uint32(ua.NodeClassObject)),
 		},
 		nil,
-		func() *ua.Variant {
+		func() *ua.DataValue {
 			n := s.Namespaces()
 			ns := make([]string, len(n))
 			for i := range ns {
 				ns[i] = n[i].Name()
 			}
-			return ua.MustVariant(ns)
+			return DataValueFromValue(ns)
 		},
 	)
 }
@@ -43,12 +43,12 @@ func ServerCapabilitiesNodes(s *Server) []*Node {
 	var nodes []*Node
 	nodes = append(nodes, NewNode(
 		ua.NewNumericNodeID(0, id.Server_ServerCapabilities_OperationLimits_MaxNodesPerRead),
-		map[ua.AttributeID]*ua.Variant{
-			ua.AttributeIDBrowseName: ua.MustVariant(attrs.BrowseName("MaxNodesPerRead")),
-			ua.AttributeIDNodeClass:  ua.MustVariant(uint32(ua.NodeClassVariable)),
+		map[ua.AttributeID]*ua.DataValue{
+			ua.AttributeIDBrowseName: DataValueFromValue(attrs.BrowseName("MaxNodesPerRead")),
+			ua.AttributeIDNodeClass:  DataValueFromValue(uint32(ua.NodeClassVariable)),
 		},
 		nil,
-		func() *ua.Variant { return ua.MustVariant(s.cfg.cap.OperationalLimits.MaxNodesPerRead) },
+		func() *ua.DataValue { return DataValueFromValue(s.cfg.cap.OperationalLimits.MaxNodesPerRead) },
 	))
 	return nodes
 }
@@ -56,10 +56,10 @@ func ServerCapabilitiesNodes(s *Server) []*Node {
 func RootNode() *Node {
 	return NewNode(
 		ua.NewNumericNodeID(0, id.RootFolder),
-		map[ua.AttributeID]*ua.Variant{
-			ua.AttributeIDNodeClass:  ua.MustVariant(attrs.NodeClass(ua.NodeClassObject)),
-			ua.AttributeIDBrowseName: ua.MustVariant(attrs.BrowseName("Root")),
-			ua.AttributeIDDataType:   ua.MustVariant(ua.NewNumericExpandedNodeID(0, id.DataTypesFolder)),
+		map[ua.AttributeID]*ua.DataValue{
+			ua.AttributeIDNodeClass:  DataValueFromValue(attrs.NodeClass(ua.NodeClassObject)),
+			ua.AttributeIDBrowseName: DataValueFromValue(attrs.BrowseName("Root")),
+			ua.AttributeIDDataType:   DataValueFromValue(ua.NewNumericExpandedNodeID(0, id.DataTypesFolder)),
 		},
 		nil,
 		nil,
@@ -105,129 +105,129 @@ func ServerStatusNodes(s *Server, ServerNode *Node) []*Node {
 
 	sStatus := NewNode(
 		ua.NewNumericNodeID(0, id.Server_ServerStatus),
-		map[ua.AttributeID]*ua.Variant{
-			ua.AttributeIDBrowseName: ua.MustVariant(attrs.BrowseName("Status")),
-			ua.AttributeIDNodeClass:  ua.MustVariant(uint32(ua.NodeClassVariable)),
+		map[ua.AttributeID]*ua.DataValue{
+			ua.AttributeIDBrowseName: DataValueFromValue(attrs.BrowseName("Status")),
+			ua.AttributeIDNodeClass:  DataValueFromValue(uint32(ua.NodeClassVariable)),
 		},
 		nil,
-		func() *ua.Variant { return ua.MustVariant(ua.NewExtensionObject(s.Status())) },
+		func() *ua.DataValue { return DataValueFromValue(ua.NewExtensionObject(s.Status())) },
 	)
 
 	sState := NewNode(
 		ua.NewNumericNodeID(0, id.Server_ServerStatus_State),
-		map[ua.AttributeID]*ua.Variant{
-			ua.AttributeIDBrowseName: ua.MustVariant(attrs.BrowseName("ServerStatus")),
-			ua.AttributeIDNodeClass:  ua.MustVariant(uint32(ua.NodeClassVariable)),
+		map[ua.AttributeID]*ua.DataValue{
+			ua.AttributeIDBrowseName: DataValueFromValue(attrs.BrowseName("ServerStatus")),
+			ua.AttributeIDNodeClass:  DataValueFromValue(uint32(ua.NodeClassVariable)),
 		},
 		nil,
-		func() *ua.Variant { return ua.MustVariant(int32(s.Status().State)) },
+		func() *ua.DataValue { return DataValueFromValue(int32(s.Status().State)) },
 	)
 	mName := NewNode(
 		ua.NewNumericNodeID(0, id.Server_ServerStatus_BuildInfo_ManufacturerName),
-		map[ua.AttributeID]*ua.Variant{
-			ua.AttributeIDBrowseName: ua.MustVariant(attrs.BrowseName("ProductName")),
-			ua.AttributeIDNodeClass:  ua.MustVariant(uint32(ua.NodeClassVariable)),
+		map[ua.AttributeID]*ua.DataValue{
+			ua.AttributeIDBrowseName: DataValueFromValue(attrs.BrowseName("ProductName")),
+			ua.AttributeIDNodeClass:  DataValueFromValue(uint32(ua.NodeClassVariable)),
 		},
 		nil,
-		func() *ua.Variant { return ua.MustVariant(s.cfg.manufacturerName) },
+		func() *ua.DataValue { return DataValueFromValue(s.cfg.manufacturerName) },
 	)
 	pName := NewNode(
 		ua.NewNumericNodeID(0, id.Server_ServerStatus_BuildInfo_ProductName),
-		map[ua.AttributeID]*ua.Variant{
-			ua.AttributeIDBrowseName: ua.MustVariant(attrs.BrowseName("ProductName")),
-			ua.AttributeIDNodeClass:  ua.MustVariant(uint32(ua.NodeClassVariable)),
+		map[ua.AttributeID]*ua.DataValue{
+			ua.AttributeIDBrowseName: DataValueFromValue(attrs.BrowseName("ProductName")),
+			ua.AttributeIDNodeClass:  DataValueFromValue(uint32(ua.NodeClassVariable)),
 		},
 		nil,
-		func() *ua.Variant { return ua.MustVariant(s.cfg.productName) },
+		func() *ua.DataValue { return DataValueFromValue(s.cfg.productName) },
 	)
 
 	pURI := NewNode(
 		ua.NewNumericNodeID(0, id.Server_ServerStatus_BuildInfo_ProductURI),
-		map[ua.AttributeID]*ua.Variant{
-			ua.AttributeIDBrowseName: ua.MustVariant(attrs.BrowseName("ProductURI")),
-			ua.AttributeIDNodeClass:  ua.MustVariant(uint32(ua.NodeClassVariable)),
+		map[ua.AttributeID]*ua.DataValue{
+			ua.AttributeIDBrowseName: DataValueFromValue(attrs.BrowseName("ProductURI")),
+			ua.AttributeIDNodeClass:  DataValueFromValue(uint32(ua.NodeClassVariable)),
 		},
 		nil,
-		func() *ua.Variant { return ua.MustVariant(s.cfg.applicationURI) },
+		func() *ua.DataValue { return DataValueFromValue(s.cfg.applicationURI) },
 	)
 
 	bInfo := NewNode(
 		ua.NewNumericNodeID(0, id.Server_ServerStatus_BuildInfo),
-		map[ua.AttributeID]*ua.Variant{
-			ua.AttributeIDBrowseName: ua.MustVariant(attrs.BrowseName("BuildInfo")),
-			ua.AttributeIDNodeClass:  ua.MustVariant(uint32(ua.NodeClassVariable)),
+		map[ua.AttributeID]*ua.DataValue{
+			ua.AttributeIDBrowseName: DataValueFromValue(attrs.BrowseName("BuildInfo")),
+			ua.AttributeIDNodeClass:  DataValueFromValue(uint32(ua.NodeClassVariable)),
 		},
 		nil,
-		func() *ua.Variant { return ua.MustVariant("") },
+		func() *ua.DataValue { return DataValueFromValue("") },
 	)
 	sVersion := NewNode(
 		ua.NewNumericNodeID(0, id.Server_ServerStatus_BuildInfo_SoftwareVersion),
-		map[ua.AttributeID]*ua.Variant{
-			ua.AttributeIDBrowseName: ua.MustVariant(attrs.BrowseName("SoftwareVersion")),
-			ua.AttributeIDNodeClass:  ua.MustVariant(uint32(ua.NodeClassVariable)),
+		map[ua.AttributeID]*ua.DataValue{
+			ua.AttributeIDBrowseName: DataValueFromValue(attrs.BrowseName("SoftwareVersion")),
+			ua.AttributeIDNodeClass:  DataValueFromValue(uint32(ua.NodeClassVariable)),
 		},
 		nil,
-		func() *ua.Variant { return ua.MustVariant(s.cfg.softwareVersion) },
+		func() *ua.DataValue { return DataValueFromValue(s.cfg.softwareVersion) },
 	)
 
 	bNumber := NewNode(
 		ua.NewNumericNodeID(0, id.Server_ServerStatus_BuildInfo_BuildNumber),
-		map[ua.AttributeID]*ua.Variant{
-			ua.AttributeIDBrowseName: ua.MustVariant(attrs.BrowseName("BuildNumber")),
-			ua.AttributeIDNodeClass:  ua.MustVariant(uint32(ua.NodeClassVariable)),
+		map[ua.AttributeID]*ua.DataValue{
+			ua.AttributeIDBrowseName: DataValueFromValue(attrs.BrowseName("BuildNumber")),
+			ua.AttributeIDNodeClass:  DataValueFromValue(uint32(ua.NodeClassVariable)),
 		},
 		nil,
-		func() *ua.Variant { return ua.MustVariant(s.cfg.softwareVersion) },
+		func() *ua.DataValue { return DataValueFromValue(s.cfg.softwareVersion) },
 	)
 
 	ts := time.Now()
 	bDate := NewNode(
 		ua.NewNumericNodeID(0, id.Server_ServerStatus_BuildInfo_BuildDate),
-		map[ua.AttributeID]*ua.Variant{
-			ua.AttributeIDBrowseName: ua.MustVariant(attrs.BrowseName("BuildDate")),
-			ua.AttributeIDNodeClass:  ua.MustVariant(uint32(ua.NodeClassVariable)),
+		map[ua.AttributeID]*ua.DataValue{
+			ua.AttributeIDBrowseName: DataValueFromValue(attrs.BrowseName("BuildDate")),
+			ua.AttributeIDNodeClass:  DataValueFromValue(uint32(ua.NodeClassVariable)),
 		},
 		nil,
-		func() *ua.Variant { return ua.MustVariant(ts) },
+		func() *ua.DataValue { return DataValueFromValue(ts) },
 	)
 	timeStart := NewNode(
 		ua.NewNumericNodeID(0, id.Server_ServerStatus_StartTime),
-		map[ua.AttributeID]*ua.Variant{
-			ua.AttributeIDBrowseName: ua.MustVariant(attrs.BrowseName("StartTime")),
-			ua.AttributeIDNodeClass:  ua.MustVariant(uint32(ua.NodeClassVariable)),
+		map[ua.AttributeID]*ua.DataValue{
+			ua.AttributeIDBrowseName: DataValueFromValue(attrs.BrowseName("StartTime")),
+			ua.AttributeIDNodeClass:  DataValueFromValue(uint32(ua.NodeClassVariable)),
 		},
 		nil,
-		func() *ua.Variant { return ua.MustVariant(ts) },
+		func() *ua.DataValue { return DataValueFromValue(ts) },
 	)
 	timeCurrent := NewNode(
 		ua.NewNumericNodeID(0, id.Server_ServerStatus_CurrentTime),
-		map[ua.AttributeID]*ua.Variant{
-			ua.AttributeIDBrowseName: ua.MustVariant(attrs.BrowseName("CurrentTime")),
-			ua.AttributeIDNodeClass:  ua.MustVariant(uint32(ua.NodeClassVariable)),
+		map[ua.AttributeID]*ua.DataValue{
+			ua.AttributeIDBrowseName: DataValueFromValue(attrs.BrowseName("CurrentTime")),
+			ua.AttributeIDNodeClass:  DataValueFromValue(uint32(ua.NodeClassVariable)),
 		},
 		nil,
-		func() *ua.Variant { return ua.MustVariant(time.Now()) },
+		func() *ua.DataValue { return DataValueFromValue(time.Now()) },
 	)
 
 	//Server_ServerStatus_SecondsTillShutdown                                                                                                                               = 2992
 	//Server_ServerStatus_ShutdownReason                                                                                                                                    = 2993
 	sTillShutdown := NewNode(
 		ua.NewNumericNodeID(0, id.Server_ServerStatus_SecondsTillShutdown),
-		map[ua.AttributeID]*ua.Variant{
-			ua.AttributeIDBrowseName: ua.MustVariant(attrs.BrowseName("SecondsTillShutdown")),
-			ua.AttributeIDNodeClass:  ua.MustVariant(uint32(ua.NodeClassVariable)),
+		map[ua.AttributeID]*ua.DataValue{
+			ua.AttributeIDBrowseName: DataValueFromValue(attrs.BrowseName("SecondsTillShutdown")),
+			ua.AttributeIDNodeClass:  DataValueFromValue(uint32(ua.NodeClassVariable)),
 		},
 		nil,
-		func() *ua.Variant { return ua.MustVariant(int32(0)) },
+		func() *ua.DataValue { return DataValueFromValue(int32(0)) },
 	)
 	sReason := NewNode(
 		ua.NewNumericNodeID(0, id.Server_ServerStatus_ShutdownReason),
-		map[ua.AttributeID]*ua.Variant{
-			ua.AttributeIDBrowseName: ua.MustVariant(attrs.BrowseName("ShutdownReason")),
-			ua.AttributeIDNodeClass:  ua.MustVariant(uint32(ua.NodeClassVariable)),
+		map[ua.AttributeID]*ua.DataValue{
+			ua.AttributeIDBrowseName: DataValueFromValue(attrs.BrowseName("ShutdownReason")),
+			ua.AttributeIDNodeClass:  DataValueFromValue(uint32(ua.NodeClassVariable)),
 		},
 		nil,
-		func() *ua.Variant { return ua.MustVariant(int32(0)) },
+		func() *ua.DataValue { return DataValueFromValue(int32(0)) },
 	)
 
 	nodes := []*Node{sState, mName, pName, pURI, sVersion, bNumber, bDate, timeStart, timeCurrent, bInfo, sTillShutdown, sReason}

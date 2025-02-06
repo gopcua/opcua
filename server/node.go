@@ -12,19 +12,29 @@ import (
 	"github.com/gopcua/opcua/ua"
 )
 
-type Attributes map[ua.AttributeID]*ua.Variant
+type Attributes map[ua.AttributeID]*ua.DataValue
 
 type References []*ua.ReferenceDescription
 
-type ValueFunc func() *ua.Variant
+type ValueFunc func() *ua.DataValue
 
 type AttrValue struct {
-	Value           *ua.Variant
+	Value           *ua.DataValue
 	SourceTimestamp time.Time
 }
 
-func NewAttrValue(v *ua.Variant) *AttrValue {
+func NewAttrValue(v *ua.DataValue) *AttrValue {
 	return &AttrValue{Value: v}
+}
+
+func DataValueFromValue(val any) *ua.DataValue {
+
+	v := ua.MustVariant(val)
+	return &ua.DataValue{
+		EncodingMask:    ua.DataValueValue,
+		Value:           v,
+		SourceTimestamp: time.Now(),
+	}
 }
 
 type Node struct {
@@ -48,12 +58,12 @@ func NewFolderNode(nodeID *ua.NodeID, name string) *Node {
 	typedef := ua.NewNumericExpandedNodeID(0, id.ObjectsFolder)
 	n := NewNode(
 		nodeID,
-		map[ua.AttributeID]*ua.Variant{
-			ua.AttributeIDNodeClass:     ua.MustVariant(uint32(ua.NodeClassObject)),
-			ua.AttributeIDBrowseName:    ua.MustVariant(attrs.BrowseName(name)),
-			ua.AttributeIDDisplayName:   ua.MustVariant(attrs.DisplayName(name, name)),
-			ua.AttributeIDDescription:   ua.MustVariant(ua.NodeClassObject),
-			ua.AttributeIDEventNotifier: ua.MustVariant(int16(0)),
+		map[ua.AttributeID]*ua.DataValue{
+			ua.AttributeIDNodeClass:     DataValueFromValue(uint32(ua.NodeClassObject)),
+			ua.AttributeIDBrowseName:    DataValueFromValue(attrs.BrowseName(name)),
+			ua.AttributeIDDisplayName:   DataValueFromValue(attrs.DisplayName(name, name)),
+			ua.AttributeIDDescription:   DataValueFromValue(ua.NodeClassObject),
+			ua.AttributeIDEventNotifier: DataValueFromValue(int16(0)),
 		},
 		[]*ua.ReferenceDescription{{
 			ReferenceTypeID: reftype,
@@ -71,22 +81,22 @@ func NewFolderNode(nodeID *ua.NodeID, name string) *Node {
 
 func NewVariableNode(nodeID *ua.NodeID, name string, value any) *Node {
 	//eoid := ua.NewNumericExpandedNodeID(nodeID.Namespace(), nodeID.IntID())
-	vf, ok := value.(func() *ua.Variant)
+	vf, ok := value.(func() *ua.DataValue)
 	if !ok {
 		typedef := ua.NewNumericExpandedNodeID(0, id.VariableNode)
 		n := NewNode(
 			nodeID,
-			map[ua.AttributeID]*ua.Variant{
-				ua.AttributeIDNodeClass:     ua.MustVariant(uint32(ua.NodeClassVariable)),
-				ua.AttributeIDBrowseName:    ua.MustVariant(attrs.BrowseName(name)),
-				ua.AttributeIDDisplayName:   ua.MustVariant(attrs.DisplayName(name, name)),
-				ua.AttributeIDDescription:   ua.MustVariant(uint32(ua.NodeClassVariable)),
-				ua.AttributeIDDataType:      ua.MustVariant(typedef),
-				ua.AttributeIDEventNotifier: ua.MustVariant(int16(0)),
+			map[ua.AttributeID]*ua.DataValue{
+				ua.AttributeIDNodeClass:     DataValueFromValue(uint32(ua.NodeClassVariable)),
+				ua.AttributeIDBrowseName:    DataValueFromValue(attrs.BrowseName(name)),
+				ua.AttributeIDDisplayName:   DataValueFromValue(attrs.DisplayName(name, name)),
+				ua.AttributeIDDescription:   DataValueFromValue(uint32(ua.NodeClassVariable)),
+				ua.AttributeIDDataType:      DataValueFromValue(typedef),
+				ua.AttributeIDEventNotifier: DataValueFromValue(int16(0)),
 			},
 			[]*ua.ReferenceDescription{},
-			func() *ua.Variant {
-				return ua.MustVariant(value)
+			func() *ua.DataValue {
+				return DataValueFromValue(value)
 			},
 		)
 		return n
@@ -94,13 +104,13 @@ func NewVariableNode(nodeID *ua.NodeID, name string, value any) *Node {
 	typedef := ua.NewNumericExpandedNodeID(0, id.VariableNode)
 	n := NewNode(
 		nodeID,
-		map[ua.AttributeID]*ua.Variant{
-			ua.AttributeIDNodeClass:     ua.MustVariant(uint32(ua.NodeClassVariable)),
-			ua.AttributeIDBrowseName:    ua.MustVariant(attrs.BrowseName(name)),
-			ua.AttributeIDDisplayName:   ua.MustVariant(attrs.DisplayName(name, name)),
-			ua.AttributeIDDescription:   ua.MustVariant(uint32(ua.NodeClassVariable)),
-			ua.AttributeIDDataType:      ua.MustVariant(typedef),
-			ua.AttributeIDEventNotifier: ua.MustVariant(int16(0)),
+		map[ua.AttributeID]*ua.DataValue{
+			ua.AttributeIDNodeClass:     DataValueFromValue(uint32(ua.NodeClassVariable)),
+			ua.AttributeIDBrowseName:    DataValueFromValue(attrs.BrowseName(name)),
+			ua.AttributeIDDisplayName:   DataValueFromValue(attrs.DisplayName(name, name)),
+			ua.AttributeIDDescription:   DataValueFromValue(uint32(ua.NodeClassVariable)),
+			ua.AttributeIDDataType:      DataValueFromValue(typedef),
+			ua.AttributeIDEventNotifier: DataValueFromValue(int16(0)),
 		},
 		[]*ua.ReferenceDescription{},
 		vf,
@@ -133,7 +143,7 @@ func (n *Node) ID() *ua.NodeID {
 	return n.id
 }
 
-func (n *Node) Value() *ua.Variant {
+func (n *Node) Value() *ua.DataValue {
 	if n.val == nil {
 		return nil
 	}
@@ -156,41 +166,41 @@ func (n *Node) Attribute(id ua.AttributeID) (*AttrValue, error) {
 		return nil, ua.StatusBadAttributeIDInvalid
 	}
 }
-func (n *Node) SetAttribute(id ua.AttributeID, val ua.DataValue) error {
+func (n *Node) SetAttribute(id ua.AttributeID, val *ua.DataValue) error {
 	switch {
 	case id == ua.AttributeIDValue:
 
 		// TODO: probably need to do some type checking here.
 		// And some permissions tests
-		n.val = func() *ua.Variant {
-			return ua.MustVariant(val.Value.Value())
+		n.val = func() *ua.DataValue {
+			return val
 		}
 
 		return nil
 	default:
-		n.attr[id] = val.Value
+		n.attr[id] = val
 	}
 	return ua.StatusBadNodeAttributesInvalid
 }
 
 func (n *Node) BrowseName() *ua.QualifiedName {
 	v := n.attr[ua.AttributeIDBrowseName]
-	if v == nil || v.Value() == nil {
+	if v == nil || v.Value.Value() == nil {
 		return &ua.QualifiedName{}
 	}
-	return v.Value().(*ua.QualifiedName)
+	return v.Value.Value().(*ua.QualifiedName)
 }
 
 func (n *Node) SetBrowseName(s string) {
-	n.attr[ua.AttributeIDBrowseName] = ua.MustVariant(&ua.QualifiedName{Name: s})
+	n.attr[ua.AttributeIDBrowseName] = DataValueFromValue(&ua.QualifiedName{Name: s})
 }
 
 func (n *Node) DisplayName() *ua.LocalizedText {
 	v := n.attr[ua.AttributeIDDisplayName]
-	if v == nil || v.Value() == nil {
+	if v == nil || v.Value.Value() == nil {
 		return &ua.LocalizedText{}
 	}
-	val := v.Value().(*ua.LocalizedText)
+	val := v.Value.Value().(*ua.LocalizedText)
 	val.UpdateMask()
 	return val
 }
@@ -198,19 +208,19 @@ func (n *Node) DisplayName() *ua.LocalizedText {
 func (n *Node) SetDisplayName(text, locale string) {
 	lt := &ua.LocalizedText{Text: text, Locale: locale}
 	lt.UpdateMask()
-	n.attr[ua.AttributeIDDisplayName] = ua.MustVariant(lt)
+	n.attr[ua.AttributeIDDisplayName] = DataValueFromValue(lt)
 }
 
 func (n *Node) Description() *ua.LocalizedText {
 	v := n.attr[ua.AttributeIDDescription]
-	if v == nil || v.Value() == nil {
+	if v == nil || v.Value.Value() == nil {
 		return &ua.LocalizedText{}
 	}
-	return v.Value().(*ua.LocalizedText)
+	return v.Value.Value().(*ua.LocalizedText)
 }
 
 func (n *Node) SetDescription(text, locale string) {
-	n.attr[ua.AttributeIDDescription] = ua.MustVariant(&ua.LocalizedText{Text: text, Locale: locale})
+	n.attr[ua.AttributeIDDescription] = DataValueFromValue(&ua.LocalizedText{Text: text, Locale: locale})
 }
 
 func (n *Node) DataType() *ua.ExpandedNodeID {
@@ -219,7 +229,7 @@ func (n *Node) DataType() *ua.ExpandedNodeID {
 		return ua.NewTwoByteExpandedNodeID(0)
 	}
 	v := n.attr[ua.AttributeIDDataType]
-	if v == nil || v.Value() == nil {
+	if v == nil || v.Value.Value() == nil {
 		// if we have a type definition, return that?
 		for i := range n.refs {
 			r := n.refs[i]
@@ -232,21 +242,21 @@ func (n *Node) DataType() *ua.ExpandedNodeID {
 		}
 		return ua.NewTwoByteExpandedNodeID(0)
 	}
-	return v.Value().(*ua.ExpandedNodeID)
+	return v.Value.Value().(*ua.ExpandedNodeID)
 }
 
 func (n *Node) SetNodeClass(nc ua.NodeClass) {
-	n.attr[ua.AttributeIDNodeClass] = ua.MustVariant(uint32(nc))
+	n.attr[ua.AttributeIDNodeClass] = DataValueFromValue(uint32(nc))
 }
 
 func (n *Node) NodeClass() ua.NodeClass {
 	v := n.attr[ua.AttributeIDNodeClass]
-	if v == nil || v.Value() == nil {
+	if v == nil || v.Value.Value() == nil {
 		return ua.NodeClassObject
 	}
-	vi32, ok := v.Value().(int32)
+	vi32, ok := v.Value.Value().(int32)
 	if !ok {
-		vui32, ok := v.Value().(uint32)
+		vui32, ok := v.Value.Value().(uint32)
 		if !ok {
 			return ua.NodeClassObject
 		}
