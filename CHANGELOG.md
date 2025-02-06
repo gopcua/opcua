@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.7.0 (6 Feb 2025)
+
+* server: use DataValue instead of Variant for node attributes (#766)
+
 ## v0.6.5 (22 Jan 2025)
 
 * monitor: add modification functionality (#764)
