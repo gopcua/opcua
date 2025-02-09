@@ -183,3 +183,65 @@ func TestCloneBrowseRequest(t *testing.T) {
 		})
 	}
 }
+
+func TestClient_SetState(t *testing.T) {
+	tests := []struct {
+		name      string
+		state     ConnState
+		withChan  bool
+		ctxCancel bool
+	}{
+		{
+			name:     "set state without channel",
+			state:    Connected,
+			withChan: false,
+		},
+		{
+			name:     "set state with channel",
+			state:    Connecting,
+			withChan: true,
+		},
+		{
+			name:      "set state with cancelled context",
+			state:     Disconnected,
+			withChan:  true,
+			ctxCancel: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			var opts []Option
+			var stateCh chan ConnState
+			if tt.withChan {
+				stateCh = make(chan ConnState, 1)
+				opts = append(opts, StateChangedCh(stateCh))
+			}
+
+			c, err := NewClient("opc.tcp://example.com:4840", opts...)
+			require.NoError(t, err)
+
+			if tt.ctxCancel {
+				cancel()
+			}
+
+			c.setState(ctx, tt.state)
+
+			// Verify state was set correctly
+			require.Equal(t, tt.state, c.State())
+
+			// Verify channel received state if channel exists
+			if tt.withChan && !tt.ctxCancel {
+				select {
+				case state := <-stateCh:
+					require.Equal(t, tt.state, state)
+				default:
+					t.Fatal("expected state on channel but got none")
+				}
+			}
+		})
+	}
+}
