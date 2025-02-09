@@ -57,6 +57,7 @@ type Config struct {
 	dialer  *uacp.Dialer
 	sechan  *uasc.Config
 	session *uasc.SessionConfig
+	stateCh chan<- ConnState
 }
 
 // NewDialer creates a uacp.Dialer from the config options
@@ -556,6 +557,17 @@ func SendBufferSize(n uint32) Option {
 	return func(cfg *Config) error {
 		initDialer(cfg)
 		cfg.dialer.ClientACK.SendBufSize = n
+		return nil
+	}
+}
+
+// StateChangedCh sets the channel for receiving client connection state changes.
+//
+// The caller must either consume the channel immediately or provide a buffer
+// to prevent blocking state changes in the client.
+func StateChangedCh(ch chan<- ConnState) Option {
+	return func(cfg *Config) error {
+		cfg.stateCh = ch
 		return nil
 	}
 }
