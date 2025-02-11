@@ -12,7 +12,7 @@ import (
 )
 
 type Complex struct {
-	i, j int64
+	I, J int64
 }
 
 func TestCallMethod(t *testing.T) {
@@ -71,6 +71,24 @@ func TestCallMethod(t *testing.T) {
 				OutputArguments:              []*ua.Variant{ua.MustVariant(int64(9 + 64))},
 			},
 		},
+		{
+			name: "issue768_array_of_extobjs",
+			req: &ua.CallMethodRequest{
+				ObjectID:       ua.NewStringNodeID(2, "main"),
+				MethodID:       ua.NewStringNodeID(2, "issue768"),
+				InputArguments: []*ua.Variant{},
+			},
+			resp: &ua.CallMethodResult{
+				StatusCode:                   ua.StatusOK,
+				InputArgumentResults:         []ua.StatusCode{},
+				InputArgumentDiagnosticInfos: []*ua.DiagnosticInfo{},
+				OutputArguments: []*ua.Variant{ua.MustVariant(
+					[]*ua.ExtensionObject{
+						ua.NewExtensionObject(&Complex{1, 2}),
+						ua.NewExtensionObject(&Complex{3, 4}),
+					},
+				)},
+			},
 		},
 	}
 
