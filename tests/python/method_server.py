@@ -36,6 +36,10 @@ def sum_of_squares(parent, variant):
     ret = v.i*v.i + v.j*v.j
     return [ua.Variant(ret, ua.VariantType.Int64)]
 
+def issue_768(parent):
+    print("no_args method call returns []ua.ExtensionObject")
+    return [ua.Variant([Complex(1,2), Complex(3,4)])]
+
 if __name__ == "__main__":
     server = Server()
     server.set_endpoint("opc.tcp://0.0.0.0:4840/")
@@ -46,5 +50,6 @@ if __name__ == "__main__":
     fnEven = main.add_method(ua.NodeId("even", ns), "even", even, [ua.VariantType.Int64], [ua.VariantType.Boolean])
     fnSquare = main.add_method(ua.NodeId("square", ns), "square", square, [ua.VariantType.Int64], [ua.VariantType.Int64])
     fnSumOfSquare = main.add_method(ua.NodeId("sumOfSquare", ns), "sumOfSquare", sum_of_squares, [ua.VariantType.ExtensionObject], [ua.VariantType.Int64])
+    fnNoArgs = main.add_method(ua.NodeId("issue768", ns), "issue768", issue_768, [])
 
     server.start()
