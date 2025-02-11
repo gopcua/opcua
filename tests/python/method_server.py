@@ -33,7 +33,7 @@ def square(parent, variant):
 
 def sum_of_squares(parent, variant):
     v = variant.Value # type is extension object "Complex"
-    print("sum_of_square methos call with parameter: ", v)
+    print("sum_of_square method call with parameter: ", v)
     ret = v.i*v.i + v.j*v.j
     return [ua.Variant(ret, ua.VariantType.Int64)]
 
