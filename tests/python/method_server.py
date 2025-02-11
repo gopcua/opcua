@@ -9,14 +9,13 @@ class Complex(uatypes.FrozenClass):
         ('j', 'Int64'),
     ]
 
-    def __init__(self):
-        self.i = 0
-        self.j = 0
+    def __init__(self, i=0, j=0):
+        self.i = i
+        self.j = j
         self._freeze = True
 
     def __str__(self):
-        return 'Complex(' + 'i:' + str(self.i) + ', ' + \
-               'j:' + str(self.j) + ')'
+        return f'Complex(i:{self.i}, j:{self.j})'
 
     __repr__ = __str__
 
