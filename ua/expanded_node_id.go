@@ -6,6 +6,7 @@ package ua
 
 import (
 	"encoding/base64"
+	"fmt"
 	"math"
 	"strconv"
 	"strings"
@@ -24,8 +25,35 @@ type ExpandedNodeID struct {
 	ServerIndex  uint32
 }
 
+// Returns an OPC UA standard compliant string representation of the ExpandedNodeId,
+// described in Part 6, v1.0.5, 5.1.12 QualifiedName, NodeId and ExpandedNodeId String Encoding
+// The namespaceUri has to be URL encoded when the ExpandedNodeId is created
 func (a ExpandedNodeID) String() string {
-	return a.NodeID.String()
+	var s string = ""
+	if a.ServerIndex != uint32(0) {
+		s = fmt.Sprintf("svr=%d;", a.ServerIndex)
+	}
+	if len(a.NamespaceURI) > 0 {
+		s = fmt.Sprintf("%snsu=%s;", s, a.NamespaceURI)
+	} else {
+		if a.NodeID.ns != uint16(0) {
+			s = fmt.Sprintf("%sns=%d;", s, a.NodeID.ns)
+		}
+	}
+	switch identifier := a.NodeID.Type(); identifier {
+	case NodeIDTypeTwoByte, NodeIDTypeFourByte, NodeIDTypeNumeric:
+		s = fmt.Sprintf("%si=%d", s, a.NodeID.nid)
+	case NodeIDTypeString:
+		s = fmt.Sprintf("%ss=%s", s, string(a.NodeID.bid))
+	case NodeIDTypeByteString:
+		s = fmt.Sprintf("%sb=%s", s, base64.StdEncoding.EncodeToString(a.NodeID.bid))
+	case NodeIDTypeGUID:
+		fmt.Println()
+		s = fmt.Sprintf("%sg=%s", s, a.NodeID.gid.String())
+	default:
+		panic("invalid node type")
+	}
+	return s
 }
 
 // NewExpandedNodeID creates a new ExpandedNodeID.

@@ -106,3 +106,29 @@ func TestParseExpandedNodeID(t *testing.T) {
 		})
 	}
 }
+
+func TestExpandedNodeID_String(t *testing.T) {
+	cases := []struct {
+		name string
+		n    ExpandedNodeID
+		sRep string
+	}{
+		{name: "svr=1;nsu=urn:abc:123;i=3344", n: ExpandedNodeID{ServerIndex: 1, NamespaceURI: "urn:abc:123", NodeID: NewNumericNodeID(1, 3344)}, sRep: "svr=1;nsu=urn:abc:123;i=3344"},
+		{name: "nsu=urn:abc:123;i=3344, ns=1", n: ExpandedNodeID{ServerIndex: 0, NamespaceURI: "urn:abc:123", NodeID: NewNumericNodeID(1, 3344)}, sRep: "nsu=urn:abc:123;i=3344"},
+		{name: "nsu=urn:abc:123;i=3344, ns=0", n: ExpandedNodeID{ServerIndex: 0, NamespaceURI: "urn:abc:123", NodeID: NewNumericNodeID(0, 3344)}, sRep: "nsu=urn:abc:123;i=3344"},
+		{name: "ns=1;i=3344", n: ExpandedNodeID{ServerIndex: 0, NamespaceURI: "", NodeID: NewNumericNodeID(1, 3344)}, sRep: "ns=1;i=3344"},
+		{name: "i=4, TwoByteNodeId", n: ExpandedNodeID{ServerIndex: 0, NamespaceURI: "", NodeID: NewTwoByteNodeID(uint8(4))}, sRep: "i=4"},
+		{name: "ns=2;i=5432, FourByteNodeId", n: ExpandedNodeID{ServerIndex: 0, NamespaceURI: "", NodeID: NewFourByteNodeID(2, 5432)}, sRep: "ns=2;i=5432"},
+		{name: "i=3344", n: ExpandedNodeID{ServerIndex: 0, NamespaceURI: "", NodeID: NewNumericNodeID(0, 3344)}, sRep: "i=3344"},
+		{name: "guid identifier", n: ExpandedNodeID{ServerIndex: 0, NamespaceURI: "", NodeID: NewGUIDNodeID(3, NewGUID("09087e75-8e5e-499b-954f-f2a9603db28a").String())}, sRep: "ns=3;g=09087E75-8E5E-499B-954F-F2A9603DB28A"},
+		{name: "string identifier", n: ExpandedNodeID{ServerIndex: 0, NamespaceURI: "", NodeID: NewStringNodeID(5, "mystring")}, sRep: "ns=5;s=mystring"},
+		{name: "opaque identifier", n: ExpandedNodeID{ServerIndex: 0, NamespaceURI: "", NodeID: NewByteStringNodeID(5, []byte{1, 2, 3, 4})}, sRep: "ns=5;b=AQIDBA=="},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			str := c.n.String()
+			require.Equal(t, c.sRep, str)
+		})
+	}
+}
