@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.7.1 (27 Feb 2025)
+
+* client: use nil-checked secure channel (#775)
+
 ## v0.7.0 (6 Feb 2025)
 
 * server: use DataValue instead of Variant for node attributes (#766)
