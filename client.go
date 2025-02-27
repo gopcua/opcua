@@ -736,7 +736,8 @@ func (s *Session) RevisedTimeout() time.Duration {
 //
 // See Part 4, 5.6.2
 func (c *Client) CreateSession(ctx context.Context, cfg *uasc.SessionConfig) (*Session, error) {
-	if c.SecureChannel() == nil {
+	sc := c.SecureChannel()
+	if sc == nil {
 		return nil, ua.StatusBadServerNotConnected
 	}
 
@@ -761,14 +762,14 @@ func (c *Client) CreateSession(ctx context.Context, cfg *uasc.SessionConfig) (*S
 
 	var s *Session
 	// for the CreateSessionRequest the authToken is always nil.
-	// use c.SecureChannel().SendRequest() to enforce this.
-	err := c.SecureChannel().SendRequest(ctx, req, nil, func(v ua.Response) error {
+	// use sc.SendRequest() to enforce this.
+	err := sc.SendRequest(ctx, req, nil, func(v ua.Response) error {
 		var res *ua.CreateSessionResponse
 		if err := safeAssign(v, &res); err != nil {
 			return err
 		}
 
-		err := c.SecureChannel().VerifySessionSignature(res.ServerCertificate, nonce, res.ServerSignature.Signature)
+		err := sc.VerifySessionSignature(res.ServerCertificate, nonce, res.ServerSignature.Signature)
 		if err != nil {
 			log.Printf("error verifying session signature: %s", err)
 			return nil
@@ -827,11 +828,12 @@ func anonymousPolicyID(endpoints []*ua.EndpointDescription) string {
 //
 // See Part 4, 5.6.3
 func (c *Client) ActivateSession(ctx context.Context, s *Session) error {
-	if c.SecureChannel() == nil {
+	sc := c.SecureChannel()
+	if sc == nil {
 		return ua.StatusBadServerNotConnected
 	}
 	stats.Client().Add("ActivateSession", 1)
-	sig, sigAlg, err := c.SecureChannel().NewSessionSignature(s.serverCertificate, s.serverNonce)
+	sig, sigAlg, err := sc.NewSessionSignature(s.serverCertificate, s.serverNonce)
 	if err != nil {
 		log.Printf("error creating session signature: %s", err)
 		return nil
@@ -842,7 +844,7 @@ func (c *Client) ActivateSession(ctx context.Context, s *Session) error {
 		// nothing to do
 
 	case *ua.UserNameIdentityToken:
-		pass, passAlg, err := c.SecureChannel().EncryptUserPassword(s.cfg.AuthPolicyURI, s.cfg.AuthPassword, s.serverCertificate, s.serverNonce)
+		pass, passAlg, err := sc.EncryptUserPassword(s.cfg.AuthPolicyURI, s.cfg.AuthPassword, s.serverCertificate, s.serverNonce)
 		if err != nil {
 			log.Printf("error encrypting user password: %s", err)
 			return err
@@ -851,7 +853,7 @@ func (c *Client) ActivateSession(ctx context.Context, s *Session) error {
 		tok.EncryptionAlgorithm = passAlg
 
 	case *ua.X509IdentityToken:
-		tokSig, tokSigAlg, err := c.SecureChannel().NewUserTokenSignature(s.cfg.AuthPolicyURI, s.serverCertificate, s.serverNonce)
+		tokSig, tokSigAlg, err := sc.NewUserTokenSignature(s.cfg.AuthPolicyURI, s.serverCertificate, s.serverNonce)
 		if err != nil {
 			log.Printf("error creating session signature: %s", err)
 			return err
@@ -875,7 +877,7 @@ func (c *Client) ActivateSession(ctx context.Context, s *Session) error {
 		UserIdentityToken:          ua.NewExtensionObject(s.cfg.UserIdentityToken),
 		UserTokenSignature:         s.cfg.UserTokenSignature,
 	}
-	return c.SecureChannel().SendRequest(ctx, req, s.resp.AuthenticationToken, func(v ua.Response) error {
+	return sc.SendRequest(ctx, req, s.resp.AuthenticationToken, func(v ua.Response) error {
 		var res *ua.ActivateSessionResponse
 		if err := safeAssign(v, &res); err != nil {
 			return err
@@ -956,7 +958,7 @@ func (c *Client) sendWithTimeout(ctx context.Context, req ua.Request, timeout ti
 	if s := c.Session(); s != nil {
 		authToken = s.resp.AuthenticationToken
 	}
-	return c.SecureChannel().SendRequestWithTimeout(ctx, req, authToken, timeout, h)
+	return sc.SendRequestWithTimeout(ctx, req, authToken, timeout, h)
 }
 
 // Node returns a node object which accesses its attributes
