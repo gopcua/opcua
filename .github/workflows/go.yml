@@ -15,7 +15,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest]
-        go: ["1.22.x", "1.23.x"]
+        go: ["1.23.x", "1.24.x"]
 
     steps:
       - name: Check out code into the Go module directory
