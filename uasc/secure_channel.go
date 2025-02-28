@@ -1043,9 +1043,11 @@ func (s *SecureChannel) sendAsyncWithTimeout(
 
 		// send the message
 		var n int
+		s.c.SetWriteDeadline(time.Now().Add(timeout))
 		if n, err = s.c.Write(chunk); err != nil {
 			return nil, err
 		}
+		s.c.SetWriteDeadline(time.Time{})
 
 		atomic.AddUint64(&instance.bytesSent, uint64(n))
 		atomic.AddUint32(&instance.messagesSent, 1)
