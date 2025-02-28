@@ -362,7 +362,11 @@ func SecurityFromEndpoint(ep *ua.EndpointDescription, authType ua.UserTokenType)
 			}
 
 			setPolicyID(cfg.session.UserIdentityToken, t.PolicyID)
-			cfg.session.AuthPolicyURI = t.SecurityPolicyURI
+			if t.SecurityPolicyURI != "" {
+				cfg.session.AuthPolicyURI = t.SecurityPolicyURI
+			} else {
+				cfg.session.AuthPolicyURI = ep.SecurityPolicyURI
+			}
 			return nil
 		}
 
