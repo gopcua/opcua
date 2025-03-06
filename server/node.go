@@ -99,6 +99,10 @@ func NewVariableNode(nodeID *ua.NodeID, name string, value any) *Node {
 				return DataValueFromValue(value)
 			},
 		)
+		dvFunc, ok := value.(ValueFunc)
+		if ok {
+			n.val = dvFunc
+		}
 		return n
 	}
 	typedef := ua.NewNumericExpandedNodeID(0, id.VariableNode)
@@ -154,7 +158,11 @@ func (n *Node) Attribute(id ua.AttributeID) (*AttrValue, error) {
 	switch {
 	case id == ua.AttributeIDValue:
 		if n.val != nil {
-			return NewAttrValue(n.val()), nil
+			val := n.val()
+			if val == nil {
+				return nil, ua.StatusBadAttributeIDInvalid
+			}
+			return NewAttrValue(val), nil
 		}
 		return nil, ua.StatusBadAttributeIDInvalid
 	case n.attr == nil:
