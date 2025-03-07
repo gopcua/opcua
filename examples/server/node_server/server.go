@@ -212,8 +212,8 @@ func main() {
 	var4 := server.NewNode(
 		ua.NewNumericNodeID(nodeNS.ID(), 3321), // you can use whatever node id you want here, whether it's numeric, string, guid, etc...
 		map[ua.AttributeID]*ua.DataValue{
-			ua.AttributeIDAccessLevel:     server.DataValueFromValue(byte(ua.AccessLevelExTypeCurrentRead | ua.AccessLevelExTypeCurrentWrite)),
-			ua.AttributeIDUserAccessLevel: server.DataValueFromValue(byte(ua.AccessLevelExTypeCurrentRead | ua.AccessLevelExTypeCurrentWrite)),
+			ua.AttributeIDAccessLevel:     server.DataValueFromValue(byte(ua.AccessLevelTypeCurrentRead | ua.AccessLevelTypeCurrentWrite)),
+			ua.AttributeIDUserAccessLevel: server.DataValueFromValue(byte(ua.AccessLevelTypeCurrentRead | ua.AccessLevelTypeCurrentWrite)),
 			ua.AttributeIDBrowseName:      server.DataValueFromValue(attrs.BrowseName("testBrowseName")),
 			ua.AttributeIDNodeClass:       server.DataValueFromValue(uint32(ua.NodeClassVariable)),
 		},
@@ -226,8 +226,8 @@ func main() {
 	var5 := server.NewNode(
 		ua.NewNumericNodeID(nodeNS.ID(), 222), // you can use whatever node id you want here, whether it's numeric, string, guid, etc...
 		map[ua.AttributeID]*ua.DataValue{
-			ua.AttributeIDAccessLevel:     server.DataValueFromValue(byte(ua.AccessLevelExTypeCurrentRead)),
-			ua.AttributeIDUserAccessLevel: server.DataValueFromValue(byte(ua.AccessLevelExTypeCurrentRead)),
+			ua.AttributeIDAccessLevel:     server.DataValueFromValue(byte(ua.AccessLevelTypeCurrentRead)),
+			ua.AttributeIDUserAccessLevel: server.DataValueFromValue(byte(ua.AccessLevelTypeCurrentRead)),
 			ua.AttributeIDBrowseName:      server.DataValueFromValue(attrs.BrowseName("ReadOnlyVariable")),
 			ua.AttributeIDNodeClass:       server.DataValueFromValue(uint32(ua.NodeClassVariable)),
 		},

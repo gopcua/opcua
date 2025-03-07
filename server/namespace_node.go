@@ -121,8 +121,17 @@ func (as *NodeNameSpace) Attribute(id *ua.NodeID, attr ua.AttributeID) *ua.DataV
 			Status:          ua.StatusBadNodeIDUnknown,
 		}
 	}
-	var a *AttrValue
+
+	if !n.Access(ua.AccessLevelTypeCurrentRead) {
+		return &ua.DataValue{
+			EncodingMask:    ua.DataValueServerTimestamp | ua.DataValueStatusCode,
+			ServerTimestamp: time.Now(),
+			Status:          ua.StatusBadUserAccessDenied,
+		}
+	}
+
 	var err error
+	var a *AttrValue
 
 	switch attr {
 	case ua.AttributeIDNodeID:
@@ -251,70 +260,11 @@ func (as *NodeNameSpace) SetAttribute(id *ua.NodeID, attr ua.AttributeID, val *u
 		return ua.StatusBadNodeIDUnknown
 	}
 
-	access, err := n.Attribute(ua.AttributeIDUserAccessLevel)
-	if err == nil { // if we have an access level, we need to check it.
-		x := 0
-		switch val := access.Value.Value.Value().(type) {
-		case int8:
-			x = int(val)
-		case int:
-			x = int(val)
-		case int32:
-			x = int(val)
-		case int64:
-			x = int(val)
-		case uint32:
-			x = int(val)
-		case uint64:
-			x = int(val)
-		case uint:
-			x = int(val)
-		case uint16:
-			x = int(val)
-		case uint8:
-			x = int(val)
-		default:
-			return ua.StatusBadUserAccessDenied // if we can't convert it, we can't use it.
-		}
-
-		requirement := int(ua.AccessLevelExTypeCurrentWrite)
-		if x&requirement == 0 {
-			return ua.StatusBadUserAccessDenied
-		}
-	}
-	access, err = n.Attribute(ua.AttributeIDAccessLevel)
-	if err == nil { // if we have an access level, we need to check it.
-		x := 0
-		switch val := access.Value.Value.Value().(type) {
-		case int8:
-			x = int(val)
-		case int:
-			x = int(val)
-		case int32:
-			x = int(val)
-		case int64:
-			x = int(val)
-		case uint32:
-			x = int(val)
-		case uint64:
-			x = int(val)
-		case uint:
-			x = int(val)
-		case uint16:
-			x = int(val)
-		case uint8:
-			x = int(val)
-		default:
-			return ua.StatusBadUserAccessDenied // if we can't convert it, we can't use it.
-		}
-
-		requirement := int(ua.AccessLevelExTypeCurrentWrite)
-		if x&requirement == 0 {
-			return ua.StatusBadUserAccessDenied
-		}
+	if !n.Access(ua.AccessLevelTypeCurrentWrite) {
+		return ua.StatusBadUserAccessDenied
 	}
 
-	err = n.SetAttribute(attr, val)
+	err := n.SetAttribute(attr, val)
 	if err != nil {
 		return ua.StatusBadAttributeIDInvalid
 	}

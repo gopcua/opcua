@@ -325,3 +325,39 @@ func (n *Node) AddRef(o *Node, rt RefType, forward bool) {
 	}
 	n.refs = append(n.refs, &ref)
 }
+
+// Access returns true if the node has the access level requested.
+// It checks both the UserAccessLevel and AccessLevel attributes.
+// If neither are present, it assumes global access and returns true.
+//
+// I'm not sure what the best way to implement "user" specific access levels
+// is presently.  Will need functioning user authentication first, and then a way to
+// pass it into the nodes user access attribute so it can be checked properly.
+func (n Node) Access(flag ua.AccessLevelType) bool {
+
+	access, err := n.Attribute(ua.AttributeIDUserAccessLevel)
+	if err == nil { // if we have a user access level, we need to check it.
+		val0 := access.Value.Value.Value()
+		val, ok := val0.(uint8)
+		if !ok {
+			return false
+		}
+		if val&uint8(flag) == 0 {
+			return false
+		}
+	}
+	access, err = n.Attribute(ua.AttributeIDAccessLevel)
+	if err == nil { // if we have an access level, we need to check it.
+		val0 := access.Value.Value.Value()
+		val, ok := val0.(uint8)
+		if !ok {
+			return false
+		}
+
+		if val&uint8(flag) == 0 {
+			return false
+		}
+	}
+	return true
+
+}
