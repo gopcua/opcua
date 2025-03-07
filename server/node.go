@@ -28,6 +28,26 @@ func NewAttrValue(v *ua.DataValue) *AttrValue {
 }
 
 func DataValueFromValue(val any) *ua.DataValue {
+	// if we already have a data value, just return it.
+	switch v := val.(type) {
+	case *ua.DataValue:
+		return v
+	case ua.DataValue:
+		return &v
+	case ua.Variant:
+		return &ua.DataValue{
+			EncodingMask:    ua.DataValueValue,
+			Value:           &v,
+			SourceTimestamp: time.Now(),
+		}
+	case *ua.Variant:
+		return &ua.DataValue{
+			EncodingMask:    ua.DataValueValue,
+			Value:           v,
+			SourceTimestamp: time.Now(),
+		}
+
+	}
 
 	v := ua.MustVariant(val)
 	return &ua.DataValue{
