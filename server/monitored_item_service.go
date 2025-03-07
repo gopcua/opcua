@@ -58,7 +58,7 @@ func (s *MonitoredItemService) DeleteMonitoredItem(id uint32) {
 			continue
 		}
 		if n.ID == id {
-			slices.Delete(s.Nodes[nodeid], i, i+1)
+			s.Nodes[nodeid] = slices.Delete(s.Nodes[nodeid], i, i+1)
 		}
 	}
 	//slices.DeleteFunc(s.Nodes[nodeid], func(i *MonitoredItem) bool { return i.ID == item.ID })
@@ -72,7 +72,7 @@ func (s *MonitoredItemService) DeleteMonitoredItem(id uint32) {
 			continue
 		}
 		if n.ID == id {
-			slices.Delete(s.Subs[item.Sub.ID], i, i+1)
+			s.Subs[item.Sub.ID] = slices.Delete(s.Subs[item.Sub.ID], i, i+1)
 		}
 	}
 	//slices.DeleteFunc(s.Subs[item.Sub.ID], func(i *MonitoredItem) bool { return i.ID == item.ID })
