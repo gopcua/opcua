@@ -46,6 +46,12 @@ func DataValueFromValue(val any) *ua.DataValue {
 			Value:           v,
 			SourceTimestamp: time.Now(),
 		}
+	case int:
+		return &ua.DataValue{
+			EncodingMask:    ua.DataValueValue,
+			Value:           ua.MustVariant(int32(v)),
+			SourceTimestamp: time.Now(),
+		}
 
 	}
 
