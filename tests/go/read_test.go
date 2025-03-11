@@ -56,6 +56,23 @@ func TestRead(t *testing.T) {
 	}
 }
 
+func testReadPerm(t *testing.T, ctx context.Context, c *opcua.Client, v interface{}, id *ua.NodeID, resultCode ua.StatusCode) {
+	t.Helper()
+
+	resp, err := c.Read(ctx, &ua.ReadRequest{
+		NodesToRead: []*ua.ReadValueID{
+			{NodeID: id},
+		},
+		TimestampsToReturn: ua.TimestampsToReturnBoth,
+	})
+
+	require.NoError(t, err, "Read failed")
+	require.Equal(t, resultCode, resp.Results[0].Status, "Status not OK")
+	if resultCode == ua.StatusOK {
+		require.Equal(t, v, resp.Results[0].Value.Value(), "Results[0].Value not equal")
+	}
+}
+
 func testRead(t *testing.T, ctx context.Context, c *opcua.Client, v interface{}, id *ua.NodeID) {
 	t.Helper()
 
@@ -88,4 +105,43 @@ func testRegisteredRead(t *testing.T, ctx context.Context, c *opcua.Client, v in
 		NodesToUnregister: []*ua.NodeID{id},
 	})
 	require.NoError(t, err, "UnregisterNodes failed")
+}
+
+func TestReadPerms(t *testing.T) {
+	tests := []struct {
+		id  *ua.NodeID
+		err ua.StatusCode
+		v   any
+	}{
+		{ua.NewStringNodeID(1, "NoPermVariable"), ua.StatusOK, int32(742)},
+		{ua.NewStringNodeID(1, "ReadWriteVariable"), ua.StatusOK, 12.34},
+		{ua.NewStringNodeID(1, "ReadOnlyVariable"), ua.StatusOK, 9.87},
+		{ua.NewStringNodeID(1, "NoAccessVariable"), ua.StatusBadUserAccessDenied, nil},
+	}
+
+	ctx := context.Background()
+
+	srv := startServer()
+	defer srv.Close()
+
+	time.Sleep(2 * time.Second)
+
+	c, err := opcua.NewClient("opc.tcp://localhost:4840", opcua.SecurityMode(ua.MessageSecurityModeNone))
+	require.NoError(t, err, "NewClient failed")
+
+	err = c.Connect(ctx)
+	require.NoError(t, err, "Connect failed")
+	defer c.Close(ctx)
+
+	for _, tt := range tests {
+		t.Run(tt.id.String(), func(t *testing.T) {
+			t.Run("Read", func(t *testing.T) {
+				testReadPerm(t, ctx, c, tt.v, tt.id, tt.err)
+			})
+			t.Run("RegisteredRead", func(t *testing.T) {
+				t.Skip("Not implemented in server")
+				testRegisteredRead(t, ctx, c, tt.v, tt.id)
+			})
+		})
+	}
 }

@@ -10,6 +10,7 @@ import (
 
 	"github.com/gopcua/opcua/id"
 	"github.com/gopcua/opcua/server"
+	"github.com/gopcua/opcua/server/attrs"
 	"github.com/gopcua/opcua/ua"
 )
 
@@ -67,6 +68,60 @@ func startServer() *server.Server {
 	nns_obj.AddRef(n, id.HasComponent, true)
 	n = nodeNS.AddNewVariableStringNode("rw_int32", int32(5))
 	nns_obj.AddRef(n, id.HasComponent, true)
+
+	var3 := server.NewNode(
+		ua.NewStringNodeID(nodeNS.ID(), "NoPermVariable"), // you can use whatever node id you want here, whether it's numeric, string, guid, etc...
+		map[ua.AttributeID]*ua.DataValue{
+			ua.AttributeIDBrowseName: server.DataValueFromValue(attrs.BrowseName("NoPermVariable")),
+			ua.AttributeIDNodeClass:  server.DataValueFromValue(uint32(ua.NodeClassVariable)),
+		},
+		nil,
+		func() *ua.DataValue { return server.DataValueFromValue(int32(742)) },
+	)
+	nodeNS.AddNode(var3)
+	nns_obj.AddRef(var3, id.HasComponent, true)
+
+	var4 := server.NewNode(
+		ua.NewStringNodeID(nodeNS.ID(), "ReadWriteVariable"), // you can use whatever node id you want here, whether it's numeric, string, guid, etc...
+		map[ua.AttributeID]*ua.DataValue{
+			ua.AttributeIDAccessLevel:     server.DataValueFromValue(byte(ua.AccessLevelTypeCurrentRead | ua.AccessLevelTypeCurrentWrite)),
+			ua.AttributeIDUserAccessLevel: server.DataValueFromValue(byte(ua.AccessLevelTypeCurrentRead | ua.AccessLevelTypeCurrentWrite)),
+			ua.AttributeIDBrowseName:      server.DataValueFromValue(attrs.BrowseName("ReadWriteVariable")),
+			ua.AttributeIDNodeClass:       server.DataValueFromValue(uint32(ua.NodeClassVariable)),
+		},
+		nil,
+		func() *ua.DataValue { return server.DataValueFromValue(12.34) },
+	)
+	nodeNS.AddNode(var4)
+	nns_obj.AddRef(var4, id.HasComponent, true)
+
+	var5 := server.NewNode(
+		ua.NewStringNodeID(nodeNS.ID(), "ReadOnlyVariable"), // you can use whatever node id you want here, whether it's numeric, string, guid, etc...
+		map[ua.AttributeID]*ua.DataValue{
+			ua.AttributeIDAccessLevel:     server.DataValueFromValue(byte(ua.AccessLevelTypeCurrentRead)),
+			ua.AttributeIDUserAccessLevel: server.DataValueFromValue(byte(ua.AccessLevelTypeCurrentRead)),
+			ua.AttributeIDBrowseName:      server.DataValueFromValue(attrs.BrowseName("ReadOnlyVariable")),
+			ua.AttributeIDNodeClass:       server.DataValueFromValue(uint32(ua.NodeClassVariable)),
+		},
+		nil,
+		func() *ua.DataValue { return server.DataValueFromValue(9.87) },
+	)
+	nodeNS.AddNode(var5)
+	nns_obj.AddRef(var5, id.HasComponent, true)
+
+	var6 := server.NewNode(
+		ua.NewStringNodeID(nodeNS.ID(), "NoAccessVariable"), // you can use whatever node id you want here, whether it's numeric, string, guid, etc...
+		map[ua.AttributeID]*ua.DataValue{
+			ua.AttributeIDAccessLevel:     server.DataValueFromValue(byte(ua.AccessLevelTypeNone)),
+			ua.AttributeIDUserAccessLevel: server.DataValueFromValue(byte(ua.AccessLevelTypeNone)),
+			ua.AttributeIDBrowseName:      server.DataValueFromValue(attrs.BrowseName("NoAccessVariable")),
+			ua.AttributeIDNodeClass:       server.DataValueFromValue(uint32(ua.NodeClassVariable)),
+		},
+		nil,
+		func() *ua.DataValue { return server.DataValueFromValue(55.43) },
+	)
+	nodeNS.AddNode(var6)
+	nns_obj.AddRef(var6, id.HasComponent, true)
 
 	// Create a new node namespace.  You can add namespaces before or after starting the server.
 	gopcuaNS := server.NewNodeNameSpace(s, "http://gopcua.com/")
