@@ -15,7 +15,7 @@ import (
 func TestUnsetUserIdentityTokenConnect(t *testing.T) {
 	ctx := context.Background()
 
-	srv := NewServer("unset_useridentitytoken_server.py")
+	srv := NewPythonServer("unset_useridentitytoken_server.py")
 	defer srv.Close()
 
 	endpoints, err := opcua.GetEndpoints(ctx, *&srv.Endpoint)
@@ -23,7 +23,10 @@ func TestUnsetUserIdentityTokenConnect(t *testing.T) {
 		log.Fatal(err)
 	}
 
-	ep := opcua.SelectEndpoint(endpoints, "None", ua.MessageSecurityModeFromString("None"))
+	ep, err := opcua.SelectEndpoint(endpoints, "None", ua.MessageSecurityModeFromString("None"))
+  if err != nil {
+    t.Fatal(err)
+  }
 
 	opts := []opcua.Option{
 		opcua.SecurityPolicy("None"),
