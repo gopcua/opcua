@@ -160,6 +160,8 @@ func TestOptions(t *testing.T) {
 	require.NoError(t, err, "WriteFile(keyPEMFile) failed")
 	defer os.Remove(keyPEMFile)
 
+	connStateCh := make(chan ConnState)
+
 	tests := []struct {
 		name string
 		opt  Option
@@ -305,6 +307,13 @@ func TestOptions(t *testing.T) {
 			opt:  CertificateFile("x"),
 			cfg:  &Config{},
 			err:  notFoundError("certificate", "x"),
+		},
+		{
+			name: `ConnStateCh`,
+			opt:  StateChangedCh(connStateCh),
+			cfg: &Config{
+				stateCh: connStateCh,
+			},
 		},
 		{
 			name: `Lifetime(10ms)`,

@@ -166,6 +166,9 @@ type Client struct {
 	// atomicState of the client
 	atomicState atomic.Value // ConnState
 
+	// stateCh is an optional channel for connection state changes. May be nil.
+	stateCh chan<- ConnState
+
 	// list of cached atomicNamespaces on the server
 	atomicNamespaces atomic.Value // []string
 
@@ -197,10 +200,12 @@ func NewClient(endpoint string, opts ...Option) (*Client, error) {
 		pendingAcks: make([]*ua.SubscriptionAcknowledgement, 0),
 		pausech:     make(chan struct{}, 2),
 		resumech:    make(chan struct{}, 2),
+		stateCh:     cfg.stateCh,
 	}
 	c.pauseSubscriptions(context.Background())
 	c.setPublishTimeout(uasc.MaxTimeout)
-	c.setState(Closed)
+	// cannot use setState here since it would trigger the stateCh
+	c.atomicState.Store(Closed)
 	c.setSecureChannel(nil)
 	c.setSession(nil)
 	c.setNamespaces([]string{})
@@ -230,7 +235,7 @@ func (c *Client) Connect(ctx context.Context) error {
 		return errors.Errorf("already connected")
 	}
 
-	c.setState(Connecting)
+	c.setState(ctx, Connecting)
 	if err := c.Dial(ctx); err != nil {
 		stats.RecordError(err)
 
@@ -251,7 +256,7 @@ func (c *Client) Connect(ctx context.Context) error {
 
 		return err
 	}
-	c.setState(Connected)
+	c.setState(ctx, Connected)
 
 	mctx, mcancel := context.WithCancel(context.Background())
 	c.mcancel = mcancel
@@ -282,7 +287,7 @@ func (c *Client) monitor(ctx context.Context) {
 	defer dlog.Printf("done")
 
 	defer c.mcancel()
-	defer c.setState(Closed)
+	defer c.setState(ctx, Closed)
 
 	action := none
 	for {
@@ -306,7 +311,7 @@ func (c *Client) monitor(ctx context.Context) {
 			}
 
 			// tell the handler the connection is disconnected
-			c.setState(Disconnected)
+			c.setState(ctx, Disconnected)
 			dlog.Print("disconnected")
 
 			if !c.cfg.sechan.AutoReconnect {
@@ -387,7 +392,7 @@ func (c *Client) monitor(ctx context.Context) {
 							c.setSecureChannel(nil)
 						}
 
-						c.setState(Reconnecting)
+						c.setState(ctx, Reconnecting)
 
 						dlog.Printf("trying to recreate secure channel")
 						for {
@@ -412,7 +417,7 @@ func (c *Client) monitor(ctx context.Context) {
 						// This only works if the session is still open on the server
 						// otherwise recreate it
 
-						c.setState(Reconnecting)
+						c.setState(ctx, Reconnecting)
 
 						s := c.Session()
 						if s == nil {
@@ -443,7 +448,7 @@ func (c *Client) monitor(ctx context.Context) {
 					case recreateSession:
 						dlog.Printf("action: recreateSession")
 
-						c.setState(Reconnecting)
+						c.setState(ctx, Reconnecting)
 						// create a new session to replace the previous one
 
 						// clear any previous session as we know the server has closed it
@@ -548,7 +553,7 @@ func (c *Client) monitor(ctx context.Context) {
 							activeSubs++
 						}
 
-						c.setState(Connected)
+						c.setState(ctx, Connected)
 						action = none
 
 					case abortReconnect:
@@ -618,7 +623,7 @@ func (c *Client) Close(ctx context.Context) error {
 	// try to close the session but ignore any error
 	// so that we close the underlying channel and connection.
 	c.CloseSession(ctx)
-	c.setState(Closed)
+	c.setState(ctx, Closed)
 
 	if c.mcancel != nil {
 		c.mcancel()
@@ -650,8 +655,14 @@ func (c *Client) State() ConnState {
 	return c.atomicState.Load().(ConnState)
 }
 
-func (c *Client) setState(s ConnState) {
+func (c *Client) setState(ctx context.Context, s ConnState) {
 	c.atomicState.Store(s)
+	if c.stateCh != nil {
+		select {
+		case <-ctx.Done():
+		case c.stateCh <- s:
+		}
+	}
 	n := new(expvar.Int)
 	n.Set(int64(s))
 	stats.Client().Set("State", n)
