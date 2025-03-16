@@ -108,6 +108,18 @@ YqvGJP7ubbsR1YoQxQ8CQQCyCrltDYji5+KdxMOsDt0v7bCQWkQ3+pik09faK51Y
 				},
 			},
 		},
+	  // no user security policy uri
+		{
+			SecurityPolicyURI: "c", // random value for testing
+			SecurityMode:      5,   // random value for testing
+			ServerCertificate: certDER,
+			UserIdentityTokens: []*ua.UserTokenPolicy{
+				{
+					TokenType:         ua.UserTokenTypeIssuedToken,
+					SecurityPolicyURI: "", // empty 
+				},
+			},
+		},
 	}
 )
 
@@ -561,6 +573,26 @@ func TestOptions(t *testing.T) {
 					sc := DefaultSessionConfig()
 					sc.UserIdentityToken = &ua.IssuedIdentityToken{}
 					sc.AuthPolicyURI = "b"
+					return sc
+				}(),
+			},
+		},
+		{
+			name: `SecurityFromEndpoint(no-user-auth-policy-uri)`,
+			opt:  SecurityFromEndpoint(endpoints[4], ua.UserTokenTypeIssuedToken),
+			cfg: &Config{
+				sechan: func() *uasc.Config {
+					c := DefaultClientConfig()
+					c.SecurityPolicyURI = "c"
+					c.SecurityMode = 5
+					c.RemoteCertificate = certDER
+					c.Thumbprint = uapolicy.Thumbprint(certDER)
+					return c
+				}(),
+				session: func() *uasc.SessionConfig {
+					sc := DefaultSessionConfig()
+					sc.UserIdentityToken = &ua.IssuedIdentityToken{}
+					sc.AuthPolicyURI = "c"
 					return sc
 				}(),
 			},
