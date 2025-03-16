@@ -108,7 +108,7 @@ YqvGJP7ubbsR1YoQxQ8CQQCyCrltDYji5+KdxMOsDt0v7bCQWkQ3+pik09faK51Y
 				},
 			},
 		},
-	  // no user security policy uri
+		// no user security policy uri
 		{
 			SecurityPolicyURI: "c", // random value for testing
 			SecurityMode:      5,   // random value for testing
@@ -116,7 +116,7 @@ YqvGJP7ubbsR1YoQxQ8CQQCyCrltDYji5+KdxMOsDt0v7bCQWkQ3+pik09faK51Y
 			UserIdentityTokens: []*ua.UserTokenPolicy{
 				{
 					TokenType:         ua.UserTokenTypeIssuedToken,
-					SecurityPolicyURI: "", // empty 
+					SecurityPolicyURI: "", // empty
 				},
 			},
 		},
