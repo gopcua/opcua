@@ -121,8 +121,17 @@ func (as *NodeNameSpace) Attribute(id *ua.NodeID, attr ua.AttributeID) *ua.DataV
 			Status:          ua.StatusBadNodeIDUnknown,
 		}
 	}
-	var a *AttrValue
+
+	if !n.Access(ua.AccessLevelTypeCurrentRead) {
+		return &ua.DataValue{
+			EncodingMask:    ua.DataValueServerTimestamp | ua.DataValueStatusCode,
+			ServerTimestamp: time.Now(),
+			Status:          ua.StatusBadUserAccessDenied,
+		}
+	}
+
 	var err error
+	var a *AttrValue
 
 	switch attr {
 	case ua.AttributeIDNodeID:
@@ -251,14 +260,11 @@ func (as *NodeNameSpace) SetAttribute(id *ua.NodeID, attr ua.AttributeID, val *u
 		return ua.StatusBadNodeIDUnknown
 	}
 
-	access, err := n.Attribute(ua.AttributeIDUserAccessLevel)
-	if err == nil {
-		x := access.Value.Value.Value()
-		_ = x
+	if !n.Access(ua.AccessLevelTypeCurrentWrite) {
 		return ua.StatusBadUserAccessDenied
 	}
 
-	err = n.SetAttribute(attr, val)
+	err := n.SetAttribute(attr, val)
 	if err != nil {
 		return ua.StatusBadAttributeIDInvalid
 	}

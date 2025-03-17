@@ -25,9 +25,36 @@ type AttrValue struct {
 
 func NewAttrValue(v *ua.DataValue) *AttrValue {
 	return &AttrValue{Value: v}
+
 }
 
 func DataValueFromValue(val any) *ua.DataValue {
+	// if we already have a data value, just return it.
+	switch v := val.(type) {
+	case *ua.DataValue:
+		return v
+	case ua.DataValue:
+		return &v
+	case ua.Variant:
+		return &ua.DataValue{
+			EncodingMask:    ua.DataValueValue,
+			Value:           &v,
+			SourceTimestamp: time.Now(),
+		}
+	case *ua.Variant:
+		return &ua.DataValue{
+			EncodingMask:    ua.DataValueValue,
+			Value:           v,
+			SourceTimestamp: time.Now(),
+		}
+	case int:
+		return &ua.DataValue{
+			EncodingMask:    ua.DataValueValue,
+			Value:           ua.MustVariant(int32(v)),
+			SourceTimestamp: time.Now(),
+		}
+
+	}
 
 	v := ua.MustVariant(val)
 	return &ua.DataValue{
@@ -99,6 +126,10 @@ func NewVariableNode(nodeID *ua.NodeID, name string, value any) *Node {
 				return DataValueFromValue(value)
 			},
 		)
+		dvFunc, ok := value.(ValueFunc)
+		if ok {
+			n.val = dvFunc
+		}
 		return n
 	}
 	typedef := ua.NewNumericExpandedNodeID(0, id.VariableNode)
@@ -154,7 +185,11 @@ func (n *Node) Attribute(id ua.AttributeID) (*AttrValue, error) {
 	switch {
 	case id == ua.AttributeIDValue:
 		if n.val != nil {
-			return NewAttrValue(n.val()), nil
+			val := n.val()
+			if val == nil {
+				return nil, ua.StatusBadAttributeIDInvalid
+			}
+			return NewAttrValue(val), nil
 		}
 		return nil, ua.StatusBadAttributeIDInvalid
 	case n.attr == nil:
@@ -316,4 +351,40 @@ func (n *Node) AddRef(o *Node, rt RefType, forward bool) {
 		TypeDefinition:  o.DataType(),
 	}
 	n.refs = append(n.refs, &ref)
+}
+
+// Access returns true if the node has the access level requested.
+// It checks both the UserAccessLevel and AccessLevel attributes.
+// If neither are present, it assumes global access and returns true.
+//
+// I'm not sure what the best way to implement "user" specific access levels
+// is presently.  Will need functioning user authentication first, and then a way to
+// pass it into the nodes user access attribute so it can be checked properly.
+func (n Node) Access(flag ua.AccessLevelType) bool {
+
+	access, err := n.Attribute(ua.AttributeIDUserAccessLevel)
+	if err == nil { // if we have a user access level, we need to check it.
+		val0 := access.Value.Value.Value()
+		val, ok := val0.(uint8)
+		if !ok {
+			return false
+		}
+		if val&uint8(flag) == 0 {
+			return false
+		}
+	}
+	access, err = n.Attribute(ua.AttributeIDAccessLevel)
+	if err == nil { // if we have an access level, we need to check it.
+		val0 := access.Value.Value.Value()
+		val, ok := val0.(uint8)
+		if !ok {
+			return false
+		}
+
+		if val&uint8(flag) == 0 {
+			return false
+		}
+	}
+	return true
+
 }
