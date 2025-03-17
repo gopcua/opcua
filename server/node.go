@@ -25,6 +25,7 @@ type AttrValue struct {
 
 func NewAttrValue(v *ua.DataValue) *AttrValue {
 	return &AttrValue{Value: v}
+
 }
 
 func DataValueFromValue(val any) *ua.DataValue {
