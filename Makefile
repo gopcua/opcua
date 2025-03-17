@@ -1,12 +1,15 @@
 # go test -count=1 disables the test cache so that all tests are run every time.
 
-all: test integration selfintegration examples
+all: fmt test integration selfintegration examples
 
 test:
 	go test -count=1 -race ./...
 
 lint:
 	staticcheck ./...
+
+fmt:
+	gofmt -w .
 
 integration:
 	go test -count=1 -race -v -tags=integration ./tests/python...
