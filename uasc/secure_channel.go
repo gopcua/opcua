@@ -481,6 +481,11 @@ func (s *SecureChannel) readChunk() (*MessageChunk, error) {
 			s.cfg.RemoteCertificate = m.AsymmetricSecurityHeader.SenderCertificate
 			debug.Printf("uasc %d: setting securityPolicy to %s", s.c.ID(), m.SecurityPolicyURI)
 
+			if s.cfg.SecurityMode != ua.MessageSecurityModeSignAndEncrypt &&
+				s.cfg.SecurityMode != ua.MessageSecurityModeInvalid {
+				s.cfg.SecurityMode = ua.MessageSecurityModeSignAndEncrypt
+			}
+
 			remoteCert, err := x509.ParseCertificate(s.cfg.RemoteCertificate)
 			if err != nil {
 				return nil, err
