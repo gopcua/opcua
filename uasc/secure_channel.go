@@ -212,8 +212,8 @@ func newSecureChannel(endpoint string, c *uacp.Conn, cfg *Config, kind channelKi
 	switch {
 	case cfg.SecurityPolicyURI == ua.SecurityPolicyURINone && cfg.SecurityMode != ua.MessageSecurityModeNone:
 		return nil, errors.Errorf("invalid channel config: Security policy '%s' cannot be used with '%s'", cfg.SecurityPolicyURI, cfg.SecurityMode)
-	case cfg.SecurityPolicyURI != ua.SecurityPolicyURINone && cfg.SecurityMode == ua.MessageSecurityModeNone:
-		return nil, errors.Errorf("invalid channel config: Security policy '%s' cannot be used with '%s'", cfg.SecurityPolicyURI, cfg.SecurityMode)
+	case cfg.SecurityPolicyURI != ua.SecurityPolicyURINone && (cfg.SecurityMode != ua.MessageSecurityModeSignAndEncrypt && cfg.SecurityMode != ua.MessageSecurityModeSign):
+		return nil, errors.Errorf("invalid channel config: Security policy '%s' can only be used with '%s' or '%s'", cfg.SecurityPolicyURI, ua.MessageSecurityModeSign, ua.MessageSecurityModeSignAndEncrypt)
 	case cfg.SecurityPolicyURI != ua.SecurityPolicyURINone && cfg.LocalKey == nil:
 		return nil, errors.Errorf("invalid channel config: Security policy '%s' requires a private key", cfg.SecurityPolicyURI)
 	}
@@ -480,11 +480,6 @@ func (s *SecureChannel) readChunk() (*MessageChunk, error) {
 		if m.SecurityPolicyURI != ua.SecurityPolicyURINone {
 			s.cfg.RemoteCertificate = m.AsymmetricSecurityHeader.SenderCertificate
 			debug.Printf("uasc %d: setting securityPolicy to %s", s.c.ID(), m.SecurityPolicyURI)
-
-			if s.cfg.SecurityMode != ua.MessageSecurityModeSignAndEncrypt &&
-				s.cfg.SecurityMode != ua.MessageSecurityModeInvalid {
-				s.cfg.SecurityMode = ua.MessageSecurityModeSignAndEncrypt
-			}
 
 			remoteCert, err := x509.ParseCertificate(s.cfg.RemoteCertificate)
 			if err != nil {
