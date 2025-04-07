@@ -1,5 +1,24 @@
 # Changelog
 
+## v0.7.3 (7 Apr 2025)
+
+### v0.7.2 changes
+
+* server: Prevent panic on context cancellation (#785)
+* Add Fallback to set session.AuthPolicyURI (#706, #779)
+* client: send events con connection changes (#741, #767)
+* uasc: Set conn write deadline for sendAsyncWithTimeout (#771)
+
+### v0.7.3 changes
+
+* uasc: Removed hardcoded SecurityMode in SecureChannel reacDhunk method (#780)
+* server: obay access levels in the server (#778)
+
+## ~v0.7.2~ (7 Apr 2025)
+
+### Retracted since I've tagged the wrong branch
+### Only the tag and the CHANGELOG are on the wrong branch. The code is on main.
+
 ## v0.7.1 (27 Feb 2025)
 
 * client: use nil-checked secure channel (#775)
