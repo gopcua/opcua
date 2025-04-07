@@ -45,27 +45,43 @@ type SubscriptionParameters struct {
 	Priority                   uint8
 }
 
+type MonitoredItemCreateRequestArgs struct {
+	NodeID       *ua.NodeID
+	AttributeID  ua.AttributeID
+	ClientHandle uint32
+	Filter       *ua.ExtensionObject
+}
+
 type monitoredItem struct {
 	req *ua.MonitoredItemCreateRequest
 	res *ua.MonitoredItemCreateResult
 	ts  ua.TimestampsToReturn
 }
 
+// Deprectated: Use NewDefaultMonitoredItemCreateRequest instead. Will be removed with 0.8.0
 func NewMonitoredItemCreateRequestWithDefaults(nodeID *ua.NodeID, attributeID ua.AttributeID, clientHandle uint32) *ua.MonitoredItemCreateRequest {
-	if attributeID == 0 {
-		attributeID = ua.AttributeIDValue
+	return NewDefaultMonitoredItemCreateRequest(MonitoredItemCreateRequestArgs{
+		NodeID:       nodeID,
+		AttributeID:  attributeID,
+		ClientHandle: clientHandle,
+	})
+}
+
+func NewDefaultMonitoredItemCreateRequest(args MonitoredItemCreateRequestArgs) *ua.MonitoredItemCreateRequest {
+	if args.AttributeID == 0 {
+		args.AttributeID = ua.AttributeIDValue
 	}
 	return &ua.MonitoredItemCreateRequest{
 		ItemToMonitor: &ua.ReadValueID{
-			NodeID:       nodeID,
-			AttributeID:  attributeID,
+			NodeID:       args.NodeID,
+			AttributeID:  args.AttributeID,
 			DataEncoding: &ua.QualifiedName{},
 		},
 		MonitoringMode: ua.MonitoringModeReporting,
 		RequestedParameters: &ua.MonitoringParameters{
-			ClientHandle:     clientHandle,
+			ClientHandle:     args.ClientHandle,
 			DiscardOldest:    true,
-			Filter:           nil,
+			Filter:           args.Filter,
 			QueueSize:        10,
 			SamplingInterval: 0.0,
 		},
