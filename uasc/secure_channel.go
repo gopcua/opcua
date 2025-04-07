@@ -212,8 +212,8 @@ func newSecureChannel(endpoint string, c *uacp.Conn, cfg *Config, kind channelKi
 	switch {
 	case cfg.SecurityPolicyURI == ua.SecurityPolicyURINone && cfg.SecurityMode != ua.MessageSecurityModeNone:
 		return nil, errors.Errorf("invalid channel config: Security policy '%s' cannot be used with '%s'", cfg.SecurityPolicyURI, cfg.SecurityMode)
-	case cfg.SecurityPolicyURI != ua.SecurityPolicyURINone && cfg.SecurityMode == ua.MessageSecurityModeNone:
-		return nil, errors.Errorf("invalid channel config: Security policy '%s' cannot be used with '%s'", cfg.SecurityPolicyURI, cfg.SecurityMode)
+	case cfg.SecurityPolicyURI != ua.SecurityPolicyURINone && (cfg.SecurityMode != ua.MessageSecurityModeSignAndEncrypt && cfg.SecurityMode != ua.MessageSecurityModeSign):
+		return nil, errors.Errorf("invalid channel config: Security policy '%s' can only be used with '%s' or '%s'", cfg.SecurityPolicyURI, ua.MessageSecurityModeSign, ua.MessageSecurityModeSignAndEncrypt)
 	case cfg.SecurityPolicyURI != ua.SecurityPolicyURINone && cfg.LocalKey == nil:
 		return nil, errors.Errorf("invalid channel config: Security policy '%s' requires a private key", cfg.SecurityPolicyURI)
 	}
@@ -481,11 +481,6 @@ func (s *SecureChannel) readChunk() (*MessageChunk, error) {
 			s.cfg.RemoteCertificate = m.AsymmetricSecurityHeader.SenderCertificate
 			debug.Printf("uasc %d: setting securityPolicy to %s", s.c.ID(), m.SecurityPolicyURI)
 
-			// TODO: where does this need to actually be set?  It should be independent of the securitypolicy
-			// but here I'm just assuming it is sign and encrypt when we have anything other than None
-			// The problem is we need to know whether the message has to be decrypted before we can look at the
-			// security mode field in the open request to see if it is encrypted!
-			s.cfg.SecurityMode = ua.MessageSecurityModeSignAndEncrypt
 			remoteCert, err := x509.ParseCertificate(s.cfg.RemoteCertificate)
 			if err != nil {
 				return nil, err

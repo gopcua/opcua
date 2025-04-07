@@ -319,7 +319,12 @@ func TestNewSecureChannel(t *testing.T) {
 	t.Run("uri not none, mode none", func(t *testing.T) {
 		cfg := &Config{SecurityPolicyURI: ua.SecurityPolicyURIBasic256, SecurityMode: ua.MessageSecurityModeNone}
 		_, err := NewSecureChannel("", &uacp.Conn{}, cfg, make(chan error))
-		require.ErrorContains(t, err, "Security policy 'http://opcfoundation.org/UA/SecurityPolicy#Basic256' cannot be used with 'MessageSecurityModeNone'")
+		require.ErrorContains(t, err, "invalid channel config: Security policy 'http://opcfoundation.org/UA/SecurityPolicy#Basic256' can only be used with 'MessageSecurityModeSign' or 'MessageSecurityModeSignAndEncrypt'")
+	})
+	t.Run("uri not none, security policy not none, mode invalid", func(t *testing.T) {
+		cfg := &Config{SecurityPolicyURI: ua.SecurityPolicyURIBasic256, SecurityMode: ua.MessageSecurityModeInvalid}
+		_, err := NewSecureChannel("", &uacp.Conn{}, cfg, make(chan error))
+		require.ErrorContains(t, err, "invalid channel config: Security policy 'http://opcfoundation.org/UA/SecurityPolicy#Basic256' can only be used with 'MessageSecurityModeSign' or 'MessageSecurityModeSignAndEncrypt'")
 	})
 	t.Run("uri not none, local key missing", func(t *testing.T) {
 		cfg := &Config{SecurityPolicyURI: ua.SecurityPolicyURIBasic256, SecurityMode: ua.MessageSecurityModeSign}
