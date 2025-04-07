@@ -38,8 +38,9 @@ go run examples/crypto/*.go -endpoint opc.tcp://localhost:4840 -cert path/to/cer
 # checkout examples/ for more examples...
 ```
 
-## List of Breaking Changes
+## List of Breaking Changes and noteworthy issues
 
+* v0.7.2: Tagged the wrong branch, deleted the tag, retracted the version, moved changes to v0.7.3 and v0.7.4 instead
 * `v0.7.0: The node attributes for the server now use ua.DataValue instead of ua.Variant (#766)`
 * `v0.6.0`: The `SelectEndpoint` function in the client now returns an error (#753)
 * `v0.5.1`: The `NewClient` function returns an error
