@@ -17,6 +17,7 @@ require (
 )
 
 retract (
+	v0.7.2 // tagged the wrong branch
 	v0.2.5 // https://github.com/gopcua/opcua/issues/538
 	v0.2.4 // https://github.com/gopcua/opcua/issues/538
 )
