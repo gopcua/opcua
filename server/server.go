@@ -144,6 +144,8 @@ func New(opts ...Option) *Server {
 	//s.namespaces[0].AddNode(n)
 	//}
 
+	// this nodeset is pre-compiled into the binary and contains a known set of nodes
+	// so it should *always* work ok.
 	var nodes schema.UANodeSet
 	xml.Unmarshal(schema.OpcUaNodeSet2, &nodes)
 

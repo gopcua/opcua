@@ -191,7 +191,7 @@ func main() {
 	// your variable node's value can also return a ua.Variant from a function if you want to update the value dynamically
 	// here we are just incrementing a counter every time the value is read.
 	var2Value := int32(0)
-	var2 := nodeNS.AddNewVariableStringNode("TestVar2", func() *ua.Variant { var2Value++; return ua.MustVariant(var2Value) })
+	var2 := nodeNS.AddNewVariableStringNode("TestVar2", func() *ua.DataValue { var2Value++; return server.DataValueFromValue(var2Value) })
 	nns_obj.AddRef(var2, id.HasComponent, true)
 
 	// Now we'll add a node from scratch.  This is a more manual way to add nodes to the server and gives you full
@@ -208,6 +208,48 @@ func main() {
 	)
 	nodeNS.AddNode(var3)
 	nns_obj.AddRef(var3, id.HasComponent, true)
+
+	var4 := server.NewNode(
+		ua.NewNumericNodeID(nodeNS.ID(), 100), // you can use whatever node id you want here, whether it's numeric, string, guid, etc...
+		map[ua.AttributeID]*ua.DataValue{
+			ua.AttributeIDAccessLevel:     server.DataValueFromValue(byte(ua.AccessLevelTypeCurrentRead | ua.AccessLevelTypeCurrentWrite)),
+			ua.AttributeIDUserAccessLevel: server.DataValueFromValue(byte(ua.AccessLevelTypeCurrentRead | ua.AccessLevelTypeCurrentWrite)),
+			ua.AttributeIDBrowseName:      server.DataValueFromValue(attrs.BrowseName("ReadWriteVariable")),
+			ua.AttributeIDNodeClass:       server.DataValueFromValue(uint32(ua.NodeClassVariable)),
+		},
+		nil,
+		func() *ua.DataValue { return server.DataValueFromValue(12.34) },
+	)
+	nodeNS.AddNode(var4)
+	nns_obj.AddRef(var4, id.HasComponent, true)
+
+	var5 := server.NewNode(
+		ua.NewNumericNodeID(nodeNS.ID(), 101), // you can use whatever node id you want here, whether it's numeric, string, guid, etc...
+		map[ua.AttributeID]*ua.DataValue{
+			ua.AttributeIDAccessLevel:     server.DataValueFromValue(byte(ua.AccessLevelTypeCurrentRead)),
+			ua.AttributeIDUserAccessLevel: server.DataValueFromValue(byte(ua.AccessLevelTypeCurrentRead)),
+			ua.AttributeIDBrowseName:      server.DataValueFromValue(attrs.BrowseName("ReadOnlyVariable")),
+			ua.AttributeIDNodeClass:       server.DataValueFromValue(uint32(ua.NodeClassVariable)),
+		},
+		nil,
+		func() *ua.DataValue { return server.DataValueFromValue(9.87) },
+	)
+	nodeNS.AddNode(var5)
+	nns_obj.AddRef(var5, id.HasComponent, true)
+
+	var6 := server.NewNode(
+		ua.NewNumericNodeID(nodeNS.ID(), 102), // you can use whatever node id you want here, whether it's numeric, string, guid, etc...
+		map[ua.AttributeID]*ua.DataValue{
+			ua.AttributeIDAccessLevel:     server.DataValueFromValue(byte(ua.AccessLevelTypeNone)),
+			ua.AttributeIDUserAccessLevel: server.DataValueFromValue(byte(ua.AccessLevelTypeNone)),
+			ua.AttributeIDBrowseName:      server.DataValueFromValue(attrs.BrowseName("NoAccessVariable")),
+			ua.AttributeIDNodeClass:       server.DataValueFromValue(uint32(ua.NodeClassVariable)),
+		},
+		nil,
+		func() *ua.DataValue { return server.DataValueFromValue(9.87) },
+	)
+	nodeNS.AddNode(var6)
+	nns_obj.AddRef(var6, id.HasComponent, true)
 
 	// simulate a background process updating the data in the namespace.
 	go func() {

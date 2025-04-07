@@ -110,7 +110,7 @@ func suitableRefType(srv *Server, ref1, ref2 *ua.NodeID, subtypes bool) bool {
 	oktypes := getSubRefs(srv, ref1)
 	if !subtypes && slices.ContainsFunc(oktypes, hasSubtypeFn) {
 		for n := slices.IndexFunc(oktypes, hasSubtypeFn); n > 0; {
-			slices.Delete(oktypes, n, n+1)
+			oktypes = slices.Delete(oktypes, n, n+1)
 		}
 	}
 	return slices.ContainsFunc(oktypes, hasRef2Fn)

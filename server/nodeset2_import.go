@@ -17,7 +17,7 @@ func (srv *Server) ImportNodeSet(nodes *schema.UANodeSet) error {
 	if err != nil {
 		return fmt.Errorf("problem creating nodes: %w", err)
 	}
-	srv.refsImportNodeSet(nodes)
+	err = srv.refsImportNodeSet(nodes)
 	if err != nil {
 		return fmt.Errorf("problem creating references: %w", err)
 	}
