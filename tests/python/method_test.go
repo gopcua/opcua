@@ -12,17 +12,19 @@ import (
 )
 
 type Complex struct {
-	i, j int64
+	I, J int64
 }
 
 func TestCallMethod(t *testing.T) {
 	ua.RegisterExtensionObject(ua.NewStringNodeID(2, "ComplexType"), new(Complex))
 
 	tests := []struct {
-		req *ua.CallMethodRequest
-		out []*ua.Variant
+		name string
+		req  *ua.CallMethodRequest
+		resp *ua.CallMethodResult
 	}{
 		{
+			name: "even",
 			req: &ua.CallMethodRequest{
 				ObjectID: ua.NewStringNodeID(2, "main"),
 				MethodID: ua.NewStringNodeID(2, "even"),
@@ -30,9 +32,15 @@ func TestCallMethod(t *testing.T) {
 					ua.MustVariant(int64(12)),
 				},
 			},
-			out: []*ua.Variant{ua.MustVariant(true)},
+			resp: &ua.CallMethodResult{
+				StatusCode:                   ua.StatusOK,
+				InputArgumentResults:         []ua.StatusCode{ua.StatusOK},
+				InputArgumentDiagnosticInfos: []*ua.DiagnosticInfo{},
+				OutputArguments:              []*ua.Variant{ua.MustVariant(true)},
+			},
 		},
 		{
+			name: "square",
 			req: &ua.CallMethodRequest{
 				ObjectID: ua.NewStringNodeID(2, "main"),
 				MethodID: ua.NewStringNodeID(2, "square"),
@@ -40,9 +48,15 @@ func TestCallMethod(t *testing.T) {
 					ua.MustVariant(int64(3)),
 				},
 			},
-			out: []*ua.Variant{ua.MustVariant(int64(9))},
+			resp: &ua.CallMethodResult{
+				StatusCode:                   ua.StatusOK,
+				InputArgumentResults:         []ua.StatusCode{ua.StatusOK},
+				InputArgumentDiagnosticInfos: []*ua.DiagnosticInfo{},
+				OutputArguments:              []*ua.Variant{ua.MustVariant(int64(9))},
+			},
 		},
 		{
+			name: "sumOfSquare",
 			req: &ua.CallMethodRequest{
 				ObjectID: ua.NewStringNodeID(2, "main"),
 				MethodID: ua.NewStringNodeID(2, "sumOfSquare"),
@@ -50,7 +64,31 @@ func TestCallMethod(t *testing.T) {
 					ua.MustVariant(ua.NewExtensionObject(&Complex{3, 8})),
 				},
 			},
-			out: []*ua.Variant{ua.MustVariant(int64(9 + 64))},
+			resp: &ua.CallMethodResult{
+				StatusCode:                   ua.StatusOK,
+				InputArgumentResults:         []ua.StatusCode{ua.StatusOK},
+				InputArgumentDiagnosticInfos: []*ua.DiagnosticInfo{},
+				OutputArguments:              []*ua.Variant{ua.MustVariant(int64(9 + 64))},
+			},
+		},
+		{
+			name: "issue768_array_of_extobjs",
+			req: &ua.CallMethodRequest{
+				ObjectID:       ua.NewStringNodeID(2, "main"),
+				MethodID:       ua.NewStringNodeID(2, "issue768"),
+				InputArguments: []*ua.Variant{},
+			},
+			resp: &ua.CallMethodResult{
+				StatusCode:                   ua.StatusOK,
+				InputArgumentResults:         []ua.StatusCode{},
+				InputArgumentDiagnosticInfos: []*ua.DiagnosticInfo{},
+				OutputArguments: []*ua.Variant{ua.MustVariant(
+					[]*ua.ExtensionObject{
+						ua.NewExtensionObject(&Complex{1, 2}),
+						ua.NewExtensionObject(&Complex{3, 4}),
+					},
+				)},
+			},
 		},
 	}
 
@@ -67,11 +105,10 @@ func TestCallMethod(t *testing.T) {
 	defer c.Close(ctx)
 
 	for _, tt := range tests {
-		t.Run(tt.req.ObjectID.String(), func(t *testing.T) {
+		t.Run(tt.name, func(t *testing.T) {
 			resp, err := c.Call(ctx, tt.req)
 			require.NoError(t, err, "Call failed")
-			require.Equal(t, ua.StatusOK, resp.StatusCode, "StatusCode not equal")
-			require.Equal(t, tt.out, resp.OutputArguments, "OuptutArgs not equal")
+			require.Equal(t, tt.resp, resp, "Response not equal")
 		})
 	}
 }

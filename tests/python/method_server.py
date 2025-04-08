@@ -9,14 +9,13 @@ class Complex(uatypes.FrozenClass):
         ('j', 'Int64'),
     ]
 
-    def __init__(self):
-        self.i = 0
-        self.j = 0
+    def __init__(self, i=0, j=0):
+        self.i = i
+        self.j = j
         self._freeze = True
 
     def __str__(self):
-        return 'Complex(' + 'i:' + str(self.i) + ', ' + \
-               'j:' + str(self.j) + ')'
+        return f'Complex(i:{self.i}, j:{self.j})'
 
     __repr__ = __str__
 
@@ -33,9 +32,13 @@ def square(parent, variant):
 
 def sum_of_squares(parent, variant):
     v = variant.Value # type is extension object "Complex"
-    print("sum_of_square methos call with parameter: ", v)
+    print("sum_of_square method call with parameter: ", v)
     ret = v.i*v.i + v.j*v.j
     return [ua.Variant(ret, ua.VariantType.Int64)]
+
+def issue_768(parent):
+    print("no_args method call returns []ua.ExtensionObject")
+    return [ua.Variant([Complex(1,2), Complex(3,4)])]
 
 if __name__ == "__main__":
     server = Server()
@@ -47,5 +50,6 @@ if __name__ == "__main__":
     fnEven = main.add_method(ua.NodeId("even", ns), "even", even, [ua.VariantType.Int64], [ua.VariantType.Boolean])
     fnSquare = main.add_method(ua.NodeId("square", ns), "square", square, [ua.VariantType.Int64], [ua.VariantType.Int64])
     fnSumOfSquare = main.add_method(ua.NodeId("sumOfSquare", ns), "sumOfSquare", sum_of_squares, [ua.VariantType.ExtensionObject], [ua.VariantType.Int64])
+    fnNoArgs = main.add_method(ua.NodeId("issue768", ns), "issue768", issue_768, [])
 
     server.start()
