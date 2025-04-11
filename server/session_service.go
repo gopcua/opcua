@@ -3,6 +3,7 @@ package server
 import (
 	"crypto/rand"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/gopcua/opcua/ua"
@@ -59,9 +60,11 @@ func (s *SessionService) CreateSession(sc *uasc.SecureChannel, r ua.Request, req
 	}
 
 	matching_endpoints := make([]*ua.EndpointDescription, 0)
+	reqTrimmedURL, _ := strings.CutSuffix(req.EndpointURL, "/")
 	for i := range s.srv.endpoints {
 		ep := s.srv.endpoints[i]
-		if ep.EndpointURL == req.EndpointURL {
+		epTrimmedURL, _ := strings.CutSuffix(ep.EndpointURL, "/")
+		if epTrimmedURL == reqTrimmedURL {
 			matching_endpoints = append(matching_endpoints, ep)
 		}
 	}
