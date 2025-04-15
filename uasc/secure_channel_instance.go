@@ -136,18 +136,19 @@ func (c *channelInstance) newMessage(srv interface{}, typeID uint16, requestID u
 func (c *channelInstance) SetMaximumBodySize(chunkSize int) {
 	sequenceHeaderSize := 8
 	headerSize := 12
-	symmetricAlgorithmHeader := 4
+	// symmetricAlgorithmHeader := 4
 
 	// this is the formula proposed by OPCUA - source node-opcua
-	maxBodySize :=
-		c.algo.PlaintextBlockSize()*
-			((chunkSize-headerSize-symmetricAlgorithmHeader-c.algo.SignatureLength()-1)/c.algo.BlockSize()) -
-			sequenceHeaderSize
-	c.maxBodySize = uint32(maxBodySize)
+	// maxBodySize :=
+	// 	c.algo.PlaintextBlockSize()*
+	// 		((chunkSize-headerSize-symmetricAlgorithmHeader-c.algo.SignatureLength()-1)/c.algo.BlockSize()) -
+	// 		sequenceHeaderSize
+	// c.maxBodySize = uint32(maxBodySize)
 
 	// this is the formula proposed by ERN - source node-opcua
-	// maxBlock := (chunkSize - headerSize) / c.algo.BlockSize()
-	// c.maxBodySize = c.algo.PlaintextBlockSize()*maxBlock - sequenceHeaderSize - c.algo.SignatureLength() - 1
+	maxBlock := (chunkSize - headerSize) / c.algo.BlockSize()
+	maxBodySize := c.algo.PlaintextBlockSize()*maxBlock - sequenceHeaderSize - c.algo.SignatureLength() - 1
+	c.maxBodySize = uint32(maxBodySize)
 }
 
 // signAndEncrypt encrypts the message bytes stored in b and returns the
