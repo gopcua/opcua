@@ -33,7 +33,6 @@ func DefaultClientConfig() *uasc.Config {
 		RequestTimeout:    10 * time.Second,
 		AutoReconnect:     true,
 		ReconnectInterval: 5 * time.Second,
-		DialTimeout:       10 * time.Second,
 	}
 }
 
@@ -586,12 +585,5 @@ func initDialer(cfg *Config) {
 	}
 	if cfg.dialer.ClientACK == nil {
 		cfg.dialer.ClientACK = uacp.DefaultClientACK
-	}
-}
-
-// DialTimeout sets the timeout for name resolution and establishment of a network connection
-func DialTimeout(t time.Duration) Option {
-	return func(c *uasc.Config, sc *uasc.SessionConfig) {
-		c.DialTimeout = t
 	}
 }

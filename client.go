@@ -590,9 +590,6 @@ func (c *Client) monitor(ctx context.Context) {
 func (c *Client) Dial(ctx context.Context) error {
 	stats.Client().Add("Dial", 1)
 
-	ctx, cancel := context.WithTimeout(ctx, c.cfg.DialTimeout)
-	defer cancel()
-
 	if c.SecureChannel() != nil {
 		return errors.Errorf("secure channel already connected")
 	}

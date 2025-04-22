@@ -252,7 +252,7 @@ func (s *Server) Start(ctx context.Context) error {
 	if s.url == "" {
 		s.url = defaultListenAddr
 	}
-	s.l, err = uacp.Listen(s.url, nil)
+	s.l, err = uacp.Listen(ctx, s.url, nil)
 	if err != nil {
 		return err
 	}
