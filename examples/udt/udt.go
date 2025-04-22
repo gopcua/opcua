@@ -35,13 +35,13 @@ func main() {
 
 	ctx := context.Background()
 
-	endpoints, err := opcua.GetEndpoints(*endpoint)
+	endpoints, err := opcua.GetEndpoints(ctx, *endpoint)
 	if err != nil {
 		log.Fatal(err)
 	}
-	ep := opcua.SelectEndpoint(endpoints, *policy, ua.MessageSecurityModeFromString(*mode))
-	if ep == nil {
-		log.Fatal("Failed to find suitable endpoint")
+	ep, err := opcua.SelectEndpoint(endpoints, *policy, ua.MessageSecurityModeFromString(*mode))
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	fmt.Println("*", ep.SecurityPolicyURI, ep.SecurityMode)
@@ -55,13 +55,16 @@ func main() {
 		opcua.SecurityFromEndpoint(ep, ua.UserTokenTypeAnonymous),
 	}
 
-	c := opcua.NewClient(ep.EndpointURL, opts...)
+	c, err := opcua.NewClient(ep.EndpointURL, opts...)
+	if err != nil {
+		log.Fatal(err)
+	}
 	if err := c.Connect(ctx); err != nil {
 		log.Fatal(err)
 	}
-	defer c.Close()
+	defer c.Close(ctx)
 
-	v, err := c.Node(id).Value()
+	v, err := c.Node(id).Value(ctx)
 	switch {
 	case err != nil:
 		log.Fatal(err)

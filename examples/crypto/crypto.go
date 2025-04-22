@@ -15,13 +15,15 @@ import (
 	"os"
 	"strings"
 	"syscall"
+	"time"
+
+	"golang.org/x/term"
 
 	"github.com/gopcua/opcua"
 	"github.com/gopcua/opcua/debug"
 	"github.com/gopcua/opcua/errors"
+	uatest "github.com/gopcua/opcua/tests/python"
 	"github.com/gopcua/opcua/ua"
-
-	"golang.org/x/crypto/ssh/terminal"
 )
 
 var (
@@ -46,7 +48,7 @@ func main() {
 	ctx := context.Background()
 
 	// Get a list of the endpoints for our target server
-	endpoints, err := opcua.GetEndpoints(*endpoint)
+	endpoints, err := opcua.GetEndpoints(ctx, *endpoint)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -61,14 +63,17 @@ func main() {
 	opts := clientOptsFromFlags(endpoints)
 
 	// Create a Client with the selected options
-	c := opcua.NewClient(*endpoint, opts...)
+	c, err := opcua.NewClient(*endpoint, opts...)
+	if err != nil {
+		log.Fatal(err)
+	}
 	if err := c.Connect(ctx); err != nil {
 		log.Fatal(err)
 	}
-	defer c.Close()
+	defer c.Close(ctx)
 
 	// Use our connection (read the server's time)
-	v, err := c.Node(ua.NewNumericNodeID(0, 2258)).Value()
+	v, err := c.Node(ua.NewNumericNodeID(0, 2258)).Value(ctx)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -79,25 +84,28 @@ func main() {
 	}
 
 	// Detach our session and try re-establish it on a different secure channel
-	s, err := c.DetachSession()
+	s, err := c.DetachSession(ctx)
 	if err != nil {
 		log.Fatalf("Error detaching session: %s", err)
 	}
 
-	d := opcua.NewClient(*endpoint, opts...)
+	d, err := opcua.NewClient(*endpoint, opts...)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	// Create a channel only and do not activate it automatically
 	d.Dial(ctx)
-	defer d.Close()
+	defer d.Close(ctx)
 
 	// Activate the previous session on the new channel
-	err = d.ActivateSession(s)
+	err = d.ActivateSession(ctx, s)
 	if err != nil {
 		log.Fatalf("Error reactivating session: %s", err)
 	}
 
 	// Read the time again to prove our session is still OK
-	v, err = d.Node(ua.NewNumericNodeID(0, 2258)).Value()
+	v, err = d.Node(ua.NewNumericNodeID(0, 2258)).Value(ctx)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -117,9 +125,19 @@ func clientOptsFromFlags(endpoints []*ua.EndpointDescription) []opcua.Option {
 	}
 
 	var cert []byte
+	var privateKey *rsa.PrivateKey
 	if *gencert || (*certfile != "" && *keyfile != "") {
 		if *gencert {
-			generate_cert(*appuri, 2048, *certfile, *keyfile)
+			certPEM, keyPEM, err := uatest.GenerateCert(*appuri, 2048, 24*time.Hour)
+			if err != nil {
+				log.Fatalf("failed to generate cert: %v", err)
+			}
+			if err := os.WriteFile(*certfile, certPEM, 0644); err != nil {
+				log.Fatalf("failed to write %s: %v", *certfile, err)
+			}
+			if err := os.WriteFile(*keyfile, keyPEM, 0644); err != nil {
+				log.Fatalf("failed to write %s: %v", *keyfile, err)
+			}
 		}
 		debug.Printf("Loading cert/key from %s/%s", *certfile, *keyfile)
 		c, err := tls.LoadX509KeyPair(*certfile, *keyfile)
@@ -131,6 +149,7 @@ func clientOptsFromFlags(endpoints []*ua.EndpointDescription) []opcua.Option {
 				log.Fatalf("Invalid private key")
 			}
 			cert = c.Certificate[0]
+			privateKey = pk
 			opts = append(opts, opcua.PrivateKey(pk), opcua.Certificate(cert))
 		}
 	}
@@ -150,8 +169,8 @@ func clientOptsFromFlags(endpoints []*ua.EndpointDescription) []opcua.Option {
 	}
 
 	// Select the most appropriate authentication mode from server capabilities and user input
-	authMode, authOption := authFromFlags(cert)
-	opts = append(opts, authOption)
+	authMode, authOptions := authFromFlags(cert, privateKey)
+	opts = append(opts, authOptions...)
 
 	var secMode ua.MessageSecurityMode
 	switch strings.ToLower(*mode) {
@@ -229,15 +248,15 @@ func clientOptsFromFlags(endpoints []*ua.EndpointDescription) []opcua.Option {
 	return opts
 }
 
-func authFromFlags(cert []byte) (ua.UserTokenType, opcua.Option) {
+func authFromFlags(cert []byte, pk *rsa.PrivateKey) (ua.UserTokenType, []opcua.Option) {
 	var err error
 
 	var authMode ua.UserTokenType
-	var authOption opcua.Option
+	var authOptions []opcua.Option
 	switch strings.ToLower(*auth) {
 	case "anonymous":
 		authMode = ua.UserTokenTypeAnonymous
-		authOption = opcua.AuthAnonymous()
+		authOptions = append(authOptions, opcua.AuthAnonymous())
 
 	case "username":
 		authMode = ua.UserTokenTypeUserName
@@ -260,32 +279,35 @@ func authFromFlags(cert []byte) (ua.UserTokenType, opcua.Option) {
 
 		if passPrompt {
 			fmt.Print("Enter password: ")
-			passInput, err := terminal.ReadPassword(int(syscall.Stdin))
+			passInput, err := term.ReadPassword(int(syscall.Stdin))
 			if err != nil {
 				log.Fatalf("Error reading password: %s", err)
 			}
 			*password = string(passInput)
 			fmt.Print("\n")
 		}
-		authOption = opcua.AuthUsername(*username, *password)
+		authOptions = append(authOptions, opcua.AuthUsername(*username, *password))
 
 	case "certificate":
 		authMode = ua.UserTokenTypeCertificate
-		authOption = opcua.AuthCertificate(cert)
+		// Note: You should still use these two Config options to load the auth certificate and private key
+		// separately from the secure channel configuration even if the same certificate is used for both purposes
+		authOptions = append(authOptions, opcua.AuthCertificate(cert))
+		authOptions = append(authOptions, opcua.AuthPrivateKey(pk))
 
 	case "issuedtoken":
 		// todo: this is unsupported, fail here or fail in the opcua package?
 		authMode = ua.UserTokenTypeIssuedToken
-		authOption = opcua.AuthIssuedToken([]byte(nil))
+		authOptions = append(authOptions, opcua.AuthIssuedToken([]byte(nil)))
 
 	default:
 		log.Printf("unknown auth-mode, defaulting to Anonymous")
 		authMode = ua.UserTokenTypeAnonymous
-		authOption = opcua.AuthAnonymous()
+		authOptions = append(authOptions, opcua.AuthAnonymous())
 
 	}
 
-	return authMode, authOption
+	return authMode, authOptions
 }
 
 func validateEndpointConfig(endpoints []*ua.EndpointDescription, secPolicy string, secMode ua.MessageSecurityMode, authMode ua.UserTokenType) error {
@@ -299,7 +321,7 @@ func validateEndpointConfig(endpoints []*ua.EndpointDescription, secPolicy strin
 		}
 	}
 
-	err := errors.Errorf("server does not support an endpoint with security : %s , %s", secPolicy, secMode)
+	err := errors.Errorf("server does not support an endpoint with security : %s , %s, %s", secPolicy, secMode, authMode)
 	printEndpointOptions(endpoints)
 	return err
 }

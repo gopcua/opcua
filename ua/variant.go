@@ -5,6 +5,7 @@
 package ua
 
 import (
+	"fmt"
 	"reflect"
 	"time"
 
@@ -24,9 +25,12 @@ const (
 	VariantArrayValues = 0x80
 )
 
+// ByteArray encodes a byte array as an OPC/UA array of Byte.
+type ByteArray []byte
+
 // Variant is a union of the built-in types.
 //
-// Specification: Part 6, 5.2.2.16
+// Specification: Part 6, 5.1.2 Table 1
 type Variant struct {
 	// mask contains the type and the array flags
 	// bits 0:5: built-in type id 1-25
@@ -59,6 +63,9 @@ type Variant struct {
 
 func NewVariant(v interface{}) (*Variant, error) {
 	va := &Variant{}
+	if !isBuiltinType(v) {
+		return nil, fmt.Errorf("trying to create a variant from a type that it is not supported: %s", reflect.ValueOf(v).Type().Name())
+	}
 	if err := va.set(v); err != nil {
 		return nil, err
 	}
@@ -134,13 +141,29 @@ func (m *Variant) Decode(b []byte) (int, error) {
 
 	// read flattened array elements
 	n := int(m.arrayLength)
-	if n < 0 || n > MaxVariantArrayLength {
+	if n > MaxVariantArrayLength {
 		return buf.Pos(), StatusBadEncodingLimitsExceeded
 	}
 
-	vals := reflect.MakeSlice(reflect.SliceOf(typ), n, n)
-	for i := 0; i < n; i++ {
-		vals.Index(i).Set(reflect.ValueOf(m.decodeValue(buf)))
+	// get the type for the slice
+	sliceType := reflect.SliceOf(typ)
+	if m.Type() == TypeIDByte {
+		sliceType = reflect.TypeOf(ByteArray{})
+	}
+
+	var vals reflect.Value
+	switch {
+	// decode a nil slice
+	case n == -1:
+		vals = reflect.Zero(reflect.MakeSlice(sliceType, 0, 0).Type())
+		m.value = vals.Interface()
+
+	// decode a slice with values
+	default:
+		vals = reflect.MakeSlice(sliceType, n, n)
+		for i := 0; i < n; i++ {
+			vals.Index(i).Set(reflect.ValueOf(m.decodeValue(buf)))
+		}
 	}
 
 	// check for dimensions of multi-dimensional array
@@ -403,42 +426,56 @@ var errUnbalancedSlice = errors.New("unbalanced multi-dimensional array")
 
 // sliceDim determines the element type, dimensions and the total length
 // of a one or multi-dimensional slice.
-func sliceDim(v reflect.Value) (typ reflect.Type, dim []int32, count int32, err error) {
+//
+// If the value is a nil slice then count is -1.
+func sliceDim(val reflect.Value) (typ reflect.Type, dim []int32, count int32, err error) {
 	// null type
-	if v.Kind() == reflect.Invalid {
+	if val.Kind() == reflect.Invalid {
 		return nil, nil, 0, nil
 	}
 
-	// ByteString is its own type
-	if v.Type() == reflect.TypeOf([]byte{}) {
-		return v.Type(), nil, 1, nil
+	// https://reference.opcfoundation.org/v104/Core/docs/Part6/5.1.4/
+	//
+	// We default to treating a []byte as a ByteString which is sent as a length
+	// encoded value. However, this makes it impossible to send a []byte as an
+	// array of Byte. The ByteArray type alias supports sending a []byte as an
+	// array of Byte.
+	//
+	// https://github.com/gopcua/opcua/issues/463
+	if val.Type() == reflect.TypeOf([]byte{}) && val.Type() != reflect.TypeOf(ByteArray{}) {
+		return val.Type(), nil, 1, nil
 	}
 
 	// element type
-	if v.Kind() != reflect.Slice {
-		return v.Type(), nil, 1, nil
+	if val.Kind() != reflect.Slice {
+		return val.Type(), nil, 1, nil
+	}
+
+	// nil array
+	if val.IsNil() {
+		return val.Type().Elem(), nil, -1, nil
 	}
 
 	// empty array
-	if v.Len() == 0 {
-		return v.Type().Elem(), append([]int32{0}, dim...), 0, nil
+	if val.Len() == 0 {
+		return val.Type().Elem(), append([]int32{0}, dim...), 0, nil
 	}
 
 	// check that inner slices all have the same length
-	if v.Index(0).Kind() == reflect.Slice {
-		for i := 0; i < v.Len(); i++ {
-			if v.Index(i).Len() != v.Index(0).Len() {
+	if val.Index(0).Kind() == reflect.Slice {
+		for i := 0; i < val.Len(); i++ {
+			if val.Index(i).Len() != val.Index(0).Len() {
 				return nil, nil, 0, errUnbalancedSlice
 			}
 		}
 	}
 
 	// recurse to inner slice or element type
-	typ, dim, count, err = sliceDim(v.Index(0))
+	typ, dim, count, err = sliceDim(val.Index(0))
 	if err != nil {
 		return nil, nil, 0, err
 	}
-	return typ, append([]int32{int32(v.Len())}, dim...), count * int32(v.Len()), nil
+	return typ, append([]int32{int32(val.Len())}, dim...), count * int32(val.Len()), nil
 }
 
 // set sets the value and updates the flags according to the type.
@@ -449,20 +486,23 @@ func (m *Variant) set(v interface{}) error {
 		return err
 	}
 
-	if len(dim) > 0 {
-		m.mask |= VariantArrayValues
+	switch {
+	case len(dim) > 1:
+		m.mask |= VariantArrayValues | VariantArrayDimensions
 		m.arrayLength = count
-	}
-
-	if len(dim) > 1 {
-		m.mask |= VariantArrayDimensions
 		m.arrayDimensionsLength = int32(len(dim))
 		m.arrayDimensions = dim
+
+	case len(dim) > 0 || count == -1:
+		m.mask |= VariantArrayValues
+		m.arrayLength = count
+		m.arrayDimensionsLength = 0
+		m.arrayDimensions = nil
 	}
 
 	typeid, ok := variantTypeToTypeID[et]
 	if !ok {
-		return errors.Errorf("cannot set variant to %T", v)
+		typeid = TypeIDVariant
 	}
 	m.setType(typeid)
 	m.value = v
@@ -485,6 +525,8 @@ func (m *Variant) String() string {
 		return m.value.(*LocalizedText).Text
 	case TypeIDQualifiedName:
 		return m.value.(*QualifiedName).Name
+	case TypeIDFloat:
+		return fmt.Sprintf("%f", m.value)
 	default:
 		return ""
 	}
@@ -557,6 +599,22 @@ func (m *Variant) Uint() uint64 {
 		return m.value.(uint64)
 	default:
 		return 0
+	}
+}
+
+func (m *Variant) ByteArray() ByteArray {
+	if m.ArrayLength() == 0 {
+		return nil
+	}
+	if len(m.ArrayDimensions()) > 0 {
+		return nil
+	}
+
+	switch m.Type() {
+	case TypeIDByte:
+		return m.value.(ByteArray)
+	default:
+		return nil
 	}
 }
 
@@ -726,6 +784,57 @@ func (m *Variant) XMLElement() XMLElement {
 		return m.value.(XMLElement)
 	default:
 		return ""
+	}
+}
+
+func isBuiltinType(v interface{}) bool {
+	if v == nil {
+		return true
+	}
+
+	switch v.(type) {
+
+	// builtin types
+	case
+		bool,
+		int8,
+		int16,
+		int32,
+		int64,
+		uint8,
+		uint16,
+		uint32,
+		uint64,
+		float32,
+		float64,
+		string,
+		[]byte,
+		*DataValue,
+		*DiagnosticInfo,
+		*ExpandedNodeID,
+		*ExtensionObject,
+		*GUID,
+		*LocalizedText,
+		*NodeID,
+		*QualifiedName,
+		*Variant,
+		StatusCode,
+		time.Time,
+		XMLElement:
+		return true
+
+	// slice or array of a builtin type
+	default:
+		v := reflect.ValueOf(v)
+		switch v.Type().Kind() {
+		case reflect.Array, reflect.Slice:
+			innerType := v.Type().Elem()
+			zeroValue := reflect.New(innerType).Elem().Interface()
+			return isBuiltinType(zeroValue)
+
+		default:
+			return false
+		}
 	}
 }
 

@@ -1,10 +1,23 @@
 module github.com/gopcua/opcua
 
-go 1.12
+go 1.23
 
 require (
-	github.com/pascaldekloe/goe v0.1.0
-	github.com/pkg/errors v0.8.1
-	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
-	golang.org/x/sys v0.0.0-20200323222414-85ca7c5b95cd // indirect
+	github.com/google/uuid v1.6.0
+	github.com/stretchr/testify v1.10.0
+	golang.org/x/exp v0.0.0-20241204233417-43b7b7cde48d
+	golang.org/x/term v0.27.0
+)
+
+require (
+	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/pmezard/go-difflib v1.0.0 // indirect
+	golang.org/x/sys v0.28.0 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
+)
+
+retract (
+	v0.7.2 // tagged the wrong branch
+	v0.2.5 // https://github.com/gopcua/opcua/issues/538
+	v0.2.4 // https://github.com/gopcua/opcua/issues/538
 )

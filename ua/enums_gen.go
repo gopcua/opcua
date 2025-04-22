@@ -97,6 +97,10 @@ func IdentityCriteriaTypeFromString(s string) IdentityCriteriaType {
 		return 5
 	case "AuthenticatedUser":
 		return 6
+	case "Application":
+		return 7
+	case "X509Subject":
+		return 8
 	default:
 		return 0
 	}
@@ -109,6 +113,68 @@ const (
 	IdentityCriteriaTypeGroupID           IdentityCriteriaType = 4
 	IdentityCriteriaTypeAnonymous         IdentityCriteriaType = 5
 	IdentityCriteriaTypeAuthenticatedUser IdentityCriteriaType = 6
+	IdentityCriteriaTypeApplication       IdentityCriteriaType = 7
+	IdentityCriteriaTypeX509Subject       IdentityCriteriaType = 8
+)
+
+type AlarmMask uint16
+
+func AlarmMaskFromString(s string) AlarmMask {
+	switch s {
+	case "None":
+		return 0
+	case "Active":
+		return 1
+	case "Unacknowledged":
+		return 2
+	case "Unconfirmed":
+		return 4
+	default:
+		return 0
+	}
+}
+
+const (
+	AlarmMaskNone           AlarmMask = 0
+	AlarmMaskActive         AlarmMask = 1
+	AlarmMaskUnacknowledged AlarmMask = 2
+	AlarmMaskUnconfirmed    AlarmMask = 4
+)
+
+type TrustListValidationOptions uint32
+
+func TrustListValidationOptionsFromString(s string) TrustListValidationOptions {
+	switch s {
+	case "None":
+		return 0
+	case "SuppressCertificateExpired":
+		return 1
+	case "SuppressHostNameInvalid":
+		return 2
+	case "SuppressRevocationStatusUnknown":
+		return 4
+	case "SuppressIssuerCertificateExpired":
+		return 8
+	case "SuppressIssuerRevocationStatusUnknown":
+		return 16
+	case "CheckRevocationStatusOnline":
+		return 32
+	case "CheckRevocationStatusOffline":
+		return 64
+	default:
+		return 0
+	}
+}
+
+const (
+	TrustListValidationOptionsNone                                  TrustListValidationOptions = 0
+	TrustListValidationOptionsSuppressCertificateExpired            TrustListValidationOptions = 1
+	TrustListValidationOptionsSuppressHostNameInvalid               TrustListValidationOptions = 2
+	TrustListValidationOptionsSuppressRevocationStatusUnknown       TrustListValidationOptions = 4
+	TrustListValidationOptionsSuppressIssuerCertificateExpired      TrustListValidationOptions = 8
+	TrustListValidationOptionsSuppressIssuerRevocationStatusUnknown TrustListValidationOptions = 16
+	TrustListValidationOptionsCheckRevocationStatusOnline           TrustListValidationOptions = 32
+	TrustListValidationOptionsCheckRevocationStatusOffline          TrustListValidationOptions = 64
 )
 
 type TrustListMasks uint32
@@ -153,16 +219,19 @@ func PubSubStateFromString(s string) PubSubState {
 		return 2
 	case "Error":
 		return 3
+	case "PreOperational":
+		return 4
 	default:
 		return 0
 	}
 }
 
 const (
-	PubSubStateDisabled    PubSubState = 0
-	PubSubStatePaused      PubSubState = 1
-	PubSubStateOperational PubSubState = 2
-	PubSubStateError       PubSubState = 3
+	PubSubStateDisabled       PubSubState = 0
+	PubSubStatePaused         PubSubState = 1
+	PubSubStateOperational    PubSubState = 2
+	PubSubStateError          PubSubState = 3
+	PubSubStatePreOperational PubSubState = 4
 )
 
 type DataSetFieldFlags uint16
@@ -388,18 +457,27 @@ func JSONDataSetMessageContentMaskFromString(s string) JSONDataSetMessageContent
 		return 8
 	case "Status":
 		return 16
+	case "MessageType":
+		return 32
+	case "DataSetWriterName":
+		return 64
+	case "ReversibleFieldEncoding":
+		return 128
 	default:
 		return 0
 	}
 }
 
 const (
-	JSONDataSetMessageContentMaskNone            JSONDataSetMessageContentMask = 0
-	JSONDataSetMessageContentMaskDataSetWriterID JSONDataSetMessageContentMask = 1
-	JSONDataSetMessageContentMaskMetaDataVersion JSONDataSetMessageContentMask = 2
-	JSONDataSetMessageContentMaskSequenceNumber  JSONDataSetMessageContentMask = 4
-	JSONDataSetMessageContentMaskTimestamp       JSONDataSetMessageContentMask = 8
-	JSONDataSetMessageContentMaskStatus          JSONDataSetMessageContentMask = 16
+	JSONDataSetMessageContentMaskNone                    JSONDataSetMessageContentMask = 0
+	JSONDataSetMessageContentMaskDataSetWriterID         JSONDataSetMessageContentMask = 1
+	JSONDataSetMessageContentMaskMetaDataVersion         JSONDataSetMessageContentMask = 2
+	JSONDataSetMessageContentMaskSequenceNumber          JSONDataSetMessageContentMask = 4
+	JSONDataSetMessageContentMaskTimestamp               JSONDataSetMessageContentMask = 8
+	JSONDataSetMessageContentMaskStatus                  JSONDataSetMessageContentMask = 16
+	JSONDataSetMessageContentMaskMessageType             JSONDataSetMessageContentMask = 32
+	JSONDataSetMessageContentMaskDataSetWriterName       JSONDataSetMessageContentMask = 64
+	JSONDataSetMessageContentMaskReversibleFieldEncoding JSONDataSetMessageContentMask = 128
 )
 
 type BrokerTransportQoS uint32
@@ -427,6 +505,60 @@ const (
 	BrokerTransportQoSAtLeastOnce  BrokerTransportQoS = 2
 	BrokerTransportQoSAtMostOnce   BrokerTransportQoS = 3
 	BrokerTransportQoSExactlyOnce  BrokerTransportQoS = 4
+)
+
+type PubSubConfigurationRefMask uint32
+
+func PubSubConfigurationRefMaskFromString(s string) PubSubConfigurationRefMask {
+	switch s {
+	case "None":
+		return 0
+	case "ElementAdd":
+		return 1
+	case "ElementMatch":
+		return 2
+	case "ElementModify":
+		return 4
+	case "ElementRemove":
+		return 8
+	case "ReferenceWriter":
+		return 16
+	case "ReferenceReader":
+		return 32
+	case "ReferenceWriterGroup":
+		return 64
+	case "ReferenceReaderGroup":
+		return 128
+	case "ReferenceConnection":
+		return 256
+	case "ReferencePubDataset":
+		return 512
+	case "ReferenceSubDataset":
+		return 1024
+	case "ReferenceSecurityGroup":
+		return 2048
+	case "ReferencePushTarget":
+		return 4096
+	default:
+		return 0
+	}
+}
+
+const (
+	PubSubConfigurationRefMaskNone                   PubSubConfigurationRefMask = 0
+	PubSubConfigurationRefMaskElementAdd             PubSubConfigurationRefMask = 1
+	PubSubConfigurationRefMaskElementMatch           PubSubConfigurationRefMask = 2
+	PubSubConfigurationRefMaskElementModify          PubSubConfigurationRefMask = 4
+	PubSubConfigurationRefMaskElementRemove          PubSubConfigurationRefMask = 8
+	PubSubConfigurationRefMaskReferenceWriter        PubSubConfigurationRefMask = 16
+	PubSubConfigurationRefMaskReferenceReader        PubSubConfigurationRefMask = 32
+	PubSubConfigurationRefMaskReferenceWriterGroup   PubSubConfigurationRefMask = 64
+	PubSubConfigurationRefMaskReferenceReaderGroup   PubSubConfigurationRefMask = 128
+	PubSubConfigurationRefMaskReferenceConnection    PubSubConfigurationRefMask = 256
+	PubSubConfigurationRefMaskReferencePubDataset    PubSubConfigurationRefMask = 512
+	PubSubConfigurationRefMaskReferenceSubDataset    PubSubConfigurationRefMask = 1024
+	PubSubConfigurationRefMaskReferenceSecurityGroup PubSubConfigurationRefMask = 2048
+	PubSubConfigurationRefMaskReferencePushTarget    PubSubConfigurationRefMask = 4096
 )
 
 type DiagnosticsLevel uint32
@@ -472,6 +604,339 @@ func PubSubDiagnosticsCounterClassificationFromString(s string) PubSubDiagnostic
 const (
 	PubSubDiagnosticsCounterClassificationInformation PubSubDiagnosticsCounterClassification = 0
 	PubSubDiagnosticsCounterClassificationError       PubSubDiagnosticsCounterClassification = 1
+)
+
+type PasswordOptionsMask uint32
+
+func PasswordOptionsMaskFromString(s string) PasswordOptionsMask {
+	switch s {
+	case "None":
+		return 0
+	case "SupportInitialPasswordChange":
+		return 1
+	case "SupportDisableUser":
+		return 2
+	case "SupportDisableDeleteForUser":
+		return 4
+	case "SupportNoChangeForUser":
+		return 8
+	case "SupportDescriptionForUser":
+		return 16
+	case "RequiresUpperCaseCharacters":
+		return 32
+	case "RequiresLowerCaseCharacters":
+		return 64
+	case "RequiresDigitCharacters":
+		return 128
+	case "RequiresSpecialCharacters":
+		return 256
+	default:
+		return 0
+	}
+}
+
+const (
+	PasswordOptionsMaskNone                         PasswordOptionsMask = 0
+	PasswordOptionsMaskSupportInitialPasswordChange PasswordOptionsMask = 1
+	PasswordOptionsMaskSupportDisableUser           PasswordOptionsMask = 2
+	PasswordOptionsMaskSupportDisableDeleteForUser  PasswordOptionsMask = 4
+	PasswordOptionsMaskSupportNoChangeForUser       PasswordOptionsMask = 8
+	PasswordOptionsMaskSupportDescriptionForUser    PasswordOptionsMask = 16
+	PasswordOptionsMaskRequiresUpperCaseCharacters  PasswordOptionsMask = 32
+	PasswordOptionsMaskRequiresLowerCaseCharacters  PasswordOptionsMask = 64
+	PasswordOptionsMaskRequiresDigitCharacters      PasswordOptionsMask = 128
+	PasswordOptionsMaskRequiresSpecialCharacters    PasswordOptionsMask = 256
+)
+
+type UserConfigurationMask uint32
+
+func UserConfigurationMaskFromString(s string) UserConfigurationMask {
+	switch s {
+	case "None":
+		return 0
+	case "NoDelete":
+		return 1
+	case "Disabled":
+		return 2
+	case "NoChangeByUser":
+		return 4
+	case "MustChangePassword":
+		return 8
+	default:
+		return 0
+	}
+}
+
+const (
+	UserConfigurationMaskNone               UserConfigurationMask = 0
+	UserConfigurationMaskNoDelete           UserConfigurationMask = 1
+	UserConfigurationMaskDisabled           UserConfigurationMask = 2
+	UserConfigurationMaskNoChangeByUser     UserConfigurationMask = 4
+	UserConfigurationMaskMustChangePassword UserConfigurationMask = 8
+)
+
+type Duplex uint32
+
+func DuplexFromString(s string) Duplex {
+	switch s {
+	case "Full":
+		return 0
+	case "Half":
+		return 1
+	case "Unknown":
+		return 2
+	default:
+		return 0
+	}
+}
+
+const (
+	DuplexFull    Duplex = 0
+	DuplexHalf    Duplex = 1
+	DuplexUnknown Duplex = 2
+)
+
+type InterfaceAdminStatus uint32
+
+func InterfaceAdminStatusFromString(s string) InterfaceAdminStatus {
+	switch s {
+	case "Up":
+		return 0
+	case "Down":
+		return 1
+	case "Testing":
+		return 2
+	default:
+		return 0
+	}
+}
+
+const (
+	InterfaceAdminStatusUp      InterfaceAdminStatus = 0
+	InterfaceAdminStatusDown    InterfaceAdminStatus = 1
+	InterfaceAdminStatusTesting InterfaceAdminStatus = 2
+)
+
+type InterfaceOperStatus uint32
+
+func InterfaceOperStatusFromString(s string) InterfaceOperStatus {
+	switch s {
+	case "Up":
+		return 0
+	case "Down":
+		return 1
+	case "Testing":
+		return 2
+	case "Unknown":
+		return 3
+	case "Dormant":
+		return 4
+	case "NotPresent":
+		return 5
+	case "LowerLayerDown":
+		return 6
+	default:
+		return 0
+	}
+}
+
+const (
+	InterfaceOperStatusUp             InterfaceOperStatus = 0
+	InterfaceOperStatusDown           InterfaceOperStatus = 1
+	InterfaceOperStatusTesting        InterfaceOperStatus = 2
+	InterfaceOperStatusUnknown        InterfaceOperStatus = 3
+	InterfaceOperStatusDormant        InterfaceOperStatus = 4
+	InterfaceOperStatusNotPresent     InterfaceOperStatus = 5
+	InterfaceOperStatusLowerLayerDown InterfaceOperStatus = 6
+)
+
+type NegotiationStatus uint32
+
+func NegotiationStatusFromString(s string) NegotiationStatus {
+	switch s {
+	case "InProgress":
+		return 0
+	case "Complete":
+		return 1
+	case "Failed":
+		return 2
+	case "Unknown":
+		return 3
+	case "NoNegotiation":
+		return 4
+	default:
+		return 0
+	}
+}
+
+const (
+	NegotiationStatusInProgress    NegotiationStatus = 0
+	NegotiationStatusComplete      NegotiationStatus = 1
+	NegotiationStatusFailed        NegotiationStatus = 2
+	NegotiationStatusUnknown       NegotiationStatus = 3
+	NegotiationStatusNoNegotiation NegotiationStatus = 4
+)
+
+type TsnFailureCode uint32
+
+func TsnFailureCodeFromString(s string) TsnFailureCode {
+	switch s {
+	case "NoFailure":
+		return 0
+	case "InsufficientBandwidth":
+		return 1
+	case "InsufficientResources":
+		return 2
+	case "InsufficientTrafficClassBandwidth":
+		return 3
+	case "StreamIdInUse":
+		return 4
+	case "StreamDestinationAddressInUse":
+		return 5
+	case "StreamPreemptedByHigherRank":
+		return 6
+	case "LatencyHasChanged":
+		return 7
+	case "EgressPortNotAvbCapable":
+		return 8
+	case "UseDifferentDestinationAddress":
+		return 9
+	case "OutOfMsrpResources":
+		return 10
+	case "OutOfMmrpResources":
+		return 11
+	case "CannotStoreDestinationAddress":
+		return 12
+	case "PriorityIsNotAnSrcClass":
+		return 13
+	case "MaxFrameSizeTooLarge":
+		return 14
+	case "MaxFanInPortsLimitReached":
+		return 15
+	case "FirstValueChangedForStreamId":
+		return 16
+	case "VlanBlockedOnEgress":
+		return 17
+	case "VlanTaggingDisabledOnEgress":
+		return 18
+	case "SrClassPriorityMismatch":
+		return 19
+	case "FeatureNotPropagated":
+		return 20
+	case "MaxLatencyExceeded":
+		return 21
+	case "BridgeDoesNotProvideNetworkId":
+		return 22
+	case "StreamTransformNotSupported":
+		return 23
+	case "StreamIdTypeNotSupported":
+		return 24
+	case "FeatureNotSupported":
+		return 25
+	default:
+		return 0
+	}
+}
+
+const (
+	TsnFailureCodeNoFailure                         TsnFailureCode = 0
+	TsnFailureCodeInsufficientBandwidth             TsnFailureCode = 1
+	TsnFailureCodeInsufficientResources             TsnFailureCode = 2
+	TsnFailureCodeInsufficientTrafficClassBandwidth TsnFailureCode = 3
+	TsnFailureCodeStreamIDInUse                     TsnFailureCode = 4
+	TsnFailureCodeStreamDestinationAddressInUse     TsnFailureCode = 5
+	TsnFailureCodeStreamPreemptedByHigherRank       TsnFailureCode = 6
+	TsnFailureCodeLatencyHasChanged                 TsnFailureCode = 7
+	TsnFailureCodeEgressPortNotAvbCapable           TsnFailureCode = 8
+	TsnFailureCodeUseDifferentDestinationAddress    TsnFailureCode = 9
+	TsnFailureCodeOutOfMsrpResources                TsnFailureCode = 10
+	TsnFailureCodeOutOfMmrpResources                TsnFailureCode = 11
+	TsnFailureCodeCannotStoreDestinationAddress     TsnFailureCode = 12
+	TsnFailureCodePriorityIsNotAnSrcClass           TsnFailureCode = 13
+	TsnFailureCodeMaxFrameSizeTooLarge              TsnFailureCode = 14
+	TsnFailureCodeMaxFanInPortsLimitReached         TsnFailureCode = 15
+	TsnFailureCodeFirstValueChangedForStreamID      TsnFailureCode = 16
+	TsnFailureCodeVlanBlockedOnEgress               TsnFailureCode = 17
+	TsnFailureCodeVlanTaggingDisabledOnEgress       TsnFailureCode = 18
+	TsnFailureCodeSrClassPriorityMismatch           TsnFailureCode = 19
+	TsnFailureCodeFeatureNotPropagated              TsnFailureCode = 20
+	TsnFailureCodeMaxLatencyExceeded                TsnFailureCode = 21
+	TsnFailureCodeBridgeDoesNotProvideNetworkID     TsnFailureCode = 22
+	TsnFailureCodeStreamTransformNotSupported       TsnFailureCode = 23
+	TsnFailureCodeStreamIDTypeNotSupported          TsnFailureCode = 24
+	TsnFailureCodeFeatureNotSupported               TsnFailureCode = 25
+)
+
+type TsnStreamState uint32
+
+func TsnStreamStateFromString(s string) TsnStreamState {
+	switch s {
+	case "Disabled":
+		return 0
+	case "Configuring":
+		return 1
+	case "Ready":
+		return 2
+	case "Operational":
+		return 3
+	case "Error":
+		return 4
+	default:
+		return 0
+	}
+}
+
+const (
+	TsnStreamStateDisabled    TsnStreamState = 0
+	TsnStreamStateConfiguring TsnStreamState = 1
+	TsnStreamStateReady       TsnStreamState = 2
+	TsnStreamStateOperational TsnStreamState = 3
+	TsnStreamStateError       TsnStreamState = 4
+)
+
+type TsnTalkerStatus uint32
+
+func TsnTalkerStatusFromString(s string) TsnTalkerStatus {
+	switch s {
+	case "None":
+		return 0
+	case "Ready":
+		return 1
+	case "Failed":
+		return 2
+	default:
+		return 0
+	}
+}
+
+const (
+	TsnTalkerStatusNone   TsnTalkerStatus = 0
+	TsnTalkerStatusReady  TsnTalkerStatus = 1
+	TsnTalkerStatusFailed TsnTalkerStatus = 2
+)
+
+type TsnListenerStatus uint32
+
+func TsnListenerStatusFromString(s string) TsnListenerStatus {
+	switch s {
+	case "None":
+		return 0
+	case "Ready":
+		return 1
+	case "PartialFailed":
+		return 2
+	case "Failed":
+		return 3
+	default:
+		return 0
+	}
+}
+
+const (
+	TsnListenerStatusNone          TsnListenerStatus = 0
+	TsnListenerStatusReady         TsnListenerStatus = 1
+	TsnListenerStatusPartialFailed TsnListenerStatus = 2
+	TsnListenerStatusFailed        TsnListenerStatus = 3
 )
 
 type IDType uint32
@@ -665,6 +1130,12 @@ func AccessLevelExTypeFromString(s string) AccessLevelExType {
 		return 512
 	case "WriteFullArrayOnly":
 		return 1024
+	case "NoSubDataTypes":
+		return 2048
+	case "NonVolatile":
+		return 4096
+	case "Constant":
+		return 8192
 	default:
 		return 0
 	}
@@ -682,6 +1153,9 @@ const (
 	AccessLevelExTypeNonatomicRead      AccessLevelExType = 256
 	AccessLevelExTypeNonatomicWrite     AccessLevelExType = 512
 	AccessLevelExTypeWriteFullArrayOnly AccessLevelExType = 1024
+	AccessLevelExTypeNoSubDataTypes     AccessLevelExType = 2048
+	AccessLevelExTypeNonVolatile        AccessLevelExType = 4096
+	AccessLevelExTypeConstant           AccessLevelExType = 8192
 )
 
 type EventNotifierType uint8
@@ -708,6 +1182,33 @@ const (
 	EventNotifierTypeHistoryWrite      EventNotifierType = 8
 )
 
+type AccessRestrictionType uint16
+
+func AccessRestrictionTypeFromString(s string) AccessRestrictionType {
+	switch s {
+	case "None":
+		return 0
+	case "SigningRequired":
+		return 1
+	case "EncryptionRequired":
+		return 2
+	case "SessionRequired":
+		return 4
+	case "ApplyRestrictionsToBrowse":
+		return 8
+	default:
+		return 0
+	}
+}
+
+const (
+	AccessRestrictionTypeNone                      AccessRestrictionType = 0
+	AccessRestrictionTypeSigningRequired           AccessRestrictionType = 1
+	AccessRestrictionTypeEncryptionRequired        AccessRestrictionType = 2
+	AccessRestrictionTypeSessionRequired           AccessRestrictionType = 4
+	AccessRestrictionTypeApplyRestrictionsToBrowse AccessRestrictionType = 8
+)
+
 type StructureType uint32
 
 func StructureTypeFromString(s string) StructureType {
@@ -718,6 +1219,10 @@ func StructureTypeFromString(s string) StructureType {
 		return 1
 	case "Union":
 		return 2
+	case "StructureWithSubtypedValues":
+		return 3
+	case "UnionWithSubtypedValues":
+		return 4
 	default:
 		return 0
 	}
@@ -727,6 +1232,8 @@ const (
 	StructureTypeStructure                   StructureType = 0
 	StructureTypeStructureWithOptionalFields StructureType = 1
 	StructureTypeUnion                       StructureType = 2
+	StructureTypeStructureWithSubtypedValues StructureType = 3
+	StructureTypeUnionWithSubtypedValues     StructureType = 4
 )
 
 type ApplicationType uint32

@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gopcua/opcua/debug"
 	"github.com/gopcua/opcua/errors"
 	"github.com/gopcua/opcua/id"
 	"github.com/gopcua/opcua/ua"
@@ -33,11 +34,12 @@ type channelInstance struct {
 	securityTokenID uint32
 	sequenceNumber  uint32
 	algo            *uapolicy.EncryptionAlgorithm
+	maxBodySize     uint32
 
-	messagesSent uint32
-	// messagesReceived uint32
-	bytesSent uint64
+	bytesSent uint64 // atomic.Load/Store - needs to be aligned for 32bit systems
 	// bytesReceived    uint64
+	messagesSent uint32 // atomic.Load/Store
+	// messagesReceived uint32
 }
 
 func newChannelInstance(sc *SecureChannel) *channelInstance {
@@ -84,6 +86,7 @@ func (c *channelInstance) newRequestMessage(req ua.Request, reqID uint32, authTo
 
 func (c *channelInstance) newMessage(srv interface{}, typeID uint16, requestID uint32) *Message {
 	sequenceNumber := c.nextSequenceNumber()
+	debug.Printf("got sequence number %d", sequenceNumber)
 
 	switch typeID {
 	case id.OpenSecureChannelRequest_Encoding_DefaultBinary, id.OpenSecureChannelResponse_Encoding_DefaultBinary:
@@ -130,6 +133,23 @@ func (c *channelInstance) newMessage(srv interface{}, typeID uint16, requestID u
 	}
 }
 
+func (c *channelInstance) SetMaximumBodySize(chunkSize int) {
+	sequenceHeaderSize := 8
+	headerSize := 12
+	symmetricAlgorithmHeader := 4
+
+	// this is the formula proposed by OPCUA - source node-opcua
+	maxBodySize :=
+		c.algo.PlaintextBlockSize()*
+			((chunkSize-headerSize-symmetricAlgorithmHeader-c.algo.SignatureLength()-1)/c.algo.BlockSize()) -
+			sequenceHeaderSize
+	c.maxBodySize = uint32(maxBodySize)
+
+	// this is the formula proposed by ERN - source node-opcua
+	// maxBlock := (chunkSize - headerSize) / c.algo.BlockSize()
+	// c.maxBodySize = c.algo.PlaintextBlockSize()*maxBlock - sequenceHeaderSize - c.algo.SignatureLength() - 1
+}
+
 // signAndEncrypt encrypts the message bytes stored in b and returns the
 // data signed and encrypted per the security policy information from the
 // secure channel.
@@ -152,10 +172,18 @@ func (c *channelInstance) signAndEncrypt(m *Message, b []byte) ([]byte, error) {
 	var encryptedLength int
 	if c.sc.cfg.SecurityMode == ua.MessageSecurityModeSignAndEncrypt || isAsymmetric {
 		plaintextBlockSize := c.algo.PlaintextBlockSize()
-		paddingLength := plaintextBlockSize - ((len(b[headerLength:]) + c.algo.SignatureLength() + 1) % plaintextBlockSize)
+		extraPadding := c.algo.RemoteSignatureLength() > 256
+		paddingBytes := 1
+		if extraPadding {
+			paddingBytes = 2
+		}
+		paddingLength := plaintextBlockSize - ((len(b[headerLength:]) + c.algo.SignatureLength() + paddingBytes) % plaintextBlockSize)
 
 		for i := 0; i <= paddingLength; i++ {
 			b = append(b, byte(paddingLength))
+		}
+		if extraPadding {
+			b = append(b, byte(paddingLength>>8))
 		}
 		encryptedLength = ((len(b[headerLength:]) + c.algo.SignatureLength()) / plaintextBlockSize) * c.algo.BlockSize()
 	} else { // MessageSecurityModeSign
@@ -217,7 +245,13 @@ func (c *channelInstance) verifyAndDecrypt(m *MessageChunk, r []byte) ([]byte, e
 
 	var paddingLength int
 	if c.sc.cfg.SecurityMode == ua.MessageSecurityModeSignAndEncrypt || isAsymmetric {
-		paddingLength = int(messageToVerify[len(messageToVerify)-1]) + 1
+		paddingLength = int(messageToVerify[len(messageToVerify)-1])
+		if c.algo.SignatureLength() > 256 {
+			paddingLength <<= 8
+			paddingLength += int(messageToVerify[len(messageToVerify)-2])
+			paddingLength += 1
+		}
+		paddingLength += 1
 	}
 
 	b = messageToVerify[headerLength : len(messageToVerify)-paddingLength]

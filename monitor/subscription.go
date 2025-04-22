@@ -56,7 +56,7 @@ func (m *Item) NodeID() *ua.NodeID {
 	return m.nodeID
 }
 
-// Request is a struct to manage a request to monitor a node
+// Request is a struct to manage a request to monitor a node or modify a monitored node
 type Request struct {
 	NodeID               *ua.NodeID
 	MonitoringMode       ua.MonitoringMode
@@ -88,7 +88,7 @@ func NewNodeMonitor(client *opcua.Client) (*NodeMonitor, error) {
 	return m, nil
 }
 
-func newSubscription(m *NodeMonitor, params *opcua.SubscriptionParameters, notifyChanLength int, nodes ...string) (*Subscription, error) {
+func newSubscription(ctx context.Context, m *NodeMonitor, params *opcua.SubscriptionParameters, notifyChanLength int, nodes ...string) (*Subscription, error) {
 	if params == nil {
 		params = &opcua.SubscriptionParameters{}
 	}
@@ -102,11 +102,11 @@ func newSubscription(m *NodeMonitor, params *opcua.SubscriptionParameters, notif
 	}
 
 	var err error
-	if s.sub, err = m.client.Subscribe(params, s.internalNotifyCh); err != nil {
+	if s.sub, err = m.client.Subscribe(ctx, params, s.internalNotifyCh); err != nil {
 		return nil, err
 	}
 
-	if err = s.AddNodes(nodes...); err != nil {
+	if err = s.AddNodes(ctx, nodes...); err != nil {
 		return nil, err
 	}
 
@@ -122,13 +122,12 @@ func (m *NodeMonitor) SetErrorHandler(cb ErrHandler) {
 // The caller must call `Unsubscribe` to stop and clean up resources. Canceling the context
 // will also cause the subscription to stop, but `Unsubscribe` must still be called.
 func (m *NodeMonitor) Subscribe(ctx context.Context, params *opcua.SubscriptionParameters, cb MsgHandler, nodes ...string) (*Subscription, error) {
-	sub, err := newSubscription(m, params, DefaultCallbackBufferLen, nodes...)
+	sub, err := newSubscription(ctx, m, params, DefaultCallbackBufferLen, nodes...)
 	if err != nil {
 		return nil, err
 	}
 
 	go sub.pump(ctx, nil, cb)
-	go sub.sub.Run(ctx)
 
 	return sub, nil
 }
@@ -139,13 +138,12 @@ func (m *NodeMonitor) Subscribe(ctx context.Context, params *opcua.SubscriptionP
 // The caller must call `Unsubscribe` to stop and clean up resources. Canceling the context
 // will also cause the subscription to stop, but `Unsubscribe` must still be called.
 func (m *NodeMonitor) ChanSubscribe(ctx context.Context, params *opcua.SubscriptionParameters, ch chan<- *DataChangeMessage, nodes ...string) (*Subscription, error) {
-	sub, err := newSubscription(m, params, 16, nodes...)
+	sub, err := newSubscription(ctx, m, params, 16, nodes...)
 	if err != nil {
 		return nil, err
 	}
 
 	go sub.pump(ctx, ch, nil)
-	go sub.sub.Run(ctx)
 
 	return sub, nil
 }
@@ -225,11 +223,17 @@ func (s *Subscription) pump(ctx context.Context, notifyCh chan<- *DataChangeMess
 	}
 }
 
+// Modify modifies the subscription settings
+func (s *Subscription) Modify(ctx context.Context, params *opcua.SubscriptionParameters) error {
+	_, err := s.sub.ModifySubscription(ctx, *params)
+	return err
+}
+
 // Unsubscribe removes the subscription interests and cleans up any resources
-func (s *Subscription) Unsubscribe() error {
+func (s *Subscription) Unsubscribe(ctx context.Context) error {
 	// TODO: make idempotent
 	close(s.closed)
-	return s.sub.Cancel()
+	return s.sub.Cancel(ctx)
 }
 
 // Subscribed returns the number of currently subscribed to nodes
@@ -256,17 +260,16 @@ func (s *Subscription) Dropped() uint64 {
 }
 
 // AddNodes adds nodes defined by their string representation
-func (s *Subscription) AddNodes(nodes ...string) error {
-
+func (s *Subscription) AddNodes(ctx context.Context, nodes ...string) error {
 	nodeIDs, err := parseNodeSlice(nodes...)
 	if err != nil {
 		return err
 	}
-	return s.AddNodeIDs(nodeIDs...)
+	return s.AddNodeIDs(ctx, nodeIDs...)
 }
 
 // AddNodeIDs adds nodes
-func (s *Subscription) AddNodeIDs(nodes ...*ua.NodeID) error {
+func (s *Subscription) AddNodeIDs(ctx context.Context, nodes ...*ua.NodeID) error {
 	requests := make([]Request, len(nodes))
 
 	for i, node := range nodes {
@@ -275,12 +278,12 @@ func (s *Subscription) AddNodeIDs(nodes ...*ua.NodeID) error {
 			MonitoringMode: ua.MonitoringModeReporting,
 		}
 	}
-	_, err := s.AddMonitorItems(requests...)
+	_, err := s.AddMonitorItems(ctx, requests...)
 	return err
 }
 
 // AddMonitorItems adds nodes with monitoring parameters to the subscription
-func (s *Subscription) AddMonitorItems(nodes ...Request) ([]Item, error) {
+func (s *Subscription) AddMonitorItems(ctx context.Context, nodes ...Request) ([]Item, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -307,7 +310,7 @@ func (s *Subscription) AddMonitorItems(nodes ...Request) ([]Item, error) {
 		}
 		toAdd = append(toAdd, request)
 	}
-	resp, err := s.sub.Monitor(ua.TimestampsToReturnBoth, toAdd...)
+	resp, err := s.sub.Monitor(ctx, ua.TimestampsToReturnBoth, toAdd...)
 	if err != nil {
 		return nil, err
 	}
@@ -337,36 +340,35 @@ func (s *Subscription) AddMonitorItems(nodes ...Request) ([]Item, error) {
 }
 
 // RemoveNodes removes nodes defined by their string representation
-func (s *Subscription) RemoveNodes(nodes ...string) error {
+func (s *Subscription) RemoveNodes(ctx context.Context, nodes ...string) error {
 	nodeIDs, err := parseNodeSlice(nodes...)
 	if err != nil {
 		return err
 	}
-	return s.RemoveNodeIDs(nodeIDs...)
+	return s.RemoveNodeIDs(ctx, nodeIDs...)
 }
 
 // RemoveNodeIDs removes nodes
-func (s *Subscription) RemoveNodeIDs(nodes ...*ua.NodeID) error {
+func (s *Subscription) RemoveNodeIDs(ctx context.Context, nodes ...*ua.NodeID) error {
 	if len(nodes) == 0 {
 		return nil
 	}
 
 	var toRemove []Item
-
 	for _, node := range nodes {
 		for _, item := range s.itemLookup {
-			if item.nodeID == node {
+			if item.nodeID.String() == node.String() {
 				toRemove = append(toRemove, item)
 				break
 			}
 		}
 	}
 
-	return s.RemoveMonitorItems(toRemove...)
+	return s.RemoveMonitorItems(ctx, toRemove...)
 }
 
 // RemoveMonitorItems removes nodes
-func (s *Subscription) RemoveMonitorItems(items ...Item) error {
+func (s *Subscription) RemoveMonitorItems(ctx context.Context, items ...Item) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -375,9 +377,7 @@ func (s *Subscription) RemoveMonitorItems(items ...Item) error {
 	}
 
 	var toRemove []uint32
-
 	for _, item := range items {
-
 		_, ok := s.itemLookup[item.id]
 		if !ok {
 			return errors.Errorf("item not found: %s", item.id)
@@ -387,7 +387,7 @@ func (s *Subscription) RemoveMonitorItems(items ...Item) error {
 		toRemove = append(toRemove, item.id)
 	}
 
-	resp, err := s.sub.Unmonitor(toRemove...)
+	resp, err := s.sub.Unmonitor(ctx, toRemove...)
 	if err != nil {
 		return err
 	}
@@ -409,9 +409,127 @@ func (s *Subscription) RemoveMonitorItems(items ...Item) error {
 	return nil
 }
 
+// ModifyMonitorItems modifies nodes with monitoring parameters to the subscription
+func (s *Subscription) ModifyMonitorItems(ctx context.Context, nodes ...Request) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if len(nodes) == 0 {
+		return nil
+	}
+
+	toModify := make([]*ua.MonitoredItemModifyRequest, 0)
+
+	for _, node := range nodes {
+		for _, item := range s.itemLookup {
+			if item.nodeID.String() != node.NodeID.String() {
+				continue
+			}
+
+			if node.MonitoringParameters == nil {
+				break
+			}
+
+			request := &ua.MonitoredItemModifyRequest{
+				MonitoredItemID:     item.id,
+				RequestedParameters: node.MonitoringParameters,
+			}
+			request.RequestedParameters.ClientHandle = item.handle
+			toModify = append(toModify, request)
+			break
+		}
+	}
+
+	resp, err := s.sub.ModifyMonitoredItems(ctx, ua.TimestampsToReturnBoth, toModify...)
+	if err != nil {
+		return err
+	}
+
+	if resp.ResponseHeader.ServiceResult != ua.StatusOK {
+		return resp.ResponseHeader.ServiceResult
+	}
+
+	if len(resp.Results) != len(toModify) {
+		return errors.Errorf("modify monitored items response length mismatch")
+	}
+
+	for _, res := range resp.Results {
+		if res.StatusCode != ua.StatusOK {
+			return res.StatusCode
+		}
+	}
+
+	return nil
+}
+
+// SetMonitoringModeForNodes sets the monitoring mode for nodes defined by their string representation
+func (s *Subscription) SetMonitoringModeForNodes(ctx context.Context, monitoringMode ua.MonitoringMode, nodes ...string) error {
+	nodeIDs, err := parseNodeSlice(nodes...)
+	if err != nil {
+		return err
+	}
+
+	return s.SetMonitoringModeForNodeIDs(ctx, monitoringMode, nodeIDs...)
+}
+
+// SetMonitoringModeForNodeIDs sets the monitoring mode for nodes
+func (s *Subscription) SetMonitoringModeForNodeIDs(ctx context.Context, monitoringMode ua.MonitoringMode, nodes ...*ua.NodeID) error {
+	if len(nodes) == 0 {
+		return nil
+	}
+
+	var toSet []Item
+	for _, node := range nodes {
+		for _, item := range s.itemLookup {
+			if item.nodeID.String() == node.String() {
+				toSet = append(toSet, item)
+				break
+			}
+		}
+	}
+
+	return s.SetMonitoringMode(ctx, monitoringMode, toSet...)
+}
+
+// SetMonitoringMode sets the monitoring mode for nodes
+func (s *Subscription) SetMonitoringMode(ctx context.Context, monitoringMode ua.MonitoringMode, items ...Item) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if len(items) == 0 {
+		return nil
+	}
+
+	toSet := make([]uint32, 0)
+	for _, item := range items {
+		toSet = append(toSet, item.id)
+	}
+
+	resp, err := s.sub.SetMonitoringMode(ctx, monitoringMode, toSet...)
+	if err != nil {
+		return err
+	}
+
+	if resp.ResponseHeader.ServiceResult != ua.StatusOK {
+		return resp.ResponseHeader.ServiceResult
+	}
+
+	if len(resp.Results) != len(toSet) {
+		return errors.Errorf("set monitoring mode response length mismatch")
+	}
+
+	for _, statusCode := range resp.Results {
+		if statusCode != ua.StatusOK {
+			return statusCode
+		}
+	}
+
+	return nil
+}
+
 // Stats returns statistics for the subscription
-func (s *Subscription) Stats() (*ua.SubscriptionDiagnosticsDataType, error) {
-	return s.sub.Stats()
+func (s *Subscription) Stats(ctx context.Context) (*ua.SubscriptionDiagnosticsDataType, error) {
+	return s.sub.Stats(ctx)
 }
 
 func parseNodeSlice(nodes ...string) ([]*ua.NodeID, error) {

@@ -5,8 +5,8 @@
 package opcua
 
 import (
+	"context"
 	"strings"
-	"time"
 
 	"github.com/gopcua/opcua/id"
 	"github.com/gopcua/opcua/ua"
@@ -27,8 +27,8 @@ func (n *Node) String() string {
 }
 
 // NodeClass returns the node class attribute.
-func (n *Node) NodeClass() (ua.NodeClass, error) {
-	v, err := n.Attribute(ua.AttributeIDNodeClass)
+func (n *Node) NodeClass(ctx context.Context) (ua.NodeClass, error) {
+	v, err := n.Attribute(ctx, ua.AttributeIDNodeClass)
 	if err != nil {
 		return 0, err
 	}
@@ -36,8 +36,8 @@ func (n *Node) NodeClass() (ua.NodeClass, error) {
 }
 
 // BrowseName returns the browse name of the node.
-func (n *Node) BrowseName() (*ua.QualifiedName, error) {
-	v, err := n.Attribute(ua.AttributeIDBrowseName)
+func (n *Node) BrowseName(ctx context.Context) (*ua.QualifiedName, error) {
+	v, err := n.Attribute(ctx, ua.AttributeIDBrowseName)
 	if err != nil {
 		return nil, err
 	}
@@ -45,8 +45,8 @@ func (n *Node) BrowseName() (*ua.QualifiedName, error) {
 }
 
 // Description returns the description of the node.
-func (n *Node) Description() (*ua.LocalizedText, error) {
-	v, err := n.Attribute(ua.AttributeIDDescription)
+func (n *Node) Description(ctx context.Context) (*ua.LocalizedText, error) {
+	v, err := n.Attribute(ctx, ua.AttributeIDDescription)
 	if err != nil {
 		return nil, err
 	}
@@ -54,8 +54,8 @@ func (n *Node) Description() (*ua.LocalizedText, error) {
 }
 
 // DisplayName returns the display name of the node.
-func (n *Node) DisplayName() (*ua.LocalizedText, error) {
-	v, err := n.Attribute(ua.AttributeIDDisplayName)
+func (n *Node) DisplayName(ctx context.Context) (*ua.LocalizedText, error) {
+	v, err := n.Attribute(ctx, ua.AttributeIDDisplayName)
 	if err != nil {
 		return nil, err
 	}
@@ -65,8 +65,8 @@ func (n *Node) DisplayName() (*ua.LocalizedText, error) {
 // AccessLevel returns the access level of the node.
 // The returned value is a mask where multiple values can be
 // set, e.g. read and write.
-func (n *Node) AccessLevel() (ua.AccessLevelType, error) {
-	v, err := n.Attribute(ua.AttributeIDAccessLevel)
+func (n *Node) AccessLevel(ctx context.Context) (ua.AccessLevelType, error) {
+	v, err := n.Attribute(ctx, ua.AttributeIDAccessLevel)
 	if err != nil {
 		return 0, err
 	}
@@ -75,8 +75,8 @@ func (n *Node) AccessLevel() (ua.AccessLevelType, error) {
 
 // HasAccessLevel returns true if all bits from mask are
 // set in the access level mask of the node.
-func (n *Node) HasAccessLevel(mask ua.AccessLevelType) (bool, error) {
-	v, err := n.AccessLevel()
+func (n *Node) HasAccessLevel(ctx context.Context, mask ua.AccessLevelType) (bool, error) {
+	v, err := n.AccessLevel(ctx)
 	if err != nil {
 		return false, err
 	}
@@ -84,8 +84,8 @@ func (n *Node) HasAccessLevel(mask ua.AccessLevelType) (bool, error) {
 }
 
 // UserAccessLevel returns the access level of the node.
-func (n *Node) UserAccessLevel() (ua.AccessLevelType, error) {
-	v, err := n.Attribute(ua.AttributeIDUserAccessLevel)
+func (n *Node) UserAccessLevel(ctx context.Context) (ua.AccessLevelType, error) {
+	v, err := n.Attribute(ctx, ua.AttributeIDUserAccessLevel)
 	if err != nil {
 		return 0, err
 	}
@@ -94,8 +94,8 @@ func (n *Node) UserAccessLevel() (ua.AccessLevelType, error) {
 
 // HasUserAccessLevel returns true if all bits from mask are
 // set in the user access level mask of the node.
-func (n *Node) HasUserAccessLevel(mask ua.AccessLevelType) (bool, error) {
-	v, err := n.UserAccessLevel()
+func (n *Node) HasUserAccessLevel(ctx context.Context, mask ua.AccessLevelType) (bool, error) {
+	v, err := n.UserAccessLevel(ctx)
 	if err != nil {
 		return false, err
 	}
@@ -103,15 +103,15 @@ func (n *Node) HasUserAccessLevel(mask ua.AccessLevelType) (bool, error) {
 }
 
 // Value returns the value of the node.
-func (n *Node) Value() (*ua.Variant, error) {
-	return n.Attribute(ua.AttributeIDValue)
+func (n *Node) Value(ctx context.Context) (*ua.Variant, error) {
+	return n.Attribute(ctx, ua.AttributeIDValue)
 }
 
 // Attribute returns the attribute of the node. with the given id.
-func (n *Node) Attribute(attrID ua.AttributeID) (*ua.Variant, error) {
+func (n *Node) Attribute(ctx context.Context, attrID ua.AttributeID) (*ua.Variant, error) {
 	rv := &ua.ReadValueID{NodeID: n.ID, AttributeID: attrID}
 	req := &ua.ReadRequest{NodesToRead: []*ua.ReadValueID{rv}}
-	res, err := n.c.Read(req)
+	res, err := n.c.Read(ctx, req)
 	if err != nil {
 		return nil, err
 	}
@@ -127,45 +127,49 @@ func (n *Node) Attribute(attrID ua.AttributeID) (*ua.Variant, error) {
 	return value, nil
 }
 
-func (n *Node) Attributes(attrID ...ua.AttributeID) ([]*ua.DataValue, error) {
+// Attributes returns the given node attributes.
+func (n *Node) Attributes(ctx context.Context, attrID ...ua.AttributeID) ([]*ua.DataValue, error) {
 	req := &ua.ReadRequest{}
 	for _, id := range attrID {
 		rv := &ua.ReadValueID{NodeID: n.ID, AttributeID: id}
 		req.NodesToRead = append(req.NodesToRead, rv)
 	}
-	res, err := n.c.Read(req)
+	res, err := n.c.Read(ctx, req)
 	if err != nil {
 		return nil, err
 	}
 	return res.Results, nil
 }
 
-func (n *Node) Children(refs uint32, mask ua.NodeClass) ([]*Node, error) {
+// Children returns the child nodes which match the node class mask.
+func (n *Node) Children(ctx context.Context, refs uint32, mask ua.NodeClass) ([]*Node, error) {
 	if refs == 0 {
 		refs = id.HierarchicalReferences
 	}
-	return n.ReferencedNodes(refs, ua.BrowseDirectionForward, mask, true)
+	return n.ReferencedNodes(ctx, refs, ua.BrowseDirectionForward, mask, true)
 }
 
-func (n *Node) ReferencedNodes(refs uint32, dir ua.BrowseDirection, mask ua.NodeClass, includeSubtypes bool) ([]*Node, error) {
+// ReferencedNodes returns the nodes referenced by this node.
+func (n *Node) ReferencedNodes(ctx context.Context, refs uint32, dir ua.BrowseDirection, mask ua.NodeClass, includeSubtypes bool) ([]*Node, error) {
 	if refs == 0 {
 		refs = id.References
 	}
 	var nodes []*Node
-	res, err := n.References(refs, dir, mask, includeSubtypes)
+	res, err := n.References(ctx, refs, dir, mask, includeSubtypes)
 	if err != nil {
 		return nil, err
 	}
 	for _, r := range res {
-		nodes = append(nodes, n.c.Node(r.NodeID.NodeID))
+		nodes = append(nodes, n.c.NodeFromExpandedNodeID(r.NodeID))
 	}
 	return nodes, nil
 }
 
 // References returns all references for the node.
+//
 // todo(fs): this is not complete since it only returns the
 // todo(fs): top-level reference at this point.
-func (n *Node) References(refType uint32, dir ua.BrowseDirection, mask ua.NodeClass, includeSubtypes bool) ([]*ua.ReferenceDescription, error) {
+func (n *Node) References(ctx context.Context, refType uint32, dir ua.BrowseDirection, mask ua.NodeClass, includeSubtypes bool) ([]*ua.ReferenceDescription, error) {
 	if refType == 0 {
 		refType = id.References
 	}
@@ -184,28 +188,27 @@ func (n *Node) References(refType uint32, dir ua.BrowseDirection, mask ua.NodeCl
 
 	req := &ua.BrowseRequest{
 		View: &ua.ViewDescription{
-			ViewID:    ua.NewTwoByteNodeID(0),
-			Timestamp: time.Now(),
+			ViewID: ua.NewTwoByteNodeID(0),
 		},
 		RequestedMaxReferencesPerNode: 0,
 		NodesToBrowse:                 []*ua.BrowseDescription{desc},
 	}
 
-	resp, err := n.c.Browse(req)
+	resp, err := n.c.Browse(ctx, req)
 	if err != nil {
 		return nil, err
 	}
-	return n.browseNext(resp.Results)
+	return n.browseNext(ctx, resp.Results)
 }
 
-func (n *Node) browseNext(results []*ua.BrowseResult) ([]*ua.ReferenceDescription, error) {
+func (n *Node) browseNext(ctx context.Context, results []*ua.BrowseResult) ([]*ua.ReferenceDescription, error) {
 	refs := results[0].References
 	for len(results[0].ContinuationPoint) > 0 {
 		req := &ua.BrowseNextRequest{
 			ContinuationPoints:        [][]byte{results[0].ContinuationPoint},
 			ReleaseContinuationPoints: false,
 		}
-		resp, err := n.c.BrowseNext(req)
+		resp, err := n.c.BrowseNext(ctx, req)
 		if err != nil {
 			return nil, err
 		}
@@ -216,7 +219,7 @@ func (n *Node) browseNext(results []*ua.BrowseResult) ([]*ua.ReferenceDescriptio
 }
 
 // TranslateBrowsePathsToNodeIDs translates an array of browseName segments to NodeIDs.
-func (n *Node) TranslateBrowsePathsToNodeIDs(pathNames []*ua.QualifiedName) (*ua.NodeID, error) {
+func (n *Node) TranslateBrowsePathsToNodeIDs(ctx context.Context, pathNames []*ua.QualifiedName) (*ua.NodeID, error) {
 	req := ua.TranslateBrowsePathsToNodeIDsRequest{
 		BrowsePaths: []*ua.BrowsePath{
 			{
@@ -238,7 +241,7 @@ func (n *Node) TranslateBrowsePathsToNodeIDs(pathNames []*ua.QualifiedName) (*ua
 	}
 
 	var nodeID *ua.NodeID
-	err := n.c.Send(&req, func(i interface{}) error {
+	err := n.c.Send(ctx, &req, func(i ua.Response) error {
 		if resp, ok := i.(*ua.TranslateBrowsePathsToNodeIDsResponse); ok {
 			if len(resp.Results) == 0 {
 				return ua.StatusBadUnexpectedError
@@ -260,12 +263,12 @@ func (n *Node) TranslateBrowsePathsToNodeIDs(pathNames []*ua.QualifiedName) (*ua
 }
 
 // TranslateBrowsePathInNamespaceToNodeID translates a browseName to a NodeID within the same namespace.
-func (n *Node) TranslateBrowsePathInNamespaceToNodeID(ns uint16, browsePath string) (*ua.NodeID, error) {
+func (n *Node) TranslateBrowsePathInNamespaceToNodeID(ctx context.Context, ns uint16, browsePath string) (*ua.NodeID, error) {
 	segments := strings.Split(browsePath, ".")
 	var names []*ua.QualifiedName
 	for _, segment := range segments {
 		qn := &ua.QualifiedName{NamespaceIndex: ns, Name: segment}
 		names = append(names, qn)
 	}
-	return n.TranslateBrowsePathsToNodeIDs(names)
+	return n.TranslateBrowsePathsToNodeIDs(ctx, names)
 }

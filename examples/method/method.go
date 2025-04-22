@@ -24,11 +24,14 @@ func main() {
 
 	ctx := context.Background()
 
-	c := opcua.NewClient(*endpoint, opcua.SecurityMode(ua.MessageSecurityModeNone))
+	c, err := opcua.NewClient(*endpoint, opcua.SecurityMode(ua.MessageSecurityModeNone))
+	if err != nil {
+		log.Fatal(err)
+	}
 	if err := c.Connect(ctx); err != nil {
 		log.Fatal(err)
 	}
-	defer c.Close()
+	defer c.Close(ctx)
 
 	in := int64(12)
 	req := &ua.CallMethodRequest{
@@ -37,7 +40,7 @@ func main() {
 		InputArguments: []*ua.Variant{ua.MustVariant(in)},
 	}
 
-	resp, err := c.Call(req)
+	resp, err := c.Call(ctx, req)
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -6,10 +6,10 @@ package ua
 
 import (
 	"encoding/base64"
+	"encoding/json"
+	"encoding/xml"
 	"fmt"
 	"math"
-	"strconv"
-	"strings"
 
 	"github.com/gopcua/opcua/errors"
 )
@@ -79,94 +79,68 @@ func NewByteStringNodeID(ns uint16, id []byte) *NodeID {
 	}
 }
 
+// NewNodeIDFromExpandedNodeID returns a new NodeID derived from ExpandedNodeID
+func NewNodeIDFromExpandedNodeID(id *ExpandedNodeID) *NodeID {
+	bid := make([]byte, len(id.NodeID.bid))
+	copy(bid, id.NodeID.bid)
+	if len(bid) == 0 {
+		bid = nil
+	}
+	var gid *GUID
+	if egid := id.NodeID.gid; egid != nil {
+		var ngid GUID
+		ngid.Data1 = egid.Data1
+		ngid.Data2 = egid.Data2
+		ngid.Data3 = egid.Data3
+		ngid.Data4 = make([]byte, len(egid.Data4))
+		copy(ngid.Data4, egid.Data4)
+		if len(ngid.Data4) == 0 {
+			ngid.Data4 = nil
+		}
+		gid = &ngid
+	}
+	return &NodeID{
+		mask: id.NodeID.mask & 0b00111111, // expanded flag NamespaceURI and ServerIndex need to be unset
+		ns:   id.NodeID.ns,
+		nid:  id.NodeID.nid,
+		bid:  bid,
+		gid:  gid,
+	}
+}
+
+// MustParseNodeID returns a node id from a string definition
+// if it is parseable by ParseNodeID. Otherwise, the function
+// panics.
+func MustParseNodeID(s string) *NodeID {
+	id, err := ParseNodeID(s)
+	if err != nil {
+		panic(err.Error())
+	}
+	return id
+}
+
 // ParseNodeID returns a node id from a string definition of the format
 // 'ns=<namespace>;{s,i,b,g}=<identifier>'.
 //
-// For string node ids the 's=' prefix can be omitted.
+// The 's=' prefix can be omitted for string node ids in namespace 0.
 //
 // For numeric ids the smallest possible type which can store the namespace
 // and id value is returned.
 //
-// Namespace URLs 'nsu=' are not supported since they require a lookup.
-//
+// Namespace URIs are not supported since NodeID cannot store them. If you need
+// to support namespace URIs use ParseExpandedNodeID.
 func ParseNodeID(s string) (*NodeID, error) {
-	if s == "" {
-		return NewTwoByteNodeID(0), nil
+	id, err := ParseExpandedNodeID(s, nil)
+	if err != nil {
+		return nil, err
 	}
-
-	var nsval, idval string
-
-	p := strings.SplitN(s, ";", 2)
-	switch len(p) {
-	case 1:
-		nsval, idval = "ns=0", p[0]
-	case 2:
-		nsval, idval = p[0], p[1]
-	default:
-		return nil, errors.Errorf("invalid node id: %s", s)
+	if id.HasNamespaceURI() {
+		return nil, errors.Errorf("namespace uris are not supported. use `ua.ParseExpandedNodeID`")
 	}
-
-	// parse namespace
-	var ns uint16
-	switch {
-	case strings.HasPrefix(nsval, "nsu="):
-		return nil, errors.Errorf("namespace urls are not supported: %s", s)
-
-	case strings.HasPrefix(nsval, "ns="):
-		n, err := strconv.Atoi(nsval[3:])
-		if err != nil {
-			return nil, errors.Errorf("invalid namespace id: %s", s)
-		}
-		if n < 0 || n > math.MaxUint16 {
-			return nil, errors.Errorf("namespace id out of range (0..65535): %s", s)
-		}
-		ns = uint16(n)
-
-	default:
-		return nil, errors.Errorf("invalid node id: %s", s)
+	if id.HasServerIndex() {
+		return nil, errors.Errorf("server index is not supported. use `ua.ParseExpandedNodeID`")
 	}
-
-	// parse identifier
-	switch {
-	case strings.HasPrefix(idval, "i="):
-		id, err := strconv.ParseUint(idval[2:], 10, 64)
-		if err != nil {
-			return nil, errors.Errorf("invalid numeric id: %s", s)
-		}
-		switch {
-		case ns == 0 && id < 256:
-			return NewTwoByteNodeID(byte(id)), nil
-		case ns < 256 && id < math.MaxUint16:
-			return NewFourByteNodeID(byte(ns), uint16(id)), nil
-		case id < math.MaxUint32:
-			return NewNumericNodeID(ns, uint32(id)), nil
-		default:
-			return nil, errors.Errorf("numeric id out of range (0..2^32-1): %s", s)
-		}
-
-	case strings.HasPrefix(idval, "s="):
-		return NewStringNodeID(ns, idval[2:]), nil
-
-	case strings.HasPrefix(idval, "g="):
-		n := NewGUIDNodeID(ns, idval[2:])
-		if n == nil || n.StringID() == "" {
-			return nil, errors.Errorf("invalid guid node id: %s", s)
-		}
-		return n, nil
-
-	case strings.HasPrefix(idval, "b="):
-		b, err := base64.StdEncoding.DecodeString(idval[2:])
-		if err != nil {
-			return nil, errors.Errorf("invalid opaque node id: %s", s)
-		}
-		return NewByteStringNodeID(ns, b), nil
-
-	case strings.HasPrefix(idval, "ns="):
-		return nil, errors.Errorf("invalid node id: %s", s)
-
-	default:
-		return NewStringNodeID(ns, idval), nil
-	}
+	return id.NodeID, nil
 }
 
 // EncodingMask returns the encoding mask field including the
@@ -317,8 +291,13 @@ func (n *NodeID) SetStringID(v string) error {
 // String returns the string representation of the NodeID
 // in the format described by ParseNodeID.
 func (n *NodeID) String() string {
+	if n == nil {
+		return ""
+	}
+
 	switch n.Type() {
 	case NodeIDTypeTwoByte:
+
 		return fmt.Sprintf("i=%d", n.nid)
 
 	case NodeIDTypeFourByte:
@@ -347,9 +326,9 @@ func (n *NodeID) String() string {
 
 	case NodeIDTypeByteString:
 		if n.ns == 0 {
-			return fmt.Sprintf("o=%s", n.StringID())
+			return fmt.Sprintf("b=%s", n.StringID())
 		}
-		return fmt.Sprintf("ns=%d;o=%s", n.ns, n.StringID())
+		return fmt.Sprintf("ns=%d;b=%s", n.ns, n.StringID())
 
 	default:
 		panic(fmt.Sprintf("invalid node id type: %d", n.Type()))
@@ -416,4 +395,42 @@ func (n *NodeID) Encode() ([]byte, error) {
 		return nil, errors.Errorf("invalid node id type %v", n.Type())
 	}
 	return buf.Bytes(), buf.Error()
+}
+
+func (n *NodeID) Equal(o *NodeID) bool {
+	return n.String() == o.String()
+}
+
+func (n *NodeID) MarshalJSON() ([]byte, error) {
+	if n == nil {
+		return []byte(`null`), nil
+	}
+	return json.Marshal(n.String())
+}
+
+func (n *NodeID) UnmarshalJSON(b []byte) error {
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	nid, err := ParseNodeID(s)
+	if err != nil {
+		return err
+	}
+	*n = *nid
+	return nil
+}
+
+// todo(fs): not sure if this should exist here. Maybe there are multiple different xml formats?
+func (n *NodeID) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error {
+	var s string
+	if err := d.DecodeElement(&s, &start); err != nil {
+		return err
+	}
+	id, err := ParseNodeID(s)
+	if err != nil {
+		return err
+	}
+	*n = *id
+	return nil
 }

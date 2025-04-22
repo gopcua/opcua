@@ -24,7 +24,7 @@ func TestMessage(t *testing.T) {
 					},
 				}
 				instance := &channelInstance{
-					sc: s,
+					sc:              s,
 					sequenceNumber:  0,
 					securityTokenID: 0,
 				}
@@ -123,7 +123,7 @@ func TestMessage(t *testing.T) {
 					},
 				}
 				instance := &channelInstance{
-					sc: s,
+					sc:              s,
 					sequenceNumber:  0,
 					securityTokenID: 0,
 				}
@@ -194,7 +194,7 @@ func TestMessage(t *testing.T) {
 					},
 				}
 				instance := &channelInstance{
-					sc: s,
+					sc:              s,
 					sequenceNumber:  0,
 					securityTokenID: 0,
 				}

@@ -27,14 +27,17 @@ func main() {
 
 	ctx := context.Background()
 
-	c := opcua.NewClient(*endpoint)
+	c, err := opcua.NewClient(*endpoint)
+	if err != nil {
+		log.Fatal(err)
+	}
 	if err := c.Connect(ctx); err != nil {
 		log.Fatal(err)
 	}
-	defer c.Close()
+	defer c.Close(ctx)
 
 	root := c.Node(ua.NewTwoByteNodeID(id.ObjectsFolder))
-	nodeID, err := root.TranslateBrowsePathInNamespaceToNodeID(uint16(*ns), *nodePath)
+	nodeID, err := root.TranslateBrowsePathInNamespaceToNodeID(ctx, uint16(*ns), *nodePath)
 	if err != nil {
 		log.Fatal(err)
 	}

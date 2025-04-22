@@ -5,6 +5,9 @@
 package uasc
 
 import (
+	"math"
+
+	"github.com/gopcua/opcua/debug"
 	"github.com/gopcua/opcua/errors"
 	"github.com/gopcua/opcua/ua"
 )
@@ -111,25 +114,81 @@ func (m *Message) Decode(b []byte) (int, error) {
 }
 
 func (m *Message) Encode() ([]byte, error) {
-	body := ua.NewBuffer(nil)
+	chunks, err := m.EncodeChunks(math.MaxUint32)
+	if err != nil {
+		return nil, err
+	}
+	return chunks[0], nil
+}
+
+func (m *Message) EncodeChunks(maxBodySize uint32) ([][]byte, error) {
+	dataBody := ua.NewBuffer(nil)
+	dataBody.WriteStruct(m.TypeID)
+	dataBody.WriteStruct(m.Service)
+
+	if dataBody.Error() != nil {
+		return nil, dataBody.Error()
+	}
+
+	// todo(fs): sometimes maxBodySize == 0 probably we get an invalid channel instance
+	// todo(fs): log this and investigate
+	if maxBodySize == 0 {
+		debug.Printf("maxBodySize == 0 !!!")
+		maxBodySize = 1 << 12
+	}
+
+	nrChunks := uint32(dataBody.Len())/(maxBodySize) + 1
+	chunks := make([][]byte, nrChunks)
+
 	switch m.Header.MessageType {
 	case "OPN":
-		body.WriteStruct(m.AsymmetricSecurityHeader)
+		partialHeader := ua.NewBuffer(nil)
+		partialHeader.WriteStruct(m.AsymmetricSecurityHeader)
+		partialHeader.WriteStruct(m.SequenceHeader)
+
+		if partialHeader.Error() != nil {
+			return nil, partialHeader.Error()
+		}
+
+		m.Header.MessageSize = uint32(12 + partialHeader.Len() + dataBody.Len())
+		buf := ua.NewBuffer(nil)
+		buf.WriteStruct(m.Header)
+		buf.Write(partialHeader.Bytes())
+		buf.Write(dataBody.Bytes())
+
+		return [][]byte{buf.Bytes()}, buf.Error()
+
 	case "CLO", "MSG":
-		body.WriteStruct(m.SymmetricSecurityHeader)
+
+		for i := uint32(0); i < nrChunks-1; i++ {
+			m.Header.MessageSize = maxBodySize + 24
+			m.Header.ChunkType = ChunkTypeIntermediate
+			chunk := ua.NewBuffer(nil)
+			chunk.WriteStruct(m.Header)
+			chunk.WriteStruct(m.SymmetricSecurityHeader)
+			chunk.WriteStruct(m.SequenceHeader)
+			chunk.Write(dataBody.ReadN(int(maxBodySize)))
+			if chunk.Error() != nil {
+				return nil, chunk.Error()
+			}
+
+			chunks[i] = chunk.Bytes()
+		}
+
+		m.Header.ChunkType = ChunkTypeFinal
+		m.Header.MessageSize = uint32(24 + dataBody.Len())
+		chunk := ua.NewBuffer(nil)
+		chunk.WriteStruct(m.Header)
+		chunk.WriteStruct(m.SymmetricSecurityHeader)
+		chunk.WriteStruct(m.SequenceHeader)
+		chunk.Write(dataBody.Bytes())
+		if chunk.Error() != nil {
+			return nil, chunk.Error()
+		}
+
+		chunks[nrChunks-1] = chunk.Bytes()
+		return chunks, nil
 	default:
 		return nil, errors.Errorf("invalid message type %q", m.Header.MessageType)
 	}
-	body.WriteStruct(m.SequenceHeader)
-	body.WriteStruct(m.TypeID)
-	body.WriteStruct(m.Service)
-	if body.Error() != nil {
-		return nil, body.Error()
-	}
-
-	m.Header.MessageSize = uint32(12 + body.Len())
-	buf := ua.NewBuffer(nil)
-	buf.WriteStruct(m.Header)
-	buf.Write(body.Bytes())
-	return buf.Bytes(), buf.Error()
 }

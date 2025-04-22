@@ -33,6 +33,10 @@ type Config struct {
 	// messages.  It is the key associated with Certificate
 	LocalKey *rsa.PrivateKey
 
+	// UserKey is a RSA Private Key which will be used to sign the UserTokenSignature.
+	// It is the key associated with AuthCertificate
+	UserKey *rsa.PrivateKey
+
 	// Thumbprint is the thumbprint of the X.509 v3 Certificate assigned to the receiving
 	// application Instance.
 	// The thumbprint is the CertificateDigest of the DER encoded form of the
@@ -53,6 +57,17 @@ type Config struct {
 	// A SecureChannel may have to be created even if the securityMode is NONE. The exact behaviour
 	// depends on the mapping used and is described in the Part 6.
 	SecurityMode ua.MessageSecurityMode
+
+	// AutoReconnect will make sure that once communication is restored,
+	// the old session is used whenever possible and that Susbcription data is not missed.
+	// You may choose to use AutoReconnect (true by default) or do it manually.
+	// AutoReconnect will make the UaClient to try to reconnect to the server every second,
+	// once the communication is broken. If you do it manually, you must be prepared to do it until it succeeds.
+	AutoReconnect bool
+
+	// ReconnectInterval is interval duration between each reconnection attempt,
+	// ignored if AutoReconnect is set to false.
+	ReconnectInterval time.Duration
 
 	// Lifetime is the requested lifetime, in milliseconds, for the new SecurityToken when the
 	// SecureChannel works as client. It specifies when the Client expects to renew the SecureChannel

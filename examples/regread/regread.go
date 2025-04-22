@@ -25,18 +25,21 @@ func main() {
 
 	ctx := context.Background()
 
-	c := opcua.NewClient(*endpoint, opcua.SecurityMode(ua.MessageSecurityModeNone))
+	c, err := opcua.NewClient(*endpoint, opcua.SecurityMode(ua.MessageSecurityModeNone))
+	if err != nil {
+		log.Fatal(err)
+	}
 	if err := c.Connect(ctx); err != nil {
 		log.Fatal(err)
 	}
-	defer c.Close()
+	defer c.Close(ctx)
 
 	id, err := ua.ParseNodeID(*nodeID)
 	if err != nil {
 		log.Fatalf("invalid node id: %v", err)
 	}
 
-	regResp, err := c.RegisterNodes(&ua.RegisterNodesRequest{
+	regResp, err := c.RegisterNodes(ctx, &ua.RegisterNodesRequest{
 		NodesToRegister: []*ua.NodeID{id},
 	})
 	if err != nil {
@@ -46,12 +49,12 @@ func main() {
 	req := &ua.ReadRequest{
 		MaxAge: 2000,
 		NodesToRead: []*ua.ReadValueID{
-			&ua.ReadValueID{NodeID: regResp.RegisteredNodeIDs[0]},
+			{NodeID: regResp.RegisteredNodeIDs[0]},
 		},
 		TimestampsToReturn: ua.TimestampsToReturnBoth,
 	}
 
-	resp, err := c.Read(req)
+	resp, err := c.Read(ctx, req)
 	if err != nil {
 		log.Fatalf("Read failed: %s", err)
 	}
@@ -60,7 +63,7 @@ func main() {
 	}
 	log.Print(resp.Results[0].Value.Value())
 
-	_, err = c.UnregisterNodes(&ua.UnregisterNodesRequest{
+	_, err = c.UnregisterNodes(ctx, &ua.UnregisterNodesRequest{
 		NodesToUnregister: []*ua.NodeID{id},
 	})
 	if err != nil {

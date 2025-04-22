@@ -9,7 +9,6 @@ import (
 	"bytes"
 	"flag"
 	"go/format"
-	"io/ioutil"
 	"log"
 	"os"
 	"strings"
@@ -66,7 +65,7 @@ func main() {
 		log.Fatalf("Error formatting source: %v", err)
 	}
 
-	if err := ioutil.WriteFile(*out, bfmt, 0644); err != nil {
+	if err := os.WriteFile(*out, bfmt, 0644); err != nil {
 		log.Fatalf("Error writing %s: %v", *out, err)
 	}
 	log.Printf("Wrote %s", *out)
@@ -95,9 +94,6 @@ func (n StatusCode) Error() string {
 
 var (
 	StatusOK StatusCode = 0x0
-    StatusUncertain StatusCode = 0x40000000
-    StatusBad StatusCode = 0x80000000
-
 	{{range .}}{{index . 0}} StatusCode = {{index . 1}}
 	{{end}}
 )
@@ -109,10 +105,10 @@ type StatusCodeDesc struct {
 
 // StatusCodes maps status codes to the status code error types.
 var StatusCodes = map[StatusCode]StatusCodeDesc{
-	StatusOK: StatusCodeDesc{Name: "OK", Text: ""},
-	StatusUncertain: StatusCodeDesc{Name: "Uncertain", Text: ""},
-	StatusBad: StatusCodeDesc{Name: "Bad", Text: ""},
-	{{range .}}{{index . 0}}: StatusCodeDesc{ Name: "{{index . 0}}", Text: "{{index . 2}}" },
+	StatusOK: {Name: "OK", Text: ""},
+	StatusUncertain: {Name: "Uncertain", Text: ""},
+	StatusBad: {Name: "Bad", Text: ""},
+	{{range .}}{{index . 0}}: { Name: "{{index . 0}}", Text: {{index . 2}} },
 	{{end}}
 }
 `))

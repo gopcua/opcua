@@ -1,20 +1,41 @@
 package errors
 
 import (
-	pkg_errors "github.com/pkg/errors"
+	"errors"
+	"fmt"
 )
 
 // Prefix is the default error string prefix
 const Prefix = "opcua: "
 
-// Errorf is a wrapper for `errors.Errorf`
+// Errorf wraps fmt.Errorf
 func Errorf(format string, a ...interface{}) error {
-	return pkg_errors.Errorf(Prefix+format, a...)
+	return fmt.Errorf(Prefix+format, a...)
 }
 
-// New is a wrapper for `errors.New`
+// New wraps errors.New
 func New(text string) error {
-	return pkg_errors.New(Prefix + text)
+	return errors.New(Prefix + text)
+}
+
+// Is wraps errors.Is
+func Is(err error, target error) bool {
+	return errors.Is(err, target)
+}
+
+// As wraps errors.As
+func As(err error, target interface{}) bool {
+	return errors.As(err, target)
+}
+
+// Unwrap wraps errors.Unwrap
+func Unwrap(err error) error {
+	return errors.Unwrap(err)
+}
+
+// Join wraps errors.Join
+func Join(errs ...error) error {
+	return errors.Join(errs...)
 }
 
 // Equal returns true if the two errors have the same error message.

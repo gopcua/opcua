@@ -10,7 +10,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/pascaldekloe/goe/verify"
+	"github.com/stretchr/testify/require"
 )
 
 // CodecTestCase describes a test case for a encoding and decoding an
@@ -38,26 +38,23 @@ func RunCodecTest(t *testing.T, cases []CodecTestCase) {
 				case reflect.Slice:
 					v = reflect.New(typ) // typ: []x, v: *[]x
 				default:
-					t.Fatalf("%T is not a pointer or a slice", c.Struct)
+					require.Fail(t, "%T is not a pointer or a slice", c.Struct)
 				}
 
-				if _, err := Decode(c.Bytes, v.Interface()); err != nil {
-					t.Fatal(err)
-				}
+				_, err := Decode(c.Bytes, v.Interface())
+				require.NoError(t, err, "Decode failed")
 
 				// if v is a *[]x we need to dereference it before comparing it.
 				if typ.Kind() == reflect.Slice {
 					v = v.Elem()
 				}
-				verify.Values(t, "", v.Interface(), c.Struct)
+				require.Equal(t, c.Struct, v.Interface(), "Decoded payload not equal")
 			})
 
 			t.Run("encode", func(t *testing.T) {
 				b, err := Encode(c.Struct)
-				if err != nil {
-					t.Fatal(err)
-				}
-				verify.Values(t, "", b, c.Bytes)
+				require.NoError(t, err, "Encode failed")
+				require.Equal(t, c.Bytes, b, "Encoded payload not equal")
 			})
 		})
 	}

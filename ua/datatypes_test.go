@@ -12,6 +12,17 @@ import (
 func TestDataValue(t *testing.T) {
 	cases := []CodecTestCase{
 		{
+			Name: "no value",
+			Struct: &DataValue{
+				EncodingMask: 0x00,
+				Value:        MustVariant(nil),
+			},
+			Bytes: []byte{
+				// EncodingMask
+				0x00,
+			},
+		},
+		{
 			Name: "value only",
 			Struct: &DataValue{
 				EncodingMask: 0x01,
@@ -45,6 +56,43 @@ func TestDataValue(t *testing.T) {
 				0x80, 0x3b, 0xe8, 0xb3, 0x92, 0x4e, 0xd4, 0x01,
 			},
 		},
+		{
+			Name: "source timestamp, server timestamp",
+			Struct: &DataValue{
+				EncodingMask:    0x0c,
+				Value:           MustVariant(nil),
+				SourceTimestamp: time.Date(2018, time.September, 17, 14, 28, 29, 112000000, time.UTC),
+				ServerTimestamp: time.Date(2018, time.September, 17, 14, 28, 29, 112000000, time.UTC),
+			},
+			Bytes: []byte{
+				// EncodingMask
+				0x0c,
+				// SourceTimestamp
+				0x80, 0x3b, 0xe8, 0xb3, 0x92, 0x4e, 0xd4, 0x01,
+				// SeverTimestamp
+				0x80, 0x3b, 0xe8, 0xb3, 0x92, 0x4e, 0xd4, 0x01,
+			},
+		},
+		{
+			Name: "value with nil slice, source timestamp, server timestamp",
+			Struct: &DataValue{
+				EncodingMask:    0x0d,
+				Value:           MustVariant([]string(nil)),
+				SourceTimestamp: time.Date(2018, time.September, 17, 14, 28, 29, 112000000, time.UTC),
+				ServerTimestamp: time.Date(2018, time.September, 17, 14, 28, 29, 112000000, time.UTC),
+			},
+			Bytes: []byte{
+				// EncodingMask
+				0x0d,
+				// Value
+				0x8c,                   // type
+				0xff, 0xff, 0xff, 0xff, // value
+				// SourceTimestamp
+				0x80, 0x3b, 0xe8, 0xb3, 0x92, 0x4e, 0xd4, 0x01,
+				// SeverTimestamp
+				0x80, 0x3b, 0xe8, 0xb3, 0x92, 0x4e, 0xd4, 0x01,
+			},
+		},
 	}
 	RunCodecTest(t, cases)
 }
@@ -52,7 +100,7 @@ func TestDataValue(t *testing.T) {
 func TestDataValueArray(t *testing.T) {
 	cases := []CodecTestCase{
 		{
-			Name: "value only and value, source timestamp, server timestamp",
+			Name: "value only; value, source timestamp, server timestamp; source timestamp, server timestamp",
 			Struct: []*DataValue{
 				{
 					EncodingMask: 0x01,
@@ -64,10 +112,16 @@ func TestDataValueArray(t *testing.T) {
 					SourceTimestamp: time.Date(2018, time.September, 17, 14, 28, 29, 112000000, time.UTC),
 					ServerTimestamp: time.Date(2018, time.September, 17, 14, 28, 29, 112000000, time.UTC),
 				},
+				{
+					EncodingMask:    0x0c,
+					Value:           MustVariant(nil),
+					SourceTimestamp: time.Date(2018, time.September, 17, 14, 28, 29, 112000000, time.UTC),
+					ServerTimestamp: time.Date(2018, time.September, 17, 14, 28, 29, 112000000, time.UTC),
+				},
 			},
 			Bytes: []byte{
 				// length
-				0x02, 0x00, 0x00, 0x00,
+				0x03, 0x00, 0x00, 0x00,
 
 				// EncodingMask
 				0x01,
@@ -80,6 +134,13 @@ func TestDataValueArray(t *testing.T) {
 				// Value
 				0x0a,
 				0xc9, 0x02, 0x20, 0x40,
+				// SourceTimestamp
+				0x80, 0x3b, 0xe8, 0xb3, 0x92, 0x4e, 0xd4, 0x01,
+				// ServerTimestamp
+				0x80, 0x3b, 0xe8, 0xb3, 0x92, 0x4e, 0xd4, 0x01,
+
+				// EncodingMask
+				0x0c,
 				// SourceTimestamp
 				0x80, 0x3b, 0xe8, 0xb3, 0x92, 0x4e, 0xd4, 0x01,
 				// ServerTimestamp

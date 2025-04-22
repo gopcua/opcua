@@ -26,11 +26,14 @@ func main() {
 
 	ctx := context.Background()
 
-	c := opcua.NewClient(*endpoint)
+	c, err := opcua.NewClient(*endpoint)
+	if err != nil {
+		log.Fatal(err)
+	}
 	if err := c.Connect(ctx); err != nil {
 		log.Fatal(err)
 	}
-	defer c.Close()
+	defer c.Close(ctx)
 
 	id, err := ua.ParseNodeID(*nodeID)
 	if err != nil {
@@ -44,7 +47,7 @@ func main() {
 
 	req := &ua.WriteRequest{
 		NodesToWrite: []*ua.WriteValue{
-			&ua.WriteValue{
+			{
 				NodeID:      id,
 				AttributeID: ua.AttributeIDValue,
 				Value: &ua.DataValue{
@@ -55,9 +58,9 @@ func main() {
 		},
 	}
 
-	resp, err := c.Write(req)
+	resp, err := c.Write(ctx, req)
 	if err != nil {
-		log.Fatalf("Read failed: %s", err)
+		log.Fatalf("Write failed: %s", err)
 	}
 	log.Printf("%v", resp.Results[0])
 }

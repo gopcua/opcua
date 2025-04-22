@@ -23,17 +23,12 @@ func main() {
 		certFile = flag.String("cert", "", "Path to cert.pem. Required for security mode/policy != None")
 		keyFile  = flag.String("key", "", "Path to private key.pem. Required for security mode/policy != None")
 		nodeID   = flag.String("node", "", "node id to subscribe to")
-		interval = flag.String("interval", opcua.DefaultSubscriptionInterval.String(), "subscription interval")
+		interval = flag.Duration("interval", opcua.DefaultSubscriptionInterval, "subscription interval")
 	)
 	flag.BoolVar(&debug.Enable, "debug", false, "enable debug logging")
 	flag.Parse()
 
 	// log.SetFlags(0)
-
-	subInterval, err := time.ParseDuration(*interval)
-	if err != nil {
-		log.Fatal(err)
-	}
 
 	signalCh := make(chan os.Signal, 1)
 	signal.Notify(signalCh, os.Interrupt)
@@ -47,14 +42,14 @@ func main() {
 		cancel()
 	}()
 
-	endpoints, err := opcua.GetEndpoints(*endpoint)
+	endpoints, err := opcua.GetEndpoints(ctx, *endpoint)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	ep := opcua.SelectEndpoint(endpoints, *policy, ua.MessageSecurityModeFromString(*mode))
-	if ep == nil {
-		log.Fatal("Failed to find suitable endpoint")
+	ep, err := opcua.SelectEndpoint(endpoints, *policy, ua.MessageSecurityModeFromString(*mode))
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	log.Print("*", ep.SecurityPolicyURI, ep.SecurityMode)
@@ -68,12 +63,15 @@ func main() {
 		opcua.SecurityFromEndpoint(ep, ua.UserTokenTypeAnonymous),
 	}
 
-	c := opcua.NewClient(ep.EndpointURL, opts...)
+	c, err := opcua.NewClient(ep.EndpointURL, opts...)
+	if err != nil {
+		log.Fatal(err)
+	}
 	if err := c.Connect(ctx); err != nil {
 		log.Fatal(err)
 	}
 
-	defer c.Close()
+	defer c.Close(ctx)
 
 	m, err := monitor.NewNodeMonitor(c)
 	if err != nil {
@@ -87,11 +85,11 @@ func main() {
 
 	// start callback-based subscription
 	wg.Add(1)
-	go startCallbackSub(ctx, m, subInterval, 0, wg, *nodeID)
+	go startCallbackSub(ctx, m, *interval, 0, wg, *nodeID)
 
 	// start channel-based subscription
 	wg.Add(1)
-	go startChanSub(ctx, m, subInterval, 0, wg, *nodeID)
+	go startChanSub(ctx, m, *interval, 0, wg, *nodeID)
 
 	<-ctx.Done()
 	wg.Wait()
@@ -117,7 +115,7 @@ func startCallbackSub(ctx context.Context, m *monitor.NodeMonitor, interval, lag
 		log.Fatal(err)
 	}
 
-	defer cleanup(sub, wg)
+	defer cleanup(ctx, sub, wg)
 
 	<-ctx.Done()
 }
@@ -130,7 +128,7 @@ func startChanSub(ctx context.Context, m *monitor.NodeMonitor, interval, lag tim
 		log.Fatal(err)
 	}
 
-	defer cleanup(sub, wg)
+	defer cleanup(ctx, sub, wg)
 
 	for {
 		select {
@@ -147,8 +145,8 @@ func startChanSub(ctx context.Context, m *monitor.NodeMonitor, interval, lag tim
 	}
 }
 
-func cleanup(sub *monitor.Subscription, wg *sync.WaitGroup) {
+func cleanup(ctx context.Context, sub *monitor.Subscription, wg *sync.WaitGroup) {
 	log.Printf("stats: sub=%d delivered=%d dropped=%d", sub.SubscriptionID(), sub.Delivered(), sub.Dropped())
-	sub.Unsubscribe()
+	sub.Unsubscribe(ctx)
 	wg.Done()
 }

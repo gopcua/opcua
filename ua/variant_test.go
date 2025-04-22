@@ -10,9 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gopcua/opcua/errors"
-
-	"github.com/pascaldekloe/goe/verify"
+	"github.com/stretchr/testify/require"
 )
 
 func TestVariant(t *testing.T) {
@@ -206,12 +204,8 @@ func TestVariant(t *testing.T) {
 			},
 		},
 		{
-			Name: "ExpandedNodeID",
-			Struct: MustVariant(NewExpandedNodeID(
-				true, false,
-				NewTwoByteNodeID(0xff),
-				"foobar", 0,
-			)),
+			Name:   "ExpandedNodeID",
+			Struct: MustVariant(NewExpandedNodeID(NewTwoByteNodeID(0xff), "foobar", 0)),
 			Bytes: []byte{
 				// variant encoding mask
 				0x12,
@@ -452,49 +446,70 @@ func TestVariant(t *testing.T) {
 				0x01, 0x00, 0x00, 0x00,
 			},
 		},
+		{
+			Name:   "ByteArray",
+			Struct: MustVariant(ByteArray{0x01, 0x02, 0x03}),
+			Bytes: []byte{
+				// variant encoding mask
+				0x83,
+				// array length
+				0x03, 0x00, 0x00, 0x00,
+				// array values
+				0x01, 0x02, 0x03,
+			},
+		},
+		{
+			Name:   "[]ByteArray",
+			Struct: MustVariant([]ByteArray{{0x01}, {0x02}, {0x03}}),
+			Bytes: []byte{
+				// variant encoding mask
+				0xc3,
+				// array length
+				0x03, 0x00, 0x00, 0x00,
+				// array values
+				0x01, 0x02, 0x03,
+				// array dimensions length
+				0x02, 0x00, 0x00, 0x00,
+				// array dimensions
+				0x03, 0x00, 0x00, 0x00,
+				0x01, 0x00, 0x00, 0x00,
+			},
+		},
+		{
+			Name:   "[]string(nil)",
+			Struct: MustVariant([]string(nil)),
+			Bytes: []byte{
+				// variant encoding mask
+				0x8c,
+				// array length
+				0xff, 0xff, 0xff, 0xff,
+			},
+		},
 	}
 	RunCodecTest(t, cases)
 }
 
 func TestMustVariant(t *testing.T) {
 	t.Run("int", func(t *testing.T) {
-		defer func() {
-			if r := recover(); r == nil {
-				t.Fatalf("MustVariant(int) did not panic")
-			}
-		}()
-		MustVariant(int(5))
+		require.Panics(t, func() { MustVariant(int(5)) })
 	})
 	t.Run("uint", func(t *testing.T) {
-		defer func() {
-			if r := recover(); r == nil {
-				t.Fatalf("MustVariant(uint) did not panic")
-			}
-		}()
-		MustVariant(uint(5))
+		require.Panics(t, func() { MustVariant(uint(5)) })
 	})
 }
 
 func TestArray(t *testing.T) {
 	t.Run("one-dimension", func(t *testing.T) {
 		v := MustVariant([]uint32{1, 2, 3})
-		if got, want := v.ArrayLength(), int32(3); got != want {
-			t.Fatalf("got length %d want %d", got, want)
-		}
-		if got, want := v.EncodingMask(), byte(TypeIDUint32|VariantArrayValues); got != want {
-			t.Fatalf("got mask %d want %d", got, want)
-		}
-		verify.Values(t, "", v.ArrayDimensions(), []int32{})
+		require.Equal(t, int32(3), v.ArrayLength(), "ArrayLength not equal")
+		require.Equal(t, byte(TypeIDUint32|VariantArrayValues), v.EncodingMask(), "EncodingMask not equal")
+		require.Equal(t, []int32(nil), v.ArrayDimensions())
 	})
 	t.Run("multi-dimension", func(t *testing.T) {
 		v := MustVariant([][]uint32{{1, 1}, {2, 2}, {3, 3}})
-		if got, want := v.ArrayLength(), int32(6); got != want {
-			t.Fatalf("got length %d want %d", got, want)
-		}
-		if got, want := v.EncodingMask(), byte(TypeIDUint32|VariantArrayValues|VariantArrayDimensions); got != want {
-			t.Fatalf("got mask %d want %d", got, want)
-		}
-		verify.Values(t, "", v.ArrayDimensions(), []int32{3, 2})
+		require.Equal(t, int32(6), v.ArrayLength(), "ArrayLength not equal")
+		require.Equal(t, byte(TypeIDUint32|VariantArrayValues|VariantArrayDimensions), v.EncodingMask(), "EncodingMask not equal")
+		require.Equal(t, []int32{3, 2}, v.ArrayDimensions())
 	})
 	t.Run("unbalanced", func(t *testing.T) {
 		b := []byte{
@@ -514,22 +529,7 @@ func TestArray(t *testing.T) {
 		}
 
 		_, err := Decode(b, MustVariant([]uint32{0}))
-		if got, want := err, errUnbalancedSlice; !errors.Equal(got, want) {
-			t.Fatalf("got error %#v want %#v", got, want)
-		}
-	})
-	t.Run("length negative", func(t *testing.T) {
-		b := []byte{
-			// variant encoding mask
-			0x87,
-			// array length
-			0xff, 0xff, 0xff, 0xff, // -1
-		}
-
-		_, err := Decode(b, MustVariant([]uint32{0}))
-		if got, want := err, StatusBadEncodingLimitsExceeded; !errors.Equal(got, want) {
-			t.Fatalf("got error %#v want %#v", got, want)
-		}
+		require.ErrorIs(t, err, errUnbalancedSlice)
 	})
 	t.Run("length too big", func(t *testing.T) {
 		b := []byte{
@@ -542,9 +542,7 @@ func TestArray(t *testing.T) {
 		}
 
 		_, err := Decode(b, MustVariant([]uint32{0}))
-		if got, want := err, StatusBadEncodingLimitsExceeded; !errors.Equal(got, want) {
-			t.Fatalf("got error %v want %v", err, StatusBadEncodingLimitsExceeded)
-		}
+		require.ErrorIs(t, err, StatusBadEncodingLimitsExceeded)
 	})
 	t.Run("dimensions length negative", func(t *testing.T) {
 		b := []byte{
@@ -563,9 +561,7 @@ func TestArray(t *testing.T) {
 		}
 
 		_, err := Decode(b, MustVariant([]uint32{0}))
-		if got, want := err, StatusBadEncodingLimitsExceeded; !errors.Equal(got, want) {
-			t.Fatalf("got error %#v want %#v", got, want)
-		}
+		require.ErrorIs(t, err, StatusBadEncodingLimitsExceeded)
 	})
 	t.Run("dimensions negative", func(t *testing.T) {
 		b := []byte{
@@ -584,9 +580,7 @@ func TestArray(t *testing.T) {
 		}
 
 		_, err := Decode(b, MustVariant([]uint32{0}))
-		if got, want := err, StatusBadEncodingLimitsExceeded; !errors.Equal(got, want) {
-			t.Fatalf("got error %#v want %#v", got, want)
-		}
+		require.ErrorIs(t, err, StatusBadEncodingLimitsExceeded)
 	})
 	t.Run("dimensions zero", func(t *testing.T) {
 		b := []byte{
@@ -603,9 +597,7 @@ func TestArray(t *testing.T) {
 		}
 
 		_, err := Decode(b, MustVariant([][]uint32{{}, {}}))
-		if got, want := err, StatusBadEncodingLimitsExceeded; !errors.Equal(got, want) {
-			t.Fatalf("got error %#v want %#v", got, want)
-		}
+		require.ErrorIs(t, err, StatusBadEncodingLimitsExceeded)
 	})
 }
 
@@ -635,6 +627,24 @@ func TestSet(t *testing.T) {
 				mask:        byte(VariantArrayValues | TypeIDByteString),
 				arrayLength: 2,
 				value:       [][]byte{{0xca, 0xfe}, {0xaf, 0xfe}},
+			},
+		},
+		{
+			v: ByteArray{0xca, 0xfe},
+			va: &Variant{
+				mask:        byte(VariantArrayValues | TypeIDByte),
+				arrayLength: 2,
+				value:       ByteArray{0xca, 0xfe},
+			},
+		},
+		{
+			v: []ByteArray{{0xca}, {0xfe}},
+			va: &Variant{
+				mask:                  byte(VariantArrayDimensions | VariantArrayValues | TypeIDByte),
+				arrayLength:           2,
+				arrayDimensionsLength: 2,
+				arrayDimensions:       []int32{2, 1},
+				value:                 []ByteArray{{0xca}, {0xfe}},
 			},
 		},
 		{
@@ -685,10 +695,12 @@ func TestSet(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(fmt.Sprintf("%T", tt.v), func(t *testing.T) {
 			va, err := NewVariant(tt.v)
-			if got, want := err, tt.err; got != want {
-				t.Fatalf("got error %v want %v", got, want)
-			}
-			verify.Values(t, "variant", va, tt.va)
+			require.Equal(t, tt.err, err)
+			require.Equal(t, tt.va.mask, va.mask)
+			require.Equal(t, tt.va.arrayLength, va.arrayLength)
+			require.Equal(t, tt.va.arrayDimensionsLength, va.arrayDimensionsLength)
+			require.Equal(t, tt.va.arrayDimensions, va.arrayDimensions)
+			require.Equal(t, tt.va.value, va.value)
 		})
 	}
 }
@@ -745,6 +757,18 @@ func TestSliceDim(t *testing.T) {
 			dim: []int32{3, 0},
 			len: 0,
 		},
+		{
+			v:   ByteArray{},
+			et:  reflect.TypeOf(byte(0)),
+			dim: []int32{0},
+			len: 0,
+		},
+		{
+			v:   []ByteArray{{}, {}, {}},
+			et:  reflect.TypeOf(byte(0)),
+			dim: []int32{3, 0},
+			len: 0,
+		},
 
 		// error flows
 		{
@@ -756,18 +780,10 @@ func TestSliceDim(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(fmt.Sprintf("%T", tt.v), func(t *testing.T) {
 			et, dim, len, err := sliceDim(reflect.ValueOf(tt.v))
-			if got, want := err, tt.err; got != want {
-				t.Fatalf("got error %v want %v", got, want)
-			}
-			if got, want := et, tt.et; got != want {
-				t.Fatalf("got type %v want %v", got, want)
-			}
-			if got, want := dim, tt.dim; !reflect.DeepEqual(got, want) {
-				t.Fatalf("got dimensions %v want %v", got, want)
-			}
-			if got, want := len, tt.len; got != want {
-				t.Fatalf("got len %v want %v", got, want)
-			}
+			require.Equal(t, tt.err, err)
+			require.Equal(t, tt.et, et)
+			require.Equal(t, tt.dim, dim)
+			require.Equal(t, tt.len, len)
 		})
 	}
 }
@@ -776,17 +792,14 @@ func TestVariantUnsupportedType(t *testing.T) {
 	tests := []interface{}{int(5), uint(5)}
 	for _, v := range tests {
 		t.Run(fmt.Sprintf("%T", v), func(t *testing.T) {
-			if _, err := NewVariant(v); err == nil {
-				t.Fatal("got nil want err")
-			}
+			_, err := NewVariant(v)
+			require.Error(t, err)
 		})
 	}
 }
 
 func TestVariantValueMethod(t *testing.T) {
-	if got, want := MustVariant(int32(5)).Value().(int32), int32(5); got != want {
-		t.Fatalf("got %d want %d", got, want)
-	}
+	require.Equal(t, int32(5), MustVariant(int32(5)).Value().(int32))
 }
 
 func TestVariantValueHelpers(t *testing.T) {
@@ -908,6 +921,18 @@ func TestVariantValueHelpers(t *testing.T) {
 			v:    uint64(5),
 			want: uint64(5),
 			fn:   func(v *Variant) interface{} { return v.Uint() },
+		},
+
+		// ByteArray
+		{
+			v:    false,
+			want: (ByteArray)(nil),
+			fn:   func(v *Variant) interface{} { return v.ByteArray() },
+		},
+		{
+			v:    ByteArray("abc"),
+			want: ByteArray("abc"),
+			fn:   func(v *Variant) interface{} { return v.ByteArray() },
 		},
 
 		// ByteString
@@ -1108,6 +1133,13 @@ func TestVariantValueHelpers(t *testing.T) {
 			fn:   func(v *Variant) interface{} { return v.ByteString() },
 		},
 
+		// []ByteArray
+		{
+			v:    []ByteArray{{'x', 'y', 'z'}},
+			want: (ByteArray)(nil),
+			fn:   func(v *Variant) interface{} { return v.ByteArray() },
+		},
+
 		// []*DataValue
 		{
 			v:    []*DataValue{{Status: StatusBad}},
@@ -1195,7 +1227,7 @@ func TestVariantValueHelpers(t *testing.T) {
 	for i, tt := range tests {
 		name := fmt.Sprintf("test-%d %T -> %T", i, tt.v, tt.want)
 		t.Run(name, func(t *testing.T) {
-			verify.Values(t, "", tt.fn(MustVariant(tt.v)), tt.want)
+			require.Equal(t, tt.want, tt.fn(MustVariant(tt.v)))
 		})
 	}
 }
@@ -1208,7 +1240,5 @@ func TestDecodeInvalidType(t *testing.T) {
 
 	v := &Variant{}
 	_, err := v.Decode(b)
-	if got, want := err, errors.New("invalid type id: 32"); !errors.Equal(got, want) {
-		t.Fatalf("got error %s want %s", got, want)
-	}
+	require.EqualError(t, err, "opcua: invalid type id: 32")
 }

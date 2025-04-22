@@ -45,13 +45,13 @@ func join(a, b string) string {
 	return a + "." + b
 }
 
-func browse(n *opcua.Node, path string, level int) ([]NodeDef, error) {
+func browse(ctx context.Context, n *opcua.Node, path string, level int) ([]NodeDef, error) {
 	// fmt.Printf("node:%s path:%q level:%d\n", n, path, level)
 	if level > 10 {
 		return nil, nil
 	}
 
-	attrs, err := n.Attributes(ua.AttributeIDNodeClass, ua.AttributeIDBrowseName, ua.AttributeIDDescription, ua.AttributeIDAccessLevel, ua.AttributeIDDataType)
+	attrs, err := n.Attributes(ctx, ua.AttributeIDNodeClass, ua.AttributeIDBrowseName, ua.AttributeIDDescription, ua.AttributeIDAccessLevel, ua.AttributeIDDataType)
 	if err != nil {
 		return nil, err
 	}
@@ -138,13 +138,13 @@ func browse(n *opcua.Node, path string, level int) ([]NodeDef, error) {
 	}
 
 	browseChildren := func(refType uint32) error {
-		refs, err := n.ReferencedNodes(refType, ua.BrowseDirectionForward, ua.NodeClassAll, true)
+		refs, err := n.ReferencedNodes(ctx, refType, ua.BrowseDirectionForward, ua.NodeClassAll, true)
 		if err != nil {
 			return errors.Errorf("References: %d: %s", refType, err)
 		}
 		// fmt.Printf("found %d child refs\n", len(refs))
 		for _, rn := range refs {
-			children, err := browse(rn, def.Path, level+1)
+			children, err := browse(ctx, rn, def.Path, level+1)
 			if err != nil {
 				return errors.Errorf("browse children: %s", err)
 			}
@@ -174,18 +174,21 @@ func main() {
 
 	ctx := context.Background()
 
-	c := opcua.NewClient(*endpoint)
+	c, err := opcua.NewClient(*endpoint)
+	if err != nil {
+		log.Fatal(err)
+	}
 	if err := c.Connect(ctx); err != nil {
 		log.Fatal(err)
 	}
-	defer c.Close()
+	defer c.Close(ctx)
 
 	id, err := ua.ParseNodeID(*nodeID)
 	if err != nil {
 		log.Fatalf("invalid node id: %s", err)
 	}
 
-	nodeList, err := browse(c.Node(id), "", 0)
+	nodeList, err := browse(ctx, c.Node(id), "", 0)
 	if err != nil {
 		log.Fatal(err)
 	}

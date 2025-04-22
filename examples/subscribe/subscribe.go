@@ -26,31 +26,28 @@ func main() {
 		keyFile  = flag.String("key", "", "Path to private key.pem. Required for security mode/policy != None")
 		nodeID   = flag.String("node", "", "node id to subscribe to")
 		event    = flag.Bool("event", false, "subscribe to node event changes (Default: node value changes)")
-		interval = flag.String("interval", opcua.DefaultSubscriptionInterval.String(), "subscription interval")
+		interval = flag.Duration("interval", opcua.DefaultSubscriptionInterval, "subscription interval")
 	)
 	flag.BoolVar(&debug.Enable, "debug", false, "enable debug logging")
 	flag.Parse()
 	log.SetFlags(0)
-
-	subInterval, err := time.ParseDuration(*interval)
-	if err != nil {
-		log.Fatal(err)
-	}
 
 	// add an arbitrary timeout to demonstrate how to stop a subscription
 	// with a context.
 	d := 60 * time.Second
 	ctx, cancel := context.WithTimeout(context.Background(), d)
 	defer cancel()
+	log.Printf("Subscription will stop after %s for demonstration purposes", d)
 
-	endpoints, err := opcua.GetEndpoints(*endpoint)
+	endpoints, err := opcua.GetEndpoints(ctx, *endpoint)
 	if err != nil {
 		log.Fatal(err)
 	}
-	ep := opcua.SelectEndpoint(endpoints, *policy, ua.MessageSecurityModeFromString(*mode))
-	if ep == nil {
-		log.Fatal("Failed to find suitable endpoint")
+	ep, err := opcua.SelectEndpoint(endpoints, *policy, ua.MessageSecurityModeFromString(*mode))
+	if err != nil {
+		log.Fatal(err)
 	}
+	ep.EndpointURL = *endpoint
 
 	fmt.Println("*", ep.SecurityPolicyURI, ep.SecurityMode)
 
@@ -63,21 +60,24 @@ func main() {
 		opcua.SecurityFromEndpoint(ep, ua.UserTokenTypeAnonymous),
 	}
 
-	c := opcua.NewClient(ep.EndpointURL, opts...)
+	c, err := opcua.NewClient(ep.EndpointURL, opts...)
+	if err != nil {
+		log.Fatal(err)
+	}
 	if err := c.Connect(ctx); err != nil {
 		log.Fatal(err)
 	}
-	defer c.Close()
+	defer c.Close(ctx)
 
 	notifyCh := make(chan *opcua.PublishNotificationData)
 
-	sub, err := c.Subscribe(&opcua.SubscriptionParameters{
-		Interval: subInterval,
+	sub, err := c.Subscribe(ctx, &opcua.SubscriptionParameters{
+		Interval: *interval,
 	}, notifyCh)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer sub.Cancel()
+	defer sub.Cancel(ctx)
 	log.Printf("Created subscription with id %v", sub.SubscriptionID)
 
 	id, err := ua.ParseNodeID(*nodeID)
@@ -92,12 +92,18 @@ func main() {
 	} else {
 		miCreateRequest = valueRequest(id)
 	}
-	res, err := sub.Monitor(ua.TimestampsToReturnBoth, miCreateRequest)
+	res, err := sub.Monitor(ctx, ua.TimestampsToReturnBoth, miCreateRequest)
 	if err != nil || res.Results[0].StatusCode != ua.StatusOK {
 		log.Fatal(err)
 	}
 
-	go sub.Run(ctx) // start Publish loop
+	// Uncomment the following to try modifying the subscription
+	//
+	// var params opcua.SubscriptionParameters
+	// params.Interval = time.Millisecond * 2000
+	// if _, err := sub.ModifySubscription(ctx, params); err != nil {
+	// 	log.Fatal(err)
+	// }
 
 	// read from subscription's notification channel until ctx is cancelled
 	for {

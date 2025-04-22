@@ -25,11 +25,14 @@ func main() {
 
 	ctx := context.Background()
 
-	c := opcua.NewClient(*endpoint)
+	c, err := opcua.NewClient(*endpoint)
+	if err != nil {
+		log.Fatal(err)
+	}
 	if err := c.Connect(ctx); err != nil {
 		log.Fatal(err)
 	}
-	defer c.Close()
+	defer c.Close(ctx)
 
 	id, err := ua.ParseNodeID(*nodeID)
 	if err != nil {
@@ -37,19 +40,19 @@ func main() {
 	}
 
 	n := c.Node(id)
-	accessLevel, err := n.AccessLevel()
+	accessLevel, err := n.AccessLevel(ctx)
 	if err != nil {
 		log.Fatal(err)
 	}
 	log.Print("AccessLevel: ", accessLevel)
 
-	userAccessLevel, err := n.UserAccessLevel()
+	userAccessLevel, err := n.UserAccessLevel(ctx)
 	if err != nil {
 		log.Fatal(err)
 	}
 	log.Print("UserAccessLevel: ", userAccessLevel)
 
-	v, err := n.Value()
+	v, err := n.Value(ctx)
 	switch {
 	case err != nil:
 		log.Fatal(err)

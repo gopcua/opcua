@@ -27,16 +27,11 @@ func main() {
 		triggerNodeID = flag.String("trigger", "", "node id to trigger with")
 		reportNodeID  = flag.String("report", "", "node id value to report on trigger")
 		filter        = flag.String("filter", "timestamp", "DataFilter: status, value, timestamp.")
-		interval      = flag.String("interval", opcua.DefaultSubscriptionInterval.String(), "subscription interval")
+		interval      = flag.Duration("interval", opcua.DefaultSubscriptionInterval, "subscription interval")
 	)
 	flag.BoolVar(&debug.Enable, "debug", false, "enable debug logging")
 	flag.Parse()
 	log.SetFlags(0)
-
-	subInterval, err := time.ParseDuration(*interval)
-	if err != nil {
-		log.Fatal(err)
-	}
 
 	// add an arbitrary timeout to demonstrate how to stop a subscription
 	// with a context.
@@ -44,13 +39,13 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), d)
 	defer cancel()
 
-	endpoints, err := opcua.GetEndpoints(*endpoint)
+	endpoints, err := opcua.GetEndpoints(ctx, *endpoint)
 	if err != nil {
 		log.Fatal(err)
 	}
-	ep := opcua.SelectEndpoint(endpoints, *policy, ua.MessageSecurityModeFromString(*mode))
-	if ep == nil {
-		log.Fatal("Failed to find suitable endpoint")
+	ep, err := opcua.SelectEndpoint(endpoints, *policy, ua.MessageSecurityModeFromString(*mode))
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	fmt.Println("*", ep.SecurityPolicyURI, ep.SecurityMode)
@@ -64,21 +59,24 @@ func main() {
 		opcua.SecurityFromEndpoint(ep, ua.UserTokenTypeAnonymous),
 	}
 
-	c := opcua.NewClient(ep.EndpointURL, opts...)
+	c, err := opcua.NewClient(ep.EndpointURL, opts...)
+	if err != nil {
+		log.Fatal(err)
+	}
 	if err := c.Connect(ctx); err != nil {
 		log.Fatal(err)
 	}
-	defer c.Close()
+	defer c.Close(ctx)
 
 	notifyCh := make(chan *opcua.PublishNotificationData)
 
-	sub, err := c.Subscribe(&opcua.SubscriptionParameters{
-		Interval: subInterval,
+	sub, err := c.Subscribe(ctx, &opcua.SubscriptionParameters{
+		Interval: *interval,
 	}, notifyCh)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer sub.Cancel()
+	defer sub.Cancel(ctx)
 	log.Printf("Created subscription with id %v", sub.SubscriptionID)
 
 	triggeringNode, err := ua.ParseNodeID(*triggerNodeID)
@@ -110,15 +108,13 @@ func main() {
 		},
 	}
 
-	subRes, err := sub.Monitor(ua.TimestampsToReturnBoth, miCreateRequests...)
+	subRes, err := sub.Monitor(ctx, ua.TimestampsToReturnBoth, miCreateRequests...)
 	if err != nil || subRes.Results[0].StatusCode != ua.StatusOK {
 		log.Fatal(err)
 	}
 
-	go sub.Run(ctx) // start Publish loop
-
 	triggeringServerID, triggeredServerID := subRes.Results[0].MonitoredItemID, subRes.Results[1].MonitoredItemID
-	tRes, err := sub.SetTriggering(triggeringServerID, []uint32{triggeredServerID}, nil)
+	tRes, err := sub.SetTriggering(ctx, triggeringServerID, []uint32{triggeredServerID}, nil)
 
 	if err != nil {
 		log.Fatal(err)
