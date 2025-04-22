@@ -38,8 +38,8 @@ func TestResolveEndpoint(t *testing.T) {
 			"",
 		},
 		{ // Valid, hostname resolved
-			// note: xip.io is hosted by Basecamp (see: https://github.com/basecamp/xip-pdns)
-			"opc.tcp://www.1.1.1.1.xip.io:4840/foo/bar",
+			// note: see https://github.com/cunnie/sslip.io
+			"opc.tcp://www.1.1.1.1.sslip.io:4840/foo/bar",
 			"tcp",
 			&url.URL{
 				Scheme: "opc.tcp",
