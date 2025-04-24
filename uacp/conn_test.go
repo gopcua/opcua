@@ -17,7 +17,7 @@ import (
 func TestConn(t *testing.T) {
 	t.Run("server exists ", func(t *testing.T) {
 		ep := "opc.tcp://127.0.0.1:4840/foo/bar"
-		ln, err := Listen(ep, nil)
+		ln, err := Listen(context.Background(), ep, nil)
 		require.NoError(t, err)
 		defer ln.Close()
 
@@ -64,7 +64,7 @@ func TestConn(t *testing.T) {
 
 func TestClientWrite(t *testing.T) {
 	ep := "opc.tcp://127.0.0.1:4840/foo/bar"
-	ln, err := Listen(ep, nil)
+	ln, err := Listen(context.Background(), ep, nil)
 	require.NoError(t, err, "Listen failed")
 	defer ln.Close()
 
@@ -118,7 +118,7 @@ NEXT:
 
 func TestServerWrite(t *testing.T) {
 	ep := "opc.tcp://127.0.0.1:4840/foo/bar"
-	ln, err := Listen(ep, nil)
+	ln, err := Listen(context.Background(), ep, nil)
 	require.NoError(t, err, "Listen failed")
 	defer ln.Close()
 
