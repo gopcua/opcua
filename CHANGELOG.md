@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.7.5 (24 Apr 2025)
+
+* Add test for method call with no inputs and an array of extobjs as output (#770)
+* Server: Ignore trailing slashes when checking matching endpoints (#788)
+
+## v0.7.4 (7 Apr 2025)
+
+* Removed hardcoded SecurityMode in SecureChannel readChunk method (#780)
+* Obey access levels in the server (#778, #776)
+
 ## v0.7.3 (7 Apr 2025)
 
 ### v0.7.2 changes
