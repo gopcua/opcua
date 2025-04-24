@@ -778,10 +778,7 @@ func TestOptions(t *testing.T) {
 			opt:  MaxMessageSize(5),
 			cfg: &Config{
 				dialer: func() *uacp.Dialer {
-					d := &uacp.Dialer{
-						Dialer:    &net.Dialer{},
-						ClientACK: uacp.DefaultClientACK,
-					}
+					d := DefaultDialer()
 					d.ClientACK.MaxMessageSize = 5
 					return d
 				}(),
@@ -792,10 +789,7 @@ func TestOptions(t *testing.T) {
 			opt:  MaxChunkCount(5),
 			cfg: &Config{
 				dialer: func() *uacp.Dialer {
-					d := &uacp.Dialer{
-						Dialer:    &net.Dialer{},
-						ClientACK: uacp.DefaultClientACK,
-					}
+					d := DefaultDialer()
 					d.ClientACK.MaxChunkCount = 5
 					return d
 				}(),
@@ -806,10 +800,7 @@ func TestOptions(t *testing.T) {
 			opt:  ReceiveBufferSize(5),
 			cfg: &Config{
 				dialer: func() *uacp.Dialer {
-					d := &uacp.Dialer{
-						Dialer:    &net.Dialer{},
-						ClientACK: uacp.DefaultClientACK,
-					}
+					d := DefaultDialer()
 					d.ClientACK.ReceiveBufSize = 5
 					return d
 				}(),
@@ -820,10 +811,7 @@ func TestOptions(t *testing.T) {
 			opt:  SendBufferSize(5),
 			cfg: &Config{
 				dialer: func() *uacp.Dialer {
-					d := &uacp.Dialer{
-						Dialer:    &net.Dialer{},
-						ClientACK: uacp.DefaultClientACK,
-					}
+					d := DefaultDialer()
 					d.ClientACK.SendBufSize = 5
 					return d
 				}(),
@@ -833,6 +821,9 @@ func TestOptions(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.cfg.dialer == nil {
+				tt.cfg.dialer = DefaultDialer()
+			}
 			if tt.cfg.sechan == nil {
 				tt.cfg.sechan = DefaultClientConfig()
 			}

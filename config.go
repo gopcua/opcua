@@ -23,6 +23,10 @@ import (
 	"github.com/gopcua/opcua/uasc"
 )
 
+const (
+	DefaultDialTimeout = 10 * time.Second
+)
+
 // DefaultClientConfig returns the default configuration for a client
 // to establish a secure channel.
 func DefaultClientConfig() *uasc.Config {
@@ -60,21 +64,28 @@ type Config struct {
 	stateCh chan<- ConnState
 }
 
-// NewDialer creates a uacp.Dialer from the config options
-func NewDialer(cfg *Config) *uacp.Dialer {
-	if cfg.dialer == nil {
-		return &uacp.Dialer{}
+func DefaultDialer() *uacp.Dialer {
+	return &uacp.Dialer{
+		Dialer: &net.Dialer{
+			Timeout: DefaultDialTimeout,
+		},
+		ClientACK: uacp.DefaultClientACK,
 	}
-	return cfg.dialer
+}
+
+func newConfig() *Config {
+	return &Config{
+		dialer:  DefaultDialer(),
+		sechan:  DefaultClientConfig(),
+		session: DefaultSessionConfig(),
+	}
 }
 
 // ApplyConfig applies the config options to the default configuration.
 // todo(fs): Can we find a better name?
 func ApplyConfig(opts ...Option) (*Config, error) {
-	cfg := &Config{
-		sechan:  DefaultClientConfig(),
-		session: DefaultSessionConfig(),
-	}
+	cfg := newConfig()
+
 	var errs []error
 	for _, opt := range opts {
 		if err := opt(cfg); err != nil {
@@ -513,7 +524,6 @@ func RequestTimeout(t time.Duration) Option {
 // Dialer sets the uacp.Dialer to establish the connection to the server.
 func Dialer(d *uacp.Dialer) Option {
 	return func(cfg *Config) error {
-		initDialer(cfg)
 		cfg.dialer = d
 		return nil
 	}
@@ -523,7 +533,6 @@ func Dialer(d *uacp.Dialer) Option {
 // Defaults to DefaultDialTimeout. Set to zero for no timeout.
 func DialTimeout(d time.Duration) Option {
 	return func(cfg *Config) error {
-		initDialer(cfg)
 		cfg.dialer.Dialer.Timeout = d
 		return nil
 	}
@@ -532,7 +541,6 @@ func DialTimeout(d time.Duration) Option {
 // MaxMessageSize sets the maximum message size for the UACP handshake.
 func MaxMessageSize(n uint32) Option {
 	return func(cfg *Config) error {
-		initDialer(cfg)
 		cfg.dialer.ClientACK.MaxMessageSize = n
 		return nil
 	}
@@ -541,7 +549,6 @@ func MaxMessageSize(n uint32) Option {
 // MaxChunkCount sets the maximum chunk count for the UACP handshake.
 func MaxChunkCount(n uint32) Option {
 	return func(cfg *Config) error {
-		initDialer(cfg)
 		cfg.dialer.ClientACK.MaxChunkCount = n
 		return nil
 	}
@@ -550,7 +557,6 @@ func MaxChunkCount(n uint32) Option {
 // ReceiveBufferSize sets the receive buffer size for the UACP handshake.
 func ReceiveBufferSize(n uint32) Option {
 	return func(cfg *Config) error {
-		initDialer(cfg)
 		cfg.dialer.ClientACK.ReceiveBufSize = n
 		return nil
 	}
@@ -559,7 +565,6 @@ func ReceiveBufferSize(n uint32) Option {
 // SendBufferSize sets the send buffer size for the UACP handshake.
 func SendBufferSize(n uint32) Option {
 	return func(cfg *Config) error {
-		initDialer(cfg)
 		cfg.dialer.ClientACK.SendBufSize = n
 		return nil
 	}
@@ -573,17 +578,5 @@ func StateChangedCh(ch chan<- ConnState) Option {
 	return func(cfg *Config) error {
 		cfg.stateCh = ch
 		return nil
-	}
-}
-
-func initDialer(cfg *Config) {
-	if cfg.dialer == nil {
-		cfg.dialer = &uacp.Dialer{}
-	}
-	if cfg.dialer.Dialer == nil {
-		cfg.dialer.Dialer = &net.Dialer{}
-	}
-	if cfg.dialer.ClientACK == nil {
-		cfg.dialer.ClientACK = uacp.DefaultClientACK
 	}
 }

@@ -26,7 +26,6 @@ const (
 	DefaultSendBufSize    = 0xffff
 	DefaultMaxChunkCount  = 512
 	DefaultMaxMessageSize = 2 * MB
-	DefaultDialTimeout    = time.Second * 10
 )
 
 var (
@@ -79,7 +78,7 @@ func (d *Dialer) Dial(ctx context.Context, endpoint string) (*Conn, error) {
 	if dl == nil {
 		dl = &net.Dialer{}
 
-}
+	}
 
 	c, err := dl.DialContext(ctx, "tcp", raddr.Host)
 	if err != nil {
