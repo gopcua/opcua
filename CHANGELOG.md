@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.8.0 (24 Apr 2025)
+
+* add DialTimeout and cleanup ResolveEndpoint (#372)
+
 ## v0.7.5 (24 Apr 2025)
 
 * Add test for method call with no inputs and an array of extobjs as output (#770)
