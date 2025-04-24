@@ -6,6 +6,8 @@ package uacp
 
 import (
 	"context"
+	"github.com/stretchr/testify/require"
+	_ "github.com/stretchr/testify/require"
 	"net/url"
 	"testing"
 )
@@ -63,20 +65,12 @@ func TestResolveEndpoint(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		var errStr string
 		network, u, err := ResolveEndpoint(context.Background(), c.input)
-		if err != nil {
-			errStr = err.Error()
-			if got, want := errStr, c.errStr; got != want {
-				t.Fatalf("got error %q want %q", got, want)
-			}
+		if c.errStr != "" {
+			require.EqualError(t, err, c.errStr)
 		} else {
-			if got, want := network, c.network; got != want {
-				t.Fatalf("got network %q want %q", got, want)
-			}
-			if got, want := u.String(), c.u.String(); got != want {
-				t.Fatalf("got addr %q want %q", got, want)
-			}
+			require.Equal(t, c.network, network)
+			require.Equal(t, c.u, u)
 		}
 	}
 }
