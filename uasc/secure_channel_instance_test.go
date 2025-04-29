@@ -82,7 +82,7 @@ func TestSetMaximumBodySize_Padding(t *testing.T) {
 			require.NoError(t, err)
 
 			ch := &channelInstance{algo: algo}
-			ch.SetMaximumBodySize(tt.messageSize)
+			ch.setMaximumBodySize(tt.messageSize)
 			require.NoError(t, err)
 			require.Equal(t, int(tt.expectedBody), int(ch.maxBodySize))
 		})

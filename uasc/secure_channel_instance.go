@@ -133,7 +133,7 @@ func (c *channelInstance) newMessage(srv interface{}, typeID uint16, requestID u
 	}
 }
 
-func (c *channelInstance) SetMaximumBodySize(chunkSize int) {
+func (c *channelInstance) setMaximumBodySize(chunkSize int) {
 	sequenceHeaderSize := 8
 	headerSize := 12
 	// symmetricAlgorithmHeader := 4
