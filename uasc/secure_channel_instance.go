@@ -146,8 +146,8 @@ func (c *channelInstance) SetMaximumBodySize(chunkSize int) {
 	// c.maxBodySize = uint32(maxBodySize)
 
 	// this is the formula proposed by ERN - source node-opcua
-	maxBlock := (chunkSize - headerSize) / c.algo.BlockSize()
-	maxBodySize := c.algo.PlaintextBlockSize()*maxBlock - sequenceHeaderSize - c.algo.SignatureLength() - 1
+	maxBlock := (chunkSize - headerSize - 1) / c.algo.BlockSize()
+	maxBodySize := c.algo.PlaintextBlockSize()*maxBlock - sequenceHeaderSize - c.algo.SignatureLength()
 	c.maxBodySize = uint32(maxBodySize)
 }
 
