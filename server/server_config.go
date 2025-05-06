@@ -27,7 +27,7 @@ func PrivateKey(key *rsa.PrivateKey) Option {
 	}
 }
 
-// EndPointHostName adds an additional endpoint to the server based on the host name.
+// EndPoint adds an additional endpoint to the server based on the host name.
 // A 0 port will let the OS select a random port (call [Server.URL] to retrieve the port).
 func EndPoint(host string, port int) Option {
 	return func(s *serverConfig) {
