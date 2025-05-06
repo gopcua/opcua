@@ -209,7 +209,6 @@ func (s *Server) AddNamespace(ns NameSpace) int {
 
 	if ns.ID() == 0 {
 		return 0
-
 	}
 
 	return len(s.namespaces) - 1
@@ -236,6 +235,12 @@ func (s *Server) URLs() []string {
 	return s.cfg.endpoints
 }
 
+// URL returns the resolved opc endpoint that the server is listening on.
+// Useful when a :0 port was provided.
+func (s *Server) URL() string {
+	return s.l.Endpoint()
+}
+
 // Start initializes and starts a Server listening on addr
 // If s was not initialized with NewServer(), addr defaults
 // to localhost:0 to let the OS select a random port
@@ -256,7 +261,7 @@ func (s *Server) Start(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	log.Printf("Started listening on %v", s.URLs())
+	log.Printf("Started listening on %v", s.URL())
 
 	s.initEndpoints()
 	s.setServerState(ua.ServerStateRunning)

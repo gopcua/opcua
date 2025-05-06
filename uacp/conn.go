@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/url"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -77,7 +79,6 @@ func (d *Dialer) Dial(ctx context.Context, endpoint string) (*Conn, error) {
 	dl := d.Dialer
 	if dl == nil {
 		dl = &net.Dialer{}
-
 	}
 
 	c, err := dl.DialContext(ctx, "tcp", raddr.Host)
@@ -133,6 +134,21 @@ func Listen(ctx context.Context, endpoint string, ack *Acknowledge) (*Listener, 
 	l, err := lc.Listen(ctx, "tcp", laddr.Host)
 	if err != nil {
 		return nil, err
+	}
+	if _, ok := strings.CutSuffix(laddr.Host, ":0"); ok {
+		// replace the :0 port with the actual port
+
+		// extract the port from the actual URL
+		actual := l.Addr().String()
+		port := actual[strings.LastIndexByte(actual, ':'):]
+
+		// set the port in the provided endpoint
+		u, err := url.Parse(endpoint)
+		if err != nil {
+			return nil, err // should never happen (checked in ResolveEndpoint)
+		}
+		u.Host = strings.TrimSuffix(u.Host, ":0") + port
+		endpoint = u.String()
 	}
 	return &Listener{
 		l:        l.(*net.TCPListener),
