@@ -120,7 +120,8 @@ type Listener struct {
 //
 // If the IP field of laddr is nil or an unspecified IP address, Listen listens
 // on all available unicast and anycast IP addresses of the local system.
-// If the Port field of laddr is 0, a port number is automatically chosen.
+// If the Port field of laddr is 0, a port number is automatically chosen
+// (can be retrieved with the Endpoint method).
 func Listen(ctx context.Context, endpoint string, ack *Acknowledge) (*Listener, error) {
 	if ack == nil {
 		ack = DefaultServerACK
@@ -135,26 +136,37 @@ func Listen(ctx context.Context, endpoint string, ack *Acknowledge) (*Listener, 
 	if err != nil {
 		return nil, err
 	}
-	if _, ok := strings.CutSuffix(laddr.Host, ":0"); ok {
-		// replace the :0 port with the actual port
 
-		// extract the port from the actual URL
-		actual := l.Addr().String()
-		port := actual[strings.LastIndexByte(actual, ':'):]
-
-		// set the port in the provided endpoint
-		u, err := url.Parse(endpoint)
-		if err != nil {
-			return nil, err // should never happen (checked in ResolveEndpoint)
-		}
-		u.Host = strings.TrimSuffix(u.Host, ":0") + port
-		endpoint = u.String()
+	// replace the :0 port with the actual port to allow the caller to know which port was chosen
+	endpoint, err = replaceZeroPort(endpoint, l.Addr())
+	if err != nil {
+		return nil, err // should never happen (validity already checked in ResolveEndpoint)
 	}
+
 	return &Listener{
 		l:        l.(*net.TCPListener),
 		ack:      ack,
 		endpoint: endpoint,
 	}, nil
+}
+
+// replaceZeroPort replaces the :0 port from endpoint with the port from the addr.
+func replaceZeroPort(endpoint string, addr net.Addr) (string, error) {
+	u, err := url.Parse(endpoint)
+	if err != nil {
+		return "", err
+	}
+	host, ok := strings.CutSuffix(u.Host, ":0")
+	if !ok {
+		return endpoint, nil // endpoint host does not end with :0: return as-is
+	}
+
+	// extract the port from the actual URL
+	actual := addr.String()
+	port := actual[strings.LastIndexByte(actual, ':'):]
+
+	u.Host = host + port
+	return u.String(), nil
 }
 
 // Accept accepts the next incoming call and returns the new connection.
