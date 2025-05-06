@@ -1031,6 +1031,13 @@ func TestVariantValueHelpers(t *testing.T) {
 			fn:   func(v *Variant) interface{} { return v.NodeID() },
 		},
 
+		// ExpandedNodeID
+		{
+			v:    NewExpandedNodeID(NewFourByteNodeID(1, 2), "uri", 1),
+			want: NewFourByteNodeID(1, 2),
+			fn:   func(v *Variant) interface{} { return v.NodeID() },
+		},
+
 		// QualifiedName
 		{
 			v:    false,
@@ -1227,7 +1234,7 @@ func TestVariantValueHelpers(t *testing.T) {
 	for i, tt := range tests {
 		name := fmt.Sprintf("test-%d %T -> %T", i, tt.v, tt.want)
 		t.Run(name, func(t *testing.T) {
-			require.Equal(t, tt.want, tt.fn(MustVariant(tt.v)))
+			require.EqualExportedValues(t, tt.want, tt.fn(MustVariant(tt.v)))
 		})
 	}
 }

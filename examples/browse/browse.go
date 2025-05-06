@@ -45,9 +45,11 @@ func join(a, b string) string {
 	return a + "." + b
 }
 
+const maxDepth = 10
+
 func browse(ctx context.Context, n *opcua.Node, path string, level int) ([]NodeDef, error) {
 	// fmt.Printf("node:%s path:%q level:%d\n", n, path, level)
-	if level > 10 {
+	if level > maxDepth {
 		return nil, nil
 	}
 
@@ -167,7 +169,7 @@ func browse(ctx context.Context, n *opcua.Node, path string, level int) ([]NodeD
 
 func main() {
 	endpoint := flag.String("endpoint", "opc.tcp://localhost:4840", "OPC UA Endpoint URL")
-	nodeID := flag.String("node", "", "node id for the root node")
+	nodeID := flag.String("node", "i=84", "node id for the root node") // i=84 is the standard root node
 	flag.BoolVar(&debug.Enable, "debug", false, "enable debug logging")
 	flag.Parse()
 	log.SetFlags(0)
