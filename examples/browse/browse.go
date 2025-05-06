@@ -45,9 +45,11 @@ func join(a, b string) string {
 	return a + "." + b
 }
 
+const maxDepth = 10
+
 func browse(ctx context.Context, n *opcua.Node, path string, level int) ([]NodeDef, error) {
 	// fmt.Printf("node:%s path:%q level:%d\n", n, path, level)
-	if level > 10 {
+	if level > maxDepth {
 		return nil, nil
 	}
 
