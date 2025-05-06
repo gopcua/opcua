@@ -96,7 +96,8 @@ type security struct {
 }
 
 // New returns an initialized OPC-UA server.
-// Call Start() afterwards to begin listening and serving connections
+// At least one [EndPoint] must be provided.
+// Call [Server.Start] afterwards to begin listening and serving connections
 func New(opts ...Option) *Server {
 	cfg := &serverConfig{
 		cap:              capabilities,
@@ -209,7 +210,6 @@ func (s *Server) AddNamespace(ns NameSpace) int {
 
 	if ns.ID() == 0 {
 		return 0
-
 	}
 
 	return len(s.namespaces) - 1
@@ -236,9 +236,12 @@ func (s *Server) URLs() []string {
 	return s.cfg.endpoints
 }
 
-// Start initializes and starts a Server listening on addr
-// If s was not initialized with NewServer(), addr defaults
-// to localhost:0 to let the OS select a random port
+// URL returns the resolved opc endpoint that the server is listening on.
+func (s *Server) URL() string {
+	return s.l.Endpoint()
+}
+
+// Start initializes and starts a Server.
 func (s *Server) Start(ctx context.Context) error {
 	var err error
 
@@ -256,7 +259,7 @@ func (s *Server) Start(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	log.Printf("Started listening on %v", s.URLs())
+	log.Printf("Started listening on %v", s.URL())
 
 	s.initEndpoints()
 	s.setServerState(ua.ServerStateRunning)

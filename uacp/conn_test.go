@@ -7,6 +7,8 @@ package uacp
 import (
 	"context"
 	"net"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -59,6 +61,25 @@ func TestConn(t *testing.T) {
 		if errors.As(err, &operr) && !operr.Timeout() {
 			t.Error(err)
 		}
+	})
+
+	t.Run("random endpoint ", func(t *testing.T) {
+		ep := "opc.tcp://localhost:0/foo/bar"
+		ln, err := Listen(context.Background(), ep, nil)
+		require.NoError(t, err)
+		defer ln.Close()
+
+		resolved := ln.Endpoint()
+
+		require.NotEqual(t, ep, resolved)
+
+		after, ok := strings.CutPrefix(resolved, "opc.tcp://localhost:")
+		require.True(t, ok)
+		port, ok := strings.CutSuffix(after, "/foo/bar")
+		require.True(t, ok)
+		p, err := strconv.Atoi(port)
+		require.NoError(t, err)
+		require.Greater(t, p, 0)
 	})
 }
 
