@@ -27,7 +27,8 @@ func PrivateKey(key *rsa.PrivateKey) Option {
 	}
 }
 
-// EndPointHostName adds an additional endpoint to the server based on the host name
+// EndPointHostName adds an additional endpoint to the server based on the host name.
+// A 0 port will let the OS select a random port (call [Server.URL] to retrieve the port).
 func EndPoint(host string, port int) Option {
 	return func(s *serverConfig) {
 		if s.endpoints == nil {
@@ -99,7 +100,6 @@ func EnableSecurity(secPolicy string, secMode ua.MessageSecurityMode) Option {
 // must also be called with at least one non-"None" SecurityPolicy
 func EnableAuthMode(tokenType ua.UserTokenType) Option {
 	return func(s *serverConfig) {
-
 		for _, a := range s.enabledAuth {
 			if a.tokenType == tokenType {
 				if s.logger != nil {
