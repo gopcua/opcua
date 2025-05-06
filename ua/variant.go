@@ -717,6 +717,8 @@ func (m *Variant) NodeID() *NodeID {
 	switch m.Type() {
 	case TypeIDNodeID:
 		return m.value.(*NodeID)
+	case TypeIDExpandedNodeID:
+		return m.value.(*ExpandedNodeID).NodeID
 	default:
 		return nil
 	}
