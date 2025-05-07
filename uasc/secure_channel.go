@@ -641,7 +641,7 @@ func (s *SecureChannel) open(ctx context.Context, instance *channelInstance, req
 	reqID := s.nextRequestID()
 
 	s.openingInstance.algo = algo
-	s.openingInstance.SetMaximumBodySize(int(s.c.SendBufSize()))
+	s.openingInstance.setMaximumBodySize(int(s.c.SendBufSize()))
 
 	localNonce, err := algo.MakeNonce()
 	if err != nil {
@@ -683,7 +683,7 @@ func (s *SecureChannel) handleOpenSecureChannelResponse(resp *ua.OpenSecureChann
 		return err
 	}
 
-	instance.SetMaximumBodySize(int(s.c.SendBufSize()))
+	instance.setMaximumBodySize(int(s.c.SendBufSize()))
 
 	s.instancesMu.Lock()
 	defer s.instancesMu.Unlock()
