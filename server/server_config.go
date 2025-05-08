@@ -149,8 +149,7 @@ func SoftwareVersion(name string) Option {
 	}
 }
 
-// this logger interface is used to allow the user to provide their own logger
-// it is compatible with slog.Logger
+// Logger defines an interface for a custom logger which is compatible with slog.Logger.
 type Logger interface {
 	Debug(msg string, args ...any)
 	Error(msg string, args ...any)
@@ -158,9 +157,18 @@ type Logger interface {
 	Warn(msg string, args ...any)
 }
 
-// the server.SetLogger takes a server.Logger interface.  This interface is met by
-// slog.Logger{}.  A simple wrapper could be made for other loggers if they don't already
-// meet the interface.
+// DiscardLogger implements a Logger which discards all messages.
+type DiscardLogger struct{}
+
+func (l *DiscardLogger) Debug(msg string, args ...any) {}
+func (l *DiscardLogger) Error(msg string, args ...any) {}
+func (l *DiscardLogger) Info(msg string, args ...any)  {}
+func (l *DiscardLogger) Warn(msg string, args ...any)  {}
+
+var _ Logger = ((*DiscardLogger)(nil))
+
+// SetLogger configures a logger for the server.
+// If logger is `nil` then the `DiscardLogger` is used.
 func SetLogger(logger Logger) Option {
 	return func(s *serverConfig) {
 		s.logger = logger

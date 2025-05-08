@@ -112,6 +112,9 @@ func New(opts ...Option) *Server {
 	if len(cfg.endpoints) != 0 {
 		url = cfg.endpoints[0]
 	}
+	if cfg.logger == nil {
+		cfg.logger = &DiscardLogger{}
+	}
 
 	s := &Server{
 		url:      url,
@@ -306,26 +309,20 @@ func (srv *Server) acceptAndRegister(ctx context.Context, l *uacp.Listener) {
 				switch x := err.(type) {
 				case *net.OpError:
 					// socket closed. Cannot recover from this.
-					if srv.cfg.logger != nil {
-						srv.cfg.logger.Error("socket closed: %s", err)
-					}
+					srv.cfg.logger.Error("socket closed: %s", err)
 					return
 				case temporary:
 					if x.Temporary() {
 						continue
 					}
 				default:
-					if srv.cfg.logger != nil {
-						srv.cfg.logger.Error("error accepting connection: %s", err)
-					}
+					srv.cfg.logger.Error("error accepting connection: %s", err)
 					continue
 				}
 			}
 
 			go srv.cb.RegisterConn(ctx, c, srv.cfg.certificate, srv.cfg.privateKey)
-			if srv.cfg.logger != nil {
-				srv.cfg.logger.Info("registered connection: %s", c.RemoteAddr())
-			}
+			srv.cfg.logger.Info("registered connection: %s", c.RemoteAddr())
 		}
 	}
 }
@@ -339,28 +336,20 @@ func (srv *Server) monitorConnections(ctx context.Context) {
 			continue // ctx is likely done, ctx.Err will be non-nil
 		}
 		if msg.Err != nil {
-			if srv.cfg.logger != nil {
-				srv.cfg.logger.Error("monitorConnections: Error received: %s\n", msg.Err)
-			}
+			srv.cfg.logger.Error("monitorConnections: Error received: %s\n", msg.Err)
 			continue // todo(fs): close SC???
 		}
 		if resp := msg.Response(); resp != nil {
-			if srv.cfg.logger != nil {
-				srv.cfg.logger.Error("monitorConnections: Server received response %T ???", resp)
-			}
+			srv.cfg.logger.Error("monitorConnections: Server received response %T ???", resp)
 			continue // todo(fs): close SC???
 		}
-		if srv.cfg.logger != nil {
-			srv.cfg.logger.Debug("monitorConnections: Received Message: %T", msg.Request())
-		}
+		srv.cfg.logger.Debug("monitorConnections: Received Message: %T", msg.Request())
 		srv.cb.mu.RLock()
 		sc, ok := srv.cb.s[msg.SecureChannelID]
 		srv.cb.mu.RUnlock()
 		if !ok {
 			// if the secure channel ID is 0, this is probably a open secure channel request.
-			if srv.cfg.logger != nil && msg.SecureChannelID != 0 {
-				srv.cfg.logger.Error("monitorConnections: Unknown SecureChannel: %d", msg.SecureChannelID)
-			}
+			srv.cfg.logger.Error("monitorConnections: Unknown SecureChannel: %d", msg.SecureChannelID)
 			continue
 		}
 

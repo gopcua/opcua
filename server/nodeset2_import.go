@@ -75,9 +75,7 @@ func (srv *Server) nodesImportNodeSet(nodes *schema.UANodeSet) error {
 		ns, err := srv.Namespace(int(nid.Namespace()))
 		if err != nil {
 			// This namespace doesn't exist.
-			if srv.cfg.logger != nil {
-				srv.cfg.logger.Warn("Could Not Find Namespace %d", nid.Namespace())
-			}
+			srv.cfg.logger.Warn("Could Not Find Namespace %d", nid.Namespace())
 			return err
 		}
 		ns.AddNode(n)
@@ -109,9 +107,7 @@ func (srv *Server) nodesImportNodeSet(nodes *schema.UANodeSet) error {
 		ns, err := srv.Namespace(int(nid.Namespace()))
 		if err != nil {
 			// This namespace doesn't exist.
-			if srv.cfg.logger != nil {
-				srv.cfg.logger.Warn("Could Not Find Namespace %d", nid.Namespace())
-			}
+			srv.cfg.logger.Warn("Could Not Find Namespace %d", nid.Namespace())
 			return err
 		}
 		ns.AddNode(n)
@@ -141,9 +137,7 @@ func (srv *Server) nodesImportNodeSet(nodes *schema.UANodeSet) error {
 		ns, err := srv.Namespace(int(nid.Namespace()))
 		if err != nil {
 			// This namespace doesn't exist.
-			if srv.cfg.logger != nil {
-				srv.cfg.logger.Warn("Could Not Find Namespace %d", nid.Namespace())
-			}
+			srv.cfg.logger.Warn("Could Not Find Namespace %d", nid.Namespace())
 			return err
 		}
 		ns.AddNode(n)
@@ -172,9 +166,7 @@ func (srv *Server) nodesImportNodeSet(nodes *schema.UANodeSet) error {
 		ns, err := srv.Namespace(int(nid.Namespace()))
 		if err != nil {
 			// This namespace doesn't exist.
-			if srv.cfg.logger != nil {
-				srv.cfg.logger.Warn("Could Not Find Namespace %d", nid.Namespace())
-			}
+			srv.cfg.logger.Warn("Could Not Find Namespace %d", nid.Namespace())
 			return err
 		}
 		ns.AddNode(n)
@@ -203,9 +195,7 @@ func (srv *Server) nodesImportNodeSet(nodes *schema.UANodeSet) error {
 		ns, err := srv.Namespace(int(nid.Namespace()))
 		if err != nil {
 			// This namespace doesn't exist.
-			if srv.cfg.logger != nil {
-				srv.cfg.logger.Warn("Could Not Find Namespace %d", nid.Namespace())
-			}
+			srv.cfg.logger.Warn("Could Not Find Namespace %d", nid.Namespace())
 			return err
 		}
 		ns.AddNode(n)
@@ -234,9 +224,7 @@ func (srv *Server) nodesImportNodeSet(nodes *schema.UANodeSet) error {
 		ns, err := srv.Namespace(int(nid.Namespace()))
 		if err != nil {
 			// This namespace doesn't exist.
-			if srv.cfg.logger != nil {
-				srv.cfg.logger.Warn("Could Not Find Namespace %d", nid.Namespace())
-			}
+			srv.cfg.logger.Warn("Could Not Find Namespace %d", nid.Namespace())
 			return err
 		}
 		ns.AddNode(n)
@@ -269,9 +257,7 @@ func (srv *Server) nodesImportNodeSet(nodes *schema.UANodeSet) error {
 		ns, err := srv.Namespace(int(nid.Namespace()))
 		if err != nil {
 			// This namespace doesn't exist.
-			if srv.cfg.logger != nil {
-				srv.cfg.logger.Warn("Could Not Find Namespace %d", nid.Namespace())
-			}
+			srv.cfg.logger.Warn("Could Not Find Namespace %d", nid.Namespace())
 			return err
 		}
 		ns.AddNode(n)
@@ -303,9 +289,7 @@ func (srv *Server) refsImportNodeSet(nodes *schema.UANodeSet) error {
 		aliasID := ua.MustParseNodeID(aliases[alias])
 		refnode := srv.Node(aliasID)
 		if refnode == nil {
-			if srv.cfg.logger != nil {
-				srv.cfg.logger.Warn("error loading alias %s", alias)
-			}
+			srv.cfg.logger.Warn("error loading alias %s", alias)
 			continue
 		}
 		rt := new(schema.UAReferenceType)
@@ -322,9 +306,7 @@ func (srv *Server) refsImportNodeSet(nodes *schema.UANodeSet) error {
 		if !ok {
 			reftypes[alias] = rt // sometimes they use browse name
 		} else {
-			if srv.cfg.logger != nil {
-				srv.cfg.logger.Error("Duplicate reference type %s", alias)
-			}
+			srv.cfg.logger.Error("Duplicate reference type %s", alias)
 			continue
 		}
 
@@ -332,9 +314,7 @@ func (srv *Server) refsImportNodeSet(nodes *schema.UANodeSet) error {
 		if !ok {
 			reftypes[aliases[alias]] = rt // sometimes they use node id
 		} else {
-			if srv.cfg.logger != nil {
-				srv.cfg.logger.Error("Duplicate reference type %s", aliases[alias])
-			}
+			srv.cfg.logger.Error("Duplicate reference type %s", aliases[alias])
 			continue
 		}
 
