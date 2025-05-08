@@ -9,7 +9,7 @@ import (
 	"crypto/rsa"
 	"encoding/xml"
 	"fmt"
-	"log"
+	"log/slog"
 	"net"
 	"slices"
 	"strings"
@@ -104,6 +104,7 @@ func New(opts ...Option) *Server {
 		manufacturerName: "The gopcua Team",      // override with the ManufacturerName option
 		productName:      "gopcua OPC/UA Server", // override with the ProductName option
 		softwareVersion:  "0.0.0-dev",            // override with the SoftwareVersion option
+		logger:           slog.Default(),
 	}
 	for _, opt := range opts {
 		opt(cfg)
@@ -156,7 +157,7 @@ func New(opts ...Option) *Server {
 	n0.srv = s
 	if !ok {
 		// this should never happen because we just set namespace 0 to be a node namespace
-		log.Panic("Namespace 0 is not a node namespace!")
+		panic("Namespace 0 is not a node namespace!")
 	}
 	s.ImportNodeSet(&nodes)
 
@@ -259,7 +260,7 @@ func (srv *Server) Start(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	log.Printf("Started listening on %v", srv.URLs())
+	srv.cfg.logger.Info("Started listening on %v", srv.URLs())
 
 	srv.initEndpoints()
 	srv.setServerState(ua.ServerStateRunning)

@@ -2,7 +2,6 @@ package server
 
 import (
 	"crypto/rand"
-	"log"
 	"strings"
 	"time"
 
@@ -45,7 +44,7 @@ func (s *SessionService) CreateSession(sc *uasc.SecureChannel, r ua.Request, req
 
 	nonce := make([]byte, sessionNonceLength)
 	if _, err := rand.Read(nonce); err != nil {
-		log.Printf("error creating session nonce")
+		s.srv.cfg.logger.Error("error creating session nonce")
 		return nil, ua.StatusBadInternalError
 	}
 	sess.serverNonce = nonce
@@ -53,7 +52,7 @@ func (s *SessionService) CreateSession(sc *uasc.SecureChannel, r ua.Request, req
 
 	sig, alg, err := sc.NewSessionSignature(req.ClientCertificate, req.ClientNonce)
 	if err != nil {
-		log.Printf("error creating session signature")
+		s.srv.cfg.logger.Error("error creating session signature")
 		return nil, ua.StatusBadInternalError
 	}
 
