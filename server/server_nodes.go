@@ -20,7 +20,7 @@ func CurrentTimeNode() *Node {
 	)
 }
 
-func NamespacesNode(s *Server) *Node {
+func NamespacesNode(srv *Server) *Node {
 	return NewNode(
 		ua.NewNumericNodeID(0, id.Server_NamespaceArray),
 		map[ua.AttributeID]*ua.DataValue{
@@ -29,7 +29,7 @@ func NamespacesNode(s *Server) *Node {
 		},
 		nil,
 		func() *ua.DataValue {
-			n := s.Namespaces()
+			n := srv.Namespaces()
 			ns := make([]string, len(n))
 			for i := range ns {
 				ns[i] = n[i].Name()
@@ -39,7 +39,7 @@ func NamespacesNode(s *Server) *Node {
 	)
 }
 
-func ServerCapabilitiesNodes(s *Server) []*Node {
+func ServerCapabilitiesNodes(srv *Server) []*Node {
 	var nodes []*Node
 	nodes = append(nodes, NewNode(
 		ua.NewNumericNodeID(0, id.Server_ServerCapabilities_OperationLimits_MaxNodesPerRead),
@@ -48,7 +48,7 @@ func ServerCapabilitiesNodes(s *Server) []*Node {
 			ua.AttributeIDNodeClass:  DataValueFromValue(uint32(ua.NodeClassVariable)),
 		},
 		nil,
-		func() *ua.DataValue { return DataValueFromValue(s.cfg.cap.OperationalLimits.MaxNodesPerRead) },
+		func() *ua.DataValue { return DataValueFromValue(srv.cfg.cap.OperationalLimits.MaxNodesPerRead) },
 	))
 	return nodes
 }

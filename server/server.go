@@ -169,27 +169,27 @@ func New(opts ...Option) *Server {
 	return s
 }
 
-func (s *Server) Session(hdr *ua.RequestHeader) *session {
-	return s.sb.Session(hdr.AuthenticationToken)
+func (srv *Server) Session(hdr *ua.RequestHeader) *session {
+	return srv.sb.Session(hdr.AuthenticationToken)
 }
 
-func (s *Server) Namespace(id int) (NameSpace, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if id < len(s.namespaces) {
-		return s.namespaces[id], nil
+func (srv *Server) Namespace(id int) (NameSpace, error) {
+	srv.mu.Lock()
+	defer srv.mu.Unlock()
+	if id < len(srv.namespaces) {
+		return srv.namespaces[id], nil
 	}
 	return nil, fmt.Errorf("namespace %d not found", id)
 }
 
-func (s *Server) Namespaces() []NameSpace {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.namespaces
+func (srv *Server) Namespaces() []NameSpace {
+	srv.mu.Lock()
+	defer srv.mu.Unlock()
+	return srv.namespaces
 }
 
-func (s *Server) ChangeNotification(n *ua.NodeID) {
-	s.MonitoredItemService.ChangeNotification(n)
+func (srv *Server) ChangeNotification(n *ua.NodeID) {
+	srv.MonitoredItemService.ChangeNotification(n)
 }
 
 // for now, the address space of the server is split up into namespaces.
@@ -198,104 +198,104 @@ func (s *Server) ChangeNotification(n *ua.NodeID) {
 //
 // the refRoot and refObjects flags can be used to automatically add a reference to the new Namespaces
 // root or objects object respectively to the namespace 0
-func (s *Server) AddNamespace(ns NameSpace) int {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if idx := slices.Index(s.namespaces, ns); idx >= 0 {
+func (srv *Server) AddNamespace(ns NameSpace) int {
+	srv.mu.Lock()
+	defer srv.mu.Unlock()
+	if idx := slices.Index(srv.namespaces, ns); idx >= 0 {
 		return idx
 	}
-	ns.SetID(uint16(len(s.namespaces)))
-	s.namespaces = append(s.namespaces, ns)
+	ns.SetID(uint16(len(srv.namespaces)))
+	srv.namespaces = append(srv.namespaces, ns)
 
 	if ns.ID() == 0 {
 		return 0
 
 	}
 
-	return len(s.namespaces) - 1
+	return len(srv.namespaces) - 1
 }
 
-func (s *Server) Endpoints() []*ua.EndpointDescription {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return slices.Clone(s.endpoints)
+func (srv *Server) Endpoints() []*ua.EndpointDescription {
+	srv.mu.Lock()
+	defer srv.mu.Unlock()
+	return slices.Clone(srv.endpoints)
 }
 
 // Status returns the current server status.
-func (s *Server) Status() *ua.ServerStatusDataType {
+func (srv *Server) Status() *ua.ServerStatusDataType {
 	status := new(ua.ServerStatusDataType)
-	s.mu.Lock()
-	*status = *s.status
-	s.mu.Unlock()
+	srv.mu.Lock()
+	*status = *srv.status
+	srv.mu.Unlock()
 	status.CurrentTime = time.Now()
 	return status
 }
 
 // URLs returns opc endpoint that the server is listening on.
-func (s *Server) URLs() []string {
-	return s.cfg.endpoints
+func (srv *Server) URLs() []string {
+	return srv.cfg.endpoints
 }
 
 // Start initializes and starts a Server listening on addr
 // If s was not initialized with NewServer(), addr defaults
 // to localhost:0 to let the OS select a random port
-func (s *Server) Start(ctx context.Context) error {
+func (srv *Server) Start(ctx context.Context) error {
 	var err error
 
-	if len(s.cfg.endpoints) == 0 {
+	if len(srv.cfg.endpoints) == 0 {
 		return fmt.Errorf("cannot start server: no endpoints defined")
 	}
 
 	// Register all service handlers
-	s.initHandlers()
+	srv.initHandlers()
 
-	if s.url == "" {
-		s.url = defaultListenAddr
+	if srv.url == "" {
+		srv.url = defaultListenAddr
 	}
-	s.l, err = uacp.Listen(ctx, s.url, nil)
+	srv.l, err = uacp.Listen(ctx, srv.url, nil)
 	if err != nil {
 		return err
 	}
-	log.Printf("Started listening on %v", s.URLs())
+	log.Printf("Started listening on %v", srv.URLs())
 
-	s.initEndpoints()
-	s.setServerState(ua.ServerStateRunning)
+	srv.initEndpoints()
+	srv.setServerState(ua.ServerStateRunning)
 
-	if s.cb == nil {
-		s.cb = newChannelBroker(s.cfg.logger)
+	if srv.cb == nil {
+		srv.cb = newChannelBroker(srv.cfg.logger)
 	}
 
-	go s.acceptAndRegister(ctx, s.l)
-	go s.monitorConnections(ctx)
+	go srv.acceptAndRegister(ctx, srv.l)
+	go srv.monitorConnections(ctx)
 
 	return nil
 }
 
-func (s *Server) setServerState(state ua.ServerState) {
-	s.mu.Lock()
-	s.status.State = state
-	s.mu.Unlock()
+func (srv *Server) setServerState(state ua.ServerState) {
+	srv.mu.Lock()
+	srv.status.State = state
+	srv.mu.Unlock()
 }
 
 // Close gracefully shuts the server down by closing all open connections,
 // and stops listening on all endpoints
-func (s *Server) Close() error {
-	s.setServerState(ua.ServerStateShutdown)
+func (srv *Server) Close() error {
+	srv.setServerState(ua.ServerStateShutdown)
 
 	// Close the listener, preventing new sessions from starting
-	if s.l != nil {
-		s.l.Close()
+	if srv.l != nil {
+		srv.l.Close()
 	}
 
 	// Shut down all secure channels and UACP connections
-	return s.cb.Close()
+	return srv.cb.Close()
 }
 
 type temporary interface {
 	Temporary() bool
 }
 
-func (s *Server) acceptAndRegister(ctx context.Context, l *uacp.Listener) {
+func (srv *Server) acceptAndRegister(ctx context.Context, l *uacp.Listener) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -306,8 +306,8 @@ func (s *Server) acceptAndRegister(ctx context.Context, l *uacp.Listener) {
 				switch x := err.(type) {
 				case *net.OpError:
 					// socket closed. Cannot recover from this.
-					if s.cfg.logger != nil {
-						s.cfg.logger.Error("socket closed: %s", err)
+					if srv.cfg.logger != nil {
+						srv.cfg.logger.Error("socket closed: %s", err)
 					}
 					return
 				case temporary:
@@ -315,16 +315,16 @@ func (s *Server) acceptAndRegister(ctx context.Context, l *uacp.Listener) {
 						continue
 					}
 				default:
-					if s.cfg.logger != nil {
-						s.cfg.logger.Error("error accepting connection: %s", err)
+					if srv.cfg.logger != nil {
+						srv.cfg.logger.Error("error accepting connection: %s", err)
 					}
 					continue
 				}
 			}
 
-			go s.cb.RegisterConn(ctx, c, s.cfg.certificate, s.cfg.privateKey)
-			if s.cfg.logger != nil {
-				s.cfg.logger.Info("registered connection: %s", c.RemoteAddr())
+			go srv.cb.RegisterConn(ctx, c, srv.cfg.certificate, srv.cfg.privateKey)
+			if srv.cfg.logger != nil {
+				srv.cfg.logger.Info("registered connection: %s", c.RemoteAddr())
 			}
 		}
 	}
@@ -332,73 +332,73 @@ func (s *Server) acceptAndRegister(ctx context.Context, l *uacp.Listener) {
 
 // monitorConnections reads messages off the secure channel connection and
 // sends the message to the service handler
-func (s *Server) monitorConnections(ctx context.Context) {
+func (srv *Server) monitorConnections(ctx context.Context) {
 	for ctx.Err() == nil {
-		msg := s.cb.ReadMessage(ctx)
+		msg := srv.cb.ReadMessage(ctx)
 		if msg == nil {
 			continue // ctx is likely done, ctx.Err will be non-nil
 		}
 		if msg.Err != nil {
-			if s.cfg.logger != nil {
-				s.cfg.logger.Error("monitorConnections: Error received: %s\n", msg.Err)
+			if srv.cfg.logger != nil {
+				srv.cfg.logger.Error("monitorConnections: Error received: %s\n", msg.Err)
 			}
 			continue // todo(fs): close SC???
 		}
 		if resp := msg.Response(); resp != nil {
-			if s.cfg.logger != nil {
-				s.cfg.logger.Error("monitorConnections: Server received response %T ???", resp)
+			if srv.cfg.logger != nil {
+				srv.cfg.logger.Error("monitorConnections: Server received response %T ???", resp)
 			}
 			continue // todo(fs): close SC???
 		}
-		if s.cfg.logger != nil {
-			s.cfg.logger.Debug("monitorConnections: Received Message: %T", msg.Request())
+		if srv.cfg.logger != nil {
+			srv.cfg.logger.Debug("monitorConnections: Received Message: %T", msg.Request())
 		}
-		s.cb.mu.RLock()
-		sc, ok := s.cb.s[msg.SecureChannelID]
-		s.cb.mu.RUnlock()
+		srv.cb.mu.RLock()
+		sc, ok := srv.cb.s[msg.SecureChannelID]
+		srv.cb.mu.RUnlock()
 		if !ok {
 			// if the secure channel ID is 0, this is probably a open secure channel request.
-			if s.cfg.logger != nil && msg.SecureChannelID != 0 {
-				s.cfg.logger.Error("monitorConnections: Unknown SecureChannel: %d", msg.SecureChannelID)
+			if srv.cfg.logger != nil && msg.SecureChannelID != 0 {
+				srv.cfg.logger.Error("monitorConnections: Unknown SecureChannel: %d", msg.SecureChannelID)
 			}
 			continue
 		}
 
 		// todo: should this be delegated to another goroutine in case handling this hangs?
-		s.handleService(ctx, sc, msg.RequestID, msg.Request())
+		srv.handleService(ctx, sc, msg.RequestID, msg.Request())
 	}
 }
 
 // initEndpoints builds the endpoint list from the server's configuration
-func (s *Server) initEndpoints() {
+func (srv *Server) initEndpoints() {
 	var endpoints []*ua.EndpointDescription
-	for _, sec := range s.cfg.enabledSec {
-		for _, url := range s.cfg.endpoints {
+	for _, sec := range srv.cfg.enabledSec {
+		for _, url := range srv.cfg.endpoints {
 			secLevel := uapolicy.SecurityLevel(sec.secPolicy, sec.secMode)
 
 			ep := &ua.EndpointDescription{
 				EndpointURL:   url, // todo: be able to listen on multiple adapters
 				SecurityLevel: secLevel,
 				Server: &ua.ApplicationDescription{
-					ApplicationURI: s.cfg.applicationURI,
+					ApplicationURI: srv.cfg.applicationURI,
 					ProductURI:     "urn:github.com:gopcua:server",
 					ApplicationName: &ua.LocalizedText{
 						EncodingMask: ua.LocalizedTextText,
-						Text:         s.cfg.applicationName,
+						Text:         srv.cfg.applicationName,
 					},
 					ApplicationType:     ua.ApplicationTypeServer,
 					GatewayServerURI:    "",
 					DiscoveryProfileURI: "",
-					DiscoveryURLs:       s.URLs(),
+					DiscoveryURLs:       srv.URLs(),
 				},
-				ServerCertificate:   s.cfg.certificate,
+				ServerCertificate:   srv.cfg.certificate,
 				SecurityMode:        sec.secMode,
 				SecurityPolicyURI:   sec.secPolicy,
 				TransportProfileURI: "http://opcfoundation.org/UA-Profile/Transport/uatcp-uasc-uabinary",
 			}
 
-			for _, auth := range s.cfg.enabledAuth {
-				for _, authSec := range s.cfg.enabledSec {
+			for _, auth := range srv.cfg.enabledAuth {
+				for _, authSec := range srv.cfg.enabledSec {
 					if auth.tokenType == ua.UserTokenTypeAnonymous {
 						authSec.secPolicy = "http://opcfoundation.org/UA/SecurityPolicy#None"
 					}
@@ -439,15 +439,15 @@ func (s *Server) initEndpoints() {
 		}
 	}
 
-	s.mu.Lock()
-	s.endpoints = endpoints
-	s.mu.Unlock()
+	srv.mu.Lock()
+	srv.endpoints = endpoints
+	srv.mu.Unlock()
 }
 
-func (s *Server) Node(nid *ua.NodeID) *Node {
+func (srv *Server) Node(nid *ua.NodeID) *Node {
 	ns := int(nid.Namespace())
-	if ns < len(s.namespaces) {
-		return s.namespaces[ns].Node(nid)
+	if ns < len(srv.namespaces) {
+		return srv.namespaces[ns].Node(nid)
 	}
 	return nil
 }
