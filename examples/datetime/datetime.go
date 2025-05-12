@@ -8,32 +8,33 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"log"
 
 	"github.com/gopcua/opcua"
-	"github.com/gopcua/opcua/debug"
+	"github.com/gopcua/opcua/internal/ualog"
 	"github.com/gopcua/opcua/ua"
 )
 
 func main() {
-	endpoint := flag.String("endpoint", "opc.tcp://localhost:4840", "OPC UA Endpoint URL")
-	policy := flag.String("policy", "", "Security policy: None, Basic128Rsa15, Basic256, Basic256Sha256. Default: auto")
-	mode := flag.String("mode", "", "Security mode: None, Sign, SignAndEncrypt. Default: auto")
-	certFile := flag.String("cert", "", "Path to cert.pem. Required for security mode/policy != None")
-	keyFile := flag.String("key", "", "Path to private key.pem. Required for security mode/policy != None")
-	flag.BoolVar(&debug.Enable, "debug", false, "enable debug logging")
+	var (
+		endpoint = flag.String("endpoint", "opc.tcp://localhost:4840", "OPC UA Endpoint URL")
+		policy   = flag.String("policy", "", "Security policy: None, Basic128Rsa15, Basic256, Basic256Sha256. Default: auto")
+		mode     = flag.String("mode", "", "Security mode: None, Sign, SignAndEncrypt. Default: auto")
+		certFile = flag.String("cert", "", "Path to cert.pem. Required for security mode/policy != None")
+		keyFile  = flag.String("key", "", "Path to private key.pem. Required for security mode/policy != None")
+		debug    = flag.Bool("debug", false, "enable debug logging")
+	)
 	flag.Parse()
-	log.SetFlags(0)
+	ualog.SetDebugLogger(*debug)
 
 	ctx := context.Background()
 
 	endpoints, err := opcua.GetEndpoints(ctx, *endpoint)
 	if err != nil {
-		log.Fatal(err)
+		ualog.Fatal("GetEndpoints failed", "error", err)
 	}
 	ep, err := opcua.SelectEndpoint(endpoints, *policy, ua.MessageSecurityModeFromString(*mode))
 	if err != nil {
-		log.Fatal(err)
+		ualog.Fatal("SelectEndpoint failed", "error", err)
 	}
 
 	fmt.Println("*", ep.SecurityPolicyURI, ep.SecurityMode)
@@ -49,20 +50,20 @@ func main() {
 
 	c, err := opcua.NewClient(ep.EndpointURL, opts...)
 	if err != nil {
-		log.Fatal(err)
+		ualog.Fatal("NewClient failed", "error", err)
 	}
 	if err := c.Connect(ctx); err != nil {
-		log.Fatal(err)
+		ualog.Fatal("Connect failed", "error", err)
 	}
 	defer c.Close(ctx)
 
 	v, err := c.Node(ua.NewNumericNodeID(0, 2258)).Value(ctx)
 	switch {
 	case err != nil:
-		log.Fatal(err)
+		ualog.Fatal("Node failed", "error", err)
 	case v == nil:
-		log.Print("v == nil")
+		ualog.Warn("v == nil")
 	default:
-		log.Print(v.Value())
+		ualog.Info("Got a value", "value", v.Value())
 	}
 }

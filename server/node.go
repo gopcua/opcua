@@ -1,12 +1,12 @@
 package server
 
 import (
-	"log"
 	"maps"
 	"slices"
 	"time"
 
 	"github.com/gopcua/opcua/id"
+	"github.com/gopcua/opcua/internal/ualog"
 	"github.com/gopcua/opcua/server/attrs"
 	"github.com/gopcua/opcua/server/refs"
 	"github.com/gopcua/opcua/ua"
@@ -259,8 +259,10 @@ func (n *Node) SetDescription(text, locale string) {
 }
 
 func (n *Node) DataType() *ua.ExpandedNodeID {
+	dlog := ualog.With("func", "Node.DataType", "node_id", n.id)
+
 	if n == nil {
-		log.Printf("n was nil!")
+		dlog.Debug("n was nil!")
 		return ua.NewTwoByteExpandedNodeID(0)
 	}
 	v := n.attr[ua.AttributeIDDataType]
@@ -269,7 +271,7 @@ func (n *Node) DataType() *ua.ExpandedNodeID {
 		for i := range n.refs {
 			r := n.refs[i]
 			if r.ReferenceTypeID == nil {
-				log.Printf("reftypeid was nil!")
+				dlog.Debug("reftypeid was nil!")
 			}
 			if r.ReferenceTypeID.IntID() == id.HasTypeDefinition && r.IsForward {
 				return r.NodeID

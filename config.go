@@ -9,7 +9,6 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	"log"
 	"math/rand"
 	"net"
 	"os"
@@ -17,6 +16,7 @@ import (
 	"time"
 
 	"github.com/gopcua/opcua/errors"
+	"github.com/gopcua/opcua/internal/ualog"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uacp"
 	"github.com/gopcua/opcua/uapolicy"
@@ -412,7 +412,7 @@ func setPolicyID(t interface{}, policy string) {
 func AuthPolicyID(policy string) Option {
 	return func(cfg *Config) error {
 		if cfg.session.UserIdentityToken == nil {
-			log.Printf("policy ID needs to be set after the policy type is chosen, no changes made.  Call SecurityFromEndpoint() or an AuthXXX() option first")
+			ualog.Warn("policy ID needs to be set after the policy type is chosen, no changes made.  Call SecurityFromEndpoint() or an AuthXXX() option first")
 			return nil
 		}
 		setPolicyID(cfg.session.UserIdentityToken, policy)
@@ -432,7 +432,7 @@ func AuthAnonymous() Option {
 		_, ok := cfg.session.UserIdentityToken.(*ua.AnonymousIdentityToken)
 		if !ok {
 			// todo(fs): should we Fatal here?
-			log.Printf("non-anonymous authentication already configured, ignoring")
+			ualog.Warn("non-anonymous authentication already configured, ignoring")
 			return nil
 		}
 		return nil
@@ -451,7 +451,7 @@ func AuthUsername(user, pass string) Option {
 		t, ok := cfg.session.UserIdentityToken.(*ua.UserNameIdentityToken)
 		if !ok {
 			// todo(fs): should we Fatal here?
-			log.Printf("non-username authentication already configured, ignoring")
+			ualog.Warn("non-username authentication already configured, ignoring")
 			return nil
 		}
 
@@ -473,7 +473,7 @@ func AuthCertificate(cert []byte) Option {
 		t, ok := cfg.session.UserIdentityToken.(*ua.X509IdentityToken)
 		if !ok {
 			// todo(fs): should we Fatal here?
-			log.Printf("non-certificate authentication already configured, ignoring")
+			ualog.Warn("non-certificate authentication already configured, ignoring")
 			return nil
 		}
 
@@ -503,7 +503,7 @@ func AuthIssuedToken(tokenData []byte) Option {
 
 		t, ok := cfg.session.UserIdentityToken.(*ua.IssuedIdentityToken)
 		if !ok {
-			log.Printf("non-issued token authentication already configured, ignoring")
+			ualog.Warn("non-issued token authentication already configured, ignoring")
 			return nil
 		}
 

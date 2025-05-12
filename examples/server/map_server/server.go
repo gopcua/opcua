@@ -32,29 +32,6 @@ var (
 	gencert  = flag.Bool("gen-cert", false, "Generate a new certificate")
 )
 
-type Logger int
-
-func (l Logger) Debug(msg string, args ...any) {
-	if l < 0 {
-		log.Printf(msg, args...)
-	}
-}
-func (l Logger) Info(msg string, args ...any) {
-	if l < 1 {
-		log.Printf(msg, args...)
-	}
-}
-func (l Logger) Warn(msg string, args ...any) {
-	if l < 2 {
-		log.Printf(msg, args...)
-	}
-}
-func (l Logger) Error(msg string, args ...any) {
-	if l < 3 {
-		log.Printf(msg, args...)
-	}
-}
-
 func main() {
 	flag.Parse()
 	log.SetFlags(0)
@@ -104,14 +81,6 @@ func main() {
 		server.EndPoint(*endpoint, *port),
 		server.EndPoint("localhost", *port),
 		server.EndPoint(hostname, *port),
-	)
-
-	// the server.SetLogger takes a server.Logger interface.  This interface is met by
-	// the slog.Logger{}.  A simple wrapper could be made for other loggers if they don't already
-	// meet the interface and that is what we've done here.
-	logger := Logger(1)
-	opts = append(opts,
-		server.SetLogger(logger),
 	)
 
 	// Here is an example of certificate generation.  This is not necessary if you already have a certificate.

@@ -8,30 +8,32 @@ import (
 	"context"
 	"flag"
 	"fmt"
+
 	"github.com/gopcua/opcua"
-	"github.com/gopcua/opcua/debug"
-	"log"
+	"github.com/gopcua/opcua/internal/ualog"
 )
 
 func main() {
-	endpoint := flag.String("endpoint", "opc.tcp://localhost:4840", "OPC UA Endpoint URL")
-	flag.BoolVar(&debug.Enable, "debug", false, "enable debug logging")
+	var (
+		endpoint = flag.String("endpoint", "opc.tcp://localhost:4840", "OPC UA Endpoint URL")
+		debug    = flag.Bool("debug", false, "enable debug logging")
+	)
 	flag.Parse()
-	log.SetFlags(0)
+	ualog.SetDebugLogger(*debug)
 
 	ctx := context.Background()
 
 	if err := findServersOnNetwork(ctx, *endpoint); err != nil {
-		log.Print(err)
+		ualog.Error("findServerOnNetwork failed", "error", err)
 	}
 
 	if err := findServers(ctx, *endpoint); err != nil {
-		log.Fatal(err)
+		ualog.Fatal("findServers failed", "error", err)
 	}
 }
 
 func findServersOnNetwork(ctx context.Context, endpoint string) error {
-	log.Println("Finding servers on network")
+	ualog.Info("Finding servers on network")
 	servers, err := opcua.FindServersOnNetwork(ctx, endpoint)
 	if err != nil {
 		return err
@@ -47,7 +49,7 @@ func findServersOnNetwork(ctx context.Context, endpoint string) error {
 }
 
 func findServers(ctx context.Context, endpoint string) error {
-	log.Println("Finding servers")
+	ualog.Info("Finding servers")
 	servers, err := opcua.FindServers(ctx, endpoint)
 	if err != nil {
 		return err

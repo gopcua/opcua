@@ -9,6 +9,7 @@ import (
 	"crypto/x509"
 	"fmt"
 	"log"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -149,28 +150,34 @@ func SoftwareVersion(name string) Option {
 	}
 }
 
-// Logger defines an interface for a custom logger which is compatible with slog.Logger.
-type Logger interface {
-	Debug(msg string, args ...any)
-	Error(msg string, args ...any)
-	Info(msg string, args ...any)
-	Warn(msg string, args ...any)
-}
-
-// DiscardLogger implements a Logger which discards all messages.
-type DiscardLogger struct{}
-
-func (l *DiscardLogger) Debug(msg string, args ...any) {}
-func (l *DiscardLogger) Error(msg string, args ...any) {}
-func (l *DiscardLogger) Info(msg string, args ...any)  {}
-func (l *DiscardLogger) Warn(msg string, args ...any)  {}
-
-var _ Logger = ((*DiscardLogger)(nil))
-
-// SetLogger configures a logger for the server.
-// If logger is `nil` then the `DiscardLogger` is used.
-func SetLogger(logger Logger) Option {
+// SetLoggerHandler sets the slog.Handler for the server.
+func SetLoggerHandler(h slog.Handler) Option {
 	return func(s *serverConfig) {
-		s.logger = logger
+		s.logger = &slogLogger{
+			logger: slog.New(h),
+		}
 	}
 }
+
+func SetLogger(l Logger) Option {
+	return func(s *serverConfig) {
+		s.logger = l
+	}
+}
+
+type Logger interface {
+	Debug(msg string, args ...any)
+	Info(msg string, args ...any)
+	Warn(msg string, args ...any)
+	Error(msg string, args ...any)
+}
+
+// slogLogger maps the logger interface to slog.
+type slogLogger struct {
+	logger *slog.Logger
+}
+
+func (l *slogLogger) Debug(msg string, args ...any) { l.logger.Debug(fmt.Sprintf(msg, args...)) }
+func (l *slogLogger) Info(msg string, args ...any)  { l.logger.Info(fmt.Sprintf(msg, args...)) }
+func (l *slogLogger) Warn(msg string, args ...any)  { l.logger.Warn(fmt.Sprintf(msg, args...)) }
+func (l *slogLogger) Error(msg string, args ...any) { l.logger.Error(fmt.Sprintf(msg, args...)) }

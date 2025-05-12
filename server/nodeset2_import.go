@@ -304,7 +304,7 @@ func (srv *Server) refsImportNodeSet(nodes *schema.UANodeSet) error {
 		if !ok {
 			reftypes[alias] = rt // sometimes they use browse name
 		} else {
-			srv.cfg.logger.Error("Duplicate reference type %s", alias)
+			srv.cfg.logger.Error("Duplicate reference", "type", alias)
 			continue
 		}
 
@@ -312,7 +312,7 @@ func (srv *Server) refsImportNodeSet(nodes *schema.UANodeSet) error {
 		if !ok {
 			reftypes[aliases[alias]] = rt // sometimes they use node id
 		} else {
-			srv.cfg.logger.Error("Duplicate reference type %s", aliases[alias])
+			srv.cfg.logger.Error("Duplicate reference", "type", aliases[alias])
 			continue
 		}
 	}
@@ -333,7 +333,7 @@ func (srv *Server) refsImportNodeSet(nodes *schema.UANodeSet) error {
 			refnodeid := ua.MustParseNodeID(ref.Value)
 			n := srv.Node(refnodeid)
 			if n == nil {
-				srv.cfg.logger.Warn("can't find node %s as %s reference to %s", ref.Value, ref.ReferenceTypeAttr, rt.BrowseNameAttr)
+				srv.cfg.logger.Warn("can't find reference", "node", ref.Value, "refType", ref.ReferenceTypeAttr, "refTarget", rt.BrowseNameAttr)
 				failures++
 				continue
 			}

@@ -10,8 +10,8 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/binary"
+	"fmt"
 	"io"
-	"log"
 	"math"
 	"net"
 	"strings"
@@ -19,8 +19,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/gopcua/opcua/debug"
 	"github.com/gopcua/opcua/errors"
+	"github.com/gopcua/opcua/internal/ualog"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uacp"
 	"github.com/gopcua/opcua/uapolicy"
@@ -254,6 +254,8 @@ func (s *SecureChannel) getActiveChannelInstance() (*channelInstance, error) {
 }
 
 func (s *SecureChannel) dispatcher() {
+	dlog := ualog.With("func", "SecureChannel.dispatcher")
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -284,15 +286,15 @@ func (s *SecureChannel) dispatcher() {
 			}
 
 			if msg.Err != nil {
-				debug.Printf("uasc %d/%d: err: %v", s.c.ID(), msg.RequestID, msg.Err)
+				dlog.Debug("uasc: fail", "conn_id", s.c.ID(), "req_id", msg.RequestID, "error", msg.Err)
 			} else {
-				debug.Printf("uasc %d/%d: recv %T", s.c.ID(), msg.RequestID, msg.body)
+				dlog.Debug("uasc: recv", "conn_id", s.c.ID(), "req_id", msg.RequestID, "type", fmt.Sprintf("%T", msg.body))
 			}
 
 			ch, ok := s.popHandler(msg.RequestID)
 
 			if !ok {
-				debug.Printf("uasc %d/%d: no handler for %T", s.c.ID(), msg.RequestID, msg.body)
+				dlog.Debug("uasc: no handler", "conn_id", s.c.ID(), "req_id", msg.RequestID, "msg", fmt.Sprintf("%T", msg.body))
 				continue
 			}
 
@@ -301,12 +303,12 @@ func (s *SecureChannel) dispatcher() {
 				s.rcvLocker.lock()
 			}
 
-			debug.Printf("uasc %d/%d: sending %T to handler", s.c.ID(), msg.RequestID, msg.body)
+			dlog.Debug("uasc: sending to handler", "conn_id", s.c.ID(), "req_id", msg.RequestID, "msg", fmt.Sprintf("%T", msg.body))
 			select {
 			case ch <- msg:
 			default:
 				// this should never happen since the chan is of size one
-				debug.Printf("uasc %d/%d: unexpected state. channel write should always succeed.", s.c.ID(), msg.RequestID)
+				dlog.Debug("uasc: unexpected state. channel write should always succeed.", "conn_id", s.c.ID(), "req_id", msg.RequestID)
 			}
 
 			s.rcvLocker.waitIfLock()
@@ -318,6 +320,8 @@ func (s *SecureChannel) dispatcher() {
 // them to the registered callback channel, if there is one. Otherwise,
 // the message is dropped.
 func (s *SecureChannel) Receive(ctx context.Context) *MessageBody {
+	dlog := ualog.With("func", "SecureChannel.Receive", "conn_id", s.c.ID())
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -326,7 +330,7 @@ func (s *SecureChannel) Receive(ctx context.Context) *MessageBody {
 		default:
 			chunk, err := s.readChunk()
 			if err == io.EOF {
-				debug.Printf("uasc %d: readChunk EOF", s.c.ID())
+				dlog.Debug("uasc: readChunk EOF")
 				return &MessageBody{Err: err}
 			}
 
@@ -339,7 +343,7 @@ func (s *SecureChannel) Receive(ctx context.Context) *MessageBody {
 
 			strdat := string(chunk.Data)
 			if strings.Contains(strdat, "CurrentTime") {
-				debug.Printf("Requested CurrentTime.")
+				dlog.Debug("Requested CurrentTime.")
 			}
 
 			msg := &MessageBody{
@@ -347,7 +351,17 @@ func (s *SecureChannel) Receive(ctx context.Context) *MessageBody {
 				SecureChannelID: chunk.MessageHeader.Header.SecureChannelID,
 			}
 
-			debug.Printf("uasc %d/%d: recv %s%c with %d bytes", s.c.ID(), reqID, hdr.MessageType, hdr.ChunkType, hdr.MessageSize)
+			dlog = ualog.With(
+				"func", "SecureChannel.Receive",
+				"conn_id", s.c.ID(),
+				"req_id", reqID,
+			)
+
+			dlog.Debug("uasc: recv",
+				"msg_type", hdr.MessageType,
+				"chunk_type", hdr.ChunkType,
+				"msg_size", hdr.MessageSize,
+			)
 
 			s.chunksMu.Lock()
 
@@ -358,7 +372,7 @@ func (s *SecureChannel) Receive(ctx context.Context) *MessageBody {
 
 				msga := new(MessageAbort)
 				if _, err := msga.Decode(chunk.Data); err != nil {
-					debug.Printf("uasc %d/%d: invalid MSGA chunk. %s", s.c.ID(), reqID, err)
+					dlog.Debug("uasc: invalid MSGA chunk", "error", err)
 					msg.Err = ua.StatusBadDecodingError
 					return msg
 				}
@@ -416,7 +430,7 @@ func (s *SecureChannel) Receive(ctx context.Context) *MessageBody {
 			if req, ok := msg.Request().(*ua.OpenSecureChannelRequest); ok {
 				err := s.handleOpenSecureChannelRequest(reqID, req)
 				if err != nil {
-					debug.Printf("uasc %d/%d: handling %T failed: %v", s.c.ID(), reqID, req, err)
+					dlog.Debug("uasc: handling failed", "req", fmt.Sprintf("%T", req), "error", err)
 					return &MessageBody{Err: err}
 				}
 				return &MessageBody{}
@@ -437,6 +451,8 @@ func (s *SecureChannel) Receive(ctx context.Context) *MessageBody {
 }
 
 func (s *SecureChannel) readChunk() (*MessageChunk, error) {
+	dlog := ualog.With("func", "SecureChannel.readChunk")
+
 	// read a full message from the underlying conn.
 	b, err := s.c.Receive()
 	if err == io.EOF || len(b) == 0 {
@@ -479,7 +495,7 @@ func (s *SecureChannel) readChunk() (*MessageChunk, error) {
 		s.cfg.SecurityPolicyURI = m.SecurityPolicyURI
 		if m.SecurityPolicyURI != ua.SecurityPolicyURINone {
 			s.cfg.RemoteCertificate = m.AsymmetricSecurityHeader.SenderCertificate
-			debug.Printf("uasc %d: setting securityPolicy to %s", s.c.ID(), m.SecurityPolicyURI)
+			dlog.Debug("uasc: setting security policy", "conn_id", s.c.ID(), "sec_policy", m.SecurityPolicyURI)
 
 			remoteCert, err := x509.ParseCertificate(s.cfg.RemoteCertificate)
 			if err != nil {
@@ -524,6 +540,8 @@ func (s *SecureChannel) readChunk() (*MessageChunk, error) {
 // verifyAndDecrypt verifies and optionally decrypts a message. if `instance` is given, then it will only use that
 // state. Otherwise it will look up states by channel ID and try each.
 func (s *SecureChannel) verifyAndDecrypt(m *MessageChunk, b []byte, instance *channelInstance) ([]byte, error) {
+	dlog := ualog.With("func", "SecureChannel.verifyAndDecrypt")
+
 	if instance != nil {
 		return instance.verifyAndDecrypt(m, b)
 	}
@@ -542,7 +560,7 @@ func (s *SecureChannel) verifyAndDecrypt(m *MessageChunk, b []byte, instance *ch
 		if verified, err = instances[i].verifyAndDecrypt(m, b); err == nil {
 			return verified, nil
 		}
-		debug.Printf("uasc %d: attempting an older channel state...", s.c.ID())
+		dlog.Debug("uasc: attempting an older channel state...", "conn_id", s.c.ID())
 	}
 
 	return nil, err
@@ -573,7 +591,9 @@ func (s *SecureChannel) Open(ctx context.Context) error {
 }
 
 func (s *SecureChannel) open(ctx context.Context, instance *channelInstance, requestType ua.SecurityTokenRequestType) error {
-	debug.Printf("sc.open")
+	dlog := ualog.With("func", "SecureChannel.open")
+
+	dlog.Debug("open")
 	defer s.rcvLocker.unlock()
 
 	s.openingMu.Lock()
@@ -633,7 +653,7 @@ func (s *SecureChannel) open(ctx context.Context, instance *channelInstance, req
 	// trigger cleanup after we are all done
 	defer func() {
 		if s.openingInstance == nil || s.openingInstance.state != channelActive {
-			debug.Printf("uasc %d: failed to open a new secure channel", s.c.ID())
+			dlog.Debug("uasc: failed to open a new secure channel", "conn_id", s.c.ID())
 		}
 		s.openingInstance = nil
 	}()
@@ -657,7 +677,7 @@ func (s *SecureChannel) open(ctx context.Context, instance *channelInstance, req
 	}
 
 	return s.sendRequestWithTimeout(ctx, req, reqID, s.openingInstance, nil, s.cfg.RequestTimeout, func(v ua.Response) error {
-		debug.Printf("OpenSecureChannelResponse handler")
+		dlog.Debug("OpenSecureChannelResponse handler")
 		resp, ok := v.(*ua.OpenSecureChannelResponse)
 		if !ok {
 			return errors.Errorf("got %T, want OpenSecureChannelResponse", v)
@@ -667,7 +687,9 @@ func (s *SecureChannel) open(ctx context.Context, instance *channelInstance, req
 }
 
 func (s *SecureChannel) handleOpenSecureChannelResponse(resp *ua.OpenSecureChannelResponse, localNonce []byte, instance *channelInstance) (err error) {
-	debug.Printf("sc.handleOpenSecureChannelResponse")
+	dlog := ualog.With("func", "SecureChannel.handleOpenSecureChannelResponse")
+
+	dlog.Debug("handleOpenSecureChannelResponse")
 	instance.state = channelActive
 	instance.secureChannelID = resp.SecurityToken.ChannelID
 	instance.securityTokenID = resp.SecurityToken.TokenID
@@ -695,7 +717,13 @@ func (s *SecureChannel) handleOpenSecureChannelResponse(resp *ua.OpenSecureChann
 
 	s.activeInstance = instance
 
-	debug.Printf("uasc %d: received security token. channelID=%d tokenID=%d createdAt=%s lifetime=%s", s.c.ID(), instance.secureChannelID, instance.securityTokenID, instance.createdAt.Format(time.RFC3339), instance.revisedLifetime)
+	dlog.Debug("uasc: received security token",
+		"conn_id", s.c.ID(),
+		"channel_id", instance.secureChannelID,
+		"token_id", instance.securityTokenID,
+		"created_at", instance.createdAt.Format(time.RFC3339),
+		"lifetime", instance.revisedLifetime,
+	)
 
 	// depending on whether the channel is used in a client
 	// or a server we need to trigger different behavior.
@@ -715,13 +743,15 @@ func (s *SecureChannel) handleOpenSecureChannelResponse(resp *ua.OpenSecureChann
 }
 
 func (s *SecureChannel) handleOpenSecureChannelRequest(reqID uint32, svc ua.Request) error {
-	debug.Printf("handleOpenSecureChannelRequest: Got OPN Request\n")
+	dlog := ualog.With("func", "SecureChannel.handleOpenSecureChannelRequest")
+
+	dlog.Debug("gog OPN request")
 
 	var err error
 
 	req, ok := svc.(*ua.OpenSecureChannelRequest)
 	if !ok {
-		debug.Printf("Expected OpenSecureChannel Request, got %T\n", svc)
+		dlog.Debug("expected OpenSecureChannelRequest", "got", fmt.Sprintf("%T", svc))
 	}
 
 	// Part 6.7.4: https://reference.opcfoundation.org/Core/Part6/v105/docs/6.7.4
@@ -827,13 +857,21 @@ func (s *SecureChannel) handleOpenSecureChannelRequest(reqID uint32, svc ua.Requ
 }
 
 func (s *SecureChannel) scheduleRenewal(instance *channelInstance) {
+	dlog := ualog.With("func", "SecureChannel.scheduleRenewal")
+
 	// https://reference.opcfoundation.org/v104/Core/docs/Part4/5.5.2/#5.5.2.1
 	// Clients should request a new SecurityToken after 75 % of its lifetime has elapsed. This should ensure that
 	// clients will receive the new SecurityToken before the old one actually expire
 	const renewAfter = 0.75
 	when := time.Second * time.Duration(instance.revisedLifetime.Seconds()*renewAfter)
 
-	debug.Printf("uasc %d: security token is refreshed at %s (%s). channelID=%d tokenID=%d", s.c.ID(), time.Now().UTC().Add(when).Format(time.RFC3339), when, instance.secureChannelID, instance.securityTokenID)
+	dlog.Debug("uasc: security token is refreshed",
+		"conn_id", s.c.ID(),
+		"refreshed_at", time.Now().UTC().Add(when).Format(time.RFC3339),
+		"duration", when,
+		"channel_id", instance.secureChannelID,
+		"token_id", instance.securityTokenID,
+	)
 
 	t := time.NewTimer(when)
 	defer t.Stop()
@@ -860,12 +898,19 @@ func (s *SecureChannel) renew(instance *channelInstance) error {
 }
 
 func (s *SecureChannel) scheduleExpiration(instance *channelInstance) {
+	dlog := ualog.With("func", "SecureChannel.scheduleExpiration")
+
 	// https://reference.opcfoundation.org/v104/Core/docs/Part4/5.5.2/#5.5.2.1
 	// Clients should accept Messages secured by an expired SecurityToken for up to 25 % of the token lifetime.
 	const expireAfter = 1.25
 	when := instance.createdAt.Add(time.Second * time.Duration(instance.revisedLifetime.Seconds()*expireAfter))
 
-	debug.Printf("uasc %d: security token expires at %s. channelID=%d tokenID=%d", s.c.ID(), when.UTC().Format(time.RFC3339), instance.secureChannelID, instance.securityTokenID)
+	dlog.Debug("uasc: security token expires",
+		"conn_id", s.c.ID(),
+		"expires_at", when.UTC().Format(time.RFC3339),
+		"channel_id", instance.secureChannelID,
+		"token_id", instance.securityTokenID,
+	)
 
 	t := time.NewTimer(time.Until(when))
 	defer t.Stop()
@@ -886,7 +931,7 @@ func (s *SecureChannel) scheduleExpiration(instance *channelInstance) {
 	for _, oldInstance := range oldInstances {
 		if oldInstance.secureChannelID != instance.secureChannelID {
 			// something has gone horribly wrong!
-			debug.Printf("uasc %d: secureChannelID mismatch during scheduleExpiration!", s.c.ID())
+			dlog.Debug("uasc: secureChannelID mismatch during scheduleExpiration!", "conn_id", s.c.ID())
 		}
 		if oldInstance.securityTokenID == instance.securityTokenID {
 			continue
@@ -990,6 +1035,8 @@ func (s *SecureChannel) sendAsyncWithTimeout(
 	timeout time.Duration,
 ) (<-chan *MessageBody, error) {
 
+	dlog := ualog.With("func", "SecureChannel.sendAsyncWithTimeout")
+
 	instance.Lock()
 	defer instance.Unlock()
 
@@ -1047,7 +1094,12 @@ func (s *SecureChannel) sendAsyncWithTimeout(
 		atomic.AddUint64(&instance.bytesSent, uint64(n))
 		atomic.AddUint32(&instance.messagesSent, 1)
 
-		debug.Printf("uasc %d/%d: send %T with %d bytes", s.c.ID(), reqID, req, len(chunk))
+		dlog.Debug("uasc: send",
+			"conn_id", s.c.ID(),
+			"req_id", reqID,
+			"req", fmt.Sprintf("%T", req),
+			"chunk_size", len(chunk),
+		)
 	}
 
 	return resp, nil
@@ -1057,10 +1109,12 @@ func (s *SecureChannel) SendResponseWithContext(ctx context.Context, reqID uint3
 	return s.sendResponseWithContext(ctx, nil, reqID, resp)
 }
 
-func (s *SecureChannel) SendMsgWithContext(ctx context.Context, instance *channelInstance, reqID uint32, resp any) error {
-	typeID := ua.ServiceTypeID(resp)
+func (s *SecureChannel) SendMsgWithContext(ctx context.Context, instance *channelInstance, reqID uint32, msg any) error {
+	dlog := ualog.With("func", "SecureChannel.SendMsgWithContext")
+
+	typeID := ua.ServiceTypeID(msg)
 	if typeID == 0 {
-		return errors.Errorf("uasc: unknown service %T. Did you call register?", resp)
+		return errors.Errorf("uasc: unknown service %T. Did you call register?", msg)
 	}
 
 	var err error
@@ -1073,7 +1127,7 @@ func (s *SecureChannel) SendMsgWithContext(ctx context.Context, instance *channe
 
 	// we need to get a lock on the sequence number so we are sure to send them in the correct order.
 	// encode the message
-	m := instance.newMessage(resp, typeID, reqID)
+	m := instance.newMessage(msg, typeID, reqID)
 	b, err := m.Encode()
 	if err != nil {
 		return err
@@ -1094,18 +1148,25 @@ func (s *SecureChannel) SendMsgWithContext(ctx context.Context, instance *channe
 
 	// todo(fs): what if len(b) != n? Can this happen?
 	if len(b) != n {
-		return errors.Errorf("uasc: incomplete message %T sent len=%d sent=%d", resp, len(b), n)
+		return errors.Errorf("uasc: incomplete message %T sent len=%d sent=%d", msg, len(b), n)
 	}
 
 	atomic.AddUint64(&instance.bytesSent, uint64(n))
 	atomic.AddUint32(&instance.messagesSent, 1)
 
-	debug.Printf("uasc %d/%d: send %T with %d bytes", s.c.ID(), reqID, resp, len(b))
+	dlog.Debug("uasc: send",
+		"conn_id", s.c.ID(),
+		"req_id", reqID,
+		"resp", fmt.Sprintf("%T", msg),
+		"msg_size", len(b),
+	)
 
 	return nil
 }
 
 func (s *SecureChannel) sendResponseWithContext(ctx context.Context, instance *channelInstance, reqID uint32, resp ua.Response) error {
+	dlog := ualog.With("func", "SecureChannel.sendResponseWithContext")
+
 	typeID := ua.ServiceTypeID(resp)
 	if typeID == 0 {
 		return errors.Errorf("uasc: unknown service %T. Did you call register?", resp)
@@ -1125,7 +1186,7 @@ func (s *SecureChannel) sendResponseWithContext(ctx context.Context, instance *c
 	m := instance.newMessage(resp, typeID, reqID)
 	b, err := m.Encode()
 	if err != nil {
-		log.Printf("Error encoding msg: %v", err)
+		ualog.Error("Error encoding msg", "error", err)
 		return err
 	}
 
@@ -1150,7 +1211,11 @@ func (s *SecureChannel) sendResponseWithContext(ctx context.Context, instance *c
 	atomic.AddUint64(&instance.bytesSent, uint64(n))
 	atomic.AddUint32(&instance.messagesSent, 1)
 
-	debug.Printf("uasc %d/%d: send %T with %d bytes", s.c.ID(), reqID, resp, len(b))
+	dlog.Debug("uasc: send response",
+		"conn_id", s.c.ID(),
+		"req_id", reqID,
+		"resp", fmt.Sprintf("%T", resp),
+		"msg_size", len(b))
 
 	return nil
 }
@@ -1177,7 +1242,9 @@ func (s *SecureChannel) Close() (err error) {
 }
 
 func (s *SecureChannel) close() error {
-	debug.Printf("uasc %d: Close()", s.c.ID())
+	dlog := ualog.With("func", "SecureChannel.close")
+
+	dlog.Debug("uasc: Close", "conn_id", s.c.ID())
 
 	defer func() {
 		close(s.closing)

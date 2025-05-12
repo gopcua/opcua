@@ -10,7 +10,6 @@ import (
 	"expvar"
 	"fmt"
 	"io"
-	"log"
 	"reflect"
 	"sort"
 	"sync"
@@ -18,9 +17,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/gopcua/opcua/debug"
 	"github.com/gopcua/opcua/errors"
 	"github.com/gopcua/opcua/id"
+	"github.com/gopcua/opcua/internal/ualog"
 	"github.com/gopcua/opcua/stats"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uacp"
@@ -281,10 +280,10 @@ func (c *Client) Connect(ctx context.Context) error {
 
 // monitor manages connection alteration
 func (c *Client) monitor(ctx context.Context) {
-	dlog := debug.NewPrefixLogger("client: monitor: ")
+	dlog := ualog.With("func", "Client.monitor")
 
-	dlog.Printf("start")
-	defer dlog.Printf("done")
+	dlog.Debug("start")
+	defer dlog.Debug("done")
 
 	defer c.mcancel()
 	defer c.setState(ctx, Closed)
@@ -300,7 +299,7 @@ func (c *Client) monitor(ctx context.Context) {
 
 			// return if channel or connection is closed
 			if !ok || err == io.EOF && c.State() == Closed {
-				dlog.Print("closed")
+				dlog.Debug("closed")
 				return
 			}
 
@@ -312,16 +311,16 @@ func (c *Client) monitor(ctx context.Context) {
 
 			// tell the handler the connection is disconnected
 			c.setState(ctx, Disconnected)
-			dlog.Print("disconnected")
+			dlog.Debug("disconnected")
 
 			if !c.cfg.sechan.AutoReconnect {
 				// the connection is closed and should not be restored
 				action = abortReconnect
-				dlog.Print("auto-reconnect disabled")
+				dlog.Debug("auto-reconnect disabled")
 				return
 			}
 
-			dlog.Print("auto-reconnecting")
+			dlog.Debug("auto-reconnecting")
 
 			switch {
 			case errors.Is(err, io.EOF):
@@ -372,7 +371,7 @@ func (c *Client) monitor(ctx context.Context) {
 					switch action {
 
 					case createSecureChannel:
-						dlog.Printf("action: createSecureChannel")
+						dlog.Debug("action: createSecureChannel")
 
 						// recreate a secure channel by brute forcing
 						// a reconnection to the server
@@ -394,24 +393,24 @@ func (c *Client) monitor(ctx context.Context) {
 
 						c.setState(ctx, Reconnecting)
 
-						dlog.Printf("trying to recreate secure channel")
+						dlog.Debug("trying to recreate secure channel")
 						for {
 							if err := c.Dial(ctx); err != nil {
 								select {
 								case <-ctx.Done():
 									return
 								case <-time.After(c.cfg.sechan.ReconnectInterval):
-									dlog.Printf("trying to recreate secure channel")
+									dlog.Debug("trying to recreate secure channel")
 									continue
 								}
 							}
 							break
 						}
-						dlog.Printf("secure channel recreated")
+						dlog.Debug("secure channel recreated")
 						action = restoreSession
 
 					case restoreSession:
-						dlog.Printf("action: restoreSession")
+						dlog.Debug("action: restoreSession")
 
 						// try to reactivate the session,
 						// This only works if the session is still open on the server
@@ -421,32 +420,32 @@ func (c *Client) monitor(ctx context.Context) {
 
 						s := c.Session()
 						if s == nil {
-							dlog.Printf("no session to restore")
+							dlog.Debug("no session to restore")
 							action = recreateSession
 							continue
 						}
 
-						dlog.Printf("trying to restore session")
+						dlog.Debug("trying to restore session")
 						if err := c.ActivateSession(ctx, s); err != nil {
-							dlog.Printf("restore session failed: %v", err)
+							dlog.Debug("restore session failed", "error", err)
 							action = recreateSession
 							continue
 						}
-						dlog.Printf("session restored")
+						dlog.Debug("session restored")
 
 						// todo(fs): see comment about guarding this with an option in Connect()
-						dlog.Printf("trying to update namespaces")
+						dlog.Debug("trying to update namespaces")
 						if err := c.UpdateNamespaces(ctx); err != nil {
-							dlog.Printf("updating namespaces failed: %v", err)
+							dlog.Debug("updating namespaces failed", "error", err)
 							action = createSecureChannel
 							continue
 						}
-						dlog.Printf("namespaces updated")
+						dlog.Debug("namespaces updated")
 
 						action = restoreSubscriptions
 
 					case recreateSession:
-						dlog.Printf("action: recreateSession")
+						dlog.Debug("action: recreateSession")
 
 						c.setState(ctx, Reconnecting)
 						// create a new session to replace the previous one
@@ -455,33 +454,33 @@ func (c *Client) monitor(ctx context.Context) {
 						// this also prevents any unnecessary calls to CloseSession
 						c.setSession(nil)
 
-						dlog.Printf("trying to recreate session")
+						dlog.Debug("trying to recreate session")
 						s, err := c.CreateSession(ctx, c.cfg.session)
 						if err != nil {
-							dlog.Printf("recreate session failed: %v", err)
+							dlog.Debug("recreate session failed", "error", err)
 							action = createSecureChannel
 							continue
 						}
 						if err := c.ActivateSession(ctx, s); err != nil {
-							dlog.Printf("reactivate session failed: %v", err)
+							dlog.Debug("reactivate session failed", "error", err)
 							action = createSecureChannel
 							continue
 						}
-						dlog.Print("session recreated")
+						dlog.Debug("session recreated")
 
 						// todo(fs): see comment about guarding this with an option in Connect()
-						dlog.Printf("trying to update namespaces")
+						dlog.Debug("trying to update namespaces")
 						if err := c.UpdateNamespaces(ctx); err != nil {
-							dlog.Printf("updating namespaces failed: %v", err)
+							dlog.Debug("updating namespaces failed", "error", err)
 							action = createSecureChannel
 							continue
 						}
-						dlog.Printf("namespaces updated")
+						dlog.Debug("namespaces updated")
 
 						action = transferSubscriptions
 
 					case transferSubscriptions:
-						dlog.Printf("action: transferSubscriptions")
+						dlog.Debug("action: transferSubscriptions")
 
 						// transfer subscriptions from the old to the new session
 						// and try to republish the subscriptions.
@@ -499,12 +498,12 @@ func (c *Client) monitor(ctx context.Context) {
 						switch {
 
 						case errors.Is(err, ua.StatusBadServiceUnsupported):
-							dlog.Printf("transfer subscriptions not supported. Recreating all subscriptions: %v", err)
+							dlog.Debug("transfer subscriptions not supported. Recreating all subscriptions", "error", err)
 							subsToRepublish = nil
 							subsToRecreate = subIDs
 
 						case err != nil:
-							dlog.Printf("transfer subscriptions failed. Recreating all subscriptions: %v", err)
+							dlog.Debug("transfer subscriptions failed. Recreating all subscriptions", "error", err)
 							subsToRepublish = nil
 							subsToRecreate = subIDs
 
@@ -515,7 +514,7 @@ func (c *Client) monitor(ctx context.Context) {
 								transferResult := res.Results[i]
 								switch transferResult.StatusCode {
 								case ua.StatusBadSubscriptionIDInvalid:
-									dlog.Printf("sub %d: transfer subscription failed", subIDs[i])
+									dlog.Debug("sub: transfer subscription failed", "sub_id", subIDs[i])
 									subsToRecreate = append(subsToRecreate, subIDs[i])
 
 								default:
@@ -528,7 +527,7 @@ func (c *Client) monitor(ctx context.Context) {
 						action = restoreSubscriptions
 
 					case restoreSubscriptions:
-						dlog.Printf("action: restoreSubscriptions")
+						dlog.Debug("action: restoreSubscriptions")
 
 						// try to republish the previous subscriptions from the server
 						// otherwise restore them.
@@ -538,7 +537,7 @@ func (c *Client) monitor(ctx context.Context) {
 						activeSubs = 0
 						for _, subID := range subsToRepublish {
 							if err := c.republishSubscription(ctx, subID, availableSeqs[subID]); err != nil {
-								dlog.Printf("republish of subscription %d failed", subID)
+								dlog.Debug("republish of subscription failed", "sub_id", subID)
 								subsToRecreate = append(subsToRecreate, subID)
 							}
 							activeSubs++
@@ -546,7 +545,7 @@ func (c *Client) monitor(ctx context.Context) {
 
 						for _, subID := range subsToRecreate {
 							if err := c.recreateSubscription(ctx, subID); err != nil {
-								dlog.Printf("recreate subscripitions failed: %v", err)
+								dlog.Debug("recreate subscripitions failed", "error", err)
 								action = recreateSession
 								continue
 							}
@@ -557,13 +556,13 @@ func (c *Client) monitor(ctx context.Context) {
 						action = none
 
 					case abortReconnect:
-						dlog.Printf("action: abortReconnect")
+						dlog.Debug("action: abortReconnect")
 
 						// non recoverable disconnection
 						// stop the client
 
 						// todo(unknownet): should we store the error?
-						dlog.Printf("reconnection not recoverable")
+						dlog.Debug("reconnection not recoverable")
 						return
 					}
 				}
@@ -576,11 +575,11 @@ func (c *Client) monitor(ctx context.Context) {
 
 			switch {
 			case activeSubs > 0:
-				dlog.Printf("resuming %d subscriptions", activeSubs)
+				dlog.Debug("resuming subscriptions", "active_subscriptions", activeSubs)
 				c.resumeSubscriptions(ctx)
-				dlog.Printf("resumed %d subscriptions", activeSubs)
+				dlog.Debug("resumed subscriptions", "active_subscriptions", activeSubs)
 			default:
-				dlog.Printf("no subscriptions to resume")
+				dlog.Debug("no subscriptions to resume")
 			}
 		}
 	}
@@ -781,7 +780,7 @@ func (c *Client) CreateSession(ctx context.Context, cfg *uasc.SessionConfig) (*S
 
 		err := sc.VerifySessionSignature(res.ServerCertificate, nonce, res.ServerSignature.Signature)
 		if err != nil {
-			log.Printf("error verifying session signature: %s", err)
+			ualog.Error("verifying session signature failed", "error", err)
 			return nil
 		}
 
@@ -845,7 +844,7 @@ func (c *Client) ActivateSession(ctx context.Context, s *Session) error {
 	stats.Client().Add("ActivateSession", 1)
 	sig, sigAlg, err := sc.NewSessionSignature(s.serverCertificate, s.serverNonce)
 	if err != nil {
-		log.Printf("error creating session signature: %s", err)
+		ualog.Error("creating session signature failed", "error", err)
 		return nil
 	}
 
@@ -856,7 +855,7 @@ func (c *Client) ActivateSession(ctx context.Context, s *Session) error {
 	case *ua.UserNameIdentityToken:
 		pass, passAlg, err := sc.EncryptUserPassword(s.cfg.AuthPolicyURI, s.cfg.AuthPassword, s.serverCertificate, s.serverNonce)
 		if err != nil {
-			log.Printf("error encrypting user password: %s", err)
+			ualog.Error("encrypting user password failed", "error", err)
 			return err
 		}
 		tok.Password = pass
@@ -865,7 +864,7 @@ func (c *Client) ActivateSession(ctx context.Context, s *Session) error {
 	case *ua.X509IdentityToken:
 		tokSig, tokSigAlg, err := sc.NewUserTokenSignature(s.cfg.AuthPolicyURI, s.serverCertificate, s.serverNonce)
 		if err != nil {
-			log.Printf("error creating session signature: %s", err)
+			ualog.Error("creating session signature failed", "error", err)
 			return err
 		}
 		s.cfg.UserTokenSignature = &ua.SignatureData{

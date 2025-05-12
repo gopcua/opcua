@@ -7,10 +7,9 @@ package main
 import (
 	"context"
 	"flag"
-	"log"
 
 	"github.com/gopcua/opcua"
-	"github.com/gopcua/opcua/debug"
+	"github.com/gopcua/opcua/internal/ualog"
 	"github.com/gopcua/opcua/ua"
 )
 
@@ -18,47 +17,48 @@ func main() {
 	var (
 		endpoint = flag.String("endpoint", "opc.tcp://localhost:4840", "OPC UA Endpoint URL")
 		nodeID   = flag.String("node", "", "NodeID to read")
+		debug    = flag.Bool("debug", false, "enable debug logging")
 	)
-	flag.BoolVar(&debug.Enable, "debug", false, "enable debug logging")
+
 	flag.Parse()
-	log.SetFlags(0)
+	ualog.SetDebugLogger(*debug)
 
 	ctx := context.Background()
 
 	c, err := opcua.NewClient(*endpoint)
 	if err != nil {
-		log.Fatal(err)
+		ualog.Fatal("NewClient failed", "error", err)
 	}
 	if err := c.Connect(ctx); err != nil {
-		log.Fatal(err)
+		ualog.Fatal("Connect failed", "error", err)
 	}
 	defer c.Close(ctx)
 
 	id, err := ua.ParseNodeID(*nodeID)
 	if err != nil {
-		log.Fatal(err)
+		ualog.Fatal("ParseNodeID failed", "error", err)
 	}
 
 	n := c.Node(id)
 	accessLevel, err := n.AccessLevel(ctx)
 	if err != nil {
-		log.Fatal(err)
+		ualog.Fatal("AccessLevel failed", "error", err)
 	}
-	log.Print("AccessLevel: ", accessLevel)
+	ualog.Info("Got access level", "access_level", accessLevel)
 
 	userAccessLevel, err := n.UserAccessLevel(ctx)
 	if err != nil {
-		log.Fatal(err)
+		ualog.Fatal("AccessLevel failed", "error", err)
 	}
-	log.Print("UserAccessLevel: ", userAccessLevel)
+	ualog.Info("Got user access level", "user_access_level", userAccessLevel)
 
 	v, err := n.Value(ctx)
 	switch {
 	case err != nil:
-		log.Fatal(err)
+		ualog.Fatal("Value failed", "error", err)
 	case v == nil:
-		log.Print("v == nil")
+		ualog.Info("v == nil")
 	default:
-		log.Print(v.Value())
+		ualog.Info("Got value", "value", v.Value())
 	}
 }

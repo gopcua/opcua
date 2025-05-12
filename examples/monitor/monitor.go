@@ -3,14 +3,13 @@ package main
 import (
 	"context"
 	"flag"
-	"log"
 	"os"
 	"os/signal"
 	"sync"
 	"time"
 
 	"github.com/gopcua/opcua"
-	"github.com/gopcua/opcua/debug"
+	"github.com/gopcua/opcua/internal/ualog"
 	"github.com/gopcua/opcua/monitor"
 	"github.com/gopcua/opcua/ua"
 )
@@ -24,11 +23,10 @@ func main() {
 		keyFile  = flag.String("key", "", "Path to private key.pem. Required for security mode/policy != None")
 		nodeID   = flag.String("node", "", "node id to subscribe to")
 		interval = flag.Duration("interval", opcua.DefaultSubscriptionInterval, "subscription interval")
+		debug    = flag.Bool("debug", false, "enable debug logging")
 	)
-	flag.BoolVar(&debug.Enable, "debug", false, "enable debug logging")
 	flag.Parse()
-
-	// log.SetFlags(0)
+	ualog.SetDebugLogger(*debug)
 
 	signalCh := make(chan os.Signal, 1)
 	signal.Notify(signalCh, os.Interrupt)
@@ -44,15 +42,15 @@ func main() {
 
 	endpoints, err := opcua.GetEndpoints(ctx, *endpoint)
 	if err != nil {
-		log.Fatal(err)
+		ualog.Fatal("GetEndpoints failed", "error", err)
 	}
 
 	ep, err := opcua.SelectEndpoint(endpoints, *policy, ua.MessageSecurityModeFromString(*mode))
 	if err != nil {
-		log.Fatal(err)
+		ualog.Fatal("SelectEndpoint failed", "error", err)
 	}
 
-	log.Print("*", ep.SecurityPolicyURI, ep.SecurityMode)
+	ualog.Info("*", "sec_policy", ep.SecurityPolicyURI, "sec_mode", ep.SecurityMode)
 
 	opts := []opcua.Option{
 		opcua.SecurityPolicy(*policy),
@@ -65,21 +63,21 @@ func main() {
 
 	c, err := opcua.NewClient(ep.EndpointURL, opts...)
 	if err != nil {
-		log.Fatal(err)
+		ualog.Fatal("NewClient failed", "error", err)
 	}
 	if err := c.Connect(ctx); err != nil {
-		log.Fatal(err)
+		ualog.Fatal("Connect failed", "error", err)
 	}
 
 	defer c.Close(ctx)
 
 	m, err := monitor.NewNodeMonitor(c)
 	if err != nil {
-		log.Fatal(err)
+		ualog.Fatal("NewNodeMonitor failed", "error", err)
 	}
 
 	m.SetErrorHandler(func(_ *opcua.Client, sub *monitor.Subscription, err error) {
-		log.Printf("error: sub=%d err=%s", sub.SubscriptionID(), err.Error())
+		ualog.Error("error", "sub_id", sub.SubscriptionID(), "error", err.Error())
 	})
 	wg := &sync.WaitGroup{}
 
@@ -103,16 +101,16 @@ func startCallbackSub(ctx context.Context, m *monitor.NodeMonitor, interval, lag
 		},
 		func(s *monitor.Subscription, msg *monitor.DataChangeMessage) {
 			if msg.Error != nil {
-				log.Printf("[callback] sub=%d error=%s", s.SubscriptionID(), msg.Error)
+				ualog.Error("[callback]", "sub_id", s.SubscriptionID(), "error", msg.Error)
 			} else {
-				log.Printf("[callback] sub=%d ts=%s node=%s value=%v", s.SubscriptionID(), msg.SourceTimestamp.UTC().Format(time.RFC3339), msg.NodeID, msg.Value.Value())
+				ualog.Info("[callback]", "sub_id", s.SubscriptionID(), "timestamp", msg.SourceTimestamp.UTC().Format(time.RFC3339), "node_id", msg.NodeID, "value", msg.Value.Value())
 			}
 			time.Sleep(lag)
 		},
 		nodes...)
 
 	if err != nil {
-		log.Fatal(err)
+		ualog.Fatal("Subscribe failed", "error", err)
 	}
 
 	defer cleanup(ctx, sub, wg)
@@ -125,7 +123,7 @@ func startChanSub(ctx context.Context, m *monitor.NodeMonitor, interval, lag tim
 	sub, err := m.ChanSubscribe(ctx, &opcua.SubscriptionParameters{Interval: interval}, ch, nodes...)
 
 	if err != nil {
-		log.Fatal(err)
+		ualog.Fatal("ChanSubscribe failed", "error", err)
 	}
 
 	defer cleanup(ctx, sub, wg)
@@ -136,9 +134,9 @@ func startChanSub(ctx context.Context, m *monitor.NodeMonitor, interval, lag tim
 			return
 		case msg := <-ch:
 			if msg.Error != nil {
-				log.Printf("[channel ] sub=%d error=%s", sub.SubscriptionID(), msg.Error)
+				ualog.Error("[channel]", "sub_id", sub.SubscriptionID(), "error", msg.Error)
 			} else {
-				log.Printf("[channel ] sub=%d ts=%s node=%s value=%v", sub.SubscriptionID(), msg.SourceTimestamp.UTC().Format(time.RFC3339), msg.NodeID, msg.Value.Value())
+				ualog.Info("[channel]", "sub_id", sub.SubscriptionID(), "timestamp", msg.SourceTimestamp.UTC().Format(time.RFC3339), "node_id", msg.NodeID, "value", msg.Value.Value())
 			}
 			time.Sleep(lag)
 		}
@@ -146,7 +144,7 @@ func startChanSub(ctx context.Context, m *monitor.NodeMonitor, interval, lag tim
 }
 
 func cleanup(ctx context.Context, sub *monitor.Subscription, wg *sync.WaitGroup) {
-	log.Printf("stats: sub=%d delivered=%d dropped=%d", sub.SubscriptionID(), sub.Delivered(), sub.Dropped())
+	ualog.Info("stats", "sub_id", sub.SubscriptionID(), "delivered", sub.Delivered(), "dropped", sub.Dropped())
 	sub.Unsubscribe(ctx)
 	wg.Done()
 }

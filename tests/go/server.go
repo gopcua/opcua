@@ -6,9 +6,9 @@ package uatest2
 
 import (
 	"context"
-	"log"
 
 	"github.com/gopcua/opcua/id"
+	"github.com/gopcua/opcua/internal/ualog"
 	"github.com/gopcua/opcua/server"
 	"github.com/gopcua/opcua/server/attrs"
 	"github.com/gopcua/opcua/ua"
@@ -134,7 +134,7 @@ func startServer() *server.Server {
 	// Create a new node namespace.  You can add namespaces before or after starting the server.
 	// Start the server
 	if err := s.Start(context.Background()); err != nil {
-		log.Fatalf("Error starting server, exiting: %s", err)
+		ualog.Fatal("Starting server failed", "error", err)
 	}
 	return s
 }

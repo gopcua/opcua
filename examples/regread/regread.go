@@ -7,10 +7,10 @@ package main
 import (
 	"context"
 	"flag"
-	"log"
+	"fmt"
 
 	"github.com/gopcua/opcua"
-	"github.com/gopcua/opcua/debug"
+	"github.com/gopcua/opcua/internal/ualog"
 	"github.com/gopcua/opcua/ua"
 )
 
@@ -18,32 +18,32 @@ func main() {
 	var (
 		endpoint = flag.String("endpoint", "opc.tcp://localhost:4840", "OPC UA Endpoint URL")
 		nodeID   = flag.String("node", "", "NodeID to read")
+		debug    = flag.Bool("debug", false, "enable debug logging")
 	)
-	flag.BoolVar(&debug.Enable, "debug", false, "enable debug logging")
 	flag.Parse()
-	log.SetFlags(0)
+	ualog.SetDebugLogger(*debug)
 
 	ctx := context.Background()
 
 	c, err := opcua.NewClient(*endpoint, opcua.SecurityMode(ua.MessageSecurityModeNone))
 	if err != nil {
-		log.Fatal(err)
+		ualog.Fatal("NewClient failed", "error", err)
 	}
 	if err := c.Connect(ctx); err != nil {
-		log.Fatal(err)
+		ualog.Fatal("Connect failed", "error", err)
 	}
 	defer c.Close(ctx)
 
 	id, err := ua.ParseNodeID(*nodeID)
 	if err != nil {
-		log.Fatalf("invalid node id: %v", err)
+		ualog.Fatal("invalid node id", "node_id", *nodeID, "error", err)
 	}
 
 	regResp, err := c.RegisterNodes(ctx, &ua.RegisterNodesRequest{
 		NodesToRegister: []*ua.NodeID{id},
 	})
 	if err != nil {
-		log.Fatalf("RegisterNodes failed: %v", err)
+		ualog.Fatal("RegisterNodes failed", "error", err)
 	}
 
 	req := &ua.ReadRequest{
@@ -56,17 +56,17 @@ func main() {
 
 	resp, err := c.Read(ctx, req)
 	if err != nil {
-		log.Fatalf("Read failed: %s", err)
+		ualog.Fatal("Read failed", "error", err)
 	}
 	if resp.Results[0].Status != ua.StatusOK {
-		log.Fatalf("Status not OK: %v", resp.Results[0].Status)
+		ualog.Fatal("Status not OK", "status_code", resp.Results[0].Status)
 	}
-	log.Print(resp.Results[0].Value.Value())
+	ualog.Info(fmt.Sprintf("Value: %#v", resp.Results[0].Value.Value()))
 
 	_, err = c.UnregisterNodes(ctx, &ua.UnregisterNodesRequest{
 		NodesToUnregister: []*ua.NodeID{id},
 	})
 	if err != nil {
-		log.Fatalf("UnregisterNodes failed: %v", err)
+		ualog.Fatal("UnregisterNodes failed", "error", err)
 	}
 }

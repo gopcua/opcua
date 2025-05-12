@@ -8,38 +8,38 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"log"
 
 	"github.com/gopcua/opcua"
-	"github.com/gopcua/opcua/debug"
 	"github.com/gopcua/opcua/id"
+	"github.com/gopcua/opcua/internal/ualog"
 	"github.com/gopcua/opcua/ua"
 )
 
 func main() {
-	endpoint := flag.String("endpoint", "opc.tcp://localhost:4840", "OPC UA Endpoint URL")
-	nodePath := flag.String("path", "device_led.temperature", "path of a node's browse name")
-	ns := flag.Int("namespace", 0, "namespace of the node")
-	flag.BoolVar(&debug.Enable, "debug", false, "enable debug logging")
-
+	var (
+		endpoint = flag.String("endpoint", "opc.tcp://localhost:4840", "OPC UA Endpoint URL")
+		nodePath = flag.String("path", "device_led.temperature", "path of a node's browse name")
+		ns       = flag.Int("namespace", 0, "namespace of the node")
+		debug    = flag.Bool("debug", false, "enable debug logging")
+	)
 	flag.Parse()
-	log.SetFlags(0)
+	ualog.SetDebugLogger(*debug)
 
 	ctx := context.Background()
 
 	c, err := opcua.NewClient(*endpoint)
 	if err != nil {
-		log.Fatal(err)
+		ualog.Fatal("NewClient failed", "error", err)
 	}
 	if err := c.Connect(ctx); err != nil {
-		log.Fatal(err)
+		ualog.Fatal("Connect failed", "error", err)
 	}
 	defer c.Close(ctx)
 
 	root := c.Node(ua.NewTwoByteNodeID(id.ObjectsFolder))
 	nodeID, err := root.TranslateBrowsePathInNamespaceToNodeID(ctx, uint16(*ns), *nodePath)
 	if err != nil {
-		log.Fatal(err)
+		ualog.Fatal("TranslateBrowsePathInNamespaceToNodeID failed", "error", err)
 	}
 	fmt.Println(nodeID)
 }

@@ -3,12 +3,12 @@ package opcua
 import (
 	"context"
 	"io"
-	"log"
 	"slices"
 	"time"
 
 	"github.com/gopcua/opcua/debug"
 	"github.com/gopcua/opcua/errors"
+	"github.com/gopcua/opcua/internal/ualog"
 	"github.com/gopcua/opcua/stats"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uasc"
@@ -129,15 +129,17 @@ func (c *Client) republishSubscription(ctx context.Context, id uint32, available
 		return errors.Errorf("invalid subscription id %d", id)
 	}
 
-	debug.Printf("republishing subscription %d", sub.SubscriptionID)
+	dlog := ualog.With("func", "Client.republishSubscription", "sub_id", sub.SubscriptionID)
+
+	dlog.Debug("republishing subscription")
 	if err := c.sendRepublishRequests(ctx, sub, availableSeq); err != nil {
 		switch {
 		case errors.Is(err, ua.StatusBadSessionIDInvalid):
 			return nil
 		case errors.Is(err, ua.StatusBadSubscriptionIDInvalid):
 			// todo(fs): do we need to forget the subscription id in this case?
-			debug.Printf("republish failed since subscription %d is invalid", sub.SubscriptionID)
-			return errors.Errorf("republish failed since subscription %d is invalid", sub.SubscriptionID)
+			dlog.Debug("republish failed since subscription is invalid")
+			return errors.Errorf("republish failed since subscription is invalid. subscription_id=%d", sub.SubscriptionID)
 		default:
 			return err
 		}
@@ -149,11 +151,17 @@ func (c *Client) republishSubscription(ctx context.Context, id uint32, available
 // until it gets a BadMessageNotAvailable which implies that there are no
 // more messages to restore.
 func (c *Client) sendRepublishRequests(ctx context.Context, sub *Subscription, availableSeq []uint32) error {
+	dlog := ualog.With("func", "Client.sendPublishRequests")
+
 	// todo(fs): check if sub.nextSeq is in the available sequence numbers
 	// todo(fs): if not then we need to decide whether we fail b/c of data loss
 	// todo(fs): or whether we log it and continue.
 	if len(availableSeq) > 0 && !slices.Contains(availableSeq, sub.nextSeq) {
-		log.Printf("sub %d: next sequence number %d not in retransmission buffer %v", sub.SubscriptionID, sub.nextSeq, availableSeq)
+		ualog.Info("sub: next sequence number not in retransmission buffer",
+			"sub_id", sub.SubscriptionID,
+			"next_seq_nr", sub.nextSeq,
+			"avail_seq_nrs", availableSeq,
+		)
 	}
 
 	for {
@@ -162,38 +170,38 @@ func (c *Client) sendRepublishRequests(ctx context.Context, sub *Subscription, a
 			RetransmitSequenceNumber: sub.nextSeq,
 		}
 
-		debug.Printf("Republishing subscription %d and sequence number %d",
-			req.SubscriptionID,
-			req.RetransmitSequenceNumber,
+		dlog.Debug("Republishing subscription and sequence number",
+			"sub_id", req.SubscriptionID,
+			"seq_nr", req.RetransmitSequenceNumber,
 		)
 
 		s := c.Session()
 		if s == nil {
-			debug.Printf("Republishing subscription %d aborted", req.SubscriptionID)
+			dlog.Debug("Republishing subscription aborted", "sub_id", req.SubscriptionID)
 			return ua.StatusBadSessionClosed
 		}
 
 		sc := c.SecureChannel()
 		if sc == nil {
-			debug.Printf("Republishing subscription %d aborted", req.SubscriptionID)
+			dlog.Debug("Republishing subscription aborted", "sub_id", req.SubscriptionID)
 			return ua.StatusBadNotConnected
 		}
 
-		debug.Printf("RepublishRequest: req=%s", debug.ToJSON(req))
+		dlog.Debug("RepublishRequest", "req", debug.ToJSON(req))
 		var res *ua.RepublishResponse
 		err := sc.SendRequest(ctx, req, c.Session().resp.AuthenticationToken, func(v ua.Response) error {
 			return safeAssign(v, &res)
 		})
-		debug.Printf("RepublishResponse: res=%s err=%v", debug.ToJSON(res), err)
+		dlog.Debug("RepublishResponse", "res", debug.ToJSON(res), "error", err)
 
 		switch {
 		case err == ua.StatusBadMessageNotAvailable:
 			// No more message to restore
-			debug.Printf("Republishing subscription %d OK", req.SubscriptionID)
+			dlog.Debug("Republishing subscription OK", "sub_id", req.SubscriptionID)
 			return nil
 
 		case err != nil:
-			debug.Printf("Republishing subscription %d failed: %v", req.SubscriptionID, err)
+			dlog.Debug("Republishing subscription failed", "sub_id", req.SubscriptionID, "error", err)
 			return err
 
 		default:
@@ -203,7 +211,7 @@ func (c *Client) sendRepublishRequests(ctx context.Context, sub *Subscription, a
 			}
 
 			if status != ua.StatusOK {
-				debug.Printf("Republishing subscription %d failed: %v", req.SubscriptionID, status)
+				dlog.Debug("Republishing subscription failed", "sub_id", req.SubscriptionID, "error", status)
 				return status
 			}
 		}
@@ -345,34 +353,34 @@ func (c *Client) resumeSubscriptions(ctx context.Context) {
 // monitorSubscriptions sends publish requests and handles publish responses
 // for all active subscriptions.
 func (c *Client) monitorSubscriptions(ctx context.Context) {
-	dlog := debug.NewPrefixLogger("sub: ")
-	defer dlog.Print("done")
+	dlog := ualog.With("func", "Client.monitorSubscriptions")
+	defer dlog.Debug("done")
 
 publish:
 	for {
 		select {
 		case <-ctx.Done():
-			dlog.Println("ctx.Done()")
+			dlog.Debug("ctx.Done()")
 			return
 
 		case <-c.resumech:
-			dlog.Print("resume")
+			dlog.Debug("resume")
 			// ignore since not paused
 
 		case <-c.pausech:
-			dlog.Print("pause")
+			dlog.Debug("pause")
 			for {
 				select {
 				case <-ctx.Done():
-					dlog.Print("pause: ctx.Done()")
+					dlog.Debug("pause: ctx.Done()")
 					return
 
 				case <-c.resumech:
-					dlog.Print("pause: resume")
+					dlog.Debug("pause: resume")
 					continue publish
 
 				case <-c.pausech:
-					dlog.Print("pause: pause")
+					dlog.Debug("pause: pause")
 					// ignore since already paused
 				}
 			}
@@ -383,7 +391,7 @@ publish:
 			// publish() blocks until a PublishResponse
 			// is received or the context is cancelled.
 			if err := c.publish(ctx); err != nil {
-				dlog.Print("error: ", err.Error())
+				dlog.Debug("publish failed. Pausing subscriptions", "error", err.Error())
 				c.pauseSubscriptions(ctx)
 			}
 		}
@@ -392,10 +400,10 @@ publish:
 
 // publish sends a publish request and handles the response.
 func (c *Client) publish(ctx context.Context) error {
-	dlog := debug.NewPrefixLogger("publish: ")
+	dlog := ualog.With("func", "Client.publish")
 
 	c.subMux.RLock()
-	dlog.Printf("pendingAcks=%s", debug.ToJSON(c.pendingAcks))
+	dlog.Debug("pendingAcks", "ack_ids", debug.ToJSON(c.pendingAcks))
 	c.subMux.RUnlock()
 
 	// send the next publish request
@@ -404,30 +412,30 @@ func (c *Client) publish(ctx context.Context) error {
 	stats.RecordError(err)
 	switch {
 	case err == io.EOF:
-		dlog.Printf("eof: pausing publish loop")
+		dlog.Debug("eof: pausing publish loop")
 		return err
 
 	case err == ua.StatusBadSessionNotActivated:
-		dlog.Printf("error: session not active. pausing publish loop")
+		dlog.Debug("error: session not active. pausing publish loop")
 		return err
 
 	case err == ua.StatusBadSessionIDInvalid:
-		dlog.Printf("error: session not valid. pausing publish loop")
+		dlog.Debug("error: session not valid. pausing publish loop")
 		return err
 
 	case err == ua.StatusBadServerNotConnected:
-		dlog.Printf("error: no connection. pausing publish loop")
+		dlog.Debug("error: no connection. pausing publish loop")
 		return err
 
 	case err == ua.StatusBadSequenceNumberUnknown:
 		// todo(fs): this should only happen per in the status codes
 		// todo(fs): lets log this here to see
-		dlog.Printf("error: this should only happen when ACK'ing results: %s", err)
+		dlog.Debug("error: this should only happen when ACK'ing results", "error", err)
 
 	case err == ua.StatusBadTooManyPublishRequests:
 		// todo(fs): we have sent too many publish requests
 		// todo(fs): we need to slow down
-		dlog.Printf("error: sleeping for one second: %s", err)
+		dlog.Debug("error: sleeping for one second", "error", err)
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
@@ -436,12 +444,12 @@ func (c *Client) publish(ctx context.Context) error {
 
 	case err == ua.StatusBadTimeout:
 		// ignore and continue the loop
-		dlog.Printf("error: ignoring: %s", err)
+		dlog.Debug("error: ignoring", "error", err)
 
 	case err == ua.StatusBadNoSubscription:
 		// All subscriptions have been deleted, but the publishing loop is still running
 		// We should pause publishing until a subscription has been created
-		dlog.Printf("error: no subscriptions but the publishing loop is still running: %s", err)
+		dlog.Debug("error: no subscriptions but the publishing loop is still running", "error", err)
 		return err
 
 	case err != nil && res != nil:
@@ -452,11 +460,11 @@ func (c *Client) publish(ctx context.Context) error {
 		} else {
 			c.notifySubscriptionOfError(ctx, res.SubscriptionID, err)
 		}
-		dlog.Printf("error: %s", err)
+		dlog.Debug("error", "error", err)
 		return err
 
 	case err != nil:
-		dlog.Printf("error: unexpected error. Do we need to stop the publish loop?: %s", err)
+		dlog.Debug("error: unexpected error. Do we need to stop the publish loop?", "error", err)
 		return err
 
 	default:
@@ -468,7 +476,7 @@ func (c *Client) publish(ctx context.Context) error {
 		if !ok {
 			c.subMux.Unlock()
 			// todo(fs): should we return an error here?
-			dlog.Printf("error: unknown subscription %d", res.SubscriptionID)
+			dlog.Debug("error: unknown subscription", "sub_id", res.SubscriptionID)
 			return nil
 		}
 
@@ -477,19 +485,19 @@ func (c *Client) publish(ctx context.Context) error {
 		c.subMux.Unlock()
 
 		c.notifySubscription(ctx, sub, res.NotificationMessage)
-		dlog.Printf("notif: %d", res.NotificationMessage.SequenceNumber)
+		dlog.Debug("notif", "sequence_nr", res.NotificationMessage.SequenceNumber)
 	}
 
 	return nil
 }
 
 func (c *Client) handleAcks_NeedsSubMuxLock(res []ua.StatusCode) {
-	dlog := debug.NewPrefixLogger("publish: ")
+	dlog := ualog.With("func", "Client.handleAcks")
 
 	// we assume that the number of results in the response match
 	// the number of pending acks from the previous PublishRequest.
 	if len(c.pendingAcks) != len(res) {
-		dlog.Printf("error: got %d results for pending ACKs but want %d", len(res), len(c.pendingAcks))
+		dlog.Debug("error: got wrong number of results for pending ACKs", "got_count", len(res), "want_count", len(c.pendingAcks))
 		c.pendingAcks = []*ua.SubscriptionAcknowledgement{}
 	}
 
@@ -502,22 +510,22 @@ func (c *Client) handleAcks_NeedsSubMuxLock(res []ua.StatusCode) {
 			// message ack'ed
 		case ua.StatusBadSubscriptionIDInvalid:
 			// old subscription id -> skip
-			dlog.Printf("error: subscription id invalid. skipping: %s", err)
+			dlog.Debug("error: subscription id invalid. skipping", "error", err)
 		case ua.StatusBadSequenceNumberUnknown:
 			// server does not have the message in its retransmission queue anymore
-			dlog.Printf("error: notif %d/%d not on server anymore: %s", ack.SubscriptionID, ack.SequenceNumber, err)
+			dlog.Debug("error: notifnot on server anymore", "sub_id", ack.SubscriptionID, "seq_nr", ack.SequenceNumber, "error", err)
 		default:
 			// otherwise, we try to ack again
 			notAcked = append(notAcked, ack)
-			dlog.Printf("retrying to ACK notif %d/%d: %s", ack.SubscriptionID, ack.SequenceNumber, err)
+			dlog.Debug("retrying to ACK notif", "sub_id", ack.SubscriptionID, "seq_nr", ack.SequenceNumber, "error", err)
 		}
 	}
 	c.pendingAcks = notAcked
-	dlog.Printf("notAcked=%v", notAcked)
+	dlog.Debug("notAcked", "ack_list", notAcked)
 }
 
 func (c *Client) handleNotification_NeedsSubMuxLock(sub *Subscription, res *ua.PublishResponse) {
-	dlog := debug.NewPrefixLogger("publish: sub %d: ", res.SubscriptionID)
+	dlog := ualog.With("func", "Client.handleNotification", "sub_id", res.SubscriptionID)
 
 	// keep-alive message
 	if len(res.NotificationMessage.NotificationData) == 0 {
@@ -527,7 +535,7 @@ func (c *Client) handleNotification_NeedsSubMuxLock(sub *Subscription, res *ua.P
 	}
 
 	if res.NotificationMessage.SequenceNumber != sub.nextSeq {
-		dlog.Printf("error: got notif %d but was expecting notif %d. Data loss?", res.NotificationMessage.SequenceNumber, sub.nextSeq)
+		dlog.Debug("error: got unexpected notif. Data loss?", "got_notif", res.NotificationMessage.SequenceNumber, "want_notif", sub.nextSeq)
 	}
 
 	sub.lastSeq = res.NotificationMessage.SequenceNumber
@@ -539,7 +547,7 @@ func (c *Client) handleNotification_NeedsSubMuxLock(sub *Subscription, res *ua.P
 }
 
 func (c *Client) sendPublishRequest(ctx context.Context) (*ua.PublishResponse, error) {
-	dlog := debug.NewPrefixLogger("publish: ")
+	dlog := ualog.With("func", "Client.sendPublishRequest")
 
 	c.subMux.RLock()
 	req := &ua.PublishRequest{
@@ -550,12 +558,12 @@ func (c *Client) sendPublishRequest(ctx context.Context) (*ua.PublishResponse, e
 	}
 	c.subMux.RUnlock()
 
-	dlog.Printf("PublishRequest: %s", debug.ToJSON(req))
+	dlog.Debug("PublishRequest", "req", debug.ToJSON(req))
 	var res *ua.PublishResponse
 	err := c.sendWithTimeout(ctx, req, c.publishTimeout(), func(v ua.Response) error {
 		return safeAssign(v, &res)
 	})
 	stats.RecordError(err)
-	dlog.Printf("PublishResponse: %s", debug.ToJSON(res))
+	dlog.Debug("PublishResponse", "resp", debug.ToJSON(res))
 	return res, err
 }

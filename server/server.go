@@ -9,7 +9,6 @@ import (
 	"crypto/rsa"
 	"encoding/xml"
 	"fmt"
-	"log/slog"
 	"net"
 	"slices"
 	"strings"
@@ -17,6 +16,7 @@ import (
 	"time"
 
 	"github.com/gopcua/opcua/id"
+	"github.com/gopcua/opcua/internal/ualog"
 	"github.com/gopcua/opcua/schema"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uacp"
@@ -104,7 +104,6 @@ func New(opts ...Option) *Server {
 		manufacturerName: "The gopcua Team",      // override with the ManufacturerName option
 		productName:      "gopcua OPC/UA Server", // override with the ProductName option
 		softwareVersion:  "0.0.0-dev",            // override with the SoftwareVersion option
-		logger:           slog.Default(),
 	}
 	for _, opt := range opts {
 		opt(cfg)
@@ -114,7 +113,7 @@ func New(opts ...Option) *Server {
 		url = cfg.endpoints[0]
 	}
 	if cfg.logger == nil {
-		cfg.logger = &DiscardLogger{}
+		cfg.logger = &slogLogger{logger: ualog.Default()}
 	}
 
 	s := &Server{
