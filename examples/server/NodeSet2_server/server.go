@@ -19,6 +19,7 @@ import (
 	"github.com/gopcua/opcua/internal/ualog"
 	"github.com/gopcua/opcua/schema"
 	"github.com/gopcua/opcua/server"
+	"github.com/gopcua/opcua/tests/utils"
 	"github.com/gopcua/opcua/ua"
 )
 
@@ -99,7 +100,7 @@ func main() {
 			*endpoint,
 		}
 
-		c, k, err := GenerateCert(endpoints, 4096, time.Minute*60*24*365*10)
+		c, k, err := utils.GenerateCert(endpoints, 4096, time.Minute*60*24*365*10)
 		if err != nil {
 			ualog.Fatal("GenerateCert failed", "error", err)
 		}

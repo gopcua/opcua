@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/gopcua/opcua/id"
-	uatest "github.com/gopcua/opcua/tests/python"
+	"github.com/gopcua/opcua/tests/utils"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uacp"
 	"github.com/gopcua/opcua/uapolicy"
@@ -154,7 +154,7 @@ func TestSignAndEncryptVerifyAndDecrypt(t *testing.T) {
 	buildSecPolicy := func(bits int, uri string) *uapolicy.EncryptionAlgorithm {
 		t.Helper()
 
-		certPEM, keyPEM, err := uatest.GenerateCert("localhost", bits, 24*time.Hour)
+		certPEM, keyPEM, err := utils.GenerateCert([]string{"localhost"}, bits, 24*time.Hour)
 		require.NoError(t, err)
 
 		block, _ := pem.Decode(keyPEM)

@@ -8,7 +8,7 @@
 // Based on src/crypto/tls/generate_cert.go from the Go SDK
 // Modified by the Gopcua Authors for use in creating an OPC-UA compliant client certificate
 
-package uatest2
+package utils
 
 import (
 	"crypto/ecdsa"
@@ -22,11 +22,10 @@ import (
 	"net"
 	"net/url"
 	"os"
-	"strings"
 	"time"
 )
 
-func GenerateCert(host string, rsaBits int, validFor time.Duration) (certPEM, keyPEM []byte, err error) {
+func GenerateCert(host []string, rsaBits int, validFor time.Duration) (certPEM, keyPEM []byte, err error) {
 	if len(host) == 0 {
 		return nil, nil, fmt.Errorf("missing required host parameter")
 	}
@@ -51,7 +50,7 @@ func GenerateCert(host string, rsaBits int, validFor time.Duration) (certPEM, ke
 	template := x509.Certificate{
 		SerialNumber: serialNumber,
 		Subject: pkix.Name{
-			Organization: []string{"Gopcua Test Client"},
+			CommonName: "Gopcua Test Certificate",
 		},
 		NotBefore: notBefore,
 		NotAfter:  notAfter,
@@ -61,8 +60,7 @@ func GenerateCert(host string, rsaBits int, validFor time.Duration) (certPEM, ke
 		BasicConstraintsValid: true,
 	}
 
-	hosts := strings.Split(host, ",")
-	for _, h := range hosts {
+	for _, h := range host {
 		if ip := net.ParseIP(h); ip != nil {
 			template.IPAddresses = append(template.IPAddresses, ip)
 		} else {

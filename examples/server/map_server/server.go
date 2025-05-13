@@ -14,6 +14,7 @@ import (
 	"crypto/rsa"
 	"crypto/tls"
 	"flag"
+	"github.com/gopcua/opcua/tests/utils"
 	"log"
 	"os"
 	"os/signal"
@@ -93,7 +94,7 @@ func main() {
 			*endpoint,
 		}
 
-		c, k, err := GenerateCert(endpoints, 4096, time.Minute*60*24*365*10)
+		c, k, err := utils.GenerateCert(endpoints, 4096, time.Minute*60*24*365*10)
 		if err != nil {
 			log.Fatalf("problem creating cert: %v", err)
 		}

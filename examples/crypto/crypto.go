@@ -11,6 +11,7 @@ import (
 	"crypto/tls"
 	"flag"
 	"fmt"
+	"github.com/gopcua/opcua/tests/utils"
 	"os"
 	"strings"
 	"syscall"
@@ -21,7 +22,6 @@ import (
 	"github.com/gopcua/opcua"
 	"github.com/gopcua/opcua/errors"
 	"github.com/gopcua/opcua/internal/ualog"
-	uatest "github.com/gopcua/opcua/tests/python"
 	"github.com/gopcua/opcua/ua"
 )
 
@@ -127,7 +127,7 @@ func clientOptsFromFlags(endpoints []*ua.EndpointDescription) []opcua.Option {
 	var privateKey *rsa.PrivateKey
 	if *gencert || (*certfile != "" && *keyfile != "") {
 		if *gencert {
-			certPEM, keyPEM, err := uatest.GenerateCert(*appuri, 2048, 24*time.Hour)
+			certPEM, keyPEM, err := utils.GenerateCert([]string{*appuri}, 2048, 24*time.Hour)
 			if err != nil {
 				ualog.Fatal("failed to generate cert", "error", err)
 			}
