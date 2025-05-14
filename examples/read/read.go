@@ -90,5 +90,5 @@ func main() {
 		ualog.Fatal("Status not OK", "status_code", resp.Results[0].Status)
 	}
 
-	ualog.Info(fmt.Sprintf("%#v", resp.Results[0].Value.Value()))
+	slog.Info(fmt.Sprintf("%#v", resp.Results[0].Value.Value()))
 }

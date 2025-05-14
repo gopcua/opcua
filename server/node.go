@@ -1,12 +1,12 @@
 package server
 
 import (
+	"log/slog"
 	"maps"
 	"slices"
 	"time"
 
 	"github.com/gopcua/opcua/id"
-	"github.com/gopcua/opcua/internal/ualog"
 	"github.com/gopcua/opcua/server/attrs"
 	"github.com/gopcua/opcua/server/refs"
 	"github.com/gopcua/opcua/ua"
@@ -259,7 +259,7 @@ func (n *Node) SetDescription(text, locale string) {
 }
 
 func (n *Node) DataType() *ua.ExpandedNodeID {
-	dlog := ualog.With("func", "Node.DataType", "node_id", n.id)
+	dlog := slog.With("func", "Node.DataType", "node_id", n.id)
 
 	if n == nil {
 		dlog.Debug("n was nil!")

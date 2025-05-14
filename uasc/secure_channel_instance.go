@@ -6,13 +6,13 @@ package uasc
 
 import (
 	"encoding/binary"
+	"log/slog"
 	"math"
 	"sync"
 	"time"
 
 	"github.com/gopcua/opcua/errors"
 	"github.com/gopcua/opcua/id"
-	"github.com/gopcua/opcua/internal/ualog"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uapolicy"
 )
@@ -85,7 +85,7 @@ func (c *channelInstance) newRequestMessage(req ua.Request, reqID uint32, authTo
 }
 
 func (c *channelInstance) newMessage(srv interface{}, typeID uint16, requestID uint32) *Message {
-	dlog := ualog.With("func", "channelInstance.newMessage")
+	dlog := slog.With("func", "channelInstance.newMessage")
 	sequenceNumber := c.nextSequenceNumber()
 	dlog.Debug("new message", "sequence_number", sequenceNumber)
 

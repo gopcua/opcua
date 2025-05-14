@@ -62,7 +62,7 @@ func main() {
 	if resp.Results[0].Status != ua.StatusOK {
 		ualog.Fatal("Status not OK", "status_code", resp.Results[0].Status)
 	}
-	ualog.Info(fmt.Sprintf("Value: %#v", resp.Results[0].Value.Value()))
+	slog.Info(fmt.Sprintf("Value: %#v", resp.Results[0].Value.Value()))
 
 	_, err = c.UnregisterNodes(ctx, &ua.UnregisterNodesRequest{
 		NodesToUnregister: []*ua.NodeID{id},

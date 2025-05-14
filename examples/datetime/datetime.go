@@ -63,8 +63,8 @@ func main() {
 	case err != nil:
 		ualog.Fatal("Node failed", "error", err)
 	case v == nil:
-		ualog.Warn("v == nil")
+		slog.Warn("v == nil")
 	default:
-		ualog.Info("Got a value", "value", v.Value())
+		slog.Info("Got a value", "value", v.Value())
 	}
 }

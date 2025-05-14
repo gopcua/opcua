@@ -89,10 +89,10 @@ func main() {
 
 	var cert []byte
 	if *gencert || (*certfile != "" && *keyfile != "") {
-		ualog.Info("Loading cert and key", "certfile", *certfile, "keyfile", *keyfile)
+		slog.Info("Loading cert and key", "certfile", *certfile, "keyfile", *keyfile)
 		c, err := tls.LoadX509KeyPair(*certfile, *keyfile)
 		if err != nil {
-			ualog.Error("LoadX509KeyPair failed", "error", err)
+			slog.Error("LoadX509KeyPair failed", "error", err)
 		} else {
 			pk, ok := c.PrivateKey.(*rsa.PrivateKey)
 			if !ok {

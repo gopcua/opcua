@@ -37,7 +37,7 @@ func main() {
 	d := 60 * time.Second
 	ctx, cancel := context.WithTimeout(context.Background(), d)
 	defer cancel()
-	ualog.Info("Subscription will stop after a while for demonstration purposes", "duration", d)
+	slog.Info("Subscription will stop after a while for demonstration purposes", "duration", d)
 
 	endpoints, err := opcua.GetEndpoints(ctx, *endpoint)
 	if err != nil {
@@ -49,7 +49,7 @@ func main() {
 	}
 	ep.EndpointURL = *endpoint
 
-	ualog.Info("*", "sec_policy", ep.SecurityPolicyURI, "sec_mode", ep.SecurityMode)
+	slog.Info("*", "sec_policy", ep.SecurityPolicyURI, "sec_mode", ep.SecurityMode)
 
 	opts := []opcua.Option{
 		opcua.SecurityPolicy(*policy),
@@ -78,7 +78,7 @@ func main() {
 		ualog.Fatal("Subscribe failed", "error", err)
 	}
 	defer sub.Cancel(ctx)
-	ualog.Info("Created subscription", "sub_id", sub.SubscriptionID)
+	slog.Info("Created subscription", "sub_id", sub.SubscriptionID)
 
 	id, err := ua.ParseNodeID(*nodeID)
 	if err != nil {
@@ -112,7 +112,7 @@ func main() {
 			return
 		case res := <-notifyCh:
 			if res.Error != nil {
-				ualog.Error("notifyCh reports an error", "error", err)
+				slog.Error("notifyCh reports an error", "error", err)
 				continue
 			}
 
@@ -120,20 +120,20 @@ func main() {
 			case *ua.DataChangeNotification:
 				for _, item := range x.MonitoredItems {
 					data := item.Value.Value.Value()
-					ualog.Info("MonitoredItem with client handle", "client_handle", item.ClientHandle, "data", data)
+					slog.Info("MonitoredItem with client handle", "client_handle", item.ClientHandle, "data", data)
 				}
 
 			case *ua.EventNotificationList:
 				for _, item := range x.Events {
-					ualog.Info("Event for client handle", "client_handle", item.ClientHandle)
+					slog.Info("Event for client handle", "client_handle", item.ClientHandle)
 					for i, field := range item.EventFields {
-						ualog.Info("fields:", "name", eventFieldNames[i], "value", field.Value(), "type", fmt.Sprintf("%T", field.Value()))
+						slog.Info("fields:", "name", eventFieldNames[i], "value", field.Value(), "type", fmt.Sprintf("%T", field.Value()))
 					}
 					fmt.Println()
 				}
 
 			default:
-				ualog.Warn("what's this publish result?", "type", fmt.Sprintf("%T", res.Value))
+				slog.Warn("what's this publish result?", "type", fmt.Sprintf("%T", res.Value))
 			}
 		}
 	}

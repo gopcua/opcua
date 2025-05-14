@@ -8,13 +8,13 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/gopcua/opcua/errors"
-	"github.com/gopcua/opcua/internal/ualog"
 	"github.com/gopcua/opcua/ua"
 )
 
@@ -67,7 +67,7 @@ type Dialer struct {
 }
 
 func (d *Dialer) Dial(ctx context.Context, endpoint string) (*Conn, error) {
-	dlog := ualog.With("func", "Dial")
+	dlog := slog.With("func", "Dial")
 	dlog.Debug("uacp: connecting", "endpoint", endpoint)
 
 	_, raddr, err := ResolveEndpoint(ctx, endpoint)
@@ -219,14 +219,14 @@ func (c *Conn) Close() (err error) {
 }
 
 func (c *Conn) close() error {
-	dlog := ualog.With("conn_id", c.id, "func", "Conn.close")
+	dlog := slog.With("conn_id", c.id, "func", "Conn.close")
 
 	dlog.Debug("uacp: close")
 	return c.TCPConn.Close()
 }
 
 func (c *Conn) Handshake(ctx context.Context, endpoint string) error {
-	dlog := ualog.With("conn_id", c.id, "func", "Conn.Handshake")
+	dlog := slog.With("conn_id", c.id, "func", "Conn.Handshake")
 
 	hel := &Hello{
 		Version:        c.ack.Version,
@@ -291,7 +291,7 @@ func (c *Conn) Handshake(ctx context.Context, endpoint string) error {
 }
 
 func (c *Conn) srvhandshake(endpoint string) error {
-	dlog := ualog.With("conn_id", c.id, "func", "Conn.srvHandshake")
+	dlog := slog.With("conn_id", c.id, "func", "Conn.srvHandshake")
 
 	b, err := c.Receive()
 	if err != nil {
@@ -364,7 +364,7 @@ const hdrlen = 8
 // The size of b must be at least ReceiveBufSize. Otherwise,
 // the function returns an error.
 func (c *Conn) Receive() ([]byte, error) {
-	dlog := ualog.With("conn_id", c.id, "func", "Conn.Receive")
+	dlog := slog.With("conn_id", c.id, "func", "Conn.Receive")
 
 	// TODO(kung-foo): allow user-specified buffer
 	// TODO(kung-foo): sync.Pool
@@ -407,7 +407,7 @@ func (c *Conn) Receive() ([]byte, error) {
 }
 
 func (c *Conn) Send(typ string, msg interface{}) error {
-	dlog := ualog.With("conn_id", c.id, "func", "Conn.Send")
+	dlog := slog.With("conn_id", c.id, "func", "Conn.Send")
 
 	if len(typ) != 4 {
 		return errors.Errorf("invalid msg type: %s", typ)

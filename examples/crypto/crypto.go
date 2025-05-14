@@ -78,9 +78,9 @@ func main() {
 		ualog.Fatal("Node failed", "error", err)
 	}
 	if v != nil {
-		ualog.Info(fmt.Sprintf("Server's Time | Conn 1 %s | ", v.Value()))
+		slog.Info(fmt.Sprintf("Server's Time | Conn 1 %s | ", v.Value()))
 	} else {
-		ualog.Warn("v == nil")
+		slog.Warn("v == nil")
 	}
 
 	// Detach our session and try re-establish it on a different secure channel
@@ -110,9 +110,9 @@ func main() {
 		ualog.Fatal("Node failed", "error", err)
 	}
 	if v != nil {
-		ualog.Info(fmt.Sprintf("Conn 2: %s\n", v.Value()))
+		slog.Info(fmt.Sprintf("Conn 2: %s\n", v.Value()))
 	} else {
-		ualog.Warn("v == nil")
+		slog.Warn("v == nil")
 	}
 }
 
@@ -139,10 +139,10 @@ func clientOptsFromFlags(endpoints []*ua.EndpointDescription) []opcua.Option {
 				ualog.Fatal("failed to write", "keyfile", *keyfile, "error", err)
 			}
 		}
-		ualog.Debug("Loading cert/key", "certfile", *certfile, "keyfile", *keyfile)
+		slog.Debug("Loading cert/key", "certfile", *certfile, "keyfile", *keyfile)
 		c, err := tls.LoadX509KeyPair(*certfile, *keyfile)
 		if err != nil {
-			ualog.Error("Failed to load certificate", "error", err)
+			slog.Error("Failed to load certificate", "error", err)
 		} else {
 			pk, ok := c.PrivateKey.(*rsa.PrivateKey)
 			if !ok {
@@ -230,7 +230,7 @@ func clientOptsFromFlags(endpoints []*ua.EndpointDescription) []opcua.Option {
 	switch {
 	// Didn't find an endpoint with matching policy and mode.
 	case serverEndpoint == nil:
-		ualog.Warn("unable to find suitable server endpoint with selected sec-policy and sec-mode")
+		slog.Warn("unable to find suitable server endpoint with selected sec-policy and sec-mode")
 		printEndpointOptions(endpoints)
 		ualog.Fatal("quitting")
 	default:
@@ -246,7 +246,7 @@ func clientOptsFromFlags(endpoints []*ua.EndpointDescription) []opcua.Option {
 
 	opts = append(opts, opcua.SecurityFromEndpoint(serverEndpoint, authMode))
 
-	ualog.Info("Using config:",
+	slog.Info("Using config:",
 		"endpoint", serverEndpoint.EndpointURL,
 		"sec_policy", serverEndpoint.SecurityPolicyURI,
 		"sec_mode", serverEndpoint.SecurityMode,
@@ -308,7 +308,7 @@ func authFromFlags(cert []byte, pk *rsa.PrivateKey) (ua.UserTokenType, []opcua.O
 		authOptions = append(authOptions, opcua.AuthIssuedToken([]byte(nil)))
 
 	default:
-		ualog.Info("unknown auth-mode, defaulting to Anonymous")
+		slog.Info("unknown auth-mode, defaulting to Anonymous")
 		authMode = ua.UserTokenTypeAnonymous
 		authOptions = append(authOptions, opcua.AuthAnonymous())
 
@@ -334,9 +334,9 @@ func validateEndpointConfig(endpoints []*ua.EndpointDescription, secPolicy strin
 }
 
 func printEndpointOptions(endpoints []*ua.EndpointDescription) {
-	ualog.Info("Valid options for the endpoint are:")
-	ualog.Info("         sec-policy    |    sec-mode     |      auth-modes\n")
-	ualog.Info("-----------------------|-----------------|---------------------------\n")
+	slog.Info("Valid options for the endpoint are:")
+	slog.Info("         sec-policy    |    sec-mode     |      auth-modes\n")
+	slog.Info("-----------------------|-----------------|---------------------------\n")
 	for _, e := range endpoints {
 		p := strings.TrimPrefix(e.SecurityPolicyURI, "http://opcfoundation.org/UA/SecurityPolicy#")
 		m := strings.TrimPrefix(e.SecurityMode.String(), "MessageSecurityMode")
@@ -356,6 +356,6 @@ func printEndpointOptions(endpoints []*ua.EndpointDescription) {
 				tt = append(tt, tok)
 			}
 		}
-		ualog.Info(fmt.Sprintf("%22s | %-15s | (%s)", p, m, strings.Join(tt, ",")))
+		slog.Info(fmt.Sprintf("%22s | %-15s | (%s)", p, m, strings.Join(tt, ",")))
 	}
 }

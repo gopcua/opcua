@@ -63,5 +63,5 @@ func main() {
 	if err != nil {
 		ualog.Fatal("Write failed", "error", err)
 	}
-	ualog.Info(fmt.Sprintf("Value: %v", resp.Results[0]))
+	slog.Info(fmt.Sprintf("Value: %v", resp.Results[0]))
 }

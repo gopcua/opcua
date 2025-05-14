@@ -142,10 +142,10 @@ func main() {
 
 	var cert []byte
 	if *gencert || (*certfile != "" && *keyfile != "") {
-		ualog.Info("Loading cert and key", "certfile", *certfile, "keyfile", *keyfile)
+		slog.Info("Loading cert and key", "certfile", *certfile, "keyfile", *keyfile)
 		c, err := tls.LoadX509KeyPair(*certfile, *keyfile)
 		if err != nil {
-			ualog.Error("LoadX509KeyPair failed", "error", err)
+			slog.Error("LoadX509KeyPair failed", "error", err)
 		} else {
 			pk, ok := c.PrivateKey.(*rsa.PrivateKey)
 			if !ok {
@@ -178,7 +178,7 @@ func main() {
 	// Now we'll add a node namespace.  This is a more traditional way to add nodes to the server
 	// and is more in line with the opc ua node model, but may be more cumbersome for some use cases.
 	nodeNS := server.NewNodeNameSpace(s, "NodeNamespace")
-	ualog.Info("Node Namespace added", "index", nodeNS.ID())
+	slog.Info("Node Namespace added", "index", nodeNS.ID())
 
 	// add the reference for this namespace's root object folder to the server's root object folder
 	// but you can add a reference to whatever node(s) you need
@@ -293,7 +293,7 @@ func main() {
 			changed_id := <-nodeNS.ExternalNotification
 			node := nodeNS.Node(changed_id)
 			value := node.Value().Value.Value()
-			ualog.Info("node changed", "node_id", changed_id, "value", value)
+			slog.Info("node changed", "node_id", changed_id, "value", value)
 		}
 	}()
 
@@ -301,8 +301,8 @@ func main() {
 	sigch := make(chan os.Signal, 1)
 	signal.Notify(sigch, os.Interrupt)
 	defer signal.Stop(sigch)
-	ualog.Info("Press CTRL-C to exit")
+	slog.Info("Press CTRL-C to exit")
 
 	<-sigch
-	ualog.Info("Shutting down the server...")
+	slog.Info("Shutting down the server...")
 }

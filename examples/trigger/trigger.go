@@ -48,7 +48,7 @@ func main() {
 		ualog.Fatal("SelectEndpoint failed", "error", err)
 	}
 
-	ualog.Info("*", "sec_policy", ep.SecurityPolicyURI, "sec_mode", ep.SecurityMode)
+	slog.Info("*", "sec_policy", ep.SecurityPolicyURI, "sec_mode", ep.SecurityMode)
 
 	opts := []opcua.Option{
 		opcua.SecurityPolicy(*policy),
@@ -77,7 +77,7 @@ func main() {
 		ualog.Fatal("Subscribe failed", "error", err)
 	}
 	defer sub.Cancel(ctx)
-	ualog.Info("Created subscription", "sub_id", sub.SubscriptionID)
+	slog.Info("Created subscription", "sub_id", sub.SubscriptionID)
 
 	triggeringNode, err := ua.ParseNodeID(*triggerNodeID)
 	if err != nil {
@@ -130,7 +130,7 @@ func main() {
 			return
 		case res := <-notifyCh:
 			if res.Error != nil {
-				ualog.Error("notifyCh has an error", "error", res.Error)
+				slog.Error("notifyCh has an error", "error", res.Error)
 				continue
 			}
 
@@ -138,11 +138,11 @@ func main() {
 			case *ua.DataChangeNotification:
 				for _, item := range x.MonitoredItems {
 					data := item.Value.Value.Value()
-					ualog.Info("MonitoredItem with client handle", "client_handle", item.ClientHandle, "data", data)
+					slog.Info("MonitoredItem with client handle", "client_handle", item.ClientHandle, "data", data)
 				}
 
 			default:
-				ualog.Warn("what's this publish result?", "type", fmt.Sprintf("%T", res.Value))
+				slog.Warn("what's this publish result?", "type", fmt.Sprintf("%T", res.Value))
 			}
 		}
 	}

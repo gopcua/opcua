@@ -48,5 +48,5 @@ func main() {
 		ualog.Fatal("status not OK", "got", got, "want", want)
 	}
 	out := resp.OutputArguments[0].Value()
-	ualog.Info("result", "in", in, "out", out)
+	slog.Info("result", "in", in, "out", out)
 }

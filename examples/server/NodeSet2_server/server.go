@@ -117,10 +117,10 @@ func main() {
 
 	var cert []byte
 	if *gencert || (*certfile != "" && *keyfile != "") {
-		ualog.Info("Loading cert and key", "certfile", *certfile, "keyfile", *keyfile)
+		slog.Info("Loading cert and key", "certfile", *certfile, "keyfile", *keyfile)
 		c, err := tls.LoadX509KeyPair(*certfile, *keyfile)
 		if err != nil {
-			ualog.Error("LoadX509KeyPair failed", "error", err)
+			slog.Error("LoadX509KeyPair failed", "error", err)
 		} else {
 			pk, ok := c.PrivateKey.(*rsa.PrivateKey)
 			if !ok {
@@ -158,7 +158,7 @@ func main() {
 	// your heart desires
 	node := s.Node(ua.NewNumericNodeID(1, 15044))
 	if node != nil {
-		ualog.Info("Found node", "node_id", node)
+		slog.Info("Found node", "node_id", node)
 	}
 
 	// Start the server
@@ -171,8 +171,8 @@ func main() {
 	sigch := make(chan os.Signal, 1)
 	signal.Notify(sigch, os.Interrupt)
 	defer signal.Stop(sigch)
-	ualog.Info("Press CTRL-C to exit")
+	slog.Info("Press CTRL-C to exit")
 
 	<-sigch
-	ualog.Info("Shutting down the server...")
+	slog.Info("Shutting down the server...")
 }

@@ -29,6 +29,6 @@ func main() {
 	}
 
 	for i, ep := range eps {
-		ualog.Info(fmt.Sprintf("%d.", i), "ep_url", ep.EndpointURL, "sec_policy", ep.SecurityPolicyURI, "sec_mode", ep.SecurityMode)
+		slog.Info(fmt.Sprintf("%d.", i), "ep_url", ep.EndpointURL, "sec_policy", ep.SecurityPolicyURI, "sec_mode", ep.SecurityMode)
 	}
 }

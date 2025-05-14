@@ -66,7 +66,7 @@ func main() {
 			EndTime:        time.Now().UTC().AddDate(0, 1, 0),
 		})
 		if err != nil {
-			ualog.Error("HistoryReadRequest failed", "error", err)
+			slog.Error("HistoryReadRequest failed", "error", err)
 			break
 		}
 
@@ -76,7 +76,7 @@ func main() {
 
 		for nodeNum, result := range data.Results {
 			if result.StatusCode != ua.StatusOK {
-				ualog.Error("result.StatusCode not StatusOK", "status_code", result.StatusCode)
+				slog.Error("result.StatusCode not StatusOK", "status_code", result.StatusCode)
 				continue
 			}
 
@@ -97,7 +97,7 @@ func main() {
 			}
 
 			for _, value := range historyData.DataValues {
-				ualog.Info(fmt.Sprintf(
+				slog.Info(fmt.Sprintf(
 					"%s - %s - %v \n",
 					nodes[nodeNum].NodeID.String(),
 					value.SourceTimestamp.Format(time.RFC3339),

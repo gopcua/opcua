@@ -2,11 +2,11 @@ package main
 
 import (
 	"context"
+	"log/slog"
 	"testing"
 
 	"github.com/gopcua/opcua"
 	"github.com/gopcua/opcua/id"
-	"github.com/gopcua/opcua/internal/ualog"
 	"github.com/gopcua/opcua/server"
 	"github.com/gopcua/opcua/ua"
 )
@@ -71,7 +71,7 @@ func populateServer(s *server.Server) {
 
 	// Now we'll add a node namespace.
 	nodeNS := server.NewNodeNameSpace(s, "NodeNamespace")
-	ualog.Info("Node Namespace added", "index", nodeNS.ID())
+	slog.Info("Node Namespace added", "index", nodeNS.ID())
 
 	// add the reference for this namespace's root object folder to the server's root object folder
 	// but you can add a reference to whatever node(s) you need

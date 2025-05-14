@@ -9,6 +9,7 @@ import (
 	"crypto/rsa"
 	"encoding/xml"
 	"fmt"
+	"log/slog"
 	"net"
 	"slices"
 	"strings"
@@ -16,7 +17,6 @@ import (
 	"time"
 
 	"github.com/gopcua/opcua/id"
-	"github.com/gopcua/opcua/internal/ualog"
 	"github.com/gopcua/opcua/schema"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uacp"
@@ -113,7 +113,7 @@ func New(opts ...Option) *Server {
 		url = cfg.endpoints[0]
 	}
 	if cfg.logger == nil {
-		cfg.logger = &slogLogger{logger: ualog.Default()}
+		cfg.logger = &slogLogger{logger: slog.Default()}
 	}
 
 	s := &Server{

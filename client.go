@@ -10,6 +10,7 @@ import (
 	"expvar"
 	"fmt"
 	"io"
+	"log/slog"
 	"reflect"
 	"sort"
 	"sync"
@@ -19,7 +20,6 @@ import (
 
 	"github.com/gopcua/opcua/errors"
 	"github.com/gopcua/opcua/id"
-	"github.com/gopcua/opcua/internal/ualog"
 	"github.com/gopcua/opcua/stats"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uacp"
@@ -280,7 +280,7 @@ func (c *Client) Connect(ctx context.Context) error {
 
 // monitor manages connection alteration
 func (c *Client) monitor(ctx context.Context) {
-	dlog := ualog.With("func", "Client.monitor")
+	dlog := slog.With("func", "Client.monitor")
 
 	dlog.Debug("start")
 	defer dlog.Debug("done")
@@ -780,7 +780,7 @@ func (c *Client) CreateSession(ctx context.Context, cfg *uasc.SessionConfig) (*S
 
 		err := sc.VerifySessionSignature(res.ServerCertificate, nonce, res.ServerSignature.Signature)
 		if err != nil {
-			ualog.Error("verifying session signature failed", "error", err)
+			slog.Error("verifying session signature failed", "error", err)
 			return nil
 		}
 
@@ -844,7 +844,7 @@ func (c *Client) ActivateSession(ctx context.Context, s *Session) error {
 	stats.Client().Add("ActivateSession", 1)
 	sig, sigAlg, err := sc.NewSessionSignature(s.serverCertificate, s.serverNonce)
 	if err != nil {
-		ualog.Error("creating session signature failed", "error", err)
+		slog.Error("creating session signature failed", "error", err)
 		return nil
 	}
 
@@ -855,7 +855,7 @@ func (c *Client) ActivateSession(ctx context.Context, s *Session) error {
 	case *ua.UserNameIdentityToken:
 		pass, passAlg, err := sc.EncryptUserPassword(s.cfg.AuthPolicyURI, s.cfg.AuthPassword, s.serverCertificate, s.serverNonce)
 		if err != nil {
-			ualog.Error("encrypting user password failed", "error", err)
+			slog.Error("encrypting user password failed", "error", err)
 			return err
 		}
 		tok.Password = pass
@@ -864,7 +864,7 @@ func (c *Client) ActivateSession(ctx context.Context, s *Session) error {
 	case *ua.X509IdentityToken:
 		tokSig, tokSigAlg, err := sc.NewUserTokenSignature(s.cfg.AuthPolicyURI, s.serverCertificate, s.serverNonce)
 		if err != nil {
-			ualog.Error("creating session signature failed", "error", err)
+			slog.Error("creating session signature failed", "error", err)
 			return err
 		}
 		s.cfg.UserTokenSignature = &ua.SignatureData{

@@ -43,7 +43,7 @@ func main() {
 		ualog.Fatal("SelectEndpoint failed", "error", err)
 	}
 
-	ualog.Info("*", "sec_policy", ep.SecurityPolicyURI, "sec_mode", ep.SecurityMode)
+	slog.Info("*", "sec_policy", ep.SecurityPolicyURI, "sec_mode", ep.SecurityMode)
 
 	opts := []opcua.Option{
 		opcua.SecurityPolicy(*policy),
@@ -68,9 +68,9 @@ func main() {
 	case err != nil:
 		ualog.Fatal("Value failed", "error", err)
 	case v == nil:
-		ualog.Info("v == nil")
+		slog.Info("v == nil")
 	default:
-		ualog.Info("extobj", "value", v.Value().(*ua.ExtensionObject).Value)
+		slog.Info("extobj", "value", v.Value().(*ua.ExtensionObject).Value)
 	}
 }
 

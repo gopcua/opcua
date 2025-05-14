@@ -5,10 +5,10 @@
 package uasc
 
 import (
+	"log/slog"
 	"math"
 
 	"github.com/gopcua/opcua/errors"
-	"github.com/gopcua/opcua/internal/ualog"
 	"github.com/gopcua/opcua/ua"
 )
 
@@ -122,7 +122,7 @@ func (m *Message) Encode() ([]byte, error) {
 }
 
 func (m *Message) EncodeChunks(maxBodySize uint32) ([][]byte, error) {
-	dlog := ualog.With("func", "Message.EncodeChunks")
+	dlog := slog.With("func", "Message.EncodeChunks")
 
 	dataBody := ua.NewBuffer(nil)
 	dataBody.WriteStruct(m.TypeID)

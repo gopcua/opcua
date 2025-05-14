@@ -5,8 +5,9 @@
 package ua
 
 import (
+	"log/slog"
+
 	"github.com/gopcua/opcua/id"
-	"github.com/gopcua/opcua/internal/ualog"
 )
 
 // eotypes contains all known extension objects.
@@ -76,7 +77,7 @@ func (e *ExtensionObject) Decode(b []byte) (int, error) {
 	typeID := e.TypeID.NodeID
 	e.Value = eotypes.New(typeID)
 	if e.Value == nil {
-		dlog := ualog.With("func", "ExtensionObject.Decode")
+		dlog := slog.With("func", "ExtensionObject.Decode")
 		dlog.Debug("ua: unknown extension object", "type_id", typeID)
 		return buf.Pos(), buf.Error()
 	}

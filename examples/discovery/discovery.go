@@ -25,7 +25,7 @@ func main() {
 	ctx := context.Background()
 
 	if err := findServersOnNetwork(ctx, *endpoint); err != nil {
-		ualog.Error("findServerOnNetwork failed", "error", err)
+		slog.Error("findServerOnNetwork failed", "error", err)
 	}
 
 	if err := findServers(ctx, *endpoint); err != nil {
@@ -34,7 +34,7 @@ func main() {
 }
 
 func findServersOnNetwork(ctx context.Context, endpoint string) error {
-	ualog.Info("Finding servers on network")
+	slog.Info("Finding servers on network")
 	servers, err := opcua.FindServersOnNetwork(ctx, endpoint)
 	if err != nil {
 		return err
@@ -50,7 +50,7 @@ func findServersOnNetwork(ctx context.Context, endpoint string) error {
 }
 
 func findServers(ctx context.Context, endpoint string) error {
-	ualog.Info("Finding servers")
+	slog.Info("Finding servers")
 	servers, err := opcua.FindServers(ctx, endpoint)
 	if err != nil {
 		return err

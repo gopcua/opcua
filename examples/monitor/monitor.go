@@ -51,7 +51,7 @@ func main() {
 		ualog.Fatal("SelectEndpoint failed", "error", err)
 	}
 
-	ualog.Info("*", "sec_policy", ep.SecurityPolicyURI, "sec_mode", ep.SecurityMode)
+	slog.Info("*", "sec_policy", ep.SecurityPolicyURI, "sec_mode", ep.SecurityMode)
 
 	opts := []opcua.Option{
 		opcua.SecurityPolicy(*policy),
@@ -78,7 +78,7 @@ func main() {
 	}
 
 	m.SetErrorHandler(func(_ *opcua.Client, sub *monitor.Subscription, err error) {
-		ualog.Error("error", "sub_id", sub.SubscriptionID(), "error", err.Error())
+		slog.Error("error", "sub_id", sub.SubscriptionID(), "error", err.Error())
 	})
 	wg := &sync.WaitGroup{}
 
@@ -102,9 +102,9 @@ func startCallbackSub(ctx context.Context, m *monitor.NodeMonitor, interval, lag
 		},
 		func(s *monitor.Subscription, msg *monitor.DataChangeMessage) {
 			if msg.Error != nil {
-				ualog.Error("[callback]", "sub_id", s.SubscriptionID(), "error", msg.Error)
+				slog.Error("[callback]", "sub_id", s.SubscriptionID(), "error", msg.Error)
 			} else {
-				ualog.Info("[callback]", "sub_id", s.SubscriptionID(), "timestamp", msg.SourceTimestamp.UTC().Format(time.RFC3339), "node_id", msg.NodeID, "value", msg.Value.Value())
+				slog.Info("[callback]", "sub_id", s.SubscriptionID(), "timestamp", msg.SourceTimestamp.UTC().Format(time.RFC3339), "node_id", msg.NodeID, "value", msg.Value.Value())
 			}
 			time.Sleep(lag)
 		},
@@ -135,9 +135,9 @@ func startChanSub(ctx context.Context, m *monitor.NodeMonitor, interval, lag tim
 			return
 		case msg := <-ch:
 			if msg.Error != nil {
-				ualog.Error("[channel]", "sub_id", sub.SubscriptionID(), "error", msg.Error)
+				slog.Error("[channel]", "sub_id", sub.SubscriptionID(), "error", msg.Error)
 			} else {
-				ualog.Info("[channel]", "sub_id", sub.SubscriptionID(), "timestamp", msg.SourceTimestamp.UTC().Format(time.RFC3339), "node_id", msg.NodeID, "value", msg.Value.Value())
+				slog.Info("[channel]", "sub_id", sub.SubscriptionID(), "timestamp", msg.SourceTimestamp.UTC().Format(time.RFC3339), "node_id", msg.NodeID, "value", msg.Value.Value())
 			}
 			time.Sleep(lag)
 		}
@@ -145,7 +145,7 @@ func startChanSub(ctx context.Context, m *monitor.NodeMonitor, interval, lag tim
 }
 
 func cleanup(ctx context.Context, sub *monitor.Subscription, wg *sync.WaitGroup) {
-	ualog.Info("stats", "sub_id", sub.SubscriptionID(), "delivered", sub.Delivered(), "dropped", sub.Dropped())
+	slog.Info("stats", "sub_id", sub.SubscriptionID(), "delivered", sub.Delivered(), "dropped", sub.Dropped())
 	sub.Unsubscribe(ctx)
 	wg.Done()
 }

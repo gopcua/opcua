@@ -45,21 +45,21 @@ func main() {
 	if err != nil {
 		ualog.Fatal("AccessLevel failed", "error", err)
 	}
-	ualog.Info("Got access level", "access_level", accessLevel)
+	slog.Info("Got access level", "access_level", accessLevel)
 
 	userAccessLevel, err := n.UserAccessLevel(ctx)
 	if err != nil {
 		ualog.Fatal("AccessLevel failed", "error", err)
 	}
-	ualog.Info("Got user access level", "user_access_level", userAccessLevel)
+	slog.Info("Got user access level", "user_access_level", userAccessLevel)
 
 	v, err := n.Value(ctx)
 	switch {
 	case err != nil:
 		ualog.Fatal("Value failed", "error", err)
 	case v == nil:
-		ualog.Info("v == nil")
+		slog.Info("v == nil")
 	default:
-		ualog.Info("Got value", "value", v.Value())
+		slog.Info("Got value", "value", v.Value())
 	}
 }
