@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"log/slog"
 	"os"
 	"os/signal"
 	"sync"
@@ -26,7 +27,7 @@ func main() {
 		debug    = flag.Bool("debug", false, "enable debug logging")
 	)
 	flag.Parse()
-	ualog.SetDebugLogger(*debug)
+	slog.SetDefault(slog.New(ualog.NewTextHandler(*debug)))
 
 	signalCh := make(chan os.Signal, 1)
 	signal.Notify(signalCh, os.Interrupt)

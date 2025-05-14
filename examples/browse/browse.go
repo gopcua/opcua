@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/csv"
 	"flag"
+	"log/slog"
 	"os"
 	"strconv"
 
@@ -167,11 +168,13 @@ func browse(ctx context.Context, n *opcua.Node, path string, level int) ([]NodeD
 }
 
 func main() {
-	endpoint := flag.String("endpoint", "opc.tcp://localhost:4840", "OPC UA Endpoint URL")
-	nodeID := flag.String("node", "i=84", "node id for the root node") // i=84 is the standard root node
-	debug := flag.Bool("debug", false, "enable debug logging")
+	var (
+		endpoint = flag.String("endpoint", "opc.tcp://localhost:4840", "OPC UA Endpoint URL")
+		nodeID   = flag.String("node", "i=84", "node id for the root node") // i=84 is the standard root node
+		debug    = flag.Bool("debug", false, "enable debug logging")
+	)
 	flag.Parse()
-	ualog.SetDebugLogger(*debug)
+	slog.SetDefault(slog.New(ualog.NewTextHandler(*debug)))
 
 	ctx := context.Background()
 

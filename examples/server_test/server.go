@@ -10,6 +10,7 @@ import (
 	"crypto/tls"
 	"flag"
 	"fmt"
+	"log/slog"
 	"os"
 	"time"
 
@@ -29,7 +30,7 @@ func main() {
 		debug    = flag.Bool("debug", false, "enable debug logging")
 	)
 	flag.Parse()
-	ualog.SetDebugLogger(*debug)
+	slog.SetDefault(slog.New(ualog.NewTextHandler(*debug)))
 
 	var opts []server.Option
 

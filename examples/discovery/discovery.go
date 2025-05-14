@@ -8,6 +8,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"log/slog"
 
 	"github.com/gopcua/opcua"
 	"github.com/gopcua/opcua/internal/ualog"
@@ -19,7 +20,7 @@ func main() {
 		debug    = flag.Bool("debug", false, "enable debug logging")
 	)
 	flag.Parse()
-	ualog.SetDebugLogger(*debug)
+	slog.SetDefault(slog.New(ualog.NewTextHandler(*debug)))
 
 	ctx := context.Background()
 

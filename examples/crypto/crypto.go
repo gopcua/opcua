@@ -11,7 +11,7 @@ import (
 	"crypto/tls"
 	"flag"
 	"fmt"
-	"github.com/gopcua/opcua/tests/utils"
+	"log/slog"
 	"os"
 	"strings"
 	"syscall"
@@ -22,6 +22,7 @@ import (
 	"github.com/gopcua/opcua"
 	"github.com/gopcua/opcua/errors"
 	"github.com/gopcua/opcua/internal/ualog"
+	"github.com/gopcua/opcua/tests/utils"
 	"github.com/gopcua/opcua/ua"
 )
 
@@ -42,7 +43,7 @@ var (
 
 func main() {
 	flag.Parse()
-	ualog.SetDebugLogger(*debug)
+	slog.SetDefault(slog.New(ualog.NewTextHandler(*debug)))
 
 	ctx := context.Background()
 

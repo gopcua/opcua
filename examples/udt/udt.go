@@ -7,6 +7,7 @@ package main
 import (
 	"context"
 	"flag"
+	"log/slog"
 
 	"github.com/gopcua/opcua"
 	"github.com/gopcua/opcua/internal/ualog"
@@ -24,7 +25,7 @@ func main() {
 		debug    = flag.Bool("debug", false, "enable debug logging")
 	)
 	flag.Parse()
-	ualog.SetDebugLogger(*debug)
+	slog.SetDefault(slog.New(ualog.NewTextHandler(*debug)))
 
 	id, err := ua.ParseNodeID(*nodeID)
 	if err != nil {

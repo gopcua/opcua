@@ -1,3 +1,4 @@
+// Package ualog contains helper functions for logging.
 package ualog
 
 import (
@@ -6,17 +7,16 @@ import (
 	"os"
 )
 
-// SetDebugLogger configures the default log level to DEBUG
-// if [debug] is true.
-func SetDebugLogger(debug bool) {
+// NewTextHandler returns a handler with log level DEBUG
+// if [debug] is true. Otherwise, it defaults to INFO.
+func NewTextHandler(debug bool) *slog.TextHandler {
 	logLevel := slog.LevelInfo
 	if debug {
 		logLevel = slog.LevelDebug
 	}
-	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+	return slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
 		Level: logLevel,
-	}))
-	slog.SetDefault(logger)
+	})
 }
 
 // map slog global functions into ualog so that we can add Fatal

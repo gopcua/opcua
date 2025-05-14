@@ -12,6 +12,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"os/signal"
 	"time"
@@ -33,7 +34,7 @@ func main() {
 		debug    = flag.Bool("debug", false, "enable debug logging")
 	)
 	flag.Parse()
-	ualog.SetDebugLogger(*debug)
+	slog.SetDefault(slog.New(ualog.NewTextHandler(*debug)))
 
 	var opts []server.Option
 
