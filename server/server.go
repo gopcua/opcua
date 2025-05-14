@@ -115,11 +115,10 @@ func New(opts ...Option) *Server {
 		url = cfg.endpoints[0]
 	}
 
-	handler := cfg.loghandler
-	if handler == nil {
-		slog.Default().Handler()
+	logger := slog.Default()
+	if cfg.loghandler != nil {
+		logger = slog.New(cfg.loghandler)
 	}
-	logger := slog.New(handler)
 
 	s := &Server{
 		url:      url,
