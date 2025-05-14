@@ -79,9 +79,7 @@ func EnableSecurity(secPolicy string, secMode ua.MessageSecurityMode) Option {
 
 		for _, sec := range s.enabledSec {
 			if sec.secPolicy == secPolicy && sec.secMode == secMode {
-				if s.logger != nil {
-					s.logger.Warn("security policy already exists, skipping")
-				}
+				s.logger.Warn("security policy already exists, skipping")
 				return
 			}
 		}
@@ -103,9 +101,7 @@ func EnableAuthMode(tokenType ua.UserTokenType) Option {
 
 		for _, a := range s.enabledAuth {
 			if a.tokenType == tokenType {
-				if s.logger != nil {
 					s.logger.Warn("auth mode already registered, skipping")
-				}
 				return
 			}
 		}
