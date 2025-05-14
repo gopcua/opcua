@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"log/slog"
 	"sync"
 	"time"
 
@@ -16,19 +15,20 @@ import (
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.13
 type SubscriptionService struct {
 	srv *Server
-	// pub sub stuff
-	Mu   sync.Mutex
-	Subs map[uint32]*Subscription
 
-	Logger *slog.Logger
+	// mu guards subs
+	mu sync.Mutex
+
+	// subs stores the active subscriptions by id
+	subs map[uint32]*Subscription
 }
 
 // get rid of all references to a subscription and all monitored items that are pointed at this subscription.
 func (s *SubscriptionService) DeleteSubscription(id uint32) {
-	s.Mu.Lock()
-	defer s.Mu.Unlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-	sub, ok := s.Subs[id]
+	sub, ok := s.subs[id]
 	if ok {
 		sub.Mu.Lock()
 		if sub.running {
@@ -38,7 +38,7 @@ func (s *SubscriptionService) DeleteSubscription(id uint32) {
 		sub.Mu.Unlock()
 	}
 
-	delete(s.Subs, id)
+	delete(s.subs, id)
 
 	// ask the monitored item service to purge out any items that use this subscription
 	s.srv.MonitoredItemService.DeleteSub(id)
@@ -47,7 +47,7 @@ func (s *SubscriptionService) DeleteSubscription(id uint32) {
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.13.2
 func (s *SubscriptionService) CreateSubscription(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	dlog := s.Logger.With("func", "SubscriptionService.CreateSubscription")
+	dlog := s.srv.logger.With("func", "SubscriptionService.CreateSubscription")
 	dlog.Debug("Handling", "type", ualog.TypeOf(r))
 
 	req, err := safeReq[*ua.CreateSubscriptionRequest](r)
@@ -55,10 +55,10 @@ func (s *SubscriptionService) CreateSubscription(sc *uasc.SecureChannel, r ua.Re
 		return nil, err
 	}
 
-	s.Mu.Lock()
-	defer s.Mu.Unlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-	newsubid := uint32(len(s.Subs)) + 1
+	newsubid := uint32(len(s.subs)) + 1
 
 	dlog.Info("New subscription", "sub_id", newsubid, "remote_addr", sc.RemoteAddr())
 
@@ -71,7 +71,7 @@ func (s *SubscriptionService) CreateSubscription(sc *uasc.SecureChannel, r ua.Re
 	sub.RevisedLifetimeCount = req.RequestedLifetimeCount
 	sub.RevisedMaxKeepAliveCount = req.RequestedMaxKeepAliveCount
 
-	s.Subs[newsubid] = sub
+	s.subs[newsubid] = sub
 	sub.running = true
 	sub.Start()
 
@@ -94,7 +94,7 @@ func (s *SubscriptionService) CreateSubscription(sc *uasc.SecureChannel, r ua.Re
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.13.3
 func (s *SubscriptionService) ModifySubscription(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	dlog := s.Logger.With("func", "SubscriptionService.ModifySubscription")
+	dlog := s.srv.logger.With("func", "SubscriptionService.ModifySubscription")
 	dlog.Debug("Handling", "type", ualog.TypeOf(r))
 
 	req, err := safeReq[*ua.ModifySubscriptionRequest](r)
@@ -108,7 +108,7 @@ func (s *SubscriptionService) ModifySubscription(sc *uasc.SecureChannel, r ua.Re
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.13.4
 func (s *SubscriptionService) SetPublishingMode(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	dlog := s.Logger.With("func", "SubscriptionService.SetPublishingMode")
+	dlog := s.srv.logger.With("func", "SubscriptionService.SetPublishingMode")
 	dlog.Debug("Handling", "type", ualog.TypeOf(r))
 
 	req, err := safeReq[*ua.SetPublishingModeRequest](r)
@@ -121,7 +121,7 @@ func (s *SubscriptionService) SetPublishingMode(sc *uasc.SecureChannel, r ua.Req
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.13.5
 func (s *SubscriptionService) Publish(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	dlog := s.Logger.With("func", "SubscriptionService.Publish")
+	dlog := s.srv.logger.With("func", "SubscriptionService.Publish")
 	dlog.Debug("Handling", "type", ualog.TypeOf(r))
 
 	req, err := safeReq[*ua.PublishRequest](r)
@@ -165,7 +165,7 @@ func (s *SubscriptionService) Publish(sc *uasc.SecureChannel, r ua.Request, reqI
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.13.6
 func (s *SubscriptionService) Republish(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	dlog := s.Logger.With("func", "SubscriptionService.Republish")
+	dlog := s.srv.logger.With("func", "SubscriptionService.Republish")
 	dlog.Debug("Handling", "type", ualog.TypeOf(r))
 
 	req, err := safeReq[*ua.RepublishRequest](r)
@@ -177,7 +177,7 @@ func (s *SubscriptionService) Republish(sc *uasc.SecureChannel, r ua.Request, re
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.13.7
 func (s *SubscriptionService) TransferSubscriptions(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	dlog := s.Logger.With("func", "SubscriptionService.TransferSubscription")
+	dlog := s.srv.logger.With("func", "SubscriptionService.TransferSubscription")
 	dlog.Debug("Handling", "type", ualog.TypeOf(r))
 
 	req, err := safeReq[*ua.TransferSubscriptionsRequest](r)
@@ -190,7 +190,7 @@ func (s *SubscriptionService) TransferSubscriptions(sc *uasc.SecureChannel, r ua
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.13.8
 func (s *SubscriptionService) DeleteSubscriptions(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	dlog := s.Logger.With("func", "SubscriptionService.DeleteSubscription")
+	dlog := s.srv.logger.With("func", "SubscriptionService.DeleteSubscription")
 	dlog.Debug("Handling", "type", ualog.TypeOf(r))
 
 	req, err := safeReq[*ua.DeleteSubscriptionsRequest](r)
@@ -199,14 +199,14 @@ func (s *SubscriptionService) DeleteSubscriptions(sc *uasc.SecureChannel, r ua.R
 	}
 	session := s.srv.Session(req.Header())
 
-	s.Mu.Lock()
-	defer s.Mu.Unlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	results := make([]ua.StatusCode, len(req.SubscriptionIDs))
 	for i := range req.SubscriptionIDs {
 		subid := req.SubscriptionIDs[i]
 		dlog.Info("Subscription deleted by client", "sub_id", subid)
-		sub, ok := s.Subs[subid]
+		sub, ok := s.subs[subid]
 		if !ok {
 			results[i] = ua.StatusBadSubscriptionIDInvalid
 			continue

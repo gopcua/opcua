@@ -2,7 +2,6 @@ package server
 
 import (
 	"errors"
-	"log/slog"
 	"slices"
 	"sync"
 	"sync/atomic"
@@ -17,27 +16,33 @@ import (
 //
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.12
 type MonitoredItemService struct {
-	SubService *SubscriptionService
-	Mu         sync.Mutex
+	srv *Server
 
-	// items tracked by ID
-	Items map[uint32]*MonitoredItem
-	// items tracked by node
-	Nodes map[string][]*MonitoredItem
-	// items tracked by subscription
-	Subs map[uint32][]*MonitoredItem
+	subService *SubscriptionService
 
-	id uint32
+	// mu guards items, nodes and subs
+	mu sync.Mutex
 
-	// Logger for the service
-	Logger *slog.Logger
+	// items tracks items by ID
+	items map[uint32]*MonitoredItem
+
+	// nodes tracks items by node
+	nodes map[string][]*MonitoredItem
+
+	// subs tracks items by subscription
+	subs map[uint32][]*MonitoredItem
+
+	// nextID stores the next item id.
+	// Updated with atomic.AddUint32()
+	nextID uint32
 }
 
 // function to get rid of all references to a specific Monitored Item (by ID number)
 func (s *MonitoredItemService) DeleteMonitoredItem(id uint32) {
-	s.Mu.Lock()
-	defer s.Mu.Unlock()
-	item, ok := s.Items[id]
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	item, ok := s.items[id]
 	if !ok {
 		// id does not exist.
 		return
@@ -48,7 +53,7 @@ func (s *MonitoredItemService) DeleteMonitoredItem(id uint32) {
 	}
 	nodeid := item.Req.ItemToMonitor.NodeID.String()
 
-	if s == nil || s.Nodes == nil || s.Nodes[nodeid] == nil {
+	if s == nil || s.nodes == nil || s.nodes[nodeid] == nil {
 		return
 	}
 
@@ -56,45 +61,47 @@ func (s *MonitoredItemService) DeleteMonitoredItem(id uint32) {
 	// was using slices.DeleteFunc but that is from a newer go version so we'll do it manually with /exp/slices
 	// we've got to go backwards because we're deleting from the slice as we go.
 	// I'm guessing this loop is less efficient than slices.DeleteFunc but it's what we've got.
-	delete(s.Items, id)
-	for i := len(s.Nodes[nodeid]) - 1; i >= 0; i-- {
-		n := s.Nodes[nodeid][i]
+	delete(s.items, id)
+	for i := len(s.nodes[nodeid]) - 1; i >= 0; i-- {
+		n := s.nodes[nodeid][i]
 		if n == nil {
 			continue
 		}
 		if n.ID == id {
-			s.Nodes[nodeid] = slices.Delete(s.Nodes[nodeid], i, i+1)
+			s.nodes[nodeid] = slices.Delete(s.nodes[nodeid], i, i+1)
 		}
 	}
 	//slices.DeleteFunc(s.Nodes[nodeid], func(i *MonitoredItem) bool { return i.ID == item.ID })
-	if len(s.Nodes[nodeid]) == 0 {
-		delete(s.Nodes, nodeid)
+	if len(s.nodes[nodeid]) == 0 {
+		delete(s.nodes, nodeid)
 	}
 
-	for i := len(s.Subs[item.Sub.ID]) - 1; i >= 0; i-- {
-		n := s.Subs[item.Sub.ID][i]
+	for i := len(s.subs[item.Sub.ID]) - 1; i >= 0; i-- {
+		n := s.subs[item.Sub.ID][i]
 		if n == nil {
 			continue
 		}
 		if n.ID == id {
-			s.Subs[item.Sub.ID] = slices.Delete(s.Subs[item.Sub.ID], i, i+1)
+			s.subs[item.Sub.ID] = slices.Delete(s.subs[item.Sub.ID], i, i+1)
 		}
 	}
 	//slices.DeleteFunc(s.Subs[item.Sub.ID], func(i *MonitoredItem) bool { return i.ID == item.ID })
-	if len(s.Subs[item.Sub.ID]) == 0 {
-		delete(s.Subs, item.Sub.ID)
+	if len(s.subs[item.Sub.ID]) == 0 {
+		delete(s.subs, item.Sub.ID)
 	}
 }
 
 // function to delete all monitored items associated with a specific sub (as indicated by id number)
 func (s *MonitoredItemService) DeleteSub(id uint32) {
-	s.Mu.Lock()
-	items, ok := s.Subs[id]
-	delete(s.Subs, id)
-	s.Mu.Unlock()
+	s.mu.Lock()
+	items, ok := s.subs[id]
+	delete(s.subs, id)
+	s.mu.Unlock()
+
 	if !ok {
 		return
 	}
+
 	for i := range items {
 		if items[i] != nil {
 			s.DeleteMonitoredItem(items[i].ID)
@@ -103,18 +110,18 @@ func (s *MonitoredItemService) DeleteSub(id uint32) {
 }
 
 func (s *MonitoredItemService) ChangeNotification(n *ua.NodeID) {
-	dlog := s.Logger.With("func", "MonitoredItemService.ChangeNotification")
+	dlog := s.srv.logger.With("func", "MonitoredItemService.ChangeNotification")
 
-	s.Mu.Lock()
-	defer s.Mu.Unlock()
-	items, ok := s.Nodes[n.String()]
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	items, ok := s.nodes[n.String()]
 
 	if !ok {
 		// this node isn't monitored - don't have to do anything.
 		return
 	}
 
-	ns, err := s.SubService.srv.Namespace(int(n.Namespace()))
+	ns, err := s.subService.srv.Namespace(int(n.Namespace()))
 
 	for i := range items {
 		item := items[i]
@@ -139,11 +146,7 @@ func (s *MonitoredItemService) ChangeNotification(n *ua.NodeID) {
 }
 
 func (s *MonitoredItemService) NextID() uint32 {
-	i := atomic.AddUint32(&s.id, 1)
-	if i == 0 {
-		i = atomic.AddUint32(&s.id, 1)
-	}
-	return i
+	return atomic.AddUint32(&s.nextID, 1)
 }
 
 type MonitoredItem struct {
@@ -157,15 +160,16 @@ type MonitoredItem struct {
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.12.2
 func (s *MonitoredItemService) CreateMonitoredItems(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	dlog := s.Logger.With("func", "MonitoredItemService.CreateMonitoredItems")
+	dlog := s.srv.logger.With("func", "MonitoredItemService.CreateMonitoredItems")
 	dlog.Debug("Handling", "type", ualog.TypeOf(r))
 
 	req, err := safeReq[*ua.CreateMonitoredItemsRequest](r)
 	if err != nil {
 		return nil, err
 	}
-	s.Mu.Lock()
-	defer s.Mu.Unlock()
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	count := len(req.ItemsToCreate)
 
@@ -173,14 +177,14 @@ func (s *MonitoredItemService) CreateMonitoredItems(sc *uasc.SecureChannel, r ua
 
 	subID := req.SubscriptionID
 	dlog.Debug("Creating monitored items", "sub_id", subID)
-	s.SubService.Mu.Lock()
-	sub, ok := s.SubService.Subs[subID]
-	s.SubService.Mu.Unlock()
+	s.subService.mu.Lock()
+	sub, ok := s.subService.subs[subID]
+	s.subService.mu.Unlock()
 	if !ok {
 		return nil, errors.New("sub doesn't exist")
 	}
 
-	sess := s.SubService.srv.Session(req.RequestHeader)
+	sess := s.subService.srv.Session(req.RequestHeader)
 	if sub.Session.AuthTokenID.String() != sess.AuthTokenID.String() {
 		return nil, errors.New("not your subscription, bro")
 	}
@@ -195,18 +199,18 @@ func (s *MonitoredItemService) CreateMonitoredItems(sc *uasc.SecureChannel, r ua
 		}
 
 		// book keeping of the new item
-		s.Items[item.ID] = &item
-		list, ok := s.Nodes[item.Req.ItemToMonitor.NodeID.String()]
+		s.items[item.ID] = &item
+		list, ok := s.nodes[item.Req.ItemToMonitor.NodeID.String()]
 		if !ok {
 			list = make([]*MonitoredItem, 0, 1)
 		}
-		s.Nodes[item.Req.ItemToMonitor.NodeID.String()] = append(list, &item)
+		s.nodes[item.Req.ItemToMonitor.NodeID.String()] = append(list, &item)
 
-		list, ok = s.Subs[item.Sub.ID]
+		list, ok = s.subs[item.Sub.ID]
 		if !ok {
 			list = make([]*MonitoredItem, 0, 1)
 		}
-		s.Subs[item.Sub.ID] = append(list, &item)
+		s.subs[item.Sub.ID] = append(list, &item)
 
 		dlog.Debug("Adding monitored item",
 			"node_id", nodeid.String(),
@@ -246,7 +250,7 @@ func (s *MonitoredItemService) CreateMonitoredItems(sc *uasc.SecureChannel, r ua
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.12.3
 func (s *MonitoredItemService) ModifyMonitoredItems(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	dlog := s.Logger.With("func", "MonitoredItemService.ModifyMonitoredItems")
+	dlog := s.srv.logger.With("func", "MonitoredItemService.ModifyMonitoredItems")
 	dlog.Debug("Handling", "type", ualog.TypeOf(r))
 
 	req, err := safeReq[*ua.ModifyMonitoredItemsRequest](r)
@@ -258,23 +262,23 @@ func (s *MonitoredItemService) ModifyMonitoredItems(sc *uasc.SecureChannel, r ua
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.12.4
 func (s *MonitoredItemService) SetMonitoringMode(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	dlog := s.Logger.With("func", "MonitoredItemService.SetMonitoringMode")
+	dlog := s.srv.logger.With("func", "MonitoredItemService.SetMonitoringMode")
 	dlog.Debug("Handling", "type", ualog.TypeOf(r))
 
 	req, err := safeReq[*ua.SetMonitoringModeRequest](r)
 	if err != nil {
 		return nil, err
 	}
-	s.Mu.Lock()
-	defer s.Mu.Unlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	results := make([]ua.StatusCode, len(req.MonitoredItemIDs))
 
-	sess := s.SubService.srv.Session(req.RequestHeader)
+	sess := s.subService.srv.Session(req.RequestHeader)
 
 	for i := range req.MonitoredItemIDs {
 		id := req.MonitoredItemIDs[i]
-		item, ok := s.Items[id]
+		item, ok := s.items[id]
 
 		if item.Sub.Session.AuthTokenID.String() != sess.AuthTokenID.String() {
 			results[i] = ua.StatusBadSessionIDInvalid
@@ -305,7 +309,7 @@ func (s *MonitoredItemService) SetMonitoringMode(sc *uasc.SecureChannel, r ua.Re
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.12.5
 func (s *MonitoredItemService) SetTriggering(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	dlog := s.Logger.With("func", "MonitoredItemService.SetTriggering")
+	dlog := s.srv.logger.With("func", "MonitoredItemService.SetTriggering")
 	dlog.Debug("Handling", "type", ualog.TypeOf(r))
 
 	req, err := safeReq[*ua.SetTriggeringRequest](r)
@@ -317,7 +321,7 @@ func (s *MonitoredItemService) SetTriggering(sc *uasc.SecureChannel, r ua.Reques
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.12.6
 func (s *MonitoredItemService) DeleteMonitoredItems(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	dlog := s.Logger.With("func", "MonitoredItemService.DeleteMonitoredItems")
+	dlog := s.srv.logger.With("func", "MonitoredItemService.DeleteMonitoredItems")
 	dlog.Debug("Handling", "type", ualog.TypeOf(r))
 
 	req, err := safeReq[*ua.DeleteMonitoredItemsRequest](r)
@@ -325,15 +329,15 @@ func (s *MonitoredItemService) DeleteMonitoredItems(sc *uasc.SecureChannel, r ua
 		return nil, err
 	}
 
-	s.Mu.Lock()
-	defer s.Mu.Unlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-	sess := s.SubService.srv.Session(req.RequestHeader)
+	sess := s.subService.srv.Session(req.RequestHeader)
 
 	results := make([]ua.StatusCode, len(req.MonitoredItemIDs))
 	for i := range req.MonitoredItemIDs {
 		id := req.MonitoredItemIDs[i]
-		item, ok := s.Items[id]
+		item, ok := s.items[id]
 		if !ok {
 			results[i] = ua.StatusBadMonitoredItemIDInvalid
 		}

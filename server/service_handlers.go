@@ -64,9 +64,8 @@ func (srv *Server) initHandlers() {
 	srv.RegisterHandler(id.CallRequest_Encoding_DefaultBinary, method.Call)
 
 	sub := &SubscriptionService{
-		srv:    srv,
-		Subs:   make(map[uint32]*Subscription),
-		Logger: srv.logger,
+		srv:  srv,
+		subs: make(map[uint32]*Subscription),
 	}
 	srv.SubscriptionService = sub
 	srv.RegisterHandler(id.CreateSubscriptionRequest_Encoding_DefaultBinary, sub.CreateSubscription)
@@ -78,11 +77,11 @@ func (srv *Server) initHandlers() {
 	srv.RegisterHandler(id.DeleteSubscriptionsRequest_Encoding_DefaultBinary, sub.DeleteSubscriptions)
 
 	item := &MonitoredItemService{
-		SubService: sub,
-		Items:      make(map[uint32]*MonitoredItem),
-		Nodes:      make(map[string][]*MonitoredItem),
-		Subs:       make(map[uint32][]*MonitoredItem),
-		Logger:     srv.logger,
+		srv:        srv,
+		subService: sub,
+		items:      make(map[uint32]*MonitoredItem),
+		nodes:      make(map[string][]*MonitoredItem),
+		subs:       make(map[uint32][]*MonitoredItem),
 	}
 	srv.MonitoredItemService = item
 	// s.registerHandler(id.MonitoredItemCreateRequest_Encoding_DefaultBinary, item.MonitoredItemCreate)

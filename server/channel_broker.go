@@ -21,6 +21,7 @@ type channelBroker struct {
 
 	// mu protects concurrent modification of s, secureChannelID, and secureTokenID
 	mu sync.RWMutex
+
 	// s is a slice of all SecureChannels watched by the channelBroker
 	s map[uint32]*uasc.SecureChannel
 
