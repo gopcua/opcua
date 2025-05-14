@@ -14,7 +14,7 @@ type QueryService struct {
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.9.3
 func (s *QueryService) QueryFirst(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	s.srv.cfg.logger.Debug("Handling %T", r)
+	s.srv.logger.Debug("Handling %T", r)
 
 	req, err := safeReq[*ua.QueryFirstRequest](r)
 	if err != nil {
@@ -25,7 +25,7 @@ func (s *QueryService) QueryFirst(sc *uasc.SecureChannel, r ua.Request, reqID ui
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.9.4
 func (s *QueryService) QueryNext(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	s.srv.cfg.logger.Debug("Handling %T", r)
+	s.srv.logger.Debug("Handling %T", r)
 
 	req, err := safeReq[*ua.QueryNextRequest](r)
 	if err != nil {

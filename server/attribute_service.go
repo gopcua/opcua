@@ -17,7 +17,7 @@ type AttributeService struct {
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.10.2
 func (s *AttributeService) Read(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	s.srv.cfg.logger.Debug("Handling %T", r)
+	s.srv.logger.Debug("Handling %T", r)
 
 	req, err := safeReq[*ua.ReadRequest](r)
 	if err != nil {
@@ -26,7 +26,7 @@ func (s *AttributeService) Read(sc *uasc.SecureChannel, r ua.Request, reqID uint
 
 	results := make([]*ua.DataValue, len(req.NodesToRead))
 	for i, n := range req.NodesToRead {
-		s.srv.cfg.logger.Debug("server: read", "node", n.NodeID, "attr", n.AttributeID)
+		s.srv.logger.Debug("server: read", "node", n.NodeID, "attr", n.AttributeID)
 
 		ns, err := s.srv.Namespace(int(n.NodeID.Namespace()))
 		if err != nil {
@@ -51,7 +51,7 @@ func (s *AttributeService) Read(sc *uasc.SecureChannel, r ua.Request, reqID uint
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.10.3
 func (s *AttributeService) HistoryRead(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	s.srv.cfg.logger.Debug("Handling %T", r)
+	s.srv.logger.Debug("Handling %T", r)
 
 	req, err := safeReq[*ua.HistoryReadRequest](r)
 	if err != nil {
@@ -71,7 +71,7 @@ func (s *AttributeService) Write(sc *uasc.SecureChannel, r ua.Request, reqID uin
 
 	for i := range req.NodesToWrite {
 		n := req.NodesToWrite[i]
-		s.srv.cfg.logger.Debug("server: write: ", "node", n.NodeID, "attr", n.AttributeID)
+		s.srv.logger.Debug("server: write: ", "node", n.NodeID, "attr", n.AttributeID)
 
 		ns, err := s.srv.Namespace(int(n.NodeID.Namespace()))
 		if err != nil {
@@ -100,7 +100,7 @@ func (s *AttributeService) Write(sc *uasc.SecureChannel, r ua.Request, reqID uin
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.10.5
 func (s *AttributeService) HistoryUpdate(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	s.srv.cfg.logger.Debug("server: handling", "type", fmt.Sprintf("%T", r))
+	s.srv.logger.Debug("server: handling", "type", fmt.Sprintf("%T", r))
 
 	req, err := safeReq[*ua.HistoryUpdateRequest](r)
 	if err != nil {

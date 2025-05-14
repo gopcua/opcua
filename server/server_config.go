@@ -79,7 +79,8 @@ func EnableSecurity(secPolicy string, secMode ua.MessageSecurityMode) Option {
 
 		for _, sec := range s.enabledSec {
 			if sec.secPolicy == secPolicy && sec.secMode == secMode {
-				s.logger.Warn("security policy already exists, skipping")
+				// todo(fs): logging here feels wrong. Ideas?
+				slog.Warn("security policy already exists, skipping")
 				return
 			}
 		}
@@ -101,7 +102,8 @@ func EnableAuthMode(tokenType ua.UserTokenType) Option {
 
 		for _, a := range s.enabledAuth {
 			if a.tokenType == tokenType {
-					s.logger.Warn("auth mode already registered, skipping")
+				// todo(fs): logging here feels wrong. Ideas?
+				slog.Warn("auth mode already registered, skipping")
 				return
 			}
 		}
@@ -149,31 +151,6 @@ func SoftwareVersion(name string) Option {
 // SetLoggerHandler sets the slog.Handler for the server.
 func SetLoggerHandler(h slog.Handler) Option {
 	return func(s *serverConfig) {
-		s.logger = &slogLogger{
-			logger: slog.New(h),
-		}
+		s.loghandler = h
 	}
 }
-
-func SetLogger(l Logger) Option {
-	return func(s *serverConfig) {
-		s.logger = l
-	}
-}
-
-type Logger interface {
-	Debug(msg string, args ...any)
-	Info(msg string, args ...any)
-	Warn(msg string, args ...any)
-	Error(msg string, args ...any)
-}
-
-// slogLogger maps the logger interface to slog.
-type slogLogger struct {
-	logger *slog.Logger
-}
-
-func (l *slogLogger) Debug(msg string, args ...any) { l.logger.Debug(fmt.Sprintf(msg, args...)) }
-func (l *slogLogger) Info(msg string, args ...any)  { l.logger.Info(fmt.Sprintf(msg, args...)) }
-func (l *slogLogger) Warn(msg string, args ...any)  { l.logger.Warn(fmt.Sprintf(msg, args...)) }
-func (l *slogLogger) Error(msg string, args ...any) { l.logger.Error(fmt.Sprintf(msg, args...)) }

@@ -50,6 +50,8 @@ type Server struct {
 
 	SubscriptionService  *SubscriptionService
 	MonitoredItemService *MonitoredItemService
+
+	logger *slog.Logger
 }
 
 type serverConfig struct {
@@ -69,7 +71,7 @@ type serverConfig struct {
 
 	cap ServerCapabilities
 
-	logger Logger
+	loghandler slog.Handler
 }
 
 var capabilities = ServerCapabilities{
@@ -112,15 +114,18 @@ func New(opts ...Option) *Server {
 	if len(cfg.endpoints) != 0 {
 		url = cfg.endpoints[0]
 	}
-	if cfg.logger == nil {
-		cfg.logger = &slogLogger{logger: slog.Default()}
+
+	handler := cfg.loghandler
+	if handler == nil {
+		slog.Default().Handler()
 	}
+	logger := slog.New(handler)
 
 	s := &Server{
 		url:      url,
 		cfg:      cfg,
-		cb:       newChannelBroker(cfg.logger),
-		sb:       newSessionBroker(cfg.logger),
+		cb:       newChannelBroker(logger),
+		sb:       newSessionBroker(logger),
 		handlers: make(map[uint16]Handler),
 		namespaces: []NameSpace{
 			NewNameSpace("http://opcfoundation.org/UA/"), // ns:0
@@ -140,6 +145,7 @@ func New(opts ...Option) *Server {
 			SecondsTillShutdown: 0,
 			ShutdownReason:      &ua.LocalizedText{},
 		},
+		logger: logger,
 	}
 
 	// init server address space
@@ -259,13 +265,13 @@ func (srv *Server) Start(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	srv.cfg.logger.Info("Started listening on %v", srv.URLs())
+	srv.logger.Info("Started listening on %v", srv.URLs())
 
 	srv.initEndpoints()
 	srv.setServerState(ua.ServerStateRunning)
 
 	if srv.cb == nil {
-		srv.cb = newChannelBroker(srv.cfg.logger)
+		srv.cb = newChannelBroker(srv.logger)
 	}
 
 	go srv.acceptAndRegister(ctx, srv.l)
@@ -309,20 +315,20 @@ func (srv *Server) acceptAndRegister(ctx context.Context, l *uacp.Listener) {
 				switch x := err.(type) {
 				case *net.OpError:
 					// socket closed. Cannot recover from this.
-					srv.cfg.logger.Error("socket closed: %s", err)
+					srv.logger.Error("socket closed: %s", err)
 					return
 				case temporary:
 					if x.Temporary() {
 						continue
 					}
 				default:
-					srv.cfg.logger.Error("error accepting connection: %s", err)
+					srv.logger.Error("error accepting connection: %s", err)
 					continue
 				}
 			}
 
 			go srv.cb.RegisterConn(ctx, c, srv.cfg.certificate, srv.cfg.privateKey)
-			srv.cfg.logger.Info("registered connection: %s", c.RemoteAddr())
+			srv.logger.Info("registered connection: %s", c.RemoteAddr())
 		}
 	}
 }
@@ -336,20 +342,20 @@ func (srv *Server) monitorConnections(ctx context.Context) {
 			continue // ctx is likely done, ctx.Err will be non-nil
 		}
 		if msg.Err != nil {
-			srv.cfg.logger.Error("monitorConnections: Error received: %s\n", msg.Err)
+			srv.logger.Error("monitorConnections: Error received: %s\n", msg.Err)
 			continue // todo(fs): close SC???
 		}
 		if resp := msg.Response(); resp != nil {
-			srv.cfg.logger.Error("monitorConnections: Server received response %T ???", resp)
+			srv.logger.Error("monitorConnections: Server received response %T ???", resp)
 			continue // todo(fs): close SC???
 		}
-		srv.cfg.logger.Debug("monitorConnections: Received Message: %T", msg.Request())
+		srv.logger.Debug("monitorConnections: Received Message: %T", msg.Request())
 		srv.cb.mu.RLock()
 		sc, ok := srv.cb.s[msg.SecureChannelID]
 		srv.cb.mu.RUnlock()
 		if !ok {
 			// if the secure channel ID is 0, this is probably a open secure channel request.
-			srv.cfg.logger.Error("monitorConnections: Unknown SecureChannel: %d", msg.SecureChannelID)
+			srv.logger.Error("monitorConnections: Unknown SecureChannel: %d", msg.SecureChannelID)
 			continue
 		}
 

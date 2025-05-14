@@ -75,8 +75,8 @@ func (ns *MapNamespace) Browse(bd *ua.BrowseDescription) *ua.BrowseResult {
 	ns.Mu.RLock()
 	defer ns.Mu.RUnlock()
 
-	ns.srv.cfg.logger.Debug("BrowseRequest: id=%s mask=%08b\n", bd.NodeID, bd.ResultMask)
-	ns.srv.cfg.logger.Debug("Browse req for %s", bd.NodeID.String())
+	ns.srv.logger.Debug("BrowseRequest: id=%s mask=%08b\n", bd.NodeID, bd.ResultMask)
+	ns.srv.logger.Debug("Browse req for %s", bd.NodeID.String())
 	if bd.NodeID.IntID() != id.RootFolder && bd.NodeID.IntID() != id.ObjectsFolder {
 		refs := make([]*ua.ReferenceDescription, 0)
 		return &ua.BrowseResult{
@@ -131,7 +131,7 @@ func (ns *MapNamespace) Browse(bd *ua.BrowseDescription) *ua.BrowseResult {
 }
 
 func (ns *MapNamespace) Attribute(n *ua.NodeID, a ua.AttributeID) *ua.DataValue {
-	ns.srv.cfg.logger.Debug("read: node=%s attr=%s", n.String(), a)
+	ns.srv.logger.Debug("read: node=%s attr=%s", n.String(), a)
 
 	if n.IntID() != 0 {
 		// this is not one of our normal tags.
@@ -164,8 +164,8 @@ func (ns *MapNamespace) Attribute(n *ua.NodeID, a ua.AttributeID) *ua.DataValue 
 	key := n.StringID()
 
 	var err error
-	ns.srv.cfg.logger.Debug("Read req for %s", key)
-	ns.srv.cfg.logger.Debug("'%s' Data at read: %v", ns.name, ns.Data)
+	ns.srv.logger.Debug("Read req for %s", key)
+	ns.srv.logger.Debug("'%s' Data at read: %v", ns.name, ns.Data)
 
 	// because our data is native go types we don't have any of the ua "attributes" attached to it.
 	// so depending on what attribute the client wants, we'll inspect the data and return the appropriate
@@ -247,39 +247,39 @@ func (ns *MapNamespace) Attribute(n *ua.NodeID, a ua.AttributeID) *ua.DataValue 
 		case string:
 			dv.Value, err = ua.NewVariant(ua.NewNumericNodeID(0, 12))
 			if err != nil {
-				ns.srv.cfg.logger.Warn("problem creating variant: %v", err)
+				ns.srv.logger.Warn("problem creating variant: %v", err)
 			}
 		case int:
 			// we can't use an int because it is of unspecified length.  I'm going to use int64 so that we don't
 			// have to worry about cutting data off.
 			dv.Value, err = ua.NewVariant(ua.NewNumericNodeID(0, 6))
 			if err != nil {
-				ns.srv.cfg.logger.Warn("problem creating variant: %v", err)
+				ns.srv.logger.Warn("problem creating variant: %v", err)
 			}
 		case int32:
 			dv.Value, err = ua.NewVariant(ua.NewNumericNodeID(0, 6))
 			if err != nil {
-				ns.srv.cfg.logger.Warn("problem creating variant: %v", err)
+				ns.srv.logger.Warn("problem creating variant: %v", err)
 			}
 		case float32:
 			dv.Value, err = ua.NewVariant(ua.NewNumericNodeID(0, 10))
 			if err != nil {
-				ns.srv.cfg.logger.Warn("problem creating variant: %v", err)
+				ns.srv.logger.Warn("problem creating variant: %v", err)
 			}
 		case float64:
 			dv.Value, err = ua.NewVariant(ua.NewNumericNodeID(0, 11))
 			if err != nil {
-				ns.srv.cfg.logger.Warn("problem creating variant: %v", err)
+				ns.srv.logger.Warn("problem creating variant: %v", err)
 			}
 		case bool:
 			dv.Value, err = ua.NewVariant(ua.NewNumericNodeID(0, 1))
 			if err != nil {
-				ns.srv.cfg.logger.Warn("problem creating variant: %v", err)
+				ns.srv.logger.Warn("problem creating variant: %v", err)
 			}
 		default:
 			dv.Value, err = ua.NewVariant(ua.NewNumericNodeID(0, 24))
 			if err != nil {
-				ns.srv.cfg.logger.Warn("problem creating variant: %v", err)
+				ns.srv.logger.Warn("problem creating variant: %v", err)
 			}
 		}
 
@@ -299,9 +299,9 @@ func (ns *MapNamespace) Attribute(n *ua.NodeID, a ua.AttributeID) *ua.DataValue 
 	}
 
 	if dv.Value == nil {
-		ns.srv.cfg.logger.Warn("bad dv value")
+		ns.srv.logger.Warn("bad dv value")
 	} else {
-		ns.srv.cfg.logger.Debug("Read '%s' = '%v' (%v)", key, dv.Value, dv.Value.Value())
+		ns.srv.logger.Debug("Read '%s' = '%v' (%v)", key, dv.Value, dv.Value.Value())
 	}
 
 	return dv
@@ -310,7 +310,7 @@ func (ns *MapNamespace) Attribute(n *ua.NodeID, a ua.AttributeID) *ua.DataValue 
 func (s *MapNamespace) SetAttribute(node *ua.NodeID, attr ua.AttributeID, val *ua.DataValue) ua.StatusCode {
 	s.Mu.Lock()
 	defer s.Mu.Unlock()
-	s.srv.cfg.logger.Debug("'%s' Data pre-write: %v", s.name, s.Data)
+	s.srv.logger.Debug("'%s' Data pre-write: %v", s.name, s.Data)
 
 	key := node.StringID()
 

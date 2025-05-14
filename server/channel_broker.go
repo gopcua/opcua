@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rsa"
 	"io"
+	"log/slog"
 	mrand "math/rand"
 	"sync"
 	"time"
@@ -32,10 +33,12 @@ type channelBroker struct {
 	// msgChan is the common channel that all messages from all channels
 	// get funneled into for handling
 	msgChan chan *uasc.MessageBody
-	logger  Logger
+
+	// logger is the server logger
+	logger *slog.Logger
 }
 
-func newChannelBroker(logger Logger) *channelBroker {
+func newChannelBroker(logger *slog.Logger) *channelBroker {
 	rng := mrand.New(mrand.NewSource(time.Now().UnixNano()))
 	return &channelBroker{
 		endpoints:       make(map[string]*ua.EndpointDescription),

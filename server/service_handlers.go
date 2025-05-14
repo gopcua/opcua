@@ -101,7 +101,7 @@ func (srv *Server) RegisterHandler(typeID uint16, h Handler) {
 }
 
 func (srv *Server) handleService(ctx context.Context, sc *uasc.SecureChannel, reqID uint32, req ua.Request) {
-	srv.cfg.logger.Debug("handleService: Got: %T\n", req)
+	srv.logger.Debug("handleService: Got: %T\n", req)
 
 	var resp ua.Response
 	var err error
@@ -112,7 +112,7 @@ func (srv *Server) handleService(ctx context.Context, sc *uasc.SecureChannel, re
 		resp, err = h(sc, req, reqID)
 	} else {
 		if typeID == 0 {
-			srv.cfg.logger.Warn("unknown service %T. Did you call register?", req)
+			srv.logger.Warn("unknown service %T. Did you call register?", req)
 		}
 		err = ua.StatusBadServiceUnsupported
 	}
@@ -131,7 +131,7 @@ func (srv *Server) handleService(ctx context.Context, sc *uasc.SecureChannel, re
 
 	err = sc.SendResponseWithContext(ctx, reqID, resp)
 	if err != nil {
-		srv.cfg.logger.Warn("Error sending response: %s\n", err)
+		srv.logger.Warn("Error sending response: %s\n", err)
 	}
 }
 
