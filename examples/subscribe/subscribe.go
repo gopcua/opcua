@@ -127,13 +127,13 @@ func main() {
 				for _, item := range x.Events {
 					slog.Info("Event for client handle", "client_handle", item.ClientHandle)
 					for i, field := range item.EventFields {
-						slog.Info("fields:", "name", eventFieldNames[i], "value", field.Value(), "type", fmt.Sprintf("%T", field.Value()))
+						slog.Info("fields:", "name", eventFieldNames[i], "value", field.Value(), "type", ualog.TypeOf(field.Value()))
 					}
 					fmt.Println()
 				}
 
 			default:
-				slog.Warn("what's this publish result?", "type", fmt.Sprintf("%T", res.Value))
+				slog.Warn("what's this publish result?", "type", ualog.TypeOf(res.Value))
 			}
 		}
 	}

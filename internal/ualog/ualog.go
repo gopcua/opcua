@@ -2,6 +2,7 @@
 package ualog
 
 import (
+	"fmt"
 	"log/slog"
 	"os"
 )
@@ -22,4 +23,9 @@ func NewTextHandler(debug bool) *slog.TextHandler {
 func Fatal(msg string, args ...any) {
 	slog.Error(msg, args...)
 	os.Exit(1)
+}
+
+// TypeOf returns the type name of [v].
+func TypeOf(v any) string {
+	return fmt.Sprintf("%T", v)
 }

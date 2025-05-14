@@ -10,7 +10,6 @@ import (
 	"crypto/tls"
 	"encoding/xml"
 	"flag"
-	"fmt"
 	"io"
 	"log/slog"
 	"os"
@@ -124,7 +123,7 @@ func main() {
 		} else {
 			pk, ok := c.PrivateKey.(*rsa.PrivateKey)
 			if !ok {
-				ualog.Fatal("Invalid private key", "type", fmt.Sprintf("%T", c.PrivateKey))
+				ualog.Fatal("Invalid private key", "type", ualog.TypeOf(c.PrivateKey))
 			}
 			cert = c.Certificate[0]
 			opts = append(opts, server.PrivateKey(pk), server.Certificate(cert))

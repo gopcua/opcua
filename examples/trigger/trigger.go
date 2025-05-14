@@ -7,7 +7,6 @@ package main
 import (
 	"context"
 	"flag"
-	"fmt"
 	"log/slog"
 	"time"
 
@@ -142,7 +141,7 @@ func main() {
 				}
 
 			default:
-				slog.Warn("what's this publish result?", "type", fmt.Sprintf("%T", res.Value))
+				slog.Warn("what's this publish result?", "type", ualog.TypeOf(res.Value))
 			}
 		}
 	}

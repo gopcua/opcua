@@ -146,7 +146,7 @@ func clientOptsFromFlags(endpoints []*ua.EndpointDescription) []opcua.Option {
 		} else {
 			pk, ok := c.PrivateKey.(*rsa.PrivateKey)
 			if !ok {
-				ualog.Fatal("Invalid private key", "type", fmt.Sprintf("%T", c.PrivateKey))
+				ualog.Fatal("Invalid private key", "type", ualog.TypeOf(c.PrivateKey))
 			}
 			cert = c.Certificate[0]
 			privateKey = pk

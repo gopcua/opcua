@@ -10,7 +10,6 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/binary"
-	"fmt"
 	"io"
 	"log/slog"
 	"math"
@@ -21,6 +20,7 @@ import (
 	"time"
 
 	"github.com/gopcua/opcua/errors"
+	"github.com/gopcua/opcua/internal/ualog"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uacp"
 	"github.com/gopcua/opcua/uapolicy"
@@ -288,13 +288,13 @@ func (s *SecureChannel) dispatcher() {
 			if msg.Err != nil {
 				dlog.DebugContext(ctx, "uasc: fail", "conn_id", s.c.ID(), "req_id", msg.RequestID, "error", msg.Err)
 			} else {
-				dlog.DebugContext(ctx, "uasc: recv", "conn_id", s.c.ID(), "req_id", msg.RequestID, "type", fmt.Sprintf("%T", msg.body))
+				dlog.DebugContext(ctx, "uasc: recv", "conn_id", s.c.ID(), "req_id", msg.RequestID, "type", ualog.TypeOf(msg.body))
 			}
 
 			ch, ok := s.popHandler(msg.RequestID)
 
 			if !ok {
-				dlog.DebugContext(ctx, "uasc: no handler", "conn_id", s.c.ID(), "req_id", msg.RequestID, "msg", fmt.Sprintf("%T", msg.body))
+				dlog.DebugContext(ctx, "uasc: no handler", "conn_id", s.c.ID(), "req_id", msg.RequestID, "msg", ualog.TypeOf(msg.body))
 				continue
 			}
 
@@ -303,7 +303,7 @@ func (s *SecureChannel) dispatcher() {
 				s.rcvLocker.lock()
 			}
 
-			dlog.DebugContext(ctx, "uasc: sending to handler", "conn_id", s.c.ID(), "req_id", msg.RequestID, "msg", fmt.Sprintf("%T", msg.body))
+			dlog.DebugContext(ctx, "uasc: sending to handler", "conn_id", s.c.ID(), "req_id", msg.RequestID, "msg", ualog.TypeOf(msg.body))
 			select {
 			case ch <- msg:
 			default:
@@ -430,7 +430,7 @@ func (s *SecureChannel) Receive(ctx context.Context) *MessageBody {
 			if req, ok := msg.Request().(*ua.OpenSecureChannelRequest); ok {
 				err := s.handleOpenSecureChannelRequest(reqID, req)
 				if err != nil {
-					dlog.DebugContext(ctx, "uasc: handling failed", "req", fmt.Sprintf("%T", req), "error", err)
+					dlog.DebugContext(ctx, "uasc: handling failed", "req", ualog.TypeOf(req), "error", err)
 					return &MessageBody{Err: err}
 				}
 				return &MessageBody{}
@@ -751,7 +751,7 @@ func (s *SecureChannel) handleOpenSecureChannelRequest(reqID uint32, svc ua.Requ
 
 	req, ok := svc.(*ua.OpenSecureChannelRequest)
 	if !ok {
-		dlog.Debug("expected OpenSecureChannelRequest", "got", fmt.Sprintf("%T", svc))
+		dlog.Debug("expected OpenSecureChannelRequest", "got", ualog.TypeOf(svc))
 	}
 
 	// Part 6.7.4: https://reference.opcfoundation.org/Core/Part6/v105/docs/6.7.4
@@ -1097,7 +1097,7 @@ func (s *SecureChannel) sendAsyncWithTimeout(
 		dlog.DebugContext(ctx, "uasc: send",
 			"conn_id", s.c.ID(),
 			"req_id", reqID,
-			"req", fmt.Sprintf("%T", req),
+			"req", ualog.TypeOf(req),
 			"chunk_size", len(chunk),
 		)
 	}
@@ -1157,7 +1157,7 @@ func (s *SecureChannel) SendMsgWithContext(ctx context.Context, instance *channe
 	dlog.DebugContext(ctx, "uasc: send",
 		"conn_id", s.c.ID(),
 		"req_id", reqID,
-		"resp", fmt.Sprintf("%T", msg),
+		"resp", ualog.TypeOf(msg),
 		"msg_size", len(b),
 	)
 
@@ -1214,7 +1214,7 @@ func (s *SecureChannel) sendResponseWithContext(ctx context.Context, instance *c
 	dlog.DebugContext(ctx, "uasc: send response",
 		"conn_id", s.c.ID(),
 		"req_id", reqID,
-		"resp", fmt.Sprintf("%T", resp),
+		"resp", ualog.TypeOf(resp),
 		"msg_size", len(b))
 
 	return nil

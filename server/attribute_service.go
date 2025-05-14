@@ -1,9 +1,9 @@
 package server
 
 import (
-	"fmt"
 	"time"
 
+	"github.com/gopcua/opcua/internal/ualog"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uasc"
 )
@@ -100,7 +100,7 @@ func (s *AttributeService) Write(sc *uasc.SecureChannel, r ua.Request, reqID uin
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.10.5
 func (s *AttributeService) HistoryUpdate(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	s.srv.logger.Debug("server: handling", "type", fmt.Sprintf("%T", r))
+	s.srv.logger.Debug("server: handling", "type", ualog.TypeOf(r))
 
 	req, err := safeReq[*ua.HistoryUpdateRequest](r)
 	if err != nil {

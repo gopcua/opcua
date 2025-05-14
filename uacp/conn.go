@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/gopcua/opcua/errors"
+	"github.com/gopcua/opcua/internal/ualog"
 	"github.com/gopcua/opcua/ua"
 )
 
@@ -273,7 +274,7 @@ func (c *Conn) Handshake(ctx context.Context, endpoint string) error {
 			dlog.DebugContext(ctx, "uacp: server has no message size limit. Using default", "max_message_size", ack.MaxMessageSize)
 		}
 		c.ack = ack
-		dlog.DebugContext(ctx, "uacp: recv", "type", fmt.Sprintf("%T", ack))
+		dlog.DebugContext(ctx, "uacp: recv", "type", ualog.TypeOf(ack))
 		return nil
 
 	case "ERRF":
@@ -319,7 +320,7 @@ func (c *Conn) srvhandshake(endpoint string) error {
 			c.SendError(ua.StatusBadTCPInternalError)
 			return err
 		}
-		dlog.Debug("uacp: recv", "type", fmt.Sprintf("%T", hel))
+		dlog.Debug("uacp: recv", "type", ualog.TypeOf(hel))
 		return nil
 
 	case "RHEF":
@@ -340,7 +341,7 @@ func (c *Conn) srvhandshake(endpoint string) error {
 			return err
 		}
 		c.TCPConn = c2.(*net.TCPConn)
-		dlog.Debug("uacp: recv", "type", fmt.Sprintf("%T", rhe))
+		dlog.Debug("uacp: recv", "type", ualog.TypeOf(rhe))
 		return nil
 
 	case "ERRF":
