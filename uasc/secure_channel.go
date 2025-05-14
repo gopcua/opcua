@@ -179,11 +179,11 @@ type SecureChannel struct {
 }
 
 func NewSecureChannel(endpoint string, c *uacp.Conn, cfg *Config, errCh chan<- error) (*SecureChannel, error) {
-	return newSecureChannel(endpoint, c, cfg, client, errCh, 0, 0, 0)
+	return newSecureChannel(endpoint, c, cfg, client, errCh)
 }
 
 func NewServerSecureChannel(endpoint string, c *uacp.Conn, cfg *Config, errCh chan<- error, secureChannelID, sequenceNumber, securityTokenID uint32) (*SecureChannel, error) {
-	s, err := newSecureChannel(endpoint, c, cfg, server, errCh, secureChannelID, sequenceNumber, securityTokenID)
+	s, err := newSecureChannel(endpoint, c, cfg, server, errCh)
 	if err != nil {
 		return nil, err
 	}
@@ -196,7 +196,7 @@ func NewServerSecureChannel(endpoint string, c *uacp.Conn, cfg *Config, errCh ch
 	return s, nil
 }
 
-func newSecureChannel(endpoint string, c *uacp.Conn, cfg *Config, kind channelKind, errCh chan<- error, secureChannelID, sequenceNumber, securityTokenID uint32) (*SecureChannel, error) {
+func newSecureChannel(endpoint string, c *uacp.Conn, cfg *Config, kind channelKind, errCh chan<- error) (*SecureChannel, error) {
 	if c == nil {
 		return nil, errors.Errorf("no connection")
 	}
