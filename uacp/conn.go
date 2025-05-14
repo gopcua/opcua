@@ -68,7 +68,8 @@ type Dialer struct {
 }
 
 func (d *Dialer) Dial(ctx context.Context, endpoint string) (*Conn, error) {
-	dlog := slog.With("func", "Dial")
+	logger := ualog.FromContext(ctx)
+	dlog := logger.With("func", "Dial")
 	dlog.DebugContext(ctx, "uacp: connecting", "endpoint", endpoint)
 
 	_, raddr, err := ResolveEndpoint(ctx, endpoint)
@@ -87,7 +88,7 @@ func (d *Dialer) Dial(ctx context.Context, endpoint string) (*Conn, error) {
 		return nil, err
 	}
 
-	conn, err := NewConn(c.(*net.TCPConn), d.ClientACK)
+	conn, err := NewConn(c.(*net.TCPConn), d.ClientACK, logger)
 	if err != nil {
 		c.Close()
 		return nil, err
@@ -177,20 +178,21 @@ func (l *Listener) Endpoint() string {
 
 type Conn struct {
 	*net.TCPConn
-	id  uint32
-	ack *Acknowledge
+	id     uint32
+	ack    *Acknowledge
+	logger *slog.Logger
 
 	closeOnce sync.Once
 }
 
-func NewConn(c *net.TCPConn, ack *Acknowledge) (*Conn, error) {
+func NewConn(c *net.TCPConn, ack *Acknowledge, logger *slog.Logger) (*Conn, error) {
 	if c == nil {
 		return nil, fmt.Errorf("no connection")
 	}
 	if ack == nil {
 		ack = DefaultClientACK
 	}
-	return &Conn{TCPConn: c, id: nextid(), ack: ack}, nil
+	return &Conn{TCPConn: c, id: nextid(), ack: ack, logger: logger}, nil
 }
 
 func (c *Conn) ID() uint32 {
@@ -220,14 +222,14 @@ func (c *Conn) Close() (err error) {
 }
 
 func (c *Conn) close() error {
-	dlog := slog.With("conn_id", c.id, "func", "Conn.close")
+	dlog := c.logger.With("conn_id", c.id, "func", "Conn.close")
 
 	dlog.Debug("uacp: close")
 	return c.TCPConn.Close()
 }
 
 func (c *Conn) Handshake(ctx context.Context, endpoint string) error {
-	dlog := slog.With("conn_id", c.id, "func", "Conn.Handshake")
+	dlog := c.logger.With("conn_id", c.id, "func", "Conn.Handshake")
 
 	hel := &Hello{
 		Version:        c.ack.Version,
@@ -292,7 +294,7 @@ func (c *Conn) Handshake(ctx context.Context, endpoint string) error {
 }
 
 func (c *Conn) srvhandshake(endpoint string) error {
-	dlog := slog.With("conn_id", c.id, "func", "Conn.srvHandshake")
+	dlog := c.logger.With("conn_id", c.id, "func", "Conn.srvHandshake")
 
 	b, err := c.Receive()
 	if err != nil {
@@ -365,7 +367,7 @@ const hdrlen = 8
 // The size of b must be at least ReceiveBufSize. Otherwise,
 // the function returns an error.
 func (c *Conn) Receive() ([]byte, error) {
-	dlog := slog.With("conn_id", c.id, "func", "Conn.Receive")
+	dlog := c.logger.With("conn_id", c.id, "func", "Conn.Receive")
 
 	// TODO(kung-foo): allow user-specified buffer
 	// TODO(kung-foo): sync.Pool
@@ -408,7 +410,7 @@ func (c *Conn) Receive() ([]byte, error) {
 }
 
 func (c *Conn) Send(typ string, msg interface{}) error {
-	dlog := slog.With("conn_id", c.id, "func", "Conn.Send")
+	dlog := c.logger.With("conn_id", c.id, "func", "Conn.Send")
 
 	if len(typ) != 4 {
 		return errors.Errorf("invalid msg type: %s", typ)

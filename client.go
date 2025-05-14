@@ -20,6 +20,7 @@ import (
 
 	"github.com/gopcua/opcua/errors"
 	"github.com/gopcua/opcua/id"
+	"github.com/gopcua/opcua/internal/ualog"
 	"github.com/gopcua/opcua/stats"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uacp"
@@ -173,6 +174,9 @@ type Client struct {
 
 	// monitorOnce ensures only one connection monitor is running
 	monitorOnce sync.Once
+
+	// logger is the client logger
+	logger *slog.Logger
 }
 
 // NewClient creates a new Client.
@@ -200,8 +204,10 @@ func NewClient(endpoint string, opts ...Option) (*Client, error) {
 		pausech:     make(chan struct{}, 2),
 		resumech:    make(chan struct{}, 2),
 		stateCh:     cfg.stateCh,
+		logger:      cfg.logger,
 	}
-	c.pauseSubscriptions(context.Background())
+	ctx := ualog.NewContext(context.Background(), c.logger)
+	c.pauseSubscriptions(ctx)
 	c.setPublishTimeout(uasc.MaxTimeout)
 	// cannot use setState here since it would trigger the stateCh
 	c.atomicState.Store(Closed)
@@ -233,6 +239,9 @@ func (c *Client) Connect(ctx context.Context) error {
 	if c.SecureChannel() != nil {
 		return errors.Errorf("already connected")
 	}
+
+	// inject the logger into the context
+	ctx = ualog.NewContext(ctx, c.logger)
 
 	c.setState(ctx, Connecting)
 	if err := c.Dial(ctx); err != nil {
@@ -280,7 +289,7 @@ func (c *Client) Connect(ctx context.Context) error {
 
 // monitor manages connection alteration
 func (c *Client) monitor(ctx context.Context) {
-	dlog := slog.With("func", "Client.monitor")
+	dlog := c.logger.With("func", "Client.monitor")
 
 	dlog.DebugContext(ctx, "start")
 	defer dlog.DebugContext(ctx, "done")
@@ -599,7 +608,7 @@ func (c *Client) Dial(ctx context.Context) error {
 		return err
 	}
 
-	sc, err := uasc.NewSecureChannel(c.endpointURL, c.conn, c.cfg.sechan, c.sechanErr)
+	sc, err := uasc.NewSecureChannel(c.endpointURL, c.conn, c.cfg.sechan, c.sechanErr, c.logger)
 	if err != nil {
 		c.conn.Close()
 		return err
@@ -646,6 +655,11 @@ func (c *Client) Close(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+// Logger returns the client logger.
+func (c *Client) Logger() *slog.Logger {
+	return slog.New(c.logger.Handler())
 }
 
 // State returns the current connection state.
@@ -780,7 +794,7 @@ func (c *Client) CreateSession(ctx context.Context, cfg *uasc.SessionConfig) (*S
 
 		err := sc.VerifySessionSignature(res.ServerCertificate, nonce, res.ServerSignature.Signature)
 		if err != nil {
-			slog.Error("verifying session signature failed", "error", err)
+			c.logger.Error("verifying session signature failed", "error", err)
 			return nil
 		}
 
@@ -844,7 +858,7 @@ func (c *Client) ActivateSession(ctx context.Context, s *Session) error {
 	stats.Client().Add("ActivateSession", 1)
 	sig, sigAlg, err := sc.NewSessionSignature(s.serverCertificate, s.serverNonce)
 	if err != nil {
-		slog.Error("creating session signature failed", "error", err)
+		c.logger.Error("creating session signature failed", "error", err)
 		return nil
 	}
 
@@ -855,7 +869,7 @@ func (c *Client) ActivateSession(ctx context.Context, s *Session) error {
 	case *ua.UserNameIdentityToken:
 		pass, passAlg, err := sc.EncryptUserPassword(s.cfg.AuthPolicyURI, s.cfg.AuthPassword, s.serverCertificate, s.serverNonce)
 		if err != nil {
-			slog.Error("encrypting user password failed", "error", err)
+			c.logger.Error("encrypting user password failed", "error", err)
 			return err
 		}
 		tok.Password = pass
@@ -864,7 +878,7 @@ func (c *Client) ActivateSession(ctx context.Context, s *Session) error {
 	case *ua.X509IdentityToken:
 		tokSig, tokSigAlg, err := sc.NewUserTokenSignature(s.cfg.AuthPolicyURI, s.serverCertificate, s.serverNonce)
 		if err != nil {
-			slog.Error("creating session signature failed", "error", err)
+			c.logger.Error("creating session signature failed", "error", err)
 			return err
 		}
 		s.cfg.UserTokenSignature = &ua.SignatureData{

@@ -245,6 +245,11 @@ func (srv *Server) URLs() []string {
 	return srv.cfg.endpoints
 }
 
+// Logger returns the server logger
+func (srv *Server) Logger() *slog.Logger {
+	return slog.New(srv.logger.Handler())
+}
+
 // Start initializes and starts a Server listening on addr
 // If s was not initialized with NewServer(), addr defaults
 // to localhost:0 to let the OS select a random port
@@ -254,6 +259,9 @@ func (srv *Server) Start(ctx context.Context) error {
 	if len(srv.cfg.endpoints) == 0 {
 		return fmt.Errorf("cannot start server: no endpoints defined")
 	}
+
+	// inject the server logger into the context.
+	ctx = ualog.NewContext(ctx, srv.logger)
 
 	// Register all service handlers
 	srv.initHandlers()

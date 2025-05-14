@@ -5,6 +5,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"log/slog"
 	"math"
 	"testing"
 	"time"
@@ -300,35 +301,35 @@ func TestSignAndEncryptVerifyAndDecrypt(t *testing.T) {
 
 func TestNewSecureChannel(t *testing.T) {
 	t.Run("no connection", func(t *testing.T) {
-		_, err := NewSecureChannel("", nil, nil, nil)
+		_, err := NewSecureChannel("", nil, nil, nil, slog.Default())
 		require.ErrorContains(t, err, "no connection")
 	})
 	t.Run("no error channel", func(t *testing.T) {
-		_, err := NewSecureChannel("", &uacp.Conn{}, nil, nil)
+		_, err := NewSecureChannel("", &uacp.Conn{}, nil, nil, slog.Default())
 		require.ErrorContains(t, err, "no secure channel config")
 	})
 	t.Run("no config", func(t *testing.T) {
-		_, err := NewSecureChannel("", &uacp.Conn{}, nil, make(chan error))
+		_, err := NewSecureChannel("", &uacp.Conn{}, nil, make(chan error), slog.Default())
 		require.ErrorContains(t, err, "no secure channel config")
 	})
 	t.Run("uri none, mode not none", func(t *testing.T) {
 		cfg := &Config{SecurityPolicyURI: ua.SecurityPolicyURINone, SecurityMode: ua.MessageSecurityModeSign}
-		_, err := NewSecureChannel("", &uacp.Conn{}, cfg, make(chan error))
+		_, err := NewSecureChannel("", &uacp.Conn{}, cfg, make(chan error), slog.Default())
 		require.ErrorContains(t, err, "invalid channel config: Security policy 'http://opcfoundation.org/UA/SecurityPolicy#None' cannot be used with 'MessageSecurityModeSign'")
 	})
 	t.Run("uri not none, mode none", func(t *testing.T) {
 		cfg := &Config{SecurityPolicyURI: ua.SecurityPolicyURIBasic256, SecurityMode: ua.MessageSecurityModeNone}
-		_, err := NewSecureChannel("", &uacp.Conn{}, cfg, make(chan error))
+		_, err := NewSecureChannel("", &uacp.Conn{}, cfg, make(chan error), slog.Default())
 		require.ErrorContains(t, err, "invalid channel config: Security policy 'http://opcfoundation.org/UA/SecurityPolicy#Basic256' can only be used with 'MessageSecurityModeSign' or 'MessageSecurityModeSignAndEncrypt'")
 	})
 	t.Run("uri not none, security policy not none, mode invalid", func(t *testing.T) {
 		cfg := &Config{SecurityPolicyURI: ua.SecurityPolicyURIBasic256, SecurityMode: ua.MessageSecurityModeInvalid}
-		_, err := NewSecureChannel("", &uacp.Conn{}, cfg, make(chan error))
+		_, err := NewSecureChannel("", &uacp.Conn{}, cfg, make(chan error), slog.Default())
 		require.ErrorContains(t, err, "invalid channel config: Security policy 'http://opcfoundation.org/UA/SecurityPolicy#Basic256' can only be used with 'MessageSecurityModeSign' or 'MessageSecurityModeSignAndEncrypt'")
 	})
 	t.Run("uri not none, local key missing", func(t *testing.T) {
 		cfg := &Config{SecurityPolicyURI: ua.SecurityPolicyURIBasic256, SecurityMode: ua.MessageSecurityModeSign}
-		_, err := NewSecureChannel("", &uacp.Conn{}, cfg, make(chan error))
+		_, err := NewSecureChannel("", &uacp.Conn{}, cfg, make(chan error), slog.Default())
 		require.ErrorContains(t, err, "invalid channel config: Security policy 'http://opcfoundation.org/UA/SecurityPolicy#Basic256' requires a private key")
 	})
 }

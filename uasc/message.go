@@ -5,7 +5,6 @@
 package uasc
 
 import (
-	"log/slog"
 	"math"
 
 	"github.com/gopcua/opcua/errors"
@@ -122,8 +121,6 @@ func (m *Message) Encode() ([]byte, error) {
 }
 
 func (m *Message) EncodeChunks(maxBodySize uint32) ([][]byte, error) {
-	dlog := slog.With("func", "Message.EncodeChunks")
-
 	dataBody := ua.NewBuffer(nil)
 	dataBody.WriteStruct(m.TypeID)
 	dataBody.WriteStruct(m.Service)
@@ -135,7 +132,9 @@ func (m *Message) EncodeChunks(maxBodySize uint32) ([][]byte, error) {
 	// todo(fs): sometimes maxBodySize == 0 probably we get an invalid channel instance
 	// todo(fs): log this and investigate
 	if maxBodySize == 0 {
-		dlog.Debug("maxBodySize == 0 !!!")
+		// todo(fs): we don't have a good way of getting the client/server
+		// todo(fs): logger here.
+		// dlog.Debug("maxBodySize == 0 !!!")
 		maxBodySize = 1 << 12
 	}
 

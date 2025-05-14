@@ -74,6 +74,7 @@ func (c *channelBroker) RegisterConn(ctx context.Context, conn *uacp.Conn, local
 		conn,
 		cfg,
 		errch,
+		c.logger,
 		secureChannelID,
 		sequenceNumber,
 		secureTokenID,

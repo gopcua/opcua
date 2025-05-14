@@ -3,7 +3,6 @@ package opcua
 import (
 	"context"
 	"io"
-	"log/slog"
 	"slices"
 	"time"
 
@@ -129,7 +128,7 @@ func (c *Client) republishSubscription(ctx context.Context, id uint32, available
 		return errors.Errorf("invalid subscription id %d", id)
 	}
 
-	dlog := slog.With("func", "Client.republishSubscription", "sub_id", sub.SubscriptionID)
+	dlog := c.logger.With("func", "Client.republishSubscription", "sub_id", sub.SubscriptionID)
 
 	dlog.DebugContext(ctx, "republishing subscription")
 	if err := c.sendRepublishRequests(ctx, sub, availableSeq); err != nil {
@@ -151,7 +150,7 @@ func (c *Client) republishSubscription(ctx context.Context, id uint32, available
 // until it gets a BadMessageNotAvailable which implies that there are no
 // more messages to restore.
 func (c *Client) sendRepublishRequests(ctx context.Context, sub *Subscription, availableSeq []uint32) error {
-	dlog := slog.With("func", "Client.sendPublishRequests")
+	dlog := c.logger.With("func", "Client.sendPublishRequests")
 
 	// todo(fs): check if sub.nextSeq is in the available sequence numbers
 	// todo(fs): if not then we need to decide whether we fail b/c of data loss
@@ -353,7 +352,7 @@ func (c *Client) resumeSubscriptions(ctx context.Context) {
 // monitorSubscriptions sends publish requests and handles publish responses
 // for all active subscriptions.
 func (c *Client) monitorSubscriptions(ctx context.Context) {
-	dlog := slog.With("func", "Client.monitorSubscriptions")
+	dlog := c.logger.With("func", "Client.monitorSubscriptions")
 	defer dlog.DebugContext(ctx, "done")
 
 publish:
@@ -400,7 +399,7 @@ publish:
 
 // publish sends a publish request and handles the response.
 func (c *Client) publish(ctx context.Context) error {
-	dlog := slog.With("func", "Client.publish")
+	dlog := c.logger.With("func", "Client.publish")
 
 	c.subMux.RLock()
 	dlog.DebugContext(ctx, "pendingAcks", "ack_ids", debug.ToJSON(c.pendingAcks))
@@ -492,7 +491,7 @@ func (c *Client) publish(ctx context.Context) error {
 }
 
 func (c *Client) handleAcks_NeedsSubMuxLock(res []ua.StatusCode) {
-	dlog := slog.With("func", "Client.handleAcks")
+	dlog := c.logger.With("func", "Client.handleAcks")
 
 	// we assume that the number of results in the response match
 	// the number of pending acks from the previous PublishRequest.
@@ -525,7 +524,7 @@ func (c *Client) handleAcks_NeedsSubMuxLock(res []ua.StatusCode) {
 }
 
 func (c *Client) handleNotification_NeedsSubMuxLock(sub *Subscription, res *ua.PublishResponse) {
-	dlog := slog.With("func", "Client.handleNotification", "sub_id", res.SubscriptionID)
+	dlog := c.logger.With("func", "Client.handleNotification", "sub_id", res.SubscriptionID)
 
 	// keep-alive message
 	if len(res.NotificationMessage.NotificationData) == 0 {
@@ -547,7 +546,7 @@ func (c *Client) handleNotification_NeedsSubMuxLock(sub *Subscription, res *ua.P
 }
 
 func (c *Client) sendPublishRequest(ctx context.Context) (*ua.PublishResponse, error) {
-	dlog := slog.With("func", "Client.sendPublishRequest")
+	dlog := c.logger.With("func", "Client.sendPublishRequest")
 
 	c.subMux.RLock()
 	req := &ua.PublishRequest{

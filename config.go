@@ -62,6 +62,7 @@ type Config struct {
 	sechan  *uasc.Config
 	session *uasc.SessionConfig
 	stateCh chan<- ConnState
+	logger  *slog.Logger
 }
 
 func DefaultDialer() *uacp.Dialer {
@@ -78,6 +79,7 @@ func newConfig() *Config {
 		dialer:  DefaultDialer(),
 		sechan:  DefaultClientConfig(),
 		session: DefaultSessionConfig(),
+		logger:  slog.Default(),
 	}
 }
 
@@ -142,6 +144,19 @@ func Lifetime(d time.Duration) Option {
 func Locales(locale ...string) Option {
 	return func(cfg *Config) error {
 		cfg.session.LocaleIDs = locale
+		return nil
+	}
+}
+
+// LogHandler configures the logger for the client.
+// Defaults to [slog.Default()] when [h] is [nil].
+func LogHandler(h slog.Handler) Option {
+	return func(cfg *Config) error {
+		if h == nil {
+			cfg.logger = slog.Default()
+		} else {
+			cfg.logger = slog.New(h)
+		}
 		return nil
 	}
 }

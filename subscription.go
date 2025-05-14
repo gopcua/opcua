@@ -3,7 +3,6 @@ package opcua
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"sync"
 	"time"
 
@@ -395,7 +394,7 @@ func (p *SubscriptionParameters) setDefaults() {
 // recreate an existing subscription. This function deletes the
 // existing subscription from the server.
 func (s *Subscription) recreate_delete(ctx context.Context) error {
-	dlog := slog.With("func", "recreate_delete", "sub_id", s.SubscriptionID)
+	dlog := s.c.logger.With("func", "recreate_delete", "sub_id", s.SubscriptionID)
 
 	req := &ua.DeleteSubscriptionsRequest{
 		SubscriptionIDs: []uint32{s.SubscriptionID},
@@ -412,7 +411,7 @@ func (s *Subscription) recreate_delete(ctx context.Context) error {
 // recreate an existing subscription. This function creates a
 // new subscription with the same parameters as the previous one.
 func (s *Subscription) recreate_create(ctx context.Context) error {
-	dlog := slog.With("func", "recreate_create", "sub_id", s.SubscriptionID)
+	dlog := s.c.logger.With("func", "recreate_create", "sub_id", s.SubscriptionID)
 
 	s.paramsMu.Lock()
 	params := s.params
@@ -441,7 +440,7 @@ func (s *Subscription) recreate_create(ctx context.Context) error {
 	dlog.DebugContext(ctx, fmt.Sprintf("recreated as subscription_id %d", res.SubscriptionID))
 
 	// todo(fs): we cannot overwrite the [subscription_id] attribute in [dlog]
-	dlog = slog.With("func", "recreate_create", "sub_id", res.SubscriptionID)
+	dlog = s.c.logger.With("func", "recreate_create", "sub_id", res.SubscriptionID)
 
 	s.SubscriptionID = res.SubscriptionID
 	s.RevisedPublishingInterval = time.Duration(res.RevisedPublishingInterval) * time.Millisecond

@@ -22,11 +22,12 @@ func main() {
 	)
 
 	flag.Parse()
-	slog.SetDefault(slog.New(ualog.NewTextHandler(*debug)))
+
+	slog.SetDefault(slog.New(ualog.NewTextHandler(*debug, "pkg", "app")))
 
 	ctx := context.Background()
 
-	c, err := opcua.NewClient(*endpoint)
+	c, err := opcua.NewClient(*endpoint, opcua.LogHandler(ualog.NewTextHandler(*debug, "pkg", "gopcua.Client")))
 	if err != nil {
 		ualog.Fatal("NewClient failed", "error", err)
 	}

@@ -176,14 +176,17 @@ type SecureChannel struct {
 	kind channelKind
 
 	closeOnce sync.Once
+
+	// logger is the secure channel logger
+	logger *slog.Logger
 }
 
-func NewSecureChannel(endpoint string, c *uacp.Conn, cfg *Config, errCh chan<- error) (*SecureChannel, error) {
-	return newSecureChannel(endpoint, c, cfg, client, errCh)
+func NewSecureChannel(endpoint string, c *uacp.Conn, cfg *Config, errCh chan<- error, logger *slog.Logger) (*SecureChannel, error) {
+	return newSecureChannel(endpoint, c, cfg, client, errCh, logger)
 }
 
-func NewServerSecureChannel(endpoint string, c *uacp.Conn, cfg *Config, errCh chan<- error, secureChannelID, sequenceNumber, securityTokenID uint32) (*SecureChannel, error) {
-	s, err := newSecureChannel(endpoint, c, cfg, server, errCh)
+func NewServerSecureChannel(endpoint string, c *uacp.Conn, cfg *Config, errCh chan<- error, logger *slog.Logger, secureChannelID, sequenceNumber, securityTokenID uint32) (*SecureChannel, error) {
+	s, err := newSecureChannel(endpoint, c, cfg, server, errCh, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -196,7 +199,7 @@ func NewServerSecureChannel(endpoint string, c *uacp.Conn, cfg *Config, errCh ch
 	return s, nil
 }
 
-func newSecureChannel(endpoint string, c *uacp.Conn, cfg *Config, kind channelKind, errCh chan<- error) (*SecureChannel, error) {
+func newSecureChannel(endpoint string, c *uacp.Conn, cfg *Config, kind channelKind, errCh chan<- error, logger *slog.Logger) (*SecureChannel, error) {
 	if c == nil {
 		return nil, errors.Errorf("no connection")
 	}
@@ -207,6 +210,10 @@ func newSecureChannel(endpoint string, c *uacp.Conn, cfg *Config, kind channelKi
 
 	if errCh == nil {
 		return nil, errors.Errorf("no error channel")
+	}
+
+	if logger == nil {
+		return nil, errors.Errorf("no logger")
 	}
 
 	switch {
@@ -235,6 +242,7 @@ func newSecureChannel(endpoint string, c *uacp.Conn, cfg *Config, kind channelKi
 		instances:    make(map[uint32][]*channelInstance),
 		chunks:       make(map[uint32][]*MessageChunk),
 		handlers:     make(map[uint32]chan *MessageBody),
+		logger:       logger,
 	}
 
 	return s, nil
@@ -254,7 +262,7 @@ func (s *SecureChannel) getActiveChannelInstance() (*channelInstance, error) {
 }
 
 func (s *SecureChannel) dispatcher() {
-	dlog := slog.With("func", "SecureChannel.dispatcher")
+	dlog := s.logger.With("func", "SecureChannel.dispatcher")
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -320,7 +328,7 @@ func (s *SecureChannel) dispatcher() {
 // them to the registered callback channel, if there is one. Otherwise,
 // the message is dropped.
 func (s *SecureChannel) Receive(ctx context.Context) *MessageBody {
-	dlog := slog.With("func", "SecureChannel.Receive", "conn_id", s.c.ID())
+	dlog := s.logger.With("func", "SecureChannel.Receive", "conn_id", s.c.ID())
 
 	for {
 		select {
@@ -351,7 +359,7 @@ func (s *SecureChannel) Receive(ctx context.Context) *MessageBody {
 				SecureChannelID: chunk.MessageHeader.Header.SecureChannelID,
 			}
 
-			dlog = slog.With(
+			dlog = s.logger.With(
 				"func", "SecureChannel.Receive",
 				"conn_id", s.c.ID(),
 				"req_id", reqID,
@@ -451,7 +459,7 @@ func (s *SecureChannel) Receive(ctx context.Context) *MessageBody {
 }
 
 func (s *SecureChannel) readChunk() (*MessageChunk, error) {
-	dlog := slog.With("func", "SecureChannel.readChunk")
+	dlog := s.logger.With("func", "SecureChannel.readChunk")
 
 	// read a full message from the underlying conn.
 	b, err := s.c.Receive()
@@ -540,7 +548,7 @@ func (s *SecureChannel) readChunk() (*MessageChunk, error) {
 // verifyAndDecrypt verifies and optionally decrypts a message. if `instance` is given, then it will only use that
 // state. Otherwise it will look up states by channel ID and try each.
 func (s *SecureChannel) verifyAndDecrypt(m *MessageChunk, b []byte, instance *channelInstance) ([]byte, error) {
-	dlog := slog.With("func", "SecureChannel.verifyAndDecrypt")
+	dlog := s.logger.With("func", "SecureChannel.verifyAndDecrypt")
 
 	if instance != nil {
 		return instance.verifyAndDecrypt(m, b)
@@ -591,7 +599,7 @@ func (s *SecureChannel) Open(ctx context.Context) error {
 }
 
 func (s *SecureChannel) open(ctx context.Context, instance *channelInstance, requestType ua.SecurityTokenRequestType) error {
-	dlog := slog.With("func", "SecureChannel.open")
+	dlog := s.logger.With("func", "SecureChannel.open")
 
 	dlog.DebugContext(ctx, "open")
 	defer s.rcvLocker.unlock()
@@ -687,7 +695,7 @@ func (s *SecureChannel) open(ctx context.Context, instance *channelInstance, req
 }
 
 func (s *SecureChannel) handleOpenSecureChannelResponse(resp *ua.OpenSecureChannelResponse, localNonce []byte, instance *channelInstance) (err error) {
-	dlog := slog.With("func", "SecureChannel.handleOpenSecureChannelResponse")
+	dlog := s.logger.With("func", "SecureChannel.handleOpenSecureChannelResponse")
 
 	dlog.Debug("handleOpenSecureChannelResponse")
 	instance.state = channelActive
@@ -743,7 +751,7 @@ func (s *SecureChannel) handleOpenSecureChannelResponse(resp *ua.OpenSecureChann
 }
 
 func (s *SecureChannel) handleOpenSecureChannelRequest(reqID uint32, svc ua.Request) error {
-	dlog := slog.With("func", "SecureChannel.handleOpenSecureChannelRequest")
+	dlog := s.logger.With("func", "SecureChannel.handleOpenSecureChannelRequest")
 
 	dlog.Debug("gog OPN request")
 
@@ -857,7 +865,7 @@ func (s *SecureChannel) handleOpenSecureChannelRequest(reqID uint32, svc ua.Requ
 }
 
 func (s *SecureChannel) scheduleRenewal(instance *channelInstance) {
-	dlog := slog.With("func", "SecureChannel.scheduleRenewal")
+	dlog := s.logger.With("func", "SecureChannel.scheduleRenewal")
 
 	// https://reference.opcfoundation.org/v104/Core/docs/Part4/5.5.2/#5.5.2.1
 	// Clients should request a new SecurityToken after 75 % of its lifetime has elapsed. This should ensure that
@@ -898,7 +906,7 @@ func (s *SecureChannel) renew(instance *channelInstance) error {
 }
 
 func (s *SecureChannel) scheduleExpiration(instance *channelInstance) {
-	dlog := slog.With("func", "SecureChannel.scheduleExpiration")
+	dlog := s.logger.With("func", "SecureChannel.scheduleExpiration")
 
 	// https://reference.opcfoundation.org/v104/Core/docs/Part4/5.5.2/#5.5.2.1
 	// Clients should accept Messages secured by an expired SecurityToken for up to 25 % of the token lifetime.
@@ -1035,7 +1043,7 @@ func (s *SecureChannel) sendAsyncWithTimeout(
 	timeout time.Duration,
 ) (<-chan *MessageBody, error) {
 
-	dlog := slog.With("func", "SecureChannel.sendAsyncWithTimeout")
+	dlog := s.logger.With("func", "SecureChannel.sendAsyncWithTimeout")
 
 	instance.Lock()
 	defer instance.Unlock()
@@ -1110,7 +1118,7 @@ func (s *SecureChannel) SendResponseWithContext(ctx context.Context, reqID uint3
 }
 
 func (s *SecureChannel) SendMsgWithContext(ctx context.Context, instance *channelInstance, reqID uint32, msg any) error {
-	dlog := slog.With("func", "SecureChannel.SendMsgWithContext")
+	dlog := s.logger.With("func", "SecureChannel.SendMsgWithContext")
 
 	typeID := ua.ServiceTypeID(msg)
 	if typeID == 0 {
@@ -1165,7 +1173,7 @@ func (s *SecureChannel) SendMsgWithContext(ctx context.Context, instance *channe
 }
 
 func (s *SecureChannel) sendResponseWithContext(ctx context.Context, instance *channelInstance, reqID uint32, resp ua.Response) error {
-	dlog := slog.With("func", "SecureChannel.sendResponseWithContext")
+	dlog := s.logger.With("func", "SecureChannel.sendResponseWithContext")
 
 	typeID := ua.ServiceTypeID(resp)
 	if typeID == 0 {
@@ -1186,7 +1194,7 @@ func (s *SecureChannel) sendResponseWithContext(ctx context.Context, instance *c
 	m := instance.newMessage(resp, typeID, reqID)
 	b, err := m.Encode()
 	if err != nil {
-		slog.Error("Error encoding msg", "error", err)
+		s.logger.Error("Error encoding msg", "error", err)
 		return err
 	}
 
@@ -1242,7 +1250,7 @@ func (s *SecureChannel) Close() (err error) {
 }
 
 func (s *SecureChannel) close() error {
-	dlog := slog.With("func", "SecureChannel.close")
+	dlog := s.logger.With("func", "SecureChannel.close")
 
 	dlog.Debug("uasc: Close", "conn_id", s.c.ID())
 
