@@ -17,7 +17,8 @@ type AttributeService struct {
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.10.2
 func (s *AttributeService) Read(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	s.srv.logger.Debug("Handling %T", r)
+	dlog := s.srv.logger.With("func", "AttributeService.Read")
+	dlog.Debug("Handling", "type", ualog.TypeOf(r))
 
 	req, err := safeReq[*ua.ReadRequest](r)
 	if err != nil {
@@ -26,7 +27,7 @@ func (s *AttributeService) Read(sc *uasc.SecureChannel, r ua.Request, reqID uint
 
 	results := make([]*ua.DataValue, len(req.NodesToRead))
 	for i, n := range req.NodesToRead {
-		s.srv.logger.Debug("server: read", "node", n.NodeID, "attr", n.AttributeID)
+		dlog.Debug("server: read", "node", n.NodeID, "attr", n.AttributeID)
 
 		ns, err := s.srv.Namespace(int(n.NodeID.Namespace()))
 		if err != nil {
@@ -51,7 +52,8 @@ func (s *AttributeService) Read(sc *uasc.SecureChannel, r ua.Request, reqID uint
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.10.3
 func (s *AttributeService) HistoryRead(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	s.srv.logger.Debug("Handling %T", r)
+	dlog := s.srv.logger.With("func", "AttributeService.HistoryRead")
+	dlog.Debug("Handling", "type", ualog.TypeOf(r))
 
 	req, err := safeReq[*ua.HistoryReadRequest](r)
 	if err != nil {
@@ -62,6 +64,9 @@ func (s *AttributeService) HistoryRead(sc *uasc.SecureChannel, r ua.Request, req
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.10.4
 func (s *AttributeService) Write(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
+	dlog := s.srv.logger.With("func", "AttributeService.Write")
+	dlog.Debug("Handling", "type", ualog.TypeOf(r))
+
 	req, err := safeReq[*ua.WriteRequest](r)
 	if err != nil {
 		return nil, err
@@ -71,7 +76,7 @@ func (s *AttributeService) Write(sc *uasc.SecureChannel, r ua.Request, reqID uin
 
 	for i := range req.NodesToWrite {
 		n := req.NodesToWrite[i]
-		s.srv.logger.Debug("server: write: ", "node", n.NodeID, "attr", n.AttributeID)
+		dlog.Debug("server: write: ", "node", n.NodeID, "attr", n.AttributeID)
 
 		ns, err := s.srv.Namespace(int(n.NodeID.Namespace()))
 		if err != nil {
@@ -79,7 +84,6 @@ func (s *AttributeService) Write(sc *uasc.SecureChannel, r ua.Request, reqID uin
 		}
 
 		status[i] = ns.SetAttribute(n.NodeID, n.AttributeID, n.Value)
-
 	}
 	response := &ua.WriteResponse{
 		ResponseHeader: &ua.ResponseHeader{

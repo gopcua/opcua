@@ -34,7 +34,8 @@ func (srv *Server) namespacesImportNodeSet(nodes *schema.UANodeSet) error {
 }
 
 func (srv *Server) nodesImportNodeSet(nodes *schema.UANodeSet) error {
-	srv.logger.Debug("New Node Set: %s", nodes.LastModifiedAttr)
+	// todo(fs): what is this supposed to log?
+	srv.logger.Debug("New Node Set", "last_modified", nodes.LastModifiedAttr)
 
 	reftypes := make(map[string]*schema.UAReferenceType)
 
@@ -73,7 +74,7 @@ func (srv *Server) nodesImportNodeSet(nodes *schema.UANodeSet) error {
 		ns, err := srv.Namespace(int(nid.Namespace()))
 		if err != nil {
 			// This namespace doesn't exist.
-			srv.logger.Warn("Could Not Find Namespace %d", nid.Namespace())
+			srv.logger.Warn("Could Not Find Namespace", "ns", nid.Namespace())
 			return err
 		}
 		ns.AddNode(n)
@@ -105,7 +106,7 @@ func (srv *Server) nodesImportNodeSet(nodes *schema.UANodeSet) error {
 		ns, err := srv.Namespace(int(nid.Namespace()))
 		if err != nil {
 			// This namespace doesn't exist.
-			srv.logger.Warn("Could Not Find Namespace %d", nid.Namespace())
+			srv.logger.Warn("Could Not Find Namespace", "ns", nid.Namespace())
 			return err
 		}
 		ns.AddNode(n)
@@ -135,7 +136,7 @@ func (srv *Server) nodesImportNodeSet(nodes *schema.UANodeSet) error {
 		ns, err := srv.Namespace(int(nid.Namespace()))
 		if err != nil {
 			// This namespace doesn't exist.
-			srv.logger.Warn("Could Not Find Namespace %d", nid.Namespace())
+			srv.logger.Warn("Could Not Find Namespace", "ns", nid.Namespace())
 			return err
 		}
 		ns.AddNode(n)
@@ -164,7 +165,7 @@ func (srv *Server) nodesImportNodeSet(nodes *schema.UANodeSet) error {
 		ns, err := srv.Namespace(int(nid.Namespace()))
 		if err != nil {
 			// This namespace doesn't exist.
-			srv.logger.Warn("Could Not Find Namespace %d", nid.Namespace())
+			srv.logger.Warn("Could Not Find Namespace", "ns", nid.Namespace())
 			return err
 		}
 		ns.AddNode(n)
@@ -193,7 +194,7 @@ func (srv *Server) nodesImportNodeSet(nodes *schema.UANodeSet) error {
 		ns, err := srv.Namespace(int(nid.Namespace()))
 		if err != nil {
 			// This namespace doesn't exist.
-			srv.logger.Warn("Could Not Find Namespace %d", nid.Namespace())
+			srv.logger.Warn("Could Not Find Namespace", "ns", nid.Namespace())
 			return err
 		}
 		ns.AddNode(n)
@@ -222,7 +223,7 @@ func (srv *Server) nodesImportNodeSet(nodes *schema.UANodeSet) error {
 		ns, err := srv.Namespace(int(nid.Namespace()))
 		if err != nil {
 			// This namespace doesn't exist.
-			srv.logger.Warn("Could Not Find Namespace %d", nid.Namespace())
+			srv.logger.Warn("Could Not Find Namespace", "ns", nid.Namespace())
 			return err
 		}
 		ns.AddNode(n)
@@ -255,7 +256,7 @@ func (srv *Server) nodesImportNodeSet(nodes *schema.UANodeSet) error {
 		ns, err := srv.Namespace(int(nid.Namespace()))
 		if err != nil {
 			// This namespace doesn't exist.
-			srv.logger.Warn("Could Not Find Namespace %d", nid.Namespace())
+			srv.logger.Warn("Could Not Find Namespace", "ns", nid.Namespace())
 			return err
 		}
 		ns.AddNode(n)
@@ -265,7 +266,7 @@ func (srv *Server) nodesImportNodeSet(nodes *schema.UANodeSet) error {
 }
 
 func (srv *Server) refsImportNodeSet(nodes *schema.UANodeSet) error {
-	srv.logger.Debug("New Node Set: %s", nodes.LastModifiedAttr)
+	srv.logger.Debug("New Node Set", "last_modified", nodes.LastModifiedAttr)
 
 	failures := 0
 	reftypes := make(map[string]*schema.UAReferenceType)
@@ -287,7 +288,7 @@ func (srv *Server) refsImportNodeSet(nodes *schema.UANodeSet) error {
 		aliasID := ua.MustParseNodeID(aliases[alias])
 		refnode := srv.Node(aliasID)
 		if refnode == nil {
-			srv.logger.Warn("error loading alias %s", alias)
+			srv.logger.Warn("error loading alias", "alias", alias)
 			continue
 		}
 		rt := new(schema.UAReferenceType)
@@ -325,7 +326,7 @@ func (srv *Server) refsImportNodeSet(nodes *schema.UANodeSet) error {
 		nodeid := ua.MustParseNodeID(rt.NodeIdAttr)
 		node := srv.Node(nodeid)
 		if node == nil {
-			srv.logger.Warn("Error loading node %s", rt.NodeIdAttr)
+			srv.logger.Warn("Error loading node", "node_id", rt.NodeIdAttr)
 		}
 
 		for rid := range rt.References.Reference {
@@ -365,7 +366,7 @@ func (srv *Server) refsImportNodeSet(nodes *schema.UANodeSet) error {
 			refnodeid := ua.MustParseNodeID(ref.Value)
 			n := srv.Node(refnodeid)
 			if n == nil {
-				srv.logger.Warn("can't find node %s as %s reference to %s", ref.Value, ref.ReferenceTypeAttr, dt.BrowseNameAttr)
+				srv.logger.Warn("cannot find reference", "node_id", ref.Value, "ref_type", ref.ReferenceTypeAttr, "browse_name", dt.BrowseNameAttr)
 				failures++
 				continue
 			}
@@ -394,7 +395,7 @@ func (srv *Server) refsImportNodeSet(nodes *schema.UANodeSet) error {
 			refnodeid := ua.MustParseNodeID(ref.Value)
 			n := srv.Node(refnodeid)
 			if n == nil {
-				srv.logger.Warn("can't find node %s as %s reference to %s", ref.Value, ref.ReferenceTypeAttr, ot.BrowseNameAttr)
+				srv.logger.Warn("cannot find reference", "node_id", ref.Value, "ref_type", ref.ReferenceTypeAttr, "browse_name", ot.BrowseNameAttr)
 				failures++
 				continue
 			}
@@ -421,7 +422,7 @@ func (srv *Server) refsImportNodeSet(nodes *schema.UANodeSet) error {
 			refnodeid := ua.MustParseNodeID(ref.Value)
 			n := srv.Node(refnodeid)
 			if n == nil {
-				srv.logger.Warn("can't find node %s as %s reference to %s", ref.Value, ref.ReferenceTypeAttr, ot.BrowseNameAttr)
+				srv.logger.Warn("can't find reference", "node_id", ref.Value, "ref_type", ref.ReferenceTypeAttr, "browse_name", ot.BrowseNameAttr)
 				failures++
 				continue
 			}
@@ -448,7 +449,7 @@ func (srv *Server) refsImportNodeSet(nodes *schema.UANodeSet) error {
 			refnodeid := ua.MustParseNodeID(ref.Value)
 			n := srv.Node(refnodeid)
 			if n == nil {
-				srv.logger.Warn("can't find node %s as %s reference to %s", ref.Value, ref.ReferenceTypeAttr, ot.BrowseNameAttr)
+				srv.logger.Warn("can't find reference", "node_id", ref.Value, "ref_type", ref.ReferenceTypeAttr, "browse_name", ot.BrowseNameAttr)
 				failures++
 				continue
 			}
@@ -475,7 +476,7 @@ func (srv *Server) refsImportNodeSet(nodes *schema.UANodeSet) error {
 			refnodeid := ua.MustParseNodeID(ref.Value)
 			n := srv.Node(refnodeid)
 			if n == nil {
-				srv.logger.Warn("can't find node %s as %s reference to %s", ref.Value, ref.ReferenceTypeAttr, ot.BrowseNameAttr)
+				srv.logger.Warn("can't find reference", "node_id", ref.Value, "ref_type", ref.ReferenceTypeAttr, "browse_name", ot.BrowseNameAttr)
 				failures++
 				continue
 			}
@@ -505,7 +506,7 @@ func (srv *Server) refsImportNodeSet(nodes *schema.UANodeSet) error {
 			refnodeid := ua.MustParseNodeID(ref.Value)
 			n := srv.Node(refnodeid)
 			if n == nil {
-				srv.logger.Warn("can't find node %s as %s reference to %s", ref.Value, ref.ReferenceTypeAttr, ot.BrowseNameAttr)
+				srv.logger.Warn("can't find reference", "node_id", ref.Value, "ref_type", ref.ReferenceTypeAttr, "browse_name", ot.BrowseNameAttr)
 				failures++
 				continue
 			}

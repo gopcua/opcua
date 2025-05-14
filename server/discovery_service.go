@@ -3,6 +3,7 @@ package server
 import (
 	"strings"
 
+	"github.com/gopcua/opcua/internal/ualog"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uasc"
 )
@@ -16,7 +17,8 @@ type DiscoveryService struct {
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.4.2
 func (s *DiscoveryService) FindServers(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	s.srv.logger.Debug("Handling %T", r)
+	dlog := s.srv.logger.With("func", "DiscoveryService.FindServers")
+	dlog.Debug("Handling", "type", ualog.TypeOf(r))
 
 	req, err := safeReq[*ua.FindServersRequest](r)
 	if err != nil {
@@ -35,7 +37,8 @@ func (s *DiscoveryService) FindServers(sc *uasc.SecureChannel, r ua.Request, req
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.4.3
 func (s *DiscoveryService) FindServersOnNetwork(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	s.srv.logger.Debug("Handling %T", r)
+	dlog := s.srv.logger.With("func", "DiscoveryService.FindServersOnNetwork")
+	dlog.Debug("Handling", "type", ualog.TypeOf(r))
 
 	req, err := safeReq[*ua.FindServersOnNetworkRequest](r)
 	if err != nil {
@@ -46,7 +49,8 @@ func (s *DiscoveryService) FindServersOnNetwork(sc *uasc.SecureChannel, r ua.Req
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.4.4
 func (s *DiscoveryService) GetEndpoints(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	s.srv.logger.Debug("Handling %T", r)
+	dlog := s.srv.logger.With("func", "DiscoveryService.GetEndpoints")
+	dlog.Debug("Handling", "type", ualog.TypeOf(r))
 
 	req, err := safeReq[*ua.GetEndpointsRequest](r)
 	if err != nil {
@@ -72,7 +76,8 @@ func (s *DiscoveryService) GetEndpoints(sc *uasc.SecureChannel, r ua.Request, re
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.4.5
 func (s *DiscoveryService) RegisterServer(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	s.srv.logger.Debug("Handling %T", r)
+	dlog := s.srv.logger.With("func", "DiscoveryService.RegisterServer")
+	dlog.Debug("Handling", "type", ualog.TypeOf(r))
 
 	req, err := safeReq[*ua.RegisterServerRequest](r)
 	if err != nil {
@@ -83,7 +88,8 @@ func (s *DiscoveryService) RegisterServer(sc *uasc.SecureChannel, r ua.Request, 
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.4.6
 func (s *DiscoveryService) RegisterServer2(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	s.srv.logger.Debug("Handling %T", r)
+	dlog := s.srv.logger.With("func", "DiscoveryService.RegisterServer2")
+	dlog.Debug("Handling", "type", ualog.TypeOf(r))
 
 	req, err := safeReq[*ua.RegisterServer2Request](r)
 	if err != nil {

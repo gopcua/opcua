@@ -78,13 +78,13 @@ func (c *channelBroker) RegisterConn(ctx context.Context, conn *uacp.Conn, local
 		secureTokenID,
 	)
 	if err != nil {
-		c.logger.Error("Error creating secure channel for new connection: %s", err)
+		c.logger.Error("Error creating secure channel for new connection", "error", err)
 		return err
 	}
 
 	c.mu.Lock()
 	c.s[secureChannelID] = sc
-	c.logger.Info("Registered new channel (id %d) now at %d channels", secureChannelID, len(c.s))
+	c.logger.Info("Registered new channel", "secchan_id", secureChannelID, "secchan_count", len(c.s))
 	c.mu.Unlock()
 	c.wg.Add(1)
 outer:
@@ -92,16 +92,16 @@ outer:
 		select {
 		case <-ctx.Done():
 			// todo(fs): return error?
-			c.logger.Warn("Context done, closing Secure Channel %d", secureChannelID)
+			c.logger.Warn("Context done. Closing Secure Channel", "secchan_id", secureChannelID)
 			break outer
 
 		default:
 			msg := sc.Receive(ctx)
 			if msg.Err == io.EOF {
-				c.logger.Warn("Secure Channel %d closed", secureChannelID)
+				c.logger.Warn("Secure Channel closed", "secchan_id", secureChannelID)
 				break outer
 			} else if msg.Err != nil {
-				c.logger.Error("Secure Channel %d error: %s", secureChannelID, msg.Err)
+				c.logger.Error("Secure Channel error", "secchan_id", secureChannelID, "error", msg.Err)
 				break outer
 			}
 			// todo(fs): honor ctx

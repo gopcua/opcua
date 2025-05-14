@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gopcua/opcua/id"
+	"github.com/gopcua/opcua/internal/ualog"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uasc"
 )
@@ -63,8 +64,9 @@ func (srv *Server) initHandlers() {
 	srv.RegisterHandler(id.CallRequest_Encoding_DefaultBinary, method.Call)
 
 	sub := &SubscriptionService{
-		srv:  srv,
-		Subs: make(map[uint32]*Subscription),
+		srv:    srv,
+		Subs:   make(map[uint32]*Subscription),
+		Logger: srv.logger,
 	}
 	srv.SubscriptionService = sub
 	srv.RegisterHandler(id.CreateSubscriptionRequest_Encoding_DefaultBinary, sub.CreateSubscription)
@@ -80,6 +82,7 @@ func (srv *Server) initHandlers() {
 		Items:      make(map[uint32]*MonitoredItem),
 		Nodes:      make(map[string][]*MonitoredItem),
 		Subs:       make(map[uint32][]*MonitoredItem),
+		Logger:     srv.logger,
 	}
 	srv.MonitoredItemService = item
 	// s.registerHandler(id.MonitoredItemCreateRequest_Encoding_DefaultBinary, item.MonitoredItemCreate)
@@ -101,7 +104,8 @@ func (srv *Server) RegisterHandler(typeID uint16, h Handler) {
 }
 
 func (srv *Server) handleService(ctx context.Context, sc *uasc.SecureChannel, reqID uint32, req ua.Request) {
-	srv.logger.Debug("handleService: Got: %T\n", req)
+	dlog := srv.logger.With("func", "Server.handleService")
+	dlog.Debug("Handling", "type", ualog.TypeOf(req))
 
 	var resp ua.Response
 	var err error
@@ -112,7 +116,7 @@ func (srv *Server) handleService(ctx context.Context, sc *uasc.SecureChannel, re
 		resp, err = h(sc, req, reqID)
 	} else {
 		if typeID == 0 {
-			srv.logger.Warn("unknown service %T. Did you call register?", req)
+			dlog.Warn("unknown service. Did you call register?", "type", ualog.TypeOf(req))
 		}
 		err = ua.StatusBadServiceUnsupported
 	}
@@ -131,7 +135,7 @@ func (srv *Server) handleService(ctx context.Context, sc *uasc.SecureChannel, re
 
 	err = sc.SendResponseWithContext(ctx, reqID, resp)
 	if err != nil {
-		srv.logger.Warn("Error sending response: %s\n", err)
+		dlog.Warn("Error sending response", "error", err)
 	}
 }
 

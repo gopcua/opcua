@@ -63,7 +63,7 @@ func (sb *sessionBroker) Close(authToken *ua.NodeID) error {
 	defer sb.mu.Unlock()
 
 	if sb.s[authToken.String()] == nil {
-		sb.logger.Warn("sessionBroker.Close: error looking up session %v", authToken)
+		sb.logger.Warn("sessionBroker.Close: error looking up session", "auth_token", authToken)
 	}
 	delete(sb.s, authToken.String())
 
@@ -76,7 +76,7 @@ func (sb *sessionBroker) Session(authToken *ua.NodeID) *session {
 
 	s := sb.s[authToken.String()]
 	if s == nil {
-		sb.logger.Warn("sessionBroker.Session: error looking up session %v", authToken)
+		sb.logger.Warn("sessionBroker.Session: error looking up session", "auth_token", authToken)
 	}
 
 	return s

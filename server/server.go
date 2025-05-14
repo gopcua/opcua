@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/gopcua/opcua/id"
+	"github.com/gopcua/opcua/internal/ualog"
 	"github.com/gopcua/opcua/schema"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uacp"
@@ -264,7 +265,7 @@ func (srv *Server) Start(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	srv.logger.Info("Started listening on %v", srv.URLs())
+	srv.logger.Info("Started listening", "url", srv.URLs())
 
 	srv.initEndpoints()
 	srv.setServerState(ua.ServerStateRunning)
@@ -314,20 +315,20 @@ func (srv *Server) acceptAndRegister(ctx context.Context, l *uacp.Listener) {
 				switch x := err.(type) {
 				case *net.OpError:
 					// socket closed. Cannot recover from this.
-					srv.logger.Error("socket closed: %s", err)
+					srv.logger.Error("Socket closed", "error", err)
 					return
 				case temporary:
 					if x.Temporary() {
 						continue
 					}
 				default:
-					srv.logger.Error("error accepting connection: %s", err)
+					srv.logger.Error("Error accepting connection", "error", err)
 					continue
 				}
 			}
 
 			go srv.cb.RegisterConn(ctx, c, srv.cfg.certificate, srv.cfg.privateKey)
-			srv.logger.Info("registered connection: %s", c.RemoteAddr())
+			srv.logger.Info("Registered connection", "remote_addr", c.RemoteAddr())
 		}
 	}
 }
@@ -341,20 +342,20 @@ func (srv *Server) monitorConnections(ctx context.Context) {
 			continue // ctx is likely done, ctx.Err will be non-nil
 		}
 		if msg.Err != nil {
-			srv.logger.Error("monitorConnections: Error received: %s\n", msg.Err)
+			srv.logger.Error("monitorConnections: Error received", "error", msg.Err)
 			continue // todo(fs): close SC???
 		}
 		if resp := msg.Response(); resp != nil {
-			srv.logger.Error("monitorConnections: Server received response %T ???", resp)
+			srv.logger.Error("monitorConnections: Server received unknown response", "type", ualog.TypeOf(resp))
 			continue // todo(fs): close SC???
 		}
-		srv.logger.Debug("monitorConnections: Received Message: %T", msg.Request())
+		srv.logger.Debug("monitorConnections: Received message", "type", ualog.TypeOf(msg.Request()))
 		srv.cb.mu.RLock()
 		sc, ok := srv.cb.s[msg.SecureChannelID]
 		srv.cb.mu.RUnlock()
 		if !ok {
 			// if the secure channel ID is 0, this is probably a open secure channel request.
-			srv.logger.Error("monitorConnections: Unknown SecureChannel: %d", msg.SecureChannelID)
+			srv.logger.Error("monitorConnections: Unknown SecureChannel", "secchan_id", msg.SecureChannelID)
 			continue
 		}
 
