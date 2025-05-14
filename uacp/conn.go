@@ -68,7 +68,7 @@ type Dialer struct {
 
 func (d *Dialer) Dial(ctx context.Context, endpoint string) (*Conn, error) {
 	dlog := slog.With("func", "Dial")
-	dlog.Debug("uacp: connecting", "endpoint", endpoint)
+	dlog.DebugContext(ctx, "uacp: connecting", "endpoint", endpoint)
 
 	_, raddr, err := ResolveEndpoint(ctx, endpoint)
 	if err != nil {
@@ -92,9 +92,9 @@ func (d *Dialer) Dial(ctx context.Context, endpoint string) (*Conn, error) {
 		return nil, err
 	}
 
-	dlog.Debug("uacp: start HEL/ACK handshake", "conn_id", conn.id)
+	dlog.DebugContext(ctx, "uacp: start HEL/ACK handshake", "conn_id", conn.id)
 	if err := conn.Handshake(ctx, endpoint); err != nil {
-		dlog.Debug("uacp: HEL/ACK handshake failed", "conn_id", conn.id, "error", err)
+		dlog.DebugContext(ctx, "uacp: HEL/ACK handshake failed", "conn_id", conn.id, "error", err)
 		conn.Close()
 		return nil, err
 	}
@@ -266,14 +266,14 @@ func (c *Conn) Handshake(ctx context.Context, endpoint string) error {
 		}
 		if ack.MaxChunkCount == 0 {
 			ack.MaxChunkCount = DefaultMaxChunkCount
-			dlog.Debug("uacp: server has no chunk limit. Using default", "max_chunk_count", ack.MaxChunkCount)
+			dlog.DebugContext(ctx, "uacp: server has no chunk limit. Using default", "max_chunk_count", ack.MaxChunkCount)
 		}
 		if ack.MaxMessageSize == 0 {
 			ack.MaxMessageSize = DefaultMaxMessageSize
-			dlog.Debug("uacp: server has no message size limit. Using default", "max_message_size", ack.MaxMessageSize)
+			dlog.DebugContext(ctx, "uacp: server has no message size limit. Using default", "max_message_size", ack.MaxMessageSize)
 		}
 		c.ack = ack
-		dlog.Debug("uacp: recv", "type", fmt.Sprintf("%T", ack))
+		dlog.DebugContext(ctx, "uacp: recv", "type", fmt.Sprintf("%T", ack))
 		return nil
 
 	case "ERRF":
@@ -281,7 +281,7 @@ func (c *Conn) Handshake(ctx context.Context, endpoint string) error {
 		if _, err := errf.Decode(b[hdrlen:]); err != nil {
 			return errors.Errorf("uacp: decode ERR failed: %s", err)
 		}
-		dlog.Debug("uacp: recv", "error", errf)
+		dlog.DebugContext(ctx, "uacp: recv", "error", errf)
 		return errf
 
 	default:

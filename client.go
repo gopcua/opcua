@@ -282,8 +282,8 @@ func (c *Client) Connect(ctx context.Context) error {
 func (c *Client) monitor(ctx context.Context) {
 	dlog := slog.With("func", "Client.monitor")
 
-	dlog.Debug("start")
-	defer dlog.Debug("done")
+	dlog.DebugContext(ctx, "start")
+	defer dlog.DebugContext(ctx, "done")
 
 	defer c.mcancel()
 	defer c.setState(ctx, Closed)
@@ -299,7 +299,7 @@ func (c *Client) monitor(ctx context.Context) {
 
 			// return if channel or connection is closed
 			if !ok || err == io.EOF && c.State() == Closed {
-				dlog.Debug("closed")
+				dlog.DebugContext(ctx, "closed")
 				return
 			}
 
@@ -311,16 +311,16 @@ func (c *Client) monitor(ctx context.Context) {
 
 			// tell the handler the connection is disconnected
 			c.setState(ctx, Disconnected)
-			dlog.Debug("disconnected")
+			dlog.DebugContext(ctx, "disconnected")
 
 			if !c.cfg.sechan.AutoReconnect {
 				// the connection is closed and should not be restored
 				action = abortReconnect
-				dlog.Debug("auto-reconnect disabled")
+				dlog.DebugContext(ctx, "auto-reconnect disabled")
 				return
 			}
 
-			dlog.Debug("auto-reconnecting")
+			dlog.DebugContext(ctx, "auto-reconnecting")
 
 			switch {
 			case errors.Is(err, io.EOF):
@@ -371,7 +371,7 @@ func (c *Client) monitor(ctx context.Context) {
 					switch action {
 
 					case createSecureChannel:
-						dlog.Debug("action: createSecureChannel")
+						dlog.DebugContext(ctx, "action: createSecureChannel")
 
 						// recreate a secure channel by brute forcing
 						// a reconnection to the server
@@ -393,24 +393,24 @@ func (c *Client) monitor(ctx context.Context) {
 
 						c.setState(ctx, Reconnecting)
 
-						dlog.Debug("trying to recreate secure channel")
+						dlog.DebugContext(ctx, "trying to recreate secure channel")
 						for {
 							if err := c.Dial(ctx); err != nil {
 								select {
 								case <-ctx.Done():
 									return
 								case <-time.After(c.cfg.sechan.ReconnectInterval):
-									dlog.Debug("trying to recreate secure channel")
+									dlog.DebugContext(ctx, "trying to recreate secure channel")
 									continue
 								}
 							}
 							break
 						}
-						dlog.Debug("secure channel recreated")
+						dlog.DebugContext(ctx, "secure channel recreated")
 						action = restoreSession
 
 					case restoreSession:
-						dlog.Debug("action: restoreSession")
+						dlog.DebugContext(ctx, "action: restoreSession")
 
 						// try to reactivate the session,
 						// This only works if the session is still open on the server
@@ -420,32 +420,32 @@ func (c *Client) monitor(ctx context.Context) {
 
 						s := c.Session()
 						if s == nil {
-							dlog.Debug("no session to restore")
+							dlog.DebugContext(ctx, "no session to restore")
 							action = recreateSession
 							continue
 						}
 
-						dlog.Debug("trying to restore session")
+						dlog.DebugContext(ctx, "trying to restore session")
 						if err := c.ActivateSession(ctx, s); err != nil {
-							dlog.Debug("restore session failed", "error", err)
+							dlog.DebugContext(ctx, "restore session failed", "error", err)
 							action = recreateSession
 							continue
 						}
-						dlog.Debug("session restored")
+						dlog.DebugContext(ctx, "session restored")
 
 						// todo(fs): see comment about guarding this with an option in Connect()
-						dlog.Debug("trying to update namespaces")
+						dlog.DebugContext(ctx, "trying to update namespaces")
 						if err := c.UpdateNamespaces(ctx); err != nil {
-							dlog.Debug("updating namespaces failed", "error", err)
+							dlog.DebugContext(ctx, "updating namespaces failed", "error", err)
 							action = createSecureChannel
 							continue
 						}
-						dlog.Debug("namespaces updated")
+						dlog.DebugContext(ctx, "namespaces updated")
 
 						action = restoreSubscriptions
 
 					case recreateSession:
-						dlog.Debug("action: recreateSession")
+						dlog.DebugContext(ctx, "action: recreateSession")
 
 						c.setState(ctx, Reconnecting)
 						// create a new session to replace the previous one
@@ -454,33 +454,33 @@ func (c *Client) monitor(ctx context.Context) {
 						// this also prevents any unnecessary calls to CloseSession
 						c.setSession(nil)
 
-						dlog.Debug("trying to recreate session")
+						dlog.DebugContext(ctx, "trying to recreate session")
 						s, err := c.CreateSession(ctx, c.cfg.session)
 						if err != nil {
-							dlog.Debug("recreate session failed", "error", err)
+							dlog.DebugContext(ctx, "recreate session failed", "error", err)
 							action = createSecureChannel
 							continue
 						}
 						if err := c.ActivateSession(ctx, s); err != nil {
-							dlog.Debug("reactivate session failed", "error", err)
+							dlog.DebugContext(ctx, "reactivate session failed", "error", err)
 							action = createSecureChannel
 							continue
 						}
-						dlog.Debug("session recreated")
+						dlog.DebugContext(ctx, "session recreated")
 
 						// todo(fs): see comment about guarding this with an option in Connect()
-						dlog.Debug("trying to update namespaces")
+						dlog.DebugContext(ctx, "trying to update namespaces")
 						if err := c.UpdateNamespaces(ctx); err != nil {
-							dlog.Debug("updating namespaces failed", "error", err)
+							dlog.DebugContext(ctx, "updating namespaces failed", "error", err)
 							action = createSecureChannel
 							continue
 						}
-						dlog.Debug("namespaces updated")
+						dlog.DebugContext(ctx, "namespaces updated")
 
 						action = transferSubscriptions
 
 					case transferSubscriptions:
-						dlog.Debug("action: transferSubscriptions")
+						dlog.DebugContext(ctx, "action: transferSubscriptions")
 
 						// transfer subscriptions from the old to the new session
 						// and try to republish the subscriptions.
@@ -498,12 +498,12 @@ func (c *Client) monitor(ctx context.Context) {
 						switch {
 
 						case errors.Is(err, ua.StatusBadServiceUnsupported):
-							dlog.Debug("transfer subscriptions not supported. Recreating all subscriptions", "error", err)
+							dlog.DebugContext(ctx, "transfer subscriptions not supported. Recreating all subscriptions", "error", err)
 							subsToRepublish = nil
 							subsToRecreate = subIDs
 
 						case err != nil:
-							dlog.Debug("transfer subscriptions failed. Recreating all subscriptions", "error", err)
+							dlog.DebugContext(ctx, "transfer subscriptions failed. Recreating all subscriptions", "error", err)
 							subsToRepublish = nil
 							subsToRecreate = subIDs
 
@@ -514,7 +514,7 @@ func (c *Client) monitor(ctx context.Context) {
 								transferResult := res.Results[i]
 								switch transferResult.StatusCode {
 								case ua.StatusBadSubscriptionIDInvalid:
-									dlog.Debug("sub: transfer subscription failed", "sub_id", subIDs[i])
+									dlog.DebugContext(ctx, "sub: transfer subscription failed", "sub_id", subIDs[i])
 									subsToRecreate = append(subsToRecreate, subIDs[i])
 
 								default:
@@ -527,7 +527,7 @@ func (c *Client) monitor(ctx context.Context) {
 						action = restoreSubscriptions
 
 					case restoreSubscriptions:
-						dlog.Debug("action: restoreSubscriptions")
+						dlog.DebugContext(ctx, "action: restoreSubscriptions")
 
 						// try to republish the previous subscriptions from the server
 						// otherwise restore them.
@@ -537,7 +537,7 @@ func (c *Client) monitor(ctx context.Context) {
 						activeSubs = 0
 						for _, subID := range subsToRepublish {
 							if err := c.republishSubscription(ctx, subID, availableSeqs[subID]); err != nil {
-								dlog.Debug("republish of subscription failed", "sub_id", subID)
+								dlog.DebugContext(ctx, "republish of subscription failed", "sub_id", subID)
 								subsToRecreate = append(subsToRecreate, subID)
 							}
 							activeSubs++
@@ -545,7 +545,7 @@ func (c *Client) monitor(ctx context.Context) {
 
 						for _, subID := range subsToRecreate {
 							if err := c.recreateSubscription(ctx, subID); err != nil {
-								dlog.Debug("recreate subscripitions failed", "error", err)
+								dlog.DebugContext(ctx, "recreate subscripitions failed", "error", err)
 								action = recreateSession
 								continue
 							}
@@ -556,13 +556,13 @@ func (c *Client) monitor(ctx context.Context) {
 						action = none
 
 					case abortReconnect:
-						dlog.Debug("action: abortReconnect")
+						dlog.DebugContext(ctx, "action: abortReconnect")
 
 						// non recoverable disconnection
 						// stop the client
 
 						// todo(unknownet): should we store the error?
-						dlog.Debug("reconnection not recoverable")
+						dlog.DebugContext(ctx, "reconnection not recoverable")
 						return
 					}
 				}
@@ -575,11 +575,11 @@ func (c *Client) monitor(ctx context.Context) {
 
 			switch {
 			case activeSubs > 0:
-				dlog.Debug("resuming subscriptions", "active_subscriptions", activeSubs)
+				dlog.DebugContext(ctx, "resuming subscriptions", "active_subscriptions", activeSubs)
 				c.resumeSubscriptions(ctx)
-				dlog.Debug("resumed subscriptions", "active_subscriptions", activeSubs)
+				dlog.DebugContext(ctx, "resumed subscriptions", "active_subscriptions", activeSubs)
 			default:
-				dlog.Debug("no subscriptions to resume")
+				dlog.DebugContext(ctx, "no subscriptions to resume")
 			}
 		}
 	}

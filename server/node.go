@@ -262,7 +262,7 @@ func (n *Node) DataType() *ua.ExpandedNodeID {
 	dlog := slog.With("func", "Node.DataType", "node_id", n.id)
 
 	if n == nil {
-		dlog.Debug("n was nil!")
+		dlog.Debug( "n was nil!")
 		return ua.NewTwoByteExpandedNodeID(0)
 	}
 	v := n.attr[ua.AttributeIDDataType]

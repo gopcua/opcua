@@ -286,15 +286,15 @@ func (s *SecureChannel) dispatcher() {
 			}
 
 			if msg.Err != nil {
-				dlog.Debug("uasc: fail", "conn_id", s.c.ID(), "req_id", msg.RequestID, "error", msg.Err)
+				dlog.DebugContext(ctx, "uasc: fail", "conn_id", s.c.ID(), "req_id", msg.RequestID, "error", msg.Err)
 			} else {
-				dlog.Debug("uasc: recv", "conn_id", s.c.ID(), "req_id", msg.RequestID, "type", fmt.Sprintf("%T", msg.body))
+				dlog.DebugContext(ctx, "uasc: recv", "conn_id", s.c.ID(), "req_id", msg.RequestID, "type", fmt.Sprintf("%T", msg.body))
 			}
 
 			ch, ok := s.popHandler(msg.RequestID)
 
 			if !ok {
-				dlog.Debug("uasc: no handler", "conn_id", s.c.ID(), "req_id", msg.RequestID, "msg", fmt.Sprintf("%T", msg.body))
+				dlog.DebugContext(ctx, "uasc: no handler", "conn_id", s.c.ID(), "req_id", msg.RequestID, "msg", fmt.Sprintf("%T", msg.body))
 				continue
 			}
 
@@ -303,12 +303,12 @@ func (s *SecureChannel) dispatcher() {
 				s.rcvLocker.lock()
 			}
 
-			dlog.Debug("uasc: sending to handler", "conn_id", s.c.ID(), "req_id", msg.RequestID, "msg", fmt.Sprintf("%T", msg.body))
+			dlog.DebugContext(ctx, "uasc: sending to handler", "conn_id", s.c.ID(), "req_id", msg.RequestID, "msg", fmt.Sprintf("%T", msg.body))
 			select {
 			case ch <- msg:
 			default:
 				// this should never happen since the chan is of size one
-				dlog.Debug("uasc: unexpected state. channel write should always succeed.", "conn_id", s.c.ID(), "req_id", msg.RequestID)
+				dlog.DebugContext(ctx, "uasc: unexpected state. channel write should always succeed.", "conn_id", s.c.ID(), "req_id", msg.RequestID)
 			}
 
 			s.rcvLocker.waitIfLock()
@@ -330,7 +330,7 @@ func (s *SecureChannel) Receive(ctx context.Context) *MessageBody {
 		default:
 			chunk, err := s.readChunk()
 			if err == io.EOF {
-				dlog.Debug("uasc: readChunk EOF")
+				dlog.DebugContext(ctx, "uasc: readChunk EOF")
 				return &MessageBody{Err: err}
 			}
 
@@ -343,7 +343,7 @@ func (s *SecureChannel) Receive(ctx context.Context) *MessageBody {
 
 			strdat := string(chunk.Data)
 			if strings.Contains(strdat, "CurrentTime") {
-				dlog.Debug("Requested CurrentTime.")
+				dlog.DebugContext(ctx, "Requested CurrentTime.")
 			}
 
 			msg := &MessageBody{
@@ -357,7 +357,7 @@ func (s *SecureChannel) Receive(ctx context.Context) *MessageBody {
 				"req_id", reqID,
 			)
 
-			dlog.Debug("uasc: recv",
+			dlog.DebugContext(ctx, "uasc: recv",
 				"msg_type", hdr.MessageType,
 				"chunk_type", hdr.ChunkType,
 				"msg_size", hdr.MessageSize,
@@ -372,7 +372,7 @@ func (s *SecureChannel) Receive(ctx context.Context) *MessageBody {
 
 				msga := new(MessageAbort)
 				if _, err := msga.Decode(chunk.Data); err != nil {
-					dlog.Debug("uasc: invalid MSGA chunk", "error", err)
+					dlog.DebugContext(ctx, "uasc: invalid MSGA chunk", "error", err)
 					msg.Err = ua.StatusBadDecodingError
 					return msg
 				}
@@ -430,7 +430,7 @@ func (s *SecureChannel) Receive(ctx context.Context) *MessageBody {
 			if req, ok := msg.Request().(*ua.OpenSecureChannelRequest); ok {
 				err := s.handleOpenSecureChannelRequest(reqID, req)
 				if err != nil {
-					dlog.Debug("uasc: handling failed", "req", fmt.Sprintf("%T", req), "error", err)
+					dlog.DebugContext(ctx, "uasc: handling failed", "req", fmt.Sprintf("%T", req), "error", err)
 					return &MessageBody{Err: err}
 				}
 				return &MessageBody{}
@@ -593,7 +593,7 @@ func (s *SecureChannel) Open(ctx context.Context) error {
 func (s *SecureChannel) open(ctx context.Context, instance *channelInstance, requestType ua.SecurityTokenRequestType) error {
 	dlog := slog.With("func", "SecureChannel.open")
 
-	dlog.Debug("open")
+	dlog.DebugContext(ctx, "open")
 	defer s.rcvLocker.unlock()
 
 	s.openingMu.Lock()
@@ -653,7 +653,7 @@ func (s *SecureChannel) open(ctx context.Context, instance *channelInstance, req
 	// trigger cleanup after we are all done
 	defer func() {
 		if s.openingInstance == nil || s.openingInstance.state != channelActive {
-			dlog.Debug("uasc: failed to open a new secure channel", "conn_id", s.c.ID())
+			dlog.DebugContext(ctx, "uasc: failed to open a new secure channel", "conn_id", s.c.ID())
 		}
 		s.openingInstance = nil
 	}()
@@ -677,7 +677,7 @@ func (s *SecureChannel) open(ctx context.Context, instance *channelInstance, req
 	}
 
 	return s.sendRequestWithTimeout(ctx, req, reqID, s.openingInstance, nil, s.cfg.RequestTimeout, func(v ua.Response) error {
-		dlog.Debug("OpenSecureChannelResponse handler")
+		dlog.DebugContext(ctx, "OpenSecureChannelResponse handler")
 		resp, ok := v.(*ua.OpenSecureChannelResponse)
 		if !ok {
 			return errors.Errorf("got %T, want OpenSecureChannelResponse", v)
@@ -1094,7 +1094,7 @@ func (s *SecureChannel) sendAsyncWithTimeout(
 		atomic.AddUint64(&instance.bytesSent, uint64(n))
 		atomic.AddUint32(&instance.messagesSent, 1)
 
-		dlog.Debug("uasc: send",
+		dlog.DebugContext(ctx, "uasc: send",
 			"conn_id", s.c.ID(),
 			"req_id", reqID,
 			"req", fmt.Sprintf("%T", req),
@@ -1154,7 +1154,7 @@ func (s *SecureChannel) SendMsgWithContext(ctx context.Context, instance *channe
 	atomic.AddUint64(&instance.bytesSent, uint64(n))
 	atomic.AddUint32(&instance.messagesSent, 1)
 
-	dlog.Debug("uasc: send",
+	dlog.DebugContext(ctx, "uasc: send",
 		"conn_id", s.c.ID(),
 		"req_id", reqID,
 		"resp", fmt.Sprintf("%T", msg),
@@ -1211,7 +1211,7 @@ func (s *SecureChannel) sendResponseWithContext(ctx context.Context, instance *c
 	atomic.AddUint64(&instance.bytesSent, uint64(n))
 	atomic.AddUint32(&instance.messagesSent, 1)
 
-	dlog.Debug("uasc: send response",
+	dlog.DebugContext(ctx, "uasc: send response",
 		"conn_id", s.c.ID(),
 		"req_id", reqID,
 		"resp", fmt.Sprintf("%T", resp),

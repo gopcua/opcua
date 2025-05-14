@@ -404,7 +404,7 @@ func (s *Subscription) recreate_delete(ctx context.Context) error {
 	_ = s.c.Send(ctx, req, func(v ua.Response) error {
 		return safeAssign(v, &res)
 	})
-	dlog.Debug("subscription deleted")
+	dlog.DebugContext(ctx, "subscription deleted")
 	return nil
 }
 
@@ -431,14 +431,14 @@ func (s *Subscription) recreate_create(ctx context.Context) error {
 		return safeAssign(v, &res)
 	})
 	if err != nil {
-		dlog.Debug("failed to recreate subscription")
+		dlog.DebugContext(ctx, "failed to recreate subscription")
 		return err
 	}
 	// todo (unknownet): check if necessary
 	if status := res.ResponseHeader.ServiceResult; status != ua.StatusOK {
 		return status
 	}
-	dlog.Debug(fmt.Sprintf("recreated as subscription_id %d", res.SubscriptionID))
+	dlog.DebugContext(ctx, fmt.Sprintf("recreated as subscription_id %d", res.SubscriptionID))
 
 	// todo(fs): we cannot overwrite the [subscription_id] attribute in [dlog]
 	dlog = slog.With("func", "recreate_create", "sub_id", res.SubscriptionID)
@@ -453,7 +453,7 @@ func (s *Subscription) recreate_create(ctx context.Context) error {
 	if err := s.c.registerSubscription_NeedsSubMuxLock(s); err != nil {
 		return err
 	}
-	dlog.Debug("recreate: subscription registered")
+	dlog.DebugContext(ctx, "recreate: subscription registered")
 
 	// Sort by timestamp to return
 	itemsByTimestamps := make(map[ua.TimestampsToReturn][]*ua.MonitoredItemCreateRequest)
@@ -476,7 +476,7 @@ func (s *Subscription) recreate_create(ctx context.Context) error {
 			return safeAssign(v, &res)
 		})
 		if err != nil {
-			dlog.Debug("recreate: failed to create monitored items", "error", err)
+			dlog.DebugContext(ctx, "recreate: failed to create monitored items", "error", err)
 			return err
 		}
 
@@ -496,7 +496,7 @@ func (s *Subscription) recreate_create(ctx context.Context) error {
 		}
 		s.itemsMu.Unlock()
 	}
-	dlog.Debug("recreate: subscription successfully recreated")
+	dlog.DebugContext(ctx, "recreate: subscription successfully recreated")
 
 	return nil
 }

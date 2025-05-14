@@ -131,14 +131,14 @@ func (c *Client) republishSubscription(ctx context.Context, id uint32, available
 
 	dlog := slog.With("func", "Client.republishSubscription", "sub_id", sub.SubscriptionID)
 
-	dlog.Debug("republishing subscription")
+	dlog.DebugContext(ctx, "republishing subscription")
 	if err := c.sendRepublishRequests(ctx, sub, availableSeq); err != nil {
 		switch {
 		case errors.Is(err, ua.StatusBadSessionIDInvalid):
 			return nil
 		case errors.Is(err, ua.StatusBadSubscriptionIDInvalid):
 			// todo(fs): do we need to forget the subscription id in this case?
-			dlog.Debug("republish failed since subscription is invalid")
+			dlog.DebugContext(ctx, "republish failed since subscription is invalid")
 			return errors.Errorf("republish failed since subscription is invalid. subscription_id=%d", sub.SubscriptionID)
 		default:
 			return err
@@ -170,38 +170,38 @@ func (c *Client) sendRepublishRequests(ctx context.Context, sub *Subscription, a
 			RetransmitSequenceNumber: sub.nextSeq,
 		}
 
-		dlog.Debug("Republishing subscription and sequence number",
+		dlog.DebugContext(ctx, "Republishing subscription and sequence number",
 			"sub_id", req.SubscriptionID,
 			"seq_nr", req.RetransmitSequenceNumber,
 		)
 
 		s := c.Session()
 		if s == nil {
-			dlog.Debug("Republishing subscription aborted", "sub_id", req.SubscriptionID)
+			dlog.DebugContext(ctx, "Republishing subscription aborted", "sub_id", req.SubscriptionID)
 			return ua.StatusBadSessionClosed
 		}
 
 		sc := c.SecureChannel()
 		if sc == nil {
-			dlog.Debug("Republishing subscription aborted", "sub_id", req.SubscriptionID)
+			dlog.DebugContext(ctx, "Republishing subscription aborted", "sub_id", req.SubscriptionID)
 			return ua.StatusBadNotConnected
 		}
 
-		dlog.Debug("RepublishRequest", "req", debug.ToJSON(req))
+		dlog.DebugContext(ctx, "RepublishRequest", "req", debug.ToJSON(req))
 		var res *ua.RepublishResponse
 		err := sc.SendRequest(ctx, req, c.Session().resp.AuthenticationToken, func(v ua.Response) error {
 			return safeAssign(v, &res)
 		})
-		dlog.Debug("RepublishResponse", "res", debug.ToJSON(res), "error", err)
+		dlog.DebugContext(ctx, "RepublishResponse", "res", debug.ToJSON(res), "error", err)
 
 		switch {
 		case err == ua.StatusBadMessageNotAvailable:
 			// No more message to restore
-			dlog.Debug("Republishing subscription OK", "sub_id", req.SubscriptionID)
+			dlog.DebugContext(ctx, "Republishing subscription OK", "sub_id", req.SubscriptionID)
 			return nil
 
 		case err != nil:
-			dlog.Debug("Republishing subscription failed", "sub_id", req.SubscriptionID, "error", err)
+			dlog.DebugContext(ctx, "Republishing subscription failed", "sub_id", req.SubscriptionID, "error", err)
 			return err
 
 		default:
@@ -211,7 +211,7 @@ func (c *Client) sendRepublishRequests(ctx context.Context, sub *Subscription, a
 			}
 
 			if status != ua.StatusOK {
-				dlog.Debug("Republishing subscription failed", "sub_id", req.SubscriptionID, "error", status)
+				dlog.DebugContext(ctx, "Republishing subscription failed", "sub_id", req.SubscriptionID, "error", status)
 				return status
 			}
 		}
@@ -354,33 +354,33 @@ func (c *Client) resumeSubscriptions(ctx context.Context) {
 // for all active subscriptions.
 func (c *Client) monitorSubscriptions(ctx context.Context) {
 	dlog := slog.With("func", "Client.monitorSubscriptions")
-	defer dlog.Debug("done")
+	defer dlog.DebugContext(ctx, "done")
 
 publish:
 	for {
 		select {
 		case <-ctx.Done():
-			dlog.Debug("ctx.Done()")
+			dlog.DebugContext(ctx, "ctx.Done()")
 			return
 
 		case <-c.resumech:
-			dlog.Debug("resume")
+			dlog.DebugContext(ctx, "resume")
 			// ignore since not paused
 
 		case <-c.pausech:
-			dlog.Debug("pause")
+			dlog.DebugContext(ctx, "pause")
 			for {
 				select {
 				case <-ctx.Done():
-					dlog.Debug("pause: ctx.Done()")
+					dlog.DebugContext(ctx, "pause: ctx.Done()")
 					return
 
 				case <-c.resumech:
-					dlog.Debug("pause: resume")
+					dlog.DebugContext(ctx, "pause: resume")
 					continue publish
 
 				case <-c.pausech:
-					dlog.Debug("pause: pause")
+					dlog.DebugContext(ctx, "pause: pause")
 					// ignore since already paused
 				}
 			}
@@ -391,7 +391,7 @@ publish:
 			// publish() blocks until a PublishResponse
 			// is received or the context is cancelled.
 			if err := c.publish(ctx); err != nil {
-				dlog.Debug("publish failed. Pausing subscriptions", "error", err.Error())
+				dlog.DebugContext(ctx, "publish failed. Pausing subscriptions", "error", err.Error())
 				c.pauseSubscriptions(ctx)
 			}
 		}
@@ -403,7 +403,7 @@ func (c *Client) publish(ctx context.Context) error {
 	dlog := slog.With("func", "Client.publish")
 
 	c.subMux.RLock()
-	dlog.Debug("pendingAcks", "ack_ids", debug.ToJSON(c.pendingAcks))
+	dlog.DebugContext(ctx, "pendingAcks", "ack_ids", debug.ToJSON(c.pendingAcks))
 	c.subMux.RUnlock()
 
 	// send the next publish request
@@ -412,30 +412,30 @@ func (c *Client) publish(ctx context.Context) error {
 	stats.RecordError(err)
 	switch {
 	case err == io.EOF:
-		dlog.Debug("eof: pausing publish loop")
+		dlog.DebugContext(ctx, "eof: pausing publish loop")
 		return err
 
 	case err == ua.StatusBadSessionNotActivated:
-		dlog.Debug("error: session not active. pausing publish loop")
+		dlog.DebugContext(ctx, "error: session not active. pausing publish loop")
 		return err
 
 	case err == ua.StatusBadSessionIDInvalid:
-		dlog.Debug("error: session not valid. pausing publish loop")
+		dlog.DebugContext(ctx, "error: session not valid. pausing publish loop")
 		return err
 
 	case err == ua.StatusBadServerNotConnected:
-		dlog.Debug("error: no connection. pausing publish loop")
+		dlog.DebugContext(ctx, "error: no connection. pausing publish loop")
 		return err
 
 	case err == ua.StatusBadSequenceNumberUnknown:
 		// todo(fs): this should only happen per in the status codes
 		// todo(fs): lets log this here to see
-		dlog.Debug("error: this should only happen when ACK'ing results", "error", err)
+		dlog.DebugContext(ctx, "error: this should only happen when ACK'ing results", "error", err)
 
 	case err == ua.StatusBadTooManyPublishRequests:
 		// todo(fs): we have sent too many publish requests
 		// todo(fs): we need to slow down
-		dlog.Debug("error: sleeping for one second", "error", err)
+		dlog.DebugContext(ctx, "error: sleeping for one second", "error", err)
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
@@ -444,12 +444,12 @@ func (c *Client) publish(ctx context.Context) error {
 
 	case err == ua.StatusBadTimeout:
 		// ignore and continue the loop
-		dlog.Debug("error: ignoring", "error", err)
+		dlog.DebugContext(ctx, "error: ignoring", "error", err)
 
 	case err == ua.StatusBadNoSubscription:
 		// All subscriptions have been deleted, but the publishing loop is still running
 		// We should pause publishing until a subscription has been created
-		dlog.Debug("error: no subscriptions but the publishing loop is still running", "error", err)
+		dlog.DebugContext(ctx, "error: no subscriptions but the publishing loop is still running", "error", err)
 		return err
 
 	case err != nil && res != nil:
@@ -460,11 +460,11 @@ func (c *Client) publish(ctx context.Context) error {
 		} else {
 			c.notifySubscriptionOfError(ctx, res.SubscriptionID, err)
 		}
-		dlog.Debug("error", "error", err)
+		dlog.DebugContext(ctx, "error", "error", err)
 		return err
 
 	case err != nil:
-		dlog.Debug("error: unexpected error. Do we need to stop the publish loop?", "error", err)
+		dlog.DebugContext(ctx, "error: unexpected error. Do we need to stop the publish loop?", "error", err)
 		return err
 
 	default:
@@ -476,7 +476,7 @@ func (c *Client) publish(ctx context.Context) error {
 		if !ok {
 			c.subMux.Unlock()
 			// todo(fs): should we return an error here?
-			dlog.Debug("error: unknown subscription", "sub_id", res.SubscriptionID)
+			dlog.DebugContext(ctx, "error: unknown subscription", "sub_id", res.SubscriptionID)
 			return nil
 		}
 
@@ -485,7 +485,7 @@ func (c *Client) publish(ctx context.Context) error {
 		c.subMux.Unlock()
 
 		c.notifySubscription(ctx, sub, res.NotificationMessage)
-		dlog.Debug("notif", "sequence_nr", res.NotificationMessage.SequenceNumber)
+		dlog.DebugContext(ctx, "notif", "sequence_nr", res.NotificationMessage.SequenceNumber)
 	}
 
 	return nil
@@ -558,12 +558,12 @@ func (c *Client) sendPublishRequest(ctx context.Context) (*ua.PublishResponse, e
 	}
 	c.subMux.RUnlock()
 
-	dlog.Debug("PublishRequest", "req", debug.ToJSON(req))
+	dlog.DebugContext(ctx, "PublishRequest", "req", debug.ToJSON(req))
 	var res *ua.PublishResponse
 	err := c.sendWithTimeout(ctx, req, c.publishTimeout(), func(v ua.Response) error {
 		return safeAssign(v, &res)
 	})
 	stats.RecordError(err)
-	dlog.Debug("PublishResponse", "resp", debug.ToJSON(res))
+	dlog.DebugContext(ctx, "PublishResponse", "resp", debug.ToJSON(res))
 	return res, err
 }
