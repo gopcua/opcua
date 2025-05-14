@@ -157,7 +157,7 @@ func (c *Client) sendRepublishRequests(ctx context.Context, sub *Subscription, a
 	// todo(fs): if not then we need to decide whether we fail b/c of data loss
 	// todo(fs): or whether we log it and continue.
 	if len(availableSeq) > 0 && !slices.Contains(availableSeq, sub.nextSeq) {
-		ualog.Info("sub: next sequence number not in retransmission buffer",
+		dlog.Info("sub: next sequence number not in retransmission buffer",
 			"sub_id", sub.SubscriptionID,
 			"next_seq_nr", sub.nextSeq,
 			"avail_seq_nrs", availableSeq,
