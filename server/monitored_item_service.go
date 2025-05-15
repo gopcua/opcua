@@ -146,7 +146,12 @@ func (s *MonitoredItemService) ChangeNotification(n *ua.NodeID) {
 }
 
 func (s *MonitoredItemService) NextID() uint32 {
-	return atomic.AddUint32(&s.nextID, 1)
+	n := atomic.AddUint32(&s.nextID, 1)
+	// ensure that n is never zero. Could happen at roll-over.
+	if n == 0 {
+		return atomic.AddUint32(&s.nextID, 1)
+	}
+	return n
 }
 
 type MonitoredItem struct {
