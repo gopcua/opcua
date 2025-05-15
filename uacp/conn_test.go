@@ -6,11 +6,13 @@ package uacp
 
 import (
 	"context"
+	"log/slog"
 	"net"
 	"testing"
 	"time"
 
 	"github.com/gopcua/opcua/errors"
+	"github.com/gopcua/opcua/internal/ualog"
 	"github.com/stretchr/testify/require"
 )
 
@@ -21,7 +23,7 @@ func TestConn(t *testing.T) {
 		require.NoError(t, err)
 		defer ln.Close()
 
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithCancel(ualog.NewContext(context.Background(), slog.Default()))
 		defer cancel()
 
 		done := make(chan struct{})
@@ -52,8 +54,9 @@ func TestConn(t *testing.T) {
 	t.Run("Address resolves, but does not implement a opcua-server", func(t *testing.T) {
 		ep := "opc.tcp://example.com:56789"
 
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		ctx, cancel := context.WithCancel(ualog.NewContext(context.Background(), slog.Default()))
 		defer cancel()
+
 		_, err := Dial(ctx, ep)
 		var operr *net.OpError
 		if errors.As(err, &operr) && !operr.Timeout() {
@@ -68,7 +71,7 @@ func TestClientWrite(t *testing.T) {
 	require.NoError(t, err, "Listen failed")
 	defer ln.Close()
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(ualog.NewContext(context.Background(), slog.Default()))
 	defer cancel()
 
 	var srvConn *Conn
@@ -122,7 +125,7 @@ func TestServerWrite(t *testing.T) {
 	require.NoError(t, err, "Listen failed")
 	defer ln.Close()
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(ualog.NewContext(context.Background(), slog.Default()))
 	defer cancel()
 
 	var srvConn *Conn

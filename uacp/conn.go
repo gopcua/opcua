@@ -149,11 +149,12 @@ func Listen(ctx context.Context, endpoint string, ack *Acknowledge) (*Listener, 
 // The first param ctx is to be passed to monitor(), which monitors and handles
 // incoming messages automatically in another goroutine.
 func (l *Listener) Accept(ctx context.Context) (*Conn, error) {
+	logger := ualog.FromContext(ctx)
 	c, err := l.l.AcceptTCP()
 	if err != nil {
 		return nil, err
 	}
-	conn := &Conn{TCPConn: c, id: nextid(), ack: l.ack}
+	conn := &Conn{TCPConn: c, id: nextid(), ack: l.ack, logger: logger}
 	if err := conn.srvhandshake(l.endpoint); err != nil {
 		c.Close()
 		return nil, err

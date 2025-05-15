@@ -19,7 +19,11 @@ func NewContext(ctx context.Context, l *slog.Logger) context.Context {
 
 // FromContext returns the logger from the context.
 func FromContext(ctx context.Context) *slog.Logger {
-	return ctx.Value(loggerKey).(*slog.Logger)
+	val := ctx.Value(loggerKey)
+	if val != nil {
+		return val.(*slog.Logger)
+	}
+	return nil
 }
 
 // NewTextHandler returns a handler with log level DEBUG

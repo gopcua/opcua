@@ -25,6 +25,9 @@ func TestNewRequestMessage(t *testing.T) {
 		if instance == nil {
 			instance = newChannelInstance(sc)
 		}
+		if instance.logger == nil {
+			instance.logger = slog.Default()
+		}
 		sc.activeInstance = instance
 		sc.activeInstance.sc = sc
 		return sc
@@ -113,6 +116,7 @@ func TestNewRequestMessage(t *testing.T) {
 					cfg:       &Config{},
 					requestID: math.MaxUint32,
 					time:      fixedTime,
+					logger:    slog.Default(),
 				},
 				&channelInstance{
 					sequenceNumber: math.MaxUint32 - 1023,
