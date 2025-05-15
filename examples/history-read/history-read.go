@@ -7,35 +7,38 @@ package main
 import (
 	"context"
 	"flag"
-	"log"
+	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/gopcua/opcua"
-	"github.com/gopcua/opcua/debug"
+	"github.com/gopcua/opcua/internal/ualog"
 	"github.com/gopcua/opcua/ua"
 )
 
 func main() {
-	endpoint := flag.String("endpoint", "opc.tcp://localhost:4840", "OPC UA Endpoint URL")
-	nodeID := flag.String("node", "", "NodeID to read")
-	flag.BoolVar(&debug.Enable, "debug", false, "enable debug logging")
+	var (
+		endpoint = flag.String("endpoint", "opc.tcp://localhost:4840", "OPC UA Endpoint URL")
+		nodeID   = flag.String("node", "", "NodeID to read")
+		debug    = flag.Bool("debug", false, "enable debug logging")
+	)
 	flag.Parse()
-	log.SetFlags(0)
+	slog.SetDefault(slog.New(ualog.NewTextHandler(*debug)))
 
 	ctx := context.Background()
 
 	c, err := opcua.NewClient(*endpoint)
 	if err != nil {
-		log.Fatal(err)
+		ualog.Fatal("NewClient failed", "error", err)
 	}
 	if err := c.Connect(ctx); err != nil {
-		log.Fatal(err)
+		ualog.Fatal("Connect failed", "error", err)
 	}
 	defer c.Close(ctx)
 
 	id, err := ua.ParseNodeID(*nodeID)
 	if err != nil {
-		log.Fatalf("invalid node id: %v", err)
+		ualog.Fatal("invalid node id", "node_id", *nodeID, "error", err)
 	}
 
 	// HistoryRead with ContinuationPoint use
@@ -63,7 +66,7 @@ func main() {
 			EndTime:        time.Now().UTC().AddDate(0, 1, 0),
 		})
 		if err != nil {
-			log.Printf("HistoryReadRequest error: %s", err)
+			slog.Error("HistoryReadRequest failed", "error", err)
 			break
 		}
 
@@ -73,7 +76,7 @@ func main() {
 
 		for nodeNum, result := range data.Results {
 			if result.StatusCode != ua.StatusOK {
-				log.Printf("result.StatusCode not StatusOK: %d", result.StatusCode)
+				slog.Error("result.StatusCode not StatusOK", "status_code", result.StatusCode)
 				continue
 			}
 
@@ -94,12 +97,12 @@ func main() {
 			}
 
 			for _, value := range historyData.DataValues {
-				log.Printf(
+				slog.Info(fmt.Sprintf(
 					"%s - %s - %v \n",
 					nodes[nodeNum].NodeID.String(),
 					value.SourceTimestamp.Format(time.RFC3339),
 					value.Value.Value(),
-				)
+				))
 			}
 		}
 	}

@@ -5,6 +5,7 @@
 package uasc
 
 import (
+	"log/slog"
 	"testing"
 	"time"
 
@@ -27,6 +28,7 @@ func TestMessage(t *testing.T) {
 					sc:              s,
 					sequenceNumber:  0,
 					securityTokenID: 0,
+					logger:          slog.Default(),
 				}
 				m := instance.newMessage(
 					&ua.OpenSecureChannelRequest{
@@ -126,6 +128,7 @@ func TestMessage(t *testing.T) {
 					sc:              s,
 					sequenceNumber:  0,
 					securityTokenID: 0,
+					logger:          slog.Default(),
 				}
 				m := instance.newMessage(
 					&ua.GetEndpointsRequest{
@@ -197,6 +200,7 @@ func TestMessage(t *testing.T) {
 					sc:              s,
 					sequenceNumber:  0,
 					securityTokenID: 0,
+					logger:          slog.Default(),
 				}
 				m := instance.newMessage(
 					&ua.CloseSecureChannelRequest{

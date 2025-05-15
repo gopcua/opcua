@@ -9,6 +9,7 @@ import (
 	"crypto/x509"
 	"fmt"
 	"log"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -22,27 +23,27 @@ type Option func(*serverConfig)
 
 // PrivateKey sets the RSA private key in the secure channel configuration.
 func PrivateKey(key *rsa.PrivateKey) Option {
-	return func(s *serverConfig) {
-		s.privateKey = key
+	return func(cfg *serverConfig) {
+		cfg.privateKey = key
 	}
 }
 
 // EndPointHostName adds an additional endpoint to the server based on the host name
 func EndPoint(host string, port int) Option {
-	return func(s *serverConfig) {
-		if s.endpoints == nil {
-			s.endpoints = make([]string, 0)
+	return func(cfg *serverConfig) {
+		if cfg.endpoints == nil {
+			cfg.endpoints = make([]string, 0)
 		}
 		ep := fmt.Sprintf("opc.tcp://%s:%d", host, port)
-		s.endpoints = append(s.endpoints, ep)
+		cfg.endpoints = append(cfg.endpoints, ep)
 	}
 }
 
 // Certificate sets the client X509 certificate in the secure channel configuration
 // and also detects and sets the ApplicationURI from the URI within the certificate
 func Certificate(cert []byte) Option {
-	return func(s *serverConfig) {
-		s.certificate = cert
+	return func(cfg *serverConfig) {
+		cfg.certificate = cert
 
 		// Extract the application URI from the certificate.
 		var appURI string
@@ -51,14 +52,14 @@ func Certificate(cert []byte) Option {
 			appURI = x509cert.URIs[0].String()
 		}
 
-		s.applicationURI = appURI
+		cfg.applicationURI = appURI
 	}
 }
 
 // EnableSecurity registers a new endpoint security mode to the server.
 // This will also register the security policy against each enabled auth mode
 func EnableSecurity(secPolicy string, secMode ua.MessageSecurityMode) Option {
-	return func(s *serverConfig) {
+	return func(cfg *serverConfig) {
 		if !strings.HasPrefix(secPolicy, "http://opcfoundation.org/UA/SecurityPolicy#") {
 			secPolicy = "http://opcfoundation.org/UA/SecurityPolicy#" + secPolicy
 		}
@@ -76,11 +77,10 @@ func EnableSecurity(secPolicy string, secMode ua.MessageSecurityMode) Option {
 			return
 		}
 
-		for _, sec := range s.enabledSec {
+		for _, sec := range cfg.enabledSec {
 			if sec.secPolicy == secPolicy && sec.secMode == secMode {
-				if s.logger != nil {
-					s.logger.Warn("security policy already exists, skipping")
-				}
+				// todo(fs): logging here feels wrong. Ideas?
+				slog.Warn("security policy already exists, skipping")
 				return
 			}
 		}
@@ -90,7 +90,7 @@ func EnableSecurity(secPolicy string, secMode ua.MessageSecurityMode) Option {
 			secMode:   secMode,
 		}
 
-		s.enabledSec = append(s.enabledSec, sec)
+		cfg.enabledSec = append(cfg.enabledSec, sec)
 	}
 }
 
@@ -98,13 +98,12 @@ func EnableSecurity(secPolicy string, secMode ua.MessageSecurityMode) Option {
 // All AuthModes except Anonymous require encryption by default, so EnableSecurity()
 // must also be called with at least one non-"None" SecurityPolicy
 func EnableAuthMode(tokenType ua.UserTokenType) Option {
-	return func(s *serverConfig) {
+	return func(cfg *serverConfig) {
 
-		for _, a := range s.enabledAuth {
+		for _, a := range cfg.enabledAuth {
 			if a.tokenType == tokenType {
-				if s.logger != nil {
-					s.logger.Warn("auth mode already registered, skipping")
-				}
+				// todo(fs): logging here feels wrong. Ideas?
+				slog.Warn("auth mode already registered, skipping")
 				return
 			}
 		}
@@ -113,7 +112,7 @@ func EnableAuthMode(tokenType ua.UserTokenType) Option {
 			tokenType: tokenType,
 		}
 
-		s.enabledAuth = append(s.enabledAuth, a)
+		cfg.enabledAuth = append(cfg.enabledAuth, a)
 	}
 }
 
@@ -126,43 +125,32 @@ func defaultChannelConfig() *uasc.Config {
 }
 
 func ServerName(name string) Option {
-	return func(s *serverConfig) {
-		s.applicationName = name
+	return func(cfg *serverConfig) {
+		cfg.applicationName = name
 	}
 }
 
 func ManufacturerName(name string) Option {
-	return func(s *serverConfig) {
-		s.manufacturerName = name
+	return func(cfg *serverConfig) {
+		cfg.manufacturerName = name
 	}
 }
 
 func ProductName(name string) Option {
-	return func(s *serverConfig) {
-		s.productName = name
+	return func(cfg *serverConfig) {
+		cfg.productName = name
 	}
 }
 
 func SoftwareVersion(name string) Option {
-	return func(s *serverConfig) {
-		s.softwareVersion = name
+	return func(cfg *serverConfig) {
+		cfg.softwareVersion = name
 	}
 }
 
-// this logger interface is used to allow the user to provide their own logger
-// it is compatible with slog.Logger
-type Logger interface {
-	Debug(msg string, args ...any)
-	Error(msg string, args ...any)
-	Info(msg string, args ...any)
-	Warn(msg string, args ...any)
-}
-
-// the server.SetLogger takes a server.Logger interface.  This interface is met by
-// slog.Logger{}.  A simple wrapper could be made for other loggers if they don't already
-// meet the interface.
-func SetLogger(logger Logger) Option {
-	return func(s *serverConfig) {
-		s.logger = logger
+// SetLoggerHandler sets the slog.Handler for the server.
+func SetLoggerHandler(h slog.Handler) Option {
+	return func(cfg *serverConfig) {
+		cfg.loghandler = h
 	}
 }

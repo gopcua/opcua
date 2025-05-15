@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"encoding/pem"
 	"fmt"
+	"log/slog"
 	"net"
 	"os"
 	"path/filepath"
@@ -829,6 +830,9 @@ func TestOptions(t *testing.T) {
 			}
 			if tt.cfg.session == nil {
 				tt.cfg.session = DefaultSessionConfig()
+			}
+			if tt.cfg.logger == nil {
+				tt.cfg.logger = slog.Default()
 			}
 
 			errstr := func(err error) string {
