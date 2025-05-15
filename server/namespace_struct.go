@@ -1,8 +1,7 @@
 package server
 
 import (
-	"fmt"
-	"iter"
+	"reflect"
 	"sync"
 	"time"
 
@@ -14,15 +13,15 @@ import (
 // This namespaces give a convenient way to have data mapped to the OPC server
 // without having to map your application data to the OCP-UA data abstraction
 //
-// It (currently) supports ints, floats, strings, and timestamps. No maps inside of maps and no arrays.
+// # It (currently) supports a single level of field access so only atomic types are allowed in the struct
 //
-// To notify subscribers of changes, be sure to call ChangeNotification(key) after changing the value.
-// To be notified of changes from the opc-ua server to the map, receive on ExternalNotification channel
-type MapNamespace[T any] struct {
+// To notify subscribers of changes, be sure to call ChangeNotification(FieldName) after changing a value.
+// To be notified of changes from the opc-ua server to the struct, receive on ExternalNotification channel
+type StructNamespace[T any] struct {
 	srv  *Server
 	name string
 	mu   sync.RWMutex
-	data map[string]T
+	data T
 
 	// This can be used to be alerted when a value is changed from the opc server
 	ExternalNotification chan string
@@ -30,99 +29,40 @@ type MapNamespace[T any] struct {
 	id uint16
 }
 
-// Get the value associated with key from the MapNamespace.
-// This function handles locking and getting the value.
-//
-// Returns nil if the value doesn't exist.
-func (s *MapNamespace[T]) GetValue(key string) any {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.data[key]
-}
-
-// update the value associated with a key and trigger the change notification
-// to the OPC server
-func (s *MapNamespace[T]) SetValue(key string, value T) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.data[key] = value
-	s.ChangeNotification(key)
-}
-
-// All returns an iterator over key-value pairs from the map.
-// The iteration order is not specified and is not guaranteed
-// to be the same from one call to the next.
-func (s *MapNamespace[T]) All() iter.Seq2[string, T] {
-	return func(yield func(string, T) bool) {
-		s.mu.Lock()
-		defer s.mu.Unlock()
-		for k, v := range s.data {
-			if !yield(k, v) {
-				return
-			}
-		}
-	}
-}
-
-// Keys returns an iterator over keys in the map
-// The iteration order is not specified and is not guaranteed
-// to be the same from one call to the next.
-func (s *MapNamespace[T]) Keys() iter.Seq[string] {
-	return func(yield func(string) bool) {
-		s.mu.Lock()
-		defer s.mu.Unlock()
-		for k := range s.data {
-			if !yield(k) {
-				return
-			}
-		}
-	}
-}
-
-// Values returns an iterator over values in the map.
-// The iteration order is not specified and is not guaranteed
-// to be the same from one call to the next.
-func (s *MapNamespace[T]) Values() iter.Seq[T] {
-	return func(yield func(T) bool) {
-		s.mu.Lock()
-		defer s.mu.Unlock()
-		for _, v := range s.data {
-			if !yield(v) {
-				return
-			}
-		}
-	}
-}
-
 // This function is used to notify OPC UA subscribers if a key was changed without using the
 // SetValue() function
-func (s *MapNamespace[T]) ChangeNotification(key string) {
+func (s *StructNamespace[T]) ChangeNotification(key string) {
 	s.srv.ChangeNotification(ua.NewStringNodeID(s.id, key))
 }
 
-func NewMapNamespace[T any](srv *Server, name string) *MapNamespace[T] {
-	mrw := MapNamespace[T]{
+// NewStructNamespace creates a new namespace for the given struct.
+// Be sure to pass the struct in as a pointer to continue to have access to it.
+func NewStructNamespace[T any](srv *Server, name string, str T) *StructNamespace[T] {
+	mrw := StructNamespace[T]{
 		srv:                  srv,
 		name:                 name,
-		data:                 make(map[string]T),
+		data:                 str,
 		ExternalNotification: make(chan string),
 	}
 	srv.AddNamespace(&mrw)
 	return &mrw
 }
 
-func (s *MapNamespace[T]) ID() uint16 {
+func (s *StructNamespace[T]) ID() uint16 {
 	return s.id
 }
-func (ns *MapNamespace[T]) SetID(id uint16) {
+func (ns *StructNamespace[T]) SetID(id uint16) {
 	ns.id = id
 }
 
-func (ns *MapNamespace[T]) Browse(bd *ua.BrowseDescription) *ua.BrowseResult {
+func (ns *StructNamespace[T]) Browse(bd *ua.BrowseDescription) *ua.BrowseResult {
 	ns.mu.RLock()
 	defer ns.mu.RUnlock()
 
-	ns.srv.logger.Debug("BrowseRequest", "node_id", bd.NodeID, "mask", fmt.Sprintf("%08b", bd.ResultMask))
+	if ns.srv.cfg.logger != nil {
+		ns.srv.cfg.logger.Debug("BrowseRequest: id=%s mask=%08b\n", bd.NodeID, bd.ResultMask)
+		ns.srv.cfg.logger.Debug("Browse req for %s", bd.NodeID.String())
+	}
 	if bd.NodeID.IntID() != id.RootFolder && bd.NodeID.IntID() != id.ObjectsFolder {
 		refs := make([]*ua.ReferenceDescription, 0)
 		return &ua.BrowseResult{
@@ -133,6 +73,7 @@ func (ns *MapNamespace[T]) Browse(bd *ua.BrowseDescription) *ua.BrowseResult {
 	}
 
 	if bd.NodeID.IntID() == id.RootFolder {
+
 		refs := make([]*ua.ReferenceDescription, 1)
 		newid := ua.NewNumericNodeID(ns.id, id.ObjectsFolder)
 		expnewid := ua.NewNumericExpandedNodeID(ns.id, id.ObjectsFolder)
@@ -148,12 +89,16 @@ func (ns *MapNamespace[T]) Browse(bd *ua.BrowseDescription) *ua.BrowseResult {
 			StatusCode: ua.StatusGood,
 			References: refs,
 		}
+
 	}
 
-	refs := make([]*ua.ReferenceDescription, len(ns.data))
+	strRef := reflect.TypeOf(ns.data)
+	refs := make([]*ua.ReferenceDescription, strRef.NumField())
+
 	keyid := 0
-	for k := range ns.data {
-		key := k
+	for k := 0; k < strRef.NumField(); k++ {
+
+		key := strRef.Field(k).Name
 		refid := ua.NewNumericNodeID(0, id.HasComponent)
 		expnewid := ua.NewStringExpandedNodeID(ns.id, key)
 
@@ -176,9 +121,10 @@ func (ns *MapNamespace[T]) Browse(bd *ua.BrowseDescription) *ua.BrowseResult {
 
 }
 
-func (ns *MapNamespace[T]) Attribute(n *ua.NodeID, a ua.AttributeID) *ua.DataValue {
-	dlog := ns.srv.logger.With("func", "MapNamespace.Attribute")
-	dlog.Debug("Handling: ", "node_id", n, "attr", a)
+func (ns *StructNamespace[T]) Attribute(n *ua.NodeID, a ua.AttributeID) *ua.DataValue {
+	if ns.srv.cfg.logger != nil {
+		ns.srv.cfg.logger.Debug("read: node=%s attr=%s", n.String(), a)
+	}
 
 	if n.IntID() != 0 {
 		// this is not one of our normal tags.
@@ -200,6 +146,7 @@ func (ns *MapNamespace[T]) Attribute(n *ua.NodeID, a ua.AttributeID) *ua.DataVal
 		}
 
 		return attrval.Value
+
 	}
 
 	dv := &ua.DataValue{
@@ -211,7 +158,10 @@ func (ns *MapNamespace[T]) Attribute(n *ua.NodeID, a ua.AttributeID) *ua.DataVal
 	key := n.StringID()
 
 	var err error
-	dlog.Debug("Read request", "key", key, "ns", ns.name, "data", ns.data)
+	if ns.srv.cfg.logger != nil {
+		ns.srv.cfg.logger.Debug("Read req for %s", key)
+		ns.srv.cfg.logger.Debug("'%s' Data at read: %v", ns.name, ns.data)
+	}
 
 	// because our data is native go types we don't have any of the ua "attributes" attached to it.
 	// so depending on what attribute the client wants, we'll inspect the data and return the appropriate
@@ -225,17 +175,20 @@ func (ns *MapNamespace[T]) Attribute(n *ua.NodeID, a ua.AttributeID) *ua.DataVal
 
 		// we are going to use the node id directly to look it up from our data map.
 	case ua.AttributeIDValue:
+
 		dv.Status = ua.StatusOK
 		dv.EncodingMask |= ua.DataValueValue
-		v, ok := ns.data[key]
-		if !ok {
+		strRef := reflect.ValueOf(ns.data)
+		vRef := strRef.FieldByName(key)
+		if vRef.IsZero() {
 			return &ua.DataValue{
 				EncodingMask:    ua.DataValueServerTimestamp | ua.DataValueStatusCode,
 				ServerTimestamp: time.Now(),
 				Status:          ua.StatusBadNodeIDUnknown,
 			}
 		}
-		switch tv := any(v).(type) {
+		v := vRef.Interface()
+		switch tv := v.(type) {
 		case string:
 			dv.Value = ua.MustVariant(tv)
 		case int:
@@ -288,44 +241,68 @@ func (ns *MapNamespace[T]) Attribute(n *ua.NodeID, a ua.AttributeID) *ua.DataVal
 	case ua.AttributeIDDataType:
 		dv.Status = ua.StatusOK
 		dv.EncodingMask |= ua.DataValueValue
-		v := ns.data[key]
-		switch any(v).(type) {
+
+		strRef := reflect.ValueOf(ns.data)
+		vRef := strRef.FieldByName(key)
+		if vRef.IsZero() {
+			return &ua.DataValue{
+				EncodingMask:    ua.DataValueServerTimestamp | ua.DataValueStatusCode,
+				ServerTimestamp: time.Now(),
+				Status:          ua.StatusBadNodeIDUnknown,
+			}
+		}
+		v := vRef.Interface()
+		switch v.(type) {
 		case string:
 			dv.Value, err = ua.NewVariant(ua.NewNumericNodeID(0, 12))
 			if err != nil {
-				dlog.Warn("problem creating variant", "error", err)
+				if ns.srv.cfg.logger != nil {
+					ns.srv.cfg.logger.Warn("problem creating variant: %v", err)
+				}
 			}
 		case int:
 			// we can't use an int because it is of unspecified length.  I'm going to use int64 so that we don't
 			// have to worry about cutting data off.
 			dv.Value, err = ua.NewVariant(ua.NewNumericNodeID(0, 6))
 			if err != nil {
-				dlog.Warn("problem creating variant", "error", err)
+				if ns.srv.cfg.logger != nil {
+					ns.srv.cfg.logger.Warn("problem creating variant: %v", err)
+				}
 			}
 		case int32:
 			dv.Value, err = ua.NewVariant(ua.NewNumericNodeID(0, 6))
 			if err != nil {
-				dlog.Warn("problem creating variant", "error", err)
+				if ns.srv.cfg.logger != nil {
+					ns.srv.cfg.logger.Warn("problem creating variant: %v", err)
+				}
 			}
 		case float32:
 			dv.Value, err = ua.NewVariant(ua.NewNumericNodeID(0, 10))
 			if err != nil {
-				dlog.Warn("problem creating variant", "error", err)
+				if ns.srv.cfg.logger != nil {
+					ns.srv.cfg.logger.Warn("problem creating variant: %v", err)
+				}
 			}
 		case float64:
 			dv.Value, err = ua.NewVariant(ua.NewNumericNodeID(0, 11))
 			if err != nil {
-				dlog.Warn("problem creating variant", "error", err)
+				if ns.srv.cfg.logger != nil {
+					ns.srv.cfg.logger.Warn("problem creating variant: %v", err)
+				}
 			}
 		case bool:
 			dv.Value, err = ua.NewVariant(ua.NewNumericNodeID(0, 1))
 			if err != nil {
-				dlog.Warn("problem creating variant", "error", err)
+				if ns.srv.cfg.logger != nil {
+					ns.srv.cfg.logger.Warn("problem creating variant: %v", err)
+				}
 			}
 		default:
 			dv.Value, err = ua.NewVariant(ua.NewNumericNodeID(0, 24))
 			if err != nil {
-				dlog.Warn("problem creating variant", "error", err)
+				if ns.srv.cfg.logger != nil {
+					ns.srv.cfg.logger.Warn("problem creating variant: %v", err)
+				}
 			}
 		}
 
@@ -345,20 +322,25 @@ func (ns *MapNamespace[T]) Attribute(n *ua.NodeID, a ua.AttributeID) *ua.DataVal
 	}
 
 	if dv.Value == nil {
-		dlog.Warn("bad dv value")
+		if ns.srv.cfg.logger != nil {
+			ns.srv.cfg.logger.Warn("bad dv value")
+		}
 	} else {
-		dlog.Debug("Read dv.Value", "key", key, "value", dv.Value, "value_value", dv.Value.Value())
+		if ns.srv.cfg.logger != nil {
+			ns.srv.cfg.logger.Debug("Read '%s' = '%v' (%v)", key, dv.Value, dv.Value.Value())
+		}
 	}
 
 	return dv
 }
 
-func (s *MapNamespace[T]) SetAttribute(node *ua.NodeID, attr ua.AttributeID, val *ua.DataValue) ua.StatusCode {
+func (s *StructNamespace[T]) SetAttribute(node *ua.NodeID, attr ua.AttributeID, val *ua.DataValue) ua.StatusCode {
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
-	dlog := s.srv.logger.With("func", "MapNamespace.SetAttribute")
-	dlog.Debug("Data pre-write", "name", s.name, "data", s.data)
+	if s.srv.cfg.logger != nil {
+		s.srv.cfg.logger.Debug("'%s' Data pre-write: %v", s.name, s.data)
+	}
 
 	key := node.StringID()
 
@@ -366,11 +348,19 @@ func (s *MapNamespace[T]) SetAttribute(node *ua.NodeID, attr ua.AttributeID, val
 	// going to use the node id directly to look it up from our data map.
 	if attr == ua.AttributeIDValue {
 		v := val.Value.Value()
-		cast, ok := v.(T)
-		if !ok {
+		strRef := reflect.ValueOf(s.data)
+		vRef := strRef.FieldByName(key)
+		if vRef.IsZero() {
+			return ua.StatusBadNodeIDUnknown
+		}
+		if !vRef.CanSet() {
+			return ua.StatusBadUserAccessDenied
+		}
+		if vRef.Type() != reflect.TypeOf(v) {
 			return ua.StatusBadTypeMismatch
 		}
-		s.data[key] = cast
+		vRef.Set(reflect.ValueOf(v))
+
 	}
 
 	// notify the opc ua server the value has changed.
@@ -384,19 +374,17 @@ func (s *MapNamespace[T]) SetAttribute(node *ua.NodeID, attr ua.AttributeID, val
 	return ua.StatusOK
 }
 
-func (ns *MapNamespace[T]) Name() string {
+func (ns *StructNamespace[T]) Name() string {
 	return ns.name
 }
-
-func (ns *MapNamespace[T]) AddNode(n *Node) *Node {
+func (ns *StructNamespace[T]) AddNode(n *Node) *Node {
 	return n
 }
-
-func (ns *MapNamespace[T]) Node(id *ua.NodeID) *Node {
+func (ns *StructNamespace[T]) Node(id *ua.NodeID) *Node {
 	return nil
-}
 
-func (ns *MapNamespace[T]) Objects() *Node {
+}
+func (ns *StructNamespace[T]) Objects() *Node {
 	oid := ua.NewNumericNodeID(ns.ID(), id.ObjectsFolder)
 	//eoid := ua.NewNumericExpandedNodeID(ns.ID(), id.ObjectsFolder)
 	typedef := ua.NewNumericExpandedNodeID(0, id.ObjectsFolder)
@@ -415,9 +403,9 @@ func (ns *MapNamespace[T]) Objects() *Node {
 		nil,
 	)
 	return n
-}
 
-func (ns *MapNamespace[T]) Root() *Node {
+}
+func (ns *StructNamespace[T]) Root() *Node {
 	n := NewNode(
 		ua.NewNumericNodeID(ns.ID(), id.RootFolder),
 		map[ua.AttributeID]*ua.DataValue{
@@ -429,4 +417,5 @@ func (ns *MapNamespace[T]) Root() *Node {
 		nil,
 	)
 	return n
+
 }

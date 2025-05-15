@@ -130,26 +130,26 @@ func main() {
 	// the core opc ua nodes.
 	s := server.New(opts...)
 
-	// Create some map namespaces.  These are backed by go map[string]any
+	// Create some map namespaces.  These are backed by go map[string]T
 	// which may be more convenient for some use cases than the NodeNamespace which requires
 	// your application's data structure to match the opcua node model.
-	myMapNamespace1 := server.NewMapNamespace(s, "MyTestNamespace")
+	myMapNamespace1 := server.NewMapNamespace[any](s, "MyTestNamespace")
 	log.Printf("map namespace 1 added at index %d", myMapNamespace1.ID())
-	myMapNamespace2 := server.NewMapNamespace(s, "SomeOtherNamespace")
+	myMapNamespace2 := server.NewMapNamespace[any](s, "SomeOtherNamespace")
 	log.Printf("map namespace 2 added at index %d", myMapNamespace2.ID())
 
 	// fill them with data.
-	myMapNamespace1.Data["Tag1"] = 123.4
-	myMapNamespace1.Data["Tag2"] = 42
-	myMapNamespace1.Data["Tag3.Tag4"] = "some string"
-	myMapNamespace1.Data["Tag5"] = true
-	myMapNamespace1.Data["Tag6"] = time.Now()
+	myMapNamespace1.SetValue("Tag1", 123.4)
+	myMapNamespace1.SetValue("Tag2", 42)
+	myMapNamespace1.SetValue("Tag3.Tag4", "some string")
+	myMapNamespace1.SetValue("Tag5", true)
+	myMapNamespace1.SetValue("Tag6", time.Now())
 
-	myMapNamespace2.Data["Tag7"] = 56.78
-	myMapNamespace2.Data["Tag8"] = 92
-	myMapNamespace2.Data["Tag9"] = "different string"
-	myMapNamespace2.Data["Tag10"] = false
-	myMapNamespace2.Data["Tag11"] = time.Now().Add(time.Hour)
+	myMapNamespace2.SetValue("Tag7", 56.78)
+	myMapNamespace2.SetValue("Tag8", 92)
+	myMapNamespace2.SetValue("Tag9", "different string")
+	myMapNamespace2.SetValue("Tag10", false)
+	myMapNamespace2.SetValue("Tag11", time.Now().Add(time.Hour))
 
 	// simulate a background process updating the data in the map namespace.
 	go func() {
@@ -160,18 +160,19 @@ func main() {
 		for {
 			updates++
 			num++
-			// you can manually lock and change the value, then manually trigger the change notification
-			myMapNamespace1.Mu.Lock()
-			myMapNamespace1.Data["Tag2"] = num
-			myMapNamespace1.ChangeNotification("Tag2")
-			myMapNamespace1.Mu.Unlock()
+			// to update the map, you can use the SetValue function which updates the value in a thread safe way
+			myMapNamespace1.SetValue("Tag2", num)
 			if updates == 10 {
-				// or you can do it with the built-in functions.
-				// which handles the locking and triggering
 				tag5 = !tag5
 				myMapNamespace1.SetValue("Tag5", tag5)
 				updates = 0
 			}
+
+			// You can range over the map using All(), Keys(), or Values().  This is thread safe
+			for k, v := range myMapNamespace1.All() {
+				log.Printf("key: %s, value: %v", k, v)
+			}
+
 			time.Sleep(time.Second)
 		}
 	}()
