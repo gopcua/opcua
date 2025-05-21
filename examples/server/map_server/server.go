@@ -133,9 +133,12 @@ func main() {
 	// Create some map namespaces.  These are backed by go map[string]T
 	// which may be more convenient for some use cases than the NodeNamespace which requires
 	// your application's data structure to match the opcua node model.
-	myMapNamespace1 := server.NewMapNamespace[any](s, "MyTestNamespace")
+	myMapNamespace1 := server.NewMapNamespace[any](s, "MyTestNamespace", nil)
 	log.Printf("map namespace 1 added at index %d", myMapNamespace1.ID())
-	myMapNamespace2 := server.NewMapNamespace[any](s, "SomeOtherNamespace")
+
+	// if you want to monitor the map for changes, you can specify a channel to receive notifications
+	notifications := make(chan string, 10)
+	myMapNamespace2 := server.NewMapNamespace[any](s, "SomeOtherNamespace", notifications)
 	log.Printf("map namespace 2 added at index %d", myMapNamespace2.ID())
 
 	// fill them with data.
@@ -182,7 +185,7 @@ func main() {
 	// occurs through the opc ua server
 	go func() {
 		for {
-			changed_key := <-myMapNamespace2.ExternalNotification
+			changed_key := <-notifications
 			log.Printf("%s changed to %v", changed_key, myMapNamespace2.GetValue(changed_key))
 		}
 	}()

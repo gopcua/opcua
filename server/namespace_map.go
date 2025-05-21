@@ -25,7 +25,7 @@ type MapNamespace[T any] struct {
 	data map[string]T
 
 	// This can be used to be alerted when a value is changed from the opc server
-	ExternalNotification chan string
+	notif chan<- string
 
 	id uint16
 }
@@ -100,12 +100,12 @@ func (s *MapNamespace[T]) ChangeNotification(key string) {
 	s.srv.ChangeNotification(ua.NewStringNodeID(s.id, key))
 }
 
-func NewMapNamespace[T any](srv *Server, name string) *MapNamespace[T] {
+func NewMapNamespace[T any](srv *Server, name string, notif chan<- string) *MapNamespace[T] {
 	mrw := MapNamespace[T]{
-		srv:                  srv,
-		name:                 name,
-		data:                 make(map[string]T),
-		ExternalNotification: make(chan string),
+		srv:   srv,
+		name:  name,
+		data:  make(map[string]T),
+		notif: notif,
 	}
 	srv.AddNamespace(&mrw)
 	return &mrw
@@ -377,7 +377,7 @@ func (s *MapNamespace[T]) SetAttribute(node *ua.NodeID, attr ua.AttributeID, val
 	s.srv.ChangeNotification(node)
 	// notify the non-opc application the value has changed.
 	select {
-	case s.ExternalNotification <- key:
+	case s.notif <- key:
 	default:
 	}
 
