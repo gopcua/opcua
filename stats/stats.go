@@ -4,6 +4,7 @@
 package stats
 
 import (
+	"encoding/json"
 	"errors"
 	"expvar"
 	"io"
@@ -32,6 +33,14 @@ func NewStats() *Stats {
 		Error:        &expvar.Map{},
 		Subscription: &expvar.Map{},
 	}
+}
+
+func (s *Stats) MarshalJSON() ([]byte, error) {
+	return json.Marshal(map[string]interface{}{
+		"Client":       json.RawMessage(s.Client.String()),
+		"Error":        json.RawMessage(s.Error.String()),
+		"Subscription": json.RawMessage(s.Subscription.String()),
+	})
 }
 
 // Reset resets all counters to zero.
