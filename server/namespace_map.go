@@ -46,7 +46,9 @@ func (s *MapNamespace[T]) SetValue(key string, value T) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.data[key] = value
-	s.ChangeNotification(key)
+
+	// notify the opc ua server the value has changed in the background.
+	go s.ChangeNotification(key)
 }
 
 // All returns an iterator over key-value pairs from the map.
