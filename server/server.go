@@ -198,7 +198,8 @@ func (srv *Server) Namespaces() []NameSpace {
 }
 
 func (s *Server) ChangeNotification(n *ua.NodeID) {
-	s.MonitoredItemService.ChangeNotification(s.logger, n)
+	ctx := ualog.NewContext(context.Background(), s.logger)
+	s.MonitoredItemService.ChangeNotification(ctx, n)
 }
 
 // for now, the address space of the server is split up into namespaces.

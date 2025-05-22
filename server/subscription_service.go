@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"log/slog"
 	"sync"
 	"time"
 
@@ -25,7 +24,7 @@ type SubscriptionService struct {
 }
 
 // get rid of all references to a subscription and all monitored items that are pointed at this subscription.
-func (s *SubscriptionService) DeleteSubscription(logger *slog.Logger, id uint32) {
+func (s *SubscriptionService) DeleteSubscription(ctx context.Context, id uint32) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -42,7 +41,7 @@ func (s *SubscriptionService) DeleteSubscription(logger *slog.Logger, id uint32)
 	delete(s.subs, id)
 
 	// ask the monitored item service to purge out any items that use this subscription
-	s.srv.MonitoredItemService.DeleteSub(logger, id)
+	s.srv.MonitoredItemService.DeleteSub(ctx, id)
 
 }
 
@@ -72,7 +71,7 @@ func (s *SubscriptionService) CreateSubscription(ctx context.Context, sc *uasc.S
 
 	s.subs[newsubid] = sub
 	sub.running = true
-	sub.Start(dlog)
+	sub.Start(ctx)
 
 	resp := &ua.CreateSubscriptionResponse{
 		ResponseHeader: &ua.ResponseHeader{
@@ -206,7 +205,7 @@ func (s *SubscriptionService) DeleteSubscriptions(ctx context.Context, sc *uasc.
 		}
 		// delete subscription gets the lock so we set them up to run in the background
 		// once this function releases its lock
-		go s.DeleteSubscription(dlog, subid)
+		go s.DeleteSubscription(ctx, subid)
 		results[i] = ua.StatusOK
 	}
 
@@ -275,8 +274,8 @@ func (s *Subscription) Update(req *ua.ModifySubscriptionRequest) {
 	s.RevisedMaxKeepAliveCount = req.RequestedMaxKeepAliveCount
 }
 
-func (s *Subscription) Start(logger *slog.Logger) {
-	go s.run(logger)
+func (s *Subscription) Start(ctx context.Context) {
+	go s.run(ctx)
 
 }
 
@@ -315,14 +314,14 @@ func (s *Subscription) keepalive(pubreq PubReq) error {
 // this function should be run as a go-routine and will handle sending data out
 // to the client at the correct rate assuming there are publish requests queued up.
 // if the function returns it deletes the subscription
-func (s *Subscription) run(logger *slog.Logger) {
-	logger = logger.With(
+func (s *Subscription) run(ctx context.Context) {
+	dlog := ualog.FromContext(ctx).With(
 		"subscription", s.ID,
 	)
 	// if this go routine dies, we need to delete ourselves.
 	defer func() {
-		logger.Info("Subscription shutting down.")
-		s.srv.DeleteSubscription(logger, s.ID)
+		dlog.Info("Subscription shutting down.")
+		s.srv.DeleteSubscription(ctx, s.ID)
 	}()
 
 	keepalive_counter := 0
@@ -366,13 +365,13 @@ func (s *Subscription) run(logger *slog.Logger) {
 						case pubreq := <-s.Session.PublishRequests:
 							err := s.keepalive(pubreq)
 							if err != nil {
-								logger.Warn("problem sending keepalive to subscription", "err", err)
+								dlog.Warn("problem sending keepalive to subscription", "err", err)
 								return
 							}
 						default:
 							lifetime_counter++
 							if lifetime_counter > int(s.RevisedLifetimeCount) {
-								logger.Warn("Subscription timed out.")
+								dlog.Warn("Subscription timed out.")
 								return
 							}
 						}
@@ -403,7 +402,7 @@ func (s *Subscription) run(logger *slog.Logger) {
 				// we had another tick without a publish request.
 				lifetime_counter++
 				if lifetime_counter > int(s.RevisedLifetimeCount) {
-					logger.Warn("Subscription timed out.")
+					dlog.Warn("Subscription timed out.")
 					return
 				}
 			}
@@ -416,7 +415,7 @@ func (s *Subscription) run(logger *slog.Logger) {
 			// per the spec, the sequence ID cannot be 0
 			s.SequenceID = 1
 		}
-		logger.Debug("Got publish req", "seqid", s.SequenceID)
+		dlog.Debug("Got publish req", "seqid", s.SequenceID)
 		// then get all the tags and send them back to the client
 
 		//for x := range pubreq.Req.SubscriptionAcknowledgements {
@@ -464,10 +463,10 @@ func (s *Subscription) run(logger *slog.Logger) {
 		}
 		err := s.Channel.SendResponseWithContext(context.Background(), pubreq.ID, response)
 		if err != nil {
-			logger.Error("problem sending channel response", "err", err)
+			dlog.Error("problem sending channel response", "err", err)
 			return
 		}
-		logger.Debug("Published items OK", "count", len(publishQueue))
+		dlog.Debug("Published items OK", "count", len(publishQueue))
 		// wait till we've got a publish request.
 	}
 }

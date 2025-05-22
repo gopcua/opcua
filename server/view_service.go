@@ -24,13 +24,13 @@ type ViewService struct {
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.8.2
 func (s *ViewService) Browse(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	logger := ualog.FromContext(ctx)
+	dlog := ualog.FromContext(ctx)
 
 	req, err := safeReq[*ua.BrowseRequest](r)
 	if err != nil {
 		return nil, err
 	}
-	s.srv.logger.Debug("=== Browse incoming")
+	dlog.Debug("=== Browse incoming")
 
 	resp := &ua.BrowseResponse{
 		ResponseHeader: &ua.ResponseHeader{
@@ -48,7 +48,7 @@ func (s *ViewService) Browse(ctx context.Context, sc *uasc.SecureChannel, r ua.R
 
 	for i := range req.NodesToBrowse {
 		br := req.NodesToBrowse[i]
-		logger.Debug("Browse", "nodeid", br.NodeID.String())
+		dlog.Debug("Browse", "nodeid", br.NodeID.String())
 		ns, err := s.srv.Namespace(int(br.NodeID.Namespace()))
 		if err != nil {
 			resp.Results[i] = &ua.BrowseResult{StatusCode: ua.StatusBad}

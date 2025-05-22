@@ -18,7 +18,7 @@ type AttributeService struct {
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.10.2
 func (s *AttributeService) Read(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	logger := ualog.FromContext(ctx)
+	dlog := ualog.FromContext(ctx)
 
 	req, err := safeReq[*ua.ReadRequest](r)
 	if err != nil {
@@ -27,7 +27,7 @@ func (s *AttributeService) Read(ctx context.Context, sc *uasc.SecureChannel, r u
 
 	results := make([]*ua.DataValue, len(req.NodesToRead))
 	for i, n := range req.NodesToRead {
-		logger.Debug("read attribute", "nodeid", n.NodeID, "attributeid", n.AttributeID)
+		dlog.Debug("read attribute", "nodeid", n.NodeID, "attributeid", n.AttributeID)
 
 		ns, err := s.srv.Namespace(int(n.NodeID.Namespace()))
 		if err != nil {
@@ -62,7 +62,7 @@ func (s *AttributeService) HistoryRead(ctx context.Context, sc *uasc.SecureChann
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.10.4
 func (s *AttributeService) Write(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	logger := ualog.FromContext(ctx)
+	dlog := ualog.FromContext(ctx)
 
 	req, err := safeReq[*ua.WriteRequest](r)
 	if err != nil {
@@ -73,7 +73,7 @@ func (s *AttributeService) Write(ctx context.Context, sc *uasc.SecureChannel, r 
 
 	for i := range req.NodesToWrite {
 		n := req.NodesToWrite[i]
-		logger.Debug("write attribute", "nodeid", n.NodeID, "attributeid", n.AttributeID)
+		dlog.Debug("write attribute", "nodeid", n.NodeID, "attributeid", n.AttributeID)
 
 		ns, err := s.srv.Namespace(int(n.NodeID.Namespace()))
 		if err != nil {

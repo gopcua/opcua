@@ -6,7 +6,6 @@ package server
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"time"
 
@@ -105,8 +104,10 @@ func (srv *Server) RegisterHandler(typeID uint16, h Handler) {
 }
 
 func (srv *Server) handleService(ctx context.Context, sc *uasc.SecureChannel, reqID uint32, req ua.Request) {
-	dlog := srv.logger.With("func", "Server.handleService")
-	dlog.Debug("Handling", "type", ualog.TypeOf(req))
+	dlog := srv.logger.With(
+		slog.String("client", sc.RemoteAddr().String()),
+		slog.Int64("reqid", int64(reqID)),
+	)
 
 	var resp ua.Response
 	var err error
@@ -114,13 +115,9 @@ func (srv *Server) handleService(ctx context.Context, sc *uasc.SecureChannel, re
 	typeID := ua.ServiceTypeID(req)
 	h, ok := srv.handlers[typeID]
 	if ok {
-		logger := srv.logger.With(
-			slog.String("client", sc.RemoteAddr().String()),
-			slog.Int64("reqid", int64(reqID)),
-			slog.String("service", fmt.Sprintf("%T", req)),
-		)
-		logger.Debug("Handling service request")
-		ctx = ualog.NewContext(ctx, logger)
+		dlog = dlog.With(slog.String("service", ualog.TypeOf(req)))
+		dlog.Debug("Handling service request")
+		ctx = ualog.NewContext(ctx, dlog)
 		resp, err = h(ctx, sc, req, reqID)
 	} else {
 		if typeID == 0 {
