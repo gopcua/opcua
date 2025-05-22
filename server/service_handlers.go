@@ -6,6 +6,8 @@ package server
 
 import (
 	"context"
+	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/gopcua/opcua/id"
@@ -14,7 +16,7 @@ import (
 	"github.com/gopcua/opcua/uasc"
 )
 
-type Handler func(context.Context, *uasc.SecureChannel, ua.Request, uint32) (ua.Response, error)
+type Handler func(ctx context.Context, sc *uasc.SecureChannel, req ua.Request, reqID uint32) (ua.Response, error)
 
 func (srv *Server) initHandlers() {
 	// s.registerHandlerFunc(id.ServiceFault_Encoding_DefaultBinary, handleServiceFault)
@@ -112,6 +114,13 @@ func (srv *Server) handleService(ctx context.Context, sc *uasc.SecureChannel, re
 	typeID := ua.ServiceTypeID(req)
 	h, ok := srv.handlers[typeID]
 	if ok {
+		logger := srv.logger.With(
+			slog.String("client", sc.RemoteAddr().String()),
+			slog.Int64("reqid", int64(reqID)),
+			slog.String("service", fmt.Sprintf("%T", req)),
+		)
+		logger.Debug("Handling service request")
+		ctx = ualog.NewContext(ctx, logger)
 		resp, err = h(ctx, sc, req, reqID)
 	} else {
 		if typeID == 0 {

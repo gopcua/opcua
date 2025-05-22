@@ -305,7 +305,7 @@ func (srv *Server) refsImportNodeSet(nodes *schema.UANodeSet) error {
 		if !ok {
 			reftypes[alias] = rt // sometimes they use browse name
 		} else {
-			srv.logger.Error("Duplicate reference", "type", alias)
+			srv.logger.Warn("Duplicate reference", "type", alias)
 			continue
 		}
 
@@ -313,7 +313,7 @@ func (srv *Server) refsImportNodeSet(nodes *schema.UANodeSet) error {
 		if !ok {
 			reftypes[aliases[alias]] = rt // sometimes they use node id
 		} else {
-			srv.logger.Error("Duplicate reference", "type", aliases[alias])
+			srv.logger.Warn("Duplicate reference", "type", aliases[alias])
 			continue
 		}
 	}

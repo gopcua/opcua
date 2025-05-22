@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -24,7 +25,7 @@ type SubscriptionService struct {
 }
 
 // get rid of all references to a subscription and all monitored items that are pointed at this subscription.
-func (s *SubscriptionService) DeleteSubscription(id uint32) {
+func (s *SubscriptionService) DeleteSubscription(logger *slog.Logger, id uint32) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -41,7 +42,7 @@ func (s *SubscriptionService) DeleteSubscription(id uint32) {
 	delete(s.subs, id)
 
 	// ask the monitored item service to purge out any items that use this subscription
-	s.srv.MonitoredItemService.DeleteSub(id)
+	s.srv.MonitoredItemService.DeleteSub(logger, id)
 
 }
 
@@ -71,7 +72,7 @@ func (s *SubscriptionService) CreateSubscription(ctx context.Context, sc *uasc.S
 
 	s.subs[newsubid] = sub
 	sub.running = true
-	sub.Start()
+	sub.Start(dlog)
 
 	resp := &ua.CreateSubscriptionResponse{
 		ResponseHeader: &ua.ResponseHeader{
@@ -148,7 +149,7 @@ func (s *SubscriptionService) Publish(ctx context.Context, sc *uasc.SecureChanne
 	select {
 	case session.PublishRequests <- PubReq{Req: req, ID: reqID}:
 	default:
-		s.srv.logger.Warn("Too many publish reqs.")
+		dlog.Warn("Too many publish reqs.")
 	}
 
 	// per opcua spec, we don't respond now.  When data is available on the subscription,
@@ -205,7 +206,7 @@ func (s *SubscriptionService) DeleteSubscriptions(ctx context.Context, sc *uasc.
 		}
 		// delete subscription gets the lock so we set them up to run in the background
 		// once this function releases its lock
-		go s.DeleteSubscription(subid)
+		go s.DeleteSubscription(dlog, subid)
 		results[i] = ua.StatusOK
 	}
 
@@ -274,8 +275,8 @@ func (s *Subscription) Update(req *ua.ModifySubscriptionRequest) {
 	s.RevisedMaxKeepAliveCount = req.RequestedMaxKeepAliveCount
 }
 
-func (s *Subscription) Start() {
-	go s.run()
+func (s *Subscription) Start(logger *slog.Logger) {
+	go s.run(logger)
 
 }
 
@@ -314,11 +315,14 @@ func (s *Subscription) keepalive(pubreq PubReq) error {
 // this function should be run as a go-routine and will handle sending data out
 // to the client at the correct rate assuming there are publish requests queued up.
 // if the function returns it deletes the subscription
-func (s *Subscription) run() {
+func (s *Subscription) run(logger *slog.Logger) {
+	logger = logger.With(
+		"subscription", s.ID,
+	)
 	// if this go routine dies, we need to delete ourselves.
 	defer func() {
-		s.srv.srv.logger.Info("Subscription shutting down", "sub_id", s.ID)
-		s.srv.DeleteSubscription(s.ID)
+		logger.Info("Subscription shutting down.")
+		s.srv.DeleteSubscription(logger, s.ID)
 	}()
 
 	keepalive_counter := 0
@@ -362,13 +366,13 @@ func (s *Subscription) run() {
 						case pubreq := <-s.Session.PublishRequests:
 							err := s.keepalive(pubreq)
 							if err != nil {
-								s.srv.srv.logger.Warn("problem sending keepalive to subscription", "sub_id", s.ID, "error", err)
+								logger.Warn("problem sending keepalive to subscription", "err", err)
 								return
 							}
 						default:
 							lifetime_counter++
 							if lifetime_counter > int(s.RevisedLifetimeCount) {
-								s.srv.srv.logger.Warn("Subscription timed out", "sub_id", s.ID)
+								logger.Warn("Subscription timed out.")
 								return
 							}
 						}
@@ -399,7 +403,7 @@ func (s *Subscription) run() {
 				// we had another tick without a publish request.
 				lifetime_counter++
 				if lifetime_counter > int(s.RevisedLifetimeCount) {
-					s.srv.srv.logger.Warn("Subscription timed out", "sub_id", s.ID)
+					logger.Warn("Subscription timed out.")
 					return
 				}
 			}
@@ -412,7 +416,7 @@ func (s *Subscription) run() {
 			// per the spec, the sequence ID cannot be 0
 			s.SequenceID = 1
 		}
-		s.srv.srv.logger.Debug("Got publish req", "sub_id", s.ID, "seq_nr", s.SequenceID)
+		logger.Debug("Got publish req", "seqid", s.SequenceID)
 		// then get all the tags and send them back to the client
 
 		//for x := range pubreq.Req.SubscriptionAcknowledgements {
@@ -460,11 +464,10 @@ func (s *Subscription) run() {
 		}
 		err := s.Channel.SendResponseWithContext(context.Background(), pubreq.ID, response)
 		if err != nil {
-			s.srv.srv.logger.Error("problem sending channel response", "error", err)
-			s.srv.srv.logger.Error("Killing subscription", "sub_id", s.ID)
+			logger.Error("problem sending channel response", "err", err)
 			return
 		}
-		s.srv.srv.logger.Debug("Published OK items", "sub_id", s.ID, "item_count", len(publishQueue))
+		logger.Debug("Published items OK", "count", len(publishQueue))
 		// wait till we've got a publish request.
 	}
 }

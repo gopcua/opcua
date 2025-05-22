@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/gopcua/opcua/id"
+	"github.com/gopcua/opcua/internal/ualog"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uasc"
 )
@@ -23,6 +24,7 @@ type ViewService struct {
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.8.2
 func (s *ViewService) Browse(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
+	logger := ualog.FromContext(ctx)
 
 	req, err := safeReq[*ua.BrowseRequest](r)
 	if err != nil {
@@ -46,7 +48,7 @@ func (s *ViewService) Browse(ctx context.Context, sc *uasc.SecureChannel, r ua.R
 
 	for i := range req.NodesToBrowse {
 		br := req.NodesToBrowse[i]
-		s.srv.logger.Debug("    Browse Node", "node_id", br.NodeID.String())
+		logger.Debug("Browse", "nodeid", br.NodeID.String())
 		ns, err := s.srv.Namespace(int(br.NodeID.Namespace()))
 		if err != nil {
 			resp.Results[i] = &ua.BrowseResult{StatusCode: ua.StatusBad}

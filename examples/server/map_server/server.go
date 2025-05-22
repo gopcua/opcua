@@ -14,11 +14,12 @@ import (
 	"crypto/rsa"
 	"crypto/tls"
 	"flag"
-	"github.com/gopcua/opcua/tests/utils"
 	"log"
 	"os"
 	"os/signal"
 	"time"
+
+	"github.com/gopcua/opcua/tests/utils"
 
 	"github.com/gopcua/opcua/id"
 	"github.com/gopcua/opcua/server"

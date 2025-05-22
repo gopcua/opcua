@@ -197,8 +197,8 @@ func (srv *Server) Namespaces() []NameSpace {
 	return srv.namespaces
 }
 
-func (srv *Server) ChangeNotification(n *ua.NodeID) {
-	srv.MonitoredItemService.ChangeNotification(n)
+func (s *Server) ChangeNotification(n *ua.NodeID) {
+	s.MonitoredItemService.ChangeNotification(s.logger, n)
 }
 
 // for now, the address space of the server is split up into namespaces.

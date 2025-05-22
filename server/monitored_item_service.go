@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"slices"
 	"sync"
 	"sync/atomic"
@@ -39,10 +40,9 @@ type MonitoredItemService struct {
 }
 
 // function to get rid of all references to a specific Monitored Item (by ID number)
-func (s *MonitoredItemService) DeleteMonitoredItem(id uint32) {
+func (s *MonitoredItemService) DeleteMonitoredItem(logger *slog.Logger, id uint32) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
 	item, ok := s.items[id]
 	if !ok {
 		// id does not exist.
@@ -86,32 +86,30 @@ func (s *MonitoredItemService) DeleteMonitoredItem(id uint32) {
 			s.subs[item.Sub.ID] = slices.Delete(s.subs[item.Sub.ID], i, i+1)
 		}
 	}
-	//slices.DeleteFunc(s.Subs[item.Sub.ID], func(i *MonitoredItem) bool { return i.ID == item.ID })
+	//slices.DeleteFunc(s.subs[item.Sub.ID], func(i *MonitoredItem) bool { return i.ID == item.ID })
 	if len(s.subs[item.Sub.ID]) == 0 {
 		delete(s.subs, item.Sub.ID)
 	}
 }
 
 // function to delete all monitored items associated with a specific sub (as indicated by id number)
-func (s *MonitoredItemService) DeleteSub(id uint32) {
+func (s *MonitoredItemService) DeleteSub(logger *slog.Logger, id uint32) {
 	s.mu.Lock()
 	items, ok := s.subs[id]
 	delete(s.subs, id)
 	s.mu.Unlock()
-
 	if !ok {
 		return
 	}
 
 	for i := range items {
 		if items[i] != nil {
-			s.DeleteMonitoredItem(items[i].ID)
+			s.DeleteMonitoredItem(logger, items[i].ID)
 		}
 	}
 }
 
-func (s *MonitoredItemService) ChangeNotification(n *ua.NodeID) {
-	dlog := s.srv.logger.With("func", "MonitoredItemService.ChangeNotification")
+func (s *MonitoredItemService) ChangeNotification(logger *slog.Logger, n *ua.NodeID) {
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -132,7 +130,7 @@ func (s *MonitoredItemService) ChangeNotification(n *ua.NodeID) {
 		val := new(ua.MonitoredItemNotification)
 		val.ClientHandle = item.Req.RequestedParameters.ClientHandle
 		if err != nil {
-			dlog.Warn("Error getting namespace", "namespace", n.Namespace(), "error", err)
+			logger.Warn("error getting namespace ", "namespace", n.Namespace(), "err", err)
 			val.Value = &ua.DataValue{}
 			val.Value.Status = ua.StatusBad
 			val.Value.EncodingMask |= ua.DataValueStatusCode
@@ -166,7 +164,7 @@ type MonitoredItem struct {
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.12.2
 func (s *MonitoredItemService) CreateMonitoredItems(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	dlog := ualog.FromContext(ctx)
+	logger := ualog.FromContext(ctx)
 
 	req, err := safeReq[*ua.CreateMonitoredItemsRequest](r)
 	if err != nil {
@@ -181,7 +179,7 @@ func (s *MonitoredItemService) CreateMonitoredItems(ctx context.Context, sc *uas
 	res := make([]*ua.MonitoredItemCreateResult, count)
 
 	subID := req.SubscriptionID
-	dlog.Debug("Creating monitored items", "sub_id", subID)
+
 	s.subService.mu.Lock()
 	sub, ok := s.subService.subs[subID]
 	s.subService.mu.Unlock()
@@ -217,11 +215,13 @@ func (s *MonitoredItemService) CreateMonitoredItems(ctx context.Context, sc *uas
 		}
 		s.subs[item.Sub.ID] = append(list, &item)
 
-		dlog.Debug("Adding monitored item",
-			"node_id", nodeid.String(),
-			"sub_id", subID,
-			"item_id", item.ID,
-			"client_handle", itemreq.RequestedParameters.ClientHandle)
+		logger.Info("Adding node to monitored item",
+			"subid", sub.ID,
+			"nodeid", nodeid.String(),
+			"itemid", item.ID,
+			"clienthandle", itemreq.RequestedParameters.ClientHandle,
+		)
+
 		res[i] = &ua.MonitoredItemCreateResult{
 			StatusCode:              ua.StatusOK,
 			MonitoredItemID:         item.ID,
@@ -232,7 +232,7 @@ func (s *MonitoredItemService) CreateMonitoredItems(ctx context.Context, sc *uas
 		// do an initial update for the nodeids in the background.
 		// These lock the mutex so we can't do them inline here.
 		// This will cause them to happen once we unlock.
-		go s.ChangeNotification(nodeid)
+		go s.ChangeNotification(logger, nodeid)
 
 	}
 
@@ -320,6 +320,7 @@ func (s *MonitoredItemService) SetTriggering(ctx context.Context, sc *uasc.Secur
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.12.6
 func (s *MonitoredItemService) DeleteMonitoredItems(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
+	logger := ualog.FromContext(ctx)
 
 	req, err := safeReq[*ua.DeleteMonitoredItemsRequest](r)
 	if err != nil {
@@ -344,7 +345,7 @@ func (s *MonitoredItemService) DeleteMonitoredItems(ctx context.Context, sc *uas
 		}
 
 		// this function gets the lock so we need to do it in the background so it can happen after our lock is released.
-		go s.DeleteMonitoredItem(id)
+		go s.DeleteMonitoredItem(logger, id)
 		results[i] = ua.StatusOK
 	}
 

@@ -22,32 +22,6 @@ import (
 	"github.com/gopcua/opcua/ua"
 )
 
-// type Logger int
-
-//	func (l Logger) Debug(msg string, args ...any) {
-//		if l < 0 {
-//			log.Printf(msg, args...)
-//		}
-//	}
-//
-//	func (l Logger) Info(msg string, args ...any) {
-//		if l < 1 {
-//			log.Printf(msg, args...)
-//		}
-//	}
-//
-//	func (l Logger) Warn(msg string, args ...any) {
-//		if l < 2 {
-//			log.Printf(msg, args...)
-//		}
-//	}
-//
-//	func (l Logger) Error(msg string, args ...any) {
-//		if l < 3 {
-//			log.Printf(msg, args...)
-//		}
-//	}
-
 func main() {
 	var (
 		endpoint = flag.String("endpoint", "0.0.0.0", "OPC UA Endpoint URL")
