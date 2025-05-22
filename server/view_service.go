@@ -1,11 +1,11 @@
 package server
 
 import (
+	"context"
 	"slices"
 	"time"
 
 	"github.com/gopcua/opcua/id"
-	"github.com/gopcua/opcua/internal/ualog"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uasc"
 )
@@ -22,7 +22,8 @@ type ViewService struct {
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.8.2
-func (s *ViewService) Browse(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
+func (s *ViewService) Browse(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
+
 	req, err := safeReq[*ua.BrowseRequest](r)
 	if err != nil {
 		return nil, err
@@ -127,9 +128,7 @@ func getSubRefs(srv *Server, nid *ua.NodeID) []*ua.NodeID {
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.8.3
-func (s *ViewService) BrowseNext(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	dlog := s.srv.logger.With("func", "ViewService.BrowseNext")
-	dlog.Debug("Handling", "type", ualog.TypeOf(r))
+func (s *ViewService) BrowseNext(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
 
 	req, err := safeReq[*ua.BrowseNextRequest](r)
 	if err != nil {
@@ -139,9 +138,7 @@ func (s *ViewService) BrowseNext(sc *uasc.SecureChannel, r ua.Request, reqID uin
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.8.4
-func (s *ViewService) TranslateBrowsePathsToNodeIDs(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	dlog := s.srv.logger.With("func", "ViewService.TranslateBrowsePathsToNodeIDs")
-	dlog.Debug("Handling", "type", ualog.TypeOf(r))
+func (s *ViewService) TranslateBrowsePathsToNodeIDs(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
 
 	req, err := safeReq[*ua.TranslateBrowsePathsToNodeIDsRequest](r)
 	if err != nil {
@@ -151,9 +148,7 @@ func (s *ViewService) TranslateBrowsePathsToNodeIDs(sc *uasc.SecureChannel, r ua
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.8.5
-func (s *ViewService) RegisterNodes(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	dlog := s.srv.logger.With("func", "ViewService.RegisterNodes")
-	dlog.Debug("Handling", "type", ualog.TypeOf(r))
+func (s *ViewService) RegisterNodes(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
 
 	req, err := safeReq[*ua.RegisterNodesRequest](r)
 	if err != nil {
@@ -163,9 +158,7 @@ func (s *ViewService) RegisterNodes(sc *uasc.SecureChannel, r ua.Request, reqID 
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.8.6
-func (s *ViewService) UnregisterNodes(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	dlog := s.srv.logger.With("func", "ViewService.UnregisterNodes")
-	dlog.Debug("Handling", "type", ualog.TypeOf(r))
+func (s *ViewService) UnregisterNodes(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
 
 	req, err := safeReq[*ua.UnregisterNodesRequest](r)
 	if err != nil {

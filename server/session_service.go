@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"crypto/rand"
 	"strings"
 	"time"
@@ -26,9 +27,8 @@ type SessionService struct {
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.6.2
-func (s *SessionService) CreateSession(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	dlog := s.srv.logger.With("func", "SessionService.CreateSession")
-	dlog.Debug("Handling", "type", ualog.TypeOf(r))
+func (s *SessionService) CreateSession(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
+	dlog := ualog.FromContext(ctx)
 
 	req, err := safeReq[*ua.CreateSessionRequest](r)
 	if err != nil {
@@ -87,9 +87,8 @@ func (s *SessionService) CreateSession(sc *uasc.SecureChannel, r ua.Request, req
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.6.3
-func (s *SessionService) ActivateSession(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	dlog := s.srv.logger.With("func", "SessionService.ActivateSession")
-	dlog.Debug("Handling", "type", ualog.TypeOf(r))
+func (s *SessionService) ActivateSession(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
+	dlog := ualog.FromContext(ctx)
 
 	req, err := safeReq[*ua.ActivateSessionRequest](r)
 	if err != nil {
@@ -125,9 +124,7 @@ func (s *SessionService) ActivateSession(sc *uasc.SecureChannel, r ua.Request, r
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.6.4
-func (s *SessionService) CloseSession(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	dlog := s.srv.logger.With("func", "SessionService.CloseSession")
-	dlog.Debug("Handling", "type", ualog.TypeOf(r))
+func (s *SessionService) CloseSession(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
 
 	req, err := safeReq[*ua.CloseSessionRequest](r)
 	if err != nil {
@@ -148,9 +145,7 @@ func (s *SessionService) CloseSession(sc *uasc.SecureChannel, r ua.Request, reqI
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.6.5
-func (s *SessionService) Cancel(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	dlog := s.srv.logger.With("func", "SessionService.Cancel")
-	dlog.Debug("Handling", "type", ualog.TypeOf(r))
+func (s *SessionService) Cancel(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
 
 	req, err := safeReq[*ua.CancelRequest](r)
 	if err != nil {

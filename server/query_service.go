@@ -1,7 +1,8 @@
 package server
 
 import (
-	"github.com/gopcua/opcua/internal/ualog"
+	"context"
+
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uasc"
 )
@@ -14,9 +15,7 @@ type QueryService struct {
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.9.3
-func (s *QueryService) QueryFirst(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	dlog := s.srv.logger.With("func", "QueryService.QueryFirst")
-	dlog.Debug("Handling", "type", ualog.TypeOf(r))
+func (s *QueryService) QueryFirst(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
 
 	req, err := safeReq[*ua.QueryFirstRequest](r)
 	if err != nil {
@@ -26,9 +25,7 @@ func (s *QueryService) QueryFirst(sc *uasc.SecureChannel, r ua.Request, reqID ui
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.9.4
-func (s *QueryService) QueryNext(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	dlog := s.srv.logger.With("func", "QueryService.QueryNext")
-	dlog.Debug("Handling", "type", ualog.TypeOf(r))
+func (s *QueryService) QueryNext(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
 
 	req, err := safeReq[*ua.QueryNextRequest](r)
 	if err != nil {

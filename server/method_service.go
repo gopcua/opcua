@@ -1,7 +1,8 @@
 package server
 
 import (
-	"github.com/gopcua/opcua/internal/ualog"
+	"context"
+
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uasc"
 )
@@ -14,9 +15,7 @@ type MethodService struct {
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.11.2
-func (s *MethodService) Call(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	dlog := s.srv.logger.With("func", "MethodService.Call")
-	dlog.Debug("Handling", "type", ualog.TypeOf(r))
+func (s *MethodService) Call(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
 
 	req, err := safeReq[*ua.CallRequest](r)
 	if err != nil {

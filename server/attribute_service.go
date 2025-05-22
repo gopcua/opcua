@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"time"
 
 	"github.com/gopcua/opcua/internal/ualog"
@@ -16,9 +17,8 @@ type AttributeService struct {
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.10.2
-func (s *AttributeService) Read(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	dlog := s.srv.logger.With("func", "AttributeService.Read")
-	dlog.Debug("Handling", "type", ualog.TypeOf(r))
+func (s *AttributeService) Read(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
+	dlog := ualog.FromContext(ctx)
 
 	req, err := safeReq[*ua.ReadRequest](r)
 	if err != nil {
@@ -51,9 +51,7 @@ func (s *AttributeService) Read(sc *uasc.SecureChannel, r ua.Request, reqID uint
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.10.3
-func (s *AttributeService) HistoryRead(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	dlog := s.srv.logger.With("func", "AttributeService.HistoryRead")
-	dlog.Debug("Handling", "type", ualog.TypeOf(r))
+func (s *AttributeService) HistoryRead(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
 
 	req, err := safeReq[*ua.HistoryReadRequest](r)
 	if err != nil {
@@ -63,9 +61,8 @@ func (s *AttributeService) HistoryRead(sc *uasc.SecureChannel, r ua.Request, req
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.10.4
-func (s *AttributeService) Write(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	dlog := s.srv.logger.With("func", "AttributeService.Write")
-	dlog.Debug("Handling", "type", ualog.TypeOf(r))
+func (s *AttributeService) Write(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
+	dlog := ualog.FromContext(ctx)
 
 	req, err := safeReq[*ua.WriteRequest](r)
 	if err != nil {
@@ -103,8 +100,7 @@ func (s *AttributeService) Write(sc *uasc.SecureChannel, r ua.Request, reqID uin
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.10.5
-func (s *AttributeService) HistoryUpdate(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	s.srv.logger.Debug("server: handling", "type", ualog.TypeOf(r))
+func (s *AttributeService) HistoryUpdate(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
 
 	req, err := safeReq[*ua.HistoryUpdateRequest](r)
 	if err != nil {

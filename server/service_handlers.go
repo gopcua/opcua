@@ -14,7 +14,7 @@ import (
 	"github.com/gopcua/opcua/uasc"
 )
 
-type Handler func(*uasc.SecureChannel, ua.Request, uint32) (ua.Response, error)
+type Handler func(context.Context, *uasc.SecureChannel, ua.Request, uint32) (ua.Response, error)
 
 func (srv *Server) initHandlers() {
 	// s.registerHandlerFunc(id.ServiceFault_Encoding_DefaultBinary, handleServiceFault)
@@ -112,7 +112,7 @@ func (srv *Server) handleService(ctx context.Context, sc *uasc.SecureChannel, re
 	typeID := ua.ServiceTypeID(req)
 	h, ok := srv.handlers[typeID]
 	if ok {
-		resp, err = h(sc, req, reqID)
+		resp, err = h(ctx, sc, req, reqID)
 	} else {
 		if typeID == 0 {
 			dlog.Warn("unknown service. Did you call register?", "type", ualog.TypeOf(req))
