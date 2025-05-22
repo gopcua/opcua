@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gopcua/opcua/internal/ualog"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uasc"
 )
@@ -14,17 +15,20 @@ import (
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.13
 type SubscriptionService struct {
 	srv *Server
-	// pub sub stuff
-	Mu   sync.Mutex
-	Subs map[uint32]*Subscription
+
+	// mu guards subs
+	mu sync.Mutex
+
+	// subs stores the active subscriptions by id
+	subs map[uint32]*Subscription
 }
 
 // get rid of all references to a subscription and all monitored items that are pointed at this subscription.
 func (s *SubscriptionService) DeleteSubscription(id uint32) {
-	s.Mu.Lock()
-	defer s.Mu.Unlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-	sub, ok := s.Subs[id]
+	sub, ok := s.subs[id]
 	if ok {
 		sub.Mu.Lock()
 		if sub.running {
@@ -34,7 +38,7 @@ func (s *SubscriptionService) DeleteSubscription(id uint32) {
 		sub.Mu.Unlock()
 	}
 
-	delete(s.Subs, id)
+	delete(s.subs, id)
 
 	// ask the monitored item service to purge out any items that use this subscription
 	s.srv.MonitoredItemService.DeleteSub(id)
@@ -43,23 +47,20 @@ func (s *SubscriptionService) DeleteSubscription(id uint32) {
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.13.2
 func (s *SubscriptionService) CreateSubscription(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	if s.srv.cfg.logger != nil {
-		s.srv.cfg.logger.Debug("Handling %T", r)
-	}
+	dlog := s.srv.logger.With("func", "SubscriptionService.CreateSubscription")
+	dlog.Debug("Handling", "type", ualog.TypeOf(r))
 
 	req, err := safeReq[*ua.CreateSubscriptionRequest](r)
 	if err != nil {
 		return nil, err
 	}
 
-	s.Mu.Lock()
-	defer s.Mu.Unlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-	newsubid := uint32(len(s.Subs)) + 1
+	newsubid := uint32(len(s.subs)) + 1
 
-	if s.srv.cfg.logger != nil {
-		s.srv.cfg.logger.Info("New Sub %d for %v", newsubid, sc.RemoteAddr())
-	}
+	dlog.Info("New subscription", "sub_id", newsubid, "remote_addr", sc.RemoteAddr())
 
 	sub := NewSubscription()
 	sub.srv = s
@@ -70,7 +71,7 @@ func (s *SubscriptionService) CreateSubscription(sc *uasc.SecureChannel, r ua.Re
 	sub.RevisedLifetimeCount = req.RequestedLifetimeCount
 	sub.RevisedMaxKeepAliveCount = req.RequestedMaxKeepAliveCount
 
-	s.Subs[newsubid] = sub
+	s.subs[newsubid] = sub
 	sub.running = true
 	sub.Start()
 
@@ -93,9 +94,8 @@ func (s *SubscriptionService) CreateSubscription(sc *uasc.SecureChannel, r ua.Re
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.13.3
 func (s *SubscriptionService) ModifySubscription(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	if s.srv.cfg.logger != nil {
-		s.srv.cfg.logger.Debug("Handling %T", r)
-	}
+	dlog := s.srv.logger.With("func", "SubscriptionService.ModifySubscription")
+	dlog.Debug("Handling", "type", ualog.TypeOf(r))
 
 	req, err := safeReq[*ua.ModifySubscriptionRequest](r)
 	if err != nil {
@@ -103,15 +103,13 @@ func (s *SubscriptionService) ModifySubscription(sc *uasc.SecureChannel, r ua.Re
 	}
 
 	// When this gets implemented, be sure to check the subscription session vs the request session!
-
 	return serviceUnsupported(req.RequestHeader), nil
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.13.4
 func (s *SubscriptionService) SetPublishingMode(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	if s.srv.cfg.logger != nil {
-		s.srv.cfg.logger.Debug("Handling %T", r)
-	}
+	dlog := s.srv.logger.With("func", "SubscriptionService.SetPublishingMode")
+	dlog.Debug("Handling", "type", ualog.TypeOf(r))
 
 	req, err := safeReq[*ua.SetPublishingModeRequest](r)
 	if err != nil {
@@ -123,20 +121,16 @@ func (s *SubscriptionService) SetPublishingMode(sc *uasc.SecureChannel, r ua.Req
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.13.5
 func (s *SubscriptionService) Publish(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	if s.srv.cfg.logger != nil {
-		s.srv.cfg.logger.Debug("Raw Publish req")
-	}
+	dlog := s.srv.logger.With("func", "SubscriptionService.Publish")
+	dlog.Debug("Handling", "type", ualog.TypeOf(r))
 
 	req, err := safeReq[*ua.PublishRequest](r)
 	if err != nil {
-		if s.srv.cfg.logger != nil {
-			s.srv.cfg.logger.Error("ERROR: bad PublishRequest Struct")
-		}
+		dlog.Error("Bad publish request", "error", err)
 		return nil, err
 	}
 
 	session := s.srv.Session(req.RequestHeader)
-
 	if session == nil {
 		response := &ua.PublishResponse{
 			ResponseHeader: &ua.ResponseHeader{
@@ -161,9 +155,7 @@ func (s *SubscriptionService) Publish(sc *uasc.SecureChannel, r ua.Request, reqI
 	select {
 	case session.PublishRequests <- PubReq{Req: req, ID: reqID}:
 	default:
-		if s.srv.cfg.logger != nil {
-			s.srv.cfg.logger.Warn("Too many publish reqs.")
-		}
+		s.srv.logger.Warn("Too many publish reqs.")
 	}
 
 	// per opcua spec, we don't respond now.  When data is available on the subscription,
@@ -173,9 +165,8 @@ func (s *SubscriptionService) Publish(sc *uasc.SecureChannel, r ua.Request, reqI
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.13.6
 func (s *SubscriptionService) Republish(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	if s.srv.cfg.logger != nil {
-		s.srv.cfg.logger.Debug("Handling %T", r)
-	}
+	dlog := s.srv.logger.With("func", "SubscriptionService.Republish")
+	dlog.Debug("Handling", "type", ualog.TypeOf(r))
 
 	req, err := safeReq[*ua.RepublishRequest](r)
 	if err != nil {
@@ -186,9 +177,8 @@ func (s *SubscriptionService) Republish(sc *uasc.SecureChannel, r ua.Request, re
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.13.7
 func (s *SubscriptionService) TransferSubscriptions(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	if s.srv.cfg.logger != nil {
-		s.srv.cfg.logger.Debug("Handling %T", r)
-	}
+	dlog := s.srv.logger.With("func", "SubscriptionService.TransferSubscription")
+	dlog.Debug("Handling", "type", ualog.TypeOf(r))
 
 	req, err := safeReq[*ua.TransferSubscriptionsRequest](r)
 	if err != nil {
@@ -200,9 +190,8 @@ func (s *SubscriptionService) TransferSubscriptions(sc *uasc.SecureChannel, r ua
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.13.8
 func (s *SubscriptionService) DeleteSubscriptions(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	if s.srv.cfg.logger != nil {
-		s.srv.cfg.logger.Debug("Handling %T", r)
-	}
+	dlog := s.srv.logger.With("func", "SubscriptionService.DeleteSubscription")
+	dlog.Debug("Handling", "type", ualog.TypeOf(r))
 
 	req, err := safeReq[*ua.DeleteSubscriptionsRequest](r)
 	if err != nil {
@@ -210,17 +199,14 @@ func (s *SubscriptionService) DeleteSubscriptions(sc *uasc.SecureChannel, r ua.R
 	}
 	session := s.srv.Session(req.Header())
 
-	s.Mu.Lock()
-	defer s.Mu.Unlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	results := make([]ua.StatusCode, len(req.SubscriptionIDs))
 	for i := range req.SubscriptionIDs {
-
 		subid := req.SubscriptionIDs[i]
-		if s.srv.cfg.logger != nil {
-			s.srv.cfg.logger.Info("Subscription %d deleted by client", subid)
-		}
-		sub, ok := s.Subs[subid]
+		dlog.Info("Subscription deleted by client", "sub_id", subid)
+		sub, ok := s.subs[subid]
 		if !ok {
 			results[i] = ua.StatusBadSubscriptionIDInvalid
 			continue
@@ -234,6 +220,7 @@ func (s *SubscriptionService) DeleteSubscriptions(sc *uasc.SecureChannel, r ua.R
 		go s.DeleteSubscription(subid)
 		results[i] = ua.StatusOK
 	}
+
 	return &ua.DeleteSubscriptionsResponse{
 		ResponseHeader: &ua.ResponseHeader{
 			Timestamp:          time.Now(),
@@ -342,9 +329,7 @@ func (s *Subscription) keepalive(pubreq PubReq) error {
 func (s *Subscription) run() {
 	// if this go routine dies, we need to delete ourselves.
 	defer func() {
-		if s.srv.srv.cfg.logger != nil {
-			s.srv.srv.cfg.logger.Info("Subscription %d shutting down.", s.ID)
-		}
+		s.srv.srv.logger.Info("Subscription shutting down", "sub_id", s.ID)
 		s.srv.DeleteSubscription(s.ID)
 	}()
 
@@ -389,17 +374,13 @@ func (s *Subscription) run() {
 						case pubreq := <-s.Session.PublishRequests:
 							err := s.keepalive(pubreq)
 							if err != nil {
-								if s.srv.srv.cfg.logger != nil {
-									s.srv.srv.cfg.logger.Warn("problem sending keepalive to subscription #%d: %v", s.ID, err)
-								}
+								s.srv.srv.logger.Warn("problem sending keepalive to subscription", "sub_id", s.ID, "error", err)
 								return
 							}
 						default:
 							lifetime_counter++
 							if lifetime_counter > int(s.RevisedLifetimeCount) {
-								if s.srv.srv.cfg.logger != nil {
-									s.srv.srv.cfg.logger.Warn("Subscription #%d timed out.", s.ID)
-								}
+								s.srv.srv.logger.Warn("Subscription timed out", "sub_id", s.ID)
 								return
 							}
 						}
@@ -430,9 +411,7 @@ func (s *Subscription) run() {
 				// we had another tick without a publish request.
 				lifetime_counter++
 				if lifetime_counter > int(s.RevisedLifetimeCount) {
-					if s.srv.srv.cfg.logger != nil {
-						s.srv.srv.cfg.logger.Warn("Subscription %d timed out.", s.ID)
-					}
+					s.srv.srv.logger.Warn("Subscription timed out", "sub_id", s.ID)
 					return
 				}
 			}
@@ -445,9 +424,7 @@ func (s *Subscription) run() {
 			// per the spec, the sequence ID cannot be 0
 			s.SequenceID = 1
 		}
-		if s.srv.srv.cfg.logger != nil {
-			s.srv.srv.cfg.logger.Debug("Got publish req on sub #%d.  Sequence %d", s.ID, s.SequenceID)
-		}
+		s.srv.srv.logger.Debug("Got publish req", "sub_id", s.ID, "seq_nr", s.SequenceID)
 		// then get all the tags and send them back to the client
 
 		//for x := range pubreq.Req.SubscriptionAcknowledgements {
@@ -495,15 +472,11 @@ func (s *Subscription) run() {
 		}
 		err := s.Channel.SendResponseWithContext(context.Background(), pubreq.ID, response)
 		if err != nil {
-			if s.srv.srv.cfg.logger != nil {
-				s.srv.srv.cfg.logger.Error("problem sending channel response: %v", err)
-				s.srv.srv.cfg.logger.Error("Killing subscription %d", s.ID)
-			}
+			s.srv.srv.logger.Error("problem sending channel response", "error", err)
+			s.srv.srv.logger.Error("Killing subscription", "sub_id", s.ID)
 			return
 		}
-		if s.srv.srv.cfg.logger != nil {
-			s.srv.srv.cfg.logger.Debug("Published %d items OK for %d", len(publishQueue), s.ID)
-		}
+		s.srv.srv.logger.Debug("Published OK items", "sub_id", s.ID, "item_count", len(publishQueue))
 		// wait till we've got a publish request.
 	}
 }

@@ -8,12 +8,12 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/gopcua/opcua"
-	"github.com/gopcua/opcua/debug"
 	"github.com/gopcua/opcua/id"
+	"github.com/gopcua/opcua/internal/ualog"
 	"github.com/gopcua/opcua/ua"
 )
 
@@ -27,29 +27,29 @@ func main() {
 		nodeID   = flag.String("node", "", "node id to subscribe to")
 		event    = flag.Bool("event", false, "subscribe to node event changes (Default: node value changes)")
 		interval = flag.Duration("interval", opcua.DefaultSubscriptionInterval, "subscription interval")
+		debug    = flag.Bool("debug", false, "enable debug logging")
 	)
-	flag.BoolVar(&debug.Enable, "debug", false, "enable debug logging")
 	flag.Parse()
-	log.SetFlags(0)
+	slog.SetDefault(slog.New(ualog.NewTextHandler(*debug)))
 
 	// add an arbitrary timeout to demonstrate how to stop a subscription
 	// with a context.
 	d := 60 * time.Second
 	ctx, cancel := context.WithTimeout(context.Background(), d)
 	defer cancel()
-	log.Printf("Subscription will stop after %s for demonstration purposes", d)
+	slog.Info("Subscription will stop after a while for demonstration purposes", "duration", d)
 
 	endpoints, err := opcua.GetEndpoints(ctx, *endpoint)
 	if err != nil {
-		log.Fatal(err)
+		ualog.Fatal("GetEndpoints failed", "error", err)
 	}
 	ep, err := opcua.SelectEndpoint(endpoints, *policy, ua.MessageSecurityModeFromString(*mode))
 	if err != nil {
-		log.Fatal(err)
+		ualog.Fatal("SelectEndpoint failed", "error", err)
 	}
 	ep.EndpointURL = *endpoint
 
-	fmt.Println("*", ep.SecurityPolicyURI, ep.SecurityMode)
+	slog.Info("*", "sec_policy", ep.SecurityPolicyURI, "sec_mode", ep.SecurityMode)
 
 	opts := []opcua.Option{
 		opcua.SecurityPolicy(*policy),
@@ -62,10 +62,10 @@ func main() {
 
 	c, err := opcua.NewClient(ep.EndpointURL, opts...)
 	if err != nil {
-		log.Fatal(err)
+		ualog.Fatal("NewClient failed", "error", err)
 	}
 	if err := c.Connect(ctx); err != nil {
-		log.Fatal(err)
+		ualog.Fatal("Connect failed", "error", err)
 	}
 	defer c.Close(ctx)
 
@@ -75,14 +75,14 @@ func main() {
 		Interval: *interval,
 	}, notifyCh)
 	if err != nil {
-		log.Fatal(err)
+		ualog.Fatal("Subscribe failed", "error", err)
 	}
 	defer sub.Cancel(ctx)
-	log.Printf("Created subscription with id %v", sub.SubscriptionID)
+	slog.Info("Created subscription", "sub_id", sub.SubscriptionID)
 
 	id, err := ua.ParseNodeID(*nodeID)
 	if err != nil {
-		log.Fatal(err)
+		ualog.Fatal("ParseNodeID failed", "node_id", *nodeID, "error", err)
 	}
 
 	var miCreateRequest *ua.MonitoredItemCreateRequest
@@ -94,7 +94,7 @@ func main() {
 	}
 	res, err := sub.Monitor(ctx, ua.TimestampsToReturnBoth, miCreateRequest)
 	if err != nil || res.Results[0].StatusCode != ua.StatusOK {
-		log.Fatal(err)
+		ualog.Fatal("sub.Monitor failed", "error", err)
 	}
 
 	// Uncomment the following to try modifying the subscription
@@ -102,7 +102,7 @@ func main() {
 	// var params opcua.SubscriptionParameters
 	// params.Interval = time.Millisecond * 2000
 	// if _, err := sub.ModifySubscription(ctx, params); err != nil {
-	// 	log.Fatal(err)
+	// 	ualog.Fatal("ModifySubscription failed", "error", err)
 	// }
 
 	// read from subscription's notification channel until ctx is cancelled
@@ -112,7 +112,7 @@ func main() {
 			return
 		case res := <-notifyCh:
 			if res.Error != nil {
-				log.Print(res.Error)
+				slog.Error("notifyCh reports an error", "error", err)
 				continue
 			}
 
@@ -120,20 +120,20 @@ func main() {
 			case *ua.DataChangeNotification:
 				for _, item := range x.MonitoredItems {
 					data := item.Value.Value.Value()
-					log.Printf("MonitoredItem with client handle %v = %v", item.ClientHandle, data)
+					slog.Info("MonitoredItem with client handle", "client_handle", item.ClientHandle, "data", data)
 				}
 
 			case *ua.EventNotificationList:
 				for _, item := range x.Events {
-					log.Printf("Event for client handle: %v\n", item.ClientHandle)
+					slog.Info("Event for client handle", "client_handle", item.ClientHandle)
 					for i, field := range item.EventFields {
-						log.Printf("%v: %v of Type: %T", eventFieldNames[i], field.Value(), field.Value())
+						slog.Info("fields:", "name", eventFieldNames[i], "value", field.Value(), "type", ualog.TypeOf(field.Value()))
 					}
-					log.Println()
+					fmt.Println()
 				}
 
 			default:
-				log.Printf("what's this publish result? %T", res.Value)
+				slog.Warn("what's this publish result?", "type", ualog.TypeOf(res.Value))
 			}
 		}
 	}
