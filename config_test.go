@@ -173,6 +173,7 @@ func TestOptions(t *testing.T) {
 	defer os.Remove(keyPEMFile)
 
 	connStateCh := make(chan ConnState)
+	connStateFunc := func(ConnState) {}
 
 	tests := []struct {
 		name string
@@ -325,6 +326,13 @@ func TestOptions(t *testing.T) {
 			opt:  StateChangedCh(connStateCh),
 			cfg: &Config{
 				stateCh: connStateCh,
+			},
+		},
+		{
+			name: `ConnStateCh`,
+			opt:  StateChangedFunc(connStateFunc),
+			cfg: &Config{
+				stateFunc: connStateFunc,
 			},
 		},
 		{
@@ -842,6 +850,13 @@ func TestOptions(t *testing.T) {
 			if got, want := errstr(err), errstr(tt.err); got != "" || want != "" {
 				require.Equal(t, want, got, "got error %q want %q", got, want)
 				return
+			}
+			if tt.cfg.stateFunc != nil { // Functions are not comparable, so we check manually and unset
+				require.NotNil(t, cfg.stateFunc)
+				tt.cfg.stateFunc = nil
+				cfg.stateFunc = nil
+			} else {
+				require.Nil(t, cfg.stateFunc)
 			}
 			require.Equal(t, tt.cfg, cfg)
 		})

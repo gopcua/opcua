@@ -169,6 +169,9 @@ type Client struct {
 	// stateCh is an optional channel for connection state changes. May be nil.
 	stateCh chan<- ConnState
 
+	// stateFunc is an optional func for connection state changes. May be nil.
+	stateFunc func(ConnState)
+
 	// list of cached atomicNamespaces on the server
 	atomicNamespaces atomic.Value // []string
 
@@ -201,6 +204,7 @@ func NewClient(endpoint string, opts ...Option) (*Client, error) {
 		pausech:     make(chan struct{}, 2),
 		resumech:    make(chan struct{}, 2),
 		stateCh:     cfg.stateCh,
+		stateFunc:   cfg.stateFunc,
 	}
 	c.pauseSubscriptions(context.Background())
 	c.setPublishTimeout(uasc.MaxTimeout)
@@ -661,6 +665,9 @@ func (c *Client) setState(ctx context.Context, s ConnState) {
 		case <-ctx.Done():
 		case c.stateCh <- s:
 		}
+	}
+	if c.stateFunc != nil {
+		c.stateFunc(s)
 	}
 	n := new(expvar.Int)
 	n.Set(int64(s))

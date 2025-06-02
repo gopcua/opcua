@@ -58,10 +58,11 @@ func DefaultSessionConfig() *uasc.SessionConfig {
 
 // Config contains all config options.
 type Config struct {
-	dialer  *uacp.Dialer
-	sechan  *uasc.Config
-	session *uasc.SessionConfig
-	stateCh chan<- ConnState
+	dialer    *uacp.Dialer
+	sechan    *uasc.Config
+	session   *uasc.SessionConfig
+	stateCh   chan<- ConnState
+	stateFunc func(ConnState)
 }
 
 func DefaultDialer() *uacp.Dialer {
@@ -577,6 +578,14 @@ func SendBufferSize(n uint32) Option {
 func StateChangedCh(ch chan<- ConnState) Option {
 	return func(cfg *Config) error {
 		cfg.stateCh = ch
+		return nil
+	}
+}
+
+// StateChangedFunc sets the function for receiving client connection state changes.
+func StateChangedFunc(f func(ConnState)) Option {
+	return func(cfg *Config) error {
+		cfg.stateFunc = f
 		return nil
 	}
 }
