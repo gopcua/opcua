@@ -189,22 +189,26 @@ func TestClient_SetState(t *testing.T) {
 		name      string
 		state     ConnState
 		withChan  bool
+		withFunc  bool
 		ctxCancel bool
 	}{
 		{
 			name:     "set state without channel",
 			state:    Connected,
 			withChan: false,
+			withFunc: false,
 		},
 		{
 			name:     "set state with channel",
 			state:    Connecting,
 			withChan: true,
+			withFunc: true,
 		},
 		{
 			name:      "set state with cancelled context",
 			state:     Disconnected,
 			withChan:  true,
+			withFunc:  true,
 			ctxCancel: true,
 		},
 	}
@@ -219,6 +223,12 @@ func TestClient_SetState(t *testing.T) {
 			if tt.withChan {
 				stateCh = make(chan ConnState, 1)
 				opts = append(opts, StateChangedCh(stateCh))
+			}
+			funcCallback := false
+			if tt.withFunc {
+				opts = append(opts, StateChangedFunc(func(ConnState) {
+					funcCallback = true
+				}))
 			}
 
 			c, err := NewClient("opc.tcp://example.com:4840", opts...)
@@ -240,6 +250,12 @@ func TestClient_SetState(t *testing.T) {
 					require.Equal(t, tt.state, state)
 				default:
 					t.Fatal("expected state on channel but got none")
+				}
+			}
+			// Verify function received state if functions was set
+			if tt.withFunc {
+				if !funcCallback {
+					t.Error("expected function callback but got none")
 				}
 			}
 		})
