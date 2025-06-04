@@ -109,6 +109,10 @@ func (s *MonitoredItemService) DeleteSub(ctx context.Context, id uint32) {
 }
 
 func (s *MonitoredItemService) ChangeNotification(ctx context.Context, n *ua.NodeID) {
+	if s == nil {
+		// if we're not running yet, don't have to notify anyone
+		return
+	}
 	dlog := ualog.FromContext(ctx)
 
 	s.mu.Lock()
