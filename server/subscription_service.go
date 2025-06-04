@@ -314,6 +314,9 @@ func (s *Subscription) keepalive(pubreq PubReq) error {
 // this function should be run as a go-routine and will handle sending data out
 // to the client at the correct rate assuming there are publish requests queued up.
 // if the function returns it deletes the subscription
+//
+// This function will continue to run after a client has disconnected until we hit a keepalive timeout
+// I've looked into using a signal from the secure channel, but the closed channel is private
 func (s *Subscription) run(ctx context.Context) {
 	dlog := ualog.FromContext(ctx).With(
 		"subscription", s.ID,
