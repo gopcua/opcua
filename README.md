@@ -158,6 +158,7 @@ We would be happy if you can add your equipment to the list. Just open a PR :)
 | Siemens S7-1500 |v0.3.x        | production |  [IOTech Systems](https://www.iotechsys.com/) |
 | OMRON NX102-9020 |v0.3.x        | production |  [IOTech Systems](https://www.iotechsys.com/) |
 | InfluxDB Telegraf plugin                                                                               | v0.3.x         | ?                                                                                                    | Community                  |
+| Bosch Rexroth ctrlX CORE X3 v3.2.x| v0.7.x, v0.8.x | bench testing | [rymden software](https://rymden-software.com) |
 
 ## Supported Client Features
 
