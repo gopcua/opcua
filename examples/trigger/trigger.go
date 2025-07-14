@@ -7,13 +7,12 @@ package main
 import (
 	"context"
 	"flag"
-	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/gopcua/opcua"
-	"github.com/gopcua/opcua/debug"
 	"github.com/gopcua/opcua/id"
+	"github.com/gopcua/opcua/internal/ualog"
 	"github.com/gopcua/opcua/ua"
 )
 
@@ -28,10 +27,10 @@ func main() {
 		reportNodeID  = flag.String("report", "", "node id value to report on trigger")
 		filter        = flag.String("filter", "timestamp", "DataFilter: status, value, timestamp.")
 		interval      = flag.Duration("interval", opcua.DefaultSubscriptionInterval, "subscription interval")
+		debug         = flag.Bool("debug", false, "enable debug logging")
 	)
-	flag.BoolVar(&debug.Enable, "debug", false, "enable debug logging")
 	flag.Parse()
-	log.SetFlags(0)
+	slog.SetDefault(slog.New(ualog.NewTextHandler(*debug)))
 
 	// add an arbitrary timeout to demonstrate how to stop a subscription
 	// with a context.
@@ -41,14 +40,14 @@ func main() {
 
 	endpoints, err := opcua.GetEndpoints(ctx, *endpoint)
 	if err != nil {
-		log.Fatal(err)
+		ualog.Fatal("GetEndpoints failed", "error", err)
 	}
 	ep, err := opcua.SelectEndpoint(endpoints, *policy, ua.MessageSecurityModeFromString(*mode))
 	if err != nil {
-		log.Fatal(err)
+		ualog.Fatal("SelectEndpoint failed", "error", err)
 	}
 
-	fmt.Println("*", ep.SecurityPolicyURI, ep.SecurityMode)
+	slog.Info("*", "sec_policy", ep.SecurityPolicyURI, "sec_mode", ep.SecurityMode)
 
 	opts := []opcua.Option{
 		opcua.SecurityPolicy(*policy),
@@ -61,10 +60,10 @@ func main() {
 
 	c, err := opcua.NewClient(ep.EndpointURL, opts...)
 	if err != nil {
-		log.Fatal(err)
+		ualog.Fatal("NewClient failed", "error", err)
 	}
 	if err := c.Connect(ctx); err != nil {
-		log.Fatal(err)
+		ualog.Fatal("Connect failed", "error", err)
 	}
 	defer c.Close(ctx)
 
@@ -74,19 +73,19 @@ func main() {
 		Interval: *interval,
 	}, notifyCh)
 	if err != nil {
-		log.Fatal(err)
+		ualog.Fatal("Subscribe failed", "error", err)
 	}
 	defer sub.Cancel(ctx)
-	log.Printf("Created subscription with id %v", sub.SubscriptionID)
+	slog.Info("Created subscription", "sub_id", sub.SubscriptionID)
 
 	triggeringNode, err := ua.ParseNodeID(*triggerNodeID)
 	if err != nil {
-		log.Fatal(err)
+		ualog.Fatal("parse trigger node id failed", "node_id", *triggerNodeID, "error", err)
 	}
 
 	triggeredNode, err := ua.ParseNodeID(*reportNodeID)
 	if err != nil {
-		log.Fatal(err)
+		ualog.Fatal("parse report node id failed", "node_id", *reportNodeID, "error", err)
 	}
 
 	miCreateRequests := []*ua.MonitoredItemCreateRequest{
@@ -110,18 +109,17 @@ func main() {
 
 	subRes, err := sub.Monitor(ctx, ua.TimestampsToReturnBoth, miCreateRequests...)
 	if err != nil || subRes.Results[0].StatusCode != ua.StatusOK {
-		log.Fatal(err)
+		ualog.Fatal("Monitor failed", "error", err)
 	}
 
 	triggeringServerID, triggeredServerID := subRes.Results[0].MonitoredItemID, subRes.Results[1].MonitoredItemID
 	tRes, err := sub.SetTriggering(ctx, triggeringServerID, []uint32{triggeredServerID}, nil)
-
 	if err != nil {
-		log.Fatal(err)
+		ualog.Fatal("SetTriggering failed", "error", err)
 	}
 
 	if tRes.AddResults[0] != ua.StatusOK {
-		log.Fatal(tRes.AddResults[0].Error())
+		ualog.Fatal("Status code is not OK", "status_code", tRes.AddResults[0].Error())
 	}
 
 	// read from subscription's notification channel until ctx is cancelled
@@ -131,7 +129,7 @@ func main() {
 			return
 		case res := <-notifyCh:
 			if res.Error != nil {
-				log.Print(res.Error)
+				slog.Error("notifyCh has an error", "error", res.Error)
 				continue
 			}
 
@@ -139,11 +137,11 @@ func main() {
 			case *ua.DataChangeNotification:
 				for _, item := range x.MonitoredItems {
 					data := item.Value.Value.Value()
-					log.Printf("MonitoredItem with client handle %v = %v", item.ClientHandle, data)
+					slog.Info("MonitoredItem with client handle", "client_handle", item.ClientHandle, "data", data)
 				}
 
 			default:
-				log.Printf("what's this publish result? %T", res.Value)
+				slog.Warn("what's this publish result?", "type", ualog.TypeOf(res.Value))
 			}
 		}
 	}
@@ -160,7 +158,7 @@ func getFilter(filterStr string) *ua.ExtensionObject {
 	case "timestamp":
 		filter = ua.DataChangeFilter{Trigger: ua.DataChangeTriggerStatusValueTimestamp}
 	default:
-		log.Fatalf("Unable to match to a valid filter type: %v\nShould be status, value, or timestamp", filterStr)
+		ualog.Fatal("Unable to match to a valid filter\nShould be status, value, or timestamp", "type", filterStr)
 	}
 
 	return &ua.ExtensionObject{

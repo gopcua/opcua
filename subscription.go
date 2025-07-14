@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gopcua/opcua/debug"
 	"github.com/gopcua/opcua/errors"
 	"github.com/gopcua/opcua/id"
 	"github.com/gopcua/opcua/stats"
@@ -395,7 +394,8 @@ func (p *SubscriptionParameters) setDefaults() {
 // recreate an existing subscription. This function deletes the
 // existing subscription from the server.
 func (s *Subscription) recreate_delete(ctx context.Context) error {
-	dlog := debug.NewPrefixLogger("sub %d: recreate_delete: ", s.SubscriptionID)
+	dlog := s.c.logger.With("func", "recreate_delete", "sub_id", s.SubscriptionID)
+
 	req := &ua.DeleteSubscriptionsRequest{
 		SubscriptionIDs: []uint32{s.SubscriptionID},
 	}
@@ -403,7 +403,7 @@ func (s *Subscription) recreate_delete(ctx context.Context) error {
 	_ = s.c.Send(ctx, req, func(v ua.Response) error {
 		return safeAssign(v, &res)
 	})
-	dlog.Print("subscription deleted")
+	dlog.DebugContext(ctx, "subscription deleted")
 	return nil
 }
 
@@ -411,7 +411,7 @@ func (s *Subscription) recreate_delete(ctx context.Context) error {
 // recreate an existing subscription. This function creates a
 // new subscription with the same parameters as the previous one.
 func (s *Subscription) recreate_create(ctx context.Context) error {
-	dlog := debug.NewPrefixLogger("sub %d: recreate_create: ", s.SubscriptionID)
+	dlog := s.c.logger.With("func", "recreate_create", "sub_id", s.SubscriptionID)
 
 	s.paramsMu.Lock()
 	params := s.params
@@ -430,15 +430,17 @@ func (s *Subscription) recreate_create(ctx context.Context) error {
 		return safeAssign(v, &res)
 	})
 	if err != nil {
-		dlog.Printf("failed to recreate subscription")
+		dlog.DebugContext(ctx, "failed to recreate subscription")
 		return err
 	}
 	// todo (unknownet): check if necessary
 	if status := res.ResponseHeader.ServiceResult; status != ua.StatusOK {
 		return status
 	}
-	dlog.Printf("recreated as subscription %d", res.SubscriptionID)
-	dlog.SetPrefix(fmt.Sprintf("sub %d: recreate: ", res.SubscriptionID))
+	dlog.DebugContext(ctx, fmt.Sprintf("recreated as subscription_id %d", res.SubscriptionID))
+
+	// todo(fs): we cannot overwrite the [subscription_id] attribute in [dlog]
+	dlog = s.c.logger.With("func", "recreate_create", "sub_id", res.SubscriptionID)
 
 	s.SubscriptionID = res.SubscriptionID
 	s.RevisedPublishingInterval = time.Duration(res.RevisedPublishingInterval) * time.Millisecond
@@ -450,7 +452,7 @@ func (s *Subscription) recreate_create(ctx context.Context) error {
 	if err := s.c.registerSubscription_NeedsSubMuxLock(s); err != nil {
 		return err
 	}
-	dlog.Printf("subscription registered")
+	dlog.DebugContext(ctx, "recreate: subscription registered")
 
 	// Sort by timestamp to return
 	itemsByTimestamps := make(map[ua.TimestampsToReturn][]*ua.MonitoredItemCreateRequest)
@@ -473,7 +475,7 @@ func (s *Subscription) recreate_create(ctx context.Context) error {
 			return safeAssign(v, &res)
 		})
 		if err != nil {
-			dlog.Printf("failed to create monitored items: %v", err)
+			dlog.DebugContext(ctx, "recreate: failed to create monitored items", "error", err)
 			return err
 		}
 
@@ -493,7 +495,7 @@ func (s *Subscription) recreate_create(ctx context.Context) error {
 		}
 		s.itemsMu.Unlock()
 	}
-	dlog.Printf("subscription successfully recreated")
+	dlog.DebugContext(ctx, "recreate: subscription successfully recreated")
 
 	return nil
 }

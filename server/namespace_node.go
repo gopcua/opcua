@@ -1,6 +1,7 @@
 package server
 
 import (
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -62,7 +63,6 @@ func NewNodeNameSpace(srv *Server, name string) *NodeNameSpace {
 	ns.AddNode(objectsNode)
 
 	return ns
-
 }
 
 // This function is to notify opc subscribers if a node was changed
@@ -106,6 +106,7 @@ func (as *NodeNameSpace) AddNewVariableNode(name string, value any) *Node {
 	as.AddNode(n)
 	return n
 }
+
 func (as *NodeNameSpace) AddNewVariableStringNode(name string, value any) *Node {
 	n := NewVariableNode(ua.NewStringNodeID(as.id, name), name, value)
 	as.AddNode(n)
@@ -197,9 +198,8 @@ func (ns *NodeNameSpace) Browse(bd *ua.BrowseDescription) *ua.BrowseResult {
 	ns.mu.RLock()
 	defer ns.mu.RUnlock()
 
-	if ns.srv.cfg.logger != nil {
-		ns.srv.cfg.logger.Debug("BrowseRequest: id=%s mask=%08b\n", bd.NodeID, bd.ResultMask)
-	}
+	dlog := ns.srv.logger.With("func", "NodeNameSpace.Browse")
+	dlog.Debug("BrowseRequest", "node_id", bd.NodeID, "mask", fmt.Sprintf("%08b", bd.ResultMask))
 
 	n := ns.Node(bd.NodeID)
 	if n == nil {
@@ -254,6 +254,7 @@ func (ns *NodeNameSpace) ID() uint16 {
 func (ns *NodeNameSpace) SetID(id uint16) {
 	ns.id = id
 }
+
 func (as *NodeNameSpace) SetAttribute(id *ua.NodeID, attr ua.AttributeID, val *ua.DataValue) ua.StatusCode {
 	n := as.Node(id)
 	if n == nil {

@@ -1,7 +1,7 @@
 package server
 
 import (
-	"log"
+	"log/slog"
 	"maps"
 	"slices"
 	"time"
@@ -259,17 +259,21 @@ func (n *Node) SetDescription(text, locale string) {
 }
 
 func (n *Node) DataType() *ua.ExpandedNodeID {
+	dlog := slog.With("func", "Node.DataType")
+
 	if n == nil {
-		log.Printf("n was nil!")
+		dlog.Debug("n was nil!")
 		return ua.NewTwoByteExpandedNodeID(0)
 	}
+	dlog = dlog.With("node_id", n.id)
+
 	v := n.attr[ua.AttributeIDDataType]
 	if v == nil || v.Value.Value() == nil {
 		// if we have a type definition, return that?
 		for i := range n.refs {
 			r := n.refs[i]
 			if r.ReferenceTypeID == nil {
-				log.Printf("reftypeid was nil!")
+				dlog.Debug("reftypeid was nil!")
 			}
 			if r.ReferenceTypeID.IntID() == id.HasTypeDefinition && r.IsForward {
 				return r.NodeID

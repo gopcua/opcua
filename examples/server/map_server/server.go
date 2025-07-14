@@ -14,6 +14,7 @@ import (
 	"crypto/rsa"
 	"crypto/tls"
 	"flag"
+	"github.com/gopcua/opcua/tests/utils"
 	"log"
 	"os"
 	"os/signal"
@@ -31,29 +32,6 @@ var (
 	keyfile  = flag.String("key", "key.pem", "Path to PEM Private Key file")
 	gencert  = flag.Bool("gen-cert", false, "Generate a new certificate")
 )
-
-type Logger int
-
-func (l Logger) Debug(msg string, args ...any) {
-	if l < 0 {
-		log.Printf(msg, args...)
-	}
-}
-func (l Logger) Info(msg string, args ...any) {
-	if l < 1 {
-		log.Printf(msg, args...)
-	}
-}
-func (l Logger) Warn(msg string, args ...any) {
-	if l < 2 {
-		log.Printf(msg, args...)
-	}
-}
-func (l Logger) Error(msg string, args ...any) {
-	if l < 3 {
-		log.Printf(msg, args...)
-	}
-}
 
 func main() {
 	flag.Parse()
@@ -106,14 +84,6 @@ func main() {
 		server.EndPoint(hostname, *port),
 	)
 
-	// the server.SetLogger takes a server.Logger interface.  This interface is met by
-	// the slog.Logger{}.  A simple wrapper could be made for other loggers if they don't already
-	// meet the interface and that is what we've done here.
-	logger := Logger(1)
-	opts = append(opts,
-		server.SetLogger(logger),
-	)
-
 	// Here is an example of certificate generation.  This is not necessary if you already have a certificate.
 	if *gencert {
 		// it is important that the certificate is generated with the correct hostname/IP address URIs
@@ -124,7 +94,7 @@ func main() {
 			*endpoint,
 		}
 
-		c, k, err := GenerateCert(endpoints, 4096, time.Minute*60*24*365*10)
+		c, k, err := utils.GenerateCert(endpoints, 4096, time.Minute*60*24*365*10)
 		if err != nil {
 			log.Fatalf("problem creating cert: %v", err)
 		}
