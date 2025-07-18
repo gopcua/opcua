@@ -6,6 +6,7 @@ import (
 
 	"github.com/gopcua/opcua/id"
 	"github.com/gopcua/opcua/ua"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -244,4 +245,20 @@ func TestClient_SetState(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestClient_LoadNil(t *testing.T) {
+	t.Run("normal client init", func(t *testing.T) {
+		c, err := NewClient("opc.tcp://dummy")
+		require.NoError(t, err)
+		assert.NoError(t, c.Close(context.TODO()))
+		assert.Nil(t, c.SecureChannel())
+		assert.Nil(t, c.Session())
+	})
+	t.Run("abnormal client init", func(t *testing.T) {
+		c := new(Client)
+		assert.NoError(t, c.Close(context.TODO()))
+		assert.Nil(t, c.SecureChannel())
+		assert.Nil(t, c.Session())
+	})
 }
