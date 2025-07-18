@@ -61,13 +61,13 @@ func main() {
 	// Set your security options.
 	opts = append(opts,
 		server.EnableSecurity("None", ua.MessageSecurityModeNone),
+		server.EnableSecurity("Basic256Sha256", ua.MessageSecurityModeSignAndEncrypt),
 		/*
 				These security modes are not implemented yet.
 			server.EnableSecurity("Basic128Rsa15", ua.MessageSecurityModeSign),
 			server.EnableSecurity("Basic128Rsa15", ua.MessageSecurityModeSignAndEncrypt),
 			server.EnableSecurity("Basic256", ua.MessageSecurityModeSign),
 			server.EnableSecurity("Basic256", ua.MessageSecurityModeSignAndEncrypt),
-			server.EnableSecurity("Basic256Sha256", ua.MessageSecurityModeSignAndEncrypt),
 			server.EnableSecurity("Basic256Sha256", ua.MessageSecurityModeSign),
 			server.EnableSecurity("Aes128_Sha256_RsaOaep", ua.MessageSecurityModeSign),
 			server.EnableSecurity("Aes128_Sha256_RsaOaep", ua.MessageSecurityModeSignAndEncrypt),
@@ -125,11 +125,11 @@ func main() {
 		if err != nil {
 			log.Fatalf("problem creating cert: %v", err)
 		}
-		err = os.WriteFile(*certfile, c, 0)
+		err = os.WriteFile(*certfile, c, 0644)
 		if err != nil {
 			log.Fatalf("problem writing cert: %v", err)
 		}
-		err = os.WriteFile(*keyfile, k, 0)
+		err = os.WriteFile(*keyfile, k, 0600)
 		if err != nil {
 			log.Fatalf("problem writing key: %v", err)
 		}
@@ -224,7 +224,7 @@ func main() {
 	nns_obj.AddRef(var4, id.HasComponent, true)
 
 	var5 := server.NewNode(
-		ua.NewNumericNodeID(nodeNS.ID(), 101), // you can use whatever node id you want here, whether it's numeric, string, guid, etc...
+		ua.NewNumericNodeID(nodeNS.ID(), 105), // you can use whatever node id you want here, whether it's numeric, string, guid, etc...
 		map[ua.AttributeID]*ua.DataValue{
 			ua.AttributeIDAccessLevel:     server.DataValueFromValue(byte(ua.AccessLevelTypeCurrentRead)),
 			ua.AttributeIDUserAccessLevel: server.DataValueFromValue(byte(ua.AccessLevelTypeCurrentRead)),
