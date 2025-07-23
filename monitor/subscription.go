@@ -4,6 +4,7 @@ import (
 	"context"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/gopcua/opcua"
 	"github.com/gopcua/opcua/errors"
@@ -22,15 +23,27 @@ var (
 type ErrHandler func(*opcua.Client, *Subscription, error)
 
 // MsgHandler is a function that is called for each new DataValue
-type MsgHandler func(*Subscription, *DataChangeMessage)
+type MsgHandler func(*Subscription, Message)
 
-// DataChangeMessage represents the changed DataValue from the server. It also includes a reference
-// to the sending NodeID and error (if any)
+// Message is an interface that can represent either a DataChangeMessage or an EventMessage
+type Message interface {
+	isMessage()
+}
+
 type DataChangeMessage struct {
 	*ua.DataValue
 	Error  error
 	NodeID *ua.NodeID
 }
+
+func (DataChangeMessage) isMessage() {}
+
+type EventMessage struct {
+	EventFields []*ua.DataValue
+	Error       error
+}
+
+func (EventMessage) isMessage() {}
 
 // NodeMonitor creates new subscriptions
 type NodeMonitor struct {
@@ -88,7 +101,7 @@ func NewNodeMonitor(client *opcua.Client) (*NodeMonitor, error) {
 	return m, nil
 }
 
-func newSubscription(ctx context.Context, m *NodeMonitor, params *opcua.SubscriptionParameters, notifyChanLength int, nodes ...string) (*Subscription, error) {
+func newSubscription(ctx context.Context, m *NodeMonitor, params *opcua.SubscriptionParameters, notifyChanLength int, eventSub bool, filter *ua.ExtensionObject, nodes ...string) (*Subscription, error) {
 	if params == nil {
 		params = &opcua.SubscriptionParameters{}
 	}
@@ -106,7 +119,7 @@ func newSubscription(ctx context.Context, m *NodeMonitor, params *opcua.Subscrip
 		return nil, err
 	}
 
-	if err = s.AddNodes(ctx, nodes...); err != nil {
+	if err = s.AddNodes(ctx, eventSub, filter, nodes...); err != nil {
 		return nil, err
 	}
 
@@ -121,13 +134,13 @@ func (m *NodeMonitor) SetErrorHandler(cb ErrHandler) {
 // Subscribe creates a new callback-based subscription and an optional list of nodes.
 // The caller must call `Unsubscribe` to stop and clean up resources. Canceling the context
 // will also cause the subscription to stop, but `Unsubscribe` must still be called.
-func (m *NodeMonitor) Subscribe(ctx context.Context, params *opcua.SubscriptionParameters, cb MsgHandler, nodes ...string) (*Subscription, error) {
-	sub, err := newSubscription(ctx, m, params, DefaultCallbackBufferLen, nodes...)
+func (m *NodeMonitor) Subscribe(ctx context.Context, params *opcua.SubscriptionParameters, cb MsgHandler, eventSub bool, filter *ua.ExtensionObject, nodes ...string) (*Subscription, error) {
+	sub, err := newSubscription(ctx, m, params, DefaultCallbackBufferLen, eventSub, filter, nodes...)
 	if err != nil {
 		return nil, err
 	}
 
-	go sub.pump(ctx, nil, cb)
+	go sub.pump(ctx, nil, cb, true)
 
 	return sub, nil
 }
@@ -137,13 +150,13 @@ func (m *NodeMonitor) Subscribe(ctx context.Context, params *opcua.SubscriptionP
 // via the monitor's `ErrHandler`.
 // The caller must call `Unsubscribe` to stop and clean up resources. Canceling the context
 // will also cause the subscription to stop, but `Unsubscribe` must still be called.
-func (m *NodeMonitor) ChanSubscribe(ctx context.Context, params *opcua.SubscriptionParameters, ch chan<- *DataChangeMessage, nodes ...string) (*Subscription, error) {
-	sub, err := newSubscription(ctx, m, params, 16, nodes...)
+func (m *NodeMonitor) ChanSubscribe(ctx context.Context, params *opcua.SubscriptionParameters, ch chan<- Message, eventSub bool, filter *ua.ExtensionObject, nodes ...string) (*Subscription, error) {
+	sub, err := newSubscription(ctx, m, params, 16, eventSub, filter, nodes...)
 	if err != nil {
 		return nil, err
 	}
 
-	go sub.pump(ctx, ch, nil)
+	go sub.pump(ctx, ch, nil, true)
 
 	return sub, nil
 }
@@ -155,7 +168,7 @@ func (s *Subscription) sendError(err error) {
 }
 
 // internal func to read from internal channel and write to client provided channel
-func (s *Subscription) pump(ctx context.Context, notifyCh chan<- *DataChangeMessage, cb MsgHandler) {
+func (s *Subscription) pump(ctx context.Context, notifyCh chan<- Message, cb MsgHandler, sub bool) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -216,6 +229,49 @@ func (s *Subscription) pump(ctx context.Context, notifyCh chan<- *DataChangeMess
 						panic("notifyCh or cb must be set")
 					}
 				}
+
+			case *ua.EventNotificationList:
+				for _, item := range v.Events {
+					s.mu.RLock()
+					_, ok := s.handles[item.ClientHandle]
+					s.mu.RUnlock()
+
+					out := &EventMessage{}
+					if !ok {
+						out.Error = errors.Errorf("handle %d not found", item.ClientHandle)
+						// TODO: should the error also propagate via the monitor callback?
+					} else {
+						// Initialize the EventFields slice with the correct size
+						out.EventFields = make([]*ua.DataValue, len(item.EventFields))
+
+						for i, field := range item.EventFields {
+							// Create a new DataValue
+							dataValue := &ua.DataValue{
+								Value:           field,
+								Status:          ua.StatusOK,
+								SourceTimestamp: time.Now(),
+								ServerTimestamp: time.Now(),
+							}
+							out.EventFields[i] = dataValue
+						}
+					}
+
+					if notifyCh != nil {
+						select {
+						case notifyCh <- out:
+							atomic.AddUint64(&s.delivered, 1)
+						default:
+							atomic.AddUint64(&s.dropped, 1)
+							s.sendError(ErrSlowConsumer)
+						}
+					} else if cb != nil {
+						cb(s, out)
+						atomic.AddUint64(&s.delivered, 1)
+					} else {
+						panic("notifyCh or cb must be set")
+					}
+
+				}
 			default:
 				s.sendError(errors.Errorf("unknown message type: %T", msg.Value))
 			}
@@ -260,16 +316,16 @@ func (s *Subscription) Dropped() uint64 {
 }
 
 // AddNodes adds nodes defined by their string representation
-func (s *Subscription) AddNodes(ctx context.Context, nodes ...string) error {
+func (s *Subscription) AddNodes(ctx context.Context, eventSub bool, filter *ua.ExtensionObject, nodes ...string) error {
 	nodeIDs, err := parseNodeSlice(nodes...)
 	if err != nil {
 		return err
 	}
-	return s.AddNodeIDs(ctx, nodeIDs...)
+	return s.AddNodeIDs(ctx, eventSub, filter, nodeIDs...)
 }
 
 // AddNodeIDs adds nodes
-func (s *Subscription) AddNodeIDs(ctx context.Context, nodes ...*ua.NodeID) error {
+func (s *Subscription) AddNodeIDs(ctx context.Context, eventSub bool, filter *ua.ExtensionObject, nodes ...*ua.NodeID) error {
 	requests := make([]Request, len(nodes))
 
 	for i, node := range nodes {
@@ -278,12 +334,78 @@ func (s *Subscription) AddNodeIDs(ctx context.Context, nodes ...*ua.NodeID) erro
 			MonitoringMode: ua.MonitoringModeReporting,
 		}
 	}
-	_, err := s.AddMonitorItems(ctx, requests...)
+	var err error
+	if eventSub {
+		_, err = s.AddMonitorEvents(ctx, filter, requests...)
+	} else {
+		_, err = s.AddMonitorItems(ctx, requests...)
+	}
 	return err
 }
 
 // AddMonitorItems adds nodes with monitoring parameters to the subscription
 func (s *Subscription) AddMonitorItems(ctx context.Context, nodes ...Request) ([]Item, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if len(nodes) == 0 {
+		// some server implementations allow an empty monitoreditemrequest, some don't.
+		// better to just return
+		return nil, nil
+	}
+
+	toAdd := make([]*ua.MonitoredItemCreateRequest, 0)
+
+	// Add handles and make requests
+	for i, node := range nodes {
+		handle := atomic.AddUint32(&s.monitor.nextClientHandle, 1)
+		s.handles[handle] = nodes[i].NodeID
+		nodes[i].handle = handle
+
+		request := opcua.NewDefaultMonitoredItemCreateRequest(opcua.MonitoredItemCreateRequestArgs{
+			NodeID:       node.NodeID,
+			AttributeID:  ua.AttributeIDValue,
+			ClientHandle: handle,
+		})
+		request.MonitoringMode = node.MonitoringMode
+
+		if node.MonitoringParameters != nil {
+			request.RequestedParameters = node.MonitoringParameters
+			request.RequestedParameters.ClientHandle = handle
+		}
+		toAdd = append(toAdd, request)
+	}
+	resp, err := s.sub.Monitor(ctx, ua.TimestampsToReturnBoth, toAdd...)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.ResponseHeader.ServiceResult != ua.StatusOK {
+		return nil, resp.ResponseHeader.ServiceResult
+	}
+
+	if len(resp.Results) != len(toAdd) {
+		return nil, errors.Errorf("monitor items response length mismatch")
+	}
+	var monitoredItems []Item
+	for i, res := range resp.Results {
+		if res.StatusCode != ua.StatusOK {
+			return nil, res.StatusCode
+		}
+		mn := Item{
+			id:     res.MonitoredItemID,
+			handle: nodes[i].handle,
+			nodeID: toAdd[i].ItemToMonitor.NodeID,
+		}
+		s.itemLookup[res.MonitoredItemID] = mn
+		monitoredItems = append(monitoredItems, mn)
+	}
+
+	return monitoredItems, nil
+}
+
+// AddMonitorEvents adds nodes with monitoring parameters to the subscription
+func (s *Subscription) AddMonitorEvents(ctx context.Context, filter *ua.ExtensionObject, nodes ...Request) ([]Item, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -301,7 +423,12 @@ func (s *Subscription) AddMonitorItems(ctx context.Context, nodes ...Request) ([
 		s.handles[handle] = nodes[i].NodeID
 		nodes[i].handle = handle
 
-		request := opcua.NewMonitoredItemCreateRequestWithDefaults(node.NodeID, ua.AttributeIDValue, handle)
+		request := opcua.NewDefaultMonitoredItemCreateRequest(opcua.MonitoredItemCreateRequestArgs{
+			NodeID:       node.NodeID,
+			AttributeID:  ua.AttributeIDEventNotifier,
+			ClientHandle: handle,
+			Filter:       filter,
+		})
 		request.MonitoringMode = node.MonitoringMode
 
 		if node.MonitoringParameters != nil {
