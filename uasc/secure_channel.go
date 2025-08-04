@@ -495,6 +495,9 @@ func (s *SecureChannel) readChunk() (*MessageChunk, error) {
 			}
 
 			s.openingInstance.algo = algo
+
+			// For OpenSecureChannel asymmetric encryption is always used
+			s.cfg.SecurityMode = ua.MessageSecurityModeSignAndEncrypt
 		}
 
 		decryptWith = s.openingInstance
