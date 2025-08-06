@@ -1,6 +1,7 @@
 package server
 
 import (
+	"log/slog"
 	mrand "math/rand"
 	"sync"
 	"time"
@@ -30,11 +31,13 @@ type sessionBroker struct {
 	mu sync.Mutex
 
 	// s contains all sessions watched by the session broker
-	s      map[string]*session
-	logger Logger
+	s map[string]*session
+
+	// logger is the server logger.
+	logger *slog.Logger
 }
 
-func newSessionBroker(logger Logger) *sessionBroker {
+func newSessionBroker(logger *slog.Logger) *sessionBroker {
 	return &sessionBroker{
 		s:      make(map[string]*session),
 		logger: logger,
@@ -60,9 +63,7 @@ func (sb *sessionBroker) Close(authToken *ua.NodeID) error {
 	defer sb.mu.Unlock()
 
 	if sb.s[authToken.String()] == nil {
-		if sb.logger != nil {
-			sb.logger.Warn("sessionBroker.Close: error looking up session %v", authToken)
-		}
+		sb.logger.Warn("sessionBroker.Close: error looking up session", "auth_token", authToken)
 	}
 	delete(sb.s, authToken.String())
 
@@ -75,9 +76,7 @@ func (sb *sessionBroker) Session(authToken *ua.NodeID) *session {
 
 	s := sb.s[authToken.String()]
 	if s == nil {
-		if sb.logger != nil {
-			sb.logger.Warn("sessionBroker.Session: error looking up session %v", authToken)
-		}
+		sb.logger.Warn("sessionBroker.Session: error looking up session", "auth_token", authToken)
 	}
 
 	return s

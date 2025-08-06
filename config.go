@@ -9,7 +9,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	"log"
+	"log/slog"
 	"math/rand"
 	"net"
 	"os"
@@ -62,6 +62,7 @@ type Config struct {
 	sechan  *uasc.Config
 	session *uasc.SessionConfig
 	stateCh chan<- ConnState
+	logger  *slog.Logger
 }
 
 func DefaultDialer() *uacp.Dialer {
@@ -78,6 +79,7 @@ func newConfig() *Config {
 		dialer:  DefaultDialer(),
 		sechan:  DefaultClientConfig(),
 		session: DefaultSessionConfig(),
+		logger:  slog.Default(),
 	}
 }
 
@@ -142,6 +144,19 @@ func Lifetime(d time.Duration) Option {
 func Locales(locale ...string) Option {
 	return func(cfg *Config) error {
 		cfg.session.LocaleIDs = locale
+		return nil
+	}
+}
+
+// LogHandler configures the logger for the client.
+// Defaults to [slog.Default()] when [h] is [nil].
+func LogHandler(h slog.Handler) Option {
+	return func(cfg *Config) error {
+		if h == nil {
+			cfg.logger = slog.Default()
+		} else {
+			cfg.logger = slog.New(h)
+		}
 		return nil
 	}
 }
@@ -412,7 +427,7 @@ func setPolicyID(t interface{}, policy string) {
 func AuthPolicyID(policy string) Option {
 	return func(cfg *Config) error {
 		if cfg.session.UserIdentityToken == nil {
-			log.Printf("policy ID needs to be set after the policy type is chosen, no changes made.  Call SecurityFromEndpoint() or an AuthXXX() option first")
+			slog.Warn("policy ID needs to be set after the policy type is chosen, no changes made.  Call SecurityFromEndpoint() or an AuthXXX() option first")
 			return nil
 		}
 		setPolicyID(cfg.session.UserIdentityToken, policy)
@@ -432,7 +447,7 @@ func AuthAnonymous() Option {
 		_, ok := cfg.session.UserIdentityToken.(*ua.AnonymousIdentityToken)
 		if !ok {
 			// todo(fs): should we Fatal here?
-			log.Printf("non-anonymous authentication already configured, ignoring")
+			slog.Warn("non-anonymous authentication already configured, ignoring")
 			return nil
 		}
 		return nil
@@ -451,7 +466,7 @@ func AuthUsername(user, pass string) Option {
 		t, ok := cfg.session.UserIdentityToken.(*ua.UserNameIdentityToken)
 		if !ok {
 			// todo(fs): should we Fatal here?
-			log.Printf("non-username authentication already configured, ignoring")
+			slog.Warn("non-username authentication already configured, ignoring")
 			return nil
 		}
 
@@ -473,7 +488,7 @@ func AuthCertificate(cert []byte) Option {
 		t, ok := cfg.session.UserIdentityToken.(*ua.X509IdentityToken)
 		if !ok {
 			// todo(fs): should we Fatal here?
-			log.Printf("non-certificate authentication already configured, ignoring")
+			slog.Warn("non-certificate authentication already configured, ignoring")
 			return nil
 		}
 
@@ -503,7 +518,7 @@ func AuthIssuedToken(tokenData []byte) Option {
 
 		t, ok := cfg.session.UserIdentityToken.(*ua.IssuedIdentityToken)
 		if !ok {
-			log.Printf("non-issued token authentication already configured, ignoring")
+			slog.Warn("non-issued token authentication already configured, ignoring")
 			return nil
 		}
 

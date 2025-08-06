@@ -8,24 +8,27 @@ package main
 import (
 	"context"
 	"flag"
-	"log"
+	"fmt"
+	"log/slog"
 
 	"github.com/gopcua/opcua"
-	"github.com/gopcua/opcua/debug"
+	"github.com/gopcua/opcua/internal/ualog"
 )
 
 func main() {
-	var endpoint = flag.String("endpoint", "opc.tcp://localhost:4840", "OPC UA Endpoint URL")
-	flag.BoolVar(&debug.Enable, "debug", false, "enable debug logging")
+	var (
+		endpoint = flag.String("endpoint", "opc.tcp://localhost:4840", "OPC UA Endpoint URL")
+		debug    = flag.Bool("debug", false, "enable debug logging")
+	)
 	flag.Parse()
-	log.SetFlags(0)
+	slog.SetDefault(slog.New(ualog.NewTextHandler(*debug)))
 
 	eps, err := opcua.GetEndpoints(context.Background(), *endpoint)
 	if err != nil {
-		log.Fatal(err)
+		ualog.Fatal("GetEndpoints failed", "error", err)
 	}
 
-	for _, ep := range eps {
-		log.Println(ep.EndpointURL, ep.SecurityPolicyURI, ep.SecurityMode)
+	for i, ep := range eps {
+		slog.Info(fmt.Sprintf("%d.", i), "ep_url", ep.EndpointURL, "sec_policy", ep.SecurityPolicyURI, "sec_mode", ep.SecurityMode)
 	}
 }

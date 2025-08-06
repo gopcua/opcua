@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"testing"
 
 	"github.com/gopcua/opcua"
@@ -71,7 +71,7 @@ func populateServer(s *server.Server) {
 
 	// Now we'll add a node namespace.
 	nodeNS := server.NewNodeNameSpace(s, "NodeNamespace")
-	log.Printf("Node Namespace added at index %d", nodeNS.ID())
+	slog.Info("Node Namespace added", "index", nodeNS.ID())
 
 	// add the reference for this namespace's root object folder to the server's root object folder
 	// but you can add a reference to whatever node(s) you need

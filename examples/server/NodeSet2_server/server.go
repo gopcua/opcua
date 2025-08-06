@@ -11,52 +11,29 @@ import (
 	"encoding/xml"
 	"flag"
 	"io"
-	"log"
+	"log/slog"
 	"os"
 	"os/signal"
 	"time"
 
-	"github.com/gopcua/opcua/debug"
+	"github.com/gopcua/opcua/internal/ualog"
 	"github.com/gopcua/opcua/schema"
 	"github.com/gopcua/opcua/server"
+	"github.com/gopcua/opcua/tests/utils"
 	"github.com/gopcua/opcua/ua"
 )
 
-var (
-	endpoint = flag.String("endpoint", "0.0.0.0", "OPC UA Endpoint URL")
-	port     = flag.Int("port", 4840, "OPC UA Endpoint port")
-	certfile = flag.String("cert", "cert.pem", "Path to certificate file")
-	keyfile  = flag.String("key", "key.pem", "Path to PEM Private Key file")
-	gencert  = flag.Bool("gen-cert", false, "Generate a new certificate")
-)
-
-type Logger int
-
-func (l Logger) Debug(msg string, args ...any) {
-	if l < 0 {
-		log.Printf(msg, args...)
-	}
-}
-func (l Logger) Info(msg string, args ...any) {
-	if l < 1 {
-		log.Printf(msg, args...)
-	}
-}
-func (l Logger) Warn(msg string, args ...any) {
-	if l < 2 {
-		log.Printf(msg, args...)
-	}
-}
-func (l Logger) Error(msg string, args ...any) {
-	if l < 3 {
-		log.Printf(msg, args...)
-	}
-}
-
 func main() {
-	flag.BoolVar(&debug.Enable, "debug", false, "enable debug logging")
+	var (
+		endpoint = flag.String("endpoint", "0.0.0.0", "OPC UA Endpoint URL")
+		port     = flag.Int("port", 4840, "OPC UA Endpoint port")
+		certfile = flag.String("cert", "cert.pem", "Path to certificate file")
+		keyfile  = flag.String("key", "key.pem", "Path to PEM Private Key file")
+		gencert  = flag.Bool("gen-cert", false, "Generate a new certificate")
+		debug    = flag.Bool("debug", false, "enable debug logging")
+	)
 	flag.Parse()
-	log.SetFlags(0)
+	slog.SetDefault(slog.New(ualog.NewTextHandler(*debug)))
 
 	var opts []server.Option
 
@@ -96,7 +73,7 @@ func main() {
 	// be sure the hostname(s) also match the certificate the server is going to use.
 	hostname, err := os.Hostname()
 	if err != nil {
-		log.Fatalf("Error getting host name %v", err)
+		ualog.Fatal("Hostname failed", "error", err)
 	}
 
 	opts = append(opts,
@@ -108,10 +85,10 @@ func main() {
 	// the server.SetLogger takes a server.Logger interface.  This interface is met by
 	// the slog.Logger{}.  A simple wrapper could be made for other loggers if they don't already
 	// meet the interface.
-	logger := Logger(2)
-	opts = append(opts,
-		server.SetLogger(logger),
-	)
+	// logger := Logger(2)
+	// opts = append(opts,
+	// 	server.SetLogger(logger),
+	// )
 
 	// Here is an example of certificate generation.  This is not necessary if you already have a certificate.
 	if *gencert {
@@ -123,31 +100,30 @@ func main() {
 			*endpoint,
 		}
 
-		c, k, err := GenerateCert(endpoints, 4096, time.Minute*60*24*365*10)
+		c, k, err := utils.GenerateCert(endpoints, 4096, time.Minute*60*24*365*10)
 		if err != nil {
-			log.Fatalf("problem creating cert: %v", err)
+			ualog.Fatal("GenerateCert failed", "error", err)
 		}
 		err = os.WriteFile(*certfile, c, 0)
 		if err != nil {
-			log.Fatalf("problem writing cert: %v", err)
+			ualog.Fatal("Writing certfile failed", "error", err)
 		}
 		err = os.WriteFile(*keyfile, k, 0)
 		if err != nil {
-			log.Fatalf("problem writing key: %v", err)
+			ualog.Fatal("Writing keyfile failed", "error", err)
 		}
-
 	}
 
 	var cert []byte
 	if *gencert || (*certfile != "" && *keyfile != "") {
-		log.Printf("Loading cert/key from %s/%s", *certfile, *keyfile)
+		slog.Info("Loading cert and key", "certfile", *certfile, "keyfile", *keyfile)
 		c, err := tls.LoadX509KeyPair(*certfile, *keyfile)
 		if err != nil {
-			log.Printf("Failed to load certificate: %s", err)
+			slog.Error("LoadX509KeyPair failed", "error", err)
 		} else {
 			pk, ok := c.PrivateKey.(*rsa.PrivateKey)
 			if !ok {
-				log.Fatalf("Invalid private key")
+				ualog.Fatal("Invalid private key", "type", ualog.TypeOf(c.PrivateKey))
 			}
 			cert = c.Certificate[0]
 			opts = append(opts, server.PrivateKey(pk), server.Certificate(cert))
@@ -167,11 +143,11 @@ func main() {
 	// first, we read the file and unmarshal it into a schema.UANodeSet struct.  Then it can be imported
 	file, err := os.Open("Opc.Ua.Di.NodeSet2.xml")
 	if err != nil {
-		log.Fatalf("error opening nodeset file: %v", err)
+		ualog.Fatal("opening nodeset file failed", "error", err)
 	}
 	node_data, err := io.ReadAll(file)
 	if err != nil {
-		log.Fatalf("error reading nodeset file: %v", err)
+		ualog.Fatal("reading nodeset file failed", "error", err)
 	}
 	var nodes schema.UANodeSet
 	xml.Unmarshal(node_data, &nodes)
@@ -181,12 +157,12 @@ func main() {
 	// your heart desires
 	node := s.Node(ua.NewNumericNodeID(1, 15044))
 	if node != nil {
-		log.Printf("Found node %v", node)
+		slog.Info("Found node", "node_id", node)
 	}
 
 	// Start the server
 	if err := s.Start(context.Background()); err != nil {
-		log.Fatalf("Error starting server, exiting: %s", err)
+		ualog.Fatal("Starting server failed", "error", err)
 	}
 	defer s.Close()
 
@@ -194,8 +170,8 @@ func main() {
 	sigch := make(chan os.Signal, 1)
 	signal.Notify(sigch, os.Interrupt)
 	defer signal.Stop(sigch)
-	log.Printf("Press CTRL-C to exit")
+	slog.Info("Press CTRL-C to exit")
 
 	<-sigch
-	log.Printf("Shutting down the server...")
+	slog.Info("Shutting down the server...")
 }

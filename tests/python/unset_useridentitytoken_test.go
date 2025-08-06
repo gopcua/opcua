@@ -5,7 +5,6 @@ package uatest
 
 import (
 	"context"
-	"log"
 	"testing"
 
 	"github.com/gopcua/opcua"
@@ -20,7 +19,7 @@ func TestUnsetUserIdentityTokenConnect(t *testing.T) {
 
 	endpoints, err := opcua.GetEndpoints(ctx, *&srv.Endpoint)
 	if err != nil {
-		log.Fatal(err)
+		t.Fatal(err)
 	}
 
 	ep, err := opcua.SelectEndpoint(endpoints, "None", ua.MessageSecurityModeFromString("None"))

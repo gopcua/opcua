@@ -6,11 +6,11 @@ package uasc
 
 import (
 	"encoding/binary"
+	"log/slog"
 	"math"
 	"sync"
 	"time"
 
-	"github.com/gopcua/opcua/debug"
 	"github.com/gopcua/opcua/errors"
 	"github.com/gopcua/opcua/id"
 	"github.com/gopcua/opcua/ua"
@@ -40,12 +40,15 @@ type channelInstance struct {
 	// bytesReceived    uint64
 	messagesSent uint32 // atomic.Load/Store
 	// messagesReceived uint32
+
+	logger *slog.Logger
 }
 
 func newChannelInstance(sc *SecureChannel) *channelInstance {
 	return &channelInstance{
-		sc:    sc,
-		state: channelOpening,
+		sc:     sc,
+		state:  channelOpening,
+		logger: sc.logger,
 	}
 }
 
@@ -85,8 +88,9 @@ func (c *channelInstance) newRequestMessage(req ua.Request, reqID uint32, authTo
 }
 
 func (c *channelInstance) newMessage(srv interface{}, typeID uint16, requestID uint32) *Message {
+	dlog := c.logger.With("func", "channelInstance.newMessage")
 	sequenceNumber := c.nextSequenceNumber()
-	debug.Printf("got sequence number %d", sequenceNumber)
+	dlog.Debug("new message", "sequence_number", sequenceNumber)
 
 	switch typeID {
 	case id.OpenSecureChannelRequest_Encoding_DefaultBinary, id.OpenSecureChannelResponse_Encoding_DefaultBinary:

@@ -5,7 +5,8 @@
 package ua
 
 import (
-	"github.com/gopcua/opcua/debug"
+	"log/slog"
+
 	"github.com/gopcua/opcua/id"
 )
 
@@ -76,7 +77,8 @@ func (e *ExtensionObject) Decode(b []byte) (int, error) {
 	typeID := e.TypeID.NodeID
 	e.Value = eotypes.New(typeID)
 	if e.Value == nil {
-		debug.Printf("ua: unknown extension object %s", typeID)
+		dlog := slog.With("func", "ExtensionObject.Decode")
+		dlog.Debug("ua: unknown extension object", "type_id", typeID)
 		return buf.Pos(), buf.Error()
 	}
 

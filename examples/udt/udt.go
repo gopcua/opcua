@@ -7,11 +7,10 @@ package main
 import (
 	"context"
 	"flag"
-	"fmt"
-	"log"
+	"log/slog"
 
 	"github.com/gopcua/opcua"
-	"github.com/gopcua/opcua/debug"
+	"github.com/gopcua/opcua/internal/ualog"
 	"github.com/gopcua/opcua/ua"
 )
 
@@ -23,28 +22,28 @@ func main() {
 		certFile = flag.String("cert", "", "Path to cert.pem. Required for security mode/policy != None")
 		keyFile  = flag.String("key", "", "Path to private key.pem. Required for security mode/policy != None")
 		nodeID   = flag.String("node", "", "NodeID to read")
+		debug    = flag.Bool("debug", false, "enable debug logging")
 	)
-	flag.BoolVar(&debug.Enable, "debug", false, "enable debug logging")
 	flag.Parse()
-	log.SetFlags(0)
+	slog.SetDefault(slog.New(ualog.NewTextHandler(*debug)))
 
 	id, err := ua.ParseNodeID(*nodeID)
 	if err != nil {
-		log.Fatalf("invalid node id: %v", err)
+		ualog.Fatal("invalid node id", "node_id", *nodeID, "error", err)
 	}
 
 	ctx := context.Background()
 
 	endpoints, err := opcua.GetEndpoints(ctx, *endpoint)
 	if err != nil {
-		log.Fatal(err)
+		ualog.Fatal("GetEndpoints failed", "error", err)
 	}
 	ep, err := opcua.SelectEndpoint(endpoints, *policy, ua.MessageSecurityModeFromString(*mode))
 	if err != nil {
-		log.Fatal(err)
+		ualog.Fatal("SelectEndpoint failed", "error", err)
 	}
 
-	fmt.Println("*", ep.SecurityPolicyURI, ep.SecurityMode)
+	slog.Info("*", "sec_policy", ep.SecurityPolicyURI, "sec_mode", ep.SecurityMode)
 
 	opts := []opcua.Option{
 		opcua.SecurityPolicy(*policy),
@@ -57,21 +56,21 @@ func main() {
 
 	c, err := opcua.NewClient(ep.EndpointURL, opts...)
 	if err != nil {
-		log.Fatal(err)
+		ualog.Fatal("NewClient failed", "error", err)
 	}
 	if err := c.Connect(ctx); err != nil {
-		log.Fatal(err)
+		ualog.Fatal("Connect failed", "error", err)
 	}
 	defer c.Close(ctx)
 
 	v, err := c.Node(id).Value(ctx)
 	switch {
 	case err != nil:
-		log.Fatal(err)
+		ualog.Fatal("Value failed", "error", err)
 	case v == nil:
-		log.Print("v == nil")
+		slog.Info("v == nil")
 	default:
-		log.Printf("val: %#v", v.Value().(*ua.ExtensionObject).Value)
+		slog.Info("extobj", "value", v.Value().(*ua.ExtensionObject).Value)
 	}
 }
 
