@@ -89,7 +89,7 @@ func NewFolderNode(nodeID *ua.NodeID, name string) *Node {
 			ua.AttributeIDNodeClass:     DataValueFromValue(uint32(ua.NodeClassObject)),
 			ua.AttributeIDBrowseName:    DataValueFromValue(attrs.BrowseName(name)),
 			ua.AttributeIDDisplayName:   DataValueFromValue(attrs.DisplayName(name, name)),
-			ua.AttributeIDDescription:   DataValueFromValue(ua.NodeClassObject),
+			ua.AttributeIDDescription:   DataValueFromValue(uint32(ua.NodeClassObject)),
 			ua.AttributeIDEventNotifier: DataValueFromValue(int16(0)),
 		},
 		[]*ua.ReferenceDescription{{
