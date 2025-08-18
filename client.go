@@ -695,7 +695,11 @@ func (c *Client) setPublishTimeout(d time.Duration) {
 // During reconnect this value can change.
 // Make sure to capture the value in a method before using it.
 func (c *Client) SecureChannel() *uasc.SecureChannel {
-	return c.atomicSechan.Load().(*uasc.SecureChannel)
+	s, ok := c.atomicSechan.Load().(*uasc.SecureChannel)
+	if !ok {
+		return nil
+	}
+	return s
 }
 
 func (c *Client) setSecureChannel(sc *uasc.SecureChannel) {
@@ -707,7 +711,11 @@ func (c *Client) setSecureChannel(sc *uasc.SecureChannel) {
 // During reconnect this value can change.
 // Make sure to capture the value in a method before using it.
 func (c *Client) Session() *Session {
-	return c.atomicSession.Load().(*Session)
+	s, ok := c.atomicSession.Load().(*Session)
+	if !ok {
+		return nil
+	}
+	return s
 }
 
 func (c *Client) setSession(s *Session) {
