@@ -168,6 +168,11 @@ func (s *Subscription) Monitor(ctx context.Context, ts ua.TimestampsToReturn, it
 	s.itemsMu.Lock()
 	for i, item := range items {
 		result := res.Results[i]
+
+		if result.StatusCode != ua.StatusGood {
+			continue
+		}
+		
 		s.items[result.MonitoredItemID] = &monitoredItem{
 			req: item,
 			res: result,
