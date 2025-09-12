@@ -177,6 +177,12 @@ type Client struct {
 
 	// monitorOnce ensures only one connection monitor is running
 	monitorOnce sync.Once
+
+	// sessionMonitorOnce ensures only one session monitor is running
+	sessionMonitorOnce sync.Once
+
+	// sessionCancel stops session monitoring
+	sessionCancel func()
 }
 
 // NewClient creates a new Client.
@@ -268,6 +274,15 @@ func (c *Client) Connect(ctx context.Context) error {
 		go c.monitor(mctx)
 		go c.monitorSubscriptions(mctx)
 	})
+
+	// Start session keep-alive if enabled
+	if c.cfg.session.SessionKeepAlive {
+		sessionCtx, sessionCancel := context.WithCancel(context.Background())
+		c.sessionCancel = sessionCancel
+		c.sessionMonitorOnce.Do(func() {
+			go c.monitorSession(sessionCtx)
+		})
+	}
 
 	// todo(fs): we might need to guard this with an option in case of a broken
 	// todo(fs): server. For the sake of simplicity we left the option out but
@@ -590,6 +605,136 @@ func (c *Client) monitor(ctx context.Context) {
 	}
 }
 
+func (c *Client) monitorSession(ctx context.Context) {
+	dlog := debug.NewPrefixLogger("client: session-monitor: ")
+	dlog.Printf("start")
+	defer dlog.Printf("done")
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			// Wait for an active session to appear
+			s := c.waitForActiveSession(ctx)
+			if s == nil {
+				return // context cancelled
+			}
+
+			// Schedule keep alive for this session
+			c.monitorSessionKeepAlive(ctx, s)
+		}
+	}
+}
+
+// waitForActiveSession waits until we have an active session and are connected
+func (c *Client) waitForActiveSession(ctx context.Context) *Session {
+	dlog := debug.NewPrefixLogger("client: session-monitor: ")
+
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-ticker.C:
+			if c.State() == Connected {
+				if s := c.Session(); s != nil {
+					lastActivity := s.LastActivity()
+					if !lastActivity.IsZero() {
+						dlog.Printf("found active session, scheduling keep alive")
+						return s
+					}
+				}
+			}
+		}
+	}
+}
+
+// monitorSessionKeepAlive continuously monitors and sends keep-alive requests for the given session
+func (c *Client) monitorSessionKeepAlive(ctx context.Context, s *Session) {
+	dlog := debug.NewPrefixLogger("client: session-keep-alive: ")
+
+	// Set default keep alive threshold if not specified
+	cfg := c.cfg.session
+	if cfg.SessionKeepAliveThreshold == 0 {
+		cfg.SessionKeepAliveThreshold = 0.75 // default to 75% of timeout, same as secure channel
+	}
+
+	// Calculate when to send keep-alive - similar to secure channel approach
+	keepAliveThreshold := time.Duration(float64(s.RevisedTimeout()) * cfg.SessionKeepAliveThreshold)
+	lastActivity := s.LastActivity()
+
+	if lastActivity.IsZero() {
+		dlog.Printf("session last activity time unknown, cannot schedule keep alive")
+		return
+	}
+
+	// Check if keep alive is needed immediately
+	if time.Since(lastActivity) >= keepAliveThreshold {
+		dlog.Printf("keep-alive time already passed, sending immediately")
+		c.performSessionKeepAlive(ctx, s)
+		return
+	}
+
+	dlog.Printf("monitoring session keep-alive with threshold %v", keepAliveThreshold)
+
+	// Check if it's time for keep alive
+	// This automatically adapts when session activity is updated
+	ticker := time.NewTicker(s.RevisedTimeout() / 5) // Check every 5% of the timeout
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			// Check if we still have the same session and are connected
+			currentSession := c.Session()
+			if currentSession == nil || currentSession != s || c.State() != Connected {
+				dlog.Printf("session changed or disconnected, ending keep alive monitoring")
+				return
+			}
+
+			// Get current activity time (may have been updated by responses)
+			currentActivity := s.LastActivity()
+			if currentActivity.IsZero() {
+				dlog.Printf("session activity time is zero, ending keep alive monitoring")
+				return
+			}
+
+			// Check if it's time for keep alive based on current activity
+			if time.Since(currentActivity) >= keepAliveThreshold {
+				dlog.Printf("keep-alive threshold reached, sending keep alive")
+				c.performSessionKeepAlive(ctx, s)
+				// After successful keep alive, continue monitoring
+			}
+		}
+	}
+}
+
+func (c *Client) performSessionKeepAlive(ctx context.Context, s *Session) {
+	dlog := debug.NewPrefixLogger("client: session-keep-alive: ")
+	dlog.Printf("performing session keep-alive")
+
+	// Get current session to ensure we're working with the latest state
+	currentSession := c.Session()
+	if currentSession == nil || currentSession != s {
+		dlog.Printf("session changed during keep-alive, skipping")
+		return
+	}
+
+	// Perform the keep-alive
+	if err := c.keepSessionAlive(ctx, currentSession); err != nil {
+		dlog.Printf("session keep-alive failed: %v", err)
+		// Don't treat this as fatal - the reactive error handling will take over
+		return
+	}
+
+	dlog.Printf("session keep-alive successful")
+}
+
 // Dial establishes a secure channel.
 func (c *Client) Dial(ctx context.Context) error {
 	stats.Client().Add("Dial", 1)
@@ -630,6 +775,9 @@ func (c *Client) Close(ctx context.Context) error {
 
 	if c.mcancel != nil {
 		c.mcancel()
+	}
+	if c.sessionCancel != nil {
+		c.sessionCancel()
 	}
 	if sc := c.SecureChannel(); sc != nil {
 		sc.Close()
@@ -742,12 +890,28 @@ type Session struct {
 
 	// revisedTimeout is the actual maximum time that a Session shall remain open without activity.
 	revisedTimeout time.Duration
+
+	// atomicLastActivity tracks when this session last had activity (created/activated/kept alive)
+	atomicLastActivity atomic.Value // time.Time
 }
 
 // RevisedTimeout return actual maximum time that a Session shall remain open without activity.
 // This value is provided by the server in response to CreateSession.
 func (s *Session) RevisedTimeout() time.Duration {
 	return s.revisedTimeout
+}
+
+// LastActivity returns the timestamp when this session last had activity
+func (s *Session) LastActivity() time.Time {
+	if t, ok := s.atomicLastActivity.Load().(time.Time); ok {
+		return t
+	}
+	return time.Time{}
+}
+
+// setLastActivity sets the timestamp when this session last had activity
+func (s *Session) setLastActivity(t time.Time) {
+	s.atomicLastActivity.Store(t)
 }
 
 // CreateSession creates a new session which is not yet activated and not
@@ -823,6 +987,9 @@ func (c *Client) CreateSession(ctx context.Context, cfg *uasc.SessionConfig) (*S
 			serverCertificate: res.ServerCertificate,
 			revisedTimeout:    time.Duration(res.RevisedSessionTimeout) * time.Millisecond,
 		}
+
+		// Initialize session activity timestamp
+		s.setLastActivity(time.Now())
 
 		return nil
 	})
@@ -920,9 +1087,35 @@ func (c *Client) ActivateSession(ctx context.Context, s *Session) error {
 		// re-connection logic.
 		c.CloseSession(ctx)
 
+		// Update session activity timestamp when activated
+		s.setLastActivity(time.Now())
 		c.setSession(s)
 		return nil
 	})
+}
+
+// keepSessionAlive performs session keep alive by sending a lightweight service request
+// to refresh the session timeout.
+func (c *Client) keepSessionAlive(ctx context.Context, s *Session) error {
+	dlog := debug.NewPrefixLogger("client: session-keep-alive: ")
+
+	// Use a simple Read request to refresh the session timeout
+	// Reading the CurrentTime node is lightweight and always available
+	currentTimeNode := c.Node(ua.NewNumericNodeID(0, id.Server_ServerStatus_CurrentTime))
+
+	dlog.Printf("sending session keep-alive request")
+	_, err := currentTimeNode.Value(ctx)
+	if err != nil {
+		dlog.Printf("keep-alive request failed: %v", err)
+		return err
+	}
+
+	dlog.Printf("keep-alive request successful - session timeout refreshed")
+	stats.Client().Add("KeepSessionAlive", 1)
+
+	// Update session last activity time for keep alive monitoring
+	s.setLastActivity(time.Now())
+	return nil
 }
 
 // CloseSession closes the current session.
@@ -983,6 +1176,22 @@ func (c *Client) sendWithTimeout(ctx context.Context, req ua.Request, timeout ti
 	if s := c.Session(); s != nil {
 		authToken = s.resp.AuthenticationToken
 	}
+
+	// If we have an active session, wrap the response handler to update
+	// session activity on successful responses. This postpones keep alive
+	// when we're actively communicating with the server.
+	if s := c.Session(); s != nil && authToken != nil {
+		originalHandler := h
+		h = func(response ua.Response) error {
+			err := originalHandler(response)
+			// Only update activity if the response was successfully processed
+			if err == nil {
+				s.setLastActivity(time.Now())
+			}
+			return err
+		}
+	}
+
 	return sc.SendRequestWithTimeout(ctx, req, authToken, timeout, h)
 }
 

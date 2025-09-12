@@ -181,8 +181,13 @@ func (c *Client) sendRepublishRequests(ctx context.Context, sub *Subscription, a
 
 		debug.Printf("RepublishRequest: req=%s", debug.ToJSON(req))
 		var res *ua.RepublishResponse
-		err := sc.SendRequest(ctx, req, c.Session().resp.AuthenticationToken, func(v ua.Response) error {
-			return safeAssign(v, &res)
+		err := sc.SendRequest(ctx, req, s.resp.AuthenticationToken, func(v ua.Response) error {
+			err := safeAssign(v, &res)
+			// Update session activity on successful republish response
+			if err == nil {
+				s.setLastActivity(time.Now())
+			}
+			return err
 		})
 		debug.Printf("RepublishResponse: res=%s err=%v", debug.ToJSON(res), err)
 

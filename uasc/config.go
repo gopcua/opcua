@@ -148,4 +148,14 @@ type SessionConfig struct {
 	// PolicyURI to use when encrypting secrets for the User Identity Token
 	// Could be different from the secure channel's policy
 	AuthPolicyURI string
+
+	// SessionKeepAlive enables proactive session keep alive before timeout
+	// If enabled, the client will monitor session timeout and proactively
+	// send keep alive requests before the session expires, instead of waiting for errors.
+	SessionKeepAlive bool
+
+	// SessionKeepAliveThreshold is the percentage of SessionTimeout at which
+	// to trigger proactive keep alive. Default is 0.75 (75% of timeout).
+	// Must be between 0.1 and 0.9.
+	SessionKeepAliveThreshold float64
 }

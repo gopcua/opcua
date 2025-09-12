@@ -51,8 +51,10 @@ func DefaultSessionConfig() *uasc.SessionConfig {
 			ApplicationName: ua.NewLocalizedText("gopcua - OPC UA implementation in Go"),
 			ApplicationType: ua.ApplicationTypeClient,
 		},
-		LocaleIDs:          []string{"en-us"},
-		UserTokenSignature: &ua.SignatureData{},
+		LocaleIDs:                 []string{"en-us"},
+		UserTokenSignature:        &ua.SignatureData{},
+		SessionKeepAlive:          true, // enabled by default, disable for backward compatibility
+		SessionKeepAliveThreshold: 0.75, // keep alive at 75% of timeout
 	}
 }
 
@@ -236,6 +238,50 @@ func SessionName(s string) Option {
 func SessionTimeout(d time.Duration) Option {
 	return func(cfg *Config) error {
 		cfg.session.SessionTimeout = d
+		return nil
+	}
+}
+
+// SessionKeepAlive enables proactive session keep alive before timeout.
+// When enabled, the client monitors session health and sends keep alive requests
+// before the session expires, providing better reliability.
+//
+// This feature is inspired by the ReconnectAsync() approach in UA-.NETStandard SDK.
+// Unlike the existing reactive error recovery, this proactively keeps sessions alive
+// before they timeout, reducing connection interruptions.
+//
+// Example usage:
+//
+//	client, err := opcua.NewClient(endpoint,
+//		opcua.SessionKeepAlive(true),
+//		opcua.SessionTimeout(10*time.Minute),
+//		opcua.SessionKeepAliveThreshold(0.75), // Keep alive at 75% of timeout
+//	)
+//
+// When enabled:
+// - The client uses a timer-based approach (similar to secure channel renewal)
+// - Sessions are kept alive at the configured threshold (default 75% of timeout)
+// - The keep alive process sends a lightweight service request (read CurrentTime)
+// - Existing subscriptions and state are preserved
+// - Works alongside the existing reactive error recovery system
+//
+// Configuration options:
+// - SessionKeepAliveThreshold: When to send keep alive (0.1-0.9, default 0.75)
+func SessionKeepAlive(enable bool) Option {
+	return func(cfg *Config) error {
+		cfg.session.SessionKeepAlive = enable
+		return nil
+	}
+}
+
+// SessionKeepAliveThreshold sets the percentage of SessionTimeout at which
+// to trigger proactive keep alive. Default is 0.75 (75%). Must be between 0.1 and 0.9.
+func SessionKeepAliveThreshold(threshold float64) Option {
+	return func(cfg *Config) error {
+		if threshold < 0.1 || threshold > 0.9 {
+			return errors.Errorf("SessionKeepAliveThreshold must be between 0.1 and 0.9, got %f", threshold)
+		}
+		cfg.session.SessionKeepAliveThreshold = threshold
 		return nil
 	}
 }
