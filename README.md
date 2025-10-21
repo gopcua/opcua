@@ -38,6 +38,11 @@ go run examples/crypto/*.go -endpoint opc.tcp://localhost:4840 -cert path/to/cer
 # checkout examples/ for more examples...
 ```
 
+## New Maintainers
+
+Jonathan Camp (@kung-foo) and Jeremy Theocharis (@JeremyTheocharis) agreed to be the new maintainers.
+See the full post here: https://github.com/gopcua/opcua/discussions/831
+
 ## List of Breaking Changes and noteworthy issues
 
 * `v0.8.0`: `ResolveEndpoint` signature has changed. It requires a context and returns the remote address as a `url.URL`` instead of a `*net.TCPAddr`
