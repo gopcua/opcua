@@ -7,9 +7,9 @@ package main
 import (
 	"context"
 	"flag"
-	"log"
 
 	"github.com/gopcua/opcua/uacp"
+	"github.com/gopcua/opcua/ualog"
 )
 
 func main() {
@@ -20,23 +20,28 @@ func main() {
 
 	ctx := context.Background()
 
-	log.Printf("Listening on %s", *endpoint)
 	l, err := uacp.Listen(ctx, *endpoint, nil)
 	if err != nil {
-		log.Fatal(err)
+		ualog.Fatal(ctx, "failed to listen for connections",
+			ualog.String("endpoint", *endpoint), ualog.Err(err),
+		)
 	}
+
+	ualog.Info(ctx, "listening for connections", ualog.String("endpoint", *endpoint))
+
 	c, err := l.Accept(ctx)
 	if err != nil {
-		log.Fatal(err)
+		ualog.Fatal(ctx, "failed to accept incoming connection", ualog.Err(err))
 	}
 	defer c.Close()
-	log.Printf("conn %d: connection from %s", c.ID(), c.RemoteAddr())
+
+	ualog.Info(ctx, "connection received", ualog.Uint32("conn", c.ID()), ualog.Any("remote", c.RemoteAddr()))
 
 	// listener, err := uacp.Listen(*endpoint, uint32(*bufsize))
 	// if err != nil {
-	// 	log.Fatal(err)
+	//  ualog.Fatal(ctx, "", ualog.Err(err))
 	// }
-	// log.Printf("Started listening on %s.", listener.Endpoint())
+	// ualog.Info(ctx, "started listening for connections", ualog.Any("endpoint", listener.Endpoint()))
 
 	// cfg := uasc.NewServerConfig(
 	// 	"http://opcfoundation.org/UA/SecurityPolicy#None",
@@ -50,51 +55,50 @@ func main() {
 
 	// 		conn, err := listener.Accept(ctx)
 	// 		if err != nil {
-	// 			log.Print(err)
+	//          ualog.Error(ctx, "listen failed", ualog.Err(err))
 	// 			return
 	// 		}
 	// 		defer func() {
 	// 			conn.Close()
-	// 			log.Println("Successfully closed connection")
+	// 			ualog.Info(ctx, "successfully closed connection")
 	// 		}()
-	// 		log.Printf("Successfully established connection with %v", conn.RemoteAddr())
+	// 		ualog.Info(ctx, "successfully established connection", ualog.Any("remote", conn.RemoteAddr()))
 
 	// 		secChan, err := uasc.ListenAndAcceptSecureChannel(ctx, conn, cfg)
 	// 		if err != nil {
-	// 			log.Fatal(err)
+	// 			ualog.Fatal(ctx, "", ualog.Err(err))
 	// 		}
 	// 		defer func() {
 	// 			secChan.Close()
-	// 			log.Printf("Successfully closed secure channel with %v", conn.RemoteAddr())
+	// 			ualog.Info(ctx, "successfully closed secure channel", ualog.Any("remote", conn.RemoteAddr()))
 	// 		}()
-	// 		log.Printf("Successfully opened secure channel with %v", conn.RemoteAddr())
+	// 		ualog.Info(ctx, "successfully opened secure channel", ualog.Any("remote", conn.RemoteAddr()))
 
 	// 		sessCfg := uasc.NewServerSessionConfig(secChan)
 	// 		session, err := uasc.ListenAndAcceptSession(ctx, secChan, sessCfg)
 	// 		if err != nil {
-	// 			log.Fatal(err)
+	// 			ualog.Fatal(ctx, "", ualog.Err(err))
 	// 		}
 	// 		defer func() {
 	// 			session.Close()
-	// 			log.Printf("Successfully closed session with %v", conn.RemoteAddr())
+	// 			ualog.Info(ctx, "successfully closed session", ualog.Any("remote", conn.RemoteAddr()))
 	// 		}()
-	// 		log.Printf("Successfully activated session with %v", conn.RemoteAddr())
+	// 		ualog.Info(ctx, "successfully activated session", ualog.Any("remote", conn.RemoteAddr()))
 
 	// 		buf := make([]byte, 1024)
 	// 		for {
 	// 			n, err := session.ReadService(buf)
 	// 			if err != nil {
-	// 				log.Printf("Couldn't read UASC: %s", err)
+	// 				ualog.Error(ctx, "couldn't read uasc", ualog.Err(err))
 	// 				continue
 	// 			}
-	// 			log.Printf("Successfully received message: %x\n%s", buf[:n], utils.Wireshark(0, buf[:n]))
-
+	//			ualog.Info(ctx, "successfully received message", ualog.String("bytes", fmt.Sprintf("%x", buf[:n])), ualog.String("wireshark", utils.Wireshark(0, buf[:n])))
 	// 			srv, err := services.Decode(buf[:n])
 	// 			if err != nil {
-	// 				log.Printf("Couldn't decode received bytes as Service: %s", err)
+	// 				ualog.Error(ctx, "couldn't decode received bytes as Service", ualog.Err(err))
 	// 				continue
 	// 			}
-	// 			log.Printf("Successfully decoded as Service: %v", srv)
+	// 			ualog.Info(ctx, "successfully decoded as Service", ualog.Any("service", srv))
 	// 		}
 	// 	}()
 	// }

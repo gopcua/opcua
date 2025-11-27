@@ -9,13 +9,14 @@ import (
 	"crypto/rsa"
 	"crypto/tls"
 	"flag"
-	"log"
+	"log/slog"
 	"os"
 	"time"
 
 	"github.com/gopcua/opcua/debug"
 	"github.com/gopcua/opcua/server"
 	"github.com/gopcua/opcua/ua"
+	"github.com/gopcua/opcua/ualog"
 )
 
 var (
@@ -29,7 +30,15 @@ var (
 func main() {
 	flag.BoolVar(&debug.Enable, "debug", false, "enable debug logging")
 	flag.Parse()
-	log.SetFlags(0)
+
+	ctx := ualog.Logger(context.Background(), ualog.WithHandler(
+		slog.NewJSONHandler(os.Stdout, func() *slog.HandlerOptions {
+			if debug.Enable {
+				return &slog.HandlerOptions{Level: slog.LevelDebug}
+			}
+			return nil
+		}()),
+	))
 
 	var opts []server.Option
 
@@ -55,7 +64,7 @@ func main() {
 	)
 	hostname, err := os.Hostname()
 	if err != nil {
-		log.Fatalf("Error getting host name %v", err)
+		ualog.Fatal(ctx, "unable to get host name", ualog.Err(err))
 	}
 
 	// not sure if a list of hostnames is better or adding endpoints to the options
@@ -74,44 +83,42 @@ func main() {
 	if *gencert {
 		c, k, err := GenerateCert(endpoints, 4096, time.Minute*60*24*365*10)
 		if err != nil {
-			log.Fatalf("problem creating cert: %v", err)
+			ualog.Fatal(ctx, "problem creating certificate", ualog.Err(err))
 		}
 		err = os.WriteFile(*certfile, c, 0)
 		if err != nil {
-			log.Fatalf("problem writing cert: %v", err)
+			ualog.Fatal(ctx, "problem writing certificate", ualog.Err(err))
 		}
 		err = os.WriteFile(*keyfile, k, 0)
 		if err != nil {
-			log.Fatalf("problem writing key: %v", err)
+			ualog.Fatal(ctx, "problem writing key", ualog.Err(err))
 		}
-
 	}
 
 	var cert []byte
 	if *gencert || (*certfile != "" && *keyfile != "") {
-		log.Printf("Loading cert/key from %s/%s", *certfile, *keyfile)
+		ualog.Info(ctx, "loading certificate and key from files", ualog.String("cert", *certfile), ualog.String("key", *keyfile))
 		c, err := tls.LoadX509KeyPair(*certfile, *keyfile)
 		if err != nil {
-			log.Printf("Failed to load certificate: %s", err)
+			ualog.Error(ctx, "failed to load certificate", ualog.Err(err))
 		} else {
 			pk, ok := c.PrivateKey.(*rsa.PrivateKey)
 			if !ok {
-				log.Fatalf("Invalid private key")
+				ualog.Fatal(ctx, "invalid private key")
 			}
 			cert = c.Certificate[0]
 			opts = append(opts, server.PrivateKey(pk), server.Certificate(cert))
 		}
 	}
 
-	s := server.New(opts...)
+	s := server.New(ctx, opts...)
 
 	// Create a new node namespace.  You can add namespaces before or after starting the server.
 	// Start the server
-	if err := s.Start(context.Background()); err != nil {
-		log.Fatalf("Error starting server, exiting: %s", err)
+	if err := s.Start(ctx); err != nil {
+		ualog.Fatal(ctx, "unable to start server", ualog.Err(err))
 	}
-	defer s.Close()
+	defer s.Close(ctx)
 
 	select {}
-
 }
