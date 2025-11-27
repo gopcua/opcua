@@ -1,9 +1,11 @@
 package server
 
 import (
+	"context"
 	"strings"
 
 	"github.com/gopcua/opcua/ua"
+	"github.com/gopcua/opcua/ualog"
 	"github.com/gopcua/opcua/uasc"
 )
 
@@ -14,11 +16,18 @@ type DiscoveryService struct {
 	srv *Server
 }
 
-// https://reference.opcfoundation.org/Core/Part4/v105/docs/5.4.2
-func (s *DiscoveryService) FindServers(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	if s.srv.cfg.logger != nil {
-		s.srv.cfg.logger.Debug("Handling %T", r)
+func NewDiscoveryService(s *Server) *DiscoveryService {
+	return &DiscoveryService{
+		srv: s,
 	}
+}
+
+var newDiscoveryServiceLogAttributes = newServiceLogAttributeCreatorForSet("discovery")
+
+// https://reference.opcfoundation.org/Core/Part4/v105/docs/5.4.2
+func (s *DiscoveryService) FindServers(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
+	ctx = ualog.With(ctx, newDiscoveryServiceLogAttributes("find servers"))
+	logServiceRequest(ctx, r)
 
 	req, err := safeReq[*ua.FindServersRequest](r)
 	if err != nil {
@@ -36,23 +45,22 @@ func (s *DiscoveryService) FindServers(sc *uasc.SecureChannel, r ua.Request, req
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.4.3
-func (s *DiscoveryService) FindServersOnNetwork(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	if s.srv.cfg.logger != nil {
-		s.srv.cfg.logger.Debug("Handling %T", r)
-	}
+func (s *DiscoveryService) FindServersOnNetwork(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
+	ctx = ualog.With(ctx, newDiscoveryServiceLogAttributes("find servers on network"))
+	logServiceRequest(ctx, r)
 
 	req, err := safeReq[*ua.FindServersOnNetworkRequest](r)
 	if err != nil {
 		return nil, err
 	}
+
 	return serviceUnsupported(req.RequestHeader), nil
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.4.4
-func (s *DiscoveryService) GetEndpoints(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	if s.srv.cfg.logger != nil {
-		s.srv.cfg.logger.Debug("Handling %T", r)
-	}
+func (s *DiscoveryService) GetEndpoints(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
+	ctx = ualog.With(ctx, newDiscoveryServiceLogAttributes("get endpoints"))
+	logServiceRequest(ctx, r)
 
 	req, err := safeReq[*ua.GetEndpointsRequest](r)
 	if err != nil {
@@ -77,27 +85,27 @@ func (s *DiscoveryService) GetEndpoints(sc *uasc.SecureChannel, r ua.Request, re
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.4.5
-func (s *DiscoveryService) RegisterServer(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	if s.srv.cfg.logger != nil {
-		s.srv.cfg.logger.Debug("Handling %T", r)
-	}
+func (s *DiscoveryService) RegisterServer(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
+	ctx = ualog.With(ctx, newDiscoveryServiceLogAttributes("register server"))
+	logServiceRequest(ctx, r)
 
 	req, err := safeReq[*ua.RegisterServerRequest](r)
 	if err != nil {
 		return nil, err
 	}
+
 	return serviceUnsupported(req.RequestHeader), nil
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.4.6
-func (s *DiscoveryService) RegisterServer2(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	if s.srv.cfg.logger != nil {
-		s.srv.cfg.logger.Debug("Handling %T", r)
-	}
+func (s *DiscoveryService) RegisterServer2(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
+	ctx = ualog.With(ctx, newDiscoveryServiceLogAttributes("register server 2"))
+	logServiceRequest(ctx, r)
 
 	req, err := safeReq[*ua.RegisterServer2Request](r)
 	if err != nil {
 		return nil, err
 	}
+
 	return serviceUnsupported(req.RequestHeader), nil
 }

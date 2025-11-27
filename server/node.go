@@ -1,7 +1,7 @@
 package server
 
 import (
-	"log"
+	"fmt"
 	"maps"
 	"slices"
 	"time"
@@ -260,18 +260,19 @@ func (n *Node) SetDescription(text, locale string) {
 
 func (n *Node) DataType() *ua.ExpandedNodeID {
 	if n == nil {
-		log.Printf("n was nil!")
+		fmt.Println("n was nil!")
 		return ua.NewTwoByteExpandedNodeID(0)
 	}
-	v := n.attr[ua.AttributeIDDataType]
-	if v == nil || v.Value.Value() == nil {
+
+	v, ok := n.attr[ua.AttributeIDDataType]
+	if !ok || v == nil || v.Value.Value() == nil {
 		// if we have a type definition, return that?
 		for i := range n.refs {
 			r := n.refs[i]
 			if r.ReferenceTypeID == nil {
-				log.Printf("reftypeid was nil!")
+				fmt.Println("reftypeid was nil!")
 			}
-			if r.ReferenceTypeID.IntID() == id.HasTypeDefinition && r.IsForward {
+			if r.ReferenceTypeID != nil && r.ReferenceTypeID.IntID() == id.HasTypeDefinition && r.IsForward {
 				return r.NodeID
 			}
 		}
@@ -298,7 +299,6 @@ func (n *Node) NodeClass() ua.NodeClass {
 		return ua.NodeClass(int32(vui32))
 	}
 	return ua.NodeClass(vi32)
-
 }
 
 func (n *Node) AddObject(o *Node) *Node {
@@ -386,5 +386,4 @@ func (n Node) Access(flag ua.AccessLevelType) bool {
 		}
 	}
 	return true
-
 }

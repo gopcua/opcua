@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	mrand "math/rand"
 	"sync"
 	"time"
@@ -8,6 +9,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/gopcua/opcua/ua"
+	"github.com/gopcua/opcua/ualog"
 )
 
 type session struct {
@@ -30,14 +32,12 @@ type sessionBroker struct {
 	mu sync.Mutex
 
 	// s contains all sessions watched by the session broker
-	s      map[string]*session
-	logger Logger
+	s map[string]*session
 }
 
-func newSessionBroker(logger Logger) *sessionBroker {
+func newSessionBroker() *sessionBroker {
 	return &sessionBroker{
-		s:      make(map[string]*session),
-		logger: logger,
+		s: make(map[string]*session),
 	}
 }
 
@@ -55,29 +55,28 @@ func (sb *sessionBroker) NewSession() *session {
 	return s
 }
 
-func (sb *sessionBroker) Close(authToken *ua.NodeID) error {
+func (sb *sessionBroker) Close(ctx context.Context, authToken *ua.NodeID) error {
 	sb.mu.Lock()
 	defer sb.mu.Unlock()
 
 	if sb.s[authToken.String()] == nil {
-		if sb.logger != nil {
-			sb.logger.Warn("sessionBroker.Close: error looking up session %v", authToken)
-		}
+		ualog.Warn(ctx, "unable to close session",
+			ualog.String(ualog.ErrorKey, "error looking up session"),
+			ualog.Any("token", authToken),
+		)
 	}
 	delete(sb.s, authToken.String())
 
 	return nil
 }
 
-func (sb *sessionBroker) Session(authToken *ua.NodeID) *session {
+func (sb *sessionBroker) Session(ctx context.Context, authToken *ua.NodeID) *session {
 	sb.mu.Lock()
 	defer sb.mu.Unlock()
 
 	s := sb.s[authToken.String()]
 	if s == nil {
-		if sb.logger != nil {
-			sb.logger.Warn("sessionBroker.Session: error looking up session %v", authToken)
-		}
+		ualog.Warn(ctx, "unable to lookup session", ualog.Any("token", authToken))
 	}
 
 	return s

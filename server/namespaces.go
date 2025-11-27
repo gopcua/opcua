@@ -5,6 +5,8 @@
 package server
 
 import (
+	"context"
+
 	"github.com/gopcua/opcua/id"
 	"github.com/gopcua/opcua/ua"
 )
@@ -34,7 +36,7 @@ type NameSpace interface {
 	// This is the function to list all available nodes to the client that is browsing.
 	// The BrowseDescription has the root node of the browse and what kind of nodes the
 	// client is looking for.  The Browse Result should have the list of matching nodes.
-	Browse(req *ua.BrowseDescription) *ua.BrowseResult
+	Browse(ctx context.Context, req *ua.BrowseDescription) *ua.BrowseResult
 
 	// ID and SetID are the namespace ID number of this namespace.  When you add it to the server
 	// with srv.AddNamespace(xxx) it will set these for you.
@@ -44,6 +46,6 @@ type NameSpace interface {
 	// These are the functions for reading and writing arbitrary attributes.  The most common
 	// is the value attribute, but many clients also read the datatype and description attributes.
 	// as well as attributes related to array bounds
-	Attribute(*ua.NodeID, ua.AttributeID) *ua.DataValue
-	SetAttribute(*ua.NodeID, ua.AttributeID, *ua.DataValue) ua.StatusCode
+	Attribute(context.Context, *ua.NodeID, ua.AttributeID) *ua.DataValue
+	SetAttribute(context.Context, *ua.NodeID, ua.AttributeID, *ua.DataValue) ua.StatusCode
 }
