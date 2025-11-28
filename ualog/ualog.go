@@ -3,8 +3,6 @@ package ualog
 import (
 	"context"
 	"log/slog"
-	"os"
-	"time"
 )
 
 // Debug forwards the provided message and attributes to the current logger
@@ -31,12 +29,6 @@ func DebugFunc(ctx context.Context, msg string, attrs func() []Attr) {
 // Error forwards the provided message and attributes to the current logger
 func Error(ctx context.Context, msg string, attrs ...Attr) {
 	log(ctx, fromContext(ctx), slog.LevelError, msg, attrs...)
-}
-
-func Fatal(ctx context.Context, msg string, attrs ...Attr) {
-	log(ctx, fromContext(ctx), slog.LevelError, "FATAL: "+msg, attrs...)
-	time.Sleep(2 * time.Second)
-	os.Exit(1)
 }
 
 // Info forwards the provided message and attributes to the current logger

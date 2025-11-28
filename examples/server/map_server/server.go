@@ -13,6 +13,7 @@ import (
 	"context"
 	"crypto/rsa"
 	"crypto/tls"
+	"errors"
 	"flag"
 	"log/slog"
 	"os"
@@ -76,7 +77,7 @@ func main() {
 	// be sure the hostname(s) also match the certificate the server is going to use.
 	hostname, err := os.Hostname()
 	if err != nil {
-		ualog.Fatal(ctx, "unable to get host name", ualog.Err(err))
+		fatal(ctx, "unable to get host name", err)
 	}
 
 	opts = append(opts,
@@ -97,15 +98,15 @@ func main() {
 
 		c, k, err := GenerateCert(endpoints, 4096, time.Minute*60*24*365*10)
 		if err != nil {
-			ualog.Fatal(ctx, "problem creating certificate", ualog.Err(err))
+			fatal(ctx, "problem creating certificate", err)
 		}
 		err = os.WriteFile(*certfile, c, 0)
 		if err != nil {
-			ualog.Fatal(ctx, "problem writing certificate", ualog.Err(err))
+			fatal(ctx, "problem writing certificate", err)
 		}
 		err = os.WriteFile(*keyfile, k, 0)
 		if err != nil {
-			ualog.Fatal(ctx, "problem writing key", ualog.Err(err))
+			fatal(ctx, "problem writing key", err)
 		}
 	}
 
@@ -120,7 +121,7 @@ func main() {
 		} else {
 			pk, ok := c.PrivateKey.(*rsa.PrivateKey)
 			if !ok {
-				ualog.Fatal(ctx, "invalid private key")
+				fatal(ctx, "invalid private key", errors.New("incorrect type"))
 			}
 			cert = c.Certificate[0]
 			opts = append(opts, server.PrivateKey(pk), server.Certificate(cert))
@@ -205,7 +206,7 @@ func main() {
 	// Start the server
 	// Note that you can add namespaces before or after starting the server.
 	if err := s.Start(ctx); err != nil {
-		ualog.Fatal(ctx, "unable to start server", ualog.Err(err))
+		fatal(ctx, "unable to start server", err)
 	}
 	defer s.Close(ctx)
 
@@ -219,4 +220,10 @@ func main() {
 	<-sigch
 
 	ualog.Info(ctx, "shutting down the server...")
+}
+
+func fatal(ctx context.Context, reason string, err error) {
+	ualog.Error(ctx, "FATAL: "+reason, ualog.Err(err))
+	time.Sleep(time.Second)
+	os.Exit(1)
 }

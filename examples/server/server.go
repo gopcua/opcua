@@ -7,6 +7,8 @@ package main
 import (
 	"context"
 	"flag"
+	"os"
+	"time"
 
 	"github.com/gopcua/opcua/uacp"
 	"github.com/gopcua/opcua/ualog"
@@ -22,16 +24,14 @@ func main() {
 
 	l, err := uacp.Listen(ctx, *endpoint, nil)
 	if err != nil {
-		ualog.Fatal(ctx, "failed to listen for connections",
-			ualog.String("endpoint", *endpoint), ualog.Err(err),
-		)
+		fatal(ctx, "failed to listen for connections", err)
 	}
 
 	ualog.Info(ctx, "listening for connections", ualog.String("endpoint", *endpoint))
 
 	c, err := l.Accept(ctx)
 	if err != nil {
-		ualog.Fatal(ctx, "failed to accept incoming connection", ualog.Err(err))
+		fatal(ctx, "failed to accept incoming connection", err)
 	}
 	defer c.Close()
 
@@ -102,4 +102,10 @@ func main() {
 	// 		}
 	// 	}()
 	// }
+}
+
+func fatal(ctx context.Context, reason string, err error) {
+	ualog.Error(ctx, "FATAL: "+reason, ualog.Err(err))
+	time.Sleep(time.Second)
+	os.Exit(1)
 }

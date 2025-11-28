@@ -8,6 +8,7 @@ import (
 	"context"
 	"crypto/rsa"
 	"crypto/tls"
+	"errors"
 	"flag"
 	"log/slog"
 	"os"
@@ -65,7 +66,7 @@ func main() {
 	)
 	hostname, err := os.Hostname()
 	if err != nil {
-		ualog.Fatal(ctx, "unable to get host name", ualog.Err(err))
+		fatal(ctx, "unable to get host name", err)
 	}
 
 	// not sure if a list of hostnames is better or adding endpoints to the options
@@ -84,15 +85,15 @@ func main() {
 	if *gencert {
 		c, k, err := GenerateCert(endpoints, 4096, time.Minute*60*24*365*10)
 		if err != nil {
-			ualog.Fatal(ctx, "problem creating certificate", ualog.Err(err))
+			fatal(ctx, "problem creating certificate", err)
 		}
 		err = os.WriteFile(*certfile, c, 0)
 		if err != nil {
-			ualog.Fatal(ctx, "problem writing certificate", ualog.Err(err))
+			fatal(ctx, "problem writing certificate", err)
 		}
 		err = os.WriteFile(*keyfile, k, 0)
 		if err != nil {
-			ualog.Fatal(ctx, "problem writing key", ualog.Err(err))
+			fatal(ctx, "problem writing key", err)
 		}
 	}
 
@@ -105,7 +106,7 @@ func main() {
 		} else {
 			pk, ok := c.PrivateKey.(*rsa.PrivateKey)
 			if !ok {
-				ualog.Fatal(ctx, "invalid private key")
+				fatal(ctx, "invalid private key", errors.New("incorrect type"))
 			}
 			cert = c.Certificate[0]
 			opts = append(opts, server.PrivateKey(pk), server.Certificate(cert))
@@ -117,9 +118,15 @@ func main() {
 	// Create a new node namespace.  You can add namespaces before or after starting the server.
 	// Start the server
 	if err := s.Start(ctx); err != nil {
-		ualog.Fatal(ctx, "unable to start server", ualog.Err(err))
+		fatal(ctx, "unable to start server", err)
 	}
 	defer s.Close(ctx)
 
 	select {}
+}
+
+func fatal(ctx context.Context, reason string, err error) {
+	ualog.Error(ctx, "FATAL: "+reason, ualog.Err(err))
+	time.Sleep(time.Second)
+	os.Exit(1)
 }
