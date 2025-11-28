@@ -40,7 +40,7 @@ func main() {
 	}()))
 
 	logger = logger.With("foo", "bar")
-	ctx := ualog.Logger(context.Background(), ualog.WithLogger(logger))
+	ctx := ualog.New(context.Background(), ualog.WithLogger(logger))
 
 	var opts []server.Option
 

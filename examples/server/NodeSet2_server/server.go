@@ -36,7 +36,7 @@ func main() {
 	flag.BoolVar(&debug.Enable, "debug", false, "enable debug logging")
 	flag.Parse()
 
-	ctx := ualog.Logger(context.Background(), ualog.WithHandler(
+	ctx := ualog.New(context.Background(), ualog.WithHandler(
 		slog.NewJSONHandler(os.Stdout, func() *slog.HandlerOptions {
 			if debug.Enable {
 				return &slog.HandlerOptions{Level: slog.LevelDebug}

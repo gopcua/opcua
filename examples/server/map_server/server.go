@@ -37,7 +37,7 @@ var (
 func main() {
 	flag.Parse()
 
-	ctx := ualog.Logger(context.Background(), ualog.WithHandler(slog.NewJSONHandler(os.Stdout, nil)))
+	ctx := ualog.New(context.Background(), ualog.WithHandler(slog.NewJSONHandler(os.Stdout, nil)))
 
 	var opts []server.Option
 
