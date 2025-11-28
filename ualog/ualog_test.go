@@ -54,12 +54,13 @@ func ExampleWithErrorKey() {
 		ualog.WithErrorKey("oops"),
 	)
 
-	ualog.Error(ctx, "something went wrong", ualog.Err(errors.New("unknown error")))
+	err := errors.New("unknown error")
+	ualog.Error(ctx, "something went wrong", ualog.Err(err))
 
 	// Output: level=ERROR msg="something went wrong" oops="unknown error"
 }
 
-// testLogOpts returns a handler options instance that remove the time
+// testLogOpts returns a handler options instance that removes the time
 // from log records to make the test output predictable
 func testLogOpts() *slog.HandlerOptions {
 	return &slog.HandlerOptions{
