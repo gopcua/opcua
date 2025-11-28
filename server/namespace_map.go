@@ -139,7 +139,7 @@ func (ns *MapNamespace) Browse(ctx context.Context, bd *ua.BrowseDescription) *u
 }
 
 func (ns *MapNamespace) Attribute(ctx context.Context, n *ua.NodeID, a ua.AttributeID) *ua.DataValue {
-	ctx = ualog.With(ctx, ns.logAttributes)
+	ctx = ualog.WithAttrs(ctx, ns.logAttributes)
 	ualog.Debug(ctx, "read node attribute",
 		ualog.Any(ualog.NodeIdKey, n), ualog.Any("attr", a),
 	)
@@ -320,7 +320,7 @@ func (ns *MapNamespace) Attribute(ctx context.Context, n *ua.NodeID, a ua.Attrib
 }
 
 func (s *MapNamespace) SetAttribute(ctx context.Context, node *ua.NodeID, attr ua.AttributeID, val *ua.DataValue) ua.StatusCode {
-	ctx = ualog.With(ctx, s.logAttributes)
+	ctx = ualog.WithAttrs(ctx, s.logAttributes)
 	ualog.Debug(ctx, "write node attribute", ualog.Any(ualog.NodeIdKey, node), ualog.Any("attr", attr))
 
 	s.Mu.Lock()

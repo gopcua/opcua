@@ -32,7 +32,7 @@ var newViewServiceLogAttributes = newServiceLogAttributeCreatorForSet("view")
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.8.2
 func (s *ViewService) Browse(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	ctx = ualog.With(ctx, newViewServiceLogAttributes("browse"))
+	ctx = ualog.WithAttrs(ctx, newViewServiceLogAttributes("browse"))
 	logServiceRequest(ctx, r)
 
 	req, err := safeReq[*ua.BrowseRequest](r)
@@ -139,7 +139,7 @@ func getSubRefs(srv *Server, nid *ua.NodeID) []*ua.NodeID {
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.8.3
 func (s *ViewService) BrowseNext(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	ctx = ualog.With(ctx, newViewServiceLogAttributes("browse next"))
+	ctx = ualog.WithAttrs(ctx, newViewServiceLogAttributes("browse next"))
 	logServiceRequest(ctx, r)
 
 	req, err := safeReq[*ua.BrowseNextRequest](r)
@@ -152,7 +152,7 @@ func (s *ViewService) BrowseNext(ctx context.Context, sc *uasc.SecureChannel, r 
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.8.4
 func (s *ViewService) TranslateBrowsePathsToNodeIDs(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	ctx = ualog.With(ctx, newViewServiceLogAttributes("translate browse paths to node ids"))
+	ctx = ualog.WithAttrs(ctx, newViewServiceLogAttributes("translate browse paths to node ids"))
 	logServiceRequest(ctx, r)
 
 	req, err := safeReq[*ua.TranslateBrowsePathsToNodeIDsRequest](r)
@@ -165,7 +165,7 @@ func (s *ViewService) TranslateBrowsePathsToNodeIDs(ctx context.Context, sc *uas
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.8.5
 func (s *ViewService) RegisterNodes(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	ctx = ualog.With(ctx, newViewServiceLogAttributes("register nodes"))
+	ctx = ualog.WithAttrs(ctx, newViewServiceLogAttributes("register nodes"))
 	logServiceRequest(ctx, r)
 
 	req, err := safeReq[*ua.RegisterNodesRequest](r)
@@ -178,7 +178,7 @@ func (s *ViewService) RegisterNodes(ctx context.Context, sc *uasc.SecureChannel,
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.8.6
 func (s *ViewService) UnregisterNodes(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	ctx = ualog.With(ctx, newViewServiceLogAttributes("unregister nodes"))
+	ctx = ualog.WithAttrs(ctx, newViewServiceLogAttributes("unregister nodes"))
 	logServiceRequest(ctx, r)
 
 	req, err := safeReq[*ua.UnregisterNodesRequest](r)

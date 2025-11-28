@@ -26,7 +26,7 @@ var newAttributeServiceLogAttributes = newServiceLogAttributeCreatorForSet("attr
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.10.2
 func (s *AttributeService) Read(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	ctx = ualog.With(ctx, newAttributeServiceLogAttributes("read"))
+	ctx = ualog.WithAttrs(ctx, newAttributeServiceLogAttributes("read"))
 	logServiceRequest(ctx, r)
 
 	req, err := safeReq[*ua.ReadRequest](r)
@@ -62,7 +62,7 @@ func (s *AttributeService) Read(ctx context.Context, sc *uasc.SecureChannel, r u
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.10.3
 func (s *AttributeService) HistoryRead(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	ctx = ualog.With(ctx, newAttributeServiceLogAttributes("history read"))
+	ctx = ualog.WithAttrs(ctx, newAttributeServiceLogAttributes("history read"))
 	logServiceRequest(ctx, r)
 
 	req, err := safeReq[*ua.HistoryReadRequest](r)
@@ -75,7 +75,7 @@ func (s *AttributeService) HistoryRead(ctx context.Context, sc *uasc.SecureChann
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.10.4
 func (s *AttributeService) Write(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	ctx = ualog.With(ctx, newAttributeServiceLogAttributes("write"))
+	ctx = ualog.WithAttrs(ctx, newAttributeServiceLogAttributes("write"))
 	logServiceRequest(ctx, r)
 
 	req, err := safeReq[*ua.WriteRequest](r)
@@ -117,7 +117,7 @@ func (s *AttributeService) Write(ctx context.Context, sc *uasc.SecureChannel, r 
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.10.5
 func (s *AttributeService) HistoryUpdate(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	ctx = ualog.With(ctx, newAttributeServiceLogAttributes("history update"))
+	ctx = ualog.WithAttrs(ctx, newAttributeServiceLogAttributes("history update"))
 	logServiceRequest(ctx, r)
 
 	req, err := safeReq[*ua.HistoryUpdateRequest](r)

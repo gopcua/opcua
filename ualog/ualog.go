@@ -9,10 +9,10 @@ import (
 
 // Debug forwards the provided message and attributes to the current logger
 // iff its handler's debug level is enabled
-func Debug(ctx context.Context, msg string, args ...Attr) {
+func Debug(ctx context.Context, msg string, attrs ...Attr) {
 	logger := fromContext(ctx)
 	if logger.Handler().Enabled(ctx, slog.LevelDebug) {
-		log(ctx, fromContext(ctx), slog.LevelDebug, msg, args...)
+		log(ctx, fromContext(ctx), slog.LevelDebug, msg, attrs...)
 	}
 }
 
@@ -29,29 +29,29 @@ func DebugFunc(ctx context.Context, msg string, attrs func() []Attr) {
 }
 
 // Error forwards the provided message and attributes to the current logger
-func Error(ctx context.Context, msg string, args ...Attr) {
-	log(ctx, fromContext(ctx), slog.LevelError, msg, args...)
+func Error(ctx context.Context, msg string, attrs ...Attr) {
+	log(ctx, fromContext(ctx), slog.LevelError, msg, attrs...)
 }
 
-func Fatal(ctx context.Context, msg string, args ...Attr) {
-	log(ctx, fromContext(ctx), slog.LevelError, "FATAL: "+msg, args...)
+func Fatal(ctx context.Context, msg string, attrs ...Attr) {
+	log(ctx, fromContext(ctx), slog.LevelError, "FATAL: "+msg, attrs...)
 	time.Sleep(2 * time.Second)
 	os.Exit(1)
 }
 
 // Info forwards the provided message and attributes to the current logger
-func Info(ctx context.Context, msg string, args ...Attr) {
-	log(ctx, fromContext(ctx), slog.LevelInfo, msg, args...)
+func Info(ctx context.Context, msg string, attrs ...Attr) {
+	log(ctx, fromContext(ctx), slog.LevelInfo, msg, attrs...)
 }
 
 // Warn forwards the provided message and attributes to the current logger
-func Warn(ctx context.Context, msg string, args ...Attr) {
-	log(ctx, fromContext(ctx), slog.LevelWarn, msg, args...)
+func Warn(ctx context.Context, msg string, attrs ...Attr) {
+	log(ctx, fromContext(ctx), slog.LevelWarn, msg, attrs...)
 }
 
-// With takes a context and decorates its current logger using the supplied
+// WithAttrs takes a context and decorates its current logger using the supplied
 // ualog Attr values
-func With(ctx context.Context, attrs ...Attr) context.Context {
+func WithAttrs(ctx context.Context, attrs ...Attr) context.Context {
 
 	if attrCount := len(attrs); attrCount > 0 {
 		logger := fromContext(ctx)

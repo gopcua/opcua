@@ -165,7 +165,7 @@ type MonitoredItem struct {
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.12.2
 func (s *MonitoredItemService) CreateMonitoredItems(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	ctx = ualog.With(ctx, newMonitoredItemServiceLogAttributes("create"))
+	ctx = ualog.WithAttrs(ctx, newMonitoredItemServiceLogAttributes("create"))
 	logServiceRequest(ctx, r)
 
 	req, err := safeReq[*ua.CreateMonitoredItemsRequest](r)
@@ -255,7 +255,7 @@ func (s *MonitoredItemService) CreateMonitoredItems(ctx context.Context, sc *uas
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.12.3
 func (s *MonitoredItemService) ModifyMonitoredItems(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	ctx = ualog.With(ctx, newMonitoredItemServiceLogAttributes("modify"))
+	ctx = ualog.WithAttrs(ctx, newMonitoredItemServiceLogAttributes("modify"))
 	logServiceRequest(ctx, r)
 
 	req, err := safeReq[*ua.ModifyMonitoredItemsRequest](r)
@@ -268,7 +268,7 @@ func (s *MonitoredItemService) ModifyMonitoredItems(ctx context.Context, sc *uas
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.12.4
 func (s *MonitoredItemService) SetMonitoringMode(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	ctx = ualog.With(ctx, newMonitoredItemServiceLogAttributes("set monitoring mode"))
+	ctx = ualog.WithAttrs(ctx, newMonitoredItemServiceLogAttributes("set monitoring mode"))
 	logServiceRequest(ctx, r)
 
 	req, err := safeReq[*ua.SetMonitoringModeRequest](r)
@@ -314,7 +314,7 @@ func (s *MonitoredItemService) SetMonitoringMode(ctx context.Context, sc *uasc.S
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.12.5
 func (s *MonitoredItemService) SetTriggering(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	ctx = ualog.With(ctx, newMonitoredItemServiceLogAttributes("set triggering"))
+	ctx = ualog.WithAttrs(ctx, newMonitoredItemServiceLogAttributes("set triggering"))
 	logServiceRequest(ctx, r)
 
 	req, err := safeReq[*ua.SetTriggeringRequest](r)
@@ -327,7 +327,7 @@ func (s *MonitoredItemService) SetTriggering(ctx context.Context, sc *uasc.Secur
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.12.6
 func (s *MonitoredItemService) DeleteMonitoredItems(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	ctx = ualog.With(ctx, newMonitoredItemServiceLogAttributes("delete"))
+	ctx = ualog.WithAttrs(ctx, newMonitoredItemServiceLogAttributes("delete"))
 	logServiceRequest(ctx, r)
 
 	req, err := safeReq[*ua.DeleteMonitoredItemsRequest](r)

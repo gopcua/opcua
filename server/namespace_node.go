@@ -118,7 +118,7 @@ func (as *NodeNameSpace) AddNewVariableStringNode(name string, value any) *Node 
 }
 
 func (as *NodeNameSpace) Attribute(ctx context.Context, id *ua.NodeID, attr ua.AttributeID) *ua.DataValue {
-	ctx = ualog.With(ctx, as.logAttributes)
+	ctx = ualog.WithAttrs(ctx, as.logAttributes)
 	ualog.Debug(ctx, "read node attribute",
 		ualog.Any(ualog.NodeIdKey, id), ualog.Any("attr", attr),
 	)
@@ -264,7 +264,7 @@ func (ns *NodeNameSpace) SetID(id uint16) {
 	ns.id = id
 }
 func (as *NodeNameSpace) SetAttribute(ctx context.Context, id *ua.NodeID, attr ua.AttributeID, val *ua.DataValue) ua.StatusCode {
-	ctx = ualog.With(ctx, as.logAttributes)
+	ctx = ualog.WithAttrs(ctx, as.logAttributes)
 	ualog.Debug(ctx, "write node attribute", ualog.Any(ualog.NodeIdKey, id), ualog.Any("attr", attr))
 
 	n := as.Node(id)

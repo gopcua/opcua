@@ -26,7 +26,7 @@ var newDiscoveryServiceLogAttributes = newServiceLogAttributeCreatorForSet("disc
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.4.2
 func (s *DiscoveryService) FindServers(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	ctx = ualog.With(ctx, newDiscoveryServiceLogAttributes("find servers"))
+	ctx = ualog.WithAttrs(ctx, newDiscoveryServiceLogAttributes("find servers"))
 	logServiceRequest(ctx, r)
 
 	req, err := safeReq[*ua.FindServersRequest](r)
@@ -46,7 +46,7 @@ func (s *DiscoveryService) FindServers(ctx context.Context, sc *uasc.SecureChann
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.4.3
 func (s *DiscoveryService) FindServersOnNetwork(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	ctx = ualog.With(ctx, newDiscoveryServiceLogAttributes("find servers on network"))
+	ctx = ualog.WithAttrs(ctx, newDiscoveryServiceLogAttributes("find servers on network"))
 	logServiceRequest(ctx, r)
 
 	req, err := safeReq[*ua.FindServersOnNetworkRequest](r)
@@ -59,7 +59,7 @@ func (s *DiscoveryService) FindServersOnNetwork(ctx context.Context, sc *uasc.Se
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.4.4
 func (s *DiscoveryService) GetEndpoints(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	ctx = ualog.With(ctx, newDiscoveryServiceLogAttributes("get endpoints"))
+	ctx = ualog.WithAttrs(ctx, newDiscoveryServiceLogAttributes("get endpoints"))
 	logServiceRequest(ctx, r)
 
 	req, err := safeReq[*ua.GetEndpointsRequest](r)
@@ -86,7 +86,7 @@ func (s *DiscoveryService) GetEndpoints(ctx context.Context, sc *uasc.SecureChan
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.4.5
 func (s *DiscoveryService) RegisterServer(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	ctx = ualog.With(ctx, newDiscoveryServiceLogAttributes("register server"))
+	ctx = ualog.WithAttrs(ctx, newDiscoveryServiceLogAttributes("register server"))
 	logServiceRequest(ctx, r)
 
 	req, err := safeReq[*ua.RegisterServerRequest](r)
@@ -99,7 +99,7 @@ func (s *DiscoveryService) RegisterServer(ctx context.Context, sc *uasc.SecureCh
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.4.6
 func (s *DiscoveryService) RegisterServer2(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	ctx = ualog.With(ctx, newDiscoveryServiceLogAttributes("register server 2"))
+	ctx = ualog.WithAttrs(ctx, newDiscoveryServiceLogAttributes("register server 2"))
 	logServiceRequest(ctx, r)
 
 	req, err := safeReq[*ua.RegisterServer2Request](r)

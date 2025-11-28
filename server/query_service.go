@@ -25,7 +25,7 @@ var newQueryServiceLogAttributes = newServiceLogAttributeCreatorForSet("query")
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.9.3
 func (s *QueryService) QueryFirst(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	ctx = ualog.With(ctx, newQueryServiceLogAttributes("query first"))
+	ctx = ualog.WithAttrs(ctx, newQueryServiceLogAttributes("query first"))
 	logServiceRequest(ctx, r)
 
 	req, err := safeReq[*ua.QueryFirstRequest](r)
@@ -38,7 +38,7 @@ func (s *QueryService) QueryFirst(ctx context.Context, sc *uasc.SecureChannel, r
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.9.4
 func (s *QueryService) QueryNext(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	ctx = ualog.With(ctx, newQueryServiceLogAttributes("query next"))
+	ctx = ualog.WithAttrs(ctx, newQueryServiceLogAttributes("query next"))
 	logServiceRequest(ctx, r)
 
 	req, err := safeReq[*ua.QueryNextRequest](r)

@@ -52,7 +52,7 @@ func (s *SubscriptionService) DeleteSubscription(ctx context.Context, id uint32)
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.13.2
 func (s *SubscriptionService) CreateSubscription(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	ctx = ualog.With(ctx, newSubscriptionServiceLogAttributes("create"))
+	ctx = ualog.WithAttrs(ctx, newSubscriptionServiceLogAttributes("create"))
 	logServiceRequest(ctx, r)
 
 	req, err := safeReq[*ua.CreateSubscriptionRequest](r)
@@ -102,7 +102,7 @@ func (s *SubscriptionService) CreateSubscription(ctx context.Context, sc *uasc.S
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.13.3
 func (s *SubscriptionService) ModifySubscription(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	ctx = ualog.With(ctx, newSubscriptionServiceLogAttributes("modify"))
+	ctx = ualog.WithAttrs(ctx, newSubscriptionServiceLogAttributes("modify"))
 	logServiceRequest(ctx, r)
 
 	req, err := safeReq[*ua.ModifySubscriptionRequest](r)
@@ -117,7 +117,7 @@ func (s *SubscriptionService) ModifySubscription(ctx context.Context, sc *uasc.S
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.13.4
 func (s *SubscriptionService) SetPublishingMode(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	ctx = ualog.With(ctx, newSubscriptionServiceLogAttributes("set publishing mode"))
+	ctx = ualog.WithAttrs(ctx, newSubscriptionServiceLogAttributes("set publishing mode"))
 	logServiceRequest(ctx, r)
 
 	req, err := safeReq[*ua.SetPublishingModeRequest](r)
@@ -131,7 +131,7 @@ func (s *SubscriptionService) SetPublishingMode(ctx context.Context, sc *uasc.Se
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.13.5
 func (s *SubscriptionService) Publish(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	ctx = ualog.With(ctx, newSubscriptionServiceLogAttributes("publish"))
+	ctx = ualog.WithAttrs(ctx, newSubscriptionServiceLogAttributes("publish"))
 	logServiceRequest(ctx, r)
 
 	req, err := safeReq[*ua.PublishRequest](r)
@@ -176,7 +176,7 @@ func (s *SubscriptionService) Publish(ctx context.Context, sc *uasc.SecureChanne
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.13.6
 func (s *SubscriptionService) Republish(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	ctx = ualog.With(ctx, newSubscriptionServiceLogAttributes("republish"))
+	ctx = ualog.WithAttrs(ctx, newSubscriptionServiceLogAttributes("republish"))
 	logServiceRequest(ctx, r)
 
 	req, err := safeReq[*ua.RepublishRequest](r)
@@ -189,7 +189,7 @@ func (s *SubscriptionService) Republish(ctx context.Context, sc *uasc.SecureChan
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.13.7
 func (s *SubscriptionService) TransferSubscriptions(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	ctx = ualog.With(ctx, newSubscriptionServiceLogAttributes("transfer"))
+	ctx = ualog.WithAttrs(ctx, newSubscriptionServiceLogAttributes("transfer"))
 	logServiceRequest(ctx, r)
 
 	req, err := safeReq[*ua.TransferSubscriptionsRequest](r)
@@ -203,7 +203,7 @@ func (s *SubscriptionService) TransferSubscriptions(ctx context.Context, sc *uas
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.13.8
 func (s *SubscriptionService) DeleteSubscriptions(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	ctx = ualog.With(ctx, newSubscriptionServiceLogAttributes("delete"))
+	ctx = ualog.WithAttrs(ctx, newSubscriptionServiceLogAttributes("delete"))
 	logServiceRequest(ctx, r)
 
 	req, err := safeReq[*ua.DeleteSubscriptionsRequest](r)
@@ -300,7 +300,7 @@ func (s *Subscription) Update(req *ua.ModifySubscriptionRequest) {
 }
 
 func (s *Subscription) Start(ctx context.Context) {
-	ctx = ualog.With(ctx, ualog.Uint32("sub", s.ID))
+	ctx = ualog.WithAttrs(ctx, ualog.Uint32("sub", s.ID))
 	go s.run(ctx)
 }
 

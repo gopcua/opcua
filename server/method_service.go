@@ -25,7 +25,7 @@ var newMethodServiceLogAttributes = newServiceLogAttributeCreatorForSet("method"
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.11.2
 func (s *MethodService) Call(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	ctx = ualog.With(ctx, newMethodServiceLogAttributes("call"))
+	ctx = ualog.WithAttrs(ctx, newMethodServiceLogAttributes("call"))
 	logServiceRequest(ctx, r)
 
 	req, err := safeReq[*ua.CallRequest](r)
