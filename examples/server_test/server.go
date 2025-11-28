@@ -31,14 +31,15 @@ func main() {
 	flag.BoolVar(&debug.Enable, "debug", false, "enable debug logging")
 	flag.Parse()
 
-	ctx := ualog.Logger(context.Background(), ualog.WithHandler(
-		slog.NewJSONHandler(os.Stdout, func() *slog.HandlerOptions {
-			if debug.Enable {
-				return &slog.HandlerOptions{Level: slog.LevelDebug}
-			}
-			return nil
-		}()),
-	))
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, func() *slog.HandlerOptions {
+		if debug.Enable {
+			return &slog.HandlerOptions{Level: slog.LevelDebug}
+		}
+		return nil
+	}()))
+
+	logger = logger.With("foo", "bar")
+	ctx := ualog.Logger(context.Background(), ualog.WithLogger(logger))
 
 	var opts []server.Option
 
