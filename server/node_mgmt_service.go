@@ -21,11 +21,11 @@ func NewNodeManagementService(s *Server) *NodeManagementService {
 	}
 }
 
-var newNodeMgmtServiceLogAttributes = newServiceLogAttributeCreatorForSet("nodemanagement")
+var newNodeMgmtServiceLogAttribute = newServiceLogAttributeCreatorForSet("nodemanagement")
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.7.2
 func (s *NodeManagementService) AddNodes(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	ctx = ualog.WithAttrs(ctx, newNodeMgmtServiceLogAttributes("add nodes"))
+	ctx = ualog.WithAttrs(ctx, newNodeMgmtServiceLogAttribute("add nodes"))
 	logServiceRequest(ctx, r)
 
 	req, err := safeReq[*ua.AddNodesRequest](r)
@@ -38,7 +38,7 @@ func (s *NodeManagementService) AddNodes(ctx context.Context, sc *uasc.SecureCha
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.7.3
 func (s *NodeManagementService) AddReferences(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	ctx = ualog.WithAttrs(ctx, newNodeMgmtServiceLogAttributes("add references"))
+	ctx = ualog.WithAttrs(ctx, newNodeMgmtServiceLogAttribute("add references"))
 	logServiceRequest(ctx, r)
 
 	req, err := safeReq[*ua.AddReferencesRequest](r)
@@ -51,7 +51,7 @@ func (s *NodeManagementService) AddReferences(ctx context.Context, sc *uasc.Secu
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.7.4
 func (s *NodeManagementService) DeleteNodes(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	ctx = ualog.WithAttrs(ctx, newNodeMgmtServiceLogAttributes("delete nodes"))
+	ctx = ualog.WithAttrs(ctx, newNodeMgmtServiceLogAttribute("delete nodes"))
 	logServiceRequest(ctx, r)
 
 	req, err := safeReq[*ua.DeleteNodesRequest](r)
@@ -64,7 +64,7 @@ func (s *NodeManagementService) DeleteNodes(ctx context.Context, sc *uasc.Secure
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.7.5
 func (s *NodeManagementService) DeleteReferences(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	ctx = ualog.WithAttrs(ctx, newNodeMgmtServiceLogAttributes("delete references"))
+	ctx = ualog.WithAttrs(ctx, newNodeMgmtServiceLogAttribute("delete references"))
 	logServiceRequest(ctx, r)
 
 	req, err := safeReq[*ua.DeleteReferencesRequest](r)

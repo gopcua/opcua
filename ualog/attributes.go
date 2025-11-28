@@ -6,7 +6,11 @@ import (
 )
 
 var (
-	ErrorKey  string = "err"
+	// ErrorKey is used as the key when ualog.Err creates a String attribute for err.Error()
+	ErrorKey string = "err"
+	// NodeIdKey should be used when logging the id of a ua.Node
+	//
+	// This avoids the use of "node", "node_id", "id" in different places.
 	NodeIdKey string = "node_id"
 )
 
