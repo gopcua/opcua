@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"log"
 	"maps"
 	"slices"
@@ -16,6 +17,7 @@ type Attributes map[ua.AttributeID]*ua.DataValue
 
 type References []*ua.ReferenceDescription
 
+type MethodFunc func(context.Context, ...*ua.Variant) ([]*ua.Variant, ua.StatusCode)
 type ValueFunc func() *ua.DataValue
 
 type AttrValue struct {
@@ -25,7 +27,6 @@ type AttrValue struct {
 
 func NewAttrValue(v *ua.DataValue) *AttrValue {
 	return &AttrValue{Value: v}
-
 }
 
 func DataValueFromValue(val any) *ua.DataValue {
@@ -69,12 +70,13 @@ type Node struct {
 	attr Attributes
 	refs References
 	val  ValueFunc
+	call MethodFunc
 
 	ns NameSpace
 }
 
 func NewNode(id *ua.NodeID, attr Attributes, refs References, val ValueFunc) *Node {
-	n := &Node{id, attr, refs, val, nil}
+	n := &Node{id, attr, refs, val, nil, nil}
 	n.sanitize()
 	return n
 }
@@ -201,6 +203,7 @@ func (n *Node) Attribute(id ua.AttributeID) (*AttrValue, error) {
 		return nil, ua.StatusBadAttributeIDInvalid
 	}
 }
+
 func (n *Node) SetAttribute(id ua.AttributeID, val *ua.DataValue) error {
 	switch {
 	case id == ua.AttributeIDValue:
@@ -278,6 +281,14 @@ func (n *Node) DataType() *ua.ExpandedNodeID {
 		return ua.NewTwoByteExpandedNodeID(0)
 	}
 	return v.Value.Value().(*ua.ExpandedNodeID)
+}
+
+func (n *Node) CallMethod(ctx context.Context, args ...*ua.Variant) ([]*ua.Variant, ua.StatusCode) {
+	if n.call == nil {
+		return nil, ua.StatusBadNotImplemented
+	}
+
+	return n.call(ctx, args...)
 }
 
 func (n *Node) SetNodeClass(nc ua.NodeClass) {
@@ -386,5 +397,4 @@ func (n Node) Access(flag ua.AccessLevelType) bool {
 		}
 	}
 	return true
-
 }
