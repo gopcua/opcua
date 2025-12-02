@@ -206,7 +206,21 @@ func (c *Client) sendRepublishRequests(ctx context.Context, sub *Subscription, a
 				debug.Printf("Republishing subscription %d failed: %v", req.SubscriptionID, status)
 				return status
 			}
+
+			// Process the republished notification and advance sequence number
+			if res.NotificationMessage != nil {
+				c.notifySubscription(ctx, sub, res.NotificationMessage)
+				sub.lastSeq = res.NotificationMessage.SequenceNumber
+				sub.nextSeq = sub.lastSeq + 1
+				debug.Printf("Republished notification %d for subscription %d", res.NotificationMessage.SequenceNumber, sub.SubscriptionID)
+
+				if len(availableSeq) > 0 && !slices.Contains(availableSeq, sub.nextSeq) {
+					debug.Printf("Republishing subscription %d complete - no more sequences in buffer", sub.SubscriptionID)
+					return nil
+				}
+			}
 		}
+
 		time.Sleep(time.Second)
 	}
 }
