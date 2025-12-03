@@ -18,6 +18,8 @@ type Attributes map[ua.AttributeID]*ua.DataValue
 type References []*ua.ReferenceDescription
 
 type MethodFunc func(context.Context, ...*ua.Variant) ([]*ua.Variant, ua.StatusCode)
+type MethodMiddleware func(MethodFunc) MethodFunc
+
 type ValueFunc func() *ua.DataValue
 
 type AttrValue struct {

@@ -12,7 +12,8 @@ import (
 //
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.12
 type MethodService struct {
-	srv *Server
+	srv        *Server
+	middleware MethodMiddleware
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.12.2
@@ -69,7 +70,7 @@ func (s *MethodService) Call(sc *uasc.SecureChannel, r ua.Request, reqID uint32)
 		}
 
 		res := &ua.CallMethodResult{}
-		res.OutputArguments, res.StatusCode = methodNode.CallMethod(
+		res.OutputArguments, res.StatusCode = s.middleware(methodNode.CallMethod)(
 			context.Background(),
 			method.InputArguments...,
 		)
