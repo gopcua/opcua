@@ -4,6 +4,7 @@ import (
 	"context"
 	"slices"
 
+	srvctx "github.com/gopcua/opcua/server/context"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uasc"
 )
@@ -18,6 +19,7 @@ type MethodService struct {
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.12.2
 func (s *MethodService) Call(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
+	ctx := srvctx.WithServiceSetAndName(context.Background(), "Method", "Call")
 	if s.srv.cfg.logger != nil {
 		s.srv.cfg.logger.Debug("Handling %T", r)
 	}
@@ -71,7 +73,10 @@ func (s *MethodService) Call(sc *uasc.SecureChannel, r ua.Request, reqID uint32)
 
 		res := &ua.CallMethodResult{}
 		res.OutputArguments, res.StatusCode = s.middleware(methodNode.CallMethod)(
-			context.Background(),
+			srvctx.WithMethodCall(ctx,
+				objectNode.ID().String(), objectNode.DisplayName().Text,
+				methodNode.ID().String(), methodNode.DisplayName().Text,
+			),
 			method.InputArguments...,
 		)
 
