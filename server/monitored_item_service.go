@@ -32,9 +32,10 @@ type MonitoredItemService struct {
 
 func NewMonitoredItemService(sub *SubscriptionService) *MonitoredItemService {
 	return &MonitoredItemService{
-		Items: make(map[uint32]*MonitoredItem),
-		Nodes: make(map[string][]*MonitoredItem),
-		Subs:  make(map[uint32][]*MonitoredItem),
+		SubService: sub,
+		Items:      make(map[uint32]*MonitoredItem),
+		Nodes:      make(map[string][]*MonitoredItem),
+		Subs:       make(map[uint32][]*MonitoredItem),
 	}
 }
 
