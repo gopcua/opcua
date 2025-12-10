@@ -126,10 +126,16 @@ type ClientInterface interface {
 	Browse(context.Context, *ua.BrowseRequest) (*ua.BrowseResponse, error)
 	BrowseNext(context.Context, *ua.BrowseNextRequest) (*ua.BrowseNextResponse, error)
 
+	Node(*ua.NodeID) *Node
 	NodeFromExpandedNodeID(*ua.ExpandedNodeID) *Node
 
 	Read(context.Context, *ua.ReadRequest) (*ua.ReadResponse, error)
 	Send(context.Context, ua.Request, func(ua.Response) error) error
+
+	ForgetSubscription(context.Context, uint32)
+	RegisterSubscription_NeedsSubMuxLock(*Subscription) error
+
+	RequestTimeout() time.Duration
 }
 
 // Client is a high-level client for an OPC/UA server.
@@ -1350,6 +1356,10 @@ func (c *Client) UpdateNamespaces(ctx context.Context) error {
 	}
 	c.setNamespaces(ns)
 	return nil
+}
+
+func (c *Client) RequestTimeout() time.Duration {
+	return c.cfg.sechan.RequestTimeout
 }
 
 // safeAssign implements a type-safe assign from T to *T.
