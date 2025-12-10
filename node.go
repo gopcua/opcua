@@ -19,7 +19,7 @@ type Node struct {
 	// ID is the node id of the node.
 	ID *ua.NodeID
 
-	c *Client
+	c ClientInterface
 }
 
 func (n *Node) String() string {

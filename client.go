@@ -122,6 +122,16 @@ func (a bySecurityLevel) Len() int           { return len(a) }
 func (a bySecurityLevel) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a bySecurityLevel) Less(i, j int) bool { return a[i].SecurityLevel < a[j].SecurityLevel }
 
+type ClientInterface interface {
+	Browse(context.Context, *ua.BrowseRequest) (*ua.BrowseResponse, error)
+	BrowseNext(context.Context, *ua.BrowseNextRequest) (*ua.BrowseNextResponse, error)
+
+	NodeFromExpandedNodeID(*ua.ExpandedNodeID) *Node
+
+	Read(context.Context, *ua.ReadRequest) (*ua.ReadResponse, error)
+	Send(context.Context, ua.Request, func(ua.Response) error) error
+}
+
 // Client is a high-level client for an OPC/UA server.
 // It establishes a secure channel and a session.
 type Client struct {
