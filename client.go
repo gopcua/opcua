@@ -1005,14 +1005,14 @@ func (c *Client) sendWithTimeout(ctx context.Context, req ua.Request, timeout ti
 // Node returns a node object which accesses its attributes
 // through this client connection.
 func (c *Client) Node(id *ua.NodeID) *Node {
-	return &Node{ID: id, c: c}
+	return NewNode(id, c)
 }
 
 // NodeFromExpandedNodeID returns a node object which accesses its attributes
 // through this client connection. This is usually needed when working with node ids returned
 // from browse responses by the server.
 func (c *Client) NodeFromExpandedNodeID(id *ua.ExpandedNodeID) *Node {
-	return &Node{ID: ua.NewNodeIDFromExpandedNodeID(id), c: c}
+	return NewNode(ua.NewNodeIDFromExpandedNodeID(id), c)
 }
 
 // FindServers finds the servers available at an endpoint

@@ -22,6 +22,10 @@ type Node struct {
 	c ClientInterface
 }
 
+func NewNode(id *ua.NodeID, c ClientInterface) *Node {
+	return &Node{ID: id, c: c}
+}
+
 func (n *Node) String() string {
 	return n.ID.String()
 }
