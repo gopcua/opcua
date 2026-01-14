@@ -173,7 +173,7 @@ func (s *ViewService) TranslateBrowsePathsToNodeIDs(sc *uasc.SecureChannel, r ua
 		},
 		Results: make([]*ua.BrowsePathResult, len(req.BrowsePaths)),
 
-		DiagnosticInfos: []*ua.DiagnosticInfo{{}},
+		DiagnosticInfos: []*ua.DiagnosticInfo{},
 	}
 
 	findTarget := func(n *Node, pathElements []*ua.RelativePathElement) (*ua.BrowsePathResult, error) {
