@@ -200,10 +200,10 @@ func (s *ViewService) TranslateBrowsePathsToNodeIDs(sc *uasc.SecureChannel, r ua
 		}, nil
 	}
 
-	for _, path := range req.BrowsePaths {
+	for idx, path := range req.BrowsePaths {
 		if n := s.srv.Node(path.StartingNode); n != nil && path.RelativePath != nil {
 			if bpr, err := findTarget(n, path.RelativePath.Elements); err == nil {
-				resp.Results = append(resp.Results, bpr)
+				resp.Results[idx] = bpr
 			}
 		}
 	}
