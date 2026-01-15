@@ -122,6 +122,22 @@ func (a bySecurityLevel) Len() int           { return len(a) }
 func (a bySecurityLevel) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a bySecurityLevel) Less(i, j int) bool { return a[i].SecurityLevel < a[j].SecurityLevel }
 
+type ClientInterface interface {
+	Browse(context.Context, *ua.BrowseRequest) (*ua.BrowseResponse, error)
+	BrowseNext(context.Context, *ua.BrowseNextRequest) (*ua.BrowseNextResponse, error)
+
+	Node(*ua.NodeID) *Node
+	NodeFromExpandedNodeID(*ua.ExpandedNodeID) *Node
+
+	Read(context.Context, *ua.ReadRequest) (*ua.ReadResponse, error)
+	Send(context.Context, ua.Request, func(ua.Response) error) error
+
+	ForgetSubscription(context.Context, uint32)
+	RegisterSubscription_NeedsSubMuxLock(*Subscription) error
+
+	RequestTimeout() time.Duration
+}
+
 // Client is a high-level client for an OPC/UA server.
 // It establishes a secure channel and a session.
 type Client struct {
@@ -989,14 +1005,14 @@ func (c *Client) sendWithTimeout(ctx context.Context, req ua.Request, timeout ti
 // Node returns a node object which accesses its attributes
 // through this client connection.
 func (c *Client) Node(id *ua.NodeID) *Node {
-	return &Node{ID: id, c: c}
+	return NewNode(id, c)
 }
 
 // NodeFromExpandedNodeID returns a node object which accesses its attributes
 // through this client connection. This is usually needed when working with node ids returned
 // from browse responses by the server.
 func (c *Client) NodeFromExpandedNodeID(id *ua.ExpandedNodeID) *Node {
-	return &Node{ID: ua.NewNodeIDFromExpandedNodeID(id), c: c}
+	return NewNode(ua.NewNodeIDFromExpandedNodeID(id), c)
 }
 
 // FindServers finds the servers available at an endpoint
@@ -1340,6 +1356,10 @@ func (c *Client) UpdateNamespaces(ctx context.Context) error {
 	}
 	c.setNamespaces(ns)
 	return nil
+}
+
+func (c *Client) RequestTimeout() time.Duration {
+	return c.cfg.sechan.RequestTimeout
 }
 
 // safeAssign implements a type-safe assign from T to *T.

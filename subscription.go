@@ -34,7 +34,7 @@ type Subscription struct {
 	itemsMu                   sync.Mutex
 	lastSeq                   uint32
 	nextSeq                   uint32
-	c                         *Client
+	c                         ClientInterface
 }
 
 type SubscriptionParameters struct {
@@ -82,7 +82,7 @@ type PublishNotificationData struct {
 // from the client and the server.
 func (s *Subscription) Cancel(ctx context.Context) error {
 	stats.Subscription().Add("Cancel", 1)
-	s.c.forgetSubscription(ctx, s.SubscriptionID)
+	s.c.ForgetSubscription(ctx, s.SubscriptionID)
 	return s.delete(ctx)
 }
 
@@ -321,8 +321,8 @@ func (s *Subscription) publishTimeout() time.Duration {
 	if timeout > uasc.MaxTimeout {
 		return uasc.MaxTimeout
 	}
-	if timeout < s.c.cfg.sechan.RequestTimeout {
-		return s.c.cfg.sechan.RequestTimeout
+	if requestTimeout := s.c.RequestTimeout(); timeout < requestTimeout {
+		return requestTimeout
 	}
 	return timeout
 }
@@ -447,7 +447,7 @@ func (s *Subscription) recreate_create(ctx context.Context) error {
 	s.lastSeq = 0
 	s.nextSeq = 1
 
-	if err := s.c.registerSubscription_NeedsSubMuxLock(s); err != nil {
+	if err := s.c.RegisterSubscription_NeedsSubMuxLock(s); err != nil {
 		return err
 	}
 	dlog.Printf("subscription registered")

@@ -225,8 +225,8 @@ func (c *Client) sendRepublishRequests(ctx context.Context, sub *Subscription, a
 	}
 }
 
-// registerSubscription_NeedsSubMuxLock registers a subscription
-func (c *Client) registerSubscription_NeedsSubMuxLock(sub *Subscription) error {
+// RegisterSubscription_NeedsSubMuxLock registers a subscription
+func (c *Client) RegisterSubscription_NeedsSubMuxLock(sub *Subscription) error {
 	if sub.SubscriptionID == 0 {
 		return ua.StatusBadSubscriptionIDInvalid
 	}
@@ -239,7 +239,7 @@ func (c *Client) registerSubscription_NeedsSubMuxLock(sub *Subscription) error {
 	return nil
 }
 
-func (c *Client) forgetSubscription(ctx context.Context, id uint32) {
+func (c *Client) ForgetSubscription(ctx context.Context, id uint32) {
 	c.subMux.Lock()
 	c.forgetSubscription_NeedsSubMuxLock(ctx, id)
 	c.subMux.Unlock()
