@@ -259,8 +259,19 @@ type ValueExtensionObjectArgument struct {
 	} `xml:"Description"`
 }
 
+type ValueExtensionObjectEnumValueType struct {
+	Value       int `xml:"Value"`
+	DisplayName struct {
+		Text string `xml:"Text"`
+	} `xml:"DisplayName"`
+	Description struct {
+		Text string `xml:"Text"`
+	} `xml:"Description"`
+}
+
 type ValueExtensionObjectBody struct {
-	Argument ValueExtensionObjectArgument `xml:"Argument"`
+	Argument      *ValueExtensionObjectArgument      `xml:"Argument,omitempty"`
+	EnumValueType *ValueExtensionObjectEnumValueType `xml:"EnumValueType,omitempty"`
 }
 
 type ValueExtensionObject struct {

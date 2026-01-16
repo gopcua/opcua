@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/gopcua/opcua/id"
 	"github.com/gopcua/opcua/schema"
 	"github.com/gopcua/opcua/ua"
 )
@@ -265,7 +266,8 @@ func (srv *Server) nodesImportNodeSet(nodes *schema.UANodeSet) error {
 				valueFunc = newValueFuncFromData(data)
 			} else if ot.Value.ExtObjAttr != nil {
 				extObj := ot.Value.ExtObjAttr
-				if extObj.TypeID.Identifier == "i=297" {
+				typeId := ua.MustParseNodeID(extObj.TypeID.Identifier)
+				if typeId.IntID() == id.Argument_Encoding_DefaultXML {
 					arg := &ua.Argument{
 						Name:            extObj.Body.Argument.Name,
 						DataType:        ua.MustParseNodeID(extObj.Body.Argument.DataType.Identifier),
@@ -279,25 +281,46 @@ func (srv *Server) nodesImportNodeSet(nodes *schema.UANodeSet) error {
 					}
 					v := ua.NewExtensionObject(arg)
 					valueFunc = newValueFuncFromData(v)
+				} else if typeId.IntID() == id.EnumValueType_Encoding_DefaultXML {
+					evt := ot.Value.ExtObjAttr.Body.EnumValueType
+					data := &ua.EnumValueType{
+						Value:       int64(evt.Value),
+						DisplayName: ua.NewLocalizedText(evt.DisplayName.Text),
+						Description: ua.NewLocalizedText(evt.Description.Text),
+					}
+					v := ua.NewExtensionObject(data)
+					valueFunc = newValueFuncFromData(v)
 				}
 			} else if ot.Value.ExtObjListAttr != nil {
+				supportedTypes := map[string]struct{}{"i=297": {}, "i=7616": {}}
 				if !slices.ContainsFunc(ot.Value.ExtObjListAttr.Data, func(eo schema.ValueExtensionObject) bool {
-					return eo.TypeID.Identifier != "i=297"
+					_, ok := supportedTypes[eo.TypeID.Identifier]
+					return !ok
 				}) {
 					data := make([]*ua.ExtensionObject, 0, len(ot.Value.ExtObjListAttr.Data))
 					for _, extObj := range ot.Value.ExtObjListAttr.Data {
-						arg := &ua.Argument{
-							Name:            extObj.Body.Argument.Name,
-							DataType:        ua.MustParseNodeID(extObj.Body.Argument.DataType.Identifier),
-							ValueRank:       int32(extObj.Body.Argument.ValueRank),
-							ArrayDimensions: make([]uint32, 0, len(extObj.Body.Argument.ArrayDimensions.Data)),
-							Description:     ua.NewLocalizedText(extObj.Body.Argument.Description.Text),
-						}
+						typeId := ua.MustParseNodeID(extObj.TypeID.Identifier)
+						if typeId.IntID() == id.Argument_Encoding_DefaultXML {
+							arg := &ua.Argument{
+								Name:            extObj.Body.Argument.Name,
+								DataType:        ua.MustParseNodeID(extObj.Body.Argument.DataType.Identifier),
+								ValueRank:       int32(extObj.Body.Argument.ValueRank),
+								ArrayDimensions: make([]uint32, 0, len(extObj.Body.Argument.ArrayDimensions.Data)),
+								Description:     ua.NewLocalizedText(extObj.Body.Argument.Description.Text),
+							}
 
-						for _, ad := range extObj.Body.Argument.ArrayDimensions.Data {
-							arg.ArrayDimensions = append(arg.ArrayDimensions, ad.Data)
+							for _, ad := range extObj.Body.Argument.ArrayDimensions.Data {
+								arg.ArrayDimensions = append(arg.ArrayDimensions, ad.Data)
+							}
+							data = append(data, ua.NewExtensionObject(arg))
+						} else if typeId.IntID() == id.EnumValueType_Encoding_DefaultXML {
+							evt := extObj.Body.EnumValueType
+							data = append(data, ua.NewExtensionObject(&ua.EnumValueType{
+								Value:       int64(evt.Value),
+								DisplayName: ua.NewLocalizedText(evt.DisplayName.Text),
+								Description: ua.NewLocalizedText(evt.Description.Text),
+							}))
 						}
-						data = append(data, ua.NewExtensionObject(arg))
 					}
 					v, _ := ua.NewVariant(data)
 					valueFunc = newValueFuncFromData(v)
@@ -367,7 +390,7 @@ func (srv *Server) nodesImportNodeSet(nodes *schema.UANodeSet) error {
 	for i := range nodes.UAObject {
 		ot := nodes.UAObject[i]
 		nid := ua.MustParseNodeID(ot.NodeIdAttr)
-		if ot.NodeIdAttr == "i=85" {
+		if nid.IntID() == id.ObjectsFolder {
 			log.Printf("doing objects.")
 		}
 		var attrs Attributes = make(map[ua.AttributeID]*ua.DataValue)
@@ -648,7 +671,7 @@ func (srv *Server) refsImportNodeSet(nodes *schema.UANodeSet) error {
 		ot := nodes.UAObject[i]
 		nid := ua.MustParseNodeID(ot.NodeIdAttr)
 		node := srv.Node(nid)
-		if ot.NodeIdAttr == "i=84" {
+		if nid.IntID() == id.RootFolder {
 			log.Printf("doing root.")
 		}
 
