@@ -2,7 +2,10 @@
 
 package schema
 
-import _ "embed"
+import (
+	_ "embed"
+	"time"
+)
 
 //go:embed Opc.Ua.NodeSet2.xml
 var OpcUaNodeSet2 []byte
@@ -234,8 +237,102 @@ type UAObject struct {
 	*UAInstance
 }
 
+type ValueBool struct {
+	Data bool `xml:",chardata"`
+}
+
+type ValueDateTime struct {
+	Data time.Time `xml:",chardata"`
+}
+
+type ValueExtensionObjectArgument struct {
+	Name     string `xml:"Name"`
+	DataType struct {
+		Identifier string `xml:"Identifier"`
+	} `xml:"DataType"`
+	ValueRank       int `xml:"ValueRank"`
+	ArrayDimensions struct {
+		Data []ValueUInt32 `xml:"UInt32,omitempty"`
+	}
+	Description struct {
+		Text string `xml:"Text"`
+	} `xml:"Description"`
+}
+
+type ValueExtensionObjectEnumValueType struct {
+	Value       int `xml:"Value"`
+	DisplayName struct {
+		Text string `xml:"Text"`
+	} `xml:"DisplayName"`
+	Description struct {
+		Text string `xml:"Text"`
+	} `xml:"Description"`
+}
+
+type ValueExtensionObjectBody struct {
+	Argument      *ValueExtensionObjectArgument      `xml:"Argument,omitempty"`
+	EnumValueType *ValueExtensionObjectEnumValueType `xml:"EnumValueType,omitempty"`
+}
+
+type ValueExtensionObject struct {
+	TypeID struct {
+		Identifier string `xml:"Identifier"`
+	} `xml:"TypeId"`
+	Body ValueExtensionObjectBody `xml:"Body"`
+}
+
+type ValueExtensionObjectList struct {
+	Data []ValueExtensionObject `xml:"ExtensionObject"`
+}
+
+type ValueInt32 struct {
+	Data int32 `xml:",chardata"`
+}
+
+type ValueInt32List struct {
+	Data []ValueInt32 `xml:"Int32"`
+}
+
+type ValueLocalizedText struct {
+	Locale string `xml:"Locale"`
+	Text   string `xml:"Text"`
+}
+
+type ValueLocalizedTextList struct {
+	Data []ValueLocalizedText `xml:"LocalizedText"`
+}
+
+type ValueQualifiedName struct {
+	NamespaceIndex int    `xml:"NamespaceIndex"`
+	Name           string `xml:"Name"`
+}
+
+type ValueUInt32 struct {
+	Data uint32 `xml:",chardata"`
+}
+
+type ValueString struct {
+	Data string `xml:",chardata"`
+}
+
+type ValueStringList struct {
+	Data []ValueString `xml:"String"`
+}
+
 // Value ...
 type Value struct {
+	BoolAttr          *ValueBool                `xml:"Boolean,omitempty"`
+	DateTimeAttr      *ValueDateTime            `xml:"DateTime,omitempty"`
+	ExtObjAttr        *ValueExtensionObject     `xml:"ExtensionObject,omitempty"`
+	ExtObjListAttr    *ValueExtensionObjectList `xml:"ListOfExtensionObject,omitempty"`
+	Int32Attr         *ValueInt32               `xml:"Int32,omitempty"`
+	Int32ListAttr     *ValueInt32List           `xml:"ListOfInt32,omitempty"`
+	QualifiedNameAttr *ValueQualifiedName       `xml:"QualifiedName,omitempty"`
+	StringAttr        *ValueString              `xml:"String,omitempty"`
+	StringListAttr    *ValueStringList          `xml:"ListOfString,omitempty"`
+	TextAttr          *ValueLocalizedText       `xml:"LocalizedText,omitempty"`
+	TextListAttr      *ValueLocalizedTextList   `xml:"ListOfLocalizedText,omitempty"`
+	UInt32Attr        *ValueUInt32              `xml:"UInt32,omitempty"`
 }
 
 // UAVariable ...

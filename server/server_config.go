@@ -149,6 +149,12 @@ func SoftwareVersion(name string) Option {
 	}
 }
 
+func WithMethodMiddleware(mw MethodMiddleware) Option {
+	return func(s *serverConfig) {
+		s.methodCallMiddleware = mw
+	}
+}
+
 // this logger interface is used to allow the user to provide their own logger
 // it is compatible with slog.Logger
 type Logger interface {

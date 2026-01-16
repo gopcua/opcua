@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"log"
 	"maps"
 	"slices"
@@ -16,6 +17,9 @@ type Attributes map[ua.AttributeID]*ua.DataValue
 
 type References []*ua.ReferenceDescription
 
+type MethodFunc func(context.Context, ...*ua.Variant) ([]*ua.Variant, ua.StatusCode)
+type MethodMiddleware func(MethodFunc) MethodFunc
+
 type ValueFunc func() *ua.DataValue
 
 type AttrValue struct {
@@ -25,7 +29,6 @@ type AttrValue struct {
 
 func NewAttrValue(v *ua.DataValue) *AttrValue {
 	return &AttrValue{Value: v}
-
 }
 
 func DataValueFromValue(val any) *ua.DataValue {
@@ -69,12 +72,13 @@ type Node struct {
 	attr Attributes
 	refs References
 	val  ValueFunc
+	call MethodFunc
 
 	ns NameSpace
 }
 
 func NewNode(id *ua.NodeID, attr Attributes, refs References, val ValueFunc) *Node {
-	n := &Node{id, attr, refs, val, nil}
+	n := &Node{id, attr, refs, val, nil, nil}
 	n.sanitize()
 	return n
 }
@@ -186,7 +190,7 @@ func (n *Node) Attribute(id ua.AttributeID) (*AttrValue, error) {
 	case id == ua.AttributeIDValue:
 		if n.val != nil {
 			val := n.val()
-			if val == nil {
+			if val == nil || val.Value == nil {
 				return nil, ua.StatusBadAttributeIDInvalid
 			}
 			return NewAttrValue(val), nil
@@ -201,6 +205,7 @@ func (n *Node) Attribute(id ua.AttributeID) (*AttrValue, error) {
 		return nil, ua.StatusBadAttributeIDInvalid
 	}
 }
+
 func (n *Node) SetAttribute(id ua.AttributeID, val *ua.DataValue) error {
 	switch {
 	case id == ua.AttributeIDValue:
@@ -263,6 +268,7 @@ func (n *Node) DataType() *ua.ExpandedNodeID {
 		log.Printf("n was nil!")
 		return ua.NewTwoByteExpandedNodeID(0)
 	}
+
 	v := n.attr[ua.AttributeIDDataType]
 	if v == nil || v.Value.Value() == nil {
 		// if we have a type definition, return that?
@@ -277,7 +283,23 @@ func (n *Node) DataType() *ua.ExpandedNodeID {
 		}
 		return ua.NewTwoByteExpandedNodeID(0)
 	}
-	return v.Value.Value().(*ua.ExpandedNodeID)
+
+	switch val := v.Value.Value().(type) {
+	case *ua.ExpandedNodeID:
+		return val
+	case *ua.NodeID:
+		return &ua.ExpandedNodeID{NodeID: val}
+	}
+
+	return ua.NewTwoByteExpandedNodeID(0)
+}
+
+func (n *Node) CallMethod(ctx context.Context, args ...*ua.Variant) ([]*ua.Variant, ua.StatusCode) {
+	if n.call == nil {
+		return nil, ua.StatusBadNotImplemented
+	}
+
+	return n.call(ctx, args...)
 }
 
 func (n *Node) SetNodeClass(nc ua.NodeClass) {
@@ -386,5 +408,4 @@ func (n Node) Access(flag ua.AccessLevelType) bool {
 		}
 	}
 	return true
-
 }

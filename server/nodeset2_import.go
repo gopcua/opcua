@@ -3,7 +3,10 @@ package server
 import (
 	"fmt"
 	"log"
+	"slices"
+	"strings"
 
+	"github.com/gopcua/opcua/id"
 	"github.com/gopcua/opcua/schema"
 	"github.com/gopcua/opcua/ua"
 )
@@ -114,6 +117,7 @@ func (srv *Server) nodesImportNodeSet(nodes *schema.UANodeSet) error {
 			}
 			return err
 		}
+
 		ns.AddNode(n)
 	}
 
@@ -184,11 +188,36 @@ func (srv *Server) nodesImportNodeSet(nodes *schema.UANodeSet) error {
 	for i := range nodes.UAVariable {
 		ot := nodes.UAVariable[i]
 		nid := ua.MustParseNodeID(ot.NodeIdAttr)
+
 		var attrs Attributes = make(map[ua.AttributeID]*ua.DataValue)
 		attrs[ua.AttributeIDAccessRestrictions] = DataValueFromValue(ot.AccessRestrictionsAttr)
 		attrs[ua.AttributeIDBrowseName] = DataValueFromValue(&ua.QualifiedName{NamespaceIndex: nid.Namespace(), Name: ot.BrowseNameAttr})
 		attrs[ua.AttributeIDUserWriteMask] = DataValueFromValue(ot.UserWriteMaskAttr)
 		attrs[ua.AttributeIDWriteMask] = DataValueFromValue(ot.WriteMaskAttr)
+		attrs[ua.AttributeIDHistorizing] = DataValueFromValue(ot.HistorizingAttr)
+		attrs[ua.AttributeIDValueRank] = DataValueFromValue(ot.ValueRankAttr)
+
+		dtidx := slices.IndexFunc(nodes.UADataType, func(dt *schema.UADataType) bool {
+			if strings.Compare(dt.BrowseNameAttr, ot.DataTypeAttr) == 0 {
+				return true
+			}
+
+			return strings.Compare(dt.NodeIdAttr, ot.DataTypeAttr) == 0
+		})
+
+		if dtidx >= 0 {
+			dt := nodes.UADataType[dtidx]
+			attrs[ua.AttributeIDDataType] = DataValueFromValue(ua.MustParseNodeID(dt.NodeIdAttr))
+		} else {
+			aliasidx := slices.IndexFunc(nodes.Aliases.Alias, func(a *schema.NodeIdAlias) bool {
+				return strings.Compare(a.AliasAttr, ot.DataTypeAttr) == 0
+			})
+			if aliasidx >= 0 {
+				dt := nodes.Aliases.Alias[aliasidx]
+				attrs[ua.AttributeIDDataType] = DataValueFromValue(ua.MustParseNodeID(dt.Value))
+			}
+		}
+
 		if len(ot.DisplayName) > 0 {
 			attrs[ua.AttributeIDDisplayName] = DataValueFromValue(ua.NewLocalizedText(ot.DisplayName[0].Value))
 		}
@@ -197,9 +226,120 @@ func (srv *Server) nodesImportNodeSet(nodes *schema.UANodeSet) error {
 		}
 		attrs[ua.AttributeIDNodeClass] = DataValueFromValue(uint32(ua.NodeClassVariable))
 
-		var refs References = make([]*ua.ReferenceDescription, 0)
+		var valueFunc ValueFunc
+		newValueFuncFromData := func(v any) ValueFunc {
+			dv := DataValueFromValue(v)
+			return func() *ua.DataValue { return dv }
+		}
 
-		n := NewNode(nid, attrs, refs, nil)
+		if ot.Value != nil {
+			if ot.Value.StringAttr != nil {
+				valueFunc = newValueFuncFromData(ot.Value.StringAttr.Data)
+			} else if ot.Value.StringListAttr != nil {
+				data := make([]string, 0, len(ot.Value.StringListAttr.Data))
+				for _, s := range ot.Value.StringListAttr.Data {
+					data = append(data, s.Data)
+				}
+				valueFunc = newValueFuncFromData(data)
+			} else if ot.Value.DateTimeAttr != nil {
+				valueFunc = newValueFuncFromData(ot.Value.DateTimeAttr.Data)
+			} else if ot.Value.Int32Attr != nil {
+				valueFunc = newValueFuncFromData(ot.Value.Int32Attr.Data)
+			} else if ot.Value.UInt32Attr != nil {
+				valueFunc = newValueFuncFromData(ot.Value.UInt32Attr.Data)
+			} else if ot.Value.Int32ListAttr != nil {
+				data := make([]int32, 0, len(ot.Value.Int32ListAttr.Data))
+				for _, i := range ot.Value.Int32ListAttr.Data {
+					data = append(data, i.Data)
+				}
+				valueFunc = newValueFuncFromData(data)
+			} else if ot.Value.BoolAttr != nil {
+				valueFunc = newValueFuncFromData(ot.Value.BoolAttr.Data)
+			} else if ot.Value.TextAttr != nil {
+				v := ua.NewLocalizedTextWithLocale(ot.Value.TextAttr.Text, ot.Value.TextAttr.Locale)
+				valueFunc = newValueFuncFromData(v)
+			} else if ot.Value.TextListAttr != nil {
+				data := make([]*ua.LocalizedText, 0, len(ot.Value.TextListAttr.Data))
+				for _, t := range ot.Value.TextListAttr.Data {
+					data = append(data, ua.NewLocalizedTextWithLocale(t.Text, t.Locale))
+				}
+				valueFunc = newValueFuncFromData(data)
+			} else if ot.Value.ExtObjAttr != nil {
+				extObj := ot.Value.ExtObjAttr
+				typeId := ua.MustParseNodeID(extObj.TypeID.Identifier)
+				if typeId.IntID() == id.Argument_Encoding_DefaultXML {
+					arg := &ua.Argument{
+						Name:            extObj.Body.Argument.Name,
+						DataType:        ua.MustParseNodeID(extObj.Body.Argument.DataType.Identifier),
+						ValueRank:       int32(extObj.Body.Argument.ValueRank),
+						ArrayDimensions: make([]uint32, 0, len(extObj.Body.Argument.ArrayDimensions.Data)),
+						Description:     ua.NewLocalizedText(extObj.Body.Argument.Description.Text),
+					}
+
+					for _, ad := range extObj.Body.Argument.ArrayDimensions.Data {
+						arg.ArrayDimensions = append(arg.ArrayDimensions, ad.Data)
+					}
+					v := ua.NewExtensionObject(arg)
+					valueFunc = newValueFuncFromData(v)
+				} else if typeId.IntID() == id.EnumValueType_Encoding_DefaultXML {
+					evt := ot.Value.ExtObjAttr.Body.EnumValueType
+					data := &ua.EnumValueType{
+						Value:       int64(evt.Value),
+						DisplayName: ua.NewLocalizedText(evt.DisplayName.Text),
+						Description: ua.NewLocalizedText(evt.Description.Text),
+					}
+					v := ua.NewExtensionObject(data)
+					valueFunc = newValueFuncFromData(v)
+				}
+			} else if ot.Value.ExtObjListAttr != nil {
+				supportedTypes := map[string]struct{}{"i=297": {}, "i=7616": {}}
+				if !slices.ContainsFunc(ot.Value.ExtObjListAttr.Data, func(eo schema.ValueExtensionObject) bool {
+					_, ok := supportedTypes[eo.TypeID.Identifier]
+					return !ok
+				}) {
+					data := make([]*ua.ExtensionObject, 0, len(ot.Value.ExtObjListAttr.Data))
+					for _, extObj := range ot.Value.ExtObjListAttr.Data {
+						typeId := ua.MustParseNodeID(extObj.TypeID.Identifier)
+						if typeId.IntID() == id.Argument_Encoding_DefaultXML {
+							arg := &ua.Argument{
+								Name:            extObj.Body.Argument.Name,
+								DataType:        ua.MustParseNodeID(extObj.Body.Argument.DataType.Identifier),
+								ValueRank:       int32(extObj.Body.Argument.ValueRank),
+								ArrayDimensions: make([]uint32, 0, len(extObj.Body.Argument.ArrayDimensions.Data)),
+								Description:     ua.NewLocalizedText(extObj.Body.Argument.Description.Text),
+							}
+
+							for _, ad := range extObj.Body.Argument.ArrayDimensions.Data {
+								arg.ArrayDimensions = append(arg.ArrayDimensions, ad.Data)
+							}
+							data = append(data, ua.NewExtensionObject(arg))
+						} else if typeId.IntID() == id.EnumValueType_Encoding_DefaultXML {
+							evt := extObj.Body.EnumValueType
+							data = append(data, ua.NewExtensionObject(&ua.EnumValueType{
+								Value:       int64(evt.Value),
+								DisplayName: ua.NewLocalizedText(evt.DisplayName.Text),
+								Description: ua.NewLocalizedText(evt.Description.Text),
+							}))
+						}
+					}
+					v, _ := ua.NewVariant(data)
+					valueFunc = newValueFuncFromData(v)
+				}
+			} else if ot.Value.QualifiedNameAttr != nil {
+				valueFunc = newValueFuncFromData(&ua.QualifiedName{
+					NamespaceIndex: uint16(ot.Value.QualifiedNameAttr.NamespaceIndex),
+					Name:           ot.Value.QualifiedNameAttr.Name,
+				})
+			} else {
+				if ot.ReleaseStatusAttr != "Deprecated" {
+					srv.cfg.logger.Warn("failed to parse value for datatype " + ot.DataTypeAttr)
+				}
+			}
+		}
+
+		var refs References = make([]*ua.ReferenceDescription, 0)
+		n := NewNode(nid, attrs, refs, valueFunc)
+
 		ns, err := srv.Namespace(int(nid.Namespace()))
 		if err != nil {
 			// This namespace doesn't exist.
@@ -208,6 +348,7 @@ func (srv *Server) nodesImportNodeSet(nodes *schema.UANodeSet) error {
 			}
 			return err
 		}
+
 		ns.AddNode(n)
 	}
 
@@ -215,11 +356,13 @@ func (srv *Server) nodesImportNodeSet(nodes *schema.UANodeSet) error {
 	for i := range nodes.UAMethod {
 		ot := nodes.UAMethod[i]
 		nid := ua.MustParseNodeID(ot.NodeIdAttr)
+
 		var attrs Attributes = make(map[ua.AttributeID]*ua.DataValue)
 		attrs[ua.AttributeIDAccessRestrictions] = DataValueFromValue(ot.AccessRestrictionsAttr)
 		attrs[ua.AttributeIDBrowseName] = DataValueFromValue(&ua.QualifiedName{NamespaceIndex: nid.Namespace(), Name: ot.BrowseNameAttr})
 		attrs[ua.AttributeIDUserWriteMask] = DataValueFromValue(ot.UserWriteMaskAttr)
 		attrs[ua.AttributeIDWriteMask] = DataValueFromValue(ot.WriteMaskAttr)
+
 		if len(ot.DisplayName) > 0 {
 			attrs[ua.AttributeIDDisplayName] = DataValueFromValue(ua.NewLocalizedText(ot.DisplayName[0].Value))
 		}
@@ -231,6 +374,7 @@ func (srv *Server) nodesImportNodeSet(nodes *schema.UANodeSet) error {
 		var refs References = make([]*ua.ReferenceDescription, 0)
 
 		n := NewNode(nid, attrs, refs, nil)
+
 		ns, err := srv.Namespace(int(nid.Namespace()))
 		if err != nil {
 			// This namespace doesn't exist.
@@ -246,7 +390,7 @@ func (srv *Server) nodesImportNodeSet(nodes *schema.UANodeSet) error {
 	for i := range nodes.UAObject {
 		ot := nodes.UAObject[i]
 		nid := ua.MustParseNodeID(ot.NodeIdAttr)
-		if ot.NodeIdAttr == "i=85" {
+		if nid.IntID() == id.ObjectsFolder {
 			log.Printf("doing objects.")
 		}
 		var attrs Attributes = make(map[ua.AttributeID]*ua.DataValue)
@@ -527,7 +671,7 @@ func (srv *Server) refsImportNodeSet(nodes *schema.UANodeSet) error {
 		ot := nodes.UAObject[i]
 		nid := ua.MustParseNodeID(ot.NodeIdAttr)
 		node := srv.Node(nid)
-		if ot.NodeIdAttr == "i=84" {
+		if nid.IntID() == id.RootFolder {
 			log.Printf("doing root.")
 		}
 
