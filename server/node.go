@@ -190,7 +190,7 @@ func (n *Node) Attribute(id ua.AttributeID) (*AttrValue, error) {
 	case id == ua.AttributeIDValue:
 		if n.val != nil {
 			val := n.val()
-			if val == nil {
+			if val == nil || val.Value == nil {
 				return nil, ua.StatusBadAttributeIDInvalid
 			}
 			return NewAttrValue(val), nil
@@ -268,6 +268,7 @@ func (n *Node) DataType() *ua.ExpandedNodeID {
 		log.Printf("n was nil!")
 		return ua.NewTwoByteExpandedNodeID(0)
 	}
+
 	v := n.attr[ua.AttributeIDDataType]
 	if v == nil || v.Value.Value() == nil {
 		// if we have a type definition, return that?
@@ -282,7 +283,15 @@ func (n *Node) DataType() *ua.ExpandedNodeID {
 		}
 		return ua.NewTwoByteExpandedNodeID(0)
 	}
-	return v.Value.Value().(*ua.ExpandedNodeID)
+
+	switch val := v.Value.Value().(type) {
+	case *ua.ExpandedNodeID:
+		return val
+	case *ua.NodeID:
+		return &ua.ExpandedNodeID{NodeID: val}
+	}
+
+	return ua.NewTwoByteExpandedNodeID(0)
 }
 
 func (n *Node) CallMethod(ctx context.Context, args ...*ua.Variant) ([]*ua.Variant, ua.StatusCode) {
