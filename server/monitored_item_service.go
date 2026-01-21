@@ -193,6 +193,10 @@ func (s *MonitoredItemService) CreateMonitoredItems(sc *uasc.SecureChannel, r ua
 			Req: itemreq,
 		}
 
+		if itemreq.RequestedParameters.QueueSize < 1 {
+			itemreq.RequestedParameters.QueueSize = 1
+		}
+
 		// book keeping of the new item
 		s.Items[item.ID] = &item
 		list, ok := s.Nodes[item.Req.ItemToMonitor.NodeID.String()]
@@ -218,7 +222,7 @@ func (s *MonitoredItemService) CreateMonitoredItems(sc *uasc.SecureChannel, r ua
 			StatusCode:              ua.StatusOK,
 			MonitoredItemID:         item.ID,
 			RevisedSamplingInterval: sub.RevisedPublishingInterval,
-			RevisedQueueSize:        1,
+			RevisedQueueSize:        itemreq.RequestedParameters.QueueSize,
 			FilterResult:            ua.NewExtensionObject(nil),
 		}
 		// do an initial update for the nodeids in the background.
