@@ -740,8 +740,8 @@ func (s *SecureChannel) handleOpenSecureChannelRequest(reqID uint32, svc ua.Requ
 	}
 
 	// Part 6.7.4: The AuthenticationToken should be nil. ???
-	if req.RequestHeader.AuthenticationToken.IntID() != 0 {
-		return ua.StatusBadSecureChannelTokenUnknown
+	if req.RequestHeader.AuthenticationToken != nil {
+		debug.Printf("Received non-nil AuthenticationToken on OpenSecureChannelRequest")
 	}
 
 	s.cfg.Lifetime = req.RequestedLifetime
