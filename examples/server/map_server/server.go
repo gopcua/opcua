@@ -13,8 +13,9 @@ import (
 	"context"
 	"crypto/rsa"
 	"crypto/tls"
+	"errors"
 	"flag"
-	"log"
+	"log/slog"
 	"os"
 	"os/signal"
 	"time"
@@ -22,6 +23,7 @@ import (
 	"github.com/gopcua/opcua/id"
 	"github.com/gopcua/opcua/server"
 	"github.com/gopcua/opcua/ua"
+	"github.com/gopcua/opcua/ualog"
 )
 
 var (
@@ -32,32 +34,10 @@ var (
 	gencert  = flag.Bool("gen-cert", false, "Generate a new certificate")
 )
 
-type Logger int
-
-func (l Logger) Debug(msg string, args ...any) {
-	if l < 0 {
-		log.Printf(msg, args...)
-	}
-}
-func (l Logger) Info(msg string, args ...any) {
-	if l < 1 {
-		log.Printf(msg, args...)
-	}
-}
-func (l Logger) Warn(msg string, args ...any) {
-	if l < 2 {
-		log.Printf(msg, args...)
-	}
-}
-func (l Logger) Error(msg string, args ...any) {
-	if l < 3 {
-		log.Printf(msg, args...)
-	}
-}
-
 func main() {
 	flag.Parse()
-	log.SetFlags(0)
+
+	ctx := ualog.New(context.Background(), ualog.WithHandler(slog.NewJSONHandler(os.Stdout, nil)))
 
 	var opts []server.Option
 
@@ -97,21 +77,13 @@ func main() {
 	// be sure the hostname(s) also match the certificate the server is going to use.
 	hostname, err := os.Hostname()
 	if err != nil {
-		log.Fatalf("Error getting host name %v", err)
+		fatal(ctx, "unable to get host name", err)
 	}
 
 	opts = append(opts,
 		server.EndPoint(*endpoint, *port),
 		server.EndPoint("localhost", *port),
 		server.EndPoint(hostname, *port),
-	)
-
-	// the server.SetLogger takes a server.Logger interface.  This interface is met by
-	// the slog.Logger{}.  A simple wrapper could be made for other loggers if they don't already
-	// meet the interface and that is what we've done here.
-	logger := Logger(1)
-	opts = append(opts,
-		server.SetLogger(logger),
 	)
 
 	// Here is an example of certificate generation.  This is not necessary if you already have a certificate.
@@ -126,29 +98,30 @@ func main() {
 
 		c, k, err := GenerateCert(endpoints, 4096, time.Minute*60*24*365*10)
 		if err != nil {
-			log.Fatalf("problem creating cert: %v", err)
+			fatal(ctx, "problem creating certificate", err)
 		}
 		err = os.WriteFile(*certfile, c, 0)
 		if err != nil {
-			log.Fatalf("problem writing cert: %v", err)
+			fatal(ctx, "problem writing certificate", err)
 		}
 		err = os.WriteFile(*keyfile, k, 0)
 		if err != nil {
-			log.Fatalf("problem writing key: %v", err)
+			fatal(ctx, "problem writing key", err)
 		}
-
 	}
 
 	var cert []byte
 	if *gencert || (*certfile != "" && *keyfile != "") {
-		log.Printf("Loading cert/key from %s/%s", *certfile, *keyfile)
+		ualog.Info(ctx, "loading certificate and key from files",
+			ualog.String("cert", *certfile), ualog.String("key", *keyfile),
+		)
 		c, err := tls.LoadX509KeyPair(*certfile, *keyfile)
 		if err != nil {
-			log.Printf("Failed to load certificate: %s", err)
+			ualog.Error(ctx, "failed to load certificate", ualog.Err(err))
 		} else {
 			pk, ok := c.PrivateKey.(*rsa.PrivateKey)
 			if !ok {
-				log.Fatalf("Invalid private key")
+				fatal(ctx, "invalid private key", errors.New("incorrect type"))
 			}
 			cert = c.Certificate[0]
 			opts = append(opts, server.PrivateKey(pk), server.Certificate(cert))
@@ -158,15 +131,15 @@ func main() {
 	// Now that all the options are set, create the server.
 	// When the server is created, it will automatically create namespace 0 and populate it with
 	// the core opc ua nodes.
-	s := server.New(opts...)
+	s := server.New(ctx, opts...)
 
 	// Create some map namespaces.  These are backed by go map[string]any
 	// which may be more convenient for some use cases than the NodeNamespace which requires
 	// your application's data structure to match the opcua node model.
 	myMapNamespace1 := server.NewMapNamespace(s, "MyTestNamespace")
-	log.Printf("map namespace 1 added at index %d", myMapNamespace1.ID())
+	ualog.Info(ctx, "map namespace 1 added", ualog.Uint32("index", uint32(myMapNamespace1.ID())))
 	myMapNamespace2 := server.NewMapNamespace(s, "SomeOtherNamespace")
-	log.Printf("map namespace 2 added at index %d", myMapNamespace2.ID())
+	ualog.Info(ctx, "map namespace 2 added", ualog.Uint32("index", uint32(myMapNamespace1.ID())))
 
 	// fill them with data.
 	myMapNamespace1.Data["Tag1"] = 123.4
@@ -193,13 +166,13 @@ func main() {
 			// you can manually lock and change the value, then manually trigger the change notification
 			myMapNamespace1.Mu.Lock()
 			myMapNamespace1.Data["Tag2"] = num
-			myMapNamespace1.ChangeNotification("Tag2")
+			myMapNamespace1.ChangeNotification(ctx, "Tag2")
 			myMapNamespace1.Mu.Unlock()
 			if updates == 10 {
 				// or you can do it with the built-in functions.
 				// which handles the locking and triggering
 				tag5 = !tag5
-				myMapNamespace1.SetValue("Tag5", tag5)
+				myMapNamespace1.SetValue(ctx, "Tag5", tag5)
 				updates = 0
 			}
 			time.Sleep(time.Second)
@@ -212,7 +185,10 @@ func main() {
 	go func() {
 		for {
 			changed_key := <-myMapNamespace2.ExternalNotification
-			log.Printf("%s changed to %v", changed_key, myMapNamespace2.GetValue(changed_key))
+			ualog.Info(ctx, "value changed",
+				ualog.String("key", changed_key),
+				ualog.Any("value", myMapNamespace2.GetValue(changed_key)),
+			)
 		}
 	}()
 
@@ -229,17 +205,25 @@ func main() {
 
 	// Start the server
 	// Note that you can add namespaces before or after starting the server.
-	if err := s.Start(context.Background()); err != nil {
-		log.Fatalf("Error starting server, exiting: %s", err)
+	if err := s.Start(ctx); err != nil {
+		fatal(ctx, "unable to start server", err)
 	}
-	defer s.Close()
+	defer s.Close(ctx)
 
 	// catch ctrl-c and gracefully shutdown the server.
 	sigch := make(chan os.Signal, 1)
 	signal.Notify(sigch, os.Interrupt)
 	defer signal.Stop(sigch)
-	log.Printf("Press CTRL-C to exit")
+
+	ualog.Info(ctx, "press ctrl-c to exit")
 
 	<-sigch
-	log.Printf("Shutting down the server...")
+
+	ualog.Info(ctx, "shutting down the server...")
+}
+
+func fatal(ctx context.Context, reason string, err error) {
+	ualog.Error(ctx, "FATAL: "+reason, ualog.Err(err))
+	time.Sleep(time.Second)
+	os.Exit(1)
 }

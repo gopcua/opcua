@@ -75,7 +75,7 @@ func GenerateCert(host string, rsaBits int, validFor time.Duration) (certPEM, ke
 
 	derBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, publicKey(priv), priv)
 	if err != nil {
-		return nil, nil, fmt.Errorf("Failed to create certificate: %s", err)
+		return nil, nil, fmt.Errorf("failed to create certificate: %s", err)
 	}
 
 	return pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: derBytes}), pem.EncodeToMemory(pemBlockForKey(priv)), nil
