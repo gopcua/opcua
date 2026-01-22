@@ -90,7 +90,11 @@ func main() {
 	}
 
 	miCreateRequests := []*ua.MonitoredItemCreateRequest{
-		opcua.NewMonitoredItemCreateRequestWithDefaults(triggeringNode, ua.AttributeIDValue, 42),
+		opcua.NewDefaultMonitoredItemCreateRequest(opcua.MonitoredItemCreateRequestArgs{
+			NodeID:       triggeringNode,
+			AttributeID:  ua.AttributeIDValue,
+			ClientHandle: 42,
+		}),
 		{
 			ItemToMonitor: &ua.ReadValueID{
 				NodeID:       triggeredNode,
