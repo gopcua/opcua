@@ -255,6 +255,10 @@ func (srv *Server) nodesImportNodeSet(nodes *schema.UANodeSet) error {
 				valueFunc = newValueFuncFromData(data)
 			} else if ot.Value.BoolAttr != nil {
 				valueFunc = newValueFuncFromData(ot.Value.BoolAttr.Data)
+			} else if ot.Value.ByteStringAttr != nil {
+				valueFunc = newValueFuncFromData(
+					strings.ReplaceAll(ot.Value.ByteStringAttr.Data, " ", ""),
+				)
 			} else if ot.Value.TextAttr != nil {
 				v := ua.NewLocalizedTextWithLocale(ot.Value.TextAttr.Text, ot.Value.TextAttr.Locale)
 				valueFunc = newValueFuncFromData(v)

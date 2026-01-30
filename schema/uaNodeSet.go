@@ -241,6 +241,10 @@ type ValueBool struct {
 	Data bool `xml:",chardata"`
 }
 
+type ValueByteString struct {
+	Data string `xml:",chardata"`
+}
+
 type ValueDateTime struct {
 	Data time.Time `xml:",chardata"`
 }
@@ -322,6 +326,7 @@ type ValueStringList struct {
 // Value ...
 type Value struct {
 	BoolAttr          *ValueBool                `xml:"Boolean,omitempty"`
+	ByteStringAttr    *ValueByteString          `xml:"ByteString,omitempty"`
 	DateTimeAttr      *ValueDateTime            `xml:"DateTime,omitempty"`
 	ExtObjAttr        *ValueExtensionObject     `xml:"ExtensionObject,omitempty"`
 	ExtObjListAttr    *ValueExtensionObjectList `xml:"ListOfExtensionObject,omitempty"`
