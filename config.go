@@ -332,7 +332,7 @@ func setCertificate(cert []byte, cfg *Config) error {
 	cfg.sechan.Certificate = cert
 
 	// Extract the application URI from the certificate.
-	x509cert, err := x509.ParseCertificate(cert)
+	x509cert, err := uapolicy.ParseCertificate(cert)
 	if err != nil {
 		return fmt.Errorf("failed to parse certificate: %s", err)
 	}

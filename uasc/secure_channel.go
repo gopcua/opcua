@@ -8,7 +8,6 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
-	"crypto/x509"
 	"encoding/binary"
 	"io"
 	"log"
@@ -481,7 +480,7 @@ func (s *SecureChannel) readChunk() (*MessageChunk, error) {
 			s.cfg.RemoteCertificate = m.AsymmetricSecurityHeader.SenderCertificate
 			debug.Printf("uasc %d: setting securityPolicy to %s", s.c.ID(), m.SecurityPolicyURI)
 
-			remoteCert, err := x509.ParseCertificate(s.cfg.RemoteCertificate)
+			remoteCert, err := uapolicy.ParseCertificate(s.cfg.RemoteCertificate)
 			if err != nil {
 				return nil, err
 			}
@@ -605,7 +604,7 @@ func (s *SecureChannel) open(ctx context.Context, instance *channelInstance, req
 		localKey = s.cfg.LocalKey
 		// todo(dh): move this into the uapolicy package proper or
 		// adjust the Asymmetric method to receive a certificate instead
-		remoteCert, err := x509.ParseCertificate(s.cfg.RemoteCertificate)
+		remoteCert, err := uapolicy.ParseCertificate(s.cfg.RemoteCertificate)
 		if err != nil {
 			return err
 		}
@@ -764,7 +763,7 @@ func (s *SecureChannel) handleOpenSecureChannelRequest(reqID uint32, svc ua.Requ
 		localKey = s.cfg.LocalKey
 		// todo(dh): move this into the uapolicy package proper or
 		// adjust the Asymmetric method to receive a certificate instead
-		remoteCert, err := x509.ParseCertificate(s.cfg.RemoteCertificate)
+		remoteCert, err := uapolicy.ParseCertificate(s.cfg.RemoteCertificate)
 		if err != nil {
 			return err
 		}
