@@ -137,11 +137,13 @@ func (c *channelInstance) SetMaximumBodySize(chunkSize int) {
 	sequenceHeaderSize := 8
 	headerSize := 12
 	symmetricAlgorithmHeader := 4
+	signaturePadding := c.algo.PlaintextBlockSize() + 1
 
 	// this is the formula proposed by OPCUA - source node-opcua
+	// Modified to reserve worst-case padding + padding length byte
 	maxBodySize :=
 		c.algo.PlaintextBlockSize()*
-			((chunkSize-headerSize-symmetricAlgorithmHeader-c.algo.SignatureLength()-1)/c.algo.BlockSize()) -
+			((chunkSize-headerSize-symmetricAlgorithmHeader-c.algo.SignatureLength()-signaturePadding)/c.algo.BlockSize()) -
 			sequenceHeaderSize
 	c.maxBodySize = uint32(maxBodySize)
 
