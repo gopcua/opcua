@@ -11,9 +11,9 @@ import (
 )
 
 const (
-	sessionTimeoutMin     = 100            // 100ms
-	sessionTimeoutMax     = 30 * 60 * 1000 // 30 minutes
-	sessionTimeoutDefault = 60 * 1000      // 60s
+	sessionTimeoutMin     = 100 * time.Millisecond
+	sessionTimeoutMax     = 1 * time.Hour
+	sessionTimeoutDefault = 60 * time.Second
 
 	sessionNonceLength = 32
 )
