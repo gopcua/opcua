@@ -430,6 +430,10 @@ func (c *Client) monitor(ctx context.Context) {
 							continue
 						}
 
+						// clear the session from the client to prevent
+						// ActivateSession from closing it via CloseSession
+						c.setSession(nil)
+
 						dlog.Printf("trying to restore session")
 						if err := c.ActivateSession(ctx, s); err != nil {
 							dlog.Printf("restore session failed: %v", err)
