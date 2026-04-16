@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"errors"
 	"slices"
 	"sync"
@@ -8,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gopcua/opcua/ua"
+	"github.com/gopcua/opcua/ualog"
 	"github.com/gopcua/opcua/uasc"
 )
 
@@ -27,6 +29,17 @@ type MonitoredItemService struct {
 
 	id uint32
 }
+
+func NewMonitoredItemService(sub *SubscriptionService) *MonitoredItemService {
+	return &MonitoredItemService{
+		SubService: sub,
+		Items:      make(map[uint32]*MonitoredItem),
+		Nodes:      make(map[string][]*MonitoredItem),
+		Subs:       make(map[uint32][]*MonitoredItem),
+	}
+}
+
+var newMonitoredItemServiceLogAttribute = newServiceLogAttributeCreatorForSet("monitoreditem")
 
 // function to get rid of all references to a specific Monitored Item (by ID number)
 func (s *MonitoredItemService) DeleteMonitoredItem(id uint32) {
@@ -97,7 +110,7 @@ func (s *MonitoredItemService) DeleteSub(id uint32) {
 	}
 }
 
-func (s *MonitoredItemService) ChangeNotification(n *ua.NodeID) {
+func (s *MonitoredItemService) ChangeNotification(ctx context.Context, n *ua.NodeID) {
 
 	s.Mu.Lock()
 	defer s.Mu.Unlock()
@@ -118,20 +131,20 @@ func (s *MonitoredItemService) ChangeNotification(n *ua.NodeID) {
 		val := new(ua.MonitoredItemNotification)
 		val.ClientHandle = item.Req.RequestedParameters.ClientHandle
 		if err != nil {
-			if s.SubService.srv.cfg.logger != nil {
-				s.SubService.srv.cfg.logger.Warn("error getting namespace %d: %v", n.Namespace(), err)
-			}
+			ualog.Warn(ctx, "error getting namespace",
+				ualog.Namespace(n.Namespace()), ualog.Err(err),
+			)
+
 			val.Value = &ua.DataValue{}
 			val.Value.Status = ua.StatusBad
 			val.Value.EncodingMask |= ua.DataValueStatusCode
 			item.Sub.NotifyChannel <- val
 			continue
 		}
-		dv := ns.Attribute(n, item.Req.ItemToMonitor.AttributeID)
+		dv := ns.Attribute(ctx, n, item.Req.ItemToMonitor.AttributeID)
 		val.Value = dv
 		item.Sub.NotifyChannel <- val
 	}
-
 }
 
 func (s *MonitoredItemService) NextID() uint32 {
@@ -152,10 +165,9 @@ type MonitoredItem struct {
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.12.2
-func (s *MonitoredItemService) CreateMonitoredItems(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	if s.SubService.srv.cfg.logger != nil {
-		s.SubService.srv.cfg.logger.Debug("Handling %T", r)
-	}
+func (s *MonitoredItemService) CreateMonitoredItems(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
+	ctx = ualog.WithAttrs(ctx, newMonitoredItemServiceLogAttribute("create"))
+	logServiceRequest(ctx, r)
 
 	req, err := safeReq[*ua.CreateMonitoredItemsRequest](r)
 	if err != nil {
@@ -169,9 +181,8 @@ func (s *MonitoredItemService) CreateMonitoredItems(sc *uasc.SecureChannel, r ua
 	res := make([]*ua.MonitoredItemCreateResult, count)
 
 	subID := req.SubscriptionID
-	if s.SubService.srv.cfg.logger != nil {
-		s.SubService.srv.cfg.logger.Debug("Creating monitored items for sub #%d", subID)
-	}
+	ualog.Debug(ctx, "creating monitored items", ualog.Uint32("sub", subID))
+
 	s.SubService.Mu.Lock()
 	sub, ok := s.SubService.Subs[subID]
 	s.SubService.Mu.Unlock()
@@ -179,7 +190,7 @@ func (s *MonitoredItemService) CreateMonitoredItems(sc *uasc.SecureChannel, r ua
 		return nil, errors.New("sub doesn't exist")
 	}
 
-	sess := s.SubService.srv.Session(req.RequestHeader)
+	sess := s.SubService.srv.Session(ctx, req.RequestHeader)
 	if sub.Session.AuthTokenID.String() != sess.AuthTokenID.String() {
 		return nil, errors.New("not your subscription, bro")
 	}
@@ -207,13 +218,13 @@ func (s *MonitoredItemService) CreateMonitoredItems(sc *uasc.SecureChannel, r ua
 		}
 		s.Subs[item.Sub.ID] = append(list, &item)
 
-		if s.SubService.srv.cfg.logger != nil {
-			s.SubService.srv.cfg.logger.Debug("Adding monitored item '%s' to sub #%d as %d->%d",
-				nodeid.String(),
-				subID,
-				item.ID,
-				itemreq.RequestedParameters.ClientHandle)
-		}
+		ualog.Debug(ctx, "adding monitored item to subscription",
+			ualog.Any(ualog.NodeIdKey, nodeid),
+			ualog.Uint32("sub", subID),
+			ualog.Uint32("item_id", item.ID),
+			ualog.Uint32("client", itemreq.RequestedParameters.ClientHandle),
+		)
+
 		res[i] = &ua.MonitoredItemCreateResult{
 			StatusCode:              ua.StatusOK,
 			MonitoredItemID:         item.ID,
@@ -224,8 +235,7 @@ func (s *MonitoredItemService) CreateMonitoredItems(sc *uasc.SecureChannel, r ua
 		// do an initial update for the nodeids in the background.
 		// These lock the mutex so we can't do them inline here.
 		// This will cause them to happen once we unlock.
-		go s.ChangeNotification(nodeid)
-
+		go s.ChangeNotification(ctx, nodeid)
 	}
 
 	resp := &ua.CreateMonitoredItemsResponse{
@@ -242,27 +252,25 @@ func (s *MonitoredItemService) CreateMonitoredItems(sc *uasc.SecureChannel, r ua
 	}
 
 	return resp, nil
-
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.12.3
-func (s *MonitoredItemService) ModifyMonitoredItems(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	if s.SubService.srv.cfg.logger != nil {
-		s.SubService.srv.cfg.logger.Debug("Handling %T", r)
-	}
+func (s *MonitoredItemService) ModifyMonitoredItems(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
+	ctx = ualog.WithAttrs(ctx, newMonitoredItemServiceLogAttribute("modify"))
+	logServiceRequest(ctx, r)
 
 	req, err := safeReq[*ua.ModifyMonitoredItemsRequest](r)
 	if err != nil {
 		return nil, err
 	}
+
 	return serviceUnsupported(req.RequestHeader), nil
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.12.4
-func (s *MonitoredItemService) SetMonitoringMode(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	if s.SubService.srv.cfg.logger != nil {
-		s.SubService.srv.cfg.logger.Debug("Handling %T", r)
-	}
+func (s *MonitoredItemService) SetMonitoringMode(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
+	ctx = ualog.WithAttrs(ctx, newMonitoredItemServiceLogAttribute("set monitoring mode"))
+	logServiceRequest(ctx, r)
 
 	req, err := safeReq[*ua.SetMonitoringModeRequest](r)
 	if err != nil {
@@ -273,7 +281,7 @@ func (s *MonitoredItemService) SetMonitoringMode(sc *uasc.SecureChannel, r ua.Re
 
 	results := make([]ua.StatusCode, len(req.MonitoredItemIDs))
 
-	sess := s.SubService.srv.Session(req.RequestHeader)
+	sess := s.SubService.srv.Session(ctx, req.RequestHeader)
 
 	for i := range req.MonitoredItemIDs {
 		id := req.MonitoredItemIDs[i]
@@ -303,27 +311,25 @@ func (s *MonitoredItemService) SetMonitoringMode(sc *uasc.SecureChannel, r ua.Re
 		Results:         results,
 		DiagnosticInfos: []*ua.DiagnosticInfo{},
 	}, nil
-
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.12.5
-func (s *MonitoredItemService) SetTriggering(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	if s.SubService.srv.cfg.logger != nil {
-		s.SubService.srv.cfg.logger.Debug("Handling %T", r)
-	}
+func (s *MonitoredItemService) SetTriggering(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
+	ctx = ualog.WithAttrs(ctx, newMonitoredItemServiceLogAttribute("set triggering"))
+	logServiceRequest(ctx, r)
 
 	req, err := safeReq[*ua.SetTriggeringRequest](r)
 	if err != nil {
 		return nil, err
 	}
+
 	return serviceUnsupported(req.RequestHeader), nil
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.12.6
-func (s *MonitoredItemService) DeleteMonitoredItems(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	if s.SubService.srv.cfg.logger != nil {
-		s.SubService.srv.cfg.logger.Debug("Handling %T", r)
-	}
+func (s *MonitoredItemService) DeleteMonitoredItems(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
+	ctx = ualog.WithAttrs(ctx, newMonitoredItemServiceLogAttribute("delete"))
+	logServiceRequest(ctx, r)
 
 	req, err := safeReq[*ua.DeleteMonitoredItemsRequest](r)
 	if err != nil {
@@ -333,7 +339,7 @@ func (s *MonitoredItemService) DeleteMonitoredItems(sc *uasc.SecureChannel, r ua
 	s.Mu.Lock()
 	defer s.Mu.Unlock()
 
-	sess := s.SubService.srv.Session(req.RequestHeader)
+	sess := s.SubService.srv.Session(ctx, req.RequestHeader)
 
 	results := make([]ua.StatusCode, len(req.MonitoredItemIDs))
 	for i := range req.MonitoredItemIDs {
@@ -365,5 +371,4 @@ func (s *MonitoredItemService) DeleteMonitoredItems(sc *uasc.SecureChannel, r ua
 		DiagnosticInfos: []*ua.DiagnosticInfo{},
 	}
 	return response, nil
-
 }

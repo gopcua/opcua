@@ -1,11 +1,13 @@
 package server
 
 import (
+	"context"
 	"slices"
 	"time"
 
 	"github.com/gopcua/opcua/id"
 	"github.com/gopcua/opcua/ua"
+	"github.com/gopcua/opcua/ualog"
 	"github.com/gopcua/opcua/uasc"
 )
 
@@ -20,15 +22,22 @@ type ViewService struct {
 	srv *Server
 }
 
+func NewViewService(s *Server) *ViewService {
+	return &ViewService{
+		srv: s,
+	}
+}
+
+var newViewServiceLogAttribute = newServiceLogAttributeCreatorForSet("view")
+
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.8.2
-func (s *ViewService) Browse(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
+func (s *ViewService) Browse(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
+	ctx = ualog.WithAttrs(ctx, newViewServiceLogAttribute("browse"))
+	logServiceRequest(ctx, r)
 
 	req, err := safeReq[*ua.BrowseRequest](r)
 	if err != nil {
 		return nil, err
-	}
-	if s.srv.cfg.logger != nil {
-		s.srv.cfg.logger.Debug("=== Browse incoming")
 	}
 
 	resp := &ua.BrowseResponse{
@@ -47,38 +56,30 @@ func (s *ViewService) Browse(sc *uasc.SecureChannel, r ua.Request, reqID uint32)
 
 	for i := range req.NodesToBrowse {
 		br := req.NodesToBrowse[i]
-		if s.srv.cfg.logger != nil {
-			s.srv.cfg.logger.Debug("    Browse of %s", br.NodeID.String())
-		}
+		ualog.Debug(ctx, "browsing node", ualog.Any(ualog.NodeIdKey, br.NodeID))
+
 		ns, err := s.srv.Namespace(int(br.NodeID.Namespace()))
 		if err != nil {
 			resp.Results[i] = &ua.BrowseResult{StatusCode: ua.StatusBad}
 			continue
 		}
-		resp.Results[i] = ns.Browse(br)
+		resp.Results[i] = ns.Browse(ctx, br)
 	}
 
 	return resp, nil
-
 }
 
-func suitableRef(srv *Server, desc *ua.BrowseDescription, ref *ua.ReferenceDescription) bool {
+func suitableRef(ctx context.Context, srv *Server, desc *ua.BrowseDescription, ref *ua.ReferenceDescription) bool {
 	if !suitableDirection(desc.BrowseDirection, ref.IsForward) {
-		if srv.cfg.logger != nil {
-			srv.cfg.logger.Debug("%v not suitable because of direction", ref)
-		}
+		ualog.Debug(ctx, "reference not suitable because of direction", ualog.Any("ref", ref))
 		return false
 	}
 	if !suitableRefType(srv, desc.ReferenceTypeID, ref.ReferenceTypeID, desc.IncludeSubtypes) {
-		if srv.cfg.logger != nil {
-			srv.cfg.logger.Debug("%v not suitable because of ref type", ref)
-		}
+		ualog.Debug(ctx, "reference not suitable because of type", ualog.Any("ref", ref))
 		return false
 	}
 	if desc.NodeClassMask > 0 && desc.NodeClassMask&uint32(ref.NodeClass) == 0 {
-		if srv.cfg.logger != nil {
-			srv.cfg.logger.Debug("%v not suitable because of node class", ref)
-		}
+		ualog.Debug(ctx, "reference not suitable because of node class", ualog.Any("ref", ref))
 		return false
 	}
 	return true
@@ -137,53 +138,53 @@ func getSubRefs(srv *Server, nid *ua.NodeID) []*ua.NodeID {
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.8.3
-func (s *ViewService) BrowseNext(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	if s.srv.cfg.logger != nil {
-		s.srv.cfg.logger.Debug("Handling %T", r)
-	}
+func (s *ViewService) BrowseNext(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
+	ctx = ualog.WithAttrs(ctx, newViewServiceLogAttribute("browse next"))
+	logServiceRequest(ctx, r)
 
 	req, err := safeReq[*ua.BrowseNextRequest](r)
 	if err != nil {
 		return nil, err
 	}
+
 	return serviceUnsupported(req.RequestHeader), nil
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.8.4
-func (s *ViewService) TranslateBrowsePathsToNodeIDs(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	if s.srv.cfg.logger != nil {
-		s.srv.cfg.logger.Debug("Handling %T", r)
-	}
+func (s *ViewService) TranslateBrowsePathsToNodeIDs(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
+	ctx = ualog.WithAttrs(ctx, newViewServiceLogAttribute("translate browse paths to node ids"))
+	logServiceRequest(ctx, r)
 
 	req, err := safeReq[*ua.TranslateBrowsePathsToNodeIDsRequest](r)
 	if err != nil {
 		return nil, err
 	}
+
 	return serviceUnsupported(req.RequestHeader), nil
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.8.5
-func (s *ViewService) RegisterNodes(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	if s.srv.cfg.logger != nil {
-		s.srv.cfg.logger.Debug("Handling %T", r)
-	}
+func (s *ViewService) RegisterNodes(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
+	ctx = ualog.WithAttrs(ctx, newViewServiceLogAttribute("register nodes"))
+	logServiceRequest(ctx, r)
 
 	req, err := safeReq[*ua.RegisterNodesRequest](r)
 	if err != nil {
 		return nil, err
 	}
+
 	return serviceUnsupported(req.RequestHeader), nil
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.8.6
-func (s *ViewService) UnregisterNodes(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	if s.srv.cfg.logger != nil {
-		s.srv.cfg.logger.Debug("Handling %T", r)
-	}
+func (s *ViewService) UnregisterNodes(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
+	ctx = ualog.WithAttrs(ctx, newViewServiceLogAttribute("unregister nodes"))
+	logServiceRequest(ctx, r)
 
 	req, err := safeReq[*ua.UnregisterNodesRequest](r)
 	if err != nil {
 		return nil, err
 	}
+
 	return serviceUnsupported(req.RequestHeader), nil
 }
