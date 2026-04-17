@@ -117,6 +117,8 @@ func TestReadPerms(t *testing.T) {
 		{ua.NewStringNodeID(1, "ReadWriteVariable"), ua.StatusOK, 12.34},
 		{ua.NewStringNodeID(1, "ReadOnlyVariable"), ua.StatusOK, 9.87},
 		{ua.NewStringNodeID(1, "NoAccessVariable"), ua.StatusBadUserAccessDenied, nil},
+		// non-existing namespace should not crash the server
+		{ua.NewNumericNodeID(132, 101), ua.StatusBad, nil},
 	}
 
 	ctx := context.Background()
