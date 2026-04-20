@@ -2,6 +2,8 @@ package monitor
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -17,6 +19,37 @@ var (
 	// ErrSlowConsumer is returned when a subscriber does not keep up with the incoming messages
 	ErrSlowConsumer = errors.New("slow consumer. messages may be dropped")
 )
+
+// ItemError represents a single monitored item that failed to be created.
+type ItemError struct {
+	NodeID *ua.NodeID
+	Status ua.StatusCode
+}
+
+// PartialError is returned by AddMonitorItems when some (but not all) items
+// failed to be created on the server. The successfully created items are still
+// returned alongside this error.
+//
+// Callers can use errors.As to check for partial failures:
+//
+//	items, err := sub.AddMonitorItems(ctx, requests...)
+//	var pe *monitor.PartialError
+//	if errors.As(err, &pe) {
+//	    // items contains the successfully created monitors
+//	    // pe.Items contains the failures with per-node status codes
+//	}
+type PartialError struct {
+	Items []ItemError
+}
+
+func (e *PartialError) Error() string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "%d monitored item(s) failed:", len(e.Items))
+	for _, item := range e.Items {
+		fmt.Fprintf(&b, " %s=%s", item.NodeID, item.Status)
+	}
+	return b.String()
+}
 
 // ErrHandler is a function that is called when there is an out of band issue with delivery
 type ErrHandler func(*opcua.Client, *Subscription, error)
@@ -323,9 +356,16 @@ func (s *Subscription) AddMonitorItems(ctx context.Context, nodes ...Request) ([
 		return nil, errors.Errorf("monitor items response length mismatch")
 	}
 	var monitoredItems []Item
+	var failedItems []ItemError
 	for i, res := range resp.Results {
 		if res.StatusCode != ua.StatusOK {
-			return nil, res.StatusCode
+			failedItems = append(failedItems, ItemError{
+				NodeID: toAdd[i].ItemToMonitor.NodeID,
+				Status: res.StatusCode,
+			})
+			// Clean up the handle for the failed item
+			delete(s.handles, nodes[i].handle)
+			continue
 		}
 		mn := Item{
 			id:     res.MonitoredItemID,
@@ -334,6 +374,10 @@ func (s *Subscription) AddMonitorItems(ctx context.Context, nodes ...Request) ([
 		}
 		s.itemLookup[res.MonitoredItemID] = mn
 		monitoredItems = append(monitoredItems, mn)
+	}
+
+	if len(failedItems) > 0 {
+		return monitoredItems, &PartialError{Items: failedItems}
 	}
 
 	return monitoredItems, nil
