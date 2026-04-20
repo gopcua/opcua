@@ -539,6 +539,15 @@ func DialTimeout(d time.Duration) Option {
 	}
 }
 
+// PreResolver gives the caller a chance to resolve endpoint URLs to IPs
+// before the dialer attempts a DNS lookup.
+func PreResolver(pr uacp.PreResolver) Option {
+	return func(cfg *Config) error {
+		cfg.dialer.PreResolver = pr
+		return nil
+	}
+}
+
 // MaxMessageSize sets the maximum message size for the UACP handshake.
 func MaxMessageSize(n uint32) Option {
 	return func(cfg *Config) error {
