@@ -294,7 +294,7 @@ func (b *Buffer) WriteByteString(d []byte) {
 	b.Write(d)
 }
 
-func (b *Buffer) WriteStruct(w interface{}) {
+func (b *Buffer) WriteStruct(w any) {
 	if b.err != nil {
 		return
 	}

@@ -66,7 +66,7 @@ func RootNode() *Node {
 	)
 }
 
-func ServerStatusNodes(s *Server, ServerNode *Node) []*Node {
+func ServerStatusNodes(s *Server, serverNode *Node) []*Node {
 
 	/*
 		Server_ServerArray                                                                                                                                                    = 2254
@@ -234,7 +234,7 @@ func ServerStatusNodes(s *Server, ServerNode *Node) []*Node {
 	for i := range nodes {
 		sStatus.AddRef(nodes[i], id.HasComponent, true)
 	}
-	ServerNode.AddRef(sStatus, id.HasComponent, true)
+	serverNode.AddRef(sStatus, id.HasComponent, true)
 
 	nodes = append(nodes, sStatus)
 

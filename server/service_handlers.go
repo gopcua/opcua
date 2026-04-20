@@ -58,7 +58,7 @@ func (s *Server) initHandlers() {
 	s.RegisterHandler(id.WriteRequest_Encoding_DefaultBinary, attr.Write)
 	s.RegisterHandler(id.HistoryUpdateRequest_Encoding_DefaultBinary, attr.HistoryUpdate)
 
-	method := &MethodService{s}
+	method := &MethodService{s, s.cfg.methodCallMiddleware}
 	// s.registerHandler(id.CallMethodRequest_Encoding_DefaultBinary, method.CallMethod) // todo(fs): I think this is bogus
 	s.RegisterHandler(id.CallRequest_Encoding_DefaultBinary, method.Call)
 
