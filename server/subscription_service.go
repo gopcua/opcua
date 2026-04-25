@@ -368,7 +368,7 @@ func (s *Subscription) run() {
 	// In L0 and L2, If we get to the lifetime count without a publish request, we'll kill the subscription.
 	for {
 		// we don't need to do anything if we don't have at least one thing to publish so lets get that first
-		publishQueue := make(map[uint32]*ua.MonitoredItemNotification)
+		publishQueue := make(map[uint32][]*ua.MonitoredItemNotification)
 
 		// Collect notifications until our publication interval is ready
 	L0:
@@ -377,7 +377,7 @@ func (s *Subscription) run() {
 			case <-s.shutdown:
 				return
 			case newNotification := <-s.NotifyChannel:
-				publishQueue[newNotification.ClientHandle] = newNotification
+				s.handleNotification(newNotification, publishQueue)
 			case <-s.T.C:
 				if len(publishQueue) == 0 {
 					// nothing to publish, increment the keepalive counter and send a keepalive if it
@@ -424,7 +424,7 @@ func (s *Subscription) run() {
 				// once we get a publish request, we should move on to publish them back
 				break L2
 			case newNotification := <-s.NotifyChannel:
-				publishQueue[newNotification.ClientHandle] = newNotification
+				s.handleNotification(newNotification, publishQueue)
 
 			case <-s.T.C:
 				// we had another tick without a publish request.
@@ -455,11 +455,9 @@ func (s *Subscription) run() {
 		//delete(s.SeqNums, a.SequenceNumber)
 		//}
 
-		final_items := make([]*ua.MonitoredItemNotification, len(publishQueue))
-		i := 0
+		final_items := make([]*ua.MonitoredItemNotification, 0)
 		for k := range publishQueue {
-			final_items[i] = publishQueue[k]
-			i++
+			final_items = append(final_items, publishQueue[k]...)
 		}
 
 		dcn := ua.DataChangeNotification{
@@ -505,6 +503,30 @@ func (s *Subscription) run() {
 			s.srv.srv.cfg.logger.Debug("Published %d items OK for %d", len(publishQueue), s.ID)
 		}
 		// wait till we've got a publish request.
+	}
+}
+
+func (s *Subscription) handleNotification(newNotification *ua.MonitoredItemNotification, publishQueue map[uint32][]*ua.MonitoredItemNotification) {
+	item, ok := s.srv.srv.MonitoredItemService.Items[newNotification.ClientHandle]
+	if !ok {
+		return
+	}
+
+	itemQueue, ok := publishQueue[newNotification.ClientHandle]
+	if !ok {
+		publishQueue[newNotification.ClientHandle] = []*ua.MonitoredItemNotification{newNotification}
+		return
+	}
+
+	if len(itemQueue) < int(item.Req.RequestedParameters.QueueSize) {
+		publishQueue[newNotification.ClientHandle] = append(itemQueue, newNotification)
+		return
+	}
+
+	if item.Req.RequestedParameters.DiscardOldest {
+		publishQueue[newNotification.ClientHandle] = append(itemQueue[1:], newNotification)
+	} else {
+		itemQueue[len(itemQueue)-1] = newNotification
 	}
 }
 
