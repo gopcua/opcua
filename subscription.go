@@ -410,6 +410,7 @@ func (s *Subscription) recreate_delete(ctx context.Context) error {
 // recreate_create is called by the client when it is trying to
 // recreate an existing subscription. This function creates a
 // new subscription with the same parameters as the previous one.
+// The client registers the recreated subscription immediately afterwards.
 func (s *Subscription) recreate_create(ctx context.Context) error {
 	dlog := debug.NewPrefixLogger("sub %d: recreate_create: ", s.SubscriptionID)
 
@@ -447,10 +448,13 @@ func (s *Subscription) recreate_create(ctx context.Context) error {
 	s.lastSeq = 0
 	s.nextSeq = 1
 
-	if err := s.c.RegisterSubscription_NeedsSubMuxLock(s); err != nil {
-		return err
-	}
-	dlog.Printf("subscription registered")
+	return nil
+}
+
+// recreate_monitoredItems restores monitored items after the recreated
+// subscription has been registered by the client.
+func (s *Subscription) recreate_monitoredItems(ctx context.Context) error {
+	dlog := debug.NewPrefixLogger("sub %d: recreate_monitoredItems: ", s.SubscriptionID)
 
 	// Sort by timestamp to return
 	itemsByTimestamps := make(map[ua.TimestampsToReturn][]*ua.MonitoredItemCreateRequest)

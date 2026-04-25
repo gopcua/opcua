@@ -101,7 +101,15 @@ func (c *Client) recreateSubscription(ctx context.Context, id uint32) error {
 
 	sub.recreate_delete(ctx)
 	c.forgetSubscription_NeedsSubMuxLock(ctx, id)
-	return sub.recreate_create(ctx)
+	if err := sub.recreate_create(ctx); err != nil {
+		return err
+	}
+
+	if err := c.registerSubscription_NeedsSubMuxLock(sub); err != nil {
+		return err
+	}
+
+	return sub.recreate_monitoredItems(ctx)
 }
 
 // transferSubscriptions ask the server to transfer the given subscriptions
@@ -211,8 +219,8 @@ func (c *Client) sendRepublishRequests(ctx context.Context, sub *Subscription, a
 	}
 }
 
-// RegisterSubscription_NeedsSubMuxLock registers a subscription
-func (c *Client) RegisterSubscription_NeedsSubMuxLock(sub *Subscription) error {
+// registerSubscription_NeedsSubMuxLock registers a subscription while subMux is held.
+func (c *Client) registerSubscription_NeedsSubMuxLock(sub *Subscription) error {
 	if sub.SubscriptionID == 0 {
 		return ua.StatusBadSubscriptionIDInvalid
 	}

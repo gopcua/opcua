@@ -133,7 +133,6 @@ type ClientInterface interface {
 	Send(context.Context, ua.Request, func(ua.Response) error) error
 
 	ForgetSubscription(context.Context, uint32)
-	RegisterSubscription_NeedsSubMuxLock(*Subscription) error
 
 	RequestTimeout() time.Duration
 }
