@@ -69,6 +69,8 @@ type serverConfig struct {
 
 	cap ServerCapabilities
 
+	methodCallMiddleware MethodMiddleware
+
 	logger Logger
 }
 
@@ -99,11 +101,12 @@ type security struct {
 // Call Start() afterwards to begin listening and serving connections
 func New(opts ...Option) *Server {
 	cfg := &serverConfig{
-		cap:              capabilities,
-		applicationName:  "GOPCUA",               // override with the ServerName option
-		manufacturerName: "The gopcua Team",      // override with the ManufacturerName option
-		productName:      "gopcua OPC/UA Server", // override with the ProductName option
-		softwareVersion:  "0.0.0-dev",            // override with the SoftwareVersion option
+		cap:                  capabilities,
+		applicationName:      "GOPCUA",               // override with the ServerName option
+		manufacturerName:     "The gopcua Team",      // override with the ManufacturerName option
+		productName:          "gopcua OPC/UA Server", // override with the ProductName option
+		softwareVersion:      "0.0.0-dev",            // override with the SoftwareVersion option
+		methodCallMiddleware: func(fn MethodFunc) MethodFunc { return fn },
 	}
 	for _, opt := range opts {
 		opt(cfg)

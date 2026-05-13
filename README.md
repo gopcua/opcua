@@ -243,7 +243,7 @@ Here is the current set of supported services. For low-level access use the clie
 |                             | Write                         | Yes    | Yes    |              |
 |                             | HistoryRead                   | Yes    |        |              |
 |                             | HistoryUpdate                 |        |        |              |
-| Method Service Set          | Call                          | Yes    |        |              |
+| Method Service Set          | Call                          | Yes    | Yes       |              |
 | MonitoredItems Service Set  | CreateMonitoredItems          | Yes    | Yes    |              |
 |                             | DeleteMonitoredItems          | Yes    | Yes    |              |
 |                             | ModifyMonitoredItems          | Yes    | Yes    |              |
