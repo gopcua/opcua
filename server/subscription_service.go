@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/gopcua/opcua/ua"
+	"github.com/gopcua/opcua/ualog"
 	"github.com/gopcua/opcua/uasc"
 )
 
@@ -19,8 +20,17 @@ type SubscriptionService struct {
 	Subs map[uint32]*Subscription
 }
 
+func NewSubscriptionService(s *Server) *SubscriptionService {
+	return &SubscriptionService{
+		srv:  s,
+		Subs: make(map[uint32]*Subscription),
+	}
+}
+
+var newSubscriptionServiceLogAttribute = newServiceLogAttributeCreatorForSet("subscription")
+
 // get rid of all references to a subscription and all monitored items that are pointed at this subscription.
-func (s *SubscriptionService) DeleteSubscription(id uint32) {
+func (s *SubscriptionService) DeleteSubscription(ctx context.Context, id uint32) {
 	s.Mu.Lock()
 	defer s.Mu.Unlock()
 
@@ -38,14 +48,12 @@ func (s *SubscriptionService) DeleteSubscription(id uint32) {
 
 	// ask the monitored item service to purge out any items that use this subscription
 	s.srv.MonitoredItemService.DeleteSub(id)
-
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.13.2
-func (s *SubscriptionService) CreateSubscription(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	if s.srv.cfg.logger != nil {
-		s.srv.cfg.logger.Debug("Handling %T", r)
-	}
+func (s *SubscriptionService) CreateSubscription(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
+	ctx = ualog.WithAttrs(ctx, newSubscriptionServiceLogAttribute("create"))
+	logServiceRequest(ctx, r)
 
 	req, err := safeReq[*ua.CreateSubscriptionRequest](r)
 	if err != nil {
@@ -57,13 +65,14 @@ func (s *SubscriptionService) CreateSubscription(sc *uasc.SecureChannel, r ua.Re
 
 	newsubid := uint32(len(s.Subs)) + 1
 
-	if s.srv.cfg.logger != nil {
-		s.srv.cfg.logger.Info("New Sub %d for %v", newsubid, sc.RemoteAddr())
-	}
+	ualog.Info(ctx, "new subscription created",
+		ualog.Uint32("sub", newsubid),
+		ualog.Any("remote", sc.RemoteAddr()),
+	)
 
 	sub := NewSubscription()
 	sub.srv = s
-	sub.Session = s.srv.Session(r.Header())
+	sub.Session = s.srv.Session(ctx, r.Header())
 	sub.Channel = sc
 	sub.ID = newsubid
 	sub.RevisedPublishingInterval = req.RequestedPublishingInterval
@@ -72,7 +81,7 @@ func (s *SubscriptionService) CreateSubscription(sc *uasc.SecureChannel, r ua.Re
 
 	s.Subs[newsubid] = sub
 	sub.running = true
-	sub.Start()
+	sub.Start(ctx)
 
 	resp := &ua.CreateSubscriptionResponse{
 		ResponseHeader: &ua.ResponseHeader{
@@ -92,10 +101,9 @@ func (s *SubscriptionService) CreateSubscription(sc *uasc.SecureChannel, r ua.Re
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.13.3
-func (s *SubscriptionService) ModifySubscription(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	if s.srv.cfg.logger != nil {
-		s.srv.cfg.logger.Debug("Handling %T", r)
-	}
+func (s *SubscriptionService) ModifySubscription(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
+	ctx = ualog.WithAttrs(ctx, newSubscriptionServiceLogAttribute("modify"))
+	logServiceRequest(ctx, r)
 
 	req, err := safeReq[*ua.ModifySubscriptionRequest](r)
 	if err != nil {
@@ -108,34 +116,31 @@ func (s *SubscriptionService) ModifySubscription(sc *uasc.SecureChannel, r ua.Re
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.13.4
-func (s *SubscriptionService) SetPublishingMode(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	if s.srv.cfg.logger != nil {
-		s.srv.cfg.logger.Debug("Handling %T", r)
-	}
+func (s *SubscriptionService) SetPublishingMode(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
+	ctx = ualog.WithAttrs(ctx, newSubscriptionServiceLogAttribute("set publishing mode"))
+	logServiceRequest(ctx, r)
 
 	req, err := safeReq[*ua.SetPublishingModeRequest](r)
 	if err != nil {
 		return nil, err
 	}
+
 	// When this gets implemented, be sure to check the subscription session vs the request session!
 	return serviceUnsupported(req.RequestHeader), nil
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.13.5
-func (s *SubscriptionService) Publish(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	if s.srv.cfg.logger != nil {
-		s.srv.cfg.logger.Debug("Raw Publish req")
-	}
+func (s *SubscriptionService) Publish(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
+	ctx = ualog.WithAttrs(ctx, newSubscriptionServiceLogAttribute("publish"))
+	logServiceRequest(ctx, r)
 
 	req, err := safeReq[*ua.PublishRequest](r)
 	if err != nil {
-		if s.srv.cfg.logger != nil {
-			s.srv.cfg.logger.Error("ERROR: bad PublishRequest Struct")
-		}
+		ualog.Error(ctx, "bad PublishRequest struct", ualog.Err(err))
 		return nil, err
 	}
 
-	session := s.srv.Session(req.RequestHeader)
+	session := s.srv.Session(ctx, req.RequestHeader)
 
 	if session == nil {
 		response := &ua.PublishResponse{
@@ -161,9 +166,7 @@ func (s *SubscriptionService) Publish(sc *uasc.SecureChannel, r ua.Request, reqI
 	select {
 	case session.PublishRequests <- PubReq{Req: req, ID: reqID}:
 	default:
-		if s.srv.cfg.logger != nil {
-			s.srv.cfg.logger.Warn("Too many publish reqs.")
-		}
+		ualog.Warn(ctx, "too many publish requests")
 	}
 
 	// per opcua spec, we don't respond now.  When data is available on the subscription,
@@ -172,43 +175,42 @@ func (s *SubscriptionService) Publish(sc *uasc.SecureChannel, r ua.Request, reqI
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.13.6
-func (s *SubscriptionService) Republish(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	if s.srv.cfg.logger != nil {
-		s.srv.cfg.logger.Debug("Handling %T", r)
-	}
+func (s *SubscriptionService) Republish(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
+	ctx = ualog.WithAttrs(ctx, newSubscriptionServiceLogAttribute("republish"))
+	logServiceRequest(ctx, r)
 
 	req, err := safeReq[*ua.RepublishRequest](r)
 	if err != nil {
 		return nil, err
 	}
+
 	return serviceUnsupported(req.RequestHeader), nil
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.13.7
-func (s *SubscriptionService) TransferSubscriptions(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	if s.srv.cfg.logger != nil {
-		s.srv.cfg.logger.Debug("Handling %T", r)
-	}
+func (s *SubscriptionService) TransferSubscriptions(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
+	ctx = ualog.WithAttrs(ctx, newSubscriptionServiceLogAttribute("transfer"))
+	logServiceRequest(ctx, r)
 
 	req, err := safeReq[*ua.TransferSubscriptionsRequest](r)
 	if err != nil {
 		return nil, err
 	}
+
 	// When this gets implemented, be sure to check the subscription session vs the request session!
 	return serviceUnsupported(req.RequestHeader), nil
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.13.8
-func (s *SubscriptionService) DeleteSubscriptions(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	if s.srv.cfg.logger != nil {
-		s.srv.cfg.logger.Debug("Handling %T", r)
-	}
+func (s *SubscriptionService) DeleteSubscriptions(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
+	ctx = ualog.WithAttrs(ctx, newSubscriptionServiceLogAttribute("delete"))
+	logServiceRequest(ctx, r)
 
 	req, err := safeReq[*ua.DeleteSubscriptionsRequest](r)
 	if err != nil {
 		return nil, err
 	}
-	session := s.srv.Session(req.Header())
+	session := s.srv.Session(ctx, req.Header())
 
 	s.Mu.Lock()
 	defer s.Mu.Unlock()
@@ -217,9 +219,7 @@ func (s *SubscriptionService) DeleteSubscriptions(sc *uasc.SecureChannel, r ua.R
 	for i := range req.SubscriptionIDs {
 
 		subid := req.SubscriptionIDs[i]
-		if s.srv.cfg.logger != nil {
-			s.srv.cfg.logger.Info("Subscription %d deleted by client", subid)
-		}
+		ualog.Info(ctx, "subscription deleted by client", ualog.Uint32("sub", subid))
 		sub, ok := s.Subs[subid]
 		if !ok {
 			results[i] = ua.StatusBadSubscriptionIDInvalid
@@ -231,7 +231,7 @@ func (s *SubscriptionService) DeleteSubscriptions(sc *uasc.SecureChannel, r ua.R
 		}
 		// delete subscription gets the lock so we set them up to run in the background
 		// once this function releases its lock
-		go s.DeleteSubscription(subid)
+		go s.DeleteSubscription(ctx, subid)
 		results[i] = ua.StatusOK
 	}
 	return &ua.DeleteSubscriptionsResponse{
@@ -299,9 +299,9 @@ func (s *Subscription) Update(req *ua.ModifySubscriptionRequest) {
 	s.RevisedMaxKeepAliveCount = req.RequestedMaxKeepAliveCount
 }
 
-func (s *Subscription) Start() {
-	go s.run()
-
+func (s *Subscription) Start(ctx context.Context) {
+	ctx = ualog.WithAttrs(ctx, ualog.Uint32("sub", s.ID))
+	go s.run(ctx)
 }
 
 func (s *Subscription) keepalive(pubreq PubReq) error {
@@ -339,13 +339,11 @@ func (s *Subscription) keepalive(pubreq PubReq) error {
 // this function should be run as a go-routine and will handle sending data out
 // to the client at the correct rate assuming there are publish requests queued up.
 // if the function returns it deletes the subscription
-func (s *Subscription) run() {
+func (s *Subscription) run(ctx context.Context) {
 	// if this go routine dies, we need to delete ourselves.
 	defer func() {
-		if s.srv.srv.cfg.logger != nil {
-			s.srv.srv.cfg.logger.Info("Subscription %d shutting down.", s.ID)
-		}
-		s.srv.DeleteSubscription(s.ID)
+		ualog.Info(ctx, "subscription shutting down")
+		s.srv.DeleteSubscription(ctx, s.ID)
 	}()
 
 	keepalive_counter := 0
@@ -389,17 +387,13 @@ func (s *Subscription) run() {
 						case pubreq := <-s.Session.PublishRequests:
 							err := s.keepalive(pubreq)
 							if err != nil {
-								if s.srv.srv.cfg.logger != nil {
-									s.srv.srv.cfg.logger.Warn("problem sending keepalive to subscription #%d: %v", s.ID, err)
-								}
+								ualog.Warn(ctx, "problem sending keepalive to subscription", ualog.Err(err))
 								return
 							}
 						default:
 							lifetime_counter++
 							if lifetime_counter > int(s.RevisedLifetimeCount) {
-								if s.srv.srv.cfg.logger != nil {
-									s.srv.srv.cfg.logger.Warn("Subscription #%d timed out.", s.ID)
-								}
+								ualog.Warn(ctx, "subscription timed out")
 								return
 							}
 						}
@@ -430,9 +424,7 @@ func (s *Subscription) run() {
 				// we had another tick without a publish request.
 				lifetime_counter++
 				if lifetime_counter > int(s.RevisedLifetimeCount) {
-					if s.srv.srv.cfg.logger != nil {
-						s.srv.srv.cfg.logger.Warn("Subscription %d timed out.", s.ID)
-					}
+					ualog.Warn(ctx, "subscription timed out")
 					return
 				}
 			}
@@ -445,9 +437,9 @@ func (s *Subscription) run() {
 			// per the spec, the sequence ID cannot be 0
 			s.SequenceID = 1
 		}
-		if s.srv.srv.cfg.logger != nil {
-			s.srv.srv.cfg.logger.Debug("Got publish req on sub #%d.  Sequence %d", s.ID, s.SequenceID)
-		}
+
+		ualog.Debug(ctx, "got publish request", ualog.Uint32("sequence", s.SequenceID))
+
 		// then get all the tags and send them back to the client
 
 		//for x := range pubreq.Req.SubscriptionAcknowledgements {
@@ -495,15 +487,13 @@ func (s *Subscription) run() {
 		}
 		err := s.Channel.SendResponseWithContext(context.Background(), pubreq.ID, response)
 		if err != nil {
-			if s.srv.srv.cfg.logger != nil {
-				s.srv.srv.cfg.logger.Error("problem sending channel response: %v", err)
-				s.srv.srv.cfg.logger.Error("Killing subscription %d", s.ID)
-			}
+			ualog.Error(ctx, "problem sending channel response", ualog.Err(err))
+			ualog.Error(ctx, "killing subscription")
 			return
 		}
-		if s.srv.srv.cfg.logger != nil {
-			s.srv.srv.cfg.logger.Debug("Published %d items OK for %d", len(publishQueue), s.ID)
-		}
+
+		ualog.Debug(ctx, "published items", ualog.Int("count", len(publishQueue)))
+
 		// wait till we've got a publish request.
 	}
 }

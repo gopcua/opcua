@@ -16,13 +16,14 @@ func TestBrowse(t *testing.T) {
 
 	// start the server
 	s := server.New(
+		ctx,
 		server.EndPoint("localhost", 4840),
 	)
 	populateServer(s)
 	if err := s.Start(ctx); err != nil {
 		t.Fatal(err)
 	}
-	defer s.Close()
+	defer s.Close(ctx)
 
 	// prepare the client
 	c, err := opcua.NewClient("opc.tcp://localhost:4840")

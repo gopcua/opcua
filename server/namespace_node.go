@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -8,6 +9,7 @@ import (
 	"github.com/gopcua/opcua/id"
 	"github.com/gopcua/opcua/server/attrs"
 	"github.com/gopcua/opcua/ua"
+	"github.com/gopcua/opcua/ualog"
 )
 
 // the base "node-centric" namespace
@@ -21,6 +23,8 @@ type NodeNameSpace struct {
 	nodeid_sequence uint32
 
 	ExternalNotification chan *ua.NodeID
+
+	logAttributes ualog.Attr
 }
 
 func (ns *NodeNameSpace) GetNextNodeID() uint32 {
@@ -37,6 +41,7 @@ func NewNodeNameSpace(srv *Server, name string) *NodeNameSpace {
 		nodes:                make([]*Node, 0),
 		m:                    make(map[string]*Node),
 		ExternalNotification: make(chan *ua.NodeID),
+		logAttributes:        ualog.GroupAttrs("namespace", ualog.String("name", name), ualog.String("type", "node")),
 	}
 	srv.AddNamespace(ns)
 
@@ -67,8 +72,8 @@ func NewNodeNameSpace(srv *Server, name string) *NodeNameSpace {
 
 // This function is to notify opc subscribers if a node was changed
 // without using the SetAttribute method
-func (s *NodeNameSpace) ChangeNotification(nodeid *ua.NodeID) {
-	s.srv.ChangeNotification(nodeid)
+func (s *NodeNameSpace) ChangeNotification(ctx context.Context, nodeid *ua.NodeID) {
+	s.srv.ChangeNotification(ctx, nodeid)
 }
 
 func (ns *NodeNameSpace) Name() string {
@@ -112,7 +117,12 @@ func (as *NodeNameSpace) AddNewVariableStringNode(name string, value any) *Node 
 	return n
 }
 
-func (as *NodeNameSpace) Attribute(id *ua.NodeID, attr ua.AttributeID) *ua.DataValue {
+func (as *NodeNameSpace) Attribute(ctx context.Context, id *ua.NodeID, attr ua.AttributeID) *ua.DataValue {
+	ctx = ualog.WithAttrs(ctx, as.logAttributes)
+	ualog.Debug(ctx, "read node attribute",
+		ualog.Any(ualog.NodeIdKey, id), ualog.Any("attr", attr),
+	)
+
 	n := as.Node(id)
 	if n == nil {
 		return &ua.DataValue{
@@ -193,13 +203,13 @@ func (as *NodeNameSpace) Root() *Node {
 	return as.Node(RootFolder)
 }
 
-func (ns *NodeNameSpace) Browse(bd *ua.BrowseDescription) *ua.BrowseResult {
+func (ns *NodeNameSpace) Browse(ctx context.Context, bd *ua.BrowseDescription) *ua.BrowseResult {
+	ualog.Debug(ctx, "browse", ns.logAttributes,
+		ualog.Any(ualog.NodeIdKey, bd.NodeID), ualog.Bitmask("mask", bd.ResultMask),
+	)
+
 	ns.mu.RLock()
 	defer ns.mu.RUnlock()
-
-	if ns.srv.cfg.logger != nil {
-		ns.srv.cfg.logger.Debug("BrowseRequest: id=%s mask=%08b\n", bd.NodeID, bd.ResultMask)
-	}
 
 	n := ns.Node(bd.NodeID)
 	if n == nil {
@@ -216,7 +226,7 @@ func (ns *NodeNameSpace) Browse(bd *ua.BrowseDescription) *ua.BrowseResult {
 		}
 
 		// see if this is a ref the client was interested in.
-		if !suitableRef(ns.srv, bd, r) {
+		if !suitableRef(ctx, ns.srv, bd, r) {
 			continue
 		}
 
@@ -244,7 +254,6 @@ func (ns *NodeNameSpace) Browse(bd *ua.BrowseDescription) *ua.BrowseResult {
 		StatusCode: ua.StatusGood,
 		References: refs,
 	}
-
 }
 
 func (ns *NodeNameSpace) ID() uint16 {
@@ -254,7 +263,10 @@ func (ns *NodeNameSpace) ID() uint16 {
 func (ns *NodeNameSpace) SetID(id uint16) {
 	ns.id = id
 }
-func (as *NodeNameSpace) SetAttribute(id *ua.NodeID, attr ua.AttributeID, val *ua.DataValue) ua.StatusCode {
+func (as *NodeNameSpace) SetAttribute(ctx context.Context, id *ua.NodeID, attr ua.AttributeID, val *ua.DataValue) ua.StatusCode {
+	ctx = ualog.WithAttrs(ctx, as.logAttributes)
+	ualog.Debug(ctx, "write node attribute", ualog.Any(ualog.NodeIdKey, id), ualog.Any("attr", attr))
+
 	n := as.Node(id)
 	if n == nil {
 		return ua.StatusBadNodeIDUnknown
@@ -268,7 +280,7 @@ func (as *NodeNameSpace) SetAttribute(id *ua.NodeID, attr ua.AttributeID, val *u
 	if err != nil {
 		return ua.StatusBadAttributeIDInvalid
 	}
-	as.srv.ChangeNotification(id)
+	as.srv.ChangeNotification(ctx, id)
 	select {
 	case as.ExternalNotification <- id:
 	default:

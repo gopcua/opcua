@@ -22,8 +22,8 @@ func TestStats(t *testing.T) {
 
 	ctx := context.Background()
 
-	srv := startServer()
-	defer srv.Close()
+	srv := startServer(ctx)
+	defer srv.Close(ctx)
 
 	c, err := opcua.NewClient("opc.tcp://localhost:4840", opcua.SecurityMode(ua.MessageSecurityModeNone))
 	require.NoError(t, err, "NewClient failed")

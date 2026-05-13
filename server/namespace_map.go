@@ -1,12 +1,14 @@
 package server
 
 import (
+	"context"
 	"sync"
 	"time"
 
 	"github.com/gopcua/opcua/id"
 	"github.com/gopcua/opcua/server/attrs"
 	"github.com/gopcua/opcua/ua"
+	"github.com/gopcua/opcua/ualog"
 )
 
 // This namespaces give a convenient way to have data mapped to the OPC server
@@ -26,6 +28,8 @@ type MapNamespace struct {
 	ExternalNotification chan string
 
 	id uint16
+
+	logAttributes ualog.Attr
 }
 
 // Get the value associated with key from the MapNamespace.
@@ -40,17 +44,17 @@ func (s *MapNamespace) GetValue(key string) any {
 
 // update the value associated with a key and trigger the change notification
 // to the OPC server
-func (s *MapNamespace) SetValue(key string, value any) {
+func (s *MapNamespace) SetValue(ctx context.Context, key string, value any) {
 	s.Mu.Lock()
 	defer s.Mu.Unlock()
 	s.Data[key] = value
-	s.ChangeNotification(key)
+	s.ChangeNotification(ctx, key)
 }
 
 // This function is used to notify OPC UA subscribers if a key was changed without using the
 // SetValue() function
-func (s *MapNamespace) ChangeNotification(key string) {
-	s.srv.ChangeNotification(ua.NewStringNodeID(s.id, key))
+func (s *MapNamespace) ChangeNotification(ctx context.Context, key string) {
+	s.srv.ChangeNotification(ctx, ua.NewStringNodeID(s.id, key))
 }
 
 func NewMapNamespace(srv *Server, name string) *MapNamespace {
@@ -59,6 +63,7 @@ func NewMapNamespace(srv *Server, name string) *MapNamespace {
 		name:                 name,
 		Data:                 make(map[string]any),
 		ExternalNotification: make(chan string),
+		logAttributes:        ualog.GroupAttrs("namespace", ualog.String("name", name), ualog.String("type", "map")),
 	}
 	srv.AddNamespace(&mrw)
 	return &mrw
@@ -71,14 +76,14 @@ func (ns *MapNamespace) SetID(id uint16) {
 	ns.id = id
 }
 
-func (ns *MapNamespace) Browse(bd *ua.BrowseDescription) *ua.BrowseResult {
+func (ns *MapNamespace) Browse(ctx context.Context, bd *ua.BrowseDescription) *ua.BrowseResult {
 	ns.Mu.RLock()
 	defer ns.Mu.RUnlock()
 
-	if ns.srv.cfg.logger != nil {
-		ns.srv.cfg.logger.Debug("BrowseRequest: id=%s mask=%08b\n", bd.NodeID, bd.ResultMask)
-		ns.srv.cfg.logger.Debug("Browse req for %s", bd.NodeID.String())
-	}
+	ualog.Debug(ctx, "browse request for node", ns.logAttributes,
+		ualog.Any(ualog.NodeIdKey, bd.NodeID), ualog.Bitmask("mask", bd.ResultMask),
+	)
+
 	if bd.NodeID.IntID() != id.RootFolder && bd.NodeID.IntID() != id.ObjectsFolder {
 		refs := make([]*ua.ReferenceDescription, 0)
 		return &ua.BrowseResult{
@@ -105,7 +110,6 @@ func (ns *MapNamespace) Browse(bd *ua.BrowseDescription) *ua.BrowseResult {
 			StatusCode: ua.StatusGood,
 			References: refs,
 		}
-
 	}
 
 	refs := make([]*ua.ReferenceDescription, len(ns.Data))
@@ -132,13 +136,13 @@ func (ns *MapNamespace) Browse(bd *ua.BrowseDescription) *ua.BrowseResult {
 		StatusCode: ua.StatusGood,
 		References: refs,
 	}
-
 }
 
-func (ns *MapNamespace) Attribute(n *ua.NodeID, a ua.AttributeID) *ua.DataValue {
-	if ns.srv.cfg.logger != nil {
-		ns.srv.cfg.logger.Debug("read: node=%s attr=%s", n.String(), a)
-	}
+func (ns *MapNamespace) Attribute(ctx context.Context, n *ua.NodeID, a ua.AttributeID) *ua.DataValue {
+	ctx = ualog.WithAttrs(ctx, ns.logAttributes)
+	ualog.Debug(ctx, "read node attribute",
+		ualog.Any(ualog.NodeIdKey, n), ualog.Any("attr", a),
+	)
 
 	if n.IntID() != 0 {
 		// this is not one of our normal tags.
@@ -160,7 +164,6 @@ func (ns *MapNamespace) Attribute(n *ua.NodeID, a ua.AttributeID) *ua.DataValue 
 		}
 
 		return attrval.Value
-
 	}
 
 	dv := &ua.DataValue{
@@ -170,12 +173,9 @@ func (ns *MapNamespace) Attribute(n *ua.NodeID, a ua.AttributeID) *ua.DataValue 
 	}
 
 	key := n.StringID()
+	ualog.Debug(ctx, "read request", ualog.String("key", key), ualog.Any("data", ns.Data))
 
 	var err error
-	if ns.srv.cfg.logger != nil {
-		ns.srv.cfg.logger.Debug("Read req for %s", key)
-		ns.srv.cfg.logger.Debug("'%s' Data at read: %v", ns.name, ns.Data)
-	}
 
 	// because our data is native go types we don't have any of the ua "attributes" attached to it.
 	// so depending on what attribute the client wants, we'll inspect the data and return the appropriate
@@ -257,53 +257,39 @@ func (ns *MapNamespace) Attribute(n *ua.NodeID, a ua.AttributeID) *ua.DataValue 
 		case string:
 			dv.Value, err = ua.NewVariant(ua.NewNumericNodeID(0, 12))
 			if err != nil {
-				if ns.srv.cfg.logger != nil {
-					ns.srv.cfg.logger.Warn("problem creating variant: %v", err)
-				}
+				ualog.Warn(ctx, "problem creating variant", ualog.Err(err))
 			}
 		case int:
 			// we can't use an int because it is of unspecified length.  I'm going to use int64 so that we don't
 			// have to worry about cutting data off.
 			dv.Value, err = ua.NewVariant(ua.NewNumericNodeID(0, 6))
 			if err != nil {
-				if ns.srv.cfg.logger != nil {
-					ns.srv.cfg.logger.Warn("problem creating variant: %v", err)
-				}
+				ualog.Warn(ctx, "problem creating variant", ualog.Err(err))
 			}
 		case int32:
 			dv.Value, err = ua.NewVariant(ua.NewNumericNodeID(0, 6))
 			if err != nil {
-				if ns.srv.cfg.logger != nil {
-					ns.srv.cfg.logger.Warn("problem creating variant: %v", err)
-				}
+				ualog.Warn(ctx, "problem creating variant", ualog.Err(err))
 			}
 		case float32:
 			dv.Value, err = ua.NewVariant(ua.NewNumericNodeID(0, 10))
 			if err != nil {
-				if ns.srv.cfg.logger != nil {
-					ns.srv.cfg.logger.Warn("problem creating variant: %v", err)
-				}
+				ualog.Warn(ctx, "problem creating variant", ualog.Err(err))
 			}
 		case float64:
 			dv.Value, err = ua.NewVariant(ua.NewNumericNodeID(0, 11))
 			if err != nil {
-				if ns.srv.cfg.logger != nil {
-					ns.srv.cfg.logger.Warn("problem creating variant: %v", err)
-				}
+				ualog.Warn(ctx, "problem creating variant", ualog.Err(err))
 			}
 		case bool:
 			dv.Value, err = ua.NewVariant(ua.NewNumericNodeID(0, 1))
 			if err != nil {
-				if ns.srv.cfg.logger != nil {
-					ns.srv.cfg.logger.Warn("problem creating variant: %v", err)
-				}
+				ualog.Warn(ctx, "problem creating variant", ualog.Err(err))
 			}
 		default:
 			dv.Value, err = ua.NewVariant(ua.NewNumericNodeID(0, 24))
 			if err != nil {
-				if ns.srv.cfg.logger != nil {
-					ns.srv.cfg.logger.Warn("problem creating variant: %v", err)
-				}
+				ualog.Warn(ctx, "problem creating variant", ualog.Err(err))
 			}
 		}
 
@@ -323,25 +309,24 @@ func (ns *MapNamespace) Attribute(n *ua.NodeID, a ua.AttributeID) *ua.DataValue 
 	}
 
 	if dv.Value == nil {
-		if ns.srv.cfg.logger != nil {
-			ns.srv.cfg.logger.Warn("bad dv value")
-		}
+		ualog.Warn(ctx, "bad dv value")
 	} else {
-		if ns.srv.cfg.logger != nil {
-			ns.srv.cfg.logger.Debug("Read '%s' = '%v' (%v)", key, dv.Value, dv.Value.Value())
-		}
+		ualog.Debug(ctx, "read",
+			ualog.String("key", key), ualog.Any("variant", dv.Value), ualog.Any("value", dv.Value.Value()),
+		)
 	}
 
 	return dv
 }
 
-func (s *MapNamespace) SetAttribute(node *ua.NodeID, attr ua.AttributeID, val *ua.DataValue) ua.StatusCode {
+func (s *MapNamespace) SetAttribute(ctx context.Context, node *ua.NodeID, attr ua.AttributeID, val *ua.DataValue) ua.StatusCode {
+	ctx = ualog.WithAttrs(ctx, s.logAttributes)
+	ualog.Debug(ctx, "write node attribute", ualog.Any(ualog.NodeIdKey, node), ualog.Any("attr", attr))
 
 	s.Mu.Lock()
 	defer s.Mu.Unlock()
-	if s.srv.cfg.logger != nil {
-		s.srv.cfg.logger.Debug("'%s' Data pre-write: %v", s.name, s.Data)
-	}
+
+	ualog.Debug(ctx, "data pre-write", ualog.Any("data", s.Data))
 
 	key := node.StringID()
 
@@ -353,7 +338,7 @@ func (s *MapNamespace) SetAttribute(node *ua.NodeID, attr ua.AttributeID, val *u
 	}
 
 	// notify the opc ua server the value has changed.
-	s.srv.ChangeNotification(node)
+	s.srv.ChangeNotification(ctx, node)
 	// notify the non-opc application the value has changed.
 	select {
 	case s.ExternalNotification <- key:
@@ -371,7 +356,6 @@ func (ns *MapNamespace) AddNode(n *Node) *Node {
 }
 func (ns *MapNamespace) Node(id *ua.NodeID) *Node {
 	return nil
-
 }
 func (ns *MapNamespace) Objects() *Node {
 	oid := ua.NewNumericNodeID(ns.ID(), id.ObjectsFolder)
@@ -392,8 +376,8 @@ func (ns *MapNamespace) Objects() *Node {
 		nil,
 	)
 	return n
-
 }
+
 func (ns *MapNamespace) Root() *Node {
 	n := NewNode(
 		ua.NewNumericNodeID(ns.ID(), id.RootFolder),
@@ -406,5 +390,4 @@ func (ns *MapNamespace) Root() *Node {
 		nil,
 	)
 	return n
-
 }

@@ -10,6 +10,7 @@ import (
 
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uacp"
+	"github.com/gopcua/opcua/ualog"
 	"github.com/gopcua/opcua/uasc"
 )
 
@@ -32,10 +33,9 @@ type channelBroker struct {
 	// msgChan is the common channel that all messages from all channels
 	// get funneled into for handling
 	msgChan chan *uasc.MessageBody
-	logger  Logger
 }
 
-func newChannelBroker(logger Logger) *channelBroker {
+func newChannelBroker() *channelBroker {
 	rng := mrand.New(mrand.NewSource(time.Now().UnixNano()))
 	return &channelBroker{
 		endpoints:       make(map[string]*ua.EndpointDescription),
@@ -43,7 +43,6 @@ func newChannelBroker(logger Logger) *channelBroker {
 		msgChan:         make(chan *uasc.MessageBody),
 		secureChannelID: uint32(rng.Int31()),
 		secureTokenID:   uint32(rng.Int31()),
-		logger:          logger,
 	}
 }
 
@@ -75,40 +74,33 @@ func (c *channelBroker) RegisterConn(ctx context.Context, conn *uacp.Conn, local
 		secureTokenID,
 	)
 	if err != nil {
-		if c.logger != nil {
-			c.logger.Error("Error creating secure channel for new connection: %s", err)
-		}
+		ualog.Error(ctx, "could not create secure channel for new connection", ualog.Err(err))
 		return err
 	}
 
 	c.mu.Lock()
 	c.s[secureChannelID] = sc
-	if c.logger != nil {
-		c.logger.Info("Registered new channel (id %d) now at %d channels", secureChannelID, len(c.s))
-	}
 	c.mu.Unlock()
 	c.wg.Add(1)
+
+	ctx = ualog.WithAttrs(ctx, ualog.Uint32("channel", secureChannelID))
+	ualog.Info(ctx, "registered new channel", ualog.Int("count", len(c.s)))
+
 outer:
 	for {
 		select {
 		case <-ctx.Done():
 			// todo(fs): return error?
-			if c.logger != nil {
-				c.logger.Warn("Context done, closing Secure Channel %d", secureChannelID)
-			}
+			ualog.Warn(ctx, "context done, closing secure channel")
 			break outer
 
 		default:
 			msg := sc.Receive(ctx)
 			if msg.Err == io.EOF {
-				if c.logger != nil {
-					c.logger.Warn("Secure Channel %d closed", secureChannelID)
-				}
+				ualog.Warn(ctx, "secure channel closed")
 				break outer
 			} else if msg.Err != nil {
-				if c.logger != nil {
-					c.logger.Error("Secure Channel %d error: %s", secureChannelID, msg.Err)
-				}
+				ualog.Error(ctx, "secure channel error", ualog.Err(msg.Err))
 				break outer
 			}
 			// todo(fs): honor ctx
@@ -126,7 +118,7 @@ outer:
 
 // Close gracefully closes all secure channels
 // todo(fs): use ctx
-func (c *channelBroker) Close() error {
+func (c *channelBroker) Close(ctx context.Context) error {
 	var err error
 	c.mu.Lock()
 	for _, s := range c.s {
@@ -140,12 +132,15 @@ func (c *channelBroker) Close() error {
 		defer close(done)
 		c.wg.Wait()
 	}()
+
+	channelExitTimeout := time.Duration(10 * time.Second) // todo(fs): magic number
+
 	select {
 	case <-done:
-	case <-time.After(10 * time.Second): // todo(fs): magic number
-		if c.logger != nil {
-			c.logger.Error("CloseAll: timed out waiting for channels to exit")
-		}
+	case <-time.After(channelExitTimeout):
+		ualog.Error(ctx, "timed out waiting for channels to exit",
+			ualog.Duration("timeout", channelExitTimeout),
+		)
 	}
 
 	return err

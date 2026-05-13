@@ -9,7 +9,6 @@ import (
 	"crypto/rsa"
 	"encoding/xml"
 	"fmt"
-	"log"
 	"net"
 	"slices"
 	"strings"
@@ -20,6 +19,7 @@ import (
 	"github.com/gopcua/opcua/schema"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uacp"
+	"github.com/gopcua/opcua/ualog"
 	"github.com/gopcua/opcua/uapolicy"
 )
 
@@ -68,8 +68,6 @@ type serverConfig struct {
 	enabledAuth []authMode
 
 	cap ServerCapabilities
-
-	logger Logger
 }
 
 var capabilities = ServerCapabilities{
@@ -97,7 +95,7 @@ type security struct {
 
 // New returns an initialized OPC-UA server.
 // Call Start() afterwards to begin listening and serving connections
-func New(opts ...Option) *Server {
+func New(ctx context.Context, opts ...Option) *Server {
 	cfg := &serverConfig{
 		cap:              capabilities,
 		applicationName:  "GOPCUA",               // override with the ServerName option
@@ -105,9 +103,11 @@ func New(opts ...Option) *Server {
 		productName:      "gopcua OPC/UA Server", // override with the ProductName option
 		softwareVersion:  "0.0.0-dev",            // override with the SoftwareVersion option
 	}
+
 	for _, opt := range opts {
-		opt(cfg)
+		opt(ctx, cfg)
 	}
+
 	url := ""
 	if len(cfg.endpoints) != 0 {
 		url = cfg.endpoints[0]
@@ -116,8 +116,8 @@ func New(opts ...Option) *Server {
 	s := &Server{
 		url:      url,
 		cfg:      cfg,
-		cb:       newChannelBroker(cfg.logger),
-		sb:       newSessionBroker(cfg.logger),
+		cb:       newChannelBroker(),
+		sb:       newSessionBroker(),
 		handlers: make(map[uint16]Handler),
 		namespaces: []NameSpace{
 			NewNameSpace("http://opcfoundation.org/UA/"), // ns:0
@@ -153,9 +153,9 @@ func New(opts ...Option) *Server {
 	n0.srv = s
 	if !ok {
 		// this should never happen because we just set namespace 0 to be a node namespace
-		log.Panic("Namespace 0 is not a node namespace!")
+		panic("namespace 0 is not a node namespace")
 	}
-	s.ImportNodeSet(&nodes)
+	s.ImportNodeSet(ctx, &nodes)
 
 	s.namespaces[0].AddNode(CurrentTimeNode())
 	s.namespaces[0].AddNode(NamespacesNode(s))
@@ -169,8 +169,8 @@ func New(opts ...Option) *Server {
 	return s
 }
 
-func (s *Server) Session(hdr *ua.RequestHeader) *session {
-	return s.sb.Session(hdr.AuthenticationToken)
+func (s *Server) Session(ctx context.Context, hdr *ua.RequestHeader) *session {
+	return s.sb.Session(ctx, hdr.AuthenticationToken)
 }
 
 func (s *Server) Namespace(id int) (NameSpace, error) {
@@ -188,8 +188,8 @@ func (s *Server) Namespaces() []NameSpace {
 	return s.namespaces
 }
 
-func (s *Server) ChangeNotification(n *ua.NodeID) {
-	s.MonitoredItemService.ChangeNotification(n)
+func (s *Server) ChangeNotification(ctx context.Context, n *ua.NodeID) {
+	s.MonitoredItemService.ChangeNotification(ctx, n)
 }
 
 // for now, the address space of the server is split up into namespaces.
@@ -209,7 +209,6 @@ func (s *Server) AddNamespace(ns NameSpace) int {
 
 	if ns.ID() == 0 {
 		return 0
-
 	}
 
 	return len(s.namespaces) - 1
@@ -256,13 +255,14 @@ func (s *Server) Start(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	log.Printf("Started listening on %v", s.URLs())
+
+	ualog.Info(ctx, "started listening", ualog.Any("urls", s.URLs()))
 
 	s.initEndpoints()
 	s.setServerState(ua.ServerStateRunning)
 
 	if s.cb == nil {
-		s.cb = newChannelBroker(s.cfg.logger)
+		s.cb = newChannelBroker()
 	}
 
 	go s.acceptAndRegister(ctx, s.l)
@@ -279,7 +279,7 @@ func (s *Server) setServerState(state ua.ServerState) {
 
 // Close gracefully shuts the server down by closing all open connections,
 // and stops listening on all endpoints
-func (s *Server) Close() error {
+func (s *Server) Close(ctx context.Context) error {
 	s.setServerState(ua.ServerStateShutdown)
 
 	// Close the listener, preventing new sessions from starting
@@ -288,7 +288,7 @@ func (s *Server) Close() error {
 	}
 
 	// Shut down all secure channels and UACP connections
-	return s.cb.Close()
+	return s.cb.Close(ctx)
 }
 
 type temporary interface {
@@ -306,26 +306,23 @@ func (s *Server) acceptAndRegister(ctx context.Context, l *uacp.Listener) {
 				switch x := err.(type) {
 				case *net.OpError:
 					// socket closed. Cannot recover from this.
-					if s.cfg.logger != nil {
-						s.cfg.logger.Error("socket closed: %s", err)
-					}
+					ualog.Error(ctx, "socket closed", ualog.Err(err))
 					return
 				case temporary:
 					if x.Temporary() {
 						continue
 					}
 				default:
-					if s.cfg.logger != nil {
-						s.cfg.logger.Error("error accepting connection: %s", err)
-					}
+					ualog.Error(ctx, "error accepting connection", ualog.Err(err))
 					continue
 				}
 			}
 
 			go s.cb.RegisterConn(ctx, c, s.cfg.certificate, s.cfg.privateKey)
-			if s.cfg.logger != nil {
-				s.cfg.logger.Info("registered connection: %s", c.RemoteAddr())
-			}
+
+			ualog.Info(ctx, "registered connection",
+				ualog.String("remote", c.RemoteAddr().String()),
+			)
 		}
 	}
 }
@@ -333,33 +330,38 @@ func (s *Server) acceptAndRegister(ctx context.Context, l *uacp.Listener) {
 // monitorConnections reads messages off the secure channel connection and
 // sends the message to the service handler
 func (s *Server) monitorConnections(ctx context.Context) {
+
 	for ctx.Err() == nil {
 		msg := s.cb.ReadMessage(ctx)
 		if msg == nil {
 			continue // ctx is likely done, ctx.Err will be non-nil
 		}
 		if msg.Err != nil {
-			if s.cfg.logger != nil {
-				s.cfg.logger.Error("monitorConnections: Error received: %s\n", msg.Err)
-			}
+			ualog.Error(ctx, "error received",
+				ualog.String("func", "monitorConnections"),
+				ualog.Err(msg.Err),
+			)
 			continue // todo(fs): close SC???
 		}
 		if resp := msg.Response(); resp != nil {
-			if s.cfg.logger != nil {
-				s.cfg.logger.Error("monitorConnections: Server received response %T ???", resp)
-			}
+			ualog.Error(ctx, "server received response", ualog.Any("response", resp))
 			continue // todo(fs): close SC???
 		}
-		if s.cfg.logger != nil {
-			s.cfg.logger.Debug("monitorConnections: Received Message: %T", msg.Request())
-		}
+
+		ualog.Debug(ctx, "received message",
+			ualog.String("func", "monitorConnections"),
+			ualog.Any("request", msg.Request()),
+		)
+
 		s.cb.mu.RLock()
 		sc, ok := s.cb.s[msg.SecureChannelID]
 		s.cb.mu.RUnlock()
 		if !ok {
 			// if the secure channel ID is 0, this is probably a open secure channel request.
-			if s.cfg.logger != nil && msg.SecureChannelID != 0 {
-				s.cfg.logger.Error("monitorConnections: Unknown SecureChannel: %d", msg.SecureChannelID)
+			if msg.SecureChannelID != 0 {
+				ualog.Error(ctx, "unknown secure channel",
+					ualog.Uint64("channel_id", uint64(msg.SecureChannelID)),
+				)
 			}
 			continue
 		}
