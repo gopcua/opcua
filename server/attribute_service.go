@@ -84,6 +84,7 @@ func (s *AttributeService) Write(sc *uasc.SecureChannel, r ua.Request, reqID uin
 		ns, err := s.srv.Namespace(int(n.NodeID.Namespace()))
 		if err != nil {
 			status[i] = ua.StatusBadNodeNotInView
+			continue
 		}
 
 		status[i] = ns.SetAttribute(n.NodeID, n.AttributeID, n.Value)
