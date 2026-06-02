@@ -1,11 +1,16 @@
 package uasc
 
 import (
+	"context"
 	"crypto/rsa"
 	"crypto/x509"
+	"encoding/binary"
 	"encoding/pem"
 	"fmt"
+	"io"
 	"math"
+	"net"
+	"strings"
 	"testing"
 	"time"
 
@@ -331,4 +336,190 @@ func TestNewSecureChannel(t *testing.T) {
 		_, err := NewSecureChannel("", &uacp.Conn{}, cfg, make(chan error))
 		require.ErrorContains(t, err, "invalid channel config: Security policy 'http://opcfoundation.org/UA/SecurityPolicy#Basic256' requires a private key")
 	})
+}
+
+const chunkedResponseTestTimeout = 2 * time.Second
+
+func TestSendResponseWithContextWritesAllChunks(t *testing.T) {
+	// Use a real TCP pair here so we exercise the exact chunk framing that a
+	// peer would see on the wire, not just the internal message encoder.
+	serverTCP, clientTCP := newTestTCPConnPair(t)
+	defer serverTCP.Close()
+	defer clientTCP.Close()
+
+	uacpConn, err := uacp.NewConn(serverTCP, &uacp.Acknowledge{
+		ReceiveBufSize: 64 * 1024,
+		SendBufSize:    64 * 1024,
+		MaxMessageSize: 2 * 1024 * 1024,
+		MaxChunkCount:  512,
+	})
+	require.NoError(t, err)
+
+	s := &SecureChannel{
+		c: uacpConn,
+		cfg: &Config{
+			SecurityPolicyURI: ua.SecurityPolicyURINone,
+			SecurityMode:      ua.MessageSecurityModeNone,
+			RequestTimeout:    time.Second,
+		},
+		instances: make(map[uint32][]*channelInstance),
+	}
+
+	instance := newChannelInstance(s)
+	instance.state = channelActive
+	instance.secureChannelID = 1
+	instance.securityTokenID = 1
+	instance.maxBodySize = 256
+	s.activeInstance = instance
+
+	readDone := make(chan readChunksResult, 1)
+	go func() {
+		// Collect raw chunks until the final one arrives so the assertions below
+		// can validate framing and sequence progression end-to-end.
+		readDone <- readChunksUntilFinal(clientTCP)
+	}()
+
+	valueBytes := make([]byte, 4096)
+	for i := range valueBytes {
+		valueBytes[i] = byte(i)
+	}
+
+	v, err := ua.NewVariant(valueBytes)
+	require.NoError(t, err)
+
+	dv := &ua.DataValue{Value: v}
+	dv.UpdateMask()
+
+	resp := &ua.ReadResponse{
+		ResponseHeader: &ua.ResponseHeader{
+			Timestamp:          time.Now(),
+			RequestHandle:      42,
+			ServiceDiagnostics: &ua.DiagnosticInfo{},
+			StringTable:        []string{},
+			AdditionalHeader:   ua.NewExtensionObject(nil),
+		},
+		Results: []*ua.DataValue{dv},
+	}
+
+	require.NoError(t, s.SendResponseWithContext(context.Background(), 42, resp))
+
+	select {
+	case result := <-readDone:
+		require.NoError(t, result.err)
+		assertChunkedResponse(t, result.chunks)
+	case <-time.After(chunkedResponseTestTimeout):
+		t.Fatal("timed out waiting for response chunks")
+	}
+}
+
+type readChunksResult struct {
+	chunks [][]byte
+	err    error
+}
+
+func readChunksUntilFinal(conn *net.TCPConn) readChunksResult {
+	if err := conn.SetReadDeadline(time.Now().Add(chunkedResponseTestTimeout)); err != nil {
+		return readChunksResult{err: err}
+	}
+
+	var chunks [][]byte
+	for {
+		// Read the fixed UACP/UASC header first so we know how large the current
+		// chunk is before reading the remainder of its payload.
+		hdr := make([]byte, 8)
+		if _, err := io.ReadFull(conn, hdr); err != nil {
+			return readChunksResult{err: err}
+		}
+
+		messageSize := binary.LittleEndian.Uint32(hdr[4:8])
+		if messageSize < 12 {
+			return readChunksResult{err: io.ErrUnexpectedEOF}
+		}
+
+		chunk := make([]byte, int(messageSize))
+		copy(chunk, hdr)
+		if _, err := io.ReadFull(conn, chunk[8:]); err != nil {
+			return readChunksResult{err: err}
+		}
+
+		chunks = append(chunks, chunk)
+		if chunk[3] == ChunkTypeFinal {
+			return readChunksResult{chunks: chunks}
+		}
+	}
+}
+
+func assertChunkedResponse(t *testing.T, chunks [][]byte) {
+	t.Helper()
+
+	require.GreaterOrEqual(t, len(chunks), 2)
+
+	var previousSequence uint32
+	for i, chunk := range chunks {
+		require.Equal(t, MessageTypeMessage, string(chunk[:3]))
+
+		// Every chunk but the last should be marked intermediate so the test
+		// proves the response was actually split, not just sent once.
+		wantChunkType := byte(ChunkTypeIntermediate)
+		if i == len(chunks)-1 {
+			wantChunkType = ChunkTypeFinal
+		}
+		require.Equal(t, wantChunkType, chunk[3])
+
+		messageSize := binary.LittleEndian.Uint32(chunk[4:8])
+		require.Equal(t, len(chunk), int(messageSize))
+
+		secureChannelID := binary.LittleEndian.Uint32(chunk[8:12])
+		require.EqualValues(t, 1, secureChannelID)
+
+		// Additional chunks must advance the sequence number; reusing the same
+		// value would make the stream invalid for receivers.
+		sequenceNumber := binary.LittleEndian.Uint32(chunk[16:20])
+		if i > 0 {
+			require.Greater(t, sequenceNumber, previousSequence)
+		}
+		previousSequence = sequenceNumber
+	}
+}
+
+func newTestTCPConnPair(t *testing.T) (*net.TCPConn, *net.TCPConn) {
+	t.Helper()
+
+	// Keep the transport setup tiny and local so this regression test stays
+	// close to the real wire behavior without dragging in a full listener stack.
+	ln, err := net.ListenTCP("tcp", &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 0})
+	if err != nil {
+		if strings.Contains(err.Error(), "operation not permitted") {
+			t.Skipf("tcp listen not permitted in this environment: %v", err)
+		}
+		t.Fatalf("ListenTCP() failed: %v", err)
+	}
+	defer ln.Close()
+
+	accepted := make(chan *net.TCPConn, 1)
+	acceptErr := make(chan error, 1)
+	go func() {
+		conn, err := ln.AcceptTCP()
+		if err != nil {
+			acceptErr <- err
+			return
+		}
+		accepted <- conn
+	}()
+
+	client, err := net.DialTCP("tcp", nil, ln.Addr().(*net.TCPAddr))
+	require.NoError(t, err)
+
+	select {
+	case server := <-accepted:
+		return server, client
+	case err := <-acceptErr:
+		client.Close()
+		t.Fatalf("AcceptTCP() failed: %v", err)
+	case <-time.After(chunkedResponseTestTimeout):
+		client.Close()
+		t.Fatal("timed out waiting for accepted TCP connection")
+	}
+
+	return nil, nil
 }
