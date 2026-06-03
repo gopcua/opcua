@@ -813,6 +813,7 @@ func (s *SecureChannel) handleOpenSecureChannelRequest(reqID uint32, svc ua.Requ
 	if err != nil {
 		return err
 	}
+	instance.SetMaximumBodySize(int(s.c.SendBufSize()))
 
 	instance.state = channelActive // todo(fs): is this correct?
 	// s.setState(secureChannelOpen)
