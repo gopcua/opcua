@@ -1074,38 +1074,20 @@ func (s *SecureChannel) SendMsgWithContext(ctx context.Context, instance *channe
 		}
 	}
 
-	// we need to get a lock on the sequence number so we are sure to send them in the correct order.
+	// Hold the instance lock across the multi-chunk emission
+	// so concurrent sends on the same channel cannot interleave chunks on
+	// the wire and so sequence-number allocation stays monotonic.
+	instance.Lock()
+	defer instance.Unlock()
+
 	// encode the message
 	m := instance.newMessage(resp, typeID, reqID)
-	b, err := m.Encode()
-	if err != nil {
-		return err
-	}
-
-	// encrypt the message prior to sending it
-	// if SecurityMode == None, this returns the byte stream untouched
-	b, err = instance.signAndEncrypt(m, b)
-	if err != nil {
-		return err
-	}
-
-	// send the message
-	n, err := s.c.Write(b)
-	if err != nil {
-		return err
-	}
-
-	// todo(fs): what if len(b) != n? Can this happen?
-	if len(b) != n {
-		return errors.Errorf("uasc: incomplete message %T sent len=%d sent=%d", resp, len(b), n)
-	}
-
-	atomic.AddUint64(&instance.bytesSent, uint64(n))
-	atomic.AddUint32(&instance.messagesSent, 1)
-
-	debug.Printf("uasc %d/%d: send %T with %d bytes", s.c.ID(), reqID, resp, len(b))
-
-	return nil
+	// Split the response into chunks bounded by the negotiated
+	// SendBufferSize (instance.maxBodySize, set from s.c.SendBufSize() during
+	// handleOpenSecureChannelRequest). Per OPC UA Part 6 section 7.1.4 every
+	// chunk must fit the receiver's advertised SendBufferSize; mirrors the
+	// chunk-loop in sendAsyncWithTimeout (the request-side Send path).
+	return s.sendChunkedMessage(ctx, instance, m, reqID, resp)
 }
 
 func (s *SecureChannel) sendResponseWithContext(ctx context.Context, instance *channelInstance, reqID uint32, resp ua.Response) error {
@@ -1126,35 +1108,57 @@ func (s *SecureChannel) sendResponseWithContext(ctx context.Context, instance *c
 
 	// encode the message
 	m := instance.newMessage(resp, typeID, reqID)
-	b, err := m.Encode()
+	// Chunk the response per Part 6 section 7.1.4 — see
+	// SendMsgWithContext comment above for the rationale.
+	return s.sendChunkedMessage(ctx, instance, m, reqID, resp)
+}
+
+// sendChunkedMessage encodes m into one or more chunks bounded by
+// instance.maxBodySize, signs/encrypts each chunk, and writes them out
+// under the caller-held instance lock. Mirrors the request-side
+// sendAsyncWithTimeout chunk loop.
+func (s *SecureChannel) sendChunkedMessage(ctx context.Context, instance *channelInstance, m *Message, reqID uint32, payload any) error {
+	chunks, err := m.EncodeChunks(instance.maxBodySize)
 	if err != nil {
-		log.Printf("Error encoding msg: %v", err)
+		if _, ok := payload.(ua.Response); ok {
+			log.Printf("Error encoding msg: %v", err)
+		}
 		return err
 	}
 
-	// encrypt the message prior to sending it
-	// if SecurityMode == None, this returns the byte stream untouched
-	b, err = instance.signAndEncrypt(m, b)
-	if err != nil {
-		return err
+	var totalSent uint64
+	for i, chunk := range chunks {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+		if i > 0 { // fix sequence number on subsequent chunks
+			number := instance.nextSequenceNumber()
+			binary.LittleEndian.PutUint32(chunk[16:], uint32(number))
+		}
+
+		chunk, err = instance.signAndEncrypt(m, chunk)
+		if err != nil {
+			return err
+		}
+
+		n, err := s.c.Write(chunk)
+		if err != nil {
+			return err
+		}
+		if len(chunk) != n {
+			return errors.Errorf("uasc: incomplete message %T sent len=%d sent=%d", payload, len(chunk), n)
+		}
+
+		atomic.AddUint64(&instance.bytesSent, uint64(n))
+		atomic.AddUint32(&instance.messagesSent, 1)
+		totalSent += uint64(n)
+
+		debug.Printf("uasc %d/%d: send %T chunk %d/%d with %d bytes", s.c.ID(), reqID, payload, i+1, len(chunks), len(chunk))
 	}
 
-	// send the message
-	n, err := s.c.Write(b)
-	if err != nil {
-		return err
-	}
-
-	// todo(fs): what if len(b) != n? Can this happen?
-	if len(b) != n {
-		return errors.Errorf("uasc: incomplete message %T sent len=%d sent=%d", resp, len(b), n)
-	}
-
-	atomic.AddUint64(&instance.bytesSent, uint64(n))
-	atomic.AddUint32(&instance.messagesSent, 1)
-
-	debug.Printf("uasc %d/%d: send %T with %d bytes", s.c.ID(), reqID, resp, len(b))
-
+	debug.Printf("uasc %d/%d: send %T total %d bytes in %d chunk(s)", s.c.ID(), reqID, payload, totalSent, len(chunks))
 	return nil
 }
 
