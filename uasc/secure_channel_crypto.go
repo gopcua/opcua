@@ -8,6 +8,7 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/binary"
+	"strings"
 
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uapolicy"
@@ -63,10 +64,12 @@ func (s *SecureChannel) VerifySessionSignature(cert, nonce, signature []byte) er
 	return nil
 }
 
-// EncryptUserPassword issues a new signature for the client to send in ActivateSessionRequest
+// EncryptUserPassword issues a new signature for the client to send in ActivateSessionRequest.
+// An empty/whitespace-only policyURI falls back to the channel's SecurityPolicy
+// (see SecurityFromEndpoint).
 func (s *SecureChannel) EncryptUserPassword(policyURI, password string, cert, nonce []byte) ([]byte, string, error) {
 	// If the User ID Token's policy was null, then default to the secure channel's policy
-	if policyURI == "" {
+	if strings.TrimSpace(policyURI) == "" {
 		policyURI = s.cfg.SecurityPolicyURI
 	}
 
@@ -103,7 +106,7 @@ func (s *SecureChannel) EncryptUserPassword(policyURI, password string, cert, no
 // The security policy for the SecureChannel is used if policyURI value is null or empty
 // https://reference.opcfoundation.org/Core/Part4/v104/docs/7.37
 func (s *SecureChannel) NewUserTokenSignature(policyURI string, cert, nonce []byte) ([]byte, string, error) {
-	if policyURI == "" {
+	if strings.TrimSpace(policyURI) == "" {
 		policyURI = s.cfg.SecurityPolicyURI
 	}
 
