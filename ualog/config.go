@@ -16,7 +16,7 @@ func newConfig() *config {
 }
 
 func newContextFromConfig(ctx context.Context, cfg *config) context.Context {
-	return newContext(ctx, cfg.logger)
+	return newContextWithLogger(ctx, cfg.logger)
 }
 
 type option func(*config)
