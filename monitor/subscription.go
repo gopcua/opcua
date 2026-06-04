@@ -2,6 +2,7 @@ package monitor
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"sync/atomic"
 
@@ -17,6 +18,45 @@ var (
 	// ErrSlowConsumer is returned when a subscriber does not keep up with the incoming messages
 	ErrSlowConsumer = errors.New("slow consumer. messages may be dropped")
 )
+
+// ItemError represents a single monitored item that failed to be created.
+// AddMonitorItems returns an errors.Join of *ItemError when one or more items
+// could not be created on the server. Callers can inspect failures with the
+// standard errors helpers:
+//
+//	items, err := sub.AddMonitorItems(ctx, requests...)
+//	if err != nil {
+//	    // items contains the successfully created monitors (nil if all failed)
+//
+//	    // Check for a specific status code across all failures:
+//	    if errors.Is(err, ua.StatusBadNodeIDUnknown) { ... }
+//
+//	    // Inspect the first failing item:
+//	    var ie *monitor.ItemError
+//	    if errors.As(err, &ie) { _ = ie.NodeID; _ = ie.Status }
+//
+//	    // Iterate over all failures:
+//	    if u, ok := err.(interface{ Unwrap() []error }); ok {
+//	        for _, e := range u.Unwrap() {
+//	            var ie *monitor.ItemError
+//	            if errors.As(e, &ie) { /* ie.NodeID, ie.Status */ }
+//	        }
+//	    }
+//	}
+type ItemError struct {
+	NodeID *ua.NodeID
+	Status ua.StatusCode
+}
+
+func (e *ItemError) Error() string {
+	return fmt.Sprintf("%s: %s", e.NodeID, e.Status)
+}
+
+// Unwrap exposes the underlying status code so that errors.Is can match on
+// values such as ua.StatusBadNodeIDUnknown.
+func (e *ItemError) Unwrap() error {
+	return e.Status
+}
 
 // ErrHandler is a function that is called when there is an out of band issue with delivery
 type ErrHandler func(*opcua.Client, *Subscription, error)
@@ -323,9 +363,16 @@ func (s *Subscription) AddMonitorItems(ctx context.Context, nodes ...Request) ([
 		return nil, errors.Errorf("monitor items response length mismatch")
 	}
 	var monitoredItems []Item
+	var failedItems []error
 	for i, res := range resp.Results {
 		if res.StatusCode != ua.StatusOK {
-			return nil, res.StatusCode
+			failedItems = append(failedItems, &ItemError{
+				NodeID: toAdd[i].ItemToMonitor.NodeID,
+				Status: res.StatusCode,
+			})
+			// Clean up the handle for the failed item
+			delete(s.handles, nodes[i].handle)
+			continue
 		}
 		mn := Item{
 			id:     res.MonitoredItemID,
@@ -334,6 +381,13 @@ func (s *Subscription) AddMonitorItems(ctx context.Context, nodes ...Request) ([
 		}
 		s.itemLookup[res.MonitoredItemID] = mn
 		monitoredItems = append(monitoredItems, mn)
+	}
+
+	if len(failedItems) > 0 {
+		// monitoredItems is nil when every item failed and non-nil when some
+		// items succeeded; either way the joined *ItemError values let
+		// callers use errors.Is / errors.As to inspect per-node failures.
+		return monitoredItems, errors.Join(failedItems...)
 	}
 
 	return monitoredItems, nil

@@ -19,7 +19,11 @@ type Node struct {
 	// ID is the node id of the node.
 	ID *ua.NodeID
 
-	c *Client
+	c ClientInterface
+}
+
+func NewNode(id *ua.NodeID, c ClientInterface) *Node {
+	return &Node{ID: id, c: c}
 }
 
 func (n *Node) String() string {
