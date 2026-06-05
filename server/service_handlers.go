@@ -94,18 +94,30 @@ func (s *Server) RegisterHandler(typeID uint16, h Handler) {
 }
 
 func (s *Server) handleService(ctx context.Context, sc *uasc.SecureChannel, reqID uint32, req ua.Request) {
-	ualog.Debug(ctx, "handling service request", ualog.Any("request", req))
 
 	var resp ua.Response
 	var err error
 
 	typeID := ua.ServiceTypeID(req)
+
+	ctx = ualog.WithAttrs(ctx,
+		ualog.Uint32("service.type_id", uint32(typeID)),
+	)
+
+	if hdr := req.Header(); hdr != nil {
+		ctx = ualog.WithAttrs(ctx,
+			ualog.Uint32("request_handle", hdr.RequestHandle),
+		)
+	}
+
+	ualog.Debug(ctx, "handling service request")
+
 	h, ok := s.handlers[typeID]
 	if ok {
 		resp, err = h(ctx, sc, req, reqID)
 	} else {
 		if typeID == 0 {
-			ualog.Warn(ctx, "unknown (potentially non registered) service", ualog.Any("request", req))
+			ualog.Warn(ctx, "unknown (potentially non registered) service", ualog.Request(req))
 		}
 		err = ua.StatusBadServiceUnsupported
 	}
