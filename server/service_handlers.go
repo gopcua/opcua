@@ -95,13 +95,12 @@ func (s *Server) RegisterHandler(typeID uint16, h Handler) {
 
 func (s *Server) handleService(ctx context.Context, sc *uasc.SecureChannel, reqID uint32, req ua.Request) {
 
-	var resp ua.Response
-	var err error
-
 	typeID := ua.ServiceTypeID(req)
 
 	ctx = ualog.WithAttrs(ctx,
-		ualog.Uint32("service.type_id", uint32(typeID)),
+		ualog.GroupAttrs("service",
+			ualog.Uint32("type_id", uint32(typeID)),
+		),
 	)
 
 	if hdr := req.Header(); hdr != nil {
@@ -112,7 +111,11 @@ func (s *Server) handleService(ctx context.Context, sc *uasc.SecureChannel, reqI
 
 	ualog.Debug(ctx, "handling service request")
 
+	var resp ua.Response
+	var err error
+
 	h, ok := s.handlers[typeID]
+
 	if ok {
 		resp, err = h(ctx, sc, req, reqID)
 	} else {

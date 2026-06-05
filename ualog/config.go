@@ -32,7 +32,9 @@ func WithErrorKey(key string) option {
 // [log/slog.Handler]
 func WithHandler(h slog.Handler) option {
 	return func(c *config) {
-		c.logger = slog.New(h)
+		if h != nil {
+			c.logger = slog.New(h)
+		}
 	}
 }
 
@@ -40,6 +42,8 @@ func WithHandler(h slog.Handler) option {
 // ualog logger based on an already decorated [log/slog.Logger]
 func WithLogger(l *slog.Logger) option {
 	return func(c *config) {
-		c.logger = l
+		if l != nil {
+			c.logger = l
+		}
 	}
 }

@@ -3,7 +3,6 @@ package ualog
 import (
 	"context"
 	"log/slog"
-	"slices"
 )
 
 // Debug forwards the provided message and attributes to the current logger
@@ -11,7 +10,7 @@ import (
 func Debug(ctx context.Context, msg string, attrs ...Attr) {
 	logger := loggerFromContext(ctx)
 	if logger.Handler().Enabled(ctx, slog.LevelDebug) {
-		log(ctx, loggerFromContext(ctx), slog.LevelDebug, msg, attrs...)
+		log(ctx, logger, slog.LevelDebug, msg, attrs...)
 	}
 }
 
@@ -50,11 +49,11 @@ func WithAttrs(ctx context.Context, attrs ...Attr) context.Context {
 		return ctx
 	}
 
-	args := slices.Grow(attributesFromContext(ctx), attrCount)
+	stored := attributesFromContext(ctx)
 
-	for idx := range attrs {
-		args = append(args, attrs[idx])
-	}
+	next := make([]Attr, 0, len(stored)+len(attrs))
+	next = append(next, stored...)
+	next = append(next, attrs...)
 
-	return newContextWithLogAttributes(ctx, args)
+	return newContextWithLogAttributes(ctx, next)
 }

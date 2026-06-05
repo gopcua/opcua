@@ -330,7 +330,6 @@ func (s *Server) acceptAndRegister(ctx context.Context, l *uacp.Listener) {
 // monitorConnections reads messages off the secure channel connection and
 // sends the message to the service handler
 func (s *Server) monitorConnections(ctx context.Context) {
-	ctx = ualog.WithAttrs(ctx, ualog.String("func", "monitorConnections"))
 
 	for ctx.Err() == nil {
 		msg := s.cb.ReadMessage(ctx)
@@ -352,7 +351,7 @@ func (s *Server) monitorConnections(ctx context.Context) {
 			continue // todo(fs): close SC???
 		}
 
-		ualog.Debug(msgCtx, "received message", ualog.Request(msg.Request()))
+		ualog.Debug(msgCtx, "received message")
 
 		s.cb.mu.RLock()
 		sc, ok := s.cb.s[msg.SecureChannelID]
