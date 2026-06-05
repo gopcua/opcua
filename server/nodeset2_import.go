@@ -308,7 +308,7 @@ func (srv *Server) refsImportNodeSet(ctx context.Context, nodes *schema.UANodeSe
 		if !ok {
 			reftypes[alias] = rt // sometimes they use browse name
 		} else {
-			ualog.Error(ctx, "duplicate reference type", ualog.String("alias", alias))
+			ualog.Error(ctx, "duplicate reference type", nil, ualog.String("alias", alias))
 			continue
 		}
 
@@ -316,7 +316,7 @@ func (srv *Server) refsImportNodeSet(ctx context.Context, nodes *schema.UANodeSe
 		if !ok {
 			reftypes[aliases[alias]] = rt // sometimes they use node id
 		} else {
-			ualog.Error(ctx, "duplicate reference type", ualog.String("alias", aliases[alias]))
+			ualog.Error(ctx, "duplicate reference type", nil, ualog.String("alias", aliases[alias]))
 			continue
 		}
 	}
@@ -329,7 +329,7 @@ func (srv *Server) refsImportNodeSet(ctx context.Context, nodes *schema.UANodeSe
 		nodeid := ua.MustParseNodeID(rt.NodeIdAttr)
 		node := srv.Node(nodeid)
 		if node == nil {
-			ualog.Error(ctx, "error loading node", ualog.String("id", rt.NodeIdAttr))
+			ualog.Error(ctx, "error loading node", nil, ualog.String("id", rt.NodeIdAttr))
 		}
 
 		for rid := range rt.References.Reference {
@@ -337,7 +337,7 @@ func (srv *Server) refsImportNodeSet(ctx context.Context, nodes *schema.UANodeSe
 			refnodeid := ua.MustParseNodeID(ref.Value)
 			n := srv.Node(refnodeid)
 			if n == nil {
-				ualog.Error(ctx, "unable to find node",
+				ualog.Error(ctx, "unable to find node", nil,
 					ualog.String("value", ref.Value),
 					ualog.String("ref_type", ref.ReferenceTypeAttr),
 					ualog.String("browse_name", rt.BrowseNameAttr),
@@ -373,7 +373,7 @@ func (srv *Server) refsImportNodeSet(ctx context.Context, nodes *schema.UANodeSe
 			refnodeid := ua.MustParseNodeID(ref.Value)
 			n := srv.Node(refnodeid)
 			if n == nil {
-				ualog.Error(ctx, "unable to find node",
+				ualog.Error(ctx, "unable to find node", nil,
 					ualog.String("value", ref.Value),
 					ualog.String("ref_type", ref.ReferenceTypeAttr),
 					ualog.String("browse_name", dt.BrowseNameAttr),
@@ -406,7 +406,7 @@ func (srv *Server) refsImportNodeSet(ctx context.Context, nodes *schema.UANodeSe
 			refnodeid := ua.MustParseNodeID(ref.Value)
 			n := srv.Node(refnodeid)
 			if n == nil {
-				ualog.Error(ctx, "unable to find node",
+				ualog.Error(ctx, "unable to find node", nil,
 					ualog.String("value", ref.Value),
 					ualog.String("ref_type", ref.ReferenceTypeAttr),
 					ualog.String("browse_name", ot.BrowseNameAttr),
@@ -437,7 +437,7 @@ func (srv *Server) refsImportNodeSet(ctx context.Context, nodes *schema.UANodeSe
 			refnodeid := ua.MustParseNodeID(ref.Value)
 			n := srv.Node(refnodeid)
 			if n == nil {
-				ualog.Error(ctx, "unable to find node",
+				ualog.Error(ctx, "unable to find node", nil,
 					ualog.String("value", ref.Value),
 					ualog.String("ref_type", ref.ReferenceTypeAttr),
 					ualog.String("browse_name", ot.BrowseNameAttr),
@@ -468,7 +468,7 @@ func (srv *Server) refsImportNodeSet(ctx context.Context, nodes *schema.UANodeSe
 			refnodeid := ua.MustParseNodeID(ref.Value)
 			n := srv.Node(refnodeid)
 			if n == nil {
-				ualog.Error(ctx, "unable to find node",
+				ualog.Error(ctx, "unable to find node", nil,
 					ualog.String("value", ref.Value),
 					ualog.String("ref_type", ref.ReferenceTypeAttr),
 					ualog.String("browse_name", ot.BrowseNameAttr),
@@ -499,7 +499,7 @@ func (srv *Server) refsImportNodeSet(ctx context.Context, nodes *schema.UANodeSe
 			refnodeid := ua.MustParseNodeID(ref.Value)
 			n := srv.Node(refnodeid)
 			if n == nil {
-				ualog.Error(ctx, "unable to find node",
+				ualog.Error(ctx, "unable to find node", nil,
 					ualog.String("value", ref.Value),
 					ualog.String("ref_type", ref.ReferenceTypeAttr),
 					ualog.String("browse_name", ot.BrowseNameAttr),
@@ -533,7 +533,7 @@ func (srv *Server) refsImportNodeSet(ctx context.Context, nodes *schema.UANodeSe
 			refnodeid := ua.MustParseNodeID(ref.Value)
 			n := srv.Node(refnodeid)
 			if n == nil {
-				ualog.Error(ctx, "unable to find node",
+				ualog.Error(ctx, "unable to find node", nil,
 					ualog.String("value", ref.Value),
 					ualog.String("ref_type", ref.ReferenceTypeAttr),
 					ualog.String("browse_name", ot.BrowseNameAttr),

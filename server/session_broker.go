@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	mrand "math/rand"
 	"sync"
 	"time"
@@ -60,8 +61,8 @@ func (sb *sessionBroker) Close(ctx context.Context, authToken *ua.NodeID) error 
 	defer sb.mu.Unlock()
 
 	if sb.s[authToken.String()] == nil {
-		ualog.Warn(ctx, "unable to close session",
-			ualog.String(ualog.ErrorKey, "error looking up session"),
+		ualog.Error(ctx, "unable to close session",
+			errors.New("error looking up session"),
 			ualog.Any("token", authToken),
 		)
 	}

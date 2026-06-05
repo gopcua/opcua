@@ -1,6 +1,7 @@
 package ualog
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -11,7 +12,7 @@ import (
 )
 
 func TestSanitizedRequestNil(t *testing.T) {
-	require.Nil(t, sanitizedRequest(nil))
+	require.Nil(t, DefaultRequestSanitizer(nil))
 }
 
 func TestSanitizedRequestReadRequest(t *testing.T) {
@@ -341,7 +342,7 @@ func TestRequestAttrUsesSanitizedRequest(t *testing.T) {
 		NodesToRead:   []*ua.ReadValueID{{NodeID: ua.NewTwoByteNodeID(84)}},
 	}
 
-	attr := Request(req)
+	attr := Request(context.Background(), req)
 
 	require.Equal(t, "request", attr.Key)
 
@@ -365,7 +366,7 @@ func testRequestHeader() *ua.RequestHeader {
 func sanitizedRequestMap(t *testing.T, req ua.Request) map[string]any {
 	t.Helper()
 
-	return requireMap(t, sanitizedRequest(req))
+	return requireMap(t, DefaultRequestSanitizer(req))
 }
 
 func requireMap(t *testing.T, v any) map[string]any {

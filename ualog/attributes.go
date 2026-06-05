@@ -1,15 +1,14 @@
 package ualog
 
 import (
+	"context"
 	"log/slog"
 	"time"
 
 	"github.com/gopcua/opcua/ua"
 )
 
-var (
-	// ErrorKey is used as the key when ualog.Err creates a String attribute for err.Error()
-	ErrorKey string = "err"
+const (
 	// NodeIdKey should be used when logging the id of a ua.Node
 	//
 	// This avoids the use of "node", "node_id", "id" in different places.
@@ -32,17 +31,6 @@ var Bitmask = func(key string, value uint32) Attr {
 // Duration returns an Attr for a [time.Duration]
 var Duration = func(key string, value time.Duration) Attr {
 	return Attr(slog.Duration(key, value))
-}
-
-// Err takes an error and returns a String attr with the key
-// ualog.ErrorKey and the value given by err.Error(). If err
-// is nil, the Attr value will be the empty string.
-var Err = func(err error) Attr {
-	var errorMessage string
-	if err != nil {
-		errorMessage = err.Error()
-	}
-	return String(ErrorKey, errorMessage)
 }
 
 // GroupAttrs returns a single Attr for a group consisting of
@@ -69,8 +57,8 @@ var Namespace = func(namespaceId uint16) Attr {
 
 // Request sanitizes a request object to prevent/reduce likelyhood
 // of exposing sensitive data, before turning it into an Any attribute
-var Request = func(req ua.Request) Attr {
-	return Any("request", sanitizedRequest(req))
+var Request = func(ctx context.Context, req ua.Request) Attr {
+	return Any("request", stateFromContext(ctx).requestSanitizer(req))
 }
 
 // String returns an Attr for a string value

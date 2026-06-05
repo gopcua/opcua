@@ -43,7 +43,7 @@ func ExampleError() {
 	ctx := ualog.New(context.Background(), ualog.WithHandler(handler))
 
 	err := errors.New("critical reactor core failure")
-	ualog.Error(ctx, "whoopsi daisies", ualog.Err(err))
+	ualog.Error(ctx, "whoopsi daisies", err)
 
 	// {"level":"ERROR","msg":"whoopsi daisies","err":"critical reactor core failure"}
 }
@@ -55,7 +55,7 @@ func ExampleWithErrorKey() {
 	)
 
 	err := errors.New("unknown error")
-	ualog.Error(ctx, "something went wrong", ualog.Err(err))
+	ualog.Error(ctx, "something went wrong", err)
 
 	// Output: level=ERROR msg="something went wrong" oops="unknown error"
 }

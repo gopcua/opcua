@@ -306,14 +306,14 @@ func (s *Server) acceptAndRegister(ctx context.Context, l *uacp.Listener) {
 				switch x := err.(type) {
 				case *net.OpError:
 					// socket closed. Cannot recover from this.
-					ualog.Error(ctx, "socket closed", ualog.Err(err))
+					ualog.Error(ctx, "socket closed", err)
 					return
 				case temporary:
 					if x.Temporary() {
 						continue
 					}
 				default:
-					ualog.Error(ctx, "error accepting connection", ualog.Err(err))
+					ualog.Error(ctx, "error accepting connection", err)
 					continue
 				}
 			}
@@ -343,11 +343,11 @@ func (s *Server) monitorConnections(ctx context.Context) {
 		)
 
 		if msg.Err != nil {
-			ualog.Error(msgCtx, "error received", ualog.Err(msg.Err))
+			ualog.Error(msgCtx, "error received", msg.Err)
 			continue // todo(fs): close SC???
 		}
 		if resp := msg.Response(); resp != nil {
-			ualog.Error(msgCtx, "server received response", ualog.Any("response", resp))
+			ualog.Error(msgCtx, "server received response", nil, ualog.Any("response", resp))
 			continue // todo(fs): close SC???
 		}
 
@@ -359,7 +359,7 @@ func (s *Server) monitorConnections(ctx context.Context) {
 		if !ok {
 			// if the secure channel ID is 0, this is probably a open secure channel request.
 			if msg.SecureChannelID != 0 {
-				ualog.Error(msgCtx, "unknown secure channel")
+				ualog.Error(msgCtx, "unknown secure channel", nil)
 			}
 			continue
 		}

@@ -114,7 +114,7 @@ func (s *Server) handleService(ctx context.Context, sc *uasc.SecureChannel, reqI
 		resp, err = h(ctx, sc, req, reqID)
 	} else {
 		if typeID == 0 {
-			ualog.Warn(ctx, "unknown (potentially non registered) service", ualog.Request(req))
+			ualog.Warn(ctx, "unknown (potentially non registered) service", ualog.Request(ctx, req))
 		}
 		err = ua.StatusBadServiceUnsupported
 	}
@@ -133,7 +133,7 @@ func (s *Server) handleService(ctx context.Context, sc *uasc.SecureChannel, reqI
 
 	err = sc.SendResponseWithContext(ctx, reqID, resp)
 	if err != nil {
-		ualog.Warn(ctx, "unable to send response", ualog.Err(err))
+		ualog.Error(ctx, "unable to send response", err)
 	}
 }
 

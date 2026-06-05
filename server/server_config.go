@@ -8,6 +8,7 @@ import (
 	"context"
 	"crypto/rsa"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -74,7 +75,7 @@ func EnableSecurity(secPolicy string, secMode ua.MessageSecurityMode) Option {
 		}
 		if !ok {
 			ualog.Error(ctx, "unable to add endpoint security mode to config",
-				ualog.String(ualog.ErrorKey, "unsupported policy"),
+				errors.New("unsupported policy"),
 				ualog.String("policy", secPolicy),
 			)
 			return

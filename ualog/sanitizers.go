@@ -6,7 +6,7 @@ import (
 	"github.com/gopcua/opcua/ua"
 )
 
-func sanitizedRequest(req ua.Request) any {
+func DefaultRequestSanitizer(req ua.Request) any {
 	if req == nil {
 		return nil
 	}

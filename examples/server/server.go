@@ -39,7 +39,7 @@ func main() {
 
 	// listener, err := uacp.Listen(*endpoint, uint32(*bufsize))
 	// if err != nil {
-	//  ualog.Fatal(ctx, "", ualog.Err(err))
+	//  ualog.Fatal(ctx, "", err)
 	// }
 	// ualog.Info(ctx, "started listening for connections", ualog.Any("endpoint", listener.Endpoint()))
 
@@ -55,7 +55,7 @@ func main() {
 
 	// 		conn, err := listener.Accept(ctx)
 	// 		if err != nil {
-	//          ualog.Error(ctx, "listen failed", ualog.Err(err))
+	//          ualog.Error(ctx, "listen failed", err)
 	// 			return
 	// 		}
 	// 		defer func() {
@@ -66,7 +66,7 @@ func main() {
 
 	// 		secChan, err := uasc.ListenAndAcceptSecureChannel(ctx, conn, cfg)
 	// 		if err != nil {
-	// 			ualog.Fatal(ctx, "", ualog.Err(err))
+	// 			ualog.Fatal(ctx, "", err)
 	// 		}
 	// 		defer func() {
 	// 			secChan.Close()
@@ -77,7 +77,7 @@ func main() {
 	// 		sessCfg := uasc.NewServerSessionConfig(secChan)
 	// 		session, err := uasc.ListenAndAcceptSession(ctx, secChan, sessCfg)
 	// 		if err != nil {
-	// 			ualog.Fatal(ctx, "", ualog.Err(err))
+	// 			ualog.Fatal(ctx, "", err)
 	// 		}
 	// 		defer func() {
 	// 			session.Close()
@@ -89,13 +89,13 @@ func main() {
 	// 		for {
 	// 			n, err := session.ReadService(buf)
 	// 			if err != nil {
-	// 				ualog.Error(ctx, "couldn't read uasc", ualog.Err(err))
+	// 				ualog.Error(ctx, "couldn't read uasc", err)
 	// 				continue
 	// 			}
 	//			ualog.Info(ctx, "successfully received message", ualog.String("bytes", fmt.Sprintf("%x", buf[:n])), ualog.String("wireshark", utils.Wireshark(0, buf[:n])))
 	// 			srv, err := services.Decode(buf[:n])
 	// 			if err != nil {
-	// 				ualog.Error(ctx, "couldn't decode received bytes as Service", ualog.Err(err))
+	// 				ualog.Error(ctx, "couldn't decode received bytes as Service", err)
 	// 				continue
 	// 			}
 	// 			ualog.Info(ctx, "successfully decoded as Service", ualog.Any("service", srv))
@@ -105,7 +105,7 @@ func main() {
 }
 
 func fatal(ctx context.Context, reason string, err error) {
-	ualog.Error(ctx, "FATAL: "+reason, ualog.Err(err))
+	ualog.Error(ctx, "FATAL: "+reason, err)
 	time.Sleep(time.Second)
 	os.Exit(1)
 }

@@ -7,24 +7,29 @@ import (
 
 type config struct {
 	logger *slog.Logger
+
+	errorKey         string
+	requestSanitizer RequestSanitizer
 }
 
 func newConfig() *config {
 	return &config{
-		logger: slog.Default(),
+		logger:           slog.Default(),
+		errorKey:         "err",
+		requestSanitizer: DefaultRequestSanitizer,
 	}
 }
 
 func newContextFromConfig(ctx context.Context, cfg *config) context.Context {
-	return newContextWithLogger(ctx, cfg.logger)
+	return newContextWithStateFromConfig(ctx, cfg)
 }
 
 type option func(*config)
 
 // WithErrorKey replaces the default error message key with the supplied value
 func WithErrorKey(key string) option {
-	return func(_ *config) {
-		ErrorKey = key
+	return func(c *config) {
+		c.errorKey = key
 	}
 }
 
@@ -44,6 +49,17 @@ func WithLogger(l *slog.Logger) option {
 	return func(c *config) {
 		if l != nil {
 			c.logger = l
+		}
+	}
+}
+
+// WithRequestSanitizer is an option that allows the caller to control what
+// information is added to log records when incoming [ua.Request] instances
+// are logged
+func WithRequestSanitizer(sanitizer RequestSanitizer) option {
+	return func(c *config) {
+		if sanitizer != nil {
+			c.requestSanitizer = sanitizer
 		}
 	}
 }

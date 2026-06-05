@@ -102,7 +102,7 @@ func main() {
 		ualog.Info(ctx, "loading certificate and key from files", ualog.String("cert", *certfile), ualog.String("key", *keyfile))
 		c, err := tls.LoadX509KeyPair(*certfile, *keyfile)
 		if err != nil {
-			ualog.Error(ctx, "failed to load certificate", ualog.Err(err))
+			ualog.Error(ctx, "failed to load certificate", err)
 		} else {
 			pk, ok := c.PrivateKey.(*rsa.PrivateKey)
 			if !ok {
@@ -126,7 +126,7 @@ func main() {
 }
 
 func fatal(ctx context.Context, reason string, err error) {
-	ualog.Error(ctx, "FATAL: "+reason, ualog.Err(err))
+	ualog.Error(ctx, "FATAL: "+reason, err)
 	time.Sleep(time.Second)
 	os.Exit(1)
 }

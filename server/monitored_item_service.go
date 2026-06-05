@@ -131,8 +131,8 @@ func (s *MonitoredItemService) ChangeNotification(ctx context.Context, n *ua.Nod
 		val := new(ua.MonitoredItemNotification)
 		val.ClientHandle = item.Req.RequestedParameters.ClientHandle
 		if err != nil {
-			ualog.Warn(ctx, "error getting namespace",
-				ualog.Namespace(n.Namespace()), ualog.Err(err),
+			ualog.Error(ctx, "error getting namespace", err,
+				ualog.Namespace(n.Namespace()),
 			)
 
 			val.Value = &ua.DataValue{}

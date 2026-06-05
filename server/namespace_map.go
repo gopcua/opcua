@@ -257,39 +257,39 @@ func (ns *MapNamespace) Attribute(ctx context.Context, n *ua.NodeID, a ua.Attrib
 		case string:
 			dv.Value, err = ua.NewVariant(ua.NewNumericNodeID(0, 12))
 			if err != nil {
-				ualog.Warn(ctx, "problem creating variant", ualog.Err(err))
+				ualog.Error(ctx, "problem creating variant", err)
 			}
 		case int:
 			// we can't use an int because it is of unspecified length.  I'm going to use int64 so that we don't
 			// have to worry about cutting data off.
 			dv.Value, err = ua.NewVariant(ua.NewNumericNodeID(0, 6))
 			if err != nil {
-				ualog.Warn(ctx, "problem creating variant", ualog.Err(err))
+				ualog.Error(ctx, "problem creating variant", err)
 			}
 		case int32:
 			dv.Value, err = ua.NewVariant(ua.NewNumericNodeID(0, 6))
 			if err != nil {
-				ualog.Warn(ctx, "problem creating variant", ualog.Err(err))
+				ualog.Error(ctx, "problem creating variant", err)
 			}
 		case float32:
 			dv.Value, err = ua.NewVariant(ua.NewNumericNodeID(0, 10))
 			if err != nil {
-				ualog.Warn(ctx, "problem creating variant", ualog.Err(err))
+				ualog.Error(ctx, "problem creating variant", err)
 			}
 		case float64:
 			dv.Value, err = ua.NewVariant(ua.NewNumericNodeID(0, 11))
 			if err != nil {
-				ualog.Warn(ctx, "problem creating variant", ualog.Err(err))
+				ualog.Error(ctx, "problem creating variant", err)
 			}
 		case bool:
 			dv.Value, err = ua.NewVariant(ua.NewNumericNodeID(0, 1))
 			if err != nil {
-				ualog.Warn(ctx, "problem creating variant", ualog.Err(err))
+				ualog.Error(ctx, "problem creating variant", err)
 			}
 		default:
 			dv.Value, err = ua.NewVariant(ua.NewNumericNodeID(0, 24))
 			if err != nil {
-				ualog.Warn(ctx, "problem creating variant", ualog.Err(err))
+				ualog.Error(ctx, "problem creating variant", err)
 			}
 		}
 

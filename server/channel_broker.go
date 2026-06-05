@@ -74,7 +74,7 @@ func (c *channelBroker) RegisterConn(ctx context.Context, conn *uacp.Conn, local
 		secureTokenID,
 	)
 	if err != nil {
-		ualog.Error(ctx, "could not create secure channel for new connection", ualog.Err(err))
+		ualog.Error(ctx, "could not create secure channel for new connection", err)
 		return err
 	}
 
@@ -100,7 +100,7 @@ outer:
 				ualog.Warn(ctx, "secure channel closed")
 				break outer
 			} else if msg.Err != nil {
-				ualog.Error(ctx, "secure channel error", ualog.Err(msg.Err))
+				ualog.Error(ctx, "secure channel error", msg.Err)
 				break outer
 			}
 			// todo(fs): honor ctx
@@ -138,7 +138,7 @@ func (c *channelBroker) Close(ctx context.Context) error {
 	select {
 	case <-done:
 	case <-time.After(channelExitTimeout):
-		ualog.Error(ctx, "timed out waiting for channels to exit",
+		ualog.Error(ctx, "timed out waiting for channels to exit", nil,
 			ualog.Duration("timeout", channelExitTimeout),
 		)
 	}
