@@ -5,10 +5,11 @@ import (
 	"log/slog"
 )
 
-type keyType struct{}
+type attributesKeyType struct{}
+type loggerKeyType struct{}
 
-var attributesKey = keyType{}
-var loggerKey = keyType{}
+var attributesKey attributesKeyType
+var loggerKey loggerKeyType
 
 func newContextWithLogAttributes(ctx context.Context, attrs []Attr) context.Context {
 	return context.WithValue(ctx, attributesKey, attrs)
