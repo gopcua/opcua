@@ -13,7 +13,7 @@ func sanitizedRequest(req ua.Request) any {
 
 	out := map[string]any{
 		"type":            fmt.Sprintf("%T", req),
-		"service_type_id": int(ua.ServiceTypeID(req)),
+		"service_type_id": uint32(ua.ServiceTypeID(req)),
 	}
 
 	if hdr := req.Header(); hdr != nil {

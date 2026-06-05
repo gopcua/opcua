@@ -67,7 +67,7 @@ func (s *SubscriptionService) CreateSubscription(ctx context.Context, sc *uasc.S
 
 	ualog.Info(ctx, "new subscription created",
 		ualog.Uint32("subscription_id", newsubid),
-		ualog.Any("remote_addr", sc.RemoteAddr()),
+		ualog.String("remote_addr", sc.RemoteAddr().String()),
 	)
 
 	sub := NewSubscription()
