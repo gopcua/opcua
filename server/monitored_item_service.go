@@ -221,7 +221,7 @@ func (s *MonitoredItemService) CreateMonitoredItems(ctx context.Context, sc *uas
 		ualog.Debug(ctx, "adding monitored item to subscription",
 			ualog.Any(ualog.NodeIdKey, nodeid),
 			ualog.Uint32("subscription_id", subID),
-			ualog.Uint32("item_id", item.ID),
+			ualog.Uint32("monitored_item_id", item.ID),
 			ualog.Uint32("client_handle", itemreq.RequestedParameters.ClientHandle),
 		)
 

@@ -217,14 +217,20 @@ func summarizeMonitoredItems(xs []*ua.MonitoredItemCreateRequest, max int) []map
 			continue
 		}
 
-		item := x.ItemToMonitor
-
-		out = append(out, map[string]any{
-			"node_id":              nodeIDString(item.NodeID),
-			"attribute_id":         item.AttributeID,
+		entry := map[string]any{
 			"monitoring_mode":      x.MonitoringMode,
 			"requested_parameters": summarizeMonitoringParameters(x.RequestedParameters),
-		})
+		}
+
+		if item := x.ItemToMonitor; item != nil {
+			entry["node_id"] = nodeIDString(item.NodeID)
+			entry["attribute_id"] = item.AttributeID
+			entry["index_range"] = item.IndexRange
+		} else {
+			entry["item_to_monitor_nil"] = true
+		}
+
+		out = append(out, entry)
 	}
 
 	return out
