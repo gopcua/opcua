@@ -353,6 +353,39 @@ func TestRequestAttrUsesSanitizedRequest(t *testing.T) {
 	require.Equal(t, 1, gotMap["nodes_to_read_count"])
 }
 
+func TestRequestAttrUsesConfiguredRequestSanitizer(t *testing.T) {
+	req := &ua.ReadRequest{RequestHeader: testRequestHeader()}
+
+	ctx := New(context.Background(), WithRequestSanitizer(func(got ua.Request) any {
+		require.Same(t, req, got)
+		return map[string]any{
+			"custom": true,
+		}
+	}))
+
+	attr := Request(ctx, req)
+
+	require.Equal(t, "request", attr.Key)
+
+	got := requireMap(t, attr.Value.Any())
+	require.Equal(t, true, got["custom"])
+	require.NotContains(t, got, "service_type_id")
+}
+
+func TestRequestAttrSanitizerSupportsRawDumping(t *testing.T) {
+	req := &ua.ReadRequest{RequestHeader: testRequestHeader()}
+
+	ctx := New(context.Background(), WithRequestSanitizer(func(got ua.Request) any {
+		require.Same(t, req, got)
+		return got
+	}))
+
+	attr := Request(ctx, req)
+
+	require.Equal(t, "request", attr.Key)
+	require.Equal(t, any(req), attr.Value.Any())
+}
+
 func testRequestHeader() *ua.RequestHeader {
 	return &ua.RequestHeader{
 		AuthenticationToken: ua.NewByteStringNodeID(0, []byte("secret-auth-token")),

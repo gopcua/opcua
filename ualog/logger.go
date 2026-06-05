@@ -6,7 +6,7 @@ import (
 	"slices"
 )
 
-func New(ctx context.Context, opts ...option) context.Context {
+func New(ctx context.Context, opts ...Option) context.Context {
 	cfg := newConfig()
 
 	for _, opt := range opts {

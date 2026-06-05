@@ -45,7 +45,7 @@ func ExampleError() {
 	err := errors.New("critical reactor core failure")
 	ualog.Error(ctx, "whoopsi daisies", err)
 
-	// {"level":"ERROR","msg":"whoopsi daisies","err":"critical reactor core failure"}
+	// Output: {"level":"ERROR","msg":"whoopsi daisies","err":"critical reactor core failure"}
 }
 
 func ExampleWithErrorKey() {
