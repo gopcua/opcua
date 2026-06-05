@@ -181,7 +181,7 @@ func (s *MonitoredItemService) CreateMonitoredItems(ctx context.Context, sc *uas
 	res := make([]*ua.MonitoredItemCreateResult, count)
 
 	subID := req.SubscriptionID
-	ualog.Debug(ctx, "creating monitored items", ualog.Uint32("sub", subID))
+	ualog.Debug(ctx, "creating monitored items", ualog.Uint32("subscription_id", subID))
 
 	s.SubService.Mu.Lock()
 	sub, ok := s.SubService.Subs[subID]
@@ -220,9 +220,9 @@ func (s *MonitoredItemService) CreateMonitoredItems(ctx context.Context, sc *uas
 
 		ualog.Debug(ctx, "adding monitored item to subscription",
 			ualog.Any(ualog.NodeIdKey, nodeid),
-			ualog.Uint32("sub", subID),
+			ualog.Uint32("subscription_id", subID),
 			ualog.Uint32("item_id", item.ID),
-			ualog.Uint32("client", itemreq.RequestedParameters.ClientHandle),
+			ualog.Uint32("client_handle", itemreq.RequestedParameters.ClientHandle),
 		)
 
 		res[i] = &ua.MonitoredItemCreateResult{

@@ -120,6 +120,11 @@ func summarizeReadValueIDs(xs []*ua.ReadValueID, max int) []map[string]any {
 	out := make([]map[string]any, 0, n)
 
 	for _, x := range xs[:n] {
+		if x == nil {
+			out = append(out, map[string]any{"nil": true})
+			continue
+		}
+
 		out = append(out, map[string]any{
 			"node_id":      nodeIDString(x.NodeID),
 			"attribute_id": x.AttributeID,
@@ -135,6 +140,11 @@ func summarizeWriteValues(xs []*ua.WriteValue, max int) []map[string]any {
 	out := make([]map[string]any, 0, n)
 
 	for _, x := range xs[:n] {
+		if x == nil {
+			out = append(out, map[string]any{"nil": true})
+			continue
+		}
+
 		out = append(out, map[string]any{
 			"node_id":      nodeIDString(x.NodeID),
 			"attribute_id": x.AttributeID,
@@ -156,6 +166,11 @@ func summarizeBrowseDescriptions(xs []*ua.BrowseDescription, max int) []map[stri
 	out := make([]map[string]any, 0, n)
 
 	for _, x := range xs[:n] {
+		if x == nil {
+			out = append(out, map[string]any{"nil": true})
+			continue
+		}
+
 		out = append(out, map[string]any{
 			"node_id":           nodeIDString(x.NodeID),
 			"browse_direction":  x.BrowseDirection,
@@ -174,6 +189,11 @@ func summarizeCallMethods(xs []*ua.CallMethodRequest, max int) []map[string]any 
 	out := make([]map[string]any, 0, n)
 
 	for _, x := range xs[:n] {
+		if x == nil {
+			out = append(out, map[string]any{"nil": true})
+			continue
+		}
+
 		out = append(out, map[string]any{
 			"object_id":             nodeIDString(x.ObjectID),
 			"method_id":             nodeIDString(x.MethodID),
@@ -192,6 +212,11 @@ func summarizeMonitoredItems(xs []*ua.MonitoredItemCreateRequest, max int) []map
 	out := make([]map[string]any, 0, n)
 
 	for _, x := range xs[:n] {
+		if x == nil {
+			out = append(out, map[string]any{"nil": true})
+			continue
+		}
+
 		item := x.ItemToMonitor
 
 		out = append(out, map[string]any{
@@ -206,6 +231,10 @@ func summarizeMonitoredItems(xs []*ua.MonitoredItemCreateRequest, max int) []map
 }
 
 func summarizeMonitoringParameters(p *ua.MonitoringParameters) map[string]any {
+	if p == nil {
+		return nil
+	}
+
 	return map[string]any{
 		"client_handle":     p.ClientHandle,
 		"sampling_interval": p.SamplingInterval,
@@ -226,6 +255,10 @@ func nodeIDString(id *ua.NodeID) string {
 }
 
 func valueStatus(v *ua.DataValue) any {
+	if v == nil {
+		return nil
+	}
+
 	return v.Status
 }
 

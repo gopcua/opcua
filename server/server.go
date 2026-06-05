@@ -321,7 +321,7 @@ func (s *Server) acceptAndRegister(ctx context.Context, l *uacp.Listener) {
 			go s.cb.RegisterConn(ctx, c, s.cfg.certificate, s.cfg.privateKey)
 
 			ualog.Info(ctx, "registered connection",
-				ualog.String("remote", c.RemoteAddr().String()),
+				ualog.String("remote_addr", c.RemoteAddr().String()),
 			)
 		}
 	}

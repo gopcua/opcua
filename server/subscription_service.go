@@ -66,8 +66,8 @@ func (s *SubscriptionService) CreateSubscription(ctx context.Context, sc *uasc.S
 	newsubid := uint32(len(s.Subs)) + 1
 
 	ualog.Info(ctx, "new subscription created",
-		ualog.Uint32("sub", newsubid),
-		ualog.Any("remote", sc.RemoteAddr()),
+		ualog.Uint32("subscription_id", newsubid),
+		ualog.Any("remote_addr", sc.RemoteAddr()),
 	)
 
 	sub := NewSubscription()
@@ -219,7 +219,7 @@ func (s *SubscriptionService) DeleteSubscriptions(ctx context.Context, sc *uasc.
 	for i := range req.SubscriptionIDs {
 
 		subid := req.SubscriptionIDs[i]
-		ualog.Info(ctx, "subscription deleted by client", ualog.Uint32("sub", subid))
+		ualog.Info(ctx, "subscription deleted by client", ualog.Uint32("subscription_id", subid))
 		sub, ok := s.Subs[subid]
 		if !ok {
 			results[i] = ua.StatusBadSubscriptionIDInvalid
@@ -300,11 +300,11 @@ func (s *Subscription) Update(req *ua.ModifySubscriptionRequest) {
 }
 
 func (s *Subscription) Start(ctx context.Context) {
-	ctx = ualog.WithAttrs(ctx, ualog.Uint32("sub", s.ID))
+	ctx = ualog.WithAttrs(ctx, ualog.Uint32("subscription_id", s.ID))
 	go s.run(ctx)
 }
 
-func (s *Subscription) keepalive(pubreq PubReq) error {
+func (s *Subscription) keepalive(ctx context.Context, pubreq PubReq) error {
 	eo := make([]*ua.ExtensionObject, 0)
 
 	msg := ua.NotificationMessage{
@@ -329,7 +329,7 @@ func (s *Subscription) keepalive(pubreq PubReq) error {
 		Results:                  []ua.StatusCode{},
 		DiagnosticInfos:          []*ua.DiagnosticInfo{},
 	}
-	err := s.Channel.SendResponseWithContext(context.Background(), pubreq.ID, response)
+	err := s.Channel.SendResponseWithContext(ctx, pubreq.ID, response)
 	if err != nil {
 		return err
 	}
@@ -385,7 +385,7 @@ func (s *Subscription) run(ctx context.Context) {
 						keepalive_counter = 0
 						select {
 						case pubreq := <-s.Session.PublishRequests:
-							err := s.keepalive(pubreq)
+							err := s.keepalive(ctx, pubreq)
 							if err != nil {
 								ualog.Warn(ctx, "problem sending keepalive to subscription", ualog.Err(err))
 								return
@@ -485,7 +485,7 @@ func (s *Subscription) run(ctx context.Context) {
 			Results:                  []ua.StatusCode{},
 			DiagnosticInfos:          []*ua.DiagnosticInfo{},
 		}
-		err := s.Channel.SendResponseWithContext(context.Background(), pubreq.ID, response)
+		err := s.Channel.SendResponseWithContext(ctx, pubreq.ID, response)
 		if err != nil {
 			ualog.Error(ctx, "problem sending channel response", ualog.Err(err))
 			ualog.Error(ctx, "killing subscription")

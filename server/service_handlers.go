@@ -97,12 +97,6 @@ func (s *Server) handleService(ctx context.Context, sc *uasc.SecureChannel, reqI
 
 	typeID := ua.ServiceTypeID(req)
 
-	ctx = ualog.WithAttrs(ctx,
-		ualog.GroupAttrs("service",
-			ualog.Uint32("type_id", uint32(typeID)),
-		),
-	)
-
 	if hdr := req.Header(); hdr != nil {
 		ctx = ualog.WithAttrs(ctx,
 			ualog.Uint32("request_handle", hdr.RequestHandle),
