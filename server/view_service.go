@@ -172,7 +172,15 @@ func (s *ViewService) RegisterNodes(sc *uasc.SecureChannel, r ua.Request, reqID 
 	if err != nil {
 		return nil, err
 	}
-	return serviceUnsupported(req.RequestHeader), nil
+
+	// RegisterNodes is only an optimization hint. A server may legally return
+	// the same NodeIds it was given (Part 4, 5.8.5), so we treat it as the
+	// identity. This unblocks clients (e.g. telegraf) that call RegisterNodes
+	// on every connect and otherwise fail on BadServiceUnsupported.
+	return &ua.RegisterNodesResponse{
+		ResponseHeader:    responseHeader(req.RequestHeader.RequestHandle, ua.StatusOK),
+		RegisteredNodeIDs: req.NodesToRegister,
+	}, nil
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.8.6
@@ -185,5 +193,10 @@ func (s *ViewService) UnregisterNodes(sc *uasc.SecureChannel, r ua.Request, reqI
 	if err != nil {
 		return nil, err
 	}
-	return serviceUnsupported(req.RequestHeader), nil
+
+	// Identity RegisterNodes keeps no per-node state, so there is nothing to
+	// release here (Part 4, 5.8.6).
+	return &ua.UnregisterNodesResponse{
+		ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusOK),
+	}, nil
 }
