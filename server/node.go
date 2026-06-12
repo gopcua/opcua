@@ -89,7 +89,7 @@ func NewFolderNode(nodeID *ua.NodeID, name string) *Node {
 			ua.AttributeIDNodeClass:     DataValueFromValue(uint32(ua.NodeClassObject)),
 			ua.AttributeIDBrowseName:    DataValueFromValue(attrs.BrowseName(name)),
 			ua.AttributeIDDisplayName:   DataValueFromValue(attrs.DisplayName(name, name)),
-			ua.AttributeIDDescription:   DataValueFromValue(uint32(ua.NodeClassObject)),
+			ua.AttributeIDDescription:   DataValueFromValue(attrs.DisplayName(name, name)),
 			ua.AttributeIDEventNotifier: DataValueFromValue(int16(0)),
 		},
 		[]*ua.ReferenceDescription{{
@@ -117,7 +117,7 @@ func NewVariableNode(nodeID *ua.NodeID, name string, value any) *Node {
 				ua.AttributeIDNodeClass:     DataValueFromValue(uint32(ua.NodeClassVariable)),
 				ua.AttributeIDBrowseName:    DataValueFromValue(attrs.BrowseName(name)),
 				ua.AttributeIDDisplayName:   DataValueFromValue(attrs.DisplayName(name, name)),
-				ua.AttributeIDDescription:   DataValueFromValue(uint32(ua.NodeClassVariable)),
+				ua.AttributeIDDescription:   DataValueFromValue(attrs.DisplayName(name, name)),
 				ua.AttributeIDDataType:      DataValueFromValue(typedef),
 				ua.AttributeIDEventNotifier: DataValueFromValue(int16(0)),
 			},
@@ -139,7 +139,7 @@ func NewVariableNode(nodeID *ua.NodeID, name string, value any) *Node {
 			ua.AttributeIDNodeClass:     DataValueFromValue(uint32(ua.NodeClassVariable)),
 			ua.AttributeIDBrowseName:    DataValueFromValue(attrs.BrowseName(name)),
 			ua.AttributeIDDisplayName:   DataValueFromValue(attrs.DisplayName(name, name)),
-			ua.AttributeIDDescription:   DataValueFromValue(uint32(ua.NodeClassVariable)),
+			ua.AttributeIDDescription:   DataValueFromValue(attrs.DisplayName(name, name)),
 			ua.AttributeIDDataType:      DataValueFromValue(typedef),
 			ua.AttributeIDEventNotifier: DataValueFromValue(int16(0)),
 		},
@@ -277,7 +277,20 @@ func (n *Node) DataType() *ua.ExpandedNodeID {
 		}
 		return ua.NewTwoByteExpandedNodeID(0)
 	}
-	return v.Value.Value().(*ua.ExpandedNodeID)
+	// The attribute value is not guaranteed to be an ExpandedNodeID: the Write
+	// service stores client-supplied values unvalidated (Node.SetAttribute),
+	// and the DataType attribute is spec-typed NodeId (Part 3, 5.6.2), so even
+	// a well-behaved client write stores a *ua.NodeID here. An unchecked
+	// assertion lets one such write panic the server on the next Browse that
+	// resolves a reference to this node.
+	switch id := v.Value.Value().(type) {
+	case *ua.ExpandedNodeID:
+		return id
+	case *ua.NodeID:
+		return ua.NewExpandedNodeID(id, "", 0)
+	default:
+		return ua.NewTwoByteExpandedNodeID(0)
+	}
 }
 
 func (n *Node) SetNodeClass(nc ua.NodeClass) {
