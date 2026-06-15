@@ -309,13 +309,14 @@ func TestSignAndEncryptVerifyAndDecrypt(t *testing.T) {
 // encrypted if the SecurityMode is not None (even if the SecurityMode is Sign)."
 //
 // When verifyAndDecrypt is handed SecurityMode==None together with a real
-// SecurityPolicyURI and an asymmetric header, it must DECRYPT the OPN chunk, not
-// return it raw. readChunk (secure_channel.go:500) promotes SecurityMode to
-// SignAndEncrypt before calling verifyAndDecrypt, so this exact state is not
-// reached today; the guard defends the invariant against a future readChunk
-// change that has not yet promoted the mode. Without the guard verifyAndDecrypt
-// returns m.Data raw whenever SecurityMode==None, regardless of the asymmetric
-// header or policy.
+// SecurityPolicyURI and an asymmetric header, it must decrypt the OPN chunk, not
+// return it raw. readChunk no longer promotes the mode (the #817 override is no
+// longer present), so SecurityMode==None + real policy + asymmetric header is the
+// live path the server takes while decrypting an incoming OPN during the
+// handshake. The guard exercised here is that path's production mechanism: it
+// preserves the #815 fix without mutating the negotiated mode. Without it,
+// verifyAndDecrypt returns m.Data raw whenever SecurityMode==None, regardless of
+// the asymmetric header or policy, which re-introduces #815.
 func TestVerifyAndDecrypt_Part6_674_AsymmetricOPNDecryptedInNoneWindow(t *testing.T) {
 	const uri = ua.SecurityPolicyURIBasic256Sha256
 
@@ -582,6 +583,86 @@ func TestVerifyAndDecrypt_Part6_674_RealPolicyNoneModeSymmetricReturnsRaw(t *tes
 
 	require.Equal(t, chunk.Data, plain,
 		"real-policy None-mode symmetric chunk must be returned raw, not decrypted")
+}
+
+// TestVerifyAndDecrypt_Part6_674_SignModeSymmetricRoundtrip covers Sign mode
+// (MessageSecurityModeSign) on symmetric traffic: the message is signed but not
+// encrypted. signAndEncrypt's Sign branch and verifyAndDecrypt's matching verify
+// path are otherwise unexercised by unit tests, since every non-None policy in
+// TestSignAndEncryptVerifyAndDecrypt runs SignAndEncrypt. This is the regime #817
+// broke.
+//
+// OPC UA Part 6 v1.05 §6.7.4: when the SecurityMode is Sign, Messages are signed
+// but not encrypted.
+//
+// The test asserts both that the roundtrip succeeds and that the body bytes
+// (between the header and the appended signature) come back as the original
+// plaintext, confirming Sign mode does not encrypt symmetric traffic.
+func TestVerifyAndDecrypt_Part6_674_SignModeSymmetricRoundtrip(t *testing.T) {
+	const uri = ua.SecurityPolicyURIBasic256Sha256
+
+	// Equal nonces make the signing and verifying HMAC keys identical, so a
+	// single channelInstance can sign a message and verify its own signature.
+	nonce := make([]byte, 32)
+	for i := range nonce {
+		nonce[i] = byte(i)
+	}
+	algo, err := uapolicy.Symmetric(uri, nonce, nonce)
+	require.NoError(t, err)
+
+	c := &channelInstance{
+		sc: &SecureChannel{cfg: &Config{
+			SecurityMode:      ua.MessageSecurityModeSign,
+			SecurityPolicyURI: uri,
+		}},
+		algo: algo,
+	}
+
+	m := &Message{
+		MessageHeader: &MessageHeader{
+			Header: &Header{
+				MessageType: MessageTypeMessage,
+				ChunkType:   ChunkTypeFinal,
+			},
+			SymmetricSecurityHeader: &SymmetricSecurityHeader{TokenID: 1},
+			SequenceHeader: &SequenceHeader{
+				SequenceNumber: 1,
+				RequestID:      1,
+			},
+		},
+	}
+
+	// 12-byte message header + 4-byte symmetric security header (TokenID) + body.
+	headerLength := 12 + m.SymmetricSecurityHeader.Len()
+	plaintext := []byte{
+		// Message Header: MSG / Final / MessageSize (patched by signAndEncrypt) / SecureChannelID
+		0x4d, 0x53, 0x47, 0x46, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		// SymmetricSecurityHeader: TokenID
+		0x01, 0x00, 0x00, 0x00,
+		// Body
+		0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+		0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10,
+	}
+	expectedBody := append([]byte(nil), plaintext[headerLength:]...)
+
+	cipher, err := c.signAndEncrypt(m, append([]byte(nil), plaintext...))
+	require.NoError(t, err, "error: message sign")
+
+	// Sign mode appends a signature but does not encrypt, so the body on the wire
+	// stays plaintext. Read the body between the header and the trailing signature.
+	wireBody := cipher[headerLength : len(cipher)-algo.SignatureLength()]
+	require.Equal(t, expectedBody, wireBody,
+		"Sign mode must leave the symmetric body as plaintext, not ciphertext")
+
+	chunk := new(MessageChunk)
+	_, err = chunk.Decode(cipher)
+	require.NoError(t, err, "error: message decode")
+
+	plain, err := c.verifyAndDecrypt(chunk, cipher)
+	require.NoError(t, err, "error: message verify")
+
+	require.Equal(t, expectedBody, plain,
+		"Sign mode roundtrip must return the original plaintext body")
 }
 
 func TestNewSecureChannel(t *testing.T) {
