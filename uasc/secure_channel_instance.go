@@ -150,6 +150,14 @@ func (c *channelInstance) SetMaximumBodySize(chunkSize int) {
 	// c.maxBodySize = c.algo.PlaintextBlockSize()*maxBlock - sequenceHeaderSize - c.algo.SignatureLength() - 1
 }
 
+// verifyAndDecrypt returns raw data when SecurityMode==None unless the chunk is
+// an asymmetric OPN under a real policy. signAndEncrypt has no matching
+// asymmetric carve-out, so if readChunk (secure_channel.go:497-500) ever stops
+// promoting SecurityMode and the algo set together, mirror that guard there.
+//
+// TODO: split the merged asymmetric/symmetric crypto into separate functions,
+// as open62541 and the OPC Foundation .NET reference do.
+
 // signAndEncrypt encrypts the message bytes stored in b and returns the
 // data signed and encrypted per the security policy information from the
 // secure channel.
@@ -211,11 +219,17 @@ func (c *channelInstance) signAndEncrypt(m *Message, b []byte) ([]byte, error) {
 }
 
 func (c *channelInstance) verifyAndDecrypt(m *MessageChunk, r []byte) ([]byte, error) {
-	if c.sc.cfg.SecurityMode == ua.MessageSecurityModeNone {
+	isAsymmetric := m.AsymmetricSecurityHeader != nil
+
+	// An asymmetric OpenSecureChannel under a real security policy is always
+	// signed and encrypted, even while the channel's SecurityMode still reads
+	// None during the handshake (OPC UA Part 6 v1.05 §6.7.4). A genuinely
+	// unsecured channel still returns raw: that is the explicit #None policy,
+	// or any symmetric message regardless of policy.
+	if c.sc.cfg.SecurityMode == ua.MessageSecurityModeNone &&
+		(c.sc.cfg.SecurityPolicyURI == ua.SecurityPolicyURINone || !isAsymmetric) {
 		return m.Data, nil
 	}
-
-	isAsymmetric := m.AsymmetricSecurityHeader != nil
 
 	headerLength := 12
 
