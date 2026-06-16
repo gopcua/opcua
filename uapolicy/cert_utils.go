@@ -18,7 +18,10 @@ import (
 func Thumbprint(c []byte) []byte {
 	certs, err := x509.ParseCertificates(c)
 	if err != nil || len(certs) == 0 {
-		// fallback: hash the raw bytes if parsing fails
+		// Fallback: hash the raw bytes when the certificate cannot be parsed.
+		// This thumbprint won't match any well-formed peer certificate, so the
+		// peer rejects OpenSecureChannel; log it so the cause is diagnosable.
+		debug.Printf("uapolicy: Thumbprint could not parse certificate (err=%v, certs=%d), hashing raw input", err, len(certs))
 		thumbprint := sha1.Sum(c)
 		return thumbprint[:]
 	}
