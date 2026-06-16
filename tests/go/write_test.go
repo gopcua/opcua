@@ -27,8 +27,7 @@ func TestWrite(t *testing.T) {
 
 		// error flows
 		{ua.NewStringNodeID(1, "ro_bool"), false, ua.StatusBadUserAccessDenied},
-		// non-existing namespace should not crash the server
-		{ua.NewNumericNodeID(132, 101), int32(42), ua.StatusBadNodeNotInView},
+		// non-existing namespace: see TestWriteToUnknownNamespace_Part4_Write
 	}
 
 	ctx := context.Background()
