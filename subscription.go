@@ -34,7 +34,7 @@ type Subscription struct {
 	itemsMu                   sync.Mutex
 	lastSeq                   uint32
 	nextSeq                   uint32
-	c                         *Client
+	c                         ClientInterface
 }
 
 type SubscriptionParameters struct {
@@ -82,7 +82,7 @@ type PublishNotificationData struct {
 // from the client and the server.
 func (s *Subscription) Cancel(ctx context.Context) error {
 	stats.Subscription().Add("Cancel", 1)
-	s.c.forgetSubscription(ctx, s.SubscriptionID)
+	s.c.ForgetSubscription(ctx, s.SubscriptionID)
 	return s.delete(ctx)
 }
 
@@ -321,8 +321,8 @@ func (s *Subscription) publishTimeout() time.Duration {
 	if timeout > uasc.MaxTimeout {
 		return uasc.MaxTimeout
 	}
-	if timeout < s.c.cfg.sechan.RequestTimeout {
-		return s.c.cfg.sechan.RequestTimeout
+	if requestTimeout := s.c.RequestTimeout(); timeout < requestTimeout {
+		return requestTimeout
 	}
 	return timeout
 }
@@ -410,6 +410,7 @@ func (s *Subscription) recreate_delete(ctx context.Context) error {
 // recreate_create is called by the client when it is trying to
 // recreate an existing subscription. This function creates a
 // new subscription with the same parameters as the previous one.
+// The client registers the recreated subscription immediately afterwards.
 func (s *Subscription) recreate_create(ctx context.Context) error {
 	dlog := debug.NewPrefixLogger("sub %d: recreate_create: ", s.SubscriptionID)
 
@@ -447,10 +448,13 @@ func (s *Subscription) recreate_create(ctx context.Context) error {
 	s.lastSeq = 0
 	s.nextSeq = 1
 
-	if err := s.c.registerSubscription_NeedsSubMuxLock(s); err != nil {
-		return err
-	}
-	dlog.Printf("subscription registered")
+	return nil
+}
+
+// recreate_monitoredItems restores monitored items after the recreated
+// subscription has been registered by the client.
+func (s *Subscription) recreate_monitoredItems(ctx context.Context) error {
+	dlog := debug.NewPrefixLogger("sub %d: recreate_monitoredItems: ", s.SubscriptionID)
 
 	// Sort by timestamp to return
 	itemsByTimestamps := make(map[ua.TimestampsToReturn][]*ua.MonitoredItemCreateRequest)
