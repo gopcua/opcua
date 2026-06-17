@@ -1060,6 +1060,12 @@ func (s *SecureChannel) writeMessageChunks(ctx context.Context, instance *channe
 	// Large service payloads may exceed a single UASC message body. Encode the
 	// full logical message up front, then stream each chunk in sequence while the
 	// caller holds the channel-instance lock.
+	//
+	// TODO: enforce the negotiated MaxMessageSize / MaxChunkCount here and abort
+	// with Bad_ResponseTooLarge instead of writing an over-limit chunk stream.
+	// These limits are already enforced on the receive path (see the chunk-count
+	// and message-size checks in Receive) but not on send (OPC UA Part 6 §6.7.2;
+	// cf. open62541 adjustCheckMessageLimitsSym, .NET MessageLimitsExceeded).
 	chunks, err := m.EncodeChunks(instance.maxBodySize)
 	if err != nil {
 		return 0, err
@@ -1074,9 +1080,10 @@ func (s *SecureChannel) writeMessageChunks(ctx context.Context, instance *channe
 		}
 
 		if i > 0 {
-			// newMessage/newRequestMessage assigned the first sequence number when
-			// the message header was created. Each additional chunk must advance it
-			// before signing so the on-wire sequence remains monotonic.
+			// newMessage assigned the first sequence number when the message header
+			// was created, and EncodeChunks copies it into every chunk. Each chunk
+			// after the first must advance it before signing so the on-wire sequence
+			// remains monotonic.
 			number := instance.nextSequenceNumber()
 			binary.LittleEndian.PutUint32(chunk[16:], uint32(number))
 		}
