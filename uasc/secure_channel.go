@@ -477,6 +477,13 @@ func (s *SecureChannel) readChunk() (*MessageChunk, error) {
 		s.cfg.SecurityPolicyURI = m.SecurityPolicyURI
 		if m.SecurityPolicyURI != ua.SecurityPolicyURINone {
 			s.cfg.RemoteCertificate = m.AsymmetricSecurityHeader.SenderCertificate
+			// Re-derive the receiver thumbprint from the peer certificate
+			// learned in the inbound OPN. No-op for the client path, where
+			// Thumbprint is already set from the endpoint's ServerCertificate
+			// at session open.
+			if len(s.cfg.RemoteCertificate) > 0 {
+				s.cfg.Thumbprint = uapolicy.Thumbprint(s.cfg.RemoteCertificate)
+			}
 			debug.Printf("uasc %d: setting securityPolicy to %s", s.c.ID(), m.SecurityPolicyURI)
 
 			remoteCert, err := uapolicy.ParseCertificate(s.cfg.RemoteCertificate)
