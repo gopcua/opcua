@@ -138,16 +138,33 @@ func (c *channelInstance) SetMaximumBodySize(chunkSize int) {
 	headerSize := 12
 	symmetricAlgorithmHeader := 4
 
-	// this is the formula proposed by OPCUA - source node-opcua
+	// signAndEncrypt appends one PaddingSize byte (two if ExtraPaddingSize is
+	// present, i.e. for signatures longer than 256 bytes) before padding the
+	// plaintext to a block boundary.
+	paddingSizeBytes := 1
+	if c.algo.RemoteSignatureLength() > 256 {
+		paddingSizeBytes = 2
+	}
+
+	// OPC UA Part 6, 6.7.2.5 defines
+	//
+	//   MaxBodySize = PlainTextBlockSize *
+	//       Floor((MessageChunkSize - HeaderSize - 1) / CipherTextBlockSize) -
+	//       SequenceHeaderSize - SignatureSize
+	//
+	// where the -1 reserves room for the PaddingSize byte. Subtracting it
+	// inside the Floor only takes effect when chunkSize-headerSize is an exact
+	// multiple of the cipher block size. For any other chunk size (e.g. the
+	// default 65535) a maximum-size body pads out to one cipher block more
+	// than fits in the chunk. Reserving the PaddingSize byte(s) outside the
+	// Floor instead is exact: a body of maxBodySize fills the chunk to the
+	// last whole cipher block and one more byte no longer fits, for every
+	// chunk size (see TestMaxBodySizeFitsChunk).
 	maxBodySize :=
 		c.algo.PlaintextBlockSize()*
-			((chunkSize-headerSize-symmetricAlgorithmHeader-c.algo.SignatureLength()-1)/c.algo.BlockSize()) -
-			sequenceHeaderSize
+			((chunkSize-headerSize-symmetricAlgorithmHeader)/c.algo.BlockSize()) -
+			sequenceHeaderSize - c.algo.SignatureLength() - paddingSizeBytes
 	c.maxBodySize = uint32(maxBodySize)
-
-	// this is the formula proposed by ERN - source node-opcua
-	// maxBlock := (chunkSize - headerSize) / c.algo.BlockSize()
-	// c.maxBodySize = c.algo.PlaintextBlockSize()*maxBlock - sequenceHeaderSize - c.algo.SignatureLength() - 1
 }
 
 // signAndEncrypt encrypts the message bytes stored in b and returns the
@@ -190,8 +207,18 @@ func (c *channelInstance) signAndEncrypt(m *Message, b []byte) ([]byte, error) {
 		if extraPadding {
 			paddingBytes = 2
 		}
-		paddingLength := plaintextBlockSize - ((len(b[headerLength:]) + c.algo.SignatureLength() + paddingBytes) % plaintextBlockSize)
+		// The PaddingSize byte(s) and Padding must fill the plaintext up to a
+		// block boundary. If it is already block-aligned no padding is needed
+		// beyond the PaddingSize byte(s) themselves (cf. open62541
+		// ua_securechannel_crypto.c, padding calculation).
+		remainder := (len(b[headerLength:]) + c.algo.SignatureLength() + paddingBytes) % plaintextBlockSize
+		paddingLength := 0
+		if remainder != 0 {
+			paddingLength = plaintextBlockSize - remainder
+		}
 
+		// appends paddingLength Padding bytes plus one PaddingSize byte,
+		// each holding the paddingLength value (OPC UA Part 6, 6.7.2.5)
 		for i := 0; i <= paddingLength; i++ {
 			b = append(b, byte(paddingLength))
 		}

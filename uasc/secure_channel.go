@@ -11,7 +11,6 @@ import (
 	"crypto/x509"
 	"encoding/binary"
 	"io"
-	"log"
 	"math"
 	"net"
 	"strings"
@@ -811,6 +810,7 @@ func (s *SecureChannel) handleOpenSecureChannelRequest(reqID uint32, svc ua.Requ
 	if err != nil {
 		return err
 	}
+	instance.SetMaximumBodySize(int(s.c.SendBufSize()))
 
 	instance.state = channelActive // todo(fs): is this correct?
 	// s.setState(secureChannelOpen)
@@ -1053,6 +1053,65 @@ func (s *SecureChannel) sendAsyncWithTimeout(
 	return resp, nil
 }
 
+func (s *SecureChannel) writeMessageChunks(ctx context.Context, instance *channelInstance, reqID uint32, m *Message, body any) (int, error) {
+	// Large service payloads may exceed a single UASC message body. Encode the
+	// full logical message up front, then stream each chunk in sequence while the
+	// caller holds the channel-instance lock.
+	//
+	// TODO: enforce the negotiated MaxMessageSize / MaxChunkCount here and abort
+	// with Bad_ResponseTooLarge instead of writing an over-limit chunk stream.
+	// These limits are already enforced on the receive path (see the chunk-count
+	// and message-size checks in Receive) but not on send (OPC UA Part 6 §6.7.2;
+	// cf. open62541 adjustCheckMessageLimitsSym, .NET MessageLimitsExceeded).
+	chunks, err := m.EncodeChunks(instance.maxBodySize)
+	if err != nil {
+		return 0, err
+	}
+
+	var bytesSent int
+	for i, chunk := range chunks {
+		select {
+		case <-ctx.Done():
+			return bytesSent, ctx.Err()
+		default:
+		}
+
+		if i > 0 {
+			// newMessage assigned the first sequence number when the message header
+			// was created, and EncodeChunks copies it into every chunk. Each chunk
+			// after the first must advance it before signing so the on-wire sequence
+			// remains monotonic.
+			number := instance.nextSequenceNumber()
+			binary.LittleEndian.PutUint32(chunk[16:], uint32(number))
+		}
+
+		// Sign and encrypt after the final chunk bytes are in place, since the
+		// security footer covers the whole encoded chunk.
+		chunk, err = instance.signAndEncrypt(m, chunk)
+		if err != nil {
+			return bytesSent, err
+		}
+
+		// UASC writes are expected to flush complete chunks. Treat short writes as
+		// a hard error instead of silently truncating the response stream.
+		n, err := s.c.Write(chunk)
+		if err != nil {
+			return bytesSent, err
+		}
+		if len(chunk) != n {
+			return bytesSent, errors.Errorf("uasc: incomplete message %T sent len=%d sent=%d", body, len(chunk), n)
+		}
+
+		bytesSent += n
+		atomic.AddUint64(&instance.bytesSent, uint64(n))
+		atomic.AddUint32(&instance.messagesSent, 1)
+	}
+
+	debug.Printf("uasc %d/%d: send %T with %d bytes in %d chunks", s.c.ID(), reqID, body, bytesSent, len(chunks))
+
+	return bytesSent, nil
+}
+
 func (s *SecureChannel) SendResponseWithContext(ctx context.Context, reqID uint32, resp ua.Response) error {
 	return s.sendResponseWithContext(ctx, nil, reqID, resp)
 }
@@ -1072,35 +1131,13 @@ func (s *SecureChannel) SendMsgWithContext(ctx context.Context, instance *channe
 	}
 
 	// we need to get a lock on the sequence number so we are sure to send them in the correct order.
-	// encode the message
+	instance.Lock()
+	defer instance.Unlock()
+
 	m := instance.newMessage(resp, typeID, reqID)
-	b, err := m.Encode()
-	if err != nil {
+	if _, err := s.writeMessageChunks(ctx, instance, reqID, m, resp); err != nil {
 		return err
 	}
-
-	// encrypt the message prior to sending it
-	// if SecurityMode == None, this returns the byte stream untouched
-	b, err = instance.signAndEncrypt(m, b)
-	if err != nil {
-		return err
-	}
-
-	// send the message
-	n, err := s.c.Write(b)
-	if err != nil {
-		return err
-	}
-
-	// todo(fs): what if len(b) != n? Can this happen?
-	if len(b) != n {
-		return errors.Errorf("uasc: incomplete message %T sent len=%d sent=%d", resp, len(b), n)
-	}
-
-	atomic.AddUint64(&instance.bytesSent, uint64(n))
-	atomic.AddUint32(&instance.messagesSent, 1)
-
-	debug.Printf("uasc %d/%d: send %T with %d bytes", s.c.ID(), reqID, resp, len(b))
 
 	return nil
 }
@@ -1121,36 +1158,10 @@ func (s *SecureChannel) sendResponseWithContext(ctx context.Context, instance *c
 	instance.Lock()
 	defer instance.Unlock()
 
-	// encode the message
 	m := instance.newMessage(resp, typeID, reqID)
-	b, err := m.Encode()
-	if err != nil {
-		log.Printf("Error encoding msg: %v", err)
+	if _, err := s.writeMessageChunks(ctx, instance, reqID, m, resp); err != nil {
 		return err
 	}
-
-	// encrypt the message prior to sending it
-	// if SecurityMode == None, this returns the byte stream untouched
-	b, err = instance.signAndEncrypt(m, b)
-	if err != nil {
-		return err
-	}
-
-	// send the message
-	n, err := s.c.Write(b)
-	if err != nil {
-		return err
-	}
-
-	// todo(fs): what if len(b) != n? Can this happen?
-	if len(b) != n {
-		return errors.Errorf("uasc: incomplete message %T sent len=%d sent=%d", resp, len(b), n)
-	}
-
-	atomic.AddUint64(&instance.bytesSent, uint64(n))
-	atomic.AddUint32(&instance.messagesSent, 1)
-
-	debug.Printf("uasc %d/%d: send %T with %d bytes", s.c.ID(), reqID, resp, len(b))
 
 	return nil
 }
