@@ -60,18 +60,20 @@ func TestPrivateKeyFilePKCS8Handshake(t *testing.T) {
 	// server never sees. A per-row server would be redundant (unlike
 	// TestSecurityModeRoundtrip_Part6_674, where each row varies the
 	// server-side security mode).
+	// Single source of truth for the server port: the const is declared above
+	// server.New so the same value flows into EndPoint and the client address.
+	const port = 48680
 	srvCert, srvKey := genSelfSignedCert(t, "urn:gopcua:conformance:server")
 	s := server.New(
 		server.EnableSecurity("Basic256Sha256", ua.MessageSecurityModeSignAndEncrypt),
 		server.EnableAuthMode(ua.UserTokenTypeAnonymous),
-		server.EndPoint("localhost", 48680),
+		server.EndPoint("localhost", port),
 		server.PrivateKey(srvKey),
 		server.Certificate(srvCert),
 	)
 	require.NoError(t, s.Start(context.Background()))
 	defer s.Close()
 
-	const port = 48680
 	addr := fmt.Sprintf("opc.tcp://localhost:%d", port)
 
 	// Discovery: poll until the listener is ready, bounded by a 15s context,
@@ -80,31 +82,39 @@ func TestPrivateKeyFilePKCS8Handshake(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	var (
-		eps []*ua.EndpointDescription
-		err error
-	)
+	// Discovery: poll until the listener is ready AND the target
+	// Basic256Sha256/SignAndEncrypt endpoint is present, bounded by a 15s
+	// context. Breaking on a nil error alone is insufficient: GetEndpoints can
+	// succeed with an empty or partial endpoint list during startup, so the
+	// endpoint search happens inside the loop and the loop only breaks when the
+	// target endpoint is actually found.
+	var ep *ua.EndpointDescription
+	var lastErr error
 	for {
-		eps, err = opcua.GetEndpoints(ctx, addr)
+		eps, err := opcua.GetEndpoints(ctx, addr)
 		if err == nil {
+			for _, e := range eps {
+				if e.SecurityMode == ua.MessageSecurityModeSignAndEncrypt &&
+					e.SecurityPolicyURI == ua.SecurityPolicyURIBasic256Sha256 {
+					ep = e
+					break
+				}
+			}
+		} else {
+			lastErr = err
+		}
+		if ep != nil {
 			break
 		}
 		select {
 		case <-ctx.Done():
-			require.NoError(t, err, "discovery (server never became ready)")
+			if lastErr != nil {
+				require.NoError(t, lastErr, "discovery (server never became ready)")
+			}
+			require.NotNil(t, ep, "discovery timed out before target endpoint was available")
 		case <-time.After(50 * time.Millisecond):
 		}
 	}
-
-	var ep *ua.EndpointDescription
-	for _, e := range eps {
-		if e.SecurityMode == ua.MessageSecurityModeSignAndEncrypt &&
-			e.SecurityPolicyURI == ua.SecurityPolicyURIBasic256Sha256 {
-			ep = e
-			break
-		}
-	}
-	require.NotNil(t, ep, "no Basic256Sha256/SignAndEncrypt endpoint")
 
 	tests := []struct {
 		name   string
