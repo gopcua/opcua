@@ -76,18 +76,14 @@ func TestPrivateKeyFilePKCS8Handshake(t *testing.T) {
 
 	addr := fmt.Sprintf("opc.tcp://localhost:%d", port)
 
-	// Discovery: poll until the listener is ready, bounded by a 15s context,
-	// then locate the Basic256Sha256/SignAndEncrypt endpoint the way a real
-	// client does so the connection uses the server-provided certificate chain.
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
-
 	// Discovery: poll until the listener is ready AND the target
 	// Basic256Sha256/SignAndEncrypt endpoint is present, bounded by a 15s
 	// context. Breaking on a nil error alone is insufficient: GetEndpoints can
 	// succeed with an empty or partial endpoint list during startup, so the
 	// endpoint search happens inside the loop and the loop only breaks when the
 	// target endpoint is actually found.
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
 	var ep *ua.EndpointDescription
 	var lastErr error
 	for {
