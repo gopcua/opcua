@@ -81,7 +81,7 @@ func (ns *MapNamespace) Browse(ctx context.Context, bd *ua.BrowseDescription) *u
 	defer ns.Mu.RUnlock()
 
 	ualog.Debug(ctx, "browse request for node", ns.logAttributes,
-		ualog.Any(ualog.NodeIdKey, bd.NodeID), ualog.Bitmask("mask", bd.ResultMask),
+		ualog.Any("node_id", bd.NodeID), ualog.Bitmask("mask", bd.ResultMask),
 	)
 
 	if bd.NodeID.IntID() != id.RootFolder && bd.NodeID.IntID() != id.ObjectsFolder {
@@ -141,7 +141,7 @@ func (ns *MapNamespace) Browse(ctx context.Context, bd *ua.BrowseDescription) *u
 func (ns *MapNamespace) Attribute(ctx context.Context, n *ua.NodeID, a ua.AttributeID) *ua.DataValue {
 	ctx = ualog.WithAttrs(ctx, ns.logAttributes)
 	ualog.Debug(ctx, "read node attribute",
-		ualog.Any(ualog.NodeIdKey, n), ualog.Any("attr", a),
+		ualog.Any("node_id", n), ualog.Any("attr", a),
 	)
 
 	if n.IntID() != 0 {
@@ -321,7 +321,7 @@ func (ns *MapNamespace) Attribute(ctx context.Context, n *ua.NodeID, a ua.Attrib
 
 func (s *MapNamespace) SetAttribute(ctx context.Context, node *ua.NodeID, attr ua.AttributeID, val *ua.DataValue) ua.StatusCode {
 	ctx = ualog.WithAttrs(ctx, s.logAttributes)
-	ualog.Debug(ctx, "write node attribute", ualog.Any(ualog.NodeIdKey, node), ualog.Any("attr", attr))
+	ualog.Debug(ctx, "write node attribute", ualog.Any("node_id", node), ualog.Any("attr", attr))
 
 	s.Mu.Lock()
 	defer s.Mu.Unlock()

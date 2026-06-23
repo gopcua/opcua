@@ -8,13 +8,6 @@ import (
 	"github.com/gopcua/opcua/ua"
 )
 
-const (
-	// NodeIdKey should be used when logging the id of a ua.Node
-	//
-	// This avoids the use of "node", "node_id", "id" in different places.
-	NodeIdKey string = "node_id"
-)
-
 // An Attr is a key-value pair
 type Attr slog.Attr
 

@@ -56,7 +56,7 @@ func (s *ViewService) Browse(ctx context.Context, sc *uasc.SecureChannel, r ua.R
 
 	for i := range req.NodesToBrowse {
 		br := req.NodesToBrowse[i]
-		ualog.Debug(ctx, "browsing node", ualog.Any(ualog.NodeIdKey, br.NodeID))
+		ualog.Debug(ctx, "browsing node", ualog.Any("node_id", br.NodeID))
 
 		ns, err := s.srv.Namespace(int(br.NodeID.Namespace()))
 		if err != nil {
