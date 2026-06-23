@@ -3,6 +3,7 @@ package opcua
 import (
 	"crypto/rsa"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/pem"
 	"fmt"
 	"net"
@@ -37,8 +38,9 @@ GY1Q+sfu64IRjFdhnbL97a6GL+MgEVIvT9cl/DDcXtNZIl28Xk4KwAp3/lB1XrgK
 cdqKnNkOBU19ulD8SOKzAPch5ydHPFfXCw==
 -----END CERTIFICATE-----
 `)
+	certDER = derBytes(certPEM)
 
-	keyPEM = []byte(`-----BEGIN RSA PRIVATE KEY-----
+	keyPKCS1PEM = []byte(`-----BEGIN RSA PRIVATE KEY-----
 MIICXQIBAAKBgQCfHH3peKuI3F65hsYl5j6yc4NGmcSnVpTxNt36/SsKWJK0Gecp
 M7OrBrrlxDmLaiDUDQT/+VVwop5wzmaaSOEB5W1K1nyqBoCVNsEGbgEO/j8+Jfeh
 DOQ5yAQK25YkqebNi2YlS4MOr/bUusrvwouUMn7sjM+CS4NuVbdShxQg/QIDAQAB
@@ -54,10 +56,35 @@ YqvGJP7ubbsR1YoQxQ8CQQCyCrltDYji5+KdxMOsDt0v7bCQWkQ3+pik09faK51Y
 4upIBnmHPbJ80DfFIj/93JXna5JQpnIZGn/hitRixBWU
 -----END RSA PRIVATE KEY-----
 `)
+	keyPKCS1DER = derBytes(keyPKCS1PEM)
+	cert        = x509Cert(certPEM, keyPKCS1PEM)
 
-	certDER = derBytes(certPEM)
-	keyDER  = derBytes(keyPEM)
-	cert    = x509Cert(certPEM, keyPEM)
+	keyPKCS8PEM = []byte(`-----BEGIN PRIVATE KEY-----
+MIICeAIBADANBgkqhkiG9w0BAQEFAASCAmIwggJeAgEAAoGBANUocwaux45f6JhU
+QHygnO/UfitJFEFd/CeztncyAQtW1Sja19s8w/Xf5YZSSnsp96N7Op1SFE+0dAKc
+dZT5KF6H0bAlcx1YMQWRaRc17523Ft3fkzikPL1dRrUprrnz2MhhyqlL1UiB3CEg
+7m1yly3ut1feE+zuGTnvP7ETiuY5AgMBAAECgYEAjE/oB8odSjcP4NX07RS8uZJi
+yxN75dt8FJZT0fp0fYZXImGMHaDOTZdoexbIOHLTtCV13AEfpaffhaiALeQlEYA4
+3eo+YEbFNtRs3BtxLoDc82McH70RFKjXudtsXDdq6eea0I34GvpWHEKfRJSdmEB9
+jna0pI5XV4cXJJ+qBdECQQD9psF5qnGnXjU7f4SA3nNo67pT1sz/TJLsMd3pxqmS
+w6VR25Y+LcU/iJEeBzPzCgH5wpuWcAHZiEVeYee1hwbPAkEA1yG1tVMESvv8yN71
+qec2BOWKnDA9EN0qjIreBQbB9F+vnalJpJ2b4h1/rRkTi0OzmXzlLTP07+TIPC6K
+WnyEdwJAWROBqF9h8FvWJ+HdP4BfWT5HPgAWF6XlhsrwWpOoo2DPotKRjZ53QZuN
+EtWGudgO344nI4qMK79+VOne/FHB4wJBALLzbIY3VyPUtrKUnH9HP+0Uz5canUFQ
+59rejM5bj6zqh1e7gPG41PljFlhzuokmuNfdR3mxdXaztUgyYo3gdAMCQQC/TMqc
+94ZVfT5WHoLDd86J0G4Eatl/xoA+NdHs9WRxN11RrAhH/9tdK5jV9xeMa9tncHwY
+qVM50NTCCBbetzVG
+-----END PRIVATE KEY-----
+`)
+	keyPKCS8DER = derBytes(keyPKCS8PEM)
+	keyPKCS8    = rsaKeyFromPKCS8PEM(keyPKCS8PEM)
+
+	keyPKCS8ECPem = []byte(`-----BEGIN PRIVATE KEY-----
+MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgiM2hA0sCCaNxhwPy
+E0GxKISgpTDWaL/h8FmM/PuprqihRANCAAQHtEMlgfUrDdt24KJRQihb5PsjOVB+
+17YDvxN/otim+q8xEacXbb7MlY6N1Vx5bbzFUDw00jVHOfWjbppru98b
+-----END PRIVATE KEY-----
+`)
 
 	endpoints = []*ua.EndpointDescription{
 		// anonymous auth
@@ -136,6 +163,24 @@ func x509Cert(c, k []byte) tls.Certificate {
 	return cert
 }
 
+// rsaKeyFromPKCS8PEM parses a PKCS#8 PEM-encoded RSA private key.
+// It is used to produce the expected *rsa.PrivateKey value in tests.
+func rsaKeyFromPKCS8PEM(pemBytes []byte) *rsa.PrivateKey {
+	block, _ := pem.Decode(pemBytes)
+	if block == nil {
+		panic("rsaKeyFromPKCS8PEM: failed to decode PEM block")
+	}
+	key, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+	if err != nil {
+		panic("rsaKeyFromPKCS8PEM: " + err.Error())
+	}
+	pk, ok := key.(*rsa.PrivateKey)
+	if !ok {
+		panic("rsaKeyFromPKCS8PEM: key is not an RSA key")
+	}
+	return pk
+}
+
 func TestOptions(t *testing.T) {
 	randomRequestID = func() uint32 { return 125 }
 	defer func() { randomRequestID = nil }()
@@ -143,10 +188,13 @@ func TestOptions(t *testing.T) {
 	d := t.TempDir()
 
 	var (
-		certDERFile = filepath.Join(d, "cert.der")
-		certPEMFile = filepath.Join(d, "cert.pem")
-		keyDERFile  = filepath.Join(d, "key.der")
-		keyPEMFile  = filepath.Join(d, "key.pem")
+		certDERFile     = filepath.Join(d, "cert.der")
+		certPEMFile     = filepath.Join(d, "cert.pem")
+		keyDERFile      = filepath.Join(d, "key.der")
+		keyPEMFile      = filepath.Join(d, "key.pem")
+		keyPKCS8PEMFile = filepath.Join(d, "key-pkcs8.pem")
+		keyPKCS8DERFile = filepath.Join(d, "key-pkcs8.der")
+		keyPKCS8ECFile  = filepath.Join(d, "key-pkcs8-ec.pem")
 	)
 
 	// the error message for "file not found" is platform dependent.
@@ -165,12 +213,20 @@ func TestOptions(t *testing.T) {
 	err = os.WriteFile(certPEMFile, certPEM, 0644)
 	require.NoError(t, err, "WriteFile(certPEMFile) failed")
 
-	err = os.WriteFile(keyDERFile, keyDER, 0644)
+	err = os.WriteFile(keyDERFile, keyPKCS1DER, 0644)
 	require.NoError(t, err, "WriteFile(keyDERFile) failed")
 
-	err = os.WriteFile(keyPEMFile, keyPEM, 0644)
+	err = os.WriteFile(keyPEMFile, keyPKCS1PEM, 0644)
 	require.NoError(t, err, "WriteFile(keyPEMFile) failed")
-	defer os.Remove(keyPEMFile)
+
+	err = os.WriteFile(keyPKCS8PEMFile, keyPKCS8PEM, 0644)
+	require.NoError(t, err, "WriteFile(keyPKCS8PEMFile) failed")
+
+	err = os.WriteFile(keyPKCS8DERFile, keyPKCS8DER, 0644)
+	require.NoError(t, err, "WriteFile(keyPKCS8DERFile) failed")
+
+	err = os.WriteFile(keyPKCS8ECFile, keyPKCS8ECPem, 0644)
+	require.NoError(t, err, "WriteFile(keyPKCS8ECFile) failed")
 
 	connStateCh := make(chan ConnState)
 	connStateFunc := func(ConnState) {}
@@ -389,6 +445,34 @@ func TestOptions(t *testing.T) {
 					return c
 				}(),
 			},
+		},
+		{
+			name: `PrivateKeyFile("key-pkcs8.pem")`,
+			opt:  PrivateKeyFile(keyPKCS8PEMFile),
+			cfg: &Config{
+				sechan: func() *uasc.Config {
+					c := DefaultClientConfig()
+					c.LocalKey = keyPKCS8
+					return c
+				}(),
+			},
+		},
+		{
+			name: `PrivateKeyFile("key-pkcs8.der")`,
+			opt:  PrivateKeyFile(keyPKCS8DERFile),
+			cfg: &Config{
+				sechan: func() *uasc.Config {
+					c := DefaultClientConfig()
+					c.LocalKey = keyPKCS8
+					return c
+				}(),
+			},
+		},
+		{
+			name: `PrivateKeyFile("key-pkcs8-ec.pem") error`,
+			opt:  PrivateKeyFile(keyPKCS8ECFile),
+			cfg:  &Config{},
+			err:  fmt.Errorf("opcua: Private key is not an RSA key"),
 		},
 		{
 			name: `PrivateKeyFile() error`,

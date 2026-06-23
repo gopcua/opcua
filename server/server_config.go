@@ -7,7 +7,6 @@ package server
 import (
 	"context"
 	"crypto/rsa"
-	"crypto/x509"
 	"errors"
 	"fmt"
 	"strings"
@@ -48,7 +47,7 @@ func Certificate(cert []byte) Option {
 
 		// Extract the application URI from the certificate.
 		var appURI string
-		x509cert, err := x509.ParseCertificate(cert)
+		x509cert, err := uapolicy.ParseCertificate(cert)
 		if err == nil && len(x509cert.URIs) > 0 {
 			appURI = x509cert.URIs[0].String()
 		}

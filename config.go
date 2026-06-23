@@ -13,7 +13,6 @@ import (
 	"math/rand"
 	"net"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/gopcua/opcua/errors"
@@ -270,18 +269,60 @@ func loadPrivateKey(filename string) (*rsa.PrivateKey, error) {
 		return nil, errors.Errorf("Failed to load private key: %s", err)
 	}
 
-	derBytes := b
-	if strings.HasSuffix(filename, ".pem") {
-		block, _ := pem.Decode(b)
-		if block == nil || block.Type != "RSA PRIVATE KEY" {
-			return nil, errors.Errorf("Failed to decode PEM block with private key")
+	// Content-sniff: pem.Decode returns nil for non-PEM (raw DER) input,
+	// so dispatch on content, not file extension. A PKCS#8 key in a .key
+	// file (openssl genpkey default) loads correctly regardless of suffix.
+	if block, _ := pem.Decode(b); block != nil {
+		switch block.Type {
+		case "RSA PRIVATE KEY":
+			// PKCS#1 – the classic "openssl genrsa" output
+			pk, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+			if err != nil {
+				return nil, errors.Errorf("Failed to parse PKCS#1 private key: %s", err)
+			}
+			return pk, nil
+		case "PRIVATE KEY":
+			// PKCS#8 – the modern "openssl genpkey" default
+			return parsePKCS8RSAPrivateKey(block.Bytes)
+		default:
+			return nil, errors.Errorf("Failed to decode PEM block with private key: unsupported type %q", block.Type)
 		}
-		derBytes = block.Bytes
 	}
 
-	pk, err := x509.ParsePKCS1PrivateKey(derBytes)
+	return parseRSAPrivateKeyDER(b)
+}
+
+// parseRSAPrivateKeyDER tries to parse der as a PKCS#1 RSA key first and,
+// if that fails, as a PKCS#8 key. This is necessary for DER-encoded files
+// because there is no block-type header to identify the format.
+//
+// When both parses fail the errors are joined so a corrupt PKCS#1 key surfaces
+// both the PKCS#1 and PKCS#8 parse failures rather than only the (misleading)
+// PKCS#8 "asn1: structure error". A valid PKCS#8 RSA key returns cleanly from
+// parsePKCS8RSAPrivateKey without reaching the join.
+func parseRSAPrivateKeyDER(der []byte) (*rsa.PrivateKey, error) {
+	pk, errPKCS1 := x509.ParsePKCS1PrivateKey(der)
+	if errPKCS1 == nil {
+		return pk, nil
+	}
+	pk, err8 := parsePKCS8RSAPrivateKey(der)
+	if err8 != nil {
+		return nil, errors.Join(errors.Errorf("Failed to parse private key as PKCS#1: %s", errPKCS1), err8)
+	}
+	return pk, nil
+}
+
+// parsePKCS8RSAPrivateKey parses a PKCS#8-encoded RSA private key.
+// It returns an explicit error when the key is not RSA, because OPC UA
+// only supports RSA for channel security and user authentication.
+func parsePKCS8RSAPrivateKey(der []byte) (*rsa.PrivateKey, error) {
+	key, err := x509.ParsePKCS8PrivateKey(der)
 	if err != nil {
 		return nil, errors.Errorf("Failed to parse private key: %s", err)
+	}
+	pk, ok := key.(*rsa.PrivateKey)
+	if !ok {
+		return nil, errors.Errorf("Private key is not an RSA key")
 	}
 	return pk, nil
 }
@@ -317,22 +358,38 @@ func loadCertificate(filename string) ([]byte, error) {
 		return nil, errors.Errorf("Failed to load certificate: %s", err)
 	}
 
-	if !strings.HasSuffix(filename, ".pem") {
-		return b, nil
+	// Content-sniff: dispatch on content, not file extension. A PEM-encoded
+	// certificate in a .crt file loads correctly; a raw DER certificate (any
+	// suffix) is returned as-is. pem.Decode returns nil for non-PEM input.
+	// For a PEM fullchain (leaf + intermediate/CA, the common fullchain.pem
+	// layout), concatenate every CERTIFICATE block so the whole chain is sent
+	// on the wire — matching the raw-DER path, which passes a concatenated
+	// chain through whole.
+	rest := b
+	var chain []byte
+	for {
+		block, r := pem.Decode(rest)
+		if block == nil {
+			break
+		}
+		rest = r
+		if block.Type != "CERTIFICATE" {
+			return nil, errors.Errorf("Failed to decode PEM block with certificate: unsupported type %q", block.Type)
+		}
+		chain = append(chain, block.Bytes...)
+	}
+	if chain != nil {
+		return chain, nil
 	}
 
-	block, _ := pem.Decode(b)
-	if block == nil || block.Type != "CERTIFICATE" {
-		return nil, errors.Errorf("Failed to decode PEM block with certificate")
-	}
-	return block.Bytes, nil
+	return b, nil
 }
 
 func setCertificate(cert []byte, cfg *Config) error {
 	cfg.sechan.Certificate = cert
 
 	// Extract the application URI from the certificate.
-	x509cert, err := x509.ParseCertificate(cert)
+	x509cert, err := uapolicy.ParseCertificate(cert)
 	if err != nil {
 		return fmt.Errorf("failed to parse certificate: %s", err)
 	}
