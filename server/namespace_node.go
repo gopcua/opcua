@@ -130,32 +130,31 @@ func (as *NodeNameSpace) Attribute(id *ua.NodeID, attr ua.AttributeID) *ua.DataV
 		return errorDataValueWithStatus(ua.StatusBadUserAccessDenied)
 	}
 
-	var err error
-	var a *AttrValue
-
 	switch attr {
 	case ua.AttributeIDNodeID:
-		a = &AttrValue{Value: DataValueFromValue(id)}
+		return DataValueFromValue(id)
 	case ua.AttributeIDEventNotifier:
 		// TODO: this is a hack to force the EventNotifier to false for everything.
 		// If at some point someone or something needs to use this, this will have to go away and be
 		// fixed properly.
-		a = &AttrValue{Value: DataValueFromValue(byte(0))}
-	case ua.AttributeIDNodeClass:
-		if a, err = n.Attribute(attr); err != nil {
-			return errorDataValueWithStatus(ua.StatusBadAttributeIDInvalid)
-		}
+		return DataValueFromValue(byte(0))
+	}
 
+	var err error
+	var a *AttrValue
+
+	if a, err = n.Attribute(attr); err != nil {
+		return errorDataValueWithStatus(ua.StatusBadAttributeIDInvalid)
+	}
+
+	switch attr {
+	case ua.AttributeIDNodeClass:
 		// TODO: we need int32 instead of uint32 here.  this isn't the right place to fix it, but it is a bandaid
 		x, ok := a.Value.Value.Value().(uint32)
 		if ok {
 			a.Value.Value = ua.MustVariant(int32(x))
 		}
 	case ua.AttributeIDDataType:
-		if a, err = n.Attribute(attr); err != nil {
-			return errorDataValueWithStatus(ua.StatusBadAttributeIDInvalid)
-		}
-
 		if a.Value != nil && a.Value.Value != nil {
 			if nodeID := a.Value.Value.NodeID(); nodeID != nil {
 				dv := *a.Value
@@ -165,10 +164,6 @@ func (as *NodeNameSpace) Attribute(id *ua.NodeID, attr ua.AttributeID) *ua.DataV
 		}
 
 		return errorDataValueWithStatus(ua.StatusBadTypeMismatch)
-	default:
-		if a, err = n.Attribute(attr); err != nil {
-			return errorDataValueWithStatus(ua.StatusBadAttributeIDInvalid)
-		}
 	}
 
 	return a.Value
