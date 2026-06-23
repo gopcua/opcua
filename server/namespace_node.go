@@ -133,6 +133,8 @@ func (as *NodeNameSpace) Attribute(id *ua.NodeID, attr ua.AttributeID) *ua.DataV
 	var err error
 	var a *AttrValue
 
+	status := ua.StatusOK
+
 	switch attr {
 	case ua.AttributeIDNodeID:
 		a = &AttrValue{Value: DataValueFromValue(id)}
@@ -143,29 +145,42 @@ func (as *NodeNameSpace) Attribute(id *ua.NodeID, attr ua.AttributeID) *ua.DataV
 		a = &AttrValue{Value: DataValueFromValue(byte(0))}
 	case ua.AttributeIDNodeClass:
 		a, err = n.Attribute(attr)
-		if err != nil {
-			return &ua.DataValue{
-				EncodingMask:    ua.DataValueServerTimestamp | ua.DataValueStatusCode,
-				ServerTimestamp: time.Now(),
-				Status:          ua.StatusBadAttributeIDInvalid,
+		if err == nil {
+			// TODO: we need int32 instead of uint32 here.  this isn't the right place to fix it, but it is a bandaid
+			x, ok := a.Value.Value.Value().(uint32)
+			if ok {
+				a.Value.Value = ua.MustVariant(int32(x))
 			}
 		}
-		// TODO: we need int32 instead of uint32 here.  this isn't the right place to fix it, but it is a bandaid
-		x, ok := a.Value.Value.Value().(uint32)
-		if ok {
-			a.Value.Value = ua.MustVariant(int32(x))
+	case ua.AttributeIDDataType:
+		if a, err = n.Attribute(attr); err != nil {
+			status = ua.StatusBadAttributeIDInvalid
+			break
 		}
+
+		if a.Value != nil && a.Value.Value != nil {
+			if nodeID := a.Value.Value.NodeID(); nodeID != nil {
+				dv := *a.Value
+				dv.Value = ua.MustVariant(nodeID)
+				return &dv
+			}
+		}
+
+		status = ua.StatusBadTypeMismatch
 	default:
-		a, err = n.Attribute(attr)
+		if a, err = n.Attribute(attr); err != nil {
+			status = ua.StatusBadAttributeIDInvalid
+		}
 	}
 
-	if err != nil {
+	if status != ua.StatusOK {
 		return &ua.DataValue{
 			EncodingMask:    ua.DataValueServerTimestamp | ua.DataValueStatusCode,
 			ServerTimestamp: time.Now(),
-			Status:          ua.StatusBadAttributeIDInvalid,
+			Status:          status,
 		}
 	}
+
 	return a.Value
 }
 
