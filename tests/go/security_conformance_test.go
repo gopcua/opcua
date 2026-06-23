@@ -102,10 +102,12 @@ func TestSecurityModeRoundtrip_Part6_674(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			ctx := t.Context()
 			srvCert, srvKey := genSelfSignedCert(t, "urn:gopcua:conformance:server")
 			cliCert, cliKey := genSelfSignedCert(t, "urn:gopcua:conformance:client")
 
 			s := server.New(
+				ctx,
 				server.EnableSecurity("None", ua.MessageSecurityModeNone),
 				server.EnableSecurity("Basic256Sha256", ua.MessageSecurityModeSign),
 				server.EnableSecurity("Basic256Sha256", ua.MessageSecurityModeSignAndEncrypt),
@@ -114,8 +116,8 @@ func TestSecurityModeRoundtrip_Part6_674(t *testing.T) {
 				server.PrivateKey(srvKey),
 				server.Certificate(srvCert),
 			)
-			require.NoError(t, s.Start(context.Background()))
-			defer s.Close()
+			require.NoError(t, s.Start(ctx))
+			defer s.Close(ctx)
 
 			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 			defer cancel()

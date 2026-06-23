@@ -55,6 +55,7 @@ import (
 )
 
 func TestPrivateKeyFilePKCS8Handshake(t *testing.T) {
+	ctx := t.Context()
 	// Shared in-process server: the server config is identical for both rows,
 	// and the only variable under test is the client's key file, which the
 	// server never sees. A per-row server would be redundant (unlike
@@ -65,14 +66,15 @@ func TestPrivateKeyFilePKCS8Handshake(t *testing.T) {
 	const port = 48680
 	srvCert, srvKey := genSelfSignedCert(t, "urn:gopcua:conformance:server")
 	s := server.New(
+		ctx,
 		server.EnableSecurity("Basic256Sha256", ua.MessageSecurityModeSignAndEncrypt),
 		server.EnableAuthMode(ua.UserTokenTypeAnonymous),
 		server.EndPoint("localhost", port),
 		server.PrivateKey(srvKey),
 		server.Certificate(srvCert),
 	)
-	require.NoError(t, s.Start(context.Background()))
-	defer s.Close()
+	require.NoError(t, s.Start(ctx))
+	defer s.Close(ctx)
 
 	addr := fmt.Sprintf("opc.tcp://localhost:%d", port)
 
