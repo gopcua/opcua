@@ -37,3 +37,25 @@ func TestNamespaceAttributeDataTypeReturnsNodeID(t *testing.T) {
 	require.Equal(t, ua.TypeIDNodeID, dv.Value.Type())
 	require.Equal(t, uint32(id.Double), dv.Value.NodeID().IntID())
 }
+
+func TestNamespaceAttributeMissingNodeClassReturnsBadAttributeIDInvalid(t *testing.T) {
+	ns := NewNameSpace("test")
+	nodeID := ua.NewStringNodeID(1, "x")
+
+	n := NewNode(
+		nodeID,
+		Attributes{
+			ua.AttributeIDBrowseName:  DataValueFromValue(&ua.QualifiedName{Name: "x"}),
+			ua.AttributeIDDisplayName: DataValueFromValue(&ua.LocalizedText{Text: "x"}),
+		},
+		nil,
+		nil,
+	)
+
+	ns.AddNode(n)
+
+	require.NotPanics(t, func() {
+		dv := ns.Attribute(nodeID, ua.AttributeIDNodeClass)
+		require.Equal(t, ua.StatusBadAttributeIDInvalid, dv.Status)
+	})
+}

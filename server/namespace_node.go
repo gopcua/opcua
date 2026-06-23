@@ -113,27 +113,25 @@ func (as *NodeNameSpace) AddNewVariableStringNode(name string, value any) *Node 
 }
 
 func (as *NodeNameSpace) Attribute(id *ua.NodeID, attr ua.AttributeID) *ua.DataValue {
-	n := as.Node(id)
-	if n == nil {
+	errorDataValueWithStatus := func(status ua.StatusCode) *ua.DataValue {
 		return &ua.DataValue{
 			EncodingMask:    ua.DataValueServerTimestamp | ua.DataValueStatusCode,
 			ServerTimestamp: time.Now(),
-			Status:          ua.StatusBadNodeIDUnknown,
+			Status:          status,
 		}
 	}
 
+	n := as.Node(id)
+	if n == nil {
+		return errorDataValueWithStatus(ua.StatusBadNodeIDUnknown)
+	}
+
 	if !n.Access(ua.AccessLevelTypeCurrentRead) {
-		return &ua.DataValue{
-			EncodingMask:    ua.DataValueServerTimestamp | ua.DataValueStatusCode,
-			ServerTimestamp: time.Now(),
-			Status:          ua.StatusBadUserAccessDenied,
-		}
+		return errorDataValueWithStatus(ua.StatusBadUserAccessDenied)
 	}
 
 	var err error
 	var a *AttrValue
-
-	status := ua.StatusOK
 
 	switch attr {
 	case ua.AttributeIDNodeID:
@@ -144,18 +142,18 @@ func (as *NodeNameSpace) Attribute(id *ua.NodeID, attr ua.AttributeID) *ua.DataV
 		// fixed properly.
 		a = &AttrValue{Value: DataValueFromValue(byte(0))}
 	case ua.AttributeIDNodeClass:
-		a, err = n.Attribute(attr)
-		if err == nil {
-			// TODO: we need int32 instead of uint32 here.  this isn't the right place to fix it, but it is a bandaid
-			x, ok := a.Value.Value.Value().(uint32)
-			if ok {
-				a.Value.Value = ua.MustVariant(int32(x))
-			}
+		if a, err = n.Attribute(attr); err != nil {
+			return errorDataValueWithStatus(ua.StatusBadAttributeIDInvalid)
+		}
+
+		// TODO: we need int32 instead of uint32 here.  this isn't the right place to fix it, but it is a bandaid
+		x, ok := a.Value.Value.Value().(uint32)
+		if ok {
+			a.Value.Value = ua.MustVariant(int32(x))
 		}
 	case ua.AttributeIDDataType:
 		if a, err = n.Attribute(attr); err != nil {
-			status = ua.StatusBadAttributeIDInvalid
-			break
+			return errorDataValueWithStatus(ua.StatusBadAttributeIDInvalid)
 		}
 
 		if a.Value != nil && a.Value.Value != nil {
@@ -166,18 +164,10 @@ func (as *NodeNameSpace) Attribute(id *ua.NodeID, attr ua.AttributeID) *ua.DataV
 			}
 		}
 
-		status = ua.StatusBadTypeMismatch
+		return errorDataValueWithStatus(ua.StatusBadTypeMismatch)
 	default:
 		if a, err = n.Attribute(attr); err != nil {
-			status = ua.StatusBadAttributeIDInvalid
-		}
-	}
-
-	if status != ua.StatusOK {
-		return &ua.DataValue{
-			EncodingMask:    ua.DataValueServerTimestamp | ua.DataValueStatusCode,
-			ServerTimestamp: time.Now(),
-			Status:          status,
+			return errorDataValueWithStatus(ua.StatusBadAttributeIDInvalid)
 		}
 	}
 
