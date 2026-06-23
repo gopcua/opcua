@@ -17,8 +17,8 @@ func Debug(ctx context.Context, msg string, attrs ...Attr) {
 // DebugFunc forwards the provided message and attributes, retrieved from the attrs callback,
 // to the current logger iff its handler's debug level is enabled.
 //
-// This debug method allows the deferal of log attribute creation to only happen when
-// they will actually be used. The result is a reduced performace penalty in non debug modes.
+// This debug method allows the deferral of log attribute creation to only happen when
+// they will actually be used. The result is a reduced performance penalty in non debug modes.
 func DebugFunc(ctx context.Context, msg string, attrs func() []Attr) {
 	state := stateFromContext(ctx)
 	if state.logger.Handler().Enabled(ctx, slog.LevelDebug) {
