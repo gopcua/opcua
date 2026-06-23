@@ -270,18 +270,51 @@ func loadPrivateKey(filename string) (*rsa.PrivateKey, error) {
 		return nil, errors.Errorf("Failed to load private key: %s", err)
 	}
 
-	derBytes := b
 	if strings.HasSuffix(filename, ".pem") {
 		block, _ := pem.Decode(b)
-		if block == nil || block.Type != "RSA PRIVATE KEY" {
+		if block == nil {
 			return nil, errors.Errorf("Failed to decode PEM block with private key")
 		}
-		derBytes = block.Bytes
+		switch block.Type {
+		case "RSA PRIVATE KEY":
+			// PKCS#1 – the classic "openssl genrsa" output
+			pk, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+			if err != nil {
+				return nil, errors.Errorf("Failed to parse PKCS#1 private key: %s", err)
+			}
+			return pk, nil
+		case "PRIVATE KEY":
+			// PKCS#8 – the modern "openssl genpkey" default
+			return parsePKCS8RSAPrivateKey(block.Bytes)
+		default:
+			return nil, errors.Errorf("Failed to decode PEM block with private key: unsupported type %q", block.Type)
+		}
 	}
 
-	pk, err := x509.ParsePKCS1PrivateKey(derBytes)
+	return parseRSAPrivateKeyDER(b)
+}
+
+// parseRSAPrivateKeyDER tries to parse der as a PKCS#1 RSA key first and,
+// if that fails, as a PKCS#8 key. This is necessary for DER-encoded files
+// because there is no block-type header to identify the format.
+func parseRSAPrivateKeyDER(der []byte) (*rsa.PrivateKey, error) {
+	if pk, err := x509.ParsePKCS1PrivateKey(der); err == nil {
+		return pk, nil
+	}
+	return parsePKCS8RSAPrivateKey(der)
+}
+
+// parsePKCS8RSAPrivateKey parses a PKCS#8-encoded RSA private key.
+// It returns an explicit error when the key is not RSA, because OPC UA
+// only supports RSA for channel security and user authentication.
+func parsePKCS8RSAPrivateKey(der []byte) (*rsa.PrivateKey, error) {
+	key, err := x509.ParsePKCS8PrivateKey(der)
 	if err != nil {
 		return nil, errors.Errorf("Failed to parse private key: %s", err)
+	}
+	pk, ok := key.(*rsa.PrivateKey)
+	if !ok {
+		return nil, errors.Errorf("Private key is not an RSA key")
 	}
 	return pk, nil
 }
