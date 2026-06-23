@@ -29,10 +29,10 @@ func TestRead(t *testing.T) {
 		//{ua.NewStringNodeID(2, "2d_array_int32"), [][]int32{{1}, {2}, {3}}},
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 
-	srv := startServer()
-	defer srv.Close()
+	srv := startServer(ctx)
+	defer srv.Close(ctx)
 
 	time.Sleep(2 * time.Second)
 
@@ -121,10 +121,10 @@ func TestReadPerms(t *testing.T) {
 		{ua.NewNumericNodeID(132, 101), ua.StatusBad, nil},
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 
-	srv := startServer()
-	defer srv.Close()
+	srv := startServer(ctx)
+	defer srv.Close(ctx)
 
 	time.Sleep(2 * time.Second)
 

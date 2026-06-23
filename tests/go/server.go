@@ -14,7 +14,7 @@ import (
 	"github.com/gopcua/opcua/ua"
 )
 
-func startServer() *server.Server {
+func startServer(ctx context.Context) *server.Server {
 	var opts []server.Option
 	port := 4840
 
@@ -43,7 +43,7 @@ func startServer() *server.Server {
 		server.EndPoint("localhost", port),
 	)
 
-	s := server.New(opts...)
+	s := server.New(ctx, opts...)
 
 	root_ns, _ := s.Namespace(0)
 	obj_node := root_ns.Objects()
@@ -133,7 +133,7 @@ func startServer() *server.Server {
 
 	// Create a new node namespace.  You can add namespaces before or after starting the server.
 	// Start the server
-	if err := s.Start(context.Background()); err != nil {
+	if err := s.Start(ctx); err != nil {
 		log.Fatalf("Error starting server, exiting: %s", err)
 	}
 	return s

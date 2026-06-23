@@ -4,7 +4,6 @@
 package uatest2
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -30,10 +29,10 @@ import (
 // returned Bad_NodeAttributesInvalid, which NodeNameSpace.SetAttribute surfaced
 // to the client as Bad_AttributeIdInvalid.
 func TestWriteNonValueAttribute_Part4_Write(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
-	srv := startServer()
-	defer srv.Close()
+	srv := startServer(ctx)
+	defer srv.Close(ctx)
 
 	time.Sleep(2 * time.Second)
 

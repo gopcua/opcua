@@ -4,7 +4,6 @@
 package uatest2
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -31,10 +30,10 @@ import (
 // Regression for #841: AttributeService.Write omitted `continue` after a failed
 // namespace lookup and dereferenced a nil NameSpace, panicking the server.
 func TestWriteToUnknownNamespace_Part4_Write(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 
-	srv := startServer()
-	defer srv.Close()
+	srv := startServer(ctx)
+	defer srv.Close(ctx)
 
 	time.Sleep(2 * time.Second)
 

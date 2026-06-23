@@ -1,0 +1,24 @@
+package server
+
+import (
+	"context"
+
+	"github.com/gopcua/opcua/ua"
+	"github.com/gopcua/opcua/ualog"
+)
+
+// logServiceRequest logs information about the incoming request at
+// the DEBUG level. If the current logger's debug level is not enabled
+// no log attribute will be allocated. All service handlers should call
+// this function after attaching their service set/name attributes.
+func logServiceRequest(ctx context.Context, req ua.Request) {
+	ualog.DebugFunc(ctx, "handling service request", func() []ualog.Attr { return []ualog.Attr{ualog.Request(ctx, req)} })
+}
+
+// newServiceLogAttributeCreatorForSet is a utility function for wrapping a
+// service's set and name in an attribute group for logging
+func newServiceLogAttributeCreatorForSet(set string) func(string) ualog.Attr {
+	return func(service string) ualog.Attr {
+		return ualog.GroupAttrs("service", ualog.String("set", set), ualog.String("name", service))
+	}
+}
