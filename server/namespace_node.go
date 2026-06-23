@@ -113,59 +113,59 @@ func (as *NodeNameSpace) AddNewVariableStringNode(name string, value any) *Node 
 }
 
 func (as *NodeNameSpace) Attribute(id *ua.NodeID, attr ua.AttributeID) *ua.DataValue {
-	n := as.Node(id)
-	if n == nil {
+	errorDataValueWithStatus := func(status ua.StatusCode) *ua.DataValue {
 		return &ua.DataValue{
 			EncodingMask:    ua.DataValueServerTimestamp | ua.DataValueStatusCode,
 			ServerTimestamp: time.Now(),
-			Status:          ua.StatusBadNodeIDUnknown,
+			Status:          status,
 		}
 	}
 
+	n := as.Node(id)
+	if n == nil {
+		return errorDataValueWithStatus(ua.StatusBadNodeIDUnknown)
+	}
+
 	if !n.Access(ua.AccessLevelTypeCurrentRead) {
-		return &ua.DataValue{
-			EncodingMask:    ua.DataValueServerTimestamp | ua.DataValueStatusCode,
-			ServerTimestamp: time.Now(),
-			Status:          ua.StatusBadUserAccessDenied,
-		}
+		return errorDataValueWithStatus(ua.StatusBadUserAccessDenied)
+	}
+
+	switch attr {
+	case ua.AttributeIDNodeID:
+		return DataValueFromValue(id)
+	case ua.AttributeIDEventNotifier:
+		// TODO: this is a hack to force the EventNotifier to false for everything.
+		// If at some point someone or something needs to use this, this will have to go away and be
+		// fixed properly.
+		return DataValueFromValue(byte(0))
 	}
 
 	var err error
 	var a *AttrValue
 
+	if a, err = n.Attribute(attr); err != nil {
+		return errorDataValueWithStatus(ua.StatusBadAttributeIDInvalid)
+	}
+
 	switch attr {
-	case ua.AttributeIDNodeID:
-		a = &AttrValue{Value: DataValueFromValue(id)}
-	case ua.AttributeIDEventNotifier:
-		// TODO: this is a hack to force the EventNotifier to false for everything.
-		// If at some point someone or something needs to use this, this will have to go away and be
-		// fixed properly.
-		a = &AttrValue{Value: DataValueFromValue(byte(0))}
 	case ua.AttributeIDNodeClass:
-		a, err = n.Attribute(attr)
-		if err != nil {
-			return &ua.DataValue{
-				EncodingMask:    ua.DataValueServerTimestamp | ua.DataValueStatusCode,
-				ServerTimestamp: time.Now(),
-				Status:          ua.StatusBadAttributeIDInvalid,
-			}
-		}
 		// TODO: we need int32 instead of uint32 here.  this isn't the right place to fix it, but it is a bandaid
 		x, ok := a.Value.Value.Value().(uint32)
 		if ok {
 			a.Value.Value = ua.MustVariant(int32(x))
 		}
-	default:
-		a, err = n.Attribute(attr)
+	case ua.AttributeIDDataType:
+		if a.Value != nil && a.Value.Value != nil {
+			if nodeID := a.Value.Value.NodeID(); nodeID != nil {
+				dv := *a.Value
+				dv.Value = ua.MustVariant(nodeID)
+				return &dv
+			}
+		}
+
+		return errorDataValueWithStatus(ua.StatusBadTypeMismatch)
 	}
 
-	if err != nil {
-		return &ua.DataValue{
-			EncodingMask:    ua.DataValueServerTimestamp | ua.DataValueStatusCode,
-			ServerTimestamp: time.Now(),
-			Status:          ua.StatusBadAttributeIDInvalid,
-		}
-	}
 	return a.Value
 }
 
