@@ -141,7 +141,11 @@ func main() {
 
 func valueRequest(nodeID *ua.NodeID) *ua.MonitoredItemCreateRequest {
 	handle := uint32(42)
-	return opcua.NewMonitoredItemCreateRequestWithDefaults(nodeID, ua.AttributeIDValue, handle)
+	return opcua.NewDefaultMonitoredItemCreateRequest(opcua.MonitoredItemCreateRequestArgs{
+		NodeID:       nodeID,
+		AttributeID:  ua.AttributeIDValue,
+		ClientHandle: handle,
+	})
 }
 
 func eventRequest(nodeID *ua.NodeID) (*ua.MonitoredItemCreateRequest, []string) {

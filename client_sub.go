@@ -334,6 +334,7 @@ func (c *Client) notifySubscription(ctx context.Context, sub *Subscription, noti
 			sub.notify(ctx, &PublishNotificationData{
 				SubscriptionID: sub.SubscriptionID,
 				Value:          data.Value,
+				PublishTime:    notif.PublishTime,
 			})
 
 		// Error
