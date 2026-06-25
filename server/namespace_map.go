@@ -1,6 +1,8 @@
 package server
 
 import (
+	"maps"
+	"slices"
 	"sync"
 	"time"
 
@@ -110,9 +112,9 @@ func (ns *MapNamespace) Browse(bd *ua.BrowseDescription) *ua.BrowseResult {
 
 	refs := make([]*ua.ReferenceDescription, len(ns.Data))
 
-	keyid := 0
-	for k := range ns.Data {
-		key := k
+	// Sort the keys so reference order is stable across calls: BrowseNext
+	// re-browses to resume, and a random order would drop/duplicate refs.
+	for keyid, key := range slices.Sorted(maps.Keys(ns.Data)) {
 		refid := ua.NewNumericNodeID(0, id.HasComponent)
 		expnewid := ua.NewStringExpandedNodeID(ns.id, key)
 
@@ -125,7 +127,6 @@ func (ns *MapNamespace) Browse(bd *ua.BrowseDescription) *ua.BrowseResult {
 			NodeClass:       ua.NodeClassVariable, // when support is added for nested maps, this will be NodeClassObject
 			TypeDefinition:  expnewid,
 		}
-		keyid++
 	}
 
 	return &ua.BrowseResult{
