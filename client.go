@@ -576,8 +576,16 @@ func (c *Client) monitor(ctx context.Context) {
 							activeSubs++
 						}
 
-						c.setState(ctx, Connected)
-						action = none
+						// only mark the client connected once every subscription has
+						// been restored. if a subscription failed to recreate, action
+						// was set to recreateSession above so the outer loop rebuilds
+						// the session and retries. running these two lines
+						// unconditionally dropped the failed subscriptions and left the
+						// client in Connected state with a dead publish loop.
+						if action == restoreSubscriptions {
+							c.setState(ctx, Connected)
+							action = none
+						}
 
 					case abortReconnect:
 						dlog.Printf("action: abortReconnect")
