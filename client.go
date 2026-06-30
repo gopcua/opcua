@@ -585,6 +585,17 @@ func (c *Client) monitor(ctx context.Context) {
 						if action == restoreSubscriptions {
 							c.setState(ctx, Connected)
 							action = none
+						} else {
+							// a subscription failed to recreate and action is
+							// recreateSession. back off before retrying so we don't
+							// hot-loop hammering the server when a subscription can
+							// never be restored (e.g. a monitored node was permanently
+							// removed from the server's address space).
+							select {
+							case <-ctx.Done():
+								return
+							case <-time.After(c.cfg.sechan.ReconnectInterval):
+							}
 						}
 
 					case abortReconnect:
