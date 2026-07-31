@@ -30,10 +30,10 @@ func TestWrite(t *testing.T) {
 		// non-existing namespace: see TestWriteToUnknownNamespace_Part4_Write
 	}
 
-	ctx := context.Background()
+	ctx := t.Context()
 
-	srv := startServer()
-	defer srv.Close()
+	srv := startServer(ctx)
+	defer srv.Close(ctx)
 
 	time.Sleep(2 * time.Second)
 

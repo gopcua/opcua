@@ -1,7 +1,10 @@
 package server
 
 import (
+	"context"
+
 	"github.com/gopcua/opcua/ua"
+	"github.com/gopcua/opcua/ualog"
 	"github.com/gopcua/opcua/uasc"
 )
 
@@ -12,28 +15,36 @@ type QueryService struct {
 	srv *Server
 }
 
-// https://reference.opcfoundation.org/Core/Part4/v105/docs/5.9.3
-func (s *QueryService) QueryFirst(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	if s.srv.cfg.logger != nil {
-		s.srv.cfg.logger.Debug("Handling %T", r)
+func NewQueryService(s *Server) *QueryService {
+	return &QueryService{
+		srv: s,
 	}
+}
+
+var newQueryServiceLogAttribute = newServiceLogAttributeCreatorForSet("query")
+
+// https://reference.opcfoundation.org/Core/Part4/v105/docs/5.9.3
+func (s *QueryService) QueryFirst(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
+	ctx = ualog.WithAttrs(ctx, newQueryServiceLogAttribute("query first"))
+	logServiceRequest(ctx, r)
 
 	req, err := safeReq[*ua.QueryFirstRequest](r)
 	if err != nil {
 		return nil, err
 	}
+
 	return serviceUnsupported(req.RequestHeader), nil
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.9.4
-func (s *QueryService) QueryNext(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
-	if s.srv.cfg.logger != nil {
-		s.srv.cfg.logger.Debug("Handling %T", r)
-	}
+func (s *QueryService) QueryNext(ctx context.Context, sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
+	ctx = ualog.WithAttrs(ctx, newQueryServiceLogAttribute("query next"))
+	logServiceRequest(ctx, r)
 
 	req, err := safeReq[*ua.QueryNextRequest](r)
 	if err != nil {
 		return nil, err
 	}
+
 	return serviceUnsupported(req.RequestHeader), nil
 }
