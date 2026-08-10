@@ -141,7 +141,7 @@ func (m *Variant) Decode(b []byte) (int, error) {
 
 	// read flattened array elements
 	n := int(m.arrayLength)
-	if n > MaxVariantArrayLength {
+	if n < -1 || n > MaxVariantArrayLength {
 		return buf.Pos(), StatusBadEncodingLimitsExceeded
 	}
 
