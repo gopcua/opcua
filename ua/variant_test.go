@@ -1249,3 +1249,18 @@ func TestDecodeInvalidType(t *testing.T) {
 	_, err := v.Decode(b)
 	require.EqualError(t, err, "opcua: invalid type id: 32")
 }
+
+func TestVariantDecodeBoundsDimensionCountBeforeAllocation(t *testing.T) {
+	val := new(Variant)
+
+	// The packet has no dimension values, so its declared dimension count
+	// cannot exceed the remaining byte count divided by the encoded Int32 size.
+	require.NotPanics(t, func() {
+		_, err := val.Decode([]byte{
+			byte(TypeIDInt32 | VariantArrayValues | VariantArrayDimensions),
+			0x00, 0x00, 0x00, 0x00,
+			0x00, 0xe1, 0xf5, 0x05,
+		})
+		require.ErrorIs(t, err, StatusBadEncodingLimitsExceeded)
+	})
+}

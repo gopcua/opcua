@@ -169,7 +169,8 @@ func (m *Variant) Decode(b []byte) (int, error) {
 	// check for dimensions of multi-dimensional array
 	if m.Has(VariantArrayDimensions) {
 		m.arrayDimensionsLength = buf.ReadInt32()
-		if m.arrayDimensionsLength < 0 {
+		if m.arrayDimensionsLength < 0 ||
+			int64(m.arrayDimensionsLength) > int64(buf.Len()/4) {
 			return buf.Pos(), StatusBadEncodingLimitsExceeded
 		}
 		m.arrayDimensions = make([]int32, m.arrayDimensionsLength)
