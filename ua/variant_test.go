@@ -1249,3 +1249,10 @@ func TestDecodeInvalidType(t *testing.T) {
 	_, err := v.Decode(b)
 	require.EqualError(t, err, "opcua: invalid type id: 32")
 }
+
+func TestWriteEmptyStringIsNotNull(t *testing.T) {
+	buf := NewBuffer(nil)
+	buf.WriteString("")
+
+	require.Equal(t, []byte{0x00, 0x00, 0x00, 0x00}, buf.Bytes())
+}

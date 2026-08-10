@@ -271,10 +271,6 @@ func (b *Buffer) WriteFloat64(n float64) {
 }
 
 func (b *Buffer) WriteString(s string) {
-	if s == "" {
-		b.WriteUint32(null)
-		return
-	}
 	b.WriteByteString([]byte(s))
 }
 

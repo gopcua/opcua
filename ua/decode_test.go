@@ -186,7 +186,7 @@ func TestCodec(t *testing.T) {
 			v:    &struct{ V string }{""},
 			b: []byte{
 				// length
-				0xff, 0xff, 0xff, 0xff,
+				0x00, 0x00, 0x00, 0x00,
 			},
 		},
 		{
