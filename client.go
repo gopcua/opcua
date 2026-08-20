@@ -146,8 +146,16 @@ type Client struct {
 	// cfg is the configuration for the client.
 	cfg *Config
 
-	// conn is the open connection
-	conn *uacp.Conn
+	// atomicConn is the open connection.
+	//
+	// Stored atomically because Close() reads it on the caller's goroutine
+	// while monitor() writes it from Dial() during an auto-reconnect. With
+	// a plain field the race detector reports a write/read race whenever a
+	// client is closed while it is re-dialling — a realistic sequence, e.g.
+	// a server dropping and the owner stopping the client mid-reconnect.
+	// The secure channel and session below are already stored this way for
+	// the same reason; the connection was the one shared field left plain.
+	atomicConn atomic.Value // *uacp.Conn
 
 	// sechan is the open secure channel.
 	atomicSechan atomic.Value // *uasc.SecureChannel
@@ -405,7 +413,7 @@ func (c *Client) monitor(ctx context.Context) {
 						// todo(fs): down.
 						//
 						// https://github.com/gopcua/opcua/pull/470
-						c.conn.Close()
+						c.conn().Close()
 						if sc := c.SecureChannel(); sc != nil {
 							sc.Close()
 							c.setSecureChannel(nil)
@@ -614,19 +622,20 @@ func (c *Client) Dial(ctx context.Context) error {
 	}
 
 	var err error
-	c.conn, err = c.cfg.dialer.Dial(ctx, c.endpointURL)
+	conn, err := c.cfg.dialer.Dial(ctx, c.endpointURL)
+	c.setConn(conn)
 	if err != nil {
 		return err
 	}
 
-	sc, err := uasc.NewSecureChannel(c.endpointURL, c.conn, c.cfg.sechan, c.sechanErr)
+	sc, err := uasc.NewSecureChannel(c.endpointURL, c.conn(), c.cfg.sechan, c.sechanErr)
 	if err != nil {
-		c.conn.Close()
+		c.conn().Close()
 		return err
 	}
 
 	if err := sc.Open(ctx); err != nil {
-		c.conn.Close()
+		c.conn().Close()
 		return err
 	}
 	c.setSecureChannel(sc)
@@ -661,8 +670,8 @@ func (c *Client) Close(ctx context.Context) error {
 
 	// close the connection but ignore the error since there isn't
 	// anything we can do about it anyway
-	if c.conn != nil {
-		c.conn.Close()
+	if c.conn() != nil {
+		c.conn().Close()
 	}
 
 	return nil
@@ -704,6 +713,20 @@ func (c *Client) publishTimeout() time.Duration {
 
 func (c *Client) setPublishTimeout(d time.Duration) {
 	c.atomicPublishTimeout.Store(d)
+}
+
+// conn returns the active connection, or nil when none is open.
+func (c *Client) conn() *uacp.Conn {
+	v := c.atomicConn.Load()
+	if v == nil {
+		return nil
+	}
+	cc, _ := v.(*uacp.Conn)
+	return cc
+}
+
+func (c *Client) setConn(cc *uacp.Conn) {
+	c.atomicConn.Store(cc)
 }
 
 // SecureChannel returns the active secure channel.
