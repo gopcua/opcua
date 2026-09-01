@@ -36,6 +36,10 @@ func newNoneAsymmetric(*rsa.PrivateKey, *rsa.PublicKey) (*EncryptionAlgorithm, e
 		verifySignature:       &None{},
 		signatureLength:       0,
 		remoteSignatureLength: 0,
+		// A 0-length ClientNonce is allowed for SecurityPolicy#None, but some
+		// embedded servers close the connection when they receive one. A 1-byte
+		// nonce matches UaExpert and is ignored by None-policy crypto. See #894.
+		nonceLength: 1,
 	}, nil
 }
 
