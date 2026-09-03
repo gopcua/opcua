@@ -122,7 +122,10 @@ func (as *NodeNameSpace) Attribute(id *ua.NodeID, attr ua.AttributeID) *ua.DataV
 		}
 	}
 
-	if !n.Access(ua.AccessLevelTypeCurrentRead) {
+	// OPC UA Part 3 §5.6.2: AccessLevel restricts the Value attribute only.
+	// All other attributes (NodeClass, BrowseName, DisplayName, …) must
+	// remain readable regardless of the access level.
+	if attr == ua.AttributeIDValue && !n.Access(ua.AccessLevelTypeCurrentRead) {
 		return &ua.DataValue{
 			EncodingMask:    ua.DataValueServerTimestamp | ua.DataValueStatusCode,
 			ServerTimestamp: time.Now(),

@@ -1,7 +1,14 @@
+// Package monitor provides an API for subscribing to OPC UA node value changes.
+//
+// The subscription owns ClientHandles: it ignores any value a caller sets and
+// assigns its own, which is how incoming notifications are matched back to
+// nodes. Callers may therefore share one ua.MonitoringParameters across many
+// Requests. See Part 4, 7.21.
 package monitor
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"sync/atomic"
 
@@ -17,6 +24,45 @@ var (
 	// ErrSlowConsumer is returned when a subscriber does not keep up with the incoming messages
 	ErrSlowConsumer = errors.New("slow consumer. messages may be dropped")
 )
+
+// ItemError represents a single monitored item that failed to be created.
+// AddMonitorItems returns an errors.Join of *ItemError when one or more items
+// could not be created on the server. Callers can inspect failures with the
+// standard errors helpers:
+//
+//	items, err := sub.AddMonitorItems(ctx, requests...)
+//	if err != nil {
+//	    // items contains the successfully created monitors (nil if all failed)
+//
+//	    // Check for a specific status code across all failures:
+//	    if errors.Is(err, ua.StatusBadNodeIDUnknown) { ... }
+//
+//	    // Inspect the first failing item:
+//	    var ie *monitor.ItemError
+//	    if errors.As(err, &ie) { _ = ie.NodeID; _ = ie.Status }
+//
+//	    // Iterate over all failures:
+//	    if u, ok := err.(interface{ Unwrap() []error }); ok {
+//	        for _, e := range u.Unwrap() {
+//	            var ie *monitor.ItemError
+//	            if errors.As(e, &ie) { /* ie.NodeID, ie.Status */ }
+//	        }
+//	    }
+//	}
+type ItemError struct {
+	NodeID *ua.NodeID
+	Status ua.StatusCode
+}
+
+func (e *ItemError) Error() string {
+	return fmt.Sprintf("%s: %s", e.NodeID, e.Status)
+}
+
+// Unwrap exposes the underlying status code so that errors.Is can match on
+// values such as ua.StatusBadNodeIDUnknown.
+func (e *ItemError) Unwrap() error {
+	return e.Status
+}
 
 // ErrHandler is a function that is called when there is an out of band issue with delivery
 type ErrHandler func(*opcua.Client, *Subscription, error)
@@ -58,10 +104,17 @@ func (m *Item) NodeID() *ua.NodeID {
 
 // Request is a struct to manage a request to monitor a node or modify a monitored node
 type Request struct {
-	NodeID               *ua.NodeID
-	MonitoringMode       ua.MonitoringMode
+	NodeID         *ua.NodeID
+	MonitoringMode ua.MonitoringMode
+
+	// MonitoringParameters holds this node's monitoring settings. Any
+	// ClientHandle you set is ignored: Part 4, 7.21 scopes the handle to a
+	// single MonitoredItem, so the subscription assigns its own on a private,
+	// shallow copy and one instance may be shared across Requests.
+	// The copy leaves Filter and NodeID aliased with the caller; mutating
+	// either afterward is undefined, since Filter is replayed verbatim on
+	// reconnect.
 	MonitoringParameters *ua.MonitoringParameters
-	handle               uint32
 }
 
 // Subscription is an instance of an active subscription.
@@ -282,7 +335,8 @@ func (s *Subscription) AddNodeIDs(ctx context.Context, nodes ...*ua.NodeID) erro
 	return err
 }
 
-// AddMonitorItems adds nodes with monitoring parameters to the subscription
+// AddMonitorItems adds monitored nodes. Any ClientHandle set in a Request is
+// ignored; the subscription assigns its own. See Part 4, 7.21.
 func (s *Subscription) AddMonitorItems(ctx context.Context, nodes ...Request) ([]Item, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -294,21 +348,15 @@ func (s *Subscription) AddMonitorItems(ctx context.Context, nodes ...Request) ([
 	}
 
 	toAdd := make([]*ua.MonitoredItemCreateRequest, 0)
+	allocated := make([]uint32, len(nodes))
 
 	// Add handles and make requests
 	for i, node := range nodes {
 		handle := atomic.AddUint32(&s.monitor.nextClientHandle, 1)
 		s.handles[handle] = nodes[i].NodeID
-		nodes[i].handle = handle
+		allocated[i] = handle
 
-		request := opcua.NewMonitoredItemCreateRequestWithDefaults(node.NodeID, ua.AttributeIDValue, handle)
-		request.MonitoringMode = node.MonitoringMode
-
-		if node.MonitoringParameters != nil {
-			request.RequestedParameters = node.MonitoringParameters
-			request.RequestedParameters.ClientHandle = handle
-		}
-		toAdd = append(toAdd, request)
+		toAdd = append(toAdd, buildCreateRequest(node, handle))
 	}
 	resp, err := s.sub.Monitor(ctx, ua.TimestampsToReturnBoth, toAdd...)
 	if err != nil {
@@ -323,17 +371,31 @@ func (s *Subscription) AddMonitorItems(ctx context.Context, nodes ...Request) ([
 		return nil, errors.Errorf("monitor items response length mismatch")
 	}
 	var monitoredItems []Item
+	var failedItems []error
 	for i, res := range resp.Results {
 		if res.StatusCode != ua.StatusOK {
-			return nil, res.StatusCode
+			failedItems = append(failedItems, &ItemError{
+				NodeID: toAdd[i].ItemToMonitor.NodeID,
+				Status: res.StatusCode,
+			})
+			// Clean up the handle for the failed item
+			delete(s.handles, allocated[i])
+			continue
 		}
 		mn := Item{
 			id:     res.MonitoredItemID,
-			handle: nodes[i].handle,
+			handle: allocated[i],
 			nodeID: toAdd[i].ItemToMonitor.NodeID,
 		}
 		s.itemLookup[res.MonitoredItemID] = mn
 		monitoredItems = append(monitoredItems, mn)
+	}
+
+	if len(failedItems) > 0 {
+		// monitoredItems is nil when every item failed and non-nil when some
+		// items succeeded; either way the joined *ItemError values let
+		// callers use errors.Is / errors.As to inspect per-node failures.
+		return monitoredItems, errors.Join(failedItems...)
 	}
 
 	return monitoredItems, nil
@@ -409,7 +471,8 @@ func (s *Subscription) RemoveMonitorItems(ctx context.Context, items ...Item) er
 	return nil
 }
 
-// ModifyMonitorItems modifies nodes with monitoring parameters to the subscription
+// ModifyMonitorItems modifies monitored nodes. Any ClientHandle set in a
+// Request is ignored; the subscription assigns its own. See Part 4, 7.21.
 func (s *Subscription) ModifyMonitorItems(ctx context.Context, nodes ...Request) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -418,27 +481,12 @@ func (s *Subscription) ModifyMonitorItems(ctx context.Context, nodes ...Request)
 		return nil
 	}
 
-	toModify := make([]*ua.MonitoredItemModifyRequest, 0)
-
-	for _, node := range nodes {
-		for _, item := range s.itemLookup {
-			if item.nodeID.String() != node.NodeID.String() {
-				continue
-			}
-
-			if node.MonitoringParameters == nil {
-				break
-			}
-
-			request := &ua.MonitoredItemModifyRequest{
-				MonitoredItemID:     item.id,
-				RequestedParameters: node.MonitoringParameters,
-			}
-			request.RequestedParameters.ClientHandle = item.handle
-			toModify = append(toModify, request)
-			break
-		}
+	items := make([]Item, 0, len(s.itemLookup))
+	for _, item := range s.itemLookup {
+		items = append(items, item)
 	}
+
+	toModify := buildModifyRequests(nodes, items)
 
 	resp, err := s.sub.ModifyMonitoredItems(ctx, ua.TimestampsToReturnBoth, toModify...)
 	if err != nil {

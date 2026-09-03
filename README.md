@@ -45,6 +45,7 @@ See the full post here: https://github.com/gopcua/opcua/discussions/831
 
 ## List of Breaking Changes and noteworthy issues
 
+* `v0.9.0`: Node operations now run against a `Client` interface instead of the concrete `*Client` type. Code that constructs nodes against the concrete client type must be updated (#847)
 * `v0.8.0`: `ResolveEndpoint` signature has changed. It requires a context and returns the remote address as a `url.URL`` instead of a `*net.TCPAddr`
 * `v0.7.2`: Tagged the wrong branch, deleted the tag, retracted the version, moved changes to `v0.7.3` and `v0.7.4` instead
 * `v0.7.0`: The node attributes for the server now use `ua.DataValue` instead of `ua.Variant` (#766)

@@ -144,6 +144,17 @@ func decodeSlice(b []byte, val reflect.Value, name string) (int, error) {
 	}
 
 	pos := buf.Pos()
+
+	// The element count comes straight off the wire and the only prior check is
+	// n > math.MaxInt32, so a tiny message can still declare hundreds of millions
+	// of elements and force a huge MakeSlice before any element byte is read. Each
+	// element occupies at least one byte on the wire, so a count larger than the
+	// bytes remaining can never be satisfied. Reject it here to keep the allocation
+	// bounded by the actual input size.
+	if int(n) > buf.Len() {
+		return pos, errors.Errorf("array length %d exceeds remaining %d bytes", n, buf.Len())
+	}
+
 	// a is a slice of []*Foo
 	a := reflect.MakeSlice(val.Type(), int(n), int(n))
 	for i := 0; i < int(n); i++ {

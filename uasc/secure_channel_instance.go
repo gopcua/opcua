@@ -138,21 +138,51 @@ func (c *channelInstance) SetMaximumBodySize(chunkSize int) {
 	headerSize := 12
 	symmetricAlgorithmHeader := 4
 
-	// this is the formula proposed by OPCUA - source node-opcua
+	// signAndEncrypt appends one PaddingSize byte (two if ExtraPaddingSize is
+	// present, i.e. for signatures longer than 256 bytes) before padding the
+	// plaintext to a block boundary.
+	paddingSizeBytes := 1
+	if c.algo.RemoteSignatureLength() > 256 {
+		paddingSizeBytes = 2
+	}
+
+	// OPC UA Part 6, 6.7.2.5 defines
+	//
+	//   MaxBodySize = PlainTextBlockSize *
+	//       Floor((MessageChunkSize - HeaderSize - 1) / CipherTextBlockSize) -
+	//       SequenceHeaderSize - SignatureSize
+	//
+	// where the -1 reserves room for the PaddingSize byte. Subtracting it
+	// inside the Floor only takes effect when chunkSize-headerSize is an exact
+	// multiple of the cipher block size. For any other chunk size (e.g. the
+	// default 65535) a maximum-size body pads out to one cipher block more
+	// than fits in the chunk. Reserving the PaddingSize byte(s) outside the
+	// Floor instead is exact: a body of maxBodySize fills the chunk to the
+	// last whole cipher block and one more byte no longer fits, for every
+	// chunk size (see TestMaxBodySizeFitsChunk).
 	maxBodySize :=
 		c.algo.PlaintextBlockSize()*
-			((chunkSize-headerSize-symmetricAlgorithmHeader-c.algo.SignatureLength()-1)/c.algo.BlockSize()) -
-			sequenceHeaderSize
+			((chunkSize-headerSize-symmetricAlgorithmHeader)/c.algo.BlockSize()) -
+			sequenceHeaderSize - c.algo.SignatureLength() - paddingSizeBytes
 	c.maxBodySize = uint32(maxBodySize)
-
-	// this is the formula proposed by ERN - source node-opcua
-	// maxBlock := (chunkSize - headerSize) / c.algo.BlockSize()
-	// c.maxBodySize = c.algo.PlaintextBlockSize()*maxBlock - sequenceHeaderSize - c.algo.SignatureLength() - 1
 }
 
 // signAndEncrypt encrypts the message bytes stored in b and returns the
 // data signed and encrypted per the security policy information from the
 // secure channel.
+//
+// Unlike verifyAndDecrypt, this has no asymmetric carve-out for SecurityMode
+// None. That is correct only because a sender carries its real (non-None)
+// SecurityMode when emitting an OPN; add an asymmetric guard here if the crypto
+// is ever restructured. This function and verifyAndDecrypt stay in lockstep on
+// the isAsymmetric clause: changing one without the other re-breaks symmetric
+// Sign traffic.
+//
+// TODO: split the merged asymmetric/symmetric crypto into separate functions,
+// as open62541 (signAndEncryptAsym/Sym) and the OPC Foundation .NET reference
+// (WriteAsymmetric/SymmetricMessage) do. Any such split must preserve
+// verifyAndDecrypt's asymmetric carve-out for the SecurityMode==None window, or
+// symmetric Sign traffic re-breaks (#815/#817).
 func (c *channelInstance) signAndEncrypt(m *Message, b []byte) ([]byte, error) {
 	// Nothing to do
 	if c.sc.cfg.SecurityMode == ua.MessageSecurityModeNone {
@@ -177,8 +207,18 @@ func (c *channelInstance) signAndEncrypt(m *Message, b []byte) ([]byte, error) {
 		if extraPadding {
 			paddingBytes = 2
 		}
-		paddingLength := plaintextBlockSize - ((len(b[headerLength:]) + c.algo.SignatureLength() + paddingBytes) % plaintextBlockSize)
+		// The PaddingSize byte(s) and Padding must fill the plaintext up to a
+		// block boundary. If it is already block-aligned no padding is needed
+		// beyond the PaddingSize byte(s) themselves (cf. open62541
+		// ua_securechannel_crypto.c, padding calculation).
+		remainder := (len(b[headerLength:]) + c.algo.SignatureLength() + paddingBytes) % plaintextBlockSize
+		paddingLength := 0
+		if remainder != 0 {
+			paddingLength = plaintextBlockSize - remainder
+		}
 
+		// appends paddingLength Padding bytes plus one PaddingSize byte,
+		// each holding the paddingLength value (OPC UA Part 6, 6.7.2.5)
 		for i := 0; i <= paddingLength; i++ {
 			b = append(b, byte(paddingLength))
 		}
@@ -210,12 +250,24 @@ func (c *channelInstance) signAndEncrypt(m *Message, b []byte) ([]byte, error) {
 	return append(b[:headerLength], p...), nil
 }
 
+// verifyAndDecrypt verifies and optionally decrypts an incoming chunk.
+//
+// An asymmetric OpenSecureChannel under a real security policy is always signed
+// and encrypted, even while the channel's SecurityMode still reads None during
+// the handshake (OPC UA Part 6 v1.05 §6.7.4). The SecurityMode==None case below
+// therefore returns raw only for a genuinely unsecured chunk: the explicit #None
+// policy, or any symmetric message regardless of policy. This carve-out is the
+// replacement for the readChunk SecurityMode override (added in #817); that
+// override is no longer present and this guard takes its place.
 func (c *channelInstance) verifyAndDecrypt(m *MessageChunk, r []byte) ([]byte, error) {
-	if c.sc.cfg.SecurityMode == ua.MessageSecurityModeNone {
+	isAsymmetric := m.AsymmetricSecurityHeader != nil
+
+	// Return raw only for a genuinely unsecured chunk; an asymmetric OPN under a
+	// real policy must still be decrypted even while SecurityMode reads None.
+	if c.sc.cfg.SecurityMode == ua.MessageSecurityModeNone &&
+		(c.sc.cfg.SecurityPolicyURI == ua.SecurityPolicyURINone || !isAsymmetric) {
 		return m.Data, nil
 	}
-
-	isAsymmetric := m.AsymmetricSecurityHeader != nil
 
 	headerLength := 12
 

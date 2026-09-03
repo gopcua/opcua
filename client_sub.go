@@ -100,8 +100,59 @@ func (c *Client) recreateSubscription(ctx context.Context, id uint32) error {
 	}
 
 	sub.recreate_delete(ctx)
+
+	// the subscription stays registered under its old id until the replacement
+	// exists, so that a failed create leaves it for the reconnect loop to retry
+	// instead of dropping it. recreate_create only assigns the new id on
+	// success, so the old id is still the key to forget here.
+	if err := sub.recreate_create(ctx); err != nil {
+		return err
+	}
 	c.forgetSubscription_NeedsSubMuxLock(ctx, id)
-	return sub.recreate_create(ctx)
+
+	if err := c.registerSubscription_NeedsSubMuxLock(sub); err != nil {
+		return err
+	}
+
+	return sub.recreate_monitoredItems(ctx)
+}
+
+// republishOrRecreateSubscriptions performs the restoreSubscriptions step of
+// the reconnect state machine. It republishes the subscriptions the server has
+// transferred to the new session and recreates the ones which could not be
+// transferred. Subscriptions for which the republish fails are recreated as
+// well.
+//
+// It returns the next reconnect action and the number of subscriptions which
+// are active again.
+//
+// The next action is none when every subscription was restored. If at least
+// one subscription could not be recreated the next action is recreateSession
+// so that the reconnect loop rebuilds the session and tries again instead of
+// leaving the client connected with a subscription that is gone.
+func (c *Client) republishOrRecreateSubscriptions(ctx context.Context, subsToRepublish, subsToRecreate []uint32, availableSeqs map[uint32][]uint32) (reconnectAction, int) {
+	dlog := debug.NewPrefixLogger("client: restoreSubscriptions: ")
+
+	action, activeSubs := none, 0
+
+	for _, subID := range subsToRepublish {
+		if err := c.republishSubscription(ctx, subID, availableSeqs[subID]); err != nil {
+			dlog.Printf("republish of subscription %d failed", subID)
+			subsToRecreate = append(subsToRecreate, subID)
+		}
+		activeSubs++
+	}
+
+	for _, subID := range subsToRecreate {
+		if err := c.recreateSubscription(ctx, subID); err != nil {
+			dlog.Printf("recreate subscription %d failed: %v", subID, err)
+			action = recreateSession
+			continue
+		}
+		activeSubs++
+	}
+
+	return action, activeSubs
 }
 
 // transferSubscriptions ask the server to transfer the given subscriptions
@@ -225,7 +276,7 @@ func (c *Client) sendRepublishRequests(ctx context.Context, sub *Subscription, a
 	}
 }
 
-// registerSubscription_NeedsSubMuxLock registers a subscription
+// registerSubscription_NeedsSubMuxLock registers a subscription while subMux is held.
 func (c *Client) registerSubscription_NeedsSubMuxLock(sub *Subscription) error {
 	if sub.SubscriptionID == 0 {
 		return ua.StatusBadSubscriptionIDInvalid
@@ -239,7 +290,7 @@ func (c *Client) registerSubscription_NeedsSubMuxLock(sub *Subscription) error {
 	return nil
 }
 
-func (c *Client) forgetSubscription(ctx context.Context, id uint32) {
+func (c *Client) ForgetSubscription(ctx context.Context, id uint32) {
 	c.subMux.Lock()
 	c.forgetSubscription_NeedsSubMuxLock(ctx, id)
 	c.subMux.Unlock()

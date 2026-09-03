@@ -122,6 +122,21 @@ func (a bySecurityLevel) Len() int           { return len(a) }
 func (a bySecurityLevel) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a bySecurityLevel) Less(i, j int) bool { return a[i].SecurityLevel < a[j].SecurityLevel }
 
+type ClientInterface interface {
+	Browse(context.Context, *ua.BrowseRequest) (*ua.BrowseResponse, error)
+	BrowseNext(context.Context, *ua.BrowseNextRequest) (*ua.BrowseNextResponse, error)
+
+	Node(*ua.NodeID) *Node
+	NodeFromExpandedNodeID(*ua.ExpandedNodeID) *Node
+
+	Read(context.Context, *ua.ReadRequest) (*ua.ReadResponse, error)
+	Send(context.Context, ua.Request, func(ua.Response) error) error
+
+	ForgetSubscription(context.Context, uint32)
+
+	RequestTimeout() time.Duration
+}
+
 // Client is a high-level client for an OPC/UA server.
 // It establishes a secure channel and a session.
 type Client struct {
@@ -430,6 +445,10 @@ func (c *Client) monitor(ctx context.Context) {
 							continue
 						}
 
+						// clear the session from the client to prevent
+						// ActivateSession from closing it via CloseSession
+						c.setSession(nil)
+
 						dlog.Printf("trying to restore session")
 						if err := c.ActivateSession(ctx, s); err != nil {
 							dlog.Printf("restore session failed: %v", err)
@@ -539,26 +558,22 @@ func (c *Client) monitor(ctx context.Context) {
 						// Assume that subsToRecreate and subsToRepublish have been
 						// populated in the previous step.
 
-						activeSubs = 0
-						for _, subID := range subsToRepublish {
-							if err := c.republishSubscription(ctx, subID, availableSeqs[subID]); err != nil {
-								dlog.Printf("republish of subscription %d failed", subID)
-								subsToRecreate = append(subsToRecreate, subID)
-							}
-							activeSubs++
+						action, activeSubs = c.republishOrRecreateSubscriptions(ctx, subsToRepublish, subsToRecreate, availableSeqs)
+						if action == none {
+							c.setState(ctx, Connected)
+							break
 						}
 
-						for _, subID := range subsToRecreate {
-							if err := c.recreateSubscription(ctx, subID); err != nil {
-								dlog.Printf("recreate subscripitions failed: %v", err)
-								action = recreateSession
-								continue
-							}
-							activeSubs++
+						// at least one subscription could not be recreated and action
+						// is recreateSession. back off before retrying so we don't
+						// hot-loop hammering the server when a subscription can never
+						// be restored (e.g. a monitored node was permanently removed
+						// from the server's address space).
+						select {
+						case <-ctx.Done():
+							return
+						case <-time.After(c.cfg.sechan.ReconnectInterval):
 						}
-
-						c.setState(ctx, Connected)
-						action = none
 
 					case abortReconnect:
 						dlog.Printf("action: abortReconnect")
@@ -989,14 +1004,14 @@ func (c *Client) sendWithTimeout(ctx context.Context, req ua.Request, timeout ti
 // Node returns a node object which accesses its attributes
 // through this client connection.
 func (c *Client) Node(id *ua.NodeID) *Node {
-	return &Node{ID: id, c: c}
+	return NewNode(id, c)
 }
 
 // NodeFromExpandedNodeID returns a node object which accesses its attributes
 // through this client connection. This is usually needed when working with node ids returned
 // from browse responses by the server.
 func (c *Client) NodeFromExpandedNodeID(id *ua.ExpandedNodeID) *Node {
-	return &Node{ID: ua.NewNodeIDFromExpandedNodeID(id), c: c}
+	return NewNode(ua.NewNodeIDFromExpandedNodeID(id), c)
 }
 
 // FindServers finds the servers available at an endpoint
@@ -1340,6 +1355,10 @@ func (c *Client) UpdateNamespaces(ctx context.Context) error {
 	}
 	c.setNamespaces(ns)
 	return nil
+}
+
+func (c *Client) RequestTimeout() time.Duration {
+	return c.cfg.sechan.RequestTimeout
 }
 
 // safeAssign implements a type-safe assign from T to *T.

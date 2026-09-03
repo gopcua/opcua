@@ -6,7 +6,6 @@ package uasc
 
 import (
 	"crypto/rsa"
-	"crypto/x509"
 	"encoding/binary"
 
 	"github.com/gopcua/opcua/ua"
@@ -19,7 +18,7 @@ func (s *SecureChannel) NewSessionSignature(cert, nonce []byte) ([]byte, string,
 		return nil, "", nil
 	}
 
-	remoteX509Cert, err := x509.ParseCertificate(cert)
+	remoteX509Cert, err := uapolicy.ParseCertificate(cert)
 	if err != nil {
 		return nil, "", err
 	}
@@ -45,7 +44,7 @@ func (s *SecureChannel) VerifySessionSignature(cert, nonce, signature []byte) er
 		return nil
 	}
 
-	remoteX509Cert, err := x509.ParseCertificate(cert)
+	remoteX509Cert, err := uapolicy.ParseCertificate(cert)
 	if err != nil {
 		return err
 	}
@@ -74,7 +73,7 @@ func (s *SecureChannel) EncryptUserPassword(policyURI, password string, cert, no
 		return []byte(password), "", nil
 	}
 
-	remoteX509Cert, err := x509.ParseCertificate(cert)
+	remoteX509Cert, err := uapolicy.ParseCertificate(cert)
 	if err != nil {
 		return nil, "", err
 	}
@@ -111,7 +110,7 @@ func (s *SecureChannel) NewUserTokenSignature(policyURI string, cert, nonce []by
 		return nil, "", nil
 	}
 
-	remoteX509Cert, err := x509.ParseCertificate(cert)
+	remoteX509Cert, err := uapolicy.ParseCertificate(cert)
 	if err != nil {
 		return nil, "", err
 	}

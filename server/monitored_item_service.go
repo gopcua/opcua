@@ -13,7 +13,7 @@ import (
 
 // MonitoredItemService implements the MonitoredItem Service Set.
 //
-// https://reference.opcfoundation.org/Core/Part4/v105/docs/5.12
+// https://reference.opcfoundation.org/Core/Part4/v105/docs/5.13
 type MonitoredItemService struct {
 	SubService *SubscriptionService
 	Mu         sync.Mutex
@@ -151,7 +151,12 @@ type MonitoredItem struct {
 	Mode ua.MonitoringMode
 }
 
-// https://reference.opcfoundation.org/Core/Part4/v105/docs/5.12.2
+// https://reference.opcfoundation.org/Core/Part4/v105/docs/5.13.2
+// TODO: per-item results are never validated; every item is accepted with
+// StatusOK whether or not the node exists. Part 4 §5.13.2.4 (Table 65) defines
+// operation-level result codes such as Bad_NodeIdUnknown. Once implemented,
+// client failure-mode tests (e.g. a rejected item during subscription
+// recreation) could run against this server instead of an integration fixture.
 func (s *MonitoredItemService) CreateMonitoredItems(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
 	if s.SubService.srv.cfg.logger != nil {
 		s.SubService.srv.cfg.logger.Debug("Handling %T", r)
@@ -245,7 +250,7 @@ func (s *MonitoredItemService) CreateMonitoredItems(sc *uasc.SecureChannel, r ua
 
 }
 
-// https://reference.opcfoundation.org/Core/Part4/v105/docs/5.12.3
+// https://reference.opcfoundation.org/Core/Part4/v105/docs/5.13.3
 func (s *MonitoredItemService) ModifyMonitoredItems(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
 	if s.SubService.srv.cfg.logger != nil {
 		s.SubService.srv.cfg.logger.Debug("Handling %T", r)
@@ -258,7 +263,7 @@ func (s *MonitoredItemService) ModifyMonitoredItems(sc *uasc.SecureChannel, r ua
 	return serviceUnsupported(req.RequestHeader), nil
 }
 
-// https://reference.opcfoundation.org/Core/Part4/v105/docs/5.12.4
+// https://reference.opcfoundation.org/Core/Part4/v105/docs/5.13.4
 func (s *MonitoredItemService) SetMonitoringMode(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
 	if s.SubService.srv.cfg.logger != nil {
 		s.SubService.srv.cfg.logger.Debug("Handling %T", r)
@@ -306,7 +311,7 @@ func (s *MonitoredItemService) SetMonitoringMode(sc *uasc.SecureChannel, r ua.Re
 
 }
 
-// https://reference.opcfoundation.org/Core/Part4/v105/docs/5.12.5
+// https://reference.opcfoundation.org/Core/Part4/v105/docs/5.13.5
 func (s *MonitoredItemService) SetTriggering(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
 	if s.SubService.srv.cfg.logger != nil {
 		s.SubService.srv.cfg.logger.Debug("Handling %T", r)
@@ -319,7 +324,7 @@ func (s *MonitoredItemService) SetTriggering(sc *uasc.SecureChannel, r ua.Reques
 	return serviceUnsupported(req.RequestHeader), nil
 }
 
-// https://reference.opcfoundation.org/Core/Part4/v105/docs/5.12.6
+// https://reference.opcfoundation.org/Core/Part4/v105/docs/5.13.6
 func (s *MonitoredItemService) DeleteMonitoredItems(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
 	if s.SubService.srv.cfg.logger != nil {
 		s.SubService.srv.cfg.logger.Debug("Handling %T", r)
