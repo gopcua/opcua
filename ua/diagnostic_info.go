@@ -59,6 +59,11 @@ func (d *DiagnosticInfo) Decode(b []byte) (int, error) {
 }
 
 func (d *DiagnosticInfo) Encode() ([]byte, error) {
+	if d == nil {
+		// A nil DiagnosticInfo encodes as the null DiagnosticInfo (empty
+		// encoding mask) instead of panicking on the nil receiver.
+		d = &DiagnosticInfo{}
+	}
 	buf := NewBuffer(nil)
 	buf.WriteByte(d.EncodingMask)
 	if d.Has(DiagnosticInfoSymbolicID) {

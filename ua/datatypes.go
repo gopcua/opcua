@@ -62,6 +62,11 @@ func (d *DataValue) Decode(b []byte) (int, error) {
 }
 
 func (d *DataValue) Encode() ([]byte, error) {
+	if d == nil {
+		// A nil DataValue encodes as the null DataValue (empty
+		// encoding mask) instead of panicking on the nil receiver.
+		d = &DataValue{}
+	}
 	buf := NewBuffer(nil)
 	buf.WriteUint8(d.EncodingMask)
 
@@ -153,6 +158,11 @@ func (g *GUID) Decode(b []byte) (int, error) {
 }
 
 func (g *GUID) Encode() ([]byte, error) {
+	if g == nil {
+		// A nil GUID encodes as the null GUID (16 zero bytes)
+		// instead of panicking on the nil receiver.
+		g = &GUID{Data4: make([]byte, 8)}
+	}
 	buf := NewBuffer(nil)
 	buf.WriteUint32(g.Data1)
 	buf.WriteUint16(g.Data2)
@@ -228,6 +238,11 @@ func (l *LocalizedText) Decode(b []byte) (int, error) {
 }
 
 func (l *LocalizedText) Encode() ([]byte, error) {
+	if l == nil {
+		// A nil LocalizedText encodes as the null LocalizedText (empty
+		// encoding mask) instead of panicking on the nil receiver.
+		l = &LocalizedText{}
+	}
 	buf := NewBuffer(nil)
 	buf.WriteUint8(l.EncodingMask)
 	if l.Has(LocalizedTextLocale) {

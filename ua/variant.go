@@ -329,6 +329,11 @@ func (m *Variant) decodeValue(buf *Buffer) interface{} {
 
 // Encode implements the codec interface.
 func (m *Variant) Encode() ([]byte, error) {
+	if m == nil {
+		// A nil Variant encodes as the null Variant (empty encoding
+		// mask) instead of panicking on the nil receiver.
+		m = &Variant{}
+	}
 	buf := NewBuffer(nil)
 	buf.WriteByte(m.mask)
 
