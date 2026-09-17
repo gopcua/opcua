@@ -328,6 +328,11 @@ func (c *Client) monitor(ctx context.Context) {
 			if errors.Is(err, ua.StatusBadNoSubscription) {
 				continue
 			}
+			// Publish StatusBadTimeout is a keepalive miss, not a dead channel.
+			// publish() already ignores it and sends another PublishRequest.
+			if errors.Is(err, ua.StatusBadTimeout) {
+				continue
+			}
 
 			// tell the handler the connection is disconnected
 			c.setState(ctx, Disconnected)
