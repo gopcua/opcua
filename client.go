@@ -166,6 +166,39 @@ type Client struct {
 	// for all active subscriptions.
 	pendingAcks []*ua.SubscriptionAcknowledgement
 
+	// availSeqs holds, per subscription, the sequence numbers the server reported
+	// as still available in its retransmission queue in the most recent
+	// PublishResponse. Acknowledgements are filtered against this set before they
+	// are sent, see sendPublishRequest.
+	//
+	// Rationale: acknowledging a sequence number the server no longer retains
+	// yields BadSequenceNumberUnknown. That is harmless per spec, but some servers
+	// (observed with KEPServerEX V6) close the TCP connection in response, which
+	// combined with a client that then recreates the subscription produces a
+	// permanent reconnect loop. Part 4 defines AvailableSequenceNumbers precisely
+	// so that the client knows which notifications may still be acknowledged or
+	// republished, so only acking the ones in that set is the conformant
+	// behaviour rather than a workaround.
+	availSeqs map[uint32]map[uint32]struct{}
+
+	// ackRejected latches when the server answered a SubscriptionAcknowledgement
+	// with BadSequenceNumberUnknown. While it is set, no acknowledgements are sent
+	// at all.
+	//
+	// Why this is needed on top of availSeqs: some servers advertise a sequence
+	// number in the AvailableSequenceNumbers of the very response that carries it,
+	// but have already dropped it by the time the acknowledgement arrives.
+	// Filtering on the advertisement alone is then useless because the
+	// advertisement is stale. Since one such acknowledgement is enough to make
+	// those servers drop the connection, the latch has to be per client, not per
+	// subscription — a freshly recreated subscription would otherwise send one
+	// again and restart the loop.
+	//
+	// It is self-correcting: any acknowledgement answered with StatusOK clears it,
+	// so a server that returns one transient BadSequenceNumberUnknown resumes
+	// normal acknowledging on the next successful one.
+	ackRejected bool
+
 	// pausech pauses the subscription publish loop
 	pausech chan struct{}
 
@@ -216,6 +249,7 @@ func NewClient(endpoint string, opts ...Option) (*Client, error) {
 		sechanErr:   make(chan error, 1),
 		subs:        make(map[uint32]*Subscription),
 		pendingAcks: make([]*ua.SubscriptionAcknowledgement, 0),
+		availSeqs:   make(map[uint32]map[uint32]struct{}),
 		pausech:     make(chan struct{}, 2),
 		resumech:    make(chan struct{}, 2),
 		stateCh:     cfg.stateCh,

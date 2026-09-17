@@ -298,6 +298,10 @@ func (c *Client) ForgetSubscription(ctx context.Context, id uint32) {
 
 func (c *Client) forgetSubscription_NeedsSubMuxLock(ctx context.Context, id uint32) {
 	delete(c.subs, id)
+	// The subscription is gone, so is any knowledge about what the server still
+	// retains for it. Dropping the entry also keeps the map from growing without
+	// bound on long running clients that recreate subscriptions on every reconnect.
+	delete(c.availSeqs, id)
 	c.updatePublishTimeout_NeedsSubMuxLock()
 	stats.Subscription().Add("Count", -1)
 
@@ -526,6 +530,11 @@ func (c *Client) publish(ctx context.Context) error {
 
 	default:
 		c.subMux.Lock()
+		// Record what the server says it still retains before handling the acks.
+		// It describes the server's *current* retransmission queue and is unrelated
+		// to the results of the acks we just sent.
+		c.recordAvailSeqs_NeedsSubMuxLock(res)
+
 		// handle pending acks for all subscriptions
 		c.handleAcks_NeedsSubMuxLock(res.Results)
 
@@ -565,12 +574,22 @@ func (c *Client) handleAcks_NeedsSubMuxLock(res []ua.StatusCode) {
 		switch err {
 		case ua.StatusOK:
 			// message ack'ed
+			// A server that accepts an acknowledgement is behaving normally again,
+			// so release the latch (see Client.ackRejected).
+			c.ackRejected = false
 		case ua.StatusBadSubscriptionIDInvalid:
 			// old subscription id -> skip
 			dlog.Printf("error: subscription id invalid. skipping: %s", err)
 		case ua.StatusBadSequenceNumberUnknown:
 			// server does not have the message in its retransmission queue anymore
 			dlog.Printf("error: notif %d/%d not on server anymore: %s", ack.SubscriptionID, ack.SequenceNumber, err)
+			// Latch: stop acknowledging anything on this client until the server
+			// accepts an acknowledgement again. See Client.ackRejected for why this
+			// has to be per client rather than per subscription.
+			if !c.ackRejected {
+				dlog.Printf("server rejected an acknowledgement, suspending acks on this client")
+			}
+			c.ackRejected = true
 		default:
 			// otherwise, we try to ack again
 			notAcked = append(notAcked, ack)
@@ -579,6 +598,61 @@ func (c *Client) handleAcks_NeedsSubMuxLock(res []ua.StatusCode) {
 	}
 	c.pendingAcks = notAcked
 	dlog.Printf("notAcked=%v", notAcked)
+}
+
+// recordAvailSeqs_NeedsSubMuxLock stores the sequence numbers the server reported
+// as still available in its retransmission queue for this subscription.
+//
+// The set is replaced, not merged: AvailableSequenceNumbers describes the server's
+// current queue, so anything missing from a newer response is gone for good.
+func (c *Client) recordAvailSeqs_NeedsSubMuxLock(res *ua.PublishResponse) {
+	if res == nil {
+		return
+	}
+	set := make(map[uint32]struct{}, len(res.AvailableSequenceNumbers))
+	for _, s := range res.AvailableSequenceNumbers {
+		set[s] = struct{}{}
+	}
+	c.availSeqs[res.SubscriptionID] = set
+}
+
+// filterAcks_NeedsSubMuxLock drops pending acknowledgements the server can no
+// longer accept, so that we do not provoke BadSequenceNumberUnknown.
+//
+// Two gates, deliberately different in strength:
+//
+//  1. If the server already rejected an acknowledgement (ackRejected), send none
+//     at all. This is independent of the AvailableSequenceNumbers filter below,
+//     because some servers advertise a sequence number and drop it before the
+//     acknowledgement arrives — the advertisement alone cannot be trusted.
+//
+//  2. Otherwise only drop acknowledgements when the server has *explicitly* said
+//     it retains nothing for that subscription (an entry exists and is empty).
+//     Not dropping on "the number is simply not listed" is intentional: a server
+//     may list a sequence number only in a later response, and dropping on that
+//     basis would leave it unacknowledged forever and let its retransmission
+//     queue grow.
+func (c *Client) filterAcks_NeedsSubMuxLock() []*ua.SubscriptionAcknowledgement {
+	dlog := debug.NewPrefixLogger("publish: ")
+
+	if c.ackRejected {
+		if len(c.pendingAcks) > 0 {
+			dlog.Printf("acks suspended, dropping %d pending acknowledgement(s)", len(c.pendingAcks))
+		}
+		return nil
+	}
+
+	kept := make([]*ua.SubscriptionAcknowledgement, 0, len(c.pendingAcks))
+	for _, ack := range c.pendingAcks {
+		set, seen := c.availSeqs[ack.SubscriptionID]
+		if seen && len(set) == 0 {
+			dlog.Printf("server retains nothing for sub %d, skipping ack of notif %d",
+				ack.SubscriptionID, ack.SequenceNumber)
+			continue
+		}
+		kept = append(kept, ack)
+	}
+	return kept
 }
 
 func (c *Client) handleNotification_NeedsSubMuxLock(sub *Subscription, res *ua.PublishResponse) {
@@ -606,14 +680,19 @@ func (c *Client) handleNotification_NeedsSubMuxLock(sub *Subscription, res *ua.P
 func (c *Client) sendPublishRequest(ctx context.Context) (*ua.PublishResponse, error) {
 	dlog := debug.NewPrefixLogger("publish: ")
 
-	c.subMux.RLock()
+	// Write lock: the filtered result is stored back into c.pendingAcks.
+	// It has to be stored back rather than only filtering the outgoing copy,
+	// because handleAcks_NeedsSubMuxLock pairs results with pending acks by index
+	// and clears the whole queue when the two lengths disagree.
+	c.subMux.Lock()
+	c.pendingAcks = c.filterAcks_NeedsSubMuxLock()
 	req := &ua.PublishRequest{
 		SubscriptionAcknowledgements: c.pendingAcks,
 	}
 	if req.SubscriptionAcknowledgements == nil {
 		req.SubscriptionAcknowledgements = []*ua.SubscriptionAcknowledgement{}
 	}
-	c.subMux.RUnlock()
+	c.subMux.Unlock()
 
 	dlog.Printf("PublishRequest: %s", debug.ToJSON(req))
 	var res *ua.PublishResponse
