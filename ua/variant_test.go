@@ -1249,3 +1249,15 @@ func TestDecodeInvalidType(t *testing.T) {
 	_, err := v.Decode(b)
 	require.EqualError(t, err, "opcua: invalid type id: 32")
 }
+
+func TestVariantDecodeRejectsInvalidArrayLength(t *testing.T) {
+	val := new(Variant)
+
+	require.NotPanics(t, func() {
+		_, err := val.Decode([]byte{
+			byte(TypeIDInt32 | VariantArrayValues),
+			0xfe, 0xff, 0xff, 0xff,
+		})
+		require.ErrorIs(t, err, StatusBadEncodingLimitsExceeded)
+	})
+}
