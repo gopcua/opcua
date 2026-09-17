@@ -290,6 +290,21 @@ func (s *SecureChannel) dispatcher() {
 			ch, ok := s.popHandler(msg.RequestID)
 
 			if !ok {
+				// An error nothing is waiting for is the server refusing what is in flight.
+				//
+				// A server rejecting OpenSecureChannel answers with request id 0 while the pending request is id 1, so this
+				// dropped the status and the caller waited for a reply that never came - until the server closed the socket and
+				// the whole exchange surfaced as io.EOF. Dropping a response with no handler is right; dropping an error is how
+				// a refusal becomes a timeout.
+				//
+				// See https://github.com/gopcua/opcua/issues/613.
+				if msg.Err != nil {
+					debug.Printf("uasc %d/%d: no handler for error, failing requests in flight: %v",
+						s.c.ID(), msg.RequestID, msg.Err)
+					s.failPending(msg.Err)
+					continue
+				}
+
 				debug.Printf("uasc %d/%d: no handler for %T", s.c.ID(), msg.RequestID, msg.body)
 				continue
 			}
@@ -437,13 +452,21 @@ func (s *SecureChannel) Receive(ctx context.Context) *MessageBody {
 func (s *SecureChannel) readChunk() (*MessageChunk, error) {
 	// read a full message from the underlying conn.
 	b, err := s.c.Receive()
-	if err == io.EOF || len(b) == 0 {
-		return nil, io.EOF
-	}
-	// do not wrap this error since it hides conn error
+
+	// An error from the server, before the emptiness test below.
+	//
+	// Receive returns (nil, *uacp.Error) when it decodes an ERR message, so `len(b) == 0` matched first and every error a
+	// server sent became a bare io.EOF - making this branch unreachable. A PLC refusing a connection because it does not trust
+	// the client certificate answers OpenSecureChannel with ERR/BadSecurityChecksFailed, and the caller saw only EOF.
+	//
+	// See https://github.com/gopcua/opcua/issues/613.
 	var uacperr *uacp.Error
 	if errors.As(err, &uacperr) {
 		return nil, err
+	}
+
+	if err == io.EOF || len(b) == 0 {
+		return nil, io.EOF
 	}
 	if err != nil {
 		return nil, errors.Errorf("sechan: read header failed: %s %#v", err, err)
@@ -948,6 +971,27 @@ func (s *SecureChannel) sendRequestWithTimeout(
 	case <-timer.C:
 		s.popHandler(reqID)
 		return ua.StatusBadTimeout
+	}
+}
+
+// failPending hands an unaddressed error to every request waiting for a reply.
+//
+// For errors that arrive with a request id nothing registered - see the caller. Without it the request waits for a reply the
+// server has already refused to send.
+func (s *SecureChannel) failPending(err error) {
+	s.handlersMu.Lock()
+	pending := make([]chan *MessageBody, 0, len(s.handlers))
+	for reqID, ch := range s.handlers {
+		pending = append(pending, ch)
+		delete(s.handlers, reqID)
+	}
+	s.handlersMu.Unlock()
+
+	for _, ch := range pending {
+		select {
+		case ch <- &MessageBody{Err: err}:
+		default:
+		}
 	}
 }
 
