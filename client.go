@@ -466,6 +466,13 @@ func (c *Client) monitor(ctx context.Context) {
 						}
 						dlog.Printf("namespaces updated")
 
+						// the restored session still owns its subscriptions
+						// on the server, so republish them to recover the
+						// notifications missed while the connection was down.
+						// restoreSubscriptions recreates the ones the server
+						// has already dropped.
+						subsToRepublish = c.SubscriptionIDs()
+
 						action = restoreSubscriptions
 
 					case recreateSession:
