@@ -188,7 +188,10 @@ func (b *Buffer) ReadTime() time.Time {
 		return time.Time{}
 	}
 	// decode time in "100 nanosecond intervals since January 1, 1601" manner.
-	return time.Unix(0, int64((ts-116444736000000000)*100)).UTC()
+	// A full-range tick count exceeds int64 nanoseconds, so the conversion
+	// goes through seconds and a sub-second remainder.
+	sec, rem := ts/1e7, ts%1e7
+	return time.Unix(int64(sec)-11644473600, int64(rem)*100).UTC()
 }
 
 func (b *Buffer) ReadN(n int) []byte {
@@ -312,7 +315,8 @@ func (b *Buffer) WriteTime(v time.Time) {
 	d := make([]byte, 8)
 	if !v.IsZero() {
 		// encode time in "100 nanosecond intervals since January 1, 1601"
-		ts := uint64(v.UTC().UnixNano()/100 + 116444736000000000)
+		t := v.UTC()
+		ts := uint64(t.Unix())*1e7 + uint64(t.Nanosecond())/100 + 116444736000000000
 		binary.LittleEndian.PutUint64(d, ts)
 	}
 	b.Write(d)

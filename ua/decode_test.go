@@ -211,6 +211,24 @@ func TestCodec(t *testing.T) {
 			b:    []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
 		},
 		{
+			// one tick past the int64 nanosecond range of time.Time
+			name: "DateTime past UnixNano range",
+			v:    &struct{ V time.Time }{time.Date(2262, time.April, 11, 23, 47, 16, 854775900, time.UTC)},
+			b:    []byte{0xaf, 0xc7, 0x1f, 0x50, 0xf3, 0x5f, 0xe5, 0x02},
+		},
+		{
+			// Part 6 5.2.2.5 maximum DateTime
+			name: "DateTime9999",
+			v:    &struct{ V time.Time }{time.Date(9999, time.December, 31, 23, 59, 59, 0, time.UTC)},
+			b:    []byte{0x80, 0xa9, 0x27, 0xd1, 0x5e, 0x5a, 0xc8, 0x24},
+		},
+		{
+			// tick 1, underflowing the 1601 epoch subtraction
+			name: "DateTimeTick1",
+			v:    &struct{ V time.Time }{time.Date(1601, time.January, 1, 0, 0, 0, 100, time.UTC)},
+			b:    []byte{0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+		},
+		{
 			name: "DateTime as Timestamp",
 			v:    &struct{ V Timestamp }{Timestamp(time.Date(2018, time.August, 10, 23, 0, 0, 0, time.UTC))},
 			b:    []byte{0x00, 0x98, 0x67, 0xdd, 0xfd, 0x30, 0xd4, 0x01},
