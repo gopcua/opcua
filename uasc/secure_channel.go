@@ -869,11 +869,11 @@ func (s *SecureChannel) scheduleExpiration(instance *channelInstance) {
 	// https://reference.opcfoundation.org/v104/Core/docs/Part4/5.5.2/#5.5.2.1
 	// Clients should accept Messages secured by an expired SecurityToken for up to 25 % of the token lifetime.
 	const expireAfter = 1.25
-	when := instance.createdAt.Add(time.Second * time.Duration(instance.revisedLifetime.Seconds()*expireAfter))
+	when := time.Second * time.Duration(instance.revisedLifetime.Seconds()*expireAfter)
 
-	debug.Printf("uasc %d: security token expires at %s. channelID=%d tokenID=%d", s.c.ID(), when.UTC().Format(time.RFC3339), instance.secureChannelID, instance.securityTokenID)
+	debug.Printf("uasc %d: security token expires at %s (%s). channelID=%d tokenID=%d", s.c.ID(), time.Now().UTC().Add(when).Format(time.RFC3339), when, instance.secureChannelID, instance.securityTokenID)
 
-	t := time.NewTimer(time.Until(when))
+	t := time.NewTimer(when)
 	defer t.Stop()
 
 	select {
