@@ -890,3 +890,30 @@ func newTestTCPConnPair(t *testing.T) (*net.TCPConn, *net.TCPConn) {
 
 	return nil, nil
 }
+
+func TestScheduleExpiration_ClockSkew(t *testing.T) {
+	sc := &SecureChannel{
+		c:         &uacp.Conn{},
+		instances: make(map[uint32][]*channelInstance),
+		closing:   make(chan struct{}),
+	}
+	inst := &channelInstance{
+		secureChannelID: 1,
+		securityTokenID: 1,
+		createdAt:       time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC), // server clock in the past
+		revisedLifetime: 10 * time.Minute,
+	}
+	sc.instances[1] = []*channelInstance{inst}
+
+	go sc.scheduleExpiration(inst)
+
+	// Give a short period to verify the timer did not fire immediately
+	time.Sleep(50 * time.Millisecond)
+
+	sc.instancesMu.Lock()
+	instances := sc.instances[1]
+	sc.instancesMu.Unlock()
+
+	require.Len(t, instances, 1, "instance should not expire immediately when server createdAt is in the past")
+	close(sc.closing)
+}
