@@ -1,0 +1,481 @@
+package spectest
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"slices"
+	"sync"
+	"time"
+
+	"github.com/gopcua/opcua"
+	"github.com/gopcua/opcua/ua"
+	ginkgo "github.com/onsi/ginkgo/v2"
+)
+
+const (
+	defaultPublishingInterval = 100 * time.Millisecond
+	defaultReconnectInterval  = 50 * time.Millisecond
+	clientRequestTimeout      = 5 * time.Second
+	startTimeout              = 15 * time.Second
+	teardownWait              = 10 * time.Second
+	statePollInterval         = 10 * time.Millisecond
+	notificationBuffer        = 64
+	lifetimeCount             = 1_000_000
+	maxKeepAliveCount         = 1000
+	monitorClientHandle       = 1
+	publishingIntervalEnv     = "SPECTEST_PUBLISHING_INTERVAL"
+	reconnectIntervalEnv      = "SPECTEST_RECONNECT_INTERVAL"
+)
+
+const valueBeforeCut int32 = 9001
+
+// Option changes how Start builds the Environment.
+type Option func(*options)
+
+type options struct {
+	clientOptions         []opcua.Option
+	publishingInterval    time.Duration
+	publishingIntervalSet bool
+}
+
+// WithClientOptions appends client options after the ones Start sets itself.
+func WithClientOptions(opts ...opcua.Option) Option {
+	return func(o *options) {
+		o.clientOptions = append(o.clientOptions, opts...)
+	}
+}
+
+// WithPublishingInterval sets the publishing interval of the subscription
+// Start creates.
+func WithPublishingInterval(d time.Duration) Option {
+	return func(o *options) {
+		o.publishingInterval = d
+		o.publishingIntervalSet = true
+	}
+}
+
+// Environment is a client connected to a scripted server through the
+// relay, with one subscription monitored.
+type Environment struct {
+	Client   *opcua.Client
+	Relay    *Relay
+	Server   *ScriptedServer
+	Recorder *Recorder
+
+	t              T
+	mu             sync.Mutex
+	received       []int32
+	receivedErrors []error
+	states         []opcua.ConnState
+	receivedSignal chan struct{}
+	everConnected  bool
+	cutStates      int
+}
+
+// Start creates and returns a running Environment (see the Environment
+// type) and answers the first held Publish request (see HeldPublish)
+// with valueBeforeCut.
+func Start(t T, opts ...Option) *Environment {
+	var o options
+	for _, opt := range opts {
+		opt(&o)
+	}
+	publishing, reconnect, err := resolveIntervals(o, os.Getenv)
+	if err != nil {
+		t.Fatalf("spectest: %v", err)
+		return nil
+	}
+	if publishing*time.Duration(lifetimeCount) < time.Hour {
+		t.Fatalf("spectest: publishing interval %s times lifetime count %d stays below one hour, so the server's subscription service could delete the subscription before the test ends", publishing, lifetimeCount)
+		return nil
+	}
+	e := &Environment{t: t, receivedSignal: make(chan struct{}, 1)}
+	e.Server = newScriptedServer(t)
+	e.Relay, e.Recorder = newRelay(t, e.Server.Address())
+	e.Relay.onCut = e.noteCut
+	e.Server.recorder = e.Recorder
+
+	states := make(chan opcua.ConnState, notificationBuffer)
+	notifications := make(chan *opcua.PublishNotificationData, notificationBuffer)
+	drained := make(chan struct{})
+	go e.drain(notifications, drained)
+	go e.drainStates(states, drained)
+	t.Cleanup(func() { e.teardown(drained) })
+
+	clientOptions := append([]opcua.Option{
+		opcua.SecurityMode(ua.MessageSecurityModeNone),
+		opcua.AutoReconnect(true),
+		opcua.ReconnectInterval(reconnect),
+		opcua.RequestTimeout(clientRequestTimeout),
+		opcua.StateChangedCh(states),
+	}, o.clientOptions...)
+	client, err := opcua.NewClient("opc.tcp://"+e.Relay.address(), clientOptions...)
+	if err != nil {
+		t.Fatalf("spectest: creating the client failed: %v", err)
+		return nil
+	}
+	e.Client = client
+
+	ctx, cancel := context.WithTimeout(context.Background(), startTimeout)
+	connectErr := client.Connect(ctx)
+	cancel()
+	if connectErr != nil {
+		t.Fatalf("the client never connected through the relay: %v", connectErr)
+		return nil
+	}
+	e.everConnected = true
+
+	ctx, cancel = context.WithTimeout(context.Background(), startTimeout)
+	subscription, err := client.Subscribe(ctx, &opcua.SubscriptionParameters{
+		Interval:          publishing,
+		LifetimeCount:     lifetimeCount,
+		MaxKeepAliveCount: maxKeepAliveCount,
+	}, notifications)
+	cancel()
+	if err != nil {
+		t.Fatalf("the client created no subscription: %v", err)
+		return nil
+	}
+	ctx, cancel = context.WithTimeout(context.Background(), startTimeout)
+	_, monitorErr := subscription.Monitor(ctx, ua.TimestampsToReturnBoth,
+		opcua.NewMonitoredItemCreateRequestWithDefaults(e.Server.node, ua.AttributeIDValue, monitorClientHandle))
+	cancel()
+	if monitorErr != nil {
+		t.Fatalf("the client monitored no node: %v", monitorErr)
+		return nil
+	}
+	e.Server.WaitHeldPublish().Answer(e.Subscription(), valueBeforeCut)
+
+	timer := time.NewTimer(startTimeout)
+	defer timer.Stop()
+	for len(e.Received()) == 0 {
+		if errs := e.ReceivedErrors(); len(errs) > 0 {
+			t.Fatalf("the client did not deliver the pre-cut value within %s; errors: %v", startTimeout, errs)
+		}
+		select {
+		case <-e.receivedSignal:
+		case <-timer.C:
+			t.Fatalf("the client did not deliver the pre-cut value within %s", startTimeout)
+		}
+	}
+	e.checkLastSequenceNumber()
+	return e
+}
+
+// Mark holds the position of the recorder's records, the relay's
+// accepted connections and the Environment's received values, received
+// errors and reported states, so the Since methods return only what
+// arrived after it.
+type Mark struct {
+	order          int
+	connections    int
+	received       int
+	receivedErrors int
+	states         int
+}
+
+// Mark returns the current position of every stream. Mark reads each
+// position separately; take it while no traffic flows, as every spec
+// does before a cut.
+func (e *Environment) Mark() Mark {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return Mark{
+		order:          e.Recorder.position(),
+		connections:    e.Relay.ConnectionCount(),
+		received:       len(e.received),
+		receivedErrors: len(e.receivedErrors),
+		states:         len(e.states),
+	}
+}
+
+// Subscription returns the subscription the client created before
+// Start answered the first held Publish request (HeldPublish).
+func (e *Environment) Subscription() Subscription {
+	e.Server.mu.Lock()
+	defer e.Server.mu.Unlock()
+	if e.Server.first == nil {
+		e.t.Fatalf("the client created no subscription")
+	}
+	return Subscription{sub: e.Server.first}
+}
+
+// WaitUntilReconnected waits for the client to pass through
+// Reconnecting back to Connected after the most recent call to
+// Relay.Cut, searching the states recorded since that cut. The
+// deadline starts when this method is called.
+func (e *Environment) WaitUntilReconnected() {
+	e.mu.Lock()
+	cut := e.cutStates
+	e.mu.Unlock()
+	if !e.hasStateSince(cut, opcua.Reconnecting) {
+		deadline := time.Now().Add(startTimeout)
+		for !e.hasStateSince(cut, opcua.Reconnecting) {
+			if !time.Now().Before(deadline) {
+				e.t.Fatalf("client never entered Reconnecting within %s of the cut", startTimeout)
+				return
+			}
+			time.Sleep(statePollInterval)
+		}
+	}
+	reconnecting := e.lastStateIndex(opcua.Reconnecting)
+	if e.hasStateSince(reconnecting+1, opcua.Connected) {
+		return
+	}
+	deadline := time.Now().Add(startTimeout)
+	for !e.hasStateSince(reconnecting+1, opcua.Connected) {
+		if !time.Now().Before(deadline) {
+			e.t.Fatalf("client entered Reconnecting but did not reach Connected within %s; states: %v", startTimeout, e.statesFrom(reconnecting+1))
+			return
+		}
+		time.Sleep(statePollInterval)
+	}
+}
+
+func (e *Environment) lastStateIndex(state opcua.ConnState) int {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	for i := len(e.states) - 1; i >= 0; i-- {
+		if e.states[i] == state {
+			return i
+		}
+	}
+	return -1
+}
+
+func (e *Environment) noteCut() {
+	e.mu.Lock()
+	e.cutStates = len(e.states)
+	e.mu.Unlock()
+}
+
+// Received returns the int32 values of the data change notifications the
+// client delivered, in delivery order.
+func (e *Environment) Received() []int32 {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return slices.Clone(e.received)
+}
+
+// ReceivedSince returns the int32 values the client delivered after m,
+// in delivery order.
+func (e *Environment) ReceivedSince(m Mark) []int32 {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return slices.Clone(e.received[min(m.received, len(e.received)):])
+}
+
+// ReceivedErrors returns the errors the client delivered, in delivery
+// order.
+func (e *Environment) ReceivedErrors() []error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return slices.Clone(e.receivedErrors)
+}
+
+// ReceivedErrorsSince returns the errors the client delivered after m,
+// in delivery order.
+func (e *Environment) ReceivedErrorsSince(m Mark) []error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return slices.Clone(e.receivedErrors[min(m.receivedErrors, len(e.receivedErrors)):])
+}
+
+// ConnectionsSince returns how many connections the relay accepted
+// after m.
+func (e *Environment) ConnectionsSince(m Mark) int {
+	return e.Relay.ConnectionCount() - m.connections
+}
+
+// States returns the client connection states the client reported, in
+// the order it reported them.
+func (e *Environment) States() []opcua.ConnState {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return slices.Clone(e.states)
+}
+
+// StatesSince returns the client connection states the client reported
+// after m, in the order it reported them.
+func (e *Environment) StatesSince(m Mark) []opcua.ConnState {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return slices.Clone(e.states[min(m.states, len(e.states)):])
+}
+
+// LastSequenceNumber returns the sequence number of the last
+// PublishResponse carrying a data change notification that the
+// recorder saw.
+func (e *Environment) LastSequenceNumber() uint32 {
+	sequence, _, _ := lastSequencedValue(e.Recorder.Responses())
+	return sequence
+}
+
+func (e *Environment) checkLastSequenceNumber() {
+	_, value, answered := lastSequencedValue(e.Recorder.Responses())
+	if !answered {
+		e.t.Fatalf("spectest: the recorder saw no answered Publish response")
+	}
+	received := e.Received()
+	valueInt32, isInt32 := value.(int32)
+	if !isInt32 || len(received) == 0 || valueInt32 != received[len(received)-1] {
+		e.t.Fatalf("spectest: the last answered Publish response carries %v, want the value the client delivered", value)
+	}
+}
+
+func resolveIntervals(o options, getenv func(string) string) (time.Duration, time.Duration, error) {
+	publishing := o.publishingInterval
+	if !o.publishingIntervalSet {
+		if value := getenv(publishingIntervalEnv); value != "" {
+			parsed, err := time.ParseDuration(value)
+			if err != nil {
+				return 0, 0, fmt.Errorf("%s: %w", publishingIntervalEnv, err)
+			}
+			publishing = parsed
+		} else {
+			publishing = defaultPublishingInterval
+		}
+	}
+	reconnect := defaultReconnectInterval
+	if value := getenv(reconnectIntervalEnv); value != "" {
+		parsed, err := time.ParseDuration(value)
+		if err != nil {
+			return 0, 0, fmt.Errorf("%s: %w", reconnectIntervalEnv, err)
+		}
+		if parsed <= 0 {
+			return 0, 0, fmt.Errorf("%s: %s is not a positive duration", reconnectIntervalEnv, value)
+		}
+		reconnect = parsed
+	}
+	return publishing, reconnect, nil
+}
+
+func (e *Environment) hasStateSince(start int, want opcua.ConnState) bool {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	for _, state := range e.states[min(start, len(e.states)):] {
+		if state == want {
+			return true
+		}
+	}
+	return false
+}
+
+func (e *Environment) statesFrom(start int) []opcua.ConnState {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return slices.Clone(e.states[min(start, len(e.states)):])
+}
+
+func (e *Environment) drain(notifications <-chan *opcua.PublishNotificationData, drained <-chan struct{}) {
+	for {
+		select {
+		case <-drained:
+			return
+		case notification := <-notifications:
+			e.accept(notification)
+		}
+	}
+}
+
+func (e *Environment) drainStates(states <-chan opcua.ConnState, drained <-chan struct{}) {
+	for {
+		select {
+		case <-drained:
+			return
+		case state := <-states:
+			e.mu.Lock()
+			e.states = append(e.states, state)
+			e.mu.Unlock()
+		}
+	}
+}
+
+func (e *Environment) accept(notification *opcua.PublishNotificationData) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	if notification.Error != nil {
+		e.receivedErrors = append(e.receivedErrors, notification.Error)
+	} else if change, isDataChange := notification.Value.(*ua.DataChangeNotification); isDataChange {
+		for _, item := range change.MonitoredItems {
+			if item == nil || item.Value == nil {
+				continue
+			}
+			if item.Value.Value == nil {
+				e.receivedErrors = append(e.receivedErrors, fmt.Errorf("the client delivered a data change with no value"))
+				continue
+			}
+			value := item.Value.Value.Value()
+			if number, isInt32 := value.(int32); isInt32 {
+				e.received = append(e.received, number)
+			} else {
+				e.receivedErrors = append(e.receivedErrors, fmt.Errorf("the client delivered a data change carrying %T, want int32", value))
+			}
+		}
+	} else {
+		e.receivedErrors = append(e.receivedErrors, fmt.Errorf("the client delivered a %T, want a data change notification", notification.Value))
+	}
+	select {
+	case e.receivedSignal <- struct{}{}:
+	default:
+	}
+}
+
+func (e *Environment) teardown(drained chan struct{}) {
+	if e.Client == nil {
+		close(drained)
+		return
+	}
+	if e.everConnected {
+		deadline := time.Now().Add(teardownWait)
+		for e.Client.State() != opcua.Connected && time.Now().Before(deadline) {
+			time.Sleep(statePollInterval)
+		}
+		if e.Client.State() != opcua.Connected {
+			ginkgo.GinkgoWriter.Printf("spectest: the client did not reach the connected state within %s before teardown\n", teardownWait)
+		}
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), teardownWait)
+	defer cancel()
+	if err := e.Client.Close(ctx); err != nil {
+		ginkgo.GinkgoWriter.Printf("spectest: closing the client failed: %v\n", err)
+	}
+	close(drained)
+}
+
+func lastSequencedValue(responses []ServiceRecord[ua.Response]) (sequence uint32, value any, found bool) {
+	for _, record := range responses {
+		message, forwarded := record.Message()
+		if !forwarded {
+			continue
+		}
+		response, isPublish := message.(*ua.PublishResponse)
+		if !isPublish {
+			continue
+		}
+		if v, carries := dataChangeValue(response); carries {
+			sequence = response.NotificationMessage.SequenceNumber
+			value = v
+			found = true
+		}
+	}
+	return sequence, value, found
+}
+
+func dataChangeValue(response *ua.PublishResponse) (any, bool) {
+	if response.NotificationMessage == nil {
+		return nil, false
+	}
+	for _, data := range response.NotificationMessage.NotificationData {
+		if data == nil || data.Value == nil {
+			continue
+		}
+		change, isDataChange := data.Value.(*ua.DataChangeNotification)
+		if isDataChange && len(change.MonitoredItems) > 0 &&
+			change.MonitoredItems[0].Value != nil && change.MonitoredItems[0].Value.Value != nil {
+			return change.MonitoredItems[0].Value.Value.Value(), true
+		}
+	}
+	return nil, false
+}

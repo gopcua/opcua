@@ -14,7 +14,8 @@ import (
 )
 
 // T is the testing handle spectest helpers use to fail the running
-// spec and register cleanup functions.
+// spec and register cleanup functions. Fatalf must not return: it
+// stops the running spec.
 type T interface {
 	Helper()
 	Fatalf(format string, args ...any)
@@ -85,6 +86,22 @@ type TransportRecord struct {
 	Err        *TransportError
 }
 
+// ConnectionState says whether the relay connection a server-side
+// address belongs to is still open.
+type ConnectionState int
+
+const (
+	// Unknown means the relay never accepted a connection with that
+	// address.
+	Unknown ConnectionState = iota
+	// Open means the relay still forwards the connection the address
+	// belongs to.
+	Open
+	// Closed means the relay closed the connection the address
+	// belongs to.
+	Closed
+)
+
 type flow int
 
 const (
@@ -116,6 +133,11 @@ type streamState struct {
 	consumed    int
 }
 
+type connectionEntry struct {
+	index  int
+	closed bool
+}
+
 type harnessError struct {
 	connection int
 	flow       flow
@@ -139,6 +161,7 @@ type Recorder struct {
 	log         []any
 	streams     map[streamKey]*streamState
 	chunkCounts map[chunkKey]int
+	connections map[string]*connectionEntry
 	err         error
 	reported    bool
 }
@@ -148,6 +171,7 @@ func newRecorder(t T) *Recorder {
 		t:           t,
 		streams:     make(map[streamKey]*streamState),
 		chunkCounts: make(map[chunkKey]int),
+		connections: make(map[string]*connectionEntry),
 	}
 	t.Cleanup(func() {
 		recorder.mu.Lock()
@@ -173,6 +197,72 @@ func (r *Recorder) Responses() []ServiceRecord[ua.Response] {
 	defer r.mu.Unlock()
 	r.raiseLocked()
 	return slices.Clone(r.responses)
+}
+
+// RequestsSince returns a copy of the recorded client-to-server
+// messages with a higher Order than m captured, oldest first.
+func (r *Recorder) RequestsSince(m Mark) []ServiceRecord[ua.Request] {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.raiseLocked()
+	return sinceOrder(r.requests, m.order)
+}
+
+// ResponsesSince returns a copy of the recorded server-to-client
+// messages with a higher Order than m captured, oldest first.
+func (r *Recorder) ResponsesSince(m Mark) []ServiceRecord[ua.Response] {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.raiseLocked()
+	return sinceOrder(r.responses, m.order)
+}
+
+func sinceOrder[M any](records []ServiceRecord[M], order int) []ServiceRecord[M] {
+	var since []ServiceRecord[M]
+	for _, record := range records {
+		if record.Order > order {
+			since = append(since, record)
+		}
+	}
+	return since
+}
+
+// ConnectionOf maps a server-side address, what the server's
+// SecureChannel.RemoteAddr returns, to its relay connection index and
+// state.
+func (r *Recorder) ConnectionOf(addr net.Addr) (int, ConnectionState) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	entry, known := r.connections[addr.String()]
+	if !known {
+		return 0, Unknown
+	}
+	if entry.closed {
+		return entry.index, Closed
+	}
+	return entry.index, Open
+}
+
+func (r *Recorder) position() int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.order
+}
+
+func (r *Recorder) observeConnection(index int, serverAddr net.Addr) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.connections[serverAddr.String()] = &connectionEntry{index: index}
+}
+
+func (r *Recorder) observeConnectionClosed(index int) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, entry := range r.connections {
+		if entry.index == index {
+			entry.closed = true
+		}
+	}
 }
 
 // Transport returns a copy of the recorded transport messages, oldest
@@ -368,27 +458,40 @@ func (r *Recorder) chunkCount(connection int, flow flow, requestID uint32) int {
 // upstream server while a Recorder observes the traffic.
 type Relay struct {
 	listener    net.Listener
+	recorder    *Recorder
 	mu          sync.Mutex
-	connections []net.Conn
+	connections []relayConn
 	count       int
 	wg          sync.WaitGroup
 	closed      bool
+	onCut       func()
+}
+
+type relayConn struct {
+	index  int
+	client net.Conn
+	server net.Conn
 }
 
 func (r *Relay) address() string {
 	return r.listener.Addr().String()
 }
 
-// Cut closes both sides of every connection in r.connections, live or
-// already closed. The listener stays open, so the next dial is accepted
-// immediately.
+// Cut closes both sides of every live connection. The listener stays
+// open, so the next dial is accepted immediately.
 func (r *Relay) Cut() {
 	r.mu.Lock()
-	defer r.mu.Unlock()
-	for _, conn := range r.connections {
-		_ = conn.Close()
-	}
+	conns := r.connections
 	r.connections = nil
+	r.mu.Unlock()
+	for _, conn := range conns {
+		_ = conn.client.Close()
+		_ = conn.server.Close()
+		r.recorder.observeConnectionClosed(conn.index)
+	}
+	if r.onCut != nil {
+		r.onCut()
+	}
 }
 
 // ConnectionCount returns the number of connections the relay has
@@ -407,6 +510,7 @@ func newRelay(t T, upstream string) (*Relay, *Recorder) {
 	relay := &Relay{listener: listener}
 	relay.wg.Add(1)
 	recorder := newRecorder(t)
+	relay.recorder = recorder
 	t.Cleanup(relay.close)
 	go relay.acceptLoop(upstream, recorder)
 	return relay, recorder
@@ -449,9 +553,10 @@ func (r *Relay) acceptLoop(upstream string, recorder *Recorder) {
 		}
 		connection := r.count
 		r.count++
-		r.connections = append(r.connections, clientConn, serverConn)
+		r.connections = append(r.connections, relayConn{index: connection, client: clientConn, server: serverConn})
 		r.wg.Add(2)
 		r.mu.Unlock()
+		recorder.observeConnection(connection, serverConn.LocalAddr())
 		go r.pump(recorder, connection, clientToServer, clientConn, serverConn)
 		go r.pump(recorder, connection, serverToClient, clientConn, serverConn)
 	}
@@ -459,6 +564,7 @@ func (r *Relay) acceptLoop(upstream string, recorder *Recorder) {
 
 func (r *Relay) pump(recorder *Recorder, connection int, flow flow, clientConn, serverConn net.Conn) {
 	defer r.wg.Done()
+	defer recorder.observeConnectionClosed(connection)
 	defer recorder.observeClose(connection, flow)
 	defer func() {
 		_ = clientConn.Close()

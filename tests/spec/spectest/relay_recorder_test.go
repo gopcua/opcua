@@ -125,10 +125,26 @@ func (f *fakeT) Helper() {}
 
 func (f *fakeT) Fatalf(format string, args ...any) {
 	f.fatals = append(f.fatals, fmt.Sprintf(format, args...))
+	panic(fakeFatal{})
 }
 
 func (f *fakeT) Cleanup(cleanup func()) {
 	f.cleanups = append(f.cleanups, cleanup)
+}
+
+type fakeFatal struct{}
+
+func fatalPanics(call func()) (panicked bool) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			if _, isFatal := recovered.(fakeFatal); !isFatal {
+				panic(recovered)
+			}
+			panicked = true
+		}
+	}()
+	call()
+	return panicked
 }
 
 func garbageMessage() []byte {
@@ -429,7 +445,7 @@ var _ = Describe("Recorder injected bytes", func() {
 		recorder := newRecorder(ft)
 		recorder.observe(0, clientToServer, garbageMessage())
 
-		recorder.Requests()
+		Expect(fatalPanics(func() { recorder.Requests() })).To(BeTrue(), "Requests() did not fail on the undecodable message")
 		Expect(ft.fatals).To(HaveLen(1), "Requests() did not fail exactly once")
 		Expect(ft.fatals[0]).To(HavePrefix("spectest: connection 0, client-to-server direction, byte offset 0:"))
 
@@ -444,9 +460,11 @@ var _ = Describe("Recorder injected bytes", func() {
 		recorder := newRecorder(ft)
 		recorder.observe(0, clientToServer, garbageMessage())
 
-		for _, cleanup := range ft.cleanups {
-			cleanup()
-		}
+		Expect(fatalPanics(func() {
+			for _, cleanup := range ft.cleanups {
+				cleanup()
+			}
+		})).To(BeTrue(), "the cleanup did not fail on the undecodable message")
 		Expect(ft.fatals).To(HaveLen(1), "the cleanup did not fail on the undecodable message")
 		Expect(ft.fatals[0]).To(HavePrefix("spectest: connection 0, client-to-server direction, byte offset 0:"))
 	})
@@ -519,7 +537,7 @@ var _ = Describe("Recorder injected bytes", func() {
 		Expect(err).NotTo(HaveOccurred(), "encoding the request failed")
 		recorder.observe(0, serverToClient, requestWire)
 
-		recorder.Responses()
+		Expect(fatalPanics(func() { recorder.Responses() })).To(BeTrue(), "Responses() did not fail on the request traveling the wrong direction")
 		Expect(ft.fatals).To(HaveLen(1), "Responses() did not fail on the request traveling the wrong direction")
 		Expect(ft.fatals[0]).To(HavePrefix("spectest: connection 0, server-to-client direction, byte offset 0:"))
 		Expect(ft.fatals[0]).To(ContainSubstring("*ua.ReadRequest"))
@@ -646,7 +664,7 @@ var _ = Describe("Relay upstream faults", func() {
 		Eventually(secondClosed).WithTimeout(specWait).Should(Receive(&secondErr), "the second client connection was not closed after the failed upstream dial")
 		Expect(secondErr).To(HaveOccurred(), "the second client connection is still readable after the failed upstream dial")
 
-		recorder.Requests()
+		Expect(fatalPanics(func() { recorder.Requests() })).To(BeTrue(), "the failed upstream dial did not reach the harness error")
 		Expect(ft.fatals).To(HaveLen(1), "the failed upstream dial did not reach the harness error")
 		Expect(ft.fatals[0]).To(HavePrefix("spectest:"))
 		Expect(ft.fatals[0]).To(ContainSubstring(upstreamAddress))
