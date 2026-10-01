@@ -198,7 +198,7 @@ func (e *Environment) Subscription() Subscription {
 	if e.Server.first == nil {
 		e.t.Fatalf("the client created no subscription")
 	}
-	return Subscription{sub: e.Server.first}
+	return Subscription{server: e.Server, sub: e.Server.first}
 }
 
 // WaitUntilReconnected waits for the client to pass through
@@ -308,19 +308,23 @@ func (e *Environment) StatesSince(m Mark) []opcua.ConnState {
 // PublishResponse carrying a data change notification that the
 // recorder saw.
 func (e *Environment) LastSequenceNumber() uint32 {
-	sequence, _, _ := lastSequencedValue(e.Recorder.Responses())
-	return sequence
+	answered := answeredPublishes(e.Recorder.Responses())
+	if len(answered) == 0 {
+		return 0
+	}
+	return answered[len(answered)-1].sequenceNumber
 }
 
 func (e *Environment) checkLastSequenceNumber() {
-	_, value, answered := lastSequencedValue(e.Recorder.Responses())
-	if !answered {
+	answered := answeredPublishes(e.Recorder.Responses())
+	if len(answered) == 0 {
 		e.t.Fatalf("spectest: the recorder saw no answered Publish response")
+		return
 	}
+	last := answered[len(answered)-1]
 	received := e.Received()
-	valueInt32, isInt32 := value.(int32)
-	if !isInt32 || len(received) == 0 || valueInt32 != received[len(received)-1] {
-		e.t.Fatalf("spectest: the last answered Publish response carries %v, want the value the client delivered", value)
+	if len(received) == 0 || last.value != received[len(received)-1] {
+		e.t.Fatalf("spectest: the last answered Publish response carries %d, want the value the client delivered", last.value)
 	}
 }
 
@@ -444,7 +448,15 @@ func (e *Environment) teardown(drained chan struct{}) {
 	close(drained)
 }
 
-func lastSequencedValue(responses []ServiceRecord[ua.Response]) (sequence uint32, value any, found bool) {
+type answeredPublish struct {
+	sequenceNumber           uint32
+	value                    int32
+	results                  []ua.StatusCode
+	availableSequenceNumbers []uint32
+}
+
+func answeredPublishes(responses []ServiceRecord[ua.Response]) []answeredPublish {
+	var answered []answeredPublish
 	for _, record := range responses {
 		message, forwarded := record.Message()
 		if !forwarded {
@@ -454,20 +466,26 @@ func lastSequencedValue(responses []ServiceRecord[ua.Response]) (sequence uint32
 		if !isPublish {
 			continue
 		}
-		if v, carries := dataChangeValue(response); carries {
-			sequence = response.NotificationMessage.SequenceNumber
-			value = v
-			found = true
+		value, carries := dataChangeValue(response.NotificationMessage)
+		if !carries {
+			continue
 		}
+		valueInt32, _ := value.(int32)
+		answered = append(answered, answeredPublish{
+			sequenceNumber:           response.NotificationMessage.SequenceNumber,
+			value:                    valueInt32,
+			results:                  response.Results,
+			availableSequenceNumbers: response.AvailableSequenceNumbers,
+		})
 	}
-	return sequence, value, found
+	return answered
 }
 
-func dataChangeValue(response *ua.PublishResponse) (any, bool) {
-	if response.NotificationMessage == nil {
+func dataChangeValue(message *ua.NotificationMessage) (any, bool) {
+	if message == nil {
 		return nil, false
 	}
-	for _, data := range response.NotificationMessage.NotificationData {
+	for _, data := range message.NotificationData {
 		if data == nil || data.Value == nil {
 			continue
 		}

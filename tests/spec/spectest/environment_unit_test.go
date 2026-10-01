@@ -160,54 +160,30 @@ func TestAnswerIncrementsTheSequenceCounter(t *testing.T) {
 		env.Server.WaitHeldPublish().Answer(sub, v)
 	}
 
-	var answered []uint32
-	values := map[uint32]int32{}
-	results := map[uint32][]ua.StatusCode{}
-	timeout := time.NewTimer(startTimeout)
-	defer timeout.Stop()
-	for {
-		answered = answered[:0]
-		for _, r := range env.Recorder.Responses() {
-			m, ok := r.Message()
-			if !ok {
-				continue
-			}
-			resp, isPublish := m.(*ua.PublishResponse)
-			if !isPublish {
-				continue
-			}
-			value, found := dataChangeValue(resp)
-			if !found {
-				continue
-			}
-			sequence := resp.NotificationMessage.SequenceNumber
-			answered = append(answered, sequence)
-			if v, isInt32 := value.(int32); isInt32 {
-				values[sequence] = v
-			}
-			results[sequence] = resp.Results
-		}
-		if len(answered) == 3 {
-			break
-		}
-		select {
-		case <-timeout.C:
-			t.Fatalf("the recorder saw %d answered Publish responses, want 3 (one from Start, two from Answer)", len(answered))
-		case <-time.After(statePollInterval):
+	want := []answeredPublish{
+		{sequenceNumber: 1, value: valueBeforeCut},
+		{sequenceNumber: 2, value: 7001},
+		{sequenceNumber: 3, value: 7002},
+	}
+	answered := waitAnsweredPublishes(env, want)
+	got, wantSequences := answeredSequences(answered), answeredSequences(want)
+	if !slices.Equal(got, wantSequences) {
+		t.Fatalf("the sequence numbers of the answered Publish responses are %v, want %v", got, wantSequences)
+	}
+	for i := range answered {
+		if answered[i].value != want[i].value {
+			t.Fatalf("the Publish response with sequence number %d carries %d, want %d", answered[i].sequenceNumber, answered[i].value, want[i].value)
 		}
 	}
-	if !slices.Equal(answered, []uint32{1, 2, 3}) {
-		t.Fatalf("the sequence numbers of the answered Publish responses are %v, want [1 2 3]", answered)
-	}
-	if values[1] != valueBeforeCut || values[2] != 7001 || values[3] != 7002 {
-		t.Fatalf("the answered values are %v, want the pre-cut value then 7001 then 7002", values)
-	}
-	for _, sequence := range []uint32{2, 3} {
-		if len(results[sequence]) != 1 {
-			t.Fatalf("the Publish response with sequence %d carries %d results, want one Good per acknowledgement", sequence, len(results[sequence]))
+	for _, response := range answered {
+		if response.sequenceNumber != 2 && response.sequenceNumber != 3 {
+			continue
 		}
-		if results[sequence][0] != ua.StatusOK {
-			t.Fatalf("the Publish response with sequence %d carries results %v, want [Good]", sequence, results[sequence])
+		if len(response.results) != 1 {
+			t.Fatalf("the Publish response with sequence %d carries %d results, want one Good per acknowledgement", response.sequenceNumber, len(response.results))
+		}
+		if response.results[0] != ua.StatusOK {
+			t.Fatalf("the Publish response with sequence %d carries results %v, want [Good]", response.sequenceNumber, response.results)
 		}
 	}
 }
@@ -502,7 +478,7 @@ func TestAnswerFailsWithoutAMonitoredItem(t *testing.T) {
 	sub := &harnessSub{id: 7, next: 1}
 	entry := &heldEntry{request: &ua.PublishRequest{RequestHeader: &ua.RequestHeader{}}, connection: 0, remoteAddr: openAddress}
 	held := HeldPublish{server: srv, entry: entry}
-	if !fatalPanics(func() { held.Answer(Subscription{sub: sub}, 5) }) {
+	if !fatalPanics(func() { held.Answer(Subscription{sub: sub, server: srv}, 5) }) {
 		t.Fatalf("Answer did not fail for a subscription with no monitored item")
 	}
 	if len(fake.fatals) != 1 || !strings.Contains(fake.fatals[0], "no monitored item for subscription 7") {

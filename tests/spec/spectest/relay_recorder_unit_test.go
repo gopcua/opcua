@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/gopcua/opcua/ua"
+	"github.com/gopcua/opcua/uacp"
 )
 
 func TestServiceRecordMessagePerFate(t *testing.T) {
@@ -47,5 +48,41 @@ func TestServiceMatches(t *testing.T) {
 		if got := c.service.matches(c.message); got != c.want {
 			t.Errorf("%s.matches(%T) = %v, want %v", c.service.name(), c.message, got, c.want)
 		}
+	}
+}
+
+func TestTransportRecordsAServerError(t *testing.T) {
+	fake := &fakeT{}
+	recorder := newRecorder(fake)
+	errorMessage := &uacp.Error{ErrorCode: uint32(ua.StatusBadNotConnected), Reason: "spectest error"}
+	body, err := errorMessage.Encode()
+	if err != nil {
+		t.Fatalf("encoding the ERR body failed: %v", err)
+	}
+	wire, err := transportMessage(uacp.MessageTypeError, body)
+	if err != nil {
+		t.Fatalf("encoding the ERR transport message failed: %v", err)
+	}
+
+	recorder.observe(0, serverToClient, wire)
+
+	records := recorder.Transport()
+	if len(records) != 1 {
+		t.Fatalf("Transport returned %d records for one ERR message, want 1", len(records))
+	}
+	if records[0].Type != ERR {
+		t.Fatalf("the ERR message was recorded as type %v, want ERR", records[0].Type)
+	}
+	if records[0].Err == nil {
+		t.Fatalf("the ERR record carries no error")
+	}
+	if records[0].Err.Status != ua.StatusBadNotConnected {
+		t.Fatalf("the ERR record carries status %v, want Bad_NotConnected", records[0].Err.Status)
+	}
+	if records[0].Err.Reason != "spectest error" {
+		t.Fatalf("the ERR record carries reason %q, want the written reason", records[0].Err.Reason)
+	}
+	for _, cleanup := range fake.cleanups {
+		cleanup()
 	}
 }

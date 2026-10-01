@@ -1,9 +1,14 @@
 package spectest
 
 import (
+	"cmp"
 	"context"
 	"fmt"
+	"maps"
+	"math"
 	"net"
+	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -17,6 +22,7 @@ const (
 	serverStartAttempts = 5
 	scriptedNamespace   = "spectest.scripted"
 	scriptedNode        = "spectest_variable"
+	wraparoundFailure   = "spectest: sequence number wraparound is out of scope"
 )
 
 // ScriptedServer is an OPC UA server that holds every Publish request
@@ -40,8 +46,21 @@ type ScriptedServer struct {
 }
 
 type harnessSub struct {
-	id   uint32
-	next uint32
+	id                 uint32
+	next               uint32
+	retained           map[uint32]*ua.NotificationMessage
+	failRepublish      map[uint32]ua.StatusCode
+	unansweredRetained map[uint32]bool
+}
+
+func newHarnessSub(id uint32) *harnessSub {
+	return &harnessSub{
+		id:                 id,
+		next:               1,
+		retained:           make(map[uint32]*ua.NotificationMessage),
+		failRepublish:      make(map[uint32]ua.StatusCode),
+		unansweredRetained: make(map[uint32]bool),
+	}
 }
 
 type heldEntry struct {
@@ -84,6 +103,7 @@ func newScriptedServer(t T) *ScriptedServer {
 		srv.RegisterHandler(id.CreateSubscriptionRequest_Encoding_DefaultBinary, s.createSubscription)
 		srv.RegisterHandler(id.PublishRequest_Encoding_DefaultBinary, s.holdPublish)
 		srv.RegisterHandler(id.CreateMonitoredItemsRequest_Encoding_DefaultBinary, s.createMonitoredItems)
+		srv.RegisterHandler(id.RepublishRequest_Encoding_DefaultBinary, s.republish)
 
 		if err := srv.Start(context.Background()); err != nil {
 			lastErr = err
@@ -208,7 +228,7 @@ func (s *ScriptedServer) createSubscription(sc *uasc.SecureChannel, r ua.Request
 	}
 	if create, isCreate := response.(*ua.CreateSubscriptionResponse); isCreate {
 		s.mu.Lock()
-		sub := &harnessSub{id: create.SubscriptionID, next: 1}
+		sub := newHarnessSub(create.SubscriptionID)
 		s.subscriptions[sub.id] = sub
 		if s.first == nil {
 			s.first = sub
@@ -258,15 +278,80 @@ func (s *ScriptedServer) createMonitoredItems(sc *uasc.SecureChannel, r ua.Reque
 	return response, nil
 }
 
+func (s *ScriptedServer) republish(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
+	request, isRepublish := r.(*ua.RepublishRequest)
+	if !isRepublish {
+		return nil, ua.StatusBadRequestTypeInvalid
+	}
+	sequenceNumber := request.RetransmitSequenceNumber
+	s.mu.Lock()
+	sub, live := s.subscriptions[request.SubscriptionID]
+	if !live {
+		s.mu.Unlock()
+		return nil, ua.StatusBadSubscriptionIDInvalid
+	}
+	if status, scripted := sub.failRepublish[sequenceNumber]; scripted {
+		delete(sub.failRepublish, sequenceNumber)
+		s.mu.Unlock()
+		return nil, status
+	}
+	message, retained := sub.retained[sequenceNumber]
+	if !retained {
+		s.mu.Unlock()
+		return nil, ua.StatusBadMessageNotAvailable
+	}
+	delete(sub.unansweredRetained, sequenceNumber)
+	s.mu.Unlock()
+	return &ua.RepublishResponse{
+		ResponseHeader:      responseHeader(request.RequestHeader.RequestHandle),
+		NotificationMessage: message,
+	}, nil
+}
+
+func counterAfterRetain(counter, sequenceNumber uint32) uint32 {
+	return max(counter, sequenceNumber+1)
+}
+
 // Subscription identifies one subscription the client created on a
 // scripted server.
 type Subscription struct {
-	sub *harnessSub
+	server *ScriptedServer
+	sub    *harnessSub
 }
 
 // ID returns the subscription id the server handed the client.
 func (s Subscription) ID() uint32 {
 	return s.sub.id
+}
+
+// Retain stores a NotificationMessage carrying v at seq in the
+// subscription's retransmission queue, where it stays until a Publish
+// acknowledges seq. It also moves the subscription's sequence counter
+// to the larger of the counter and seq+1 (the counterAfterRetain
+// rule), so a later Answer reuses no number at or below seq. Retain
+// fails when seq is the largest uint32, because the counter cannot
+// move past it.
+func (s Subscription) Retain(seq uint32, v int32) {
+	s.server.mu.Lock()
+	if seq == math.MaxUint32 {
+		s.server.mu.Unlock()
+		s.server.t.Fatalf("%s", wraparoundFailure)
+		return
+	}
+	handle := s.server.clientHandles[s.sub.id]
+	s.sub.retained[seq] = dataChangeNotificationMessage(seq, handle, v)
+	s.sub.unansweredRetained[seq] = true
+	s.sub.next = counterAfterRetain(s.sub.next, seq)
+	s.server.mu.Unlock()
+}
+
+// FailRepublish scripts a ServiceFault with status for the next
+// Republish that names seq, instead of the retransmission queue's
+// answer. The script answers one Republish and is then gone.
+func (s Subscription) FailRepublish(seq uint32, status ua.StatusCode) {
+	s.server.mu.Lock()
+	s.sub.failRepublish[seq] = status
+	s.server.mu.Unlock()
 }
 
 // HeldPublish is one Publish request the client sent that the harness
@@ -283,9 +368,31 @@ func (h HeldPublish) Connection() int {
 }
 
 // Answer answers the held Publish request with one data change
-// notification carrying v for sub, at sub's next sequence number.
+// notification carrying v for sub, at sub's next sequence number. Each
+// acknowledgement the request carries gets one Good result, removes the
+// acknowledged sequence number from sub's retransmission queue, and the
+// response's AvailableSequenceNumbers holds the retained numbers left.
 func (h HeldPublish) Answer(sub Subscription, v int32) {
+	h.answer(sub, 0, v, true)
+}
+
+// AnswerWithSequenceNumber answers the held Publish request with one
+// data change notification carrying v for sub, with the sequence number
+// seq given explicitly, so a test can send a duplicate sequence number.
+// It also moves the subscription's sequence counter to the larger of
+// the counter and seq+1 (the counterAfterRetain rule), so a later Answer
+// reuses no number at or below seq. AnswerWithSequenceNumber fails when
+// seq is the largest uint32, because the counter cannot move past it.
+func (h HeldPublish) AnswerWithSequenceNumber(sub Subscription, seq uint32, v int32) {
+	h.answer(sub, seq, v, false)
+}
+
+func (h HeldPublish) answer(sub Subscription, sequenceNumber uint32, v int32, useCounter bool) {
 	s := h.server
+	if sub.server != s {
+		s.t.Fatalf("spectest: answering a held Publish request of the scripted server at %s with a subscription of the scripted server at %s", s.address, sub.server.address)
+		return
+	}
 	s.mu.Lock()
 	if s.faultErr != nil {
 		err := s.faultErr
@@ -303,43 +410,37 @@ func (h HeldPublish) Answer(sub Subscription, v int32) {
 		s.t.Fatalf("spectest: the connection the held Publish request arrived on (index %d) is not open", h.entry.connection)
 		return
 	}
+	if !useCounter && sequenceNumber == math.MaxUint32 {
+		s.mu.Unlock()
+		s.t.Fatalf("%s", wraparoundFailure)
+		return
+	}
 	handle, recorded := s.clientHandles[sub.sub.id]
 	if !recorded {
 		s.mu.Unlock()
-		s.t.Fatalf("the client created no monitored item for subscription %d", sub.sub.id)
+		s.t.Fatalf("spectest: the client created no monitored item for subscription %d", sub.sub.id)
 		return
 	}
-	sequence := sub.sub.next
-	sub.sub.next++
-	h.entry.answered = true
-	change := &ua.DataChangeNotification{
-		MonitoredItems: []*ua.MonitoredItemNotification{{
-			ClientHandle: handle,
-			Value:        server.DataValueFromValue(v),
-		}},
-		DiagnosticInfos: []*ua.DiagnosticInfo{},
+	if useCounter {
+		sequenceNumber = sub.sub.next
 	}
+	for _, acknowledgement := range h.entry.request.SubscriptionAcknowledgements {
+		if acknowledgement != nil && acknowledgement.SubscriptionID == sub.sub.id {
+			delete(sub.sub.retained, acknowledgement.SequenceNumber)
+		}
+	}
+	sub.sub.next = counterAfterRetain(sub.sub.next, sequenceNumber)
+	h.entry.answered = true
 	results := make([]ua.StatusCode, len(h.entry.request.SubscriptionAcknowledgements))
 	for i := range results {
 		results[i] = ua.StatusOK
 	}
 	response := &ua.PublishResponse{
-		ResponseHeader: &ua.ResponseHeader{
-			Timestamp:          time.Now(),
-			RequestHandle:      h.entry.request.RequestHeader.RequestHandle,
-			ServiceResult:      ua.StatusOK,
-			ServiceDiagnostics: &ua.DiagnosticInfo{},
-			StringTable:        []string{},
-			AdditionalHeader:   ua.NewExtensionObject(nil),
-		},
-		SubscriptionID:    sub.sub.id,
-		MoreNotifications: false,
-		NotificationMessage: &ua.NotificationMessage{
-			SequenceNumber:   sequence,
-			PublishTime:      time.Now(),
-			NotificationData: []*ua.ExtensionObject{ua.NewExtensionObject(change)},
-		},
-		AvailableSequenceNumbers: []uint32{},
+		ResponseHeader:           responseHeader(h.entry.request.RequestHeader.RequestHandle),
+		SubscriptionID:           sub.sub.id,
+		MoreNotifications:        false,
+		NotificationMessage:      dataChangeNotificationMessage(sequenceNumber, handle, v),
+		AvailableSequenceNumbers: slices.Sorted(maps.Keys(sub.sub.retained)),
 		Results:                  results,
 		DiagnosticInfos:          []*ua.DiagnosticInfo{},
 	}
@@ -348,5 +449,59 @@ func (h HeldPublish) Answer(sub Subscription, v int32) {
 	sendErr := h.entry.channel.SendResponseWithContext(context.Background(), h.entry.requestID, response)
 	if sendErr != nil {
 		s.t.Fatalf("spectest: the connection of the held Publish request closed while answering: %v", sendErr)
+	}
+}
+
+// UnusedScripts returns one readable description per FailRepublish
+// script no Republish has answered with and per retained message no
+// Republish has answered from. Acknowledging a retained message removes
+// it from the retransmission queue but does not mark it used.
+func (s *ScriptedServer) UnusedScripts() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var scripts []string
+	for _, sub := range slices.SortedFunc(maps.Values(s.subscriptions), func(a, b *harnessSub) int {
+		return cmp.Compare(a.id, b.id)
+	}) {
+		for _, seq := range slices.Sorted(maps.Keys(sub.failRepublish)) {
+			scripts = append(scripts, fmt.Sprintf("FailRepublish(%d, %s) for subscription %d", seq, statusName(sub.failRepublish[seq]), sub.id))
+		}
+		for _, seq := range slices.Sorted(maps.Keys(sub.unansweredRetained)) {
+			scripts = append(scripts, fmt.Sprintf("retained %d for subscription %d", seq, sub.id))
+		}
+	}
+	return scripts
+}
+
+func statusName(status ua.StatusCode) string {
+	if details, known := ua.StatusCodes[status]; known {
+		return strings.TrimPrefix(details.Name, "Status")
+	}
+	return fmt.Sprintf("0x%X", uint32(status))
+}
+
+func responseHeader(requestHandle uint32) *ua.ResponseHeader {
+	return &ua.ResponseHeader{
+		Timestamp:          time.Now(),
+		RequestHandle:      requestHandle,
+		ServiceResult:      ua.StatusOK,
+		ServiceDiagnostics: &ua.DiagnosticInfo{},
+		StringTable:        []string{},
+		AdditionalHeader:   ua.NewExtensionObject(nil),
+	}
+}
+
+func dataChangeNotificationMessage(sequenceNumber, handle uint32, v int32) *ua.NotificationMessage {
+	change := &ua.DataChangeNotification{
+		MonitoredItems: []*ua.MonitoredItemNotification{{
+			ClientHandle: handle,
+			Value:        server.DataValueFromValue(v),
+		}},
+		DiagnosticInfos: []*ua.DiagnosticInfo{},
+	}
+	return &ua.NotificationMessage{
+		SequenceNumber:   sequenceNumber,
+		PublishTime:      time.Now(),
+		NotificationData: []*ua.ExtensionObject{ua.NewExtensionObject(change)},
 	}
 }

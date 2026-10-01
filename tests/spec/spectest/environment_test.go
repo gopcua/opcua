@@ -56,9 +56,9 @@ var _ = Describe("Environment Start", func() {
 
 		received := env.Received()
 		Expect(received).To(HaveLen(1), "the harness did not deliver exactly the pre-cut value")
-		publishValue, found := valueAtSequence(env.Recorder.Responses(), env.LastSequenceNumber())
-		Expect(found).To(BeTrue(), "no recorded PublishResponse carries the last sequence number")
-		Expect(publishValue).To(Equal(any(received[0])),
+		answered := answeredPublishes(env.Recorder.Responses())
+		Expect(answered).NotTo(BeEmpty(), "the recorder saw no answered Publish response")
+		Expect(answered[len(answered)-1].value).To(Equal(received[0]),
 			"the value of the last sequenced PublishResponse is not the delivered value")
 	})
 
@@ -111,6 +111,19 @@ var _ = Describe("Environment Start", func() {
 		_, state = env.Recorder.ConnectionOf(&net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 1})
 		Expect(state).To(Equal(Unknown),
 			"ConnectionOf maps an address the relay never accepted to a state other than Unknown")
+	})
+
+	It("delivers no received value and no error notification from a cut", func() {
+		env := Start(GinkgoT())
+		m := env.Mark()
+
+		env.Relay.Cut()
+		env.WaitUntilReconnected()
+
+		Expect(env.ReceivedSince(m)).To(BeEmpty(),
+			"a cut cannot deliver a value on this tree: the connection it cut is the only carrier")
+		Expect(env.ReceivedErrorsSince(m)).To(BeEmpty(),
+			"the client delivers no error notification for a cut on this tree")
 	})
 
 	It("fails spectest: when a held Publish is answered twice", func() {
@@ -272,21 +285,4 @@ func serverAddrOf(recorder *Recorder, index int) net.Addr {
 		}
 	}
 	return nil
-}
-
-func valueAtSequence(responses []ServiceRecord[ua.Response], sequence uint32) (any, bool) {
-	for _, r := range responses {
-		m, ok := r.Message()
-		if !ok {
-			continue
-		}
-		resp, isPublish := m.(*ua.PublishResponse)
-		if !isPublish || resp.NotificationMessage == nil || resp.NotificationMessage.SequenceNumber != sequence {
-			continue
-		}
-		if v, found := dataChangeValue(resp); found {
-			return v, true
-		}
-	}
-	return nil, false
 }
