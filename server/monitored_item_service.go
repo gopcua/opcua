@@ -52,6 +52,9 @@ func (s *MonitoredItemService) DeleteMonitoredItem(id uint32) {
 	// we've got to go backwards because we're deleting from the slice as we go.
 	// I'm guessing this loop is less efficient than slices.DeleteFunc but it's what we've got.
 	delete(s.Items, id)
+	if item.Sub != nil {
+		item.Sub.removeQueue(id)
+	}
 	for i := len(s.Nodes[nodeid]) - 1; i >= 0; i-- {
 		n := s.Nodes[nodeid][i]
 		if n == nil {
@@ -108,30 +111,31 @@ func (s *MonitoredItemService) ChangeNotification(n *ua.NodeID) {
 		return
 	}
 
-	ns, err := s.SubService.srv.Namespace(int(n.Namespace()))
-
 	for i := range items {
 		item := items[i]
 		if item == nil {
 			continue
 		}
-		val := new(ua.MonitoredItemNotification)
-		val.ClientHandle = item.Req.RequestedParameters.ClientHandle
-		if err != nil {
-			if s.SubService.srv.cfg.logger != nil {
-				s.SubService.srv.cfg.logger.Warn("error getting namespace %d: %v", n.Namespace(), err)
-			}
-			val.Value = &ua.DataValue{}
-			val.Value.Status = ua.StatusBad
-			val.Value.EncodingMask |= ua.DataValueStatusCode
-			item.Sub.NotifyChannel <- val
-			continue
-		}
-		dv := ns.Attribute(n, item.Req.ItemToMonitor.AttributeID)
-		val.Value = dv
-		item.Sub.NotifyChannel <- val
+		s.sampleLocked(item, n)
 	}
 
+}
+
+// sampleLocked reads the monitored attribute of item and queues the value
+// in the item's queue. The caller must hold s.Mu.
+func (s *MonitoredItemService) sampleLocked(item *MonitoredItem, n *ua.NodeID) {
+	ns, err := s.SubService.srv.Namespace(int(n.Namespace()))
+	if err != nil {
+		if s.SubService.srv.cfg.logger != nil {
+			s.SubService.srv.cfg.logger.Warn("error getting namespace %d: %v", n.Namespace(), err)
+		}
+		item.Sub.enqueue(item.ID, &ua.DataValue{
+			EncodingMask: ua.DataValueStatusCode,
+			Status:       ua.StatusBad,
+		})
+		return
+	}
+	item.Sub.enqueue(item.ID, ns.Attribute(n, item.Req.ItemToMonitor.AttributeID))
 }
 
 func (s *MonitoredItemService) NextID() uint32 {
@@ -149,6 +153,10 @@ type MonitoredItem struct {
 
 	//TODO: use this
 	Mode ua.MonitoringMode
+
+	// RevisedQueueSize reports the queue size in use for the item. The
+	// server sets it; changing it does not resize the queue.
+	RevisedQueueSize uint32
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.13.2
@@ -189,14 +197,25 @@ func (s *MonitoredItemService) CreateMonitoredItems(sc *uasc.SecureChannel, r ua
 		return nil, errors.New("not your subscription, bro")
 	}
 
+	maxQueueSize := s.SubService.srv.cfg.cap.MaxMonitoredItemsQueueSize
 	for i := range req.ItemsToCreate {
-		itemreq := req.ItemsToCreate[i]
+		// The item keeps a shallow copy of the request, so that filling in
+		// defaults does not write to the caller's request.
+		reqCopy := *req.ItemsToCreate[i]
+		itemreq := &reqCopy
 		nodeid := itemreq.ItemToMonitor.NodeID
-		item := MonitoredItem{
-			ID:  s.NextID(),
-			Sub: sub,
-			Req: itemreq,
+		if itemreq.RequestedParameters == nil {
+			// Treat missing parameters as all defaults.
+			itemreq.RequestedParameters = &ua.MonitoringParameters{}
 		}
+		params := itemreq.RequestedParameters
+		item := MonitoredItem{
+			ID:               s.NextID(),
+			Sub:              sub,
+			Req:              itemreq,
+			RevisedQueueSize: revisedQueueSize(params.QueueSize, maxQueueSize),
+		}
+		sub.createQueue(item.ID, params.ClientHandle, item.RevisedQueueSize, params.DiscardOldest)
 
 		// book keeping of the new item
 		s.Items[item.ID] = &item
@@ -223,13 +242,13 @@ func (s *MonitoredItemService) CreateMonitoredItems(sc *uasc.SecureChannel, r ua
 			StatusCode:              ua.StatusOK,
 			MonitoredItemID:         item.ID,
 			RevisedSamplingInterval: sub.RevisedPublishingInterval,
-			RevisedQueueSize:        1,
+			RevisedQueueSize:        item.RevisedQueueSize,
 			FilterResult:            ua.NewExtensionObject(nil),
 		}
-		// do an initial update for the nodeids in the background.
-		// These lock the mutex so we can't do them inline here.
-		// This will cause them to happen once we unlock.
-		go s.ChangeNotification(nodeid)
+		// Queue the initial value of the new item (Part 4 §7.25.2) before
+		// responding, which §5.13.2.1 permits. Only this item is sampled:
+		// other items on the same node keep their queues as they are.
+		s.sampleLocked(&item, nodeid)
 
 	}
 
@@ -351,6 +370,11 @@ func (s *MonitoredItemService) DeleteMonitoredItems(sc *uasc.SecureChannel, r ua
 		if item.Sub.Session.AuthTokenID.String() != sess.AuthTokenID.String() {
 			results[i] = ua.StatusBadSessionIDInvalid
 		}
+
+		// Discard the queued values now so that no publish response built
+		// after this carries them. A response already being sent may still
+		// carry them (Part 4 §5.13.6.1).
+		item.Sub.removeQueue(id)
 
 		// this function gets the lock so we need to do it in the background so it can happen after our lock is released.
 		go s.DeleteMonitoredItem(id)
