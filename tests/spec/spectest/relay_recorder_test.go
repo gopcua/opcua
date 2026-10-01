@@ -94,13 +94,17 @@ func requestTypeNames(records []ServiceRecord[ua.Request]) []string {
 }
 
 func readNode(client *opcua.Client, nodeID *ua.NodeID) *ua.ReadResponse {
-	ctx, cancel := context.WithTimeout(context.Background(), specWait)
-	defer cancel()
-	resp, err := client.Read(ctx, &ua.ReadRequest{
-		NodesToRead: []*ua.ReadValueID{{NodeID: nodeID, AttributeID: ua.AttributeIDValue}},
-	})
+	resp, err := readNodeOnce(client, nodeID)
 	Expect(err).NotTo(HaveOccurred(), "the client's read of the node failed")
 	return resp
+}
+
+func readNodeOnce(client *opcua.Client, nodeID *ua.NodeID) (*ua.ReadResponse, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), specWait)
+	defer cancel()
+	return client.Read(ctx, &ua.ReadRequest{
+		NodesToRead: []*ua.ReadValueID{{NodeID: nodeID, AttributeID: ua.AttributeIDValue}},
+	})
 }
 
 func orderOf(entry any) int {
@@ -177,6 +181,43 @@ func readResponseWire(requestID uint32) ([]byte, error) {
 	body.WriteStruct(&ua.ReadResponse{
 		ResponseHeader: &ua.ResponseHeader{ServiceDiagnostics: &ua.DiagnosticInfo{}},
 		Results:        []*ua.DataValue{},
+	})
+	if body.Error() != nil {
+		return nil, body.Error()
+	}
+	return messageChunk(uacp.ChunkTypeFinal, requestID, body.Bytes())
+}
+
+func serviceFaultWire(requestID uint32) ([]byte, error) {
+	typeID := ua.ServiceTypeID(&ua.ServiceFault{})
+	if typeID == 0 {
+		return nil, fmt.Errorf("ua.ServiceTypeID returned 0 for *ua.ServiceFault, want its registered type id")
+	}
+	body := ua.NewBuffer(nil)
+	body.WriteStruct(ua.NewFourByteExpandedNodeID(0, typeID))
+	body.WriteStruct(&ua.ServiceFault{
+		ResponseHeader: &ua.ResponseHeader{ServiceDiagnostics: &ua.DiagnosticInfo{}},
+	})
+	if body.Error() != nil {
+		return nil, body.Error()
+	}
+	return messageChunk(uacp.ChunkTypeFinal, requestID, body.Bytes())
+}
+
+func republishRequestWire(requestID uint32) ([]byte, error) {
+	typeID := ua.ServiceTypeID(&ua.RepublishRequest{})
+	if typeID == 0 {
+		return nil, fmt.Errorf("ua.ServiceTypeID returned 0 for *ua.RepublishRequest, want its registered type id")
+	}
+	body := ua.NewBuffer(nil)
+	body.WriteStruct(ua.NewFourByteExpandedNodeID(0, typeID))
+	body.WriteStruct(&ua.RepublishRequest{
+		RequestHeader: &ua.RequestHeader{
+			AuthenticationToken: ua.NewTwoByteNodeID(0),
+			RequestHandle:       requestID,
+		},
+		SubscriptionID:           1,
+		RetransmitSequenceNumber: 2,
 	})
 	if body.Error() != nil {
 		return nil, body.Error()

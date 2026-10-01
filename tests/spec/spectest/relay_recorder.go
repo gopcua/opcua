@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uacp"
@@ -28,11 +29,11 @@ type Fate int
 const (
 	// Forwarded marks a message the relay passed through unchanged.
 	Forwarded Fate = iota
-	// Dropped is reserved for the drop path a later rung adds;
-	// nothing produces it yet.
+	// Dropped marks a request a cut CutAt armed discarded instead of
+	// forwarding it; the record still holds its decoded message.
 	Dropped
-	// Truncated marks bytes that never became a complete message
-	// before their connection closed.
+	// Truncated marks bytes left over when a connection closes: a
+	// message that never became complete.
 	Truncated
 	// Aborted marks a message the sender cancelled with an abort
 	// chunk.
@@ -40,7 +41,8 @@ const (
 )
 
 // ServiceRecord is one service message the relay observed on one
-// connection; only a Forwarded record holds its decoded message.
+// connection; a Forwarded or Dropped record holds its decoded
+// message, the other Fates hold none.
 type ServiceRecord[M any] struct {
 	Order      int
 	Connection int
@@ -50,9 +52,9 @@ type ServiceRecord[M any] struct {
 }
 
 // Message returns the decoded service and whether the relay
-// forwarded it.
+// forwarded it or a cut CutAt armed dropped it.
 func (r ServiceRecord[M]) Message() (M, bool) {
-	if r.Fate != Forwarded {
+	if r.Fate != Forwarded && r.Fate != Dropped {
 		var zero M
 		return zero, false
 	}
@@ -153,6 +155,7 @@ func (e *harnessError) Error() string {
 // safe for concurrent use and return copies.
 type Recorder struct {
 	t           T
+	relay       *Relay
 	mu          sync.Mutex
 	order       int
 	requests    []ServiceRecord[ua.Request]
@@ -311,18 +314,28 @@ func (r *Recorder) setRelayError(err error) {
 func (r *Recorder) observe(connection int, flow flow, data []byte) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	_, _ = r.observeLocked(connection, flow, data)
+	_, _, _ = r.observeLocked(connection, flow, data, false)
 }
 
 // The write stays outside the lock so a peer that stops reading
 // blocks only its own direction.
-func (r *Recorder) forward(connection int, flow flow, data []byte, write func([]byte) error) error {
+func (r *Recorder) forward(connection int, flow flow, data []byte, write func([]byte) error, finishAfterResponse func() error) error {
 	r.mu.Lock()
-	messages, err := r.observeLocked(connection, flow, data)
+	messages, cut, err := r.observeLocked(connection, flow, data, true)
 	r.mu.Unlock()
-	for _, message := range messages {
+	for i, message := range messages {
+		if cut.index == i && cut.drop {
+			r.relay.closeConnection(connection)
+			return err
+		}
 		if writeErr := write(message); writeErr != nil {
 			return writeErr
+		}
+		if cut.index == i {
+			if finishErr := finishAfterResponse(); finishErr != nil {
+				r.setRelayError(fmt.Errorf("spectest: the relay could not half-close the client side after the response it wrote: %w", finishErr))
+			}
+			return err
 		}
 	}
 	return err
@@ -345,7 +358,7 @@ func (r *Recorder) observeClose(connection int, flow flow) {
 	delete(r.streams, key)
 }
 
-func (r *Recorder) observeLocked(connection int, flow flow, data []byte) ([][]byte, error) {
+func (r *Recorder) observeLocked(connection int, flow flow, data []byte, claimCuts bool) ([][]byte, firedCut, error) {
 	key := streamKey{connection, flow}
 	state := r.streams[key]
 	if state == nil {
@@ -353,56 +366,87 @@ func (r *Recorder) observeLocked(connection int, flow flow, data []byte) ([][]by
 		r.streams[key] = state
 	}
 	stream := append(state.rest, data...)
-	messages, rest, err := splitMessages(stream)
+	messages, rest, splitErr := splitMessages(stream)
 	state.rest = bytes.Clone(rest)
-	for _, message := range messages {
+	cut := firedCut{index: -1}
+	for i, message := range messages {
 		offset := state.consumed
 		state.consumed += len(message)
 		order := r.nextOrderLocked()
-		if recordErr := r.recordLocked(order, connection, flow, state, message); recordErr != nil {
+		dropped, afterResponse, recordErr := r.recordLocked(order, connection, flow, state, message, claimCuts)
+		if recordErr != nil {
 			r.setErrorLocked(connection, flow, offset, recordErr)
 		}
+		if (dropped || afterResponse) && cut.index < 0 {
+			cut = firedCut{index: i, drop: dropped}
+			messages = messages[:i+1]
+			break
+		}
 	}
-	if err != nil {
-		r.setErrorLocked(connection, flow, state.consumed, err)
-		return messages, err
+	if splitErr != nil {
+		r.setErrorLocked(connection, flow, state.consumed, splitErr)
+		return messages, cut, splitErr
 	}
-	return messages, nil
+	return messages, cut, nil
 }
 
-func (r *Recorder) recordLocked(order, connection int, flow flow, state *streamState, message []byte) error {
+func (r *Recorder) recordLocked(order, connection int, flow flow, state *streamState, message []byte, claimCuts bool) (dropped bool, afterResponse bool, err error) {
 	decoded, err := decodeFrame(message)
 	if err != nil {
-		return err
+		return false, false, err
 	}
 	switch frame := decoded.(type) {
 	case *transportFrame:
 		record := transportRecord(order, connection, frame)
 		r.transport = append(r.transport, record)
 		r.log = append(r.log, record)
-		return nil
+		return false, false, nil
 	case *chunkFrame:
 		r.chunkCounts[chunkKey{connection, flow, frame.requestID}]++
 		assembled, complete, err := state.reassembler.add(frame)
 		if err != nil {
-			return err
+			return false, false, err
 		}
 		if !complete {
-			return nil
+			return false, false, nil
 		}
 		switch msg := assembled.(type) {
 		case *completeMessage:
 			if flowErr := serviceDirectionError(flow, msg.service); flowErr != nil {
-				return flowErr
+				return false, false, flowErr
+			}
+			if claimCuts && flow == clientToServer && r.relay.takeArmed(func(c armedCut) bool {
+				return c.moment == BeforeRequestReachesServer && c.service.matches(msg.service)
+			}) {
+				r.appendService(order, connection, flow, msg.requestID, Dropped, msg.service)
+				return true, false, nil
+			}
+			if claimCuts && flow == serverToClient && r.relay.takeArmed(func(c armedCut) bool {
+				return c.moment == AfterResponseReachesClient && r.hasRecordedRequest(connection, msg.requestID, c.service)
+			}) {
+				r.appendService(order, connection, flow, msg.requestID, Forwarded, msg.service)
+				return false, true, nil
 			}
 			r.appendService(order, connection, flow, msg.requestID, Forwarded, msg.service)
-			return nil
+			return false, false, nil
 		case *abortedMessage:
 			r.appendService(order, connection, flow, msg.requestID, Aborted, nil)
-			return nil
+			return false, false, nil
 		}
 	}
-	return nil
+	return false, false, nil
+}
+
+func (r *Recorder) hasRecordedRequest(connection int, requestID uint32, service Service) bool {
+	for _, record := range r.requests {
+		if record.Connection != connection || record.RequestID != requestID {
+			continue
+		}
+		if record.message != nil && service.matches(record.message) {
+			return true
+		}
+	}
+	return false
 }
 
 func serviceDirectionError(flow flow, service any) error {
@@ -454,17 +498,82 @@ func (r *Recorder) chunkCount(connection int, flow flow, requestID uint32) int {
 	return r.chunkCounts[chunkKey{connection, flow, requestID}]
 }
 
+// Moment names the point in a request's round trip a cut CutAt
+// armed waits for before it fires.
+type Moment int
+
+const (
+	// BeforeRequestReachesServer fires while the relay still holds the
+	// matching request, before it writes the request upstream.
+	BeforeRequestReachesServer Moment = iota
+	// AfterResponseReachesClient fires once the matching response is
+	// complete, after the relay wrote it to the client.
+	AfterResponseReachesClient
+)
+
+// Service names the kind of client request an armed cut fires on.
+type Service int
+
+const (
+	// Republish is the client's RepublishRequest.
+	Republish Service = iota
+	// Read is the client's ReadRequest.
+	Read
+)
+
+func (s Service) name() string {
+	switch s {
+	case Republish:
+		return "Republish"
+	case Read:
+		return "Read"
+	}
+	return ""
+}
+
+type armedCut struct {
+	moment  Moment
+	service Service
+}
+
+type firedCut struct {
+	index int
+	drop  bool
+}
+
+func (c armedCut) describe() string {
+	if c.moment == AfterResponseReachesClient {
+		return fmt.Sprintf("after a %s response reaches the client", c.service.name())
+	}
+	return fmt.Sprintf("before a %s request reaches the server", c.service.name())
+}
+
+func (s Service) matches(message any) bool {
+	switch s {
+	case Republish:
+		_, ok := message.(*ua.RepublishRequest)
+		return ok
+	case Read:
+		_, ok := message.(*ua.ReadRequest)
+		return ok
+	}
+	return false
+}
+
 // Relay accepts client connections and forwards them to a fixed
 // upstream server while a Recorder observes the traffic.
 type Relay struct {
 	listener    net.Listener
 	recorder    *Recorder
+	t           T
 	mu          sync.Mutex
 	connections []relayConn
 	count       int
 	wg          sync.WaitGroup
 	closed      bool
 	onCut       func()
+	armed       []armedCut
+	draining    map[int]bool
 }
 
 type relayConn struct {
@@ -494,6 +603,107 @@ func (r *Relay) Cut() {
 	}
 }
 
+// CutAt arms one cut: a Moment and a Service the cut fires on, on
+// the next message that matches both. A cut armed for
+// BeforeRequestReachesServer drops the matching request, records it
+// Dropped and closes the connection it rode on. A cut armed for
+// AfterResponseReachesClient writes the matching response to the
+// client, half-closes the client side, closes the server side and
+// keeps reading and discarding what the client sends for 2 s, then
+// closes the client side.
+func (r *Relay) CutAt(moment Moment, service Service) {
+	if moment != BeforeRequestReachesServer && moment != AfterResponseReachesClient {
+		r.t.Fatalf("spectest: CutAt received an unknown Moment %d", int(moment))
+		return
+	}
+	if service != Republish && service != Read {
+		r.t.Fatalf("spectest: CutAt received an unknown Service %d", int(service))
+		return
+	}
+	r.mu.Lock()
+	r.armed = append(r.armed, armedCut{moment: moment, service: service})
+	r.mu.Unlock()
+}
+
+// ArmedCuts returns a readable description of every cut CutAt armed
+// and has not fired yet, in arming order.
+func (r *Relay) ArmedCuts() []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	descriptions := make([]string, len(r.armed))
+	for i, cut := range r.armed {
+		descriptions[i] = cut.describe()
+	}
+	return descriptions
+}
+
+func (r *Relay) takeArmed(match func(armedCut) bool) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for i, cut := range r.armed {
+		if match(cut) {
+			r.armed = append(r.armed[:i], r.armed[i+1:]...)
+			return true
+		}
+	}
+	return false
+}
+
+func (r *Relay) closeConnection(index int) {
+	r.mu.Lock()
+	var kept []relayConn
+	var conn relayConn
+	found := false
+	for _, c := range r.connections {
+		if c.index == index {
+			conn = c
+			found = true
+			continue
+		}
+		kept = append(kept, c)
+	}
+	r.connections = kept
+	r.mu.Unlock()
+	if found {
+		_ = conn.client.Close()
+		_ = conn.server.Close()
+		r.recorder.observeConnectionClosed(index)
+	}
+	if r.onCut != nil {
+		r.onCut()
+	}
+}
+
+const clientDrainTimeout = 2 * time.Second
+
+func (r *Relay) cutAfterResponse(connection int, clientConn, serverConn net.Conn) error {
+	r.mu.Lock()
+	r.draining[connection] = true
+	r.mu.Unlock()
+	closeErr := halfClose(clientConn)
+	_ = serverConn.Close()
+	if closeErr == nil {
+		drainClient(clientConn)
+	}
+	_ = clientConn.Close()
+	r.closeConnection(connection)
+	return closeErr
+}
+
+func drainClient(clientConn net.Conn) {
+	_ = clientConn.SetReadDeadline(time.Now().Add(clientDrainTimeout))
+	buffer := make([]byte, 4096)
+	for {
+		if _, err := clientConn.Read(buffer); err != nil {
+			return
+		}
+	}
+}
+
+func halfClose(conn net.Conn) error {
+	return conn.(*net.TCPConn).CloseWrite()
+}
+
 // ConnectionCount returns the number of connections the relay has
 // accepted since it was created.
 func (r *Relay) ConnectionCount() int {
@@ -507,10 +717,11 @@ func newRelay(t T, upstream string) (*Relay, *Recorder) {
 	if err != nil {
 		t.Fatalf("spectest: the relay could not listen on 127.0.0.1: %v", err)
 	}
-	relay := &Relay{listener: listener}
+	relay := &Relay{listener: listener, t: t, draining: make(map[int]bool)}
 	relay.wg.Add(1)
 	recorder := newRecorder(t)
 	relay.recorder = recorder
+	recorder.relay = relay
 	t.Cleanup(relay.close)
 	go relay.acceptLoop(upstream, recorder)
 	return relay, recorder
@@ -567,7 +778,12 @@ func (r *Relay) pump(recorder *Recorder, connection int, flow flow, clientConn, 
 	defer recorder.observeConnectionClosed(connection)
 	defer recorder.observeClose(connection, flow)
 	defer func() {
-		_ = clientConn.Close()
+		r.mu.Lock()
+		draining := r.draining[connection]
+		r.mu.Unlock()
+		if !draining {
+			_ = clientConn.Close()
+		}
 		_ = serverConn.Close()
 	}()
 	buffer := make([]byte, 64*1024)
@@ -578,9 +794,17 @@ func (r *Relay) pump(recorder *Recorder, connection int, flow flow, clientConn, 
 	for {
 		n, err := source.Read(buffer)
 		if n > 0 {
+			r.mu.Lock()
+			draining := r.draining[connection]
+			r.mu.Unlock()
+			if draining {
+				continue
+			}
 			if forwardErr := recorder.forward(connection, flow, buffer[:n], func(message []byte) error {
 				_, err := destination.Write(message)
 				return err
+			}, func() error {
+				return r.cutAfterResponse(connection, clientConn, serverConn)
 			}); forwardErr != nil {
 				return
 			}
