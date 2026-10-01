@@ -45,6 +45,7 @@ See the full post here: https://github.com/gopcua/opcua/discussions/831
 
 ## List of Breaking Changes and noteworthy issues
 
+* unreleased: The server's `Subscription.NotifyChannel` field was removed. Each MonitoredItem now has its own queue, which honors `queueSize` and `discardOldest`, and Publish responses honor `maxNotificationsPerPublish`. A queued value that stands for discarded ones carries the Overflow info bit in its StatusCode (e.g. `0x00000480` for Good)
 * `v0.9.0`: Node operations now run against a `Client` interface instead of the concrete `*Client` type. Code that constructs nodes against the concrete client type must be updated (#847)
 * `v0.8.0`: `ResolveEndpoint` signature has changed. It requires a context and returns the remote address as a `url.URL`` instead of a `*net.TCPAddr`
 * `v0.7.2`: Tagged the wrong branch, deleted the tag, retracted the version, moved changes to `v0.7.3` and `v0.7.4` instead
