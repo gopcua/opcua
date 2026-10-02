@@ -342,20 +342,28 @@ func TestRun(t *testing.T) {
 		}
 	})
 
-	t.Run("unreadable log warns and the report alone decides", func(t *testing.T) {
-		reportPath := writeFile("report.json",
-			marshalReports(knownDefectIt(types.SpecStateFailed, plainDefectMsg)))
-		logPath := filepath.Join(dir, "absent.log")
-		exit, _, stderr := runGated(t, []string{"knowndefectgate", reportPath, logPath})
-		if exit != 0 {
-			t.Errorf("exit = %d, want 0: the labelled spec still fails, so the defect is present", exit)
-		}
-		for _, want := range []string{"absent.log", "rules were skipped"} {
-			if !strings.Contains(stderr, want) {
-				t.Errorf("stderr %q does not contain %q", stderr, want)
+	for _, c := range []struct {
+		name string
+		spec types.SpecReport
+	}{
+		{name: "an unreadable log fails the gate although the labelled spec still fails", spec: knownDefectIt(types.SpecStateFailed, plainDefectMsg)},
+		{name: "an unreadable log fails the gate for a declared data-race spec", spec: dataRaceIt(types.SpecStatePassed)},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			reportPath := writeFile("report.json", marshalReports(c.spec))
+			logPath := filepath.Join(dir, "absent.log")
+			exit, stdout, stderr := runGated(t, []string{"knowndefectgate", reportPath, logPath})
+			if exit != 1 {
+				t.Errorf("exit = %d, want 1: without the log the data-race and timeout-panic rules did not run", exit)
 			}
-		}
-	})
+			if want := "the log was not read, so the data-race and timeout-panic rules did not run\n"; stdout != want {
+				t.Errorf("stdout %q, want exactly %q", stdout, want)
+			}
+			if !strings.Contains(stderr, "absent.log") {
+				t.Errorf("stderr %q does not name the unreadable log", stderr)
+			}
+		})
+	}
 }
 
 func TestVerdictCountsAnInvalidSpecAsRan(t *testing.T) {
@@ -403,6 +411,31 @@ func dataRaceItWithEntries(state types.SpecState, entries ...types.ReportEntry) 
 	return spec
 }
 
+func dataRaceItFailing(state types.SpecState, failure string) types.SpecReport {
+	spec := dataRaceIt(state)
+	spec.Failure = types.Failure{Message: failure}
+	return spec
+}
+
+func TestVerdictReadsARehydratedDataRaceDeclaration(t *testing.T) {
+	encoded, err := json.Marshal([]types.Report{{SpecReports: []types.SpecReport{dataRaceIt(types.SpecStatePassed)}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var rehydrated []types.Report
+	if err := json.Unmarshal(encoded, &rehydrated); err != nil {
+		t.Fatal(err)
+	}
+	log := raceLogBlock("github.com/gopcua/opcua.(*Client).Close()", "github.com/gopcua/opcua.(*Client).Dial()")
+	exit, message := Verdict(rehydrated, log)
+	if exit != 0 {
+		t.Errorf("Verdict exit = %d, want 0, the rehydrated declaration must read as declared (message: %q)", exit, message)
+	}
+	if want := dataRaceIt(types.SpecStatePassed).FullText() + ": data race still present"; !strings.Contains(message, want) {
+		t.Errorf("message %q does not carry the data-race verdict for the rehydrated declaration, want %q", message, want)
+	}
+}
+
 func TestVerdictScansEverySpecInTheReport(t *testing.T) {
 	unlabelled := types.SpecReport{
 		ContainerHierarchyTexts: []string{"when the session is gone"},
@@ -434,6 +467,21 @@ func TestVerdictScansEverySpecInTheReport(t *testing.T) {
 		}
 		if !strings.Contains(message, failing.FullText()+": failed, defect still present") {
 			t.Errorf("message %q does not carry the failing spec's verdict after the data-race one", message)
+		}
+	})
+
+	t.Run("a malformed data-race declaration does not stop the scan", func(t *testing.T) {
+		malformed := dataRaceItWithEntries(types.SpecStatePassed,
+			types.ReportEntry{Name: "data-race", Value: types.WrapEntryValue(42)})
+		exit, message := Verdict([]types.Report{{SpecReports: []types.SpecReport{malformed, failing}}}, "")
+		if exit != 1 {
+			t.Errorf("Verdict exit = %d, want 1, the malformed declaration fails the gate", exit)
+		}
+		if !strings.Contains(message, malformed.FullText()+": data-race entry is not a list of function names") {
+			t.Errorf("message %q does not carry the malformed-declaration failure", message)
+		}
+		if !strings.Contains(message, failing.FullText()+": failed, defect still present") {
+			t.Errorf("message %q does not carry the failing spec's verdict after the malformed one", message)
 		}
 	})
 }
@@ -503,13 +551,103 @@ func TestVerdictDataRaceRule(t *testing.T) {
 			namesSpec: true,
 		},
 		{
-			name: "a data-race entry whose value holds a non-string is not a declaration",
+			name: "a data-race entry whose value holds a non-string fails the gate",
 			specs: []types.SpecReport{dataRaceItWithEntries(types.SpecStatePassed,
 				types.ReportEntry{Name: "data-race", Value: types.WrapEntryValue([]any{"(*Client).Close", 42})},
 			)},
 			log:       raceLogBlock(closing, dialing),
 			wantExit:  1,
-			contains:  []string{passesNowMsg, "DATA RACE"},
+			contains:  []string{"data-race entry is not a list of function names"},
+			namesSpec: true,
+		},
+		{
+			name: "a data-race entry holding an empty list fails the gate",
+			specs: []types.SpecReport{dataRaceItWithEntries(types.SpecStatePassed,
+				types.ReportEntry{Name: "data-race", Value: types.WrapEntryValue([]string{})},
+			)},
+			log:       "",
+			wantExit:  1,
+			contains:  []string{"data-race entry is not a list of function names"},
+			namesSpec: true,
+		},
+		{
+			name: "a later malformed data-race entry fails the gate even after a valid one",
+			specs: []types.SpecReport{dataRaceItWithEntries(types.SpecStatePassed,
+				types.ReportEntry{Name: "data-race", Value: types.WrapEntryValue([]string{"(*Client).Close", "(*Client).Dial"})},
+				types.ReportEntry{Name: "data-race", Value: types.WrapEntryValue(42)},
+			)},
+			log:       raceLogBlock(closing, dialing),
+			wantExit:  1,
+			contains:  []string{"data-race entry is not a list of function names"},
+			namesSpec: true,
+		},
+		{
+			name: "a second header ends the open block, so two blocks are read",
+			specs: []types.SpecReport{dataRaceItWithEntries(types.SpecStatePassed,
+				types.ReportEntry{Name: "data-race", Value: types.WrapEntryValue([]string{"(*Client).Close"})},
+			)},
+			log:       "WARNING: DATA RACE\n" + closing + "\nWARNING: DATA RACE\n" + other + "\n==================\n",
+			wantExit:  1,
+			contains:  []string{"data race still present", "DATA RACE in " + other},
+			namesSpec: true,
+		},
+		{
+			name:     "a log that ends inside an undeclared block still reports the race",
+			specs:    []types.SpecReport{knownDefectIt(types.SpecStateFailed, plainDefectMsg)},
+			log:      "WARNING: DATA RACE\n" + closing + "\n",
+			wantExit: 1,
+			contains: []string{"DATA RACE in " + closing},
+		},
+		{
+			name:      "a declared spec that failed with a spectest message is a harness failure and its block is reported",
+			specs:     []types.SpecReport{dataRaceItFailing(types.SpecStateFailed, "spectest: the harness broke")},
+			log:       raceLogBlock(closing, dialing),
+			wantExit:  1,
+			contains:  []string{"harness failure", "DATA RACE in"},
+			namesSpec: true,
+		},
+		{
+			name:      "a declared spec that was skipped did not run and its block is unmatched",
+			specs:     []types.SpecReport{dataRaceIt(types.SpecStateSkipped)},
+			log:       raceLogBlock(closing, dialing),
+			wantExit:  1,
+			contains:  []string{"not run", "none of them ran", "DATA RACE in"},
+			namesSpec: true,
+		},
+		{
+			name:      "a declared spec that panicked is a verdict unknown",
+			specs:     []types.SpecReport{dataRaceIt(types.SpecStatePanicked)},
+			log:       raceLogBlock(closing, dialing),
+			wantExit:  1,
+			contains:  []string{"verdict unknown", "check whether"},
+			namesSpec: true,
+		},
+		{
+			name:      "a declared spec that failed with a plain message asserts nothing, so its verdict is unknown",
+			specs:     []types.SpecReport{dataRaceItFailing(types.SpecStateFailed, "the client never connected through the relay: dial refused")},
+			log:       "",
+			wantExit:  1,
+			contains:  []string{": failed, but it declares a data race and asserts nothing; verdict unknown"},
+			namesSpec: true,
+		},
+		{
+			name: "a data-race entry naming the empty function fails the gate",
+			specs: []types.SpecReport{dataRaceItWithEntries(types.SpecStatePassed,
+				types.ReportEntry{Name: "data-race", Value: types.WrapEntryValue([]string{""})},
+			)},
+			log:       raceLogBlock(other),
+			wantExit:  1,
+			contains:  []string{"data-race entry is not a list of function names"},
+			namesSpec: true,
+		},
+		{
+			name: "a data-race entry naming the empty function in the rehydrated form fails the gate",
+			specs: []types.SpecReport{dataRaceItWithEntries(types.SpecStatePassed,
+				types.ReportEntry{Name: "data-race", Value: types.WrapEntryValue([]any{""})},
+			)},
+			log:       raceLogBlock(other),
+			wantExit:  1,
+			contains:  []string{"data-race entry is not a list of function names"},
 			namesSpec: true,
 		},
 		{

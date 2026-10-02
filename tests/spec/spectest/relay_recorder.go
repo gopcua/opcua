@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gopcua/opcua/tests/spec/internal/harnessfault"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uacp"
 )
@@ -28,7 +29,7 @@ type T interface {
 // message starting with this prefix as a harness fault, not an
 // implementation defect.
 func harnessFault(format string, args ...any) string {
-	return "spectest: " + fmt.Sprintf(format, args...)
+	return harnessfault.Prefix + fmt.Sprintf(format, args...)
 }
 
 // Fate says what the relay did with a service message.

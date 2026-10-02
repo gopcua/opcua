@@ -442,11 +442,30 @@ func TestFailRepublishOnAReplacedHandleStoresAHarnessFault(t *testing.T) {
 	}
 }
 
-func TestHeldPublishExposesTheRequestsTransportID(t *testing.T) {
-	entry := &heldEntry{requestID: 42, request: &ua.PublishRequest{RequestHeader: &ua.RequestHeader{}}}
-	held := HeldPublish{entry: entry}
-	if held.RequestID() != 42 {
-		t.Fatalf("HeldPublish.RequestID() = %d, want 42, the held request's transport id", held.RequestID())
+func TestHeldPublishOrderMatchesTheRecordedRequest(t *testing.T) {
+	fake := &fakeT{}
+	recorder := newRecorder(fake)
+	recorder.appendService(7, 1, clientToServer, 42, Forwarded, &ua.PublishRequest{RequestHeader: &ua.RequestHeader{}})
+	srv := &ScriptedServer{
+		t:             fake,
+		heldWait:      time.Second,
+		heldSignal:    make(chan struct{}, 1),
+		subscriptions: make(map[uint32]*harnessSub),
+		clientHandles: make(map[uint32]uint32),
+		recorder:      recorder,
+	}
+	entry := &heldEntry{requestID: 42, request: &ua.PublishRequest{RequestHeader: &ua.RequestHeader{}}, connection: 1}
+	held := HeldPublish{server: srv, entry: entry}
+
+	if order, found := held.Order(); !found || order != 7 {
+		t.Fatalf("HeldPublish.Order() = %d, %v, want 7, true, the order of the recorded request it pairs with", order, found)
+	}
+	unrecorded := HeldPublish{server: srv, entry: &heldEntry{requestID: 43, request: &ua.PublishRequest{RequestHeader: &ua.RequestHeader{}}, connection: 1}}
+	if order, found := unrecorded.Order(); found {
+		t.Fatalf("HeldPublish.Order() = %d, true for a request the recorder never saw, want false", order)
+	}
+	for _, cleanup := range fake.cleanups {
+		cleanup()
 	}
 }
 

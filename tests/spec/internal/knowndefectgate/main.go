@@ -29,7 +29,9 @@ func run(args []string) int {
 	}
 	logData, err := os.ReadFile(args[2])
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "knowndefectgate: %v; the data-race and timeout-panic rules were skipped\n", err)
+		fmt.Fprintf(os.Stderr, "knowndefectgate: %v\n", err)
+		fmt.Println("the log was not read, so the data-race and timeout-panic rules did not run")
+		return 1
 	}
 	exit, message := Verdict(reports, string(logData))
 	if message != "" {

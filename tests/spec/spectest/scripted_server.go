@@ -659,10 +659,17 @@ func (h HeldPublish) Connection() int {
 	return h.entry.connection
 }
 
-// RequestID returns the transport request id of the held Publish
-// request, which pairs it with its recorded request in the Recorder.
-func (h HeldPublish) RequestID() uint32 {
-	return h.entry.requestID
+// Order returns the recorder Order of the held Publish request, so a
+// spec can compare the request against other recorded messages without
+// pairing it by hand. The bool is false when no recorded request
+// matches the held one.
+func (h HeldPublish) Order() (int, bool) {
+	for _, record := range h.server.recorder.Requests() {
+		if record.Connection == h.entry.connection && record.RequestID == h.entry.requestID {
+			return record.Order, true
+		}
+	}
+	return 0, false
 }
 
 // Answer answers the held Publish request with one data change

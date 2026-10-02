@@ -472,13 +472,13 @@ func (e *Environment) teardown(drained chan struct{}) {
 			time.Sleep(statePollInterval)
 		}
 		if e.Client.State() != opcua.Connected {
-			ginkgo.GinkgoWriter.Printf("spectest: the client did not reach the connected state within %s before teardown\n", teardownWait)
+			ginkgo.GinkgoWriter.Printf("the client did not reach the connected state within %s before teardown\n", teardownWait)
 		}
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), teardownWait)
 	defer cancel()
 	if err := e.Client.Close(ctx); err != nil {
-		ginkgo.GinkgoWriter.Printf("spectest: closing the client failed: %v\n", err)
+		ginkgo.GinkgoWriter.Printf("closing the client failed: %v\n", err)
 	}
 	if e.onClientClosed != nil {
 		e.onClientClosed()
