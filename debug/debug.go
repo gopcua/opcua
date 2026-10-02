@@ -25,6 +25,13 @@ var Flags = os.Getenv("OPC_DEBUG")
 var Enable bool = FlagSet("debug")
 
 // Logger logs the debug messages when debug logging is enabled.
+//
+// It defaults to writing to os.Stderr but, since it is an exported
+// *log.Logger, applications can redirect it at runtime with
+// Logger.SetOutput(w) (or replace it entirely, e.g. Logger = log.New(...)),
+// for example to route opcua debug logs through the app's own logging
+// framework. NewPrefixLogger honors the same destination since it derives
+// its writer from Logger.Writer().
 var Logger = log.New(os.Stderr, "debug: ", 0)
 
 // PrefixLogger returns a new debug logger when debug logging is enabled.
@@ -33,7 +40,14 @@ func NewPrefixLogger(format string, args ...interface{}) *log.Logger {
 	if !Enable {
 		return log.New(io.Discard, "", 0)
 	}
-	return log.New(os.Stderr, "debug: "+fmt.Sprintf(format, args...), 0)
+	// Logger is exported and therefore assignable, so it can be nil. Fall back
+	// to os.Stderr in that case, which is where this function wrote before it
+	// derived its writer from Logger.
+	w := io.Writer(os.Stderr)
+	if Logger != nil {
+		w = Logger.Writer()
+	}
+	return log.New(w, "debug: "+fmt.Sprintf(format, args...), 0)
 }
 
 // Printf logs the message with Logger.Printf() when debug logging is enabled.

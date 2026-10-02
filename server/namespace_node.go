@@ -113,24 +113,24 @@ func (as *NodeNameSpace) AddNewVariableStringNode(name string, value any) *Node 
 }
 
 func (as *NodeNameSpace) Attribute(id *ua.NodeID, attr ua.AttributeID) *ua.DataValue {
-	n := as.Node(id)
-	if n == nil {
+	errorDataValueWithStatus := func(status ua.StatusCode) *ua.DataValue {
 		return &ua.DataValue{
 			EncodingMask:    ua.DataValueServerTimestamp | ua.DataValueStatusCode,
 			ServerTimestamp: time.Now(),
-			Status:          ua.StatusBadNodeIDUnknown,
+			Status:          status,
 		}
+	}
+
+	n := as.Node(id)
+	if n == nil {
+		return errorDataValueWithStatus(ua.StatusBadNodeIDUnknown)
 	}
 
 	// OPC UA Part 3 §5.6.2: AccessLevel restricts the Value attribute only.
 	// All other attributes (NodeClass, BrowseName, DisplayName, …) must
 	// remain readable regardless of the access level.
 	if attr == ua.AttributeIDValue && !n.Access(ua.AccessLevelTypeCurrentRead) {
-		return &ua.DataValue{
-			EncodingMask:    ua.DataValueServerTimestamp | ua.DataValueStatusCode,
-			ServerTimestamp: time.Now(),
-			Status:          ua.StatusBadUserAccessDenied,
-		}
+		return errorDataValueWithStatus(ua.StatusBadUserAccessDenied)
 	}
 
 	var err error
@@ -147,27 +147,37 @@ func (as *NodeNameSpace) Attribute(id *ua.NodeID, attr ua.AttributeID) *ua.DataV
 	case ua.AttributeIDNodeClass:
 		a, err = n.Attribute(attr)
 		if err != nil {
-			return &ua.DataValue{
-				EncodingMask:    ua.DataValueServerTimestamp | ua.DataValueStatusCode,
-				ServerTimestamp: time.Now(),
-				Status:          ua.StatusBadAttributeIDInvalid,
-			}
+			return errorDataValueWithStatus(ua.StatusBadAttributeIDInvalid)
 		}
 		// TODO: we need int32 instead of uint32 here.  this isn't the right place to fix it, but it is a bandaid
 		x, ok := a.Value.Value.Value().(uint32)
 		if ok {
 			a.Value.Value = ua.MustVariant(int32(x))
 		}
+	case ua.AttributeIDDataType:
+		a, err = n.Attribute(attr)
+		if err != nil {
+			return errorDataValueWithStatus(ua.StatusBadAttributeIDInvalid)
+		}
+		// OPC UA Part 3, 5.6.2, Table 13 requires the DataType attribute to be
+		// a NodeId. This namespace stores it as either *ua.NodeID or
+		// *ua.ExpandedNodeID depending on how the node was built, so normalise
+		// it here. The stored attribute is left untouched.
+		if a.Value != nil && a.Value.Value != nil {
+			if nodeID := a.Value.Value.NodeID(); nodeID != nil {
+				dv := *a.Value
+				dv.Value = ua.MustVariant(nodeID)
+				return &dv
+			}
+		}
+
+		return errorDataValueWithStatus(ua.StatusBadTypeMismatch)
 	default:
 		a, err = n.Attribute(attr)
 	}
 
 	if err != nil {
-		return &ua.DataValue{
-			EncodingMask:    ua.DataValueServerTimestamp | ua.DataValueStatusCode,
-			ServerTimestamp: time.Now(),
-			Status:          ua.StatusBadAttributeIDInvalid,
-		}
+		return errorDataValueWithStatus(ua.StatusBadAttributeIDInvalid)
 	}
 	return a.Value
 }
