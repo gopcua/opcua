@@ -1,7 +1,9 @@
 package part4
 
 import (
+	"context"
 	"slices"
+	"sync"
 	"time"
 
 	"github.com/gopcua/opcua"
@@ -389,5 +391,33 @@ var _ = Describe("Part 4 §6.7 Re-establishing connections https://reference.opc
 				},
 				Label("P4-6.7", "P4-5.14.7")),
 		)
+	})
+})
+
+const dataRaceWindow = 3 * time.Second
+
+var _ = Describe("when the client is closed while it re-dials", func() {
+	It("does not race Close against the reconnect Dial", Label("P4-6.7", "issue-883", "known-defect"), func() {
+		AddReportEntry("data-race", []string{"(*Client).Close", "(*Client).Dial"})
+		env := spectest.Start(GinkgoT())
+		ctx := context.Background()
+		deadline := time.Now().Add(dataRaceWindow)
+		var closing, dialing sync.WaitGroup
+		closing.Add(1)
+		go func() {
+			defer closing.Done()
+			for time.Now().Before(deadline) {
+				_ = env.Client.Close(ctx)
+			}
+		}()
+		dialing.Add(1)
+		go func() {
+			defer dialing.Done()
+			for time.Now().Before(deadline) {
+				_ = env.Client.Dial(ctx)
+			}
+		}()
+		closing.Wait()
+		dialing.Wait()
 	})
 })

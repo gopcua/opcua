@@ -368,3 +368,181 @@ func TestVerdictCountsAnInvalidSpecAsRan(t *testing.T) {
 		t.Errorf("message %q also claims none of the known-defect specs ran", message)
 	}
 }
+
+func dataRaceIt(state types.SpecState) types.SpecReport {
+	return types.SpecReport{
+		ContainerHierarchyTexts: []string{"when the client is closed while it re-dials"},
+		LeafNodeText:            "does not race Close against the reconnect Dial",
+		LeafNodeLabels:          []string{"known-defect"},
+		LeafNodeType:            types.NodeTypeIt,
+		State:                   state,
+		ReportEntries: []types.ReportEntry{{
+			Name:  "data-race",
+			Value: types.WrapEntryValue([]string{"(*Client).Close", "(*Client).Dial"}),
+		}},
+	}
+}
+
+func raceLogBlock(frames ...string) string {
+	var log strings.Builder
+	log.WriteString("==================\n")
+	log.WriteString("WARNING: DATA RACE\n")
+	for i, frame := range frames {
+		fmt.Fprintf(&log, "  %s\n", frame)
+		if i < len(frames)-1 {
+			log.WriteString("\n")
+		}
+	}
+	log.WriteString("==================\n")
+	return log.String()
+}
+
+func dataRaceItWithEntries(state types.SpecState, entries ...types.ReportEntry) types.SpecReport {
+	spec := dataRaceIt(state)
+	spec.ReportEntries = entries
+	return spec
+}
+
+func TestVerdictScansEverySpecInTheReport(t *testing.T) {
+	unlabelled := types.SpecReport{
+		ContainerHierarchyTexts: []string{"when the session is gone"},
+		LeafNodeText:            "creates a new session only after ActivateSession fails",
+		LeafNodeType:            types.NodeTypeIt,
+		State:                   types.SpecStatePassed,
+	}
+	failing := knownDefectIt(types.SpecStateFailed, plainDefectMsg)
+
+	t.Run("an unlabelled spec first does not stop the scan", func(t *testing.T) {
+		exit, message := Verdict([]types.Report{{SpecReports: []types.SpecReport{unlabelled, failing}}}, "")
+		if exit != 0 {
+			t.Errorf("Verdict exit = %d, want 0, the failing known-defect spec is the defect", exit)
+		}
+		if want := failing.FullText() + ": failed, defect still present"; !strings.Contains(message, want) {
+			t.Errorf("message %q does not report the labelled spec after the unlabelled one, want %q", message, want)
+		}
+	})
+
+	t.Run("a data-race verdict does not stop the scan", func(t *testing.T) {
+		racing := dataRaceIt(types.SpecStatePassed)
+		log := raceLogBlock("github.com/gopcua/opcua.(*Client).Close()", "github.com/gopcua/opcua.(*Client).Dial()")
+		exit, message := Verdict([]types.Report{{SpecReports: []types.SpecReport{racing, failing}}}, log)
+		if exit != 0 {
+			t.Errorf("Verdict exit = %d, want 0, both verdicts are the defect present", exit)
+		}
+		if !strings.Contains(message, racing.FullText()+": data race still present") {
+			t.Errorf("message %q does not carry the data-race verdict", message)
+		}
+		if !strings.Contains(message, failing.FullText()+": failed, defect still present") {
+			t.Errorf("message %q does not carry the failing spec's verdict after the data-race one", message)
+		}
+	})
+}
+
+func TestVerdictDataRaceRule(t *testing.T) {
+	closing := "github.com/gopcua/opcua.(*Client).Close()"
+	dialing := "github.com/gopcua/opcua.(*Client).Dial()"
+	other := "github.com/gopcua/opcua.(*Client).Connect()"
+
+	cases := []struct {
+		name        string
+		specs       []types.SpecReport
+		log         string
+		wantExit    int
+		contains    []string
+		notContains []string
+		namesSpec   bool
+	}{
+		{
+			name:      "a block naming both declared functions is the defect still present",
+			specs:     []types.SpecReport{dataRaceIt(types.SpecStatePassed)},
+			log:       raceLogBlock(closing, dialing),
+			wantExit:  0,
+			contains:  []string{"data race still present"},
+			namesSpec: true,
+		},
+		{
+			name:      "every block naming both declared functions is exempt, however many fire",
+			specs:     []types.SpecReport{dataRaceIt(types.SpecStatePassed)},
+			log:       raceLogBlock(closing, dialing) + raceLogBlock(closing, dialing) + raceLogBlock(closing, dialing),
+			wantExit:  0,
+			contains:  []string{"data race still present"},
+			namesSpec: true,
+		},
+		{
+			name:      "no block in the log means the label must go",
+			specs:     []types.SpecReport{dataRaceIt(types.SpecStatePassed)},
+			log:       "=== RUN TestPart4\n",
+			wantExit:  1,
+			contains:  []string{passesNowMsg},
+			namesSpec: true,
+		},
+		{
+			name:      "a block naming only one declared function counts as a data race and the spec as passing",
+			specs:     []types.SpecReport{dataRaceIt(types.SpecStatePassed)},
+			log:       raceLogBlock(closing, other),
+			wantExit:  1,
+			contains:  []string{"DATA RACE", passesNowMsg},
+			namesSpec: true,
+		},
+		{
+			name:     "no data-race spec ran, so the block is today's plain data race",
+			specs:    []types.SpecReport{knownDefectIt(types.SpecStateFailed, plainDefectMsg)},
+			log:      raceLogBlock(closing, dialing),
+			wantExit: 1,
+			contains: []string{"DATA RACE"},
+		},
+		{
+			name: "an earlier entry with another name does not hide the data-race entry",
+			specs: []types.SpecReport{dataRaceItWithEntries(types.SpecStatePassed,
+				types.ReportEntry{Name: "teardown-note", Value: types.WrapEntryValue("closed")},
+				types.ReportEntry{Name: "data-race", Value: types.WrapEntryValue([]string{"(*Client).Close", "(*Client).Dial"})},
+			)},
+			log:       raceLogBlock(closing, dialing),
+			wantExit:  0,
+			contains:  []string{"data race still present"},
+			namesSpec: true,
+		},
+		{
+			name: "a data-race entry whose value holds a non-string is not a declaration",
+			specs: []types.SpecReport{dataRaceItWithEntries(types.SpecStatePassed,
+				types.ReportEntry{Name: "data-race", Value: types.WrapEntryValue([]any{"(*Client).Close", 42})},
+			)},
+			log:       raceLogBlock(closing, dialing),
+			wantExit:  1,
+			contains:  []string{passesNowMsg, "DATA RACE"},
+			namesSpec: true,
+		},
+		{
+			name:        "a second, undeclared race block fails the run",
+			specs:       []types.SpecReport{dataRaceIt(types.SpecStatePassed)},
+			log:         raceLogBlock(closing, dialing) + raceLogBlock(other),
+			wantExit:    1,
+			contains:    []string{"data race still present", "DATA RACE"},
+			notContains: []string{passesNowMsg},
+			namesSpec:   true,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			exit, message := Verdict([]types.Report{{SpecReports: c.specs}}, c.log)
+			if exit != c.wantExit {
+				t.Errorf("Verdict exit = %d, want %d (message: %q)", exit, c.wantExit, message)
+			}
+			for _, want := range c.contains {
+				if !strings.Contains(message, want) {
+					t.Errorf("message %q does not contain %q", message, want)
+				}
+			}
+			for _, unwanted := range c.notContains {
+				if strings.Contains(message, unwanted) {
+					t.Errorf("message %q must not contain %q", message, unwanted)
+				}
+			}
+			if c.namesSpec {
+				if want := c.specs[0].FullText(); !strings.Contains(message, want) {
+					t.Errorf("message %q does not name the spec %q", message, want)
+				}
+			}
+		})
+	}
+}

@@ -9,21 +9,20 @@ import (
 )
 
 // Verdict reports whether the known-defect labelled specs in the Ginkgo
-// reports still fail as their labels claim: a spec counts when its own or
-// its container labels include "known-defect", and "racy" is read the same
-// way. The exit is 1 when a labelled spec now passes, when every labelled
-// spec was skipped, when one holds a spec state the switch below counts
-// as a verdict-unknown failure, or when the log shows a data race or a
-// test timeout. A racy pass, the lines naming the specs that did not run, and
-// the line saying that no spec in the report carries the label are warnings
-// with exit 0. A failure message starting "spectest:" is a harness
-// failure, not the defect.
+// reports still fail as their labels claim, and whether the log shows a
+// data race no spec declared. A spec that records a report entry named
+// data-race takes its verdict from the log instead of its state: a
+// WARNING: DATA RACE block naming every declared function is the defect
+// still present, and no such block means the label must go. A failure
+// message starting "spectest:" is a harness failure, not the defect.
 func Verdict(reports []types.Report, log string) (exit int, message string) {
 	var lines []string
 	fail := func(format string, args ...any) {
 		exit = 1
 		lines = append(lines, fmt.Sprintf(format, args...))
 	}
+	blocks := raceBlocks(log)
+	matched := make([]bool, len(blocks))
 	knownDefectSeen := false
 	ran := false
 	for _, report := range reports {
@@ -33,6 +32,22 @@ func Verdict(reports []types.Report, log string) (exit int, message string) {
 			}
 			knownDefectSeen = true
 			name := spec.FullText()
+			if functions, declared := dataRaceFunctions(spec); declared {
+				ran = true
+				found := false
+				for i, block := range blocks {
+					if blockNamesEvery(block, functions) {
+						matched[i] = true
+						found = true
+					}
+				}
+				if found {
+					lines = append(lines, name+": data race still present")
+				} else {
+					fail("%s: passes now; remove its known-defect label", name)
+				}
+				continue
+			}
 			switch spec.State {
 			case types.SpecStatePassed:
 				ran = true
@@ -64,8 +79,11 @@ func Verdict(reports []types.Report, log string) (exit int, message string) {
 			}
 		}
 	}
-	if line := lineContaining(log, "WARNING: DATA RACE"); line != "" {
-		fail("log: %s", line)
+	for i := range blocks {
+		if matched[i] {
+			continue
+		}
+		fail("log: WARNING: DATA RACE")
 	}
 	if line := lineContaining(log, "panic: test timed out after"); line != "" {
 		fail("log: %s", line)
@@ -98,4 +116,73 @@ func lineContaining(log, needle string) string {
 		}
 	}
 	return ""
+}
+
+func dataRaceFunctions(spec types.SpecReport) ([]string, bool) {
+	for _, entry := range spec.ReportEntries {
+		if entry.Name != "data-race" {
+			continue
+		}
+		switch value := entry.Value.GetRawValue().(type) {
+		case []string:
+			if len(value) == 0 {
+				return nil, false
+			}
+			return value, true
+		case []any:
+			functions := make([]string, 0, len(value))
+			for _, item := range value {
+				function, isString := item.(string)
+				if !isString {
+					return nil, false
+				}
+				functions = append(functions, function)
+			}
+			if len(functions) == 0 {
+				return nil, false
+			}
+			return functions, true
+		}
+	}
+	return nil, false
+}
+
+func raceBlocks(log string) []string {
+	var blocks []string
+	var block []string
+	inBlock := false
+	for _, line := range strings.Split(log, "\n") {
+		if strings.HasPrefix(line, "WARNING: DATA RACE") {
+			inBlock = true
+			block = nil
+			continue
+		}
+		if !inBlock {
+			continue
+		}
+		if isDelimiter(line) {
+			blocks = append(blocks, strings.Join(block, "\n"))
+			block = nil
+			inBlock = false
+			continue
+		}
+		block = append(block, line)
+	}
+	if inBlock {
+		blocks = append(blocks, strings.Join(block, "\n"))
+	}
+	return blocks
+}
+
+func isDelimiter(line string) bool {
+	return line != "" && strings.Trim(line, "=") == ""
+}
+
+func blockNamesEvery(block string, functions []string) bool {
+	for _, function := range functions {
+		if !strings.Contains(block, function+"(") {
+			return false
+		}
+	}
+	return true
 }
