@@ -659,6 +659,12 @@ func (h HeldPublish) Connection() int {
 	return h.entry.connection
 }
 
+// RequestID returns the transport request id of the held Publish
+// request, which pairs it with its recorded request in the Recorder.
+func (h HeldPublish) RequestID() uint32 {
+	return h.entry.requestID
+}
+
 // Answer answers the held Publish request with one data change
 // notification carrying v for sub, at sub's next sequence number. Each
 // acknowledgement the request carries gets one Good result, removes the

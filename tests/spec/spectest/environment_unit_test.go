@@ -1,6 +1,7 @@
 package spectest
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -391,6 +392,26 @@ func TestTeardownClosesTheClientBeforeTheServers(t *testing.T) {
 	}
 	if dialSucceeds(env.Server.Address()) || dialSucceeds(second.Address()) {
 		t.Fatalf("teardown left a scripted server open")
+	}
+}
+
+func TestTeardownSkipsTheConnectedWaitWhenTheClientIsAlreadyClosed(t *testing.T) {
+	fake := &fakeT{}
+	env := Start(fake)
+	ctx, cancel := context.WithTimeout(context.Background(), specWait)
+	defer cancel()
+	if err := env.Client.Close(ctx); err != nil {
+		t.Fatalf("closing the client failed: %v", err)
+	}
+
+	started := time.Now()
+	fatalPanics(func() {
+		for i := len(fake.cleanups) - 1; i >= 0; i-- {
+			fake.cleanups[i]()
+		}
+	})
+	if elapsed := time.Since(started); elapsed >= time.Second {
+		t.Fatalf("teardown took %s although the client was already closed, want under one second", elapsed)
 	}
 }
 

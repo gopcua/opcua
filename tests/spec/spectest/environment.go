@@ -466,7 +466,7 @@ func (e *Environment) teardown(drained chan struct{}) {
 		close(drained)
 		return
 	}
-	if e.everConnected {
+	if e.everConnected && e.Client.State() != opcua.Closed {
 		deadline := time.Now().Add(teardownWait)
 		for e.Client.State() != opcua.Connected && time.Now().Before(deadline) {
 			time.Sleep(statePollInterval)

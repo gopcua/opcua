@@ -366,13 +366,13 @@ var _ = Describe("Part 4 §6.7 Re-establishing connections https://reference.opc
 			Entry("refused per subscription with Bad_SubscriptionIdInvalid",
 				func(second *spectest.ScriptedServer) { second.QueueTransferRefusal(ua.StatusBadSubscriptionIDInvalid) },
 				func(env *spectest.Environment, second *spectest.ScriptedServer, m spectest.Mark, last uint32) {
-					transferFailedFlow(env, second, m, transferRefusedPerResult(ua.StatusBadSubscriptionIDInvalid), noExtraTransferCheck)
+					transferFailedFlow(env, second, m, transferRefusedPerResult(ua.StatusBadSubscriptionIDInvalid), requireRecreatedCarriesFirstSubscriptionParameters)
 				},
 				Label("P4-6.7", "P4-5.14.7", "should")),
 			Entry("unsupported, with Bad_ServiceUnsupported",
 				func(second *spectest.ScriptedServer) {},
 				func(env *spectest.Environment, second *spectest.ScriptedServer, m spectest.Mark, last uint32) {
-					transferFailedFlow(env, second, m, transferAnsweredWithStatus(ua.StatusBadServiceUnsupported), noExtraTransferCheck)
+					transferFailedFlow(env, second, m, transferAnsweredWithStatus(ua.StatusBadServiceUnsupported), requireRecreatedCarriesFirstSubscriptionParameters)
 				},
 				Label("P4-6.7", "should")),
 			Entry("refused per subscription with Bad_UserAccessDenied",
@@ -391,6 +391,49 @@ var _ = Describe("Part 4 §6.7 Re-establishing connections https://reference.opc
 				},
 				Label("P4-6.7", "P4-5.14.7")),
 		)
+
+		It("opens no new connection once closed", Label("P4-6.7"), func() {
+			m := env.Mark()
+			_ = env.Client.Close(context.Background())
+			Eventually(func(g Gomega) {
+				g.Expect(env.StatesSince(m)).To(ContainElement(opcua.Closed),
+					"the client reported no Closed state after being closed; states after the close: %v", env.StatesSince(m))
+			}, noReconnectWindow).Should(Succeed())
+			Consistently(func(g Gomega) {
+				g.Expect(env.ConnectionsSince(m)).To(Equal(0),
+					"the client opened %d new relay connections after being closed", env.ConnectionsSince(m))
+				states := env.StatesSince(m)
+				if len(states) > 0 {
+					g.Expect(states[len(states)-1]).To(Equal(opcua.Closed),
+						"the client reported the state %v after Closed; states after the close: %v", states[len(states)-1], states)
+				}
+			}, noReconnectWindow).Should(Succeed())
+		})
+
+		It("republishes a recreated subscription from sequence number 1", Label("P4-6.7", "issue-879", "known-defect"), func() {
+			second.QueueTransferRefusal(ua.StatusBadSubscriptionIDInvalid)
+			m := env.Mark()
+			env.Relay.Cut()
+			env.WaitUntilReconnected()
+			created := second.WaitCreatedSubscription(m)
+			env.Relay.Cut()
+			Eventually(func(g Gomega) {
+				requests := env.Recorder.RequestsSince(m)
+				for _, record := range requestsOfType[*ua.RepublishRequest](requests) {
+					message, decoded := record.Message()
+					if !decoded {
+						continue
+					}
+					if republish, is := message.(*ua.RepublishRequest); is && republish.SubscriptionID == created.ID() {
+						g.Expect(republish.RetransmitSequenceNumber).To(Equal(uint32(1)),
+							"the first Republish for the recreated subscription asks for sequence number %d, want 1", republish.RetransmitSequenceNumber)
+						return
+					}
+				}
+				g.Expect(true).To(BeFalse(), "no Republish for the recreated subscription was recorded yet; requests after the first cut: %v", requestTypeNames(requests))
+			}, recreatedRepublishWait).Should(Succeed())
+			Expect(second.UnusedScripts()).To(BeEmpty(), "scripts this spec armed were never used: %v", second.UnusedScripts())
+		})
 	})
 })
 
@@ -419,5 +462,134 @@ var _ = Describe("when the client is closed while it re-dials", func() {
 		}()
 		closing.Wait()
 		dialing.Wait()
+	})
+})
+
+func requireRecreatedCarriesFirstSubscriptionParameters(env *spectest.Environment, m spectest.Mark, transferAnswer, createAnswer spectest.ServiceRecord[ua.Response]) {
+	var first *ua.CreateSubscriptionRequest
+	for _, record := range requestsOfType[*ua.CreateSubscriptionRequest](env.Recorder.Requests()) {
+		message, decoded := record.Message()
+		if decoded {
+			first, _ = message.(*ua.CreateSubscriptionRequest)
+			break
+		}
+	}
+	Expect(first).NotTo(BeNil(), "the recorder saw no CreateSubscription request before the cut")
+	var recreated *ua.CreateSubscriptionRequest
+	for _, record := range requestsOfType[*ua.CreateSubscriptionRequest](env.Recorder.RequestsSince(m)) {
+		if record.Connection != createAnswer.Connection || record.RequestID != createAnswer.RequestID {
+			continue
+		}
+		message, decoded := record.Message()
+		if !decoded {
+			continue
+		}
+		recreated, _ = message.(*ua.CreateSubscriptionRequest)
+		break
+	}
+	Expect(recreated).NotTo(BeNil(), "the recorder saw no CreateSubscription request for the recreated subscription")
+	Expect(recreated.RequestedPublishingInterval).To(Equal(first.RequestedPublishingInterval),
+		"the recreating CreateSubscription requests publishing interval %v, want %v, the first subscription's", recreated.RequestedPublishingInterval, first.RequestedPublishingInterval)
+	Expect(recreated.RequestedLifetimeCount).To(Equal(first.RequestedLifetimeCount),
+		"the recreating CreateSubscription requests lifetime count %d, want %d, the first subscription's", recreated.RequestedLifetimeCount, first.RequestedLifetimeCount)
+	Expect(recreated.RequestedMaxKeepAliveCount).To(Equal(first.RequestedMaxKeepAliveCount),
+		"the recreating CreateSubscription requests max keep-alive count %d, want %d, the first subscription's", recreated.RequestedMaxKeepAliveCount, first.RequestedMaxKeepAliveCount)
+}
+
+const (
+	reconnectIntervalLong   = 10 * time.Second
+	reconnectWithoutWait    = 2 * time.Second
+	clientReconnectInterval = 50 * time.Millisecond
+	noReconnectWindow       = 10 * clientReconnectInterval
+	recreatedRepublishWait  = 15 * time.Second
+)
+
+var _ = Describe("when the reconnect interval is long", func() {
+	It("reconnects without waiting the reconnect interval when the first redial succeeds", Label("P4-6.7"), func() {
+		env := spectest.Start(GinkgoT(), spectest.WithClientOptions(opcua.ReconnectInterval(reconnectIntervalLong)))
+		m := env.Mark()
+		env.Relay.Cut()
+		Eventually(func(g Gomega) {
+			g.Expect(env.StatesSince(m)).To(ContainElement(opcua.Connected),
+				"the client did not report Connected within %s of the cut although its first redial succeeds; states after the cut: %v", reconnectWithoutWait, env.StatesSince(m))
+		}, reconnectWithoutWait).Should(Succeed())
+	})
+})
+
+const (
+	publishHoldRequestTimeout           = 1 * time.Second
+	publishHold                         = 3 * time.Second
+	secondSubscribeInterval             = 100 * time.Millisecond
+	secondSubscribeLifetimeCount        = 1_000_000
+	secondSubscribeKeepAliveCount       = 1000
+	publishNotificationBuffer           = 64
+	secondSubscribeWait                 = 15 * time.Second
+	secondMonitorClientHandle           = 1
+	secondSubscriptionValue       int32 = 7100
+)
+
+func publishSentAfterOrder(env *spectest.Environment, m spectest.Mark, held spectest.HeldPublish, order int) bool {
+	for _, record := range requestsOfType[*ua.PublishRequest](env.Recorder.RequestsSince(m)) {
+		if record.Order <= order || record.Connection != held.Connection() || record.RequestID != held.RequestID() {
+			continue
+		}
+		return true
+	}
+	return false
+}
+
+var _ = Describe("when the request timeout is short", func() {
+	It("keeps a Publish open past the request timeout after recreating the subscription", Label("P4-6.7"), func() {
+		env := spectest.Start(GinkgoT(), spectest.WithClientOptions(opcua.RequestTimeout(publishHoldRequestTimeout)))
+		second := env.StartServer()
+		env.Relay.RedirectTo(second.Address())
+		second.QueueTransferRefusal(ua.StatusBadSubscriptionIDInvalid)
+		m := env.Mark()
+		env.Relay.Cut()
+		env.WaitUntilReconnected()
+		created := second.WaitCreatedSubscription(m)
+		m2 := env.Mark()
+		notifications := make(chan *opcua.PublishNotificationData, publishNotificationBuffer)
+		subscribeCtx, subscribeCancel := context.WithTimeout(context.Background(), secondSubscribeWait)
+		secondSubscription, subscribeErr := env.Client.Subscribe(subscribeCtx, &opcua.SubscriptionParameters{
+			Interval:          secondSubscribeInterval,
+			LifetimeCount:     secondSubscribeLifetimeCount,
+			MaxKeepAliveCount: secondSubscribeKeepAliveCount,
+		}, notifications)
+		subscribeCancel()
+		Expect(subscribeErr).NotTo(HaveOccurred(), "the client created no second subscription: %v", subscribeErr)
+		secondCreated := second.WaitCreatedSubscription(m2)
+		node := monitoredNode(env)
+		Expect(node).NotTo(BeNil(), "the recorder saw no CreateMonitoredItems request, so the node the client monitors is unknown")
+		monitorCtx, monitorCancel := context.WithTimeout(context.Background(), secondSubscribeWait)
+		_, monitorErr := secondSubscription.Monitor(monitorCtx, ua.TimestampsToReturnBoth,
+			opcua.NewMonitoredItemCreateRequestWithDefaults(node, ua.AttributeIDValue, secondMonitorClientHandle))
+		monitorCancel()
+		Expect(monitorErr).NotTo(HaveOccurred(), "the client monitored no node on the second subscription: %v", monitorErr)
+		firstHeld := second.WaitHeldPublish()
+		firstHeld.Answer(secondCreated, secondSubscriptionValue)
+		secondCreateOrder := 0
+		for _, record := range env.Recorder.ResponsesSince(m) {
+			message, decoded := record.Message()
+			if !decoded {
+				continue
+			}
+			if response, isCreate := message.(*ua.CreateSubscriptionResponse); isCreate && response.SubscriptionID == secondSubscription.SubscriptionID {
+				secondCreateOrder = record.Order
+			}
+		}
+		Expect(secondCreateOrder).NotTo(BeZero(), "the recorder saw no CreateSubscription response for the second subscription")
+		held := second.WaitHeldPublish()
+		Expect(publishSentAfterOrder(env, m, held, secondCreateOrder)).To(BeTrue(),
+			"the held Publish was recorded before the second subscription's CreateSubscription response, so its request predates the recomputed publish timeout")
+		time.Sleep(publishHold)
+		held.Answer(created, valueAfterReconnect)
+		Eventually(func(g Gomega) {
+			g.Expect(env.ReceivedSince(m)).To(Equal([]int32{valueAfterReconnect}),
+				"the client did not deliver the value answered after holding the Publish for %s; delivered: %v; errors: %v", publishHold, env.ReceivedSince(m), env.ReceivedErrorsSince(m))
+		}, recreatedRepublishWait).Should(Succeed())
+		Expect(env.ReceivedErrorsSince(m)).To(BeEmpty(),
+			"the client delivered errors after the cut: %v", env.ReceivedErrorsSince(m))
+		Expect(second.UnusedScripts()).To(BeEmpty(), "scripts this spec armed were never used: %v", second.UnusedScripts())
 	})
 })

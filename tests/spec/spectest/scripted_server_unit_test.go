@@ -442,6 +442,14 @@ func TestFailRepublishOnAReplacedHandleStoresAHarnessFault(t *testing.T) {
 	}
 }
 
+func TestHeldPublishExposesTheRequestsTransportID(t *testing.T) {
+	entry := &heldEntry{requestID: 42, request: &ua.PublishRequest{RequestHeader: &ua.RequestHeader{}}}
+	held := HeldPublish{entry: entry}
+	if held.RequestID() != 42 {
+		t.Fatalf("HeldPublish.RequestID() = %d, want 42, the held request's transport id", held.RequestID())
+	}
+}
+
 func TestStaleSubscriptionHandlesStoreTheNoLiveSubscriptionFault(t *testing.T) {
 	newServer := func() (*fakeT, *ScriptedServer) {
 		fake := &fakeT{}

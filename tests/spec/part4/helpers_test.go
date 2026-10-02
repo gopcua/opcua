@@ -161,9 +161,6 @@ func requireNoRepublishBetween(env *spectest.Environment, m spectest.Mark, trans
 	Expect(sentBetween).To(BeFalse(), "client sent a Republish request between the transfer response and the CreateSubscription response; requests after the first cut: %v", requestTypeNames(env.Recorder.RequestsSince(m)))
 }
 
-func noExtraTransferCheck(env *spectest.Environment, m spectest.Mark, transferAnswer, createAnswer spectest.ServiceRecord[ua.Response]) {
-}
-
 func transferFailedFlow(env *spectest.Environment, second *spectest.ScriptedServer, m spectest.Mark, transferAnswered func(spectest.ServiceRecord[ua.Response]) bool, extra func(env *spectest.Environment, m spectest.Mark, transferAnswer, createAnswer spectest.ServiceRecord[ua.Response])) {
 	oldID := env.Subscription().ID()
 	transferAnswer, createRequest, createAnswer := requireTransferAnsweredThenNewSubscription(env, m, oldID, transferAnswered)

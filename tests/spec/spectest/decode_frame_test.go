@@ -699,9 +699,9 @@ func TestDecodeFrameRejectsMalformedMessages(t *testing.T) {
 		{name: "a chunk truncated inside its headers", message: chunkTruncatedInsideItsHeaders, wantStage: "decoding chunk header"},
 		{name: "a chunk without a sequence header", message: chunkWithoutSequenceHeader, wantStage: "decoding sequence header"},
 		{name: "an ERR message without a decodable body", message: errorWithoutReason, wantStage: "decoding ERR message body"},
-		{name: "a HEL message with one trailing byte", message: helloTrailing, wantStage: "decoding HEL message body: body is"},
-		{name: "an ACK message with one trailing byte", message: ackTrailing, wantStage: "decoding ACK message body: body is"},
-		{name: "an ERR message with one trailing byte", message: errorTrailing, wantStage: "decoding ERR message body: body is"},
+		{name: "a HEL message with one trailing byte", message: helloTrailing, wantStage: "decoding HEL message body: body is 49 bytes, decoder consumed 48"},
+		{name: "an ACK message with one trailing byte", message: ackTrailing, wantStage: "decoding ACK message body: body is 21 bytes, decoder consumed 20"},
+		{name: "an ERR message with one trailing byte", message: errorTrailing, wantStage: "decoding ERR message body: body is 33 bytes, decoder consumed 32"},
 		{name: "a reverse hello, which no frame represents", message: reverseHelloWire, wantStage: "cannot decode message type"},
 	}
 	for _, testCase := range cases {
