@@ -72,6 +72,84 @@ func notificationCarryingValue(env *spectest.Environment, value int32) (spectest
 	return spectest.Notification{}, false
 }
 
+func monitoredNode(env *spectest.Environment) *ua.NodeID {
+	for _, record := range requestsOfType[*ua.CreateMonitoredItemsRequest](env.Recorder.Requests()) {
+		message, decoded := record.Message()
+		if !decoded {
+			continue
+		}
+		if request, is := message.(*ua.CreateMonitoredItemsRequest); is && len(request.ItemsToCreate) > 0 {
+			return request.ItemsToCreate[0].ItemToMonitor.NodeID
+		}
+	}
+	return nil
+}
+
+func waitSubscriptionRecreated(env *spectest.Environment, m spectest.Mark, last uint32) {
+	var republishAnswer spectest.ServiceRecord[ua.Response]
+	Eventually(func(g Gomega) {
+		requests := env.Recorder.RequestsSince(m)
+		responses := env.Recorder.ResponsesSince(m)
+		complete := false
+		if republish, sent := republishForSequence(requests, last+1); sent {
+			if answer, answered := answerTo(republish, responses); answered {
+				if status, decoded := statusOf(answer); decoded && status == ua.StatusBadSubscriptionIDInvalid {
+					republishAnswer = answer
+					complete = true
+				}
+			}
+		}
+		g.Expect(complete).To(BeTrue(), "no Republish request for sequence number %d answered Bad_SubscriptionIdInvalid was recorded after the reconnect", last+1)
+	}, 15*time.Second).Should(Succeed())
+	node := monitoredNode(env)
+	Expect(node).NotTo(BeNil(), "the recorder saw no CreateMonitoredItems request, so the node the client monitors is unknown")
+	var createSubscription spectest.ServiceRecord[ua.Request]
+	var createdID uint32
+	Eventually(func(g Gomega) {
+		requests := env.Recorder.RequestsSince(m)
+		responses := env.Recorder.ResponsesSince(m)
+		sent := false
+		for _, request := range requestsOfType[*ua.CreateSubscriptionRequest](requests) {
+			if request.Order > republishAnswer.Order {
+				if answer, answered := answerTo(request, responses); answered {
+					answerMessage, answerDecoded := answer.Message()
+					if response, isCreate := answerMessage.(*ua.CreateSubscriptionResponse); answerDecoded && isCreate {
+						createSubscription = request
+						createdID = response.SubscriptionID
+						sent = true
+					}
+				}
+				break
+			}
+		}
+		g.Expect(sent).To(BeTrue(), "client sent no CreateSubscription request answered with a subscription id after the Republish was answered Bad_SubscriptionIdInvalid")
+	}, 15*time.Second).Should(Succeed())
+	Eventually(func(g Gomega) {
+		requests := env.Recorder.RequestsSince(m)
+		sent := false
+		for _, record := range requestsOfType[*ua.CreateMonitoredItemsRequest](requests) {
+			if record.Order <= createSubscription.Order {
+				continue
+			}
+			message, decoded := record.Message()
+			if !decoded {
+				continue
+			}
+			request, is := message.(*ua.CreateMonitoredItemsRequest)
+			if !is || request.SubscriptionID != createdID || len(request.ItemsToCreate) == 0 {
+				continue
+			}
+			item := request.ItemsToCreate[0]
+			if item == nil || item.ItemToMonitor == nil || !item.ItemToMonitor.NodeID.Equal(node) {
+				continue
+			}
+			sent = true
+			break
+		}
+		g.Expect(sent).To(BeTrue(), "client sent no CreateMonitoredItems request for the monitored node on the recreated subscription")
+	}, 15*time.Second).Should(Succeed())
+}
+
 func badMessageNotAvailableAnswer(env *spectest.Environment, m spectest.Mark) (spectest.ServiceRecord[ua.Response], bool) {
 	responses := env.Recorder.ResponsesSince(m)
 	for _, republish := range requestsOfType[*ua.RepublishRequest](env.Recorder.RequestsSince(m)) {

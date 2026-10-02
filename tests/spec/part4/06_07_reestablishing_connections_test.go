@@ -183,4 +183,40 @@ var _ = Describe("Part 4 §6.7 Re-establishing connections https://reference.opc
 			Expect(env.Server.UnusedScripts()).To(BeEmpty(), "scripts this spec armed were never used: %v", env.Server.UnusedScripts())
 		})
 	})
+
+	Context("when Republish answers Bad_SubscriptionIdInvalid", func() {
+		var sub spectest.Subscription
+		var last uint32
+		var m spectest.Mark
+		BeforeEach(func() {
+			sub = env.Subscription()
+			last = env.LastSequenceNumber()
+			sub.FailRepublish(last+1, ua.StatusBadSubscriptionIDInvalid)
+			m = env.Mark()
+			env.Relay.Cut()
+			env.WaitUntilReconnected()
+		})
+
+		It("creates a new subscription", Label("P4-6.7", "should", "known-defect"), func() {
+			waitSubscriptionRecreated(env, m, last)
+			Expect(env.Server.UnusedScripts()).To(BeEmpty(), "scripts this spec armed were never used: %v", env.Server.UnusedScripts())
+		})
+
+		It("resumes publishing with the new subscription", Label("P4-6.7", "issue-895", "known-defect"), MustPassRepeatedly(10), func() {
+			waitSubscriptionRecreated(env, m, last)
+			created := env.Server.WaitCreatedSubscription(m)
+			held := env.Server.WaitHeldPublish()
+			held.Answer(created, valueAfterReconnect)
+			Eventually(func(g Gomega) {
+				g.Expect(env.ReceivedSince(m)).To(Equal([]int32{valueAfterReconnect}), "client did not resume publishing with the recreated subscription; delivered: %v", env.ReceivedSince(m))
+			}, 15*time.Second).Should(Succeed())
+			notification, answered := notificationCarryingValue(env, valueAfterReconnect)
+			Expect(answered).To(BeTrue(), "the recorder saw no answered Publish response carrying %d", valueAfterReconnect)
+			Expect(notification.SubscriptionID).To(Equal(created.ID()), "the Publish answered with valueAfterReconnect was published on subscription %d, want the recreated subscription %d", notification.SubscriptionID, created.ID())
+			Expect(notification.SequenceNumber).To(Equal(uint32(1)), "the Publish answered with valueAfterReconnect carried sequence number %d, want 1", notification.SequenceNumber)
+			second := env.Server.WaitHeldPublish()
+			Expect(second.Connection()).To(Equal(held.Connection()), "client sent no further Publish request on the recreated subscription after the first one was answered")
+			Expect(env.Server.UnusedScripts()).To(BeEmpty(), "scripts this spec armed were never used: %v", env.Server.UnusedScripts())
+		})
+	})
 })
