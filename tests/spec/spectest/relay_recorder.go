@@ -136,8 +136,9 @@ type streamState struct {
 }
 
 type connectionEntry struct {
-	index  int
-	closed bool
+	index    int
+	closed   bool
+	upstream string
 }
 
 type harnessError struct {
@@ -256,6 +257,27 @@ func (r *Recorder) observeConnection(index int, serverAddr net.Addr) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.connections[serverAddr.String()] = &connectionEntry{index: index}
+}
+
+func (r *Recorder) observeUpstream(index int, upstream string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, entry := range r.connections {
+		if entry.index == index {
+			entry.upstream = upstream
+		}
+	}
+}
+
+func (r *Recorder) connectionUpstreamOf(index int) string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, entry := range r.connections {
+		if entry.index == index {
+			return entry.upstream
+		}
+	}
+	return ""
 }
 
 func (r *Recorder) observeConnectionClosed(index int) {
@@ -437,6 +459,28 @@ func (r *Recorder) recordLocked(order, connection int, flow flow, state *streamS
 	return false, false, nil
 }
 
+func (r *Recorder) lastClientHandleOf(subscriptionID uint32) (handle uint32, found bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for i := len(r.requests) - 1; i >= 0; i-- {
+		record := r.requests[i]
+		if record.message == nil {
+			continue
+		}
+		create, isCreate := record.message.(*ua.CreateMonitoredItemsRequest)
+		if !isCreate || create.SubscriptionID != subscriptionID {
+			continue
+		}
+		for _, item := range create.ItemsToCreate {
+			if item != nil && item.RequestedParameters != nil {
+				return item.RequestedParameters.ClientHandle, true
+			}
+		}
+		return 0, true
+	}
+	return 0, false
+}
+
 func (r *Recorder) hasRecordedRequest(connection int, requestID uint32, service Service) bool {
 	for _, record := range r.requests {
 		if record.Connection != connection || record.RequestID != requestID {
@@ -574,6 +618,7 @@ type Relay struct {
 	onCut       func()
 	armed       []armedCut
 	draining    map[int]bool
+	upstream    string
 }
 
 type relayConn struct {
@@ -712,6 +757,15 @@ func (r *Relay) ConnectionCount() int {
 	return r.count
 }
 
+// RedirectTo makes every connection the relay accepts from now on dial
+// address instead of the server it was created with. Connection
+// indexes continue from where they were.
+func (r *Relay) RedirectTo(address string) {
+	r.mu.Lock()
+	r.upstream = strings.TrimPrefix(address, "opc.tcp://")
+	r.mu.Unlock()
+}
+
 func newRelay(t T, upstream string) (*Relay, *Recorder) {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -738,7 +792,9 @@ func (r *Relay) close() {
 
 func (r *Relay) acceptLoop(upstream string, recorder *Recorder) {
 	defer r.wg.Done()
-	addr := strings.TrimPrefix(upstream, "opc.tcp://")
+	r.mu.Lock()
+	r.upstream = strings.TrimPrefix(upstream, "opc.tcp://")
+	r.mu.Unlock()
 	for {
 		clientConn, err := r.listener.Accept()
 		if err != nil {
@@ -749,6 +805,9 @@ func (r *Relay) acceptLoop(upstream string, recorder *Recorder) {
 			_ = r.listener.Close()
 			return
 		}
+		r.mu.Lock()
+		addr := r.upstream
+		r.mu.Unlock()
 		serverConn, err := net.Dial("tcp", addr)
 		if err != nil {
 			_ = clientConn.Close()
@@ -768,6 +827,7 @@ func (r *Relay) acceptLoop(upstream string, recorder *Recorder) {
 		r.wg.Add(2)
 		r.mu.Unlock()
 		recorder.observeConnection(connection, serverConn.LocalAddr())
+		recorder.observeUpstream(connection, addr)
 		go r.pump(recorder, connection, clientToServer, clientConn, serverConn)
 		go r.pump(recorder, connection, serverToClient, clientConn, serverConn)
 	}

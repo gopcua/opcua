@@ -223,6 +223,9 @@ var _ = Describe("Environment Start", func() {
 		Expect(fatalPanics(func() { env.Server.WaitHeldPublish() })).To(BeTrue(),
 			"WaitHeldPublish did not fail on the off-relay Publish")
 		env.Server.t = GinkgoT()
+		env.Server.mu.Lock()
+		env.Server.faultErr = nil
+		env.Server.mu.Unlock()
 		Expect(fake.fatals).To(HaveLen(1),
 			"the off-relay Publish failed %d times, want exactly one harness fault", len(fake.fatals))
 		Expect(fake.fatals[0]).To(HavePrefix("spectest:"),

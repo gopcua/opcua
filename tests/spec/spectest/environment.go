@@ -71,6 +71,8 @@ type Environment struct {
 	receivedSignal chan struct{}
 	everConnected  bool
 	cutStates      int
+	servers        []*ScriptedServer
+	onClientClosed func()
 }
 
 // Start creates and returns a running Environment (see the Environment
@@ -199,6 +201,20 @@ func (e *Environment) Subscription() Subscription {
 		e.t.Fatalf("the client created no subscription")
 	}
 	return Subscription{server: e.Server, sub: e.Server.first}
+}
+
+// StartServer starts a second, independent scripted server with the
+// same namespace and node as the Environment's own, sharing the
+// Environment's recorder. Its traffic flows through the relay only
+// after RedirectTo sends new connections to it. The Environment's
+// teardown closes it, after the client and the relay.
+func (e *Environment) StartServer() *ScriptedServer {
+	second := newScriptedServer(e.t)
+	second.recorder = e.Recorder
+	e.mu.Lock()
+	e.servers = append(e.servers, second)
+	e.mu.Unlock()
+	return second
 }
 
 // WaitUntilReconnected waits for the client to pass through
@@ -444,6 +460,27 @@ func (e *Environment) teardown(drained chan struct{}) {
 	defer cancel()
 	if err := e.Client.Close(ctx); err != nil {
 		ginkgo.GinkgoWriter.Printf("spectest: closing the client failed: %v\n", err)
+	}
+	if e.onClientClosed != nil {
+		e.onClientClosed()
+	}
+	e.Relay.close()
+	e.Server.close()
+	e.mu.Lock()
+	servers := e.servers
+	e.mu.Unlock()
+	for _, extra := range servers {
+		extra.close()
+	}
+	for _, scripted := range append([]*ScriptedServer{e.Server}, servers...) {
+		scripted.mu.Lock()
+		faultErr := scripted.faultErr
+		scripted.mu.Unlock()
+		if faultErr != nil {
+			e.t.Fatalf("%v", faultErr)
+			close(drained)
+			return
+		}
 	}
 	close(drained)
 }

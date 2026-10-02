@@ -370,24 +370,57 @@ func TestEnvironmentSinceScope(t *testing.T) {
 	}
 }
 
-func TestTeardownClosesTheClientBeforeTheServer(t *testing.T) {
+func TestTeardownClosesTheClientBeforeTheServers(t *testing.T) {
 	fake := &fakeT{}
 	env := Start(fake)
+	second := env.StartServer()
+	serversOpenWhenClientClosed := false
+	env.onClientClosed = func() {
+		serversOpenWhenClientClosed = dialSucceeds(env.Server.Address()) && dialSucceeds(second.Address())
+	}
 
 	for i := len(fake.cleanups) - 1; i >= 0; i-- {
 		fake.cleanups[i]()
-		if i != len(fake.cleanups)-1 {
-			continue
-		}
-		conn, dialErr := net.Dial("tcp", strings.TrimPrefix(env.Server.Address(), "opc.tcp://"))
-		if dialErr != nil {
-			t.Fatalf("teardown closed the scripted server before the client: %v", dialErr)
-		}
-		_ = conn.Close()
-		if state := env.Client.State(); state != opcua.Closed {
-			t.Fatalf("teardown returned while the client still reported %v, want Closed", state)
-		}
 	}
+
+	if state := env.Client.State(); state != opcua.Closed {
+		t.Fatalf("teardown left the client in state %v, want Closed", state)
+	}
+	if !serversOpenWhenClientClosed {
+		t.Fatalf("teardown closed a scripted server before the client")
+	}
+	if dialSucceeds(env.Server.Address()) || dialSucceeds(second.Address()) {
+		t.Fatalf("teardown left a scripted server open")
+	}
+}
+
+func TestTeardownRaisesAStoredServerFault(t *testing.T) {
+	fake := &fakeT{}
+	env := Start(fake)
+	env.Server.mu.Lock()
+	env.Server.faultErr = fmt.Errorf("spectest: stored server fault")
+	env.Server.mu.Unlock()
+
+	raised := fatalPanics(func() {
+		for i := len(fake.cleanups) - 1; i >= 0; i-- {
+			fake.cleanups[i]()
+		}
+	})
+	if !raised {
+		t.Fatalf("teardown did not raise the stored server fault")
+	}
+	if len(fake.fatals) == 0 || !strings.Contains(fake.fatals[0], "stored server fault") {
+		t.Fatalf("teardown raised %q, want the stored server fault", fake.fatals)
+	}
+}
+
+func dialSucceeds(address string) bool {
+	conn, err := net.Dial("tcp", strings.TrimPrefix(address, "opc.tcp://"))
+	if err != nil {
+		return false
+	}
+	_ = conn.Close()
+	return true
 }
 
 func TestWaitHeldPublishPicksTheOldestOnTheNewestOfTwoOpenConnections(t *testing.T) {
@@ -476,6 +509,7 @@ func TestAnswerFailsWithoutAMonitoredItem(t *testing.T) {
 		recorder:      recorder,
 	}
 	sub := &harnessSub{id: 7, next: 1}
+	srv.subscriptions[7] = sub
 	entry := &heldEntry{request: &ua.PublishRequest{RequestHeader: &ua.RequestHeader{}}, connection: 0, remoteAddr: openAddress}
 	held := HeldPublish{server: srv, entry: entry}
 	if !fatalPanics(func() { held.Answer(Subscription{sub: sub, server: srv}, 5) }) {
