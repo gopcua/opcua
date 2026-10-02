@@ -14,7 +14,6 @@ var acceptedMessageTypes = []string{
 	uacp.MessageTypeHello,
 	uacp.MessageTypeAcknowledge,
 	uacp.MessageTypeError,
-	uacp.MessageTypeReverseHello,
 	uasc.MessageTypeMessage,
 	uasc.MessageTypeOpenSecureChannel,
 	uasc.MessageTypeCloseSecureChannel,
@@ -26,10 +25,8 @@ var acceptedChunkTypes = []byte{
 	uacp.ChunkTypeAbort,
 }
 
-// splitMessages splits a stream into complete OPC UA transport
-// messages and the bytes of a message that has not fully arrived yet.
-// The returned messages and rest alias stream; copy them before
-// reusing the stream buffer.
+// The returned messages and rest alias stream, so copy them before
+// reusing the buffer.
 func splitMessages(stream []byte) (messages [][]byte, rest []byte, err error) {
 	for offset := 0; offset < len(stream); {
 		if len(stream)-offset < headerLen {

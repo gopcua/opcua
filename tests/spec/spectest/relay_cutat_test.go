@@ -117,10 +117,9 @@ var _ = Describe("Relay CutAt", func() {
 		_, isReadResponse := responseMessage.(*ua.ReadResponse)
 		Expect(isReadResponse).To(BeTrue(),
 			"the record with the Read's request id holds a %T, want a *ua.ReadResponse", responseMessage)
-		Expect(env.Relay.ArmedCuts()).To(BeEmpty(),
-			"ArmedCuts still lists the cut after it fired")
-
 		env.WaitUntilReconnected()
+		Expect(env.Relay.ArmedCuts()).To(BeEmpty(),
+			"ArmedCuts still lists the cut after the client saw the connection close")
 		Expect(env.ConnectionsSince(m)).To(Equal(1),
 			"the client did not reconnect through exactly one new relay connection after the cut closed the connection")
 	})
@@ -221,9 +220,8 @@ var _ = Describe("Relay CutAt", func() {
 			}
 		}()
 
-		relay, _ := newRelay(t, upstreamListener.Addr().String())
 		cutFired := make(chan struct{}, 1)
-		relay.onCut = func() { cutFired <- struct{}{} }
+		relay, _ := newRelay(t, upstreamListener.Addr().String(), func() { cutFired <- struct{}{} })
 		relay.CutAt(BeforeRequestReachesServer, Read)
 
 		firstClient, err := net.Dial("tcp", relay.address())
@@ -249,7 +247,7 @@ var _ = Describe("Relay CutAt", func() {
 			firstClosed <- err
 		}()
 		Eventually(cutFired).WithTimeout(specWait).Should(Receive(),
-			"the fired cut did not fire the cut hook")
+			"the fired cut did not call onCut")
 		var firstErr error
 		Eventually(firstClosed).WithTimeout(specWait).Should(Receive(&firstErr),
 			"the fired cut did not close the connection it fired on")
@@ -282,7 +280,7 @@ var _ = Describe("Relay CutAt", func() {
 			}
 		}()
 
-		relay, _ := newRelay(t, upstreamListener.Addr().String())
+		relay, _ := newRelay(t, upstreamListener.Addr().String(), nil)
 		relay.CutAt(AfterResponseReachesClient, Read)
 
 		clientConn, err := net.Dial("tcp", relay.address())
@@ -334,7 +332,7 @@ var _ = Describe("Relay CutAt", func() {
 var _ = Describe("Relay CutAt injected batches", func() {
 	newInjectedRelay := func() (*Relay, *Recorder, *fakeT) {
 		ft := &fakeT{}
-		relay, recorder := newRelay(ft, "opc.tcp://127.0.0.1:1")
+		relay, recorder := newRelay(ft, "opc.tcp://127.0.0.1:1", nil)
 		DeferCleanup(func() {
 			for _, cleanup := range ft.cleanups {
 				cleanup()
@@ -354,7 +352,7 @@ var _ = Describe("Relay CutAt injected batches", func() {
 		Expect(recorder.forward(0, clientToServer, wire, func(message []byte) error {
 			written = append(written, message)
 			return nil
-		}, func() error {
+		}, func(armedCut) error {
 			finished = true
 			return nil
 		})).To(Succeed(),
@@ -391,7 +389,7 @@ var _ = Describe("Relay CutAt injected batches", func() {
 		Expect(recorder.forward(0, clientToServer, append(first, second...), func(message []byte) error {
 			written = append(written, message)
 			return nil
-		}, func() error { return nil })).To(Succeed(),
+		}, func(armedCut) error { return nil })).To(Succeed(),
 			"observing the two Reads failed")
 
 		requests := recorder.Requests()
@@ -414,7 +412,7 @@ var _ = Describe("Relay CutAt injected batches", func() {
 
 		response, err := readResponseWire(77)
 		Expect(err).NotTo(HaveOccurred(), "encoding the response failed")
-		Expect(recorder.forward(0, serverToClient, response, func([]byte) error { return nil }, func() error {
+		Expect(recorder.forward(0, serverToClient, response, func([]byte) error { return nil }, func(armedCut) error {
 			finished = true
 			return nil
 		})).To(Succeed(),
@@ -442,7 +440,7 @@ var _ = Describe("Relay CutAt injected batches", func() {
 		recorder.observe(1, clientToServer, staged)
 		response, err := readResponseWire(9)
 		Expect(err).NotTo(HaveOccurred(), "encoding the response failed")
-		Expect(recorder.forward(0, serverToClient, response, func([]byte) error { return nil }, func() error {
+		Expect(recorder.forward(0, serverToClient, response, func([]byte) error { return nil }, func(armedCut) error {
 			finished = true
 			return nil
 		})).To(Succeed(),
@@ -470,7 +468,7 @@ var _ = Describe("Relay CutAt injected batches", func() {
 		recorder.observe(0, clientToServer, staged)
 		response, err := readResponseWire(9)
 		Expect(err).NotTo(HaveOccurred(), "encoding the response failed")
-		Expect(recorder.forward(0, serverToClient, response, func([]byte) error { return nil }, func() error {
+		Expect(recorder.forward(0, serverToClient, response, func([]byte) error { return nil }, func(armedCut) error {
 			finished = true
 			return nil
 		})).To(Succeed(),
@@ -502,7 +500,7 @@ var _ = Describe("Relay CutAt injected batches", func() {
 		Expect(recorder.forward(0, serverToClient, fault, func(message []byte) error {
 			written = append(written, message)
 			return nil
-		}, func() error {
+		}, func(armedCut) error {
 			finished = true
 			return nil
 		})).To(Succeed(),
@@ -544,7 +542,7 @@ var _ = Describe("Relay CutAt injected batches", func() {
 			written = append(written, message)
 			events = append(events, "write")
 			return nil
-		}, func() error {
+		}, func(armedCut) error {
 			events = append(events, "halfClose", "cut")
 			return nil
 		})).To(Succeed(),
@@ -576,7 +574,7 @@ var _ = Describe("Relay CutAt injected batches", func() {
 		response, err := readResponseWire(9)
 		Expect(err).NotTo(HaveOccurred(), "encoding the response failed")
 		closeErr := errors.New("the spectest half-close failure")
-		Expect(recorder.forward(0, serverToClient, response, func([]byte) error { return nil }, func() error {
+		Expect(recorder.forward(0, serverToClient, response, func([]byte) error { return nil }, func(armedCut) error {
 			finished = true
 			return closeErr
 		})).To(Succeed(),
@@ -597,7 +595,6 @@ var _ = Describe("Relay CutAt injected batches", func() {
 	It("records observed messages without claiming armed cuts", func() {
 		relay, recorder, _ := newInjectedRelay()
 		relay.CutAt(BeforeRequestReachesServer, Read)
-		finished := false
 
 		request, err := readRequestWire(11)
 		Expect(err).NotTo(HaveOccurred(), "encoding the request failed")
@@ -621,18 +618,116 @@ var _ = Describe("Relay CutAt injected batches", func() {
 		Expect(responses[0].Fate).To(Equal(Forwarded),
 			"observing the response claimed the armed cut instead of only recording it")
 
-		Expect(finished).To(BeFalse(),
-			"observing messages finished an after-response cut")
 		Expect(relay.ArmedCuts()).To(Equal([]string{
 			"before a Read request reaches the server",
 			"after a Read response reaches the client",
 		}), "ArmedCuts does not list both cuts although observing messages fires none of them")
 	})
+
+	It("releases a claimed drop cut when a write before the cut fails, so the next matching message fires it", func() {
+		relay, recorder, _ := newInjectedRelay()
+		relay.CutAt(BeforeRequestReachesServer, Read)
+
+		ignored, err := republishRequestWire(31)
+		Expect(err).NotTo(HaveOccurred(), "encoding the ignored Republish failed")
+		matching, err := readRequestWire(32)
+		Expect(err).NotTo(HaveOccurred(), "encoding the Read the cut fires on failed")
+		writeErr := errors.New("the spectest write failure")
+		Expect(recorder.forward(0, clientToServer, append(ignored, matching...), func([]byte) error {
+			return writeErr
+		}, func(armedCut) error { return nil })).To(MatchError(writeErr),
+			"forward returned an error other than the write error")
+
+		Expect(relay.ArmedCuts()).To(Equal([]string{
+			"before a Read request reaches the server",
+		}), "ArmedCuts no longer lists the cut although the failed write left its message undelivered")
+
+		second, err := readRequestWire(33)
+		Expect(err).NotTo(HaveOccurred(), "encoding the second Read failed")
+		Expect(recorder.forward(0, clientToServer, second, func([]byte) error { return nil }, func(armedCut) error { return nil })).To(Succeed(),
+			"observing the second Read failed")
+		Expect(relay.ArmedCuts()).To(BeEmpty(),
+			"the released cut did not fire on the next matching message")
+
+		var dropped []uint32
+		for _, r := range recorder.Requests() {
+			if r.Fate == Dropped {
+				dropped = append(dropped, r.RequestID)
+			}
+		}
+		Expect(dropped).To(Equal([]uint32{32, 33}),
+			"the released cut did not drop the Read of each batch it fired on")
+	})
+
+	It("releases a claimed after-response cut when the write of its response fails, so the next matching response fires it", func() {
+		relay, recorder, _ := newInjectedRelay()
+		relay.CutAt(AfterResponseReachesClient, Read)
+
+		staged, err := readRequestWire(9)
+		Expect(err).NotTo(HaveOccurred(), "encoding the request failed")
+		recorder.observe(0, clientToServer, staged)
+		response, err := readResponseWire(9)
+		Expect(err).NotTo(HaveOccurred(), "encoding the response failed")
+		writeErr := errors.New("the spectest write failure")
+		finished := false
+		Expect(recorder.forward(0, serverToClient, response, func([]byte) error {
+			return writeErr
+		}, func(armedCut) error {
+			finished = true
+			return nil
+		})).To(MatchError(writeErr),
+			"forward returned an error other than the write error")
+		Expect(finished).To(BeFalse(),
+			"the relay finished the after-response cut although writing the response failed")
+		Expect(relay.ArmedCuts()).To(Equal([]string{
+			"after a Read response reaches the client",
+		}), "ArmedCuts no longer lists the cut although its response never reached the client")
+
+		Expect(recorder.forward(0, serverToClient, response, func([]byte) error { return nil }, func(armedCut) error {
+			finished = true
+			return nil
+		})).To(Succeed(),
+			"observing the second response failed")
+		Expect(finished).To(BeTrue(),
+			"the released cut did not fire on the next matching response")
+		Expect(relay.ArmedCuts()).To(BeEmpty(),
+			"ArmedCuts still lists the cut after the released cut fired")
+	})
+
+	It("leaves the second of two identical armed cuts listed and armed while the first fires", func() {
+		relay, recorder, _ := newInjectedRelay()
+		relay.CutAt(BeforeRequestReachesServer, Read)
+		relay.CutAt(BeforeRequestReachesServer, Read)
+
+		first, err := readRequestWire(41)
+		Expect(err).NotTo(HaveOccurred(), "encoding the first Read failed")
+		Expect(recorder.forward(0, clientToServer, first, func([]byte) error { return nil }, func(armedCut) error { return nil })).To(Succeed(),
+			"observing the first Read failed")
+		Expect(relay.ArmedCuts()).To(Equal([]string{
+			"before a Read request reaches the server",
+		}), "firing the first cut removed the second identical cut as well")
+
+		second, err := readRequestWire(42)
+		Expect(err).NotTo(HaveOccurred(), "encoding the second Read failed")
+		Expect(recorder.forward(0, clientToServer, second, func([]byte) error { return nil }, func(armedCut) error { return nil })).To(Succeed(),
+			"observing the second Read failed")
+		Expect(relay.ArmedCuts()).To(BeEmpty(),
+			"the second identical cut never fired on its own matching message")
+
+		var dropped []uint32
+		for _, r := range recorder.Requests() {
+			if r.Fate == Dropped {
+				dropped = append(dropped, r.RequestID)
+			}
+		}
+		Expect(dropped).To(Equal([]uint32{41, 42}),
+			"the two identical cuts did not drop one Read each")
+	})
 })
 
 func TestCutAtRejectsUnknownMomentAndService(t *testing.T) {
 	ft := &fakeT{}
-	relay, _ := newRelay(ft, "opc.tcp://127.0.0.1:1")
+	relay, _ := newRelay(ft, "opc.tcp://127.0.0.1:1", nil)
 	defer func() {
 		for _, cleanup := range ft.cleanups {
 			cleanup()

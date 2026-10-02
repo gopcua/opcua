@@ -83,12 +83,12 @@ func decodeChunk(t *testing.T, index int, wire []byte) *chunkFrame {
 func messageChunk(chunkType byte, requestID uint32, body []byte) ([]byte, error) {
 	header := uasc.NewHeader(uasc.MessageTypeMessage, chunkType, 0)
 	header.MessageSize = uint32(24 + len(body))
-	buf := ua.NewBuffer(nil)
-	buf.WriteStruct(header)
-	buf.WriteStruct(uasc.NewSymmetricSecurityHeader(0))
-	buf.WriteStruct(uasc.NewSequenceHeader(1, requestID))
-	buf.Write(body)
-	return buf.Bytes(), buf.Error()
+	buffer := ua.NewBuffer(nil)
+	buffer.WriteStruct(header)
+	buffer.WriteStruct(uasc.NewSymmetricSecurityHeader(0))
+	buffer.WriteStruct(uasc.NewSequenceHeader(1, requestID))
+	buffer.Write(body)
+	return buffer.Bytes(), buffer.Error()
 }
 
 func transportMessage(messageType string, body []byte) ([]byte, error) {

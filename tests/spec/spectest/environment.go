@@ -2,6 +2,7 @@ package spectest
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"slices"
@@ -71,6 +72,7 @@ type Environment struct {
 	receivedSignal chan struct{}
 	everConnected  bool
 	cutStates      int
+	waitTimeout    time.Duration
 	servers        []*ScriptedServer
 	onClientClosed func()
 }
@@ -85,18 +87,19 @@ func Start(t T, opts ...Option) *Environment {
 	}
 	publishing, reconnect, err := resolveIntervals(o, os.Getenv)
 	if err != nil {
-		t.Fatalf("spectest: %v", err)
+		t.Fatalf("%s", harnessFault("%v", err))
 		return nil
 	}
 	if publishing*time.Duration(lifetimeCount) < time.Hour {
-		t.Fatalf("spectest: publishing interval %s times lifetime count %d stays below one hour, so the server's subscription service could delete the subscription before the test ends", publishing, lifetimeCount)
+		t.Fatalf("%s", harnessFault("publishing interval %s times lifetime count %d stays below one hour, so the server's subscription service could delete the subscription before the test ends", publishing, lifetimeCount))
 		return nil
 	}
 	e := &Environment{t: t, receivedSignal: make(chan struct{}, 1)}
 	e.Server = newScriptedServer(t)
-	e.Relay, e.Recorder = newRelay(t, e.Server.Address())
-	e.Relay.onCut = e.noteCut
+	e.Relay, e.Recorder = newRelay(t, e.Server.Address(), e.noteCut)
+	e.Server.mu.Lock()
 	e.Server.recorder = e.Recorder
+	e.Server.mu.Unlock()
 
 	states := make(chan opcua.ConnState, notificationBuffer)
 	notifications := make(chan *opcua.PublishNotificationData, notificationBuffer)
@@ -114,7 +117,7 @@ func Start(t T, opts ...Option) *Environment {
 	}, o.clientOptions...)
 	client, err := opcua.NewClient("opc.tcp://"+e.Relay.address(), clientOptions...)
 	if err != nil {
-		t.Fatalf("spectest: creating the client failed: %v", err)
+		t.Fatalf("%s", harnessFault("creating the client failed: %v", err))
 		return nil
 	}
 	e.Client = client
@@ -210,7 +213,9 @@ func (e *Environment) Subscription() Subscription {
 // teardown closes it, after the client and the relay.
 func (e *Environment) StartServer() *ScriptedServer {
 	second := newScriptedServer(e.t)
+	second.mu.Lock()
 	second.recorder = e.Recorder
+	second.mu.Unlock()
 	e.mu.Lock()
 	e.servers = append(e.servers, second)
 	e.mu.Unlock()
@@ -218,18 +223,24 @@ func (e *Environment) StartServer() *ScriptedServer {
 }
 
 // WaitUntilReconnected waits for the client to pass through
-// Reconnecting back to Connected after the most recent call to
-// Relay.Cut, searching the states recorded since that cut. The
-// deadline starts when this method is called.
+// Reconnecting back to Connected after the most recent cut the relay
+// made, by Relay.Cut or by a fired CutAt, searching the states
+// recorded since that cut. The deadline starts when this method is
+// called, and the Connected wait restarts its deadline once
+// Reconnecting appears.
 func (e *Environment) WaitUntilReconnected() {
 	e.mu.Lock()
 	cut := e.cutStates
+	waitTimeout := e.waitTimeout
 	e.mu.Unlock()
+	if waitTimeout == 0 {
+		waitTimeout = startTimeout
+	}
 	if !e.hasStateSince(cut, opcua.Reconnecting) {
-		deadline := time.Now().Add(startTimeout)
+		deadline := time.Now().Add(waitTimeout)
 		for !e.hasStateSince(cut, opcua.Reconnecting) {
 			if !time.Now().Before(deadline) {
-				e.t.Fatalf("client never entered Reconnecting within %s of the cut", startTimeout)
+				e.t.Fatalf("client never entered Reconnecting within %s of the cut", waitTimeout)
 				return
 			}
 			time.Sleep(statePollInterval)
@@ -239,10 +250,10 @@ func (e *Environment) WaitUntilReconnected() {
 	if e.hasStateSince(reconnecting+1, opcua.Connected) {
 		return
 	}
-	deadline := time.Now().Add(startTimeout)
+	deadline := time.Now().Add(waitTimeout)
 	for !e.hasStateSince(reconnecting+1, opcua.Connected) {
 		if !time.Now().Before(deadline) {
-			e.t.Fatalf("client entered Reconnecting but did not reach Connected within %s; states: %v", startTimeout, e.statesFrom(reconnecting+1))
+			e.t.Fatalf("client entered Reconnecting but did not reach Connected within %s; states: %v", waitTimeout, e.statesFrom(reconnecting+1))
 			return
 		}
 		time.Sleep(statePollInterval)
@@ -320,27 +331,35 @@ func (e *Environment) StatesSince(m Mark) []opcua.ConnState {
 	return slices.Clone(e.states[min(m.states, len(e.states)):])
 }
 
-// LastSequenceNumber returns the sequence number of the last
-// PublishResponse carrying a data change notification that the
-// recorder saw.
+// LastSequenceNumber returns the highest sequence number of the data
+// change notifications the recorder saw the server deliver, in a
+// Publish response or a Republish response.
 func (e *Environment) LastSequenceNumber() uint32 {
-	answered := answeredPublishes(e.Recorder.Responses())
-	if len(answered) == 0 {
-		return 0
+	var highest uint32
+	for _, candidate := range e.Recorder.answeredPublishes() {
+		if candidate.sequenceNumber > highest {
+			highest = candidate.sequenceNumber
+		}
 	}
-	return answered[len(answered)-1].sequenceNumber
+	return highest
 }
 
 func (e *Environment) checkLastSequenceNumber() {
-	answered := answeredPublishes(e.Recorder.Responses())
-	if len(answered) == 0 {
-		e.t.Fatalf("spectest: the recorder saw no answered Publish response")
+	var last answeredPublish
+	seen := false
+	for _, candidate := range e.Recorder.answeredPublishes() {
+		if !candidate.republished {
+			last = candidate
+			seen = true
+		}
+	}
+	if !seen {
+		e.t.Fatalf("%s", harnessFault("the recorder saw no answered Publish response"))
 		return
 	}
-	last := answered[len(answered)-1]
 	received := e.Received()
 	if len(received) == 0 || last.value != received[len(received)-1] {
-		e.t.Fatalf("spectest: the last answered Publish response carries %d, want the value the client delivered", last.value)
+		e.t.Fatalf("%s", harnessFault("the last answered Publish response carries %d, want the value the client delivered", last.value))
 	}
 }
 
@@ -472,17 +491,19 @@ func (e *Environment) teardown(drained chan struct{}) {
 	for _, extra := range servers {
 		extra.close()
 	}
+	var faults []error
 	for _, scripted := range append([]*ScriptedServer{e.Server}, servers...) {
 		scripted.mu.Lock()
 		faultErr := scripted.faultErr
 		scripted.mu.Unlock()
 		if faultErr != nil {
-			e.t.Fatalf("%v", faultErr)
-			close(drained)
-			return
+			faults = append(faults, faultErr)
 		}
 	}
 	close(drained)
+	if len(faults) > 0 {
+		e.t.Fatalf("%s", errors.Join(faults...))
+	}
 }
 
 type answeredPublish struct {
@@ -490,23 +511,38 @@ type answeredPublish struct {
 	connection               int
 	subscriptionID           uint32
 	sequenceNumber           uint32
+	republished              bool
 	value                    int32
 	results                  []ua.StatusCode
 	availableSequenceNumbers []uint32
 }
 
-func answeredPublishes(responses []ServiceRecord[ua.Response]) []answeredPublish {
+func answeredPublishes(requests []ServiceRecord[ua.Request], responses []ServiceRecord[ua.Response]) []answeredPublish {
 	var answered []answeredPublish
 	for _, record := range responses {
 		message, forwarded := record.Message()
 		if !forwarded {
 			continue
 		}
-		response, isPublish := message.(*ua.PublishResponse)
-		if !isPublish {
+		var notification *ua.NotificationMessage
+		var subscriptionID uint32
+		var results []ua.StatusCode
+		var availableSequenceNumbers []uint32
+		republished := false
+		switch response := message.(type) {
+		case *ua.PublishResponse:
+			notification = response.NotificationMessage
+			subscriptionID = response.SubscriptionID
+			results = response.Results
+			availableSequenceNumbers = response.AvailableSequenceNumbers
+		case *ua.RepublishResponse:
+			notification = response.NotificationMessage
+			subscriptionID = republishSubscriptionID(requests, record)
+			republished = true
+		default:
 			continue
 		}
-		value, carries := dataChangeValue(response.NotificationMessage)
+		value, carries := dataChangeValue(notification)
 		if !carries {
 			continue
 		}
@@ -514,14 +550,31 @@ func answeredPublishes(responses []ServiceRecord[ua.Response]) []answeredPublish
 		answered = append(answered, answeredPublish{
 			order:                    record.Order,
 			connection:               record.Connection,
-			subscriptionID:           response.SubscriptionID,
-			sequenceNumber:           response.NotificationMessage.SequenceNumber,
+			subscriptionID:           subscriptionID,
+			sequenceNumber:           notification.SequenceNumber,
+			republished:              republished,
 			value:                    valueInt32,
-			results:                  response.Results,
-			availableSequenceNumbers: response.AvailableSequenceNumbers,
+			results:                  results,
+			availableSequenceNumbers: availableSequenceNumbers,
 		})
 	}
 	return answered
+}
+
+func republishSubscriptionID(requests []ServiceRecord[ua.Request], response ServiceRecord[ua.Response]) uint32 {
+	for _, record := range requests {
+		if record.Connection != response.Connection || record.RequestID != response.RequestID {
+			continue
+		}
+		message, forwarded := record.Message()
+		if !forwarded {
+			continue
+		}
+		if request, isRepublish := message.(*ua.RepublishRequest); isRepublish {
+			return request.SubscriptionID
+		}
+	}
+	return 0
 }
 
 func dataChangeValue(message *ua.NotificationMessage) (any, bool) {

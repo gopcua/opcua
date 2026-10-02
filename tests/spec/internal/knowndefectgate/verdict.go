@@ -12,9 +12,9 @@ import (
 // reports still fail as their labels claim: a spec counts when its own or
 // its container labels include "known-defect", and "racy" is read the same
 // way. The exit is 1 when a labelled spec now passes, when every labelled
-// spec was skipped, when one aborted, was interrupted, panicked, timed out
-// or holds an unknown state, or when the log shows a data race or a test
-// timeout. A racy pass, the lines naming the specs that did not run, and
+// spec was skipped, when one holds a spec state the switch below counts
+// as a verdict-unknown failure, or when the log shows a data race or a
+// test timeout. A racy pass, the lines naming the specs that did not run, and
 // the line saying that no spec in the report carries the label are warnings
 // with exit 0. A failure message starting "spectest:" is a harness
 // failure, not the defect.
@@ -57,6 +57,7 @@ func Verdict(reports []types.Report, log string) (exit int, message string) {
 			case types.SpecStatePending, types.SpecStateSkipped:
 				lines = append(lines, fmt.Sprintf("%s: %s, not run", name, spec.State))
 			case types.SpecStateInvalid:
+				ran = true
 				fail("%s: spec state %s, verdict unknown", name, spec.State)
 			default:
 				fail("%s: unknown spec state %d", name, uint(spec.State))

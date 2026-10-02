@@ -60,7 +60,7 @@ func startSpecServer() (string, *ua.NodeID, func()) {
 func connectThroughRelay(opts ...opcua.Option) (*opcua.Client, *Relay, *Recorder, *ua.NodeID) {
 	t := GinkgoT()
 	serverAddr, nodeID, _ := startSpecServer()
-	relay, recorder := newRelay(t, serverAddr)
+	relay, recorder := newRelay(t, serverAddr, nil)
 
 	clientOpts := append([]opcua.Option{
 		opcua.SecurityMode(ua.MessageSecurityModeNone),
@@ -205,6 +205,10 @@ func serviceFaultWire(requestID uint32) ([]byte, error) {
 }
 
 func republishRequestWire(requestID uint32) ([]byte, error) {
+	return republishRequestWireWithHandle(requestID, requestID)
+}
+
+func republishRequestWireWithHandle(requestID, requestHandle uint32) ([]byte, error) {
 	typeID := ua.ServiceTypeID(&ua.RepublishRequest{})
 	if typeID == 0 {
 		return nil, fmt.Errorf("ua.ServiceTypeID returned 0 for *ua.RepublishRequest, want its registered type id")
@@ -214,10 +218,40 @@ func republishRequestWire(requestID uint32) ([]byte, error) {
 	body.WriteStruct(&ua.RepublishRequest{
 		RequestHeader: &ua.RequestHeader{
 			AuthenticationToken: ua.NewTwoByteNodeID(0),
-			RequestHandle:       requestID,
+			RequestHandle:       requestHandle,
 		},
 		SubscriptionID:           1,
 		RetransmitSequenceNumber: 2,
+	})
+	if body.Error() != nil {
+		return nil, body.Error()
+	}
+	return messageChunk(uacp.ChunkTypeFinal, requestID, body.Bytes())
+}
+
+func republishResponseWire(requestID uint32) ([]byte, error) {
+	typeID := ua.ServiceTypeID(&ua.RepublishResponse{})
+	if typeID == 0 {
+		return nil, fmt.Errorf("ua.ServiceTypeID returned 0 for *ua.RepublishResponse, want its registered type id")
+	}
+	body := ua.NewBuffer(nil)
+	body.WriteStruct(ua.NewFourByteExpandedNodeID(0, typeID))
+	body.WriteStruct(&ua.RepublishResponse{
+		ResponseHeader: &ua.ResponseHeader{
+			ServiceDiagnostics: &ua.DiagnosticInfo{},
+			StringTable:        []string{},
+			AdditionalHeader:   ua.NewExtensionObject(nil),
+		},
+		NotificationMessage: &ua.NotificationMessage{
+			SequenceNumber: 2,
+			NotificationData: []*ua.ExtensionObject{ua.NewExtensionObject(&ua.DataChangeNotification{
+				MonitoredItems: []*ua.MonitoredItemNotification{{
+					ClientHandle: monitorClientHandle,
+					Value:        server.DataValueFromValue(7001),
+				}},
+				DiagnosticInfos: []*ua.DiagnosticInfo{},
+			})},
+		},
 	})
 	if body.Error() != nil {
 		return nil, body.Error()
@@ -424,7 +458,7 @@ var _ = Describe("Relay and Recorder", func() {
 	It("marks bytes a cut leaves behind as Truncated through the live relay", func() {
 		t := GinkgoT()
 		serverAddr, _, _ := startSpecServer()
-		relay, recorder := newRelay(t, serverAddr)
+		relay, recorder := newRelay(t, serverAddr, nil)
 
 		firstConn, err := net.Dial("tcp", relay.address())
 		Expect(err).NotTo(HaveOccurred(), "dialing the relay failed")
@@ -640,7 +674,7 @@ var _ = Describe("Relay close propagation", func() {
 			}
 		}()
 
-		relay, _ := newRelay(t, upstreamListener.Addr().String())
+		relay, _ := newRelay(t, upstreamListener.Addr().String(), nil)
 		clientConn, err := net.Dial("tcp", relay.address())
 		Expect(err).NotTo(HaveOccurred(), "dialing the relay failed")
 		var upstream net.Conn
@@ -681,7 +715,7 @@ var _ = Describe("Relay upstream faults", func() {
 		Expect(portListener.Close()).To(Succeed())
 
 		ft := &fakeT{}
-		relay, recorder := newRelay(ft, upstreamAddress)
+		relay, recorder := newRelay(ft, upstreamAddress, nil)
 
 		firstConn, err := net.Dial("tcp", relay.address())
 		Expect(err).NotTo(HaveOccurred(), "dialing the relay failed")

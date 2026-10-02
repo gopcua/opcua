@@ -266,7 +266,7 @@ func startTransferServer(t *testing.T) (*ScriptedServer, *opcua.Client, func()) 
 	t.Helper()
 	ft := &fakeT{}
 	srv := newScriptedServer(ft)
-	relay, recorder := newRelay(ft, srv.Address())
+	relay, recorder := newRelay(ft, srv.Address(), nil)
 	srv.recorder = recorder
 	client, err := opcua.NewClient("opc.tcp://"+relay.address(),
 		opcua.SecurityMode(ua.MessageSecurityModeNone),
@@ -412,7 +412,7 @@ func TestTransferCounterStartsAboveTheAvailableNumbers(t *testing.T) {
 	if publishErr := wait(); publishErr != nil {
 		t.Fatalf("the raw Publish request failed after the Answer: %v", publishErr)
 	}
-	answered := answeredPublishes(srv.recorder.Responses())
+	answered := srv.recorder.answeredPublishes()
 	if len(answered) == 0 {
 		t.Fatalf("the recorder saw no answered Publish response on the fresh server")
 	}
@@ -472,7 +472,7 @@ func TestTransferSuccessAnswersFromTheQueue(t *testing.T) {
 	if publishErr := wait(); publishErr != nil {
 		t.Fatalf("the raw Publish request failed after the Answer: %v", publishErr)
 	}
-	answered := answeredPublishes(srv.recorder.Responses())
+	answered := srv.recorder.answeredPublishes()
 	if len(answered) == 0 {
 		t.Fatalf("the recorder saw no answered Publish response on the fresh server")
 	}
@@ -483,4 +483,68 @@ func TestTransferSuccessAnswersFromTheQueue(t *testing.T) {
 	if scripts := srv.UnusedScripts(); len(scripts) != 0 {
 		t.Fatalf("the transfer answer and the retained message were used, so UnusedScripts must be empty: %v", scripts)
 	}
+}
+
+func TestTransferSuccessAnswersTwoIdsWithALiveSubscriptionForEach(t *testing.T) {
+	srv, client, closeAll := startTransferServer(t)
+	defer closeAll()
+	prepareTransferOnFreshServer(t, client, srv)
+
+	moved := srv.QueueTransferSuccess(5, 6)
+	moved.Retain(6, valueRetained)
+	transfer, err := sendTransfer(client, []uint32{1, 2})
+	if err != nil {
+		t.Fatalf("the two-id TransferSubscriptions failed: %v", err)
+	}
+	if len(transfer.Results) != 2 {
+		t.Fatalf("the transfer answered %d results, want one per requested id", len(transfer.Results))
+	}
+	for i, result := range transfer.Results {
+		if result.StatusCode != ua.StatusOK {
+			t.Fatalf("transfer result %d carries %v, want Good", i, result.StatusCode)
+		}
+		if !slices.Equal(result.AvailableSequenceNumbers, []uint32{5, 6}) {
+			t.Fatalf("transfer result %d carries available sequence numbers %v, want [5 6]", i, result.AvailableSequenceNumbers)
+		}
+	}
+	if moved.ID() != 1 {
+		t.Fatalf("the transferred handle names subscription %d, want 1: the deferred subscription binds to the first id", moved.ID())
+	}
+
+	first, err := sendRepublishOn(client, 1, 6)
+	if err != nil {
+		t.Fatalf("the Republish for the first transferred id failed: %v", err)
+	}
+	if first.NotificationMessage == nil || first.NotificationMessage.SequenceNumber != 6 {
+		t.Fatalf("the Republish for (1, 6) answered with %+v, want the staged sequence number 6", first.NotificationMessage)
+	}
+	second, err := sendRepublishOn(client, 2, 6)
+	if err == nil {
+		t.Fatalf("the Republish for the second id answered with %+v, want Bad_MessageNotAvailable: the second id got a fresh harness subscription with an empty queue", second.NotificationMessage)
+	}
+	if err == nil || err.Error() != ua.StatusBadMessageNotAvailable.Error() {
+		t.Fatalf("the Republish for the second id failed with %v, want Bad_MessageNotAvailable", err)
+	}
+	if scripts := srv.UnusedScripts(); len(scripts) != 0 {
+		t.Fatalf("the two-id transfer left unused scripts: %v", scripts)
+	}
+}
+
+func sendRepublishOn(client *opcua.Client, subscriptionID, sequenceNumber uint32) (*ua.RepublishResponse, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), specWait)
+	defer cancel()
+	request := &ua.RepublishRequest{SubscriptionID: subscriptionID, RetransmitSequenceNumber: sequenceNumber}
+	var response ua.Response
+	err := client.Send(ctx, request, func(v ua.Response) error {
+		response = v
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	republish, isRepublish := response.(*ua.RepublishResponse)
+	if !isRepublish {
+		return nil, fmt.Errorf("the Republish for (%d, %d) answered with a %T, want a RepublishResponse", subscriptionID, sequenceNumber, response)
+	}
+	return republish, nil
 }

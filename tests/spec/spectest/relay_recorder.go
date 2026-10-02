@@ -23,6 +23,14 @@ type T interface {
 	Cleanup(func())
 }
 
+// harnessFault returns the failure message for a fault in the harness
+// itself, carrying the spectest: prefix. knowndefectgate classifies a
+// message starting with this prefix as a harness fault, not an
+// implementation defect.
+func harnessFault(format string, args ...any) string {
+	return "spectest: " + fmt.Sprintf(format, args...)
+}
+
 // Fate says what the relay did with a service message.
 type Fate int
 
@@ -185,25 +193,28 @@ func newRecorder(t T) *Recorder {
 	return recorder
 }
 
-// Notification is one data change notification the recorder saw inside a
-// forwarded PublishResponse, with the wire order and connection it
-// arrived on, the subscription it was published on and the value it
-// carried.
+// Notification is one data change notification the recorder saw inside
+// a forwarded Publish or Republish response, with the wire order and
+// connection it arrived on, the subscription it belongs to and the
+// value it carried. Republished marks a Republish answer; its
+// SubscriptionID is the SubscriptionID of the Republish request the
+// response answered.
 type Notification struct {
 	Order          int
 	Connection     int
 	SubscriptionID uint32
 	SequenceNumber uint32
+	Republished    bool
 	Value          int32
 }
 
 // Notifications returns the data change notifications the recorder saw
-// inside forwarded PublishResponses, in wire order.
+// inside forwarded Publish and Republish responses, in wire order.
 func (r *Recorder) Notifications() []Notification {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.raiseLocked()
-	answered := answeredPublishes(r.responses)
+	answered := answeredPublishes(r.requests, r.responses)
 	notifications := make([]Notification, len(answered))
 	for i, publish := range answered {
 		notifications[i] = Notification{
@@ -211,10 +222,18 @@ func (r *Recorder) Notifications() []Notification {
 			Connection:     publish.connection,
 			SubscriptionID: publish.subscriptionID,
 			SequenceNumber: publish.sequenceNumber,
+			Republished:    publish.republished,
 			Value:          publish.value,
 		}
 	}
 	return notifications
+}
+
+func (r *Recorder) answeredPublishes() []answeredPublish {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.raiseLocked()
+	return answeredPublishes(r.requests, r.responses)
 }
 
 // Requests returns a copy of the recorded client-to-server messages,
@@ -342,7 +361,7 @@ func (r *Recorder) Log() []any {
 func (r *Recorder) raiseLocked() {
 	if r.err != nil && !r.reported {
 		r.reported = true
-		r.t.Fatalf("spectest: %v", r.err)
+		r.t.Fatalf("%s", harnessFault("%v", r.err))
 	}
 }
 
@@ -371,24 +390,29 @@ func (r *Recorder) observe(connection int, flow flow, data []byte) {
 	_, _, _ = r.observeLocked(connection, flow, data, false)
 }
 
-// The write stays outside the lock so a peer that stops reading
-// blocks only its own direction.
-func (r *Recorder) forward(connection int, flow flow, data []byte, write func([]byte) error, finishAfterResponse func() error) error {
+func (r *Recorder) forward(connection int, flow flow, data []byte, write func([]byte) error, finishAfterResponse func(armedCut) error) error {
 	r.mu.Lock()
 	messages, cut, err := r.observeLocked(connection, flow, data, true)
 	r.mu.Unlock()
+	// The writes stay outside the recorder lock: a write to a peer
+	// that stopped reading blocks, and every connection's pump
+	// shares this lock.
 	for i, message := range messages {
 		if cut.index == i && cut.drop {
-			r.relay.closeConnection(connection)
+			r.relay.closeConnection(connection, cut.claim)
 			return err
 		}
 		if writeErr := write(message); writeErr != nil {
+			if cut.index >= 0 {
+				r.relay.release(cut.claim)
+			}
 			return writeErr
 		}
 		if cut.index == i {
-			if finishErr := finishAfterResponse(); finishErr != nil {
-				r.setRelayError(fmt.Errorf("spectest: the relay could not half-close the client side after the response it wrote: %w", finishErr))
+			if finishErr := finishAfterResponse(cut.claim); finishErr != nil {
+				r.setRelayError(fmt.Errorf("the relay could not half-close the client side after the response it wrote: %w", finishErr))
 			}
+			r.relay.disarm(cut.claim)
 			return err
 		}
 	}
@@ -427,12 +451,12 @@ func (r *Recorder) observeLocked(connection int, flow flow, data []byte, claimCu
 		offset := state.consumed
 		state.consumed += len(message)
 		order := r.nextOrderLocked()
-		dropped, afterResponse, recordErr := r.recordLocked(order, connection, flow, state, message, claimCuts)
+		claim, dropped, afterResponse, recordErr := r.recordLocked(order, connection, flow, state, message, claimCuts)
 		if recordErr != nil {
 			r.setErrorLocked(connection, flow, offset, recordErr)
 		}
 		if (dropped || afterResponse) && cut.index < 0 {
-			cut = firedCut{index: i, drop: dropped}
+			cut = firedCut{index: i, drop: dropped, claim: claim}
 			messages = messages[:i+1]
 			break
 		}
@@ -444,51 +468,55 @@ func (r *Recorder) observeLocked(connection int, flow flow, data []byte, claimCu
 	return messages, cut, nil
 }
 
-func (r *Recorder) recordLocked(order, connection int, flow flow, state *streamState, message []byte, claimCuts bool) (dropped bool, afterResponse bool, err error) {
+func (r *Recorder) recordLocked(order, connection int, flow flow, state *streamState, message []byte, claimCuts bool) (claimed armedCut, dropped bool, afterResponse bool, err error) {
 	decoded, err := decodeFrame(message)
 	if err != nil {
-		return false, false, err
+		return armedCut{}, false, false, err
 	}
 	switch frame := decoded.(type) {
 	case *transportFrame:
 		record := transportRecord(order, connection, frame)
 		r.transport = append(r.transport, record)
 		r.log = append(r.log, record)
-		return false, false, nil
+		return armedCut{}, false, false, nil
 	case *chunkFrame:
 		r.chunkCounts[chunkKey{connection, flow, frame.requestID}]++
-		assembled, complete, err := state.reassembler.add(frame)
+		service, complete, err := state.reassembler.add(frame)
 		if err != nil {
-			return false, false, err
+			return armedCut{}, false, false, err
 		}
 		if !complete {
-			return false, false, nil
+			return armedCut{}, false, false, nil
 		}
-		switch msg := assembled.(type) {
+		switch message := service.(type) {
 		case *completeMessage:
-			if flowErr := serviceDirectionError(flow, msg.service); flowErr != nil {
-				return false, false, flowErr
+			if flowErr := serviceDirectionError(flow, message.service); flowErr != nil {
+				return armedCut{}, false, false, flowErr
 			}
-			if claimCuts && flow == clientToServer && r.relay.takeArmed(func(c armedCut) bool {
-				return c.moment == BeforeRequestReachesServer && c.service.matches(msg.service)
-			}) {
-				r.appendService(order, connection, flow, msg.requestID, Dropped, msg.service)
-				return true, false, nil
+			if claimCuts && flow == clientToServer {
+				if cut, fired := r.relay.takeArmed(func(c armedCut) bool {
+					return c.moment == BeforeRequestReachesServer && c.service.matches(message.service)
+				}); fired {
+					r.appendService(order, connection, flow, message.requestID, Dropped, message.service)
+					return cut, true, false, nil
+				}
 			}
-			if claimCuts && flow == serverToClient && r.relay.takeArmed(func(c armedCut) bool {
-				return c.moment == AfterResponseReachesClient && r.hasRecordedRequest(connection, msg.requestID, c.service)
-			}) {
-				r.appendService(order, connection, flow, msg.requestID, Forwarded, msg.service)
-				return false, true, nil
+			if claimCuts && flow == serverToClient {
+				if cut, fired := r.relay.takeArmed(func(c armedCut) bool {
+					return c.moment == AfterResponseReachesClient && r.hasRecordedRequestLocked(connection, message.requestID, c.service)
+				}); fired {
+					r.appendService(order, connection, flow, message.requestID, Forwarded, message.service)
+					return cut, false, true, nil
+				}
 			}
-			r.appendService(order, connection, flow, msg.requestID, Forwarded, msg.service)
-			return false, false, nil
+			r.appendService(order, connection, flow, message.requestID, Forwarded, message.service)
+			return armedCut{}, false, false, nil
 		case *abortedMessage:
-			r.appendService(order, connection, flow, msg.requestID, Aborted, nil)
-			return false, false, nil
+			r.appendService(order, connection, flow, message.requestID, Aborted, nil)
+			return armedCut{}, false, false, nil
 		}
 	}
-	return false, false, nil
+	return armedCut{}, false, false, nil
 }
 
 func (r *Recorder) lastClientHandleOf(subscriptionID uint32) (handle uint32, found bool) {
@@ -513,7 +541,7 @@ func (r *Recorder) lastClientHandleOf(subscriptionID uint32) (handle uint32, fou
 	return 0, false
 }
 
-func (r *Recorder) hasRecordedRequest(connection int, requestID uint32, service Service) bool {
+func (r *Recorder) hasRecordedRequestLocked(connection int, requestID uint32, service Service) bool {
 	for _, record := range r.requests {
 		if record.Connection != connection || record.RequestID != requestID {
 			continue
@@ -608,13 +636,16 @@ func (s Service) name() string {
 }
 
 type armedCut struct {
+	id      int
 	moment  Moment
 	service Service
+	firing  bool
 }
 
 type firedCut struct {
 	index int
 	drop  bool
+	claim armedCut
 }
 
 func (c armedCut) describe() string {
@@ -648,6 +679,7 @@ type Relay struct {
 	wg          sync.WaitGroup
 	closed      bool
 	onCut       func()
+	nextCutID   int
 	armed       []armedCut
 	draining    map[int]bool
 	upstream    string
@@ -663,9 +695,22 @@ func (r *Relay) address() string {
 	return r.listener.Addr().String()
 }
 
+// markCut records the cut position before any socket of the cut
+// connection closes, so the client's reaction to the close lands above
+// the cut position WaitUntilReconnected searches from.
+func (r *Relay) markCut() {
+	r.mu.Lock()
+	onCut := r.onCut
+	r.mu.Unlock()
+	if onCut != nil {
+		onCut()
+	}
+}
+
 // Cut closes both sides of every live connection. The listener stays
 // open, so the next dial is accepted immediately.
 func (r *Relay) Cut() {
+	r.markCut()
 	r.mu.Lock()
 	conns := r.connections
 	r.connections = nil
@@ -674,9 +719,6 @@ func (r *Relay) Cut() {
 		_ = conn.client.Close()
 		_ = conn.server.Close()
 		r.recorder.observeConnectionClosed(conn.index)
-	}
-	if r.onCut != nil {
-		r.onCut()
 	}
 }
 
@@ -690,20 +732,22 @@ func (r *Relay) Cut() {
 // closes the client side.
 func (r *Relay) CutAt(moment Moment, service Service) {
 	if moment != BeforeRequestReachesServer && moment != AfterResponseReachesClient {
-		r.t.Fatalf("spectest: CutAt received an unknown Moment %d", int(moment))
+		r.t.Fatalf("%s", harnessFault("CutAt received an unknown Moment %d", int(moment)))
 		return
 	}
 	if service != Republish && service != Read {
-		r.t.Fatalf("spectest: CutAt received an unknown Service %d", int(service))
+		r.t.Fatalf("%s", harnessFault("CutAt received an unknown Service %d", int(service)))
 		return
 	}
 	r.mu.Lock()
-	r.armed = append(r.armed, armedCut{moment: moment, service: service})
+	r.armed = append(r.armed, armedCut{id: r.nextCutID, moment: moment, service: service})
+	r.nextCutID++
 	r.mu.Unlock()
 }
 
 // ArmedCuts returns a readable description of every cut CutAt armed
-// and has not fired yet, in arming order.
+// whose position the relay has not marked yet, in arming order. A cut
+// the relay is firing stays listed until markCut has returned.
 func (r *Relay) ArmedCuts() []string {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -714,19 +758,48 @@ func (r *Relay) ArmedCuts() []string {
 	return descriptions
 }
 
-func (r *Relay) takeArmed(match func(armedCut) bool) bool {
+func (r *Relay) takeArmed(match func(armedCut) bool) (armedCut, bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	for i, cut := range r.armed {
-		if match(cut) {
-			r.armed = append(r.armed[:i], r.armed[i+1:]...)
-			return true
+		if cut.firing || !match(cut) {
+			continue
 		}
+		r.armed[i].firing = true
+		return cut, true
 	}
-	return false
+	return armedCut{}, false
 }
 
-func (r *Relay) closeConnection(index int) {
+func (r *Relay) disarm(cut armedCut) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for i, armed := range r.armed {
+		if armed.id == cut.id {
+			r.armed = append(r.armed[:i], r.armed[i+1:]...)
+			return
+		}
+	}
+}
+
+func (r *Relay) release(cut armedCut) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for i, armed := range r.armed {
+		if armed.id == cut.id {
+			r.armed[i].firing = false
+			return
+		}
+	}
+}
+
+func (r *Relay) closeConnection(index int, firedCut armedCut) {
+	r.markCut()
+	r.disarm(firedCut)
+	r.closeConnectionSockets(index)
+}
+
+func (r *Relay) closeConnectionSockets(index int) {
 	r.mu.Lock()
 	var kept []relayConn
 	var conn relayConn
@@ -746,14 +819,13 @@ func (r *Relay) closeConnection(index int) {
 		_ = conn.server.Close()
 		r.recorder.observeConnectionClosed(index)
 	}
-	if r.onCut != nil {
-		r.onCut()
-	}
 }
 
 const clientDrainTimeout = 2 * time.Second
 
-func (r *Relay) cutAfterResponse(connection int, clientConn, serverConn net.Conn) error {
+func (r *Relay) cutAfterResponse(connection int, clientConn, serverConn net.Conn, claim armedCut) error {
+	r.markCut()
+	r.disarm(claim)
 	r.mu.Lock()
 	r.draining[connection] = true
 	r.mu.Unlock()
@@ -763,7 +835,7 @@ func (r *Relay) cutAfterResponse(connection int, clientConn, serverConn net.Conn
 		drainClient(clientConn)
 	}
 	_ = clientConn.Close()
-	r.closeConnection(connection)
+	r.closeConnectionSockets(connection)
 	return closeErr
 }
 
@@ -778,7 +850,10 @@ func drainClient(clientConn net.Conn) {
 }
 
 func halfClose(conn net.Conn) error {
-	return conn.(*net.TCPConn).CloseWrite()
+	if closer, ok := conn.(interface{ CloseWrite() error }); ok {
+		return closer.CloseWrite()
+	}
+	return nil
 }
 
 // ConnectionCount returns the number of connections the relay has
@@ -798,12 +873,12 @@ func (r *Relay) RedirectTo(address string) {
 	r.mu.Unlock()
 }
 
-func newRelay(t T, upstream string) (*Relay, *Recorder) {
+func newRelay(t T, upstream string, onCut func()) (*Relay, *Recorder) {
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
-		t.Fatalf("spectest: the relay could not listen on 127.0.0.1: %v", err)
+		t.Fatalf("%s", harnessFault("the relay could not listen on 127.0.0.1: %v", err))
 	}
-	relay := &Relay{listener: listener, t: t, draining: make(map[int]bool)}
+	relay := &Relay{listener: listener, t: t, onCut: onCut, draining: make(map[int]bool)}
 	relay.wg.Add(1)
 	recorder := newRecorder(t)
 	relay.recorder = recorder
@@ -895,8 +970,8 @@ func (r *Relay) pump(recorder *Recorder, connection int, flow flow, clientConn, 
 			if forwardErr := recorder.forward(connection, flow, buffer[:n], func(message []byte) error {
 				_, err := destination.Write(message)
 				return err
-			}, func() error {
-				return r.cutAfterResponse(connection, clientConn, serverConn)
+			}, func(claim armedCut) error {
+				return r.cutAfterResponse(connection, clientConn, serverConn, claim)
 			}); forwardErr != nil {
 				return
 			}

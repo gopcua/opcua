@@ -170,6 +170,7 @@ func transferFailedFlow(env *spectest.Environment, second *spectest.ScriptedServ
 	extra(env, m, transferAnswer, createAnswer)
 	created := second.WaitCreatedSubscription(m)
 	requireNotDeleted(env, m, created, "after the cut", "keeping it", createRequest.Order)
+	requireRecreatedMonitoredItem(env, m, created.ID(), createRequest.Order)
 	second.WaitHeldPublish().Answer(created, valueAfterReconnect)
 	Eventually(func(g Gomega) {
 		g.Expect(env.ReceivedSince(m)).To(Equal([]int32{valueAfterReconnect}), "client did not deliver the first notification of the recreated subscription; delivered: %v; errors: %v", env.ReceivedSince(m), env.ReceivedErrorsSince(m))
@@ -284,11 +285,17 @@ func waitSubscriptionRecreated(env *spectest.Environment, m spectest.Mark, last 
 		}
 		g.Expect(sent).To(BeTrue(), "client sent no CreateSubscription request answered with a subscription id after the Republish was answered Bad_SubscriptionIdInvalid")
 	}, 15*time.Second).Should(Succeed())
+	requireRecreatedMonitoredItem(env, m, createdID, createSubscription.Order)
+}
+
+func requireRecreatedMonitoredItem(env *spectest.Environment, m spectest.Mark, id uint32, orderFloor int) {
+	node := monitoredNode(env)
+	Expect(node).NotTo(BeNil(), "the recorder saw no CreateMonitoredItems request, so the node the client monitors is unknown")
 	Eventually(func(g Gomega) {
 		requests := env.Recorder.RequestsSince(m)
 		sent := false
 		for _, record := range requestsOfType[*ua.CreateMonitoredItemsRequest](requests) {
-			if record.Order <= createSubscription.Order {
+			if record.Order <= orderFloor {
 				continue
 			}
 			message, decoded := record.Message()
@@ -296,7 +303,7 @@ func waitSubscriptionRecreated(env *spectest.Environment, m spectest.Mark, last 
 				continue
 			}
 			request, is := message.(*ua.CreateMonitoredItemsRequest)
-			if !is || request.SubscriptionID != createdID || len(request.ItemsToCreate) == 0 {
+			if !is || request.SubscriptionID != id || len(request.ItemsToCreate) == 0 {
 				continue
 			}
 			item := request.ItemsToCreate[0]
@@ -306,7 +313,7 @@ func waitSubscriptionRecreated(env *spectest.Environment, m spectest.Mark, last 
 			sent = true
 			break
 		}
-		g.Expect(sent).To(BeTrue(), "client sent no CreateMonitoredItems request for the monitored node on the recreated subscription")
+		g.Expect(sent).To(BeTrue(), "client sent no CreateMonitoredItems request for the monitored node on subscription %d", id)
 	}, 15*time.Second).Should(Succeed())
 }
 

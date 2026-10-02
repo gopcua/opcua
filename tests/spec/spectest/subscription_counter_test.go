@@ -66,7 +66,7 @@ func waitAnsweredPublishes(env *Environment, want []answeredPublish) []answeredP
 	deadline := time.NewTimer(startTimeout)
 	defer deadline.Stop()
 	for {
-		answered := answeredPublishes(env.Recorder.Responses())
+		answered := env.Recorder.answeredPublishes()
 		if len(answered) == len(want) {
 			return answered
 		}

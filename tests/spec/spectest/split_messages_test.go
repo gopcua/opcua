@@ -33,12 +33,12 @@ func randomBytes(rng *rand.Rand, n int) []byte {
 	return b
 }
 
-func offsetInError(msg string) (int, bool) {
-	at := strings.Index(msg, "offset ")
+func offsetInError(message string) (int, bool) {
+	at := strings.Index(message, "offset ")
 	if at < 0 {
 		return 0, false
 	}
-	digits := msg[at+len("offset "):]
+	digits := message[at+len("offset "):]
 	end := 0
 	for end < len(digits) && digits[end] >= '0' && digits[end] <= '9' {
 		end++
@@ -53,14 +53,14 @@ func offsetInError(msg string) (int, bool) {
 	return offset, true
 }
 
-var validMessageTypes = []string{"HEL", "ACK", "ERR", "RHE", "OPN", "MSG", "CLO"}
+var validMessageTypes = []string{"HEL", "ACK", "ERR", "OPN", "MSG", "CLO"}
 var validChunkTypes = []byte{'F', 'C', 'A'}
 
 func TestSplitMessagesReturnsCompleteMessagesAndRest(t *testing.T) {
 	hel := makeMessage(t, "HEL", 'F', 0)
-	msg := makeMessage(t, "MSG", 'F', 10)
+	message := makeMessage(t, "MSG", 'F', 10)
 	trailing := []byte{1, 2, 3, 4, 5}
-	stream := bytes.Join([][]byte{hel, msg, trailing}, nil)
+	stream := bytes.Join([][]byte{hel, message, trailing}, nil)
 	messages, rest, err := splitMessages(stream)
 	if err != nil {
 		t.Fatalf("two valid messages plus 5 trailing bytes: err = %v, want nil", err)
@@ -71,8 +71,8 @@ func TestSplitMessagesReturnsCompleteMessagesAndRest(t *testing.T) {
 	if !bytes.Equal(messages[0], hel) {
 		t.Errorf("two valid messages plus 5 trailing bytes: message 0 = %q, want the HEL message %q", messages[0], hel)
 	}
-	if !bytes.Equal(messages[1], msg) {
-		t.Errorf("two valid messages plus 5 trailing bytes: message 1 = %q, want the MSG message %q", messages[1], msg)
+	if !bytes.Equal(messages[1], message) {
+		t.Errorf("two valid messages plus 5 trailing bytes: message 1 = %q, want the MSG message %q", messages[1], message)
 	}
 	if !bytes.Equal(rest, trailing) {
 		t.Errorf("two valid messages plus 5 trailing bytes: rest = %q, want the 5 trailing bytes %q", rest, trailing)
@@ -153,7 +153,7 @@ func TestSplitMessagesSmallMessageSizeNamesOffset(t *testing.T) {
 }
 
 func TestSplitMessagesAcceptsEveryTransportMessageType(t *testing.T) {
-	messageTypes := []string{"HEL", "ACK", "ERR", "RHE", "OPN", "MSG", "CLO"}
+	messageTypes := []string{"HEL", "ACK", "ERR", "OPN", "MSG", "CLO"}
 	chunkTypes := []byte{'F', 'C', 'A'}
 	want := make([][]byte, 0, len(messageTypes)*len(chunkTypes))
 	for _, messageType := range messageTypes {
@@ -175,6 +175,17 @@ func TestSplitMessagesAcceptsEveryTransportMessageType(t *testing.T) {
 		if !bytes.Equal(messages[i], want[i]) {
 			t.Errorf("one message per message type and chunk type: message %d = %q, want %q", i, messages[i], want[i])
 		}
+	}
+}
+
+func TestSplitMessagesFailsOnReverseHello(t *testing.T) {
+	reverseHello := makeMessage(t, "RHE", 'F', 2)
+	_, _, err := splitMessages(reverseHello)
+	if err == nil {
+		t.Fatalf("a ReverseHello message split without an error, want the harness fault: the relay never dials in reverse, so no accepted message type carries it")
+	}
+	if !strings.Contains(err.Error(), "message type") {
+		t.Errorf("a ReverseHello message failed with %q, want the unknown message type error", err.Error())
 	}
 }
 

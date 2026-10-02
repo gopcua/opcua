@@ -56,7 +56,7 @@ var _ = Describe("Environment Start", func() {
 
 		received := env.Received()
 		Expect(received).To(HaveLen(1), "the harness did not deliver exactly the pre-cut value")
-		answered := answeredPublishes(env.Recorder.Responses())
+		answered := env.Recorder.answeredPublishes()
 		Expect(answered).NotTo(BeEmpty(), "the recorder saw no answered Publish response")
 		Expect(answered[len(answered)-1].value).To(Equal(received[0]),
 			"the value of the last sequenced PublishResponse is not the delivered value")

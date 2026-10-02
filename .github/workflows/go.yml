@@ -53,6 +53,10 @@ jobs:
 
       - name: Run the known-defect specs and gate on their verdict
         run: |
-          go test ./tests/spec/part4/ -race -timeout 30m -ginkgo.label-filter=known-defect \
+          go test -count=1 ./tests/spec/part4/ -race -timeout 30m -ginkgo.label-filter=known-defect \
             -ginkgo.json-report="$PWD/known-defect.json" > known-defect.log 2>&1 || true
-          go run ./tests/spec/internal/knowndefectgate "$PWD/known-defect.json" known-defect.log
+          go run ./tests/spec/internal/knowndefectgate "$PWD/known-defect.json" known-defect.log || gate=$?
+          if [ -n "$gate" ]; then
+            tail -n 300 known-defect.log
+            exit "$gate"
+          fi

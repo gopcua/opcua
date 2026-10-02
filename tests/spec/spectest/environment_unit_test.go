@@ -409,8 +409,38 @@ func TestTeardownRaisesAStoredServerFault(t *testing.T) {
 	if !raised {
 		t.Fatalf("teardown did not raise the stored server fault")
 	}
-	if len(fake.fatals) == 0 || !strings.Contains(fake.fatals[0], "stored server fault") {
-		t.Fatalf("teardown raised %q, want the stored server fault", fake.fatals)
+	if len(fake.fatals) == 0 || !strings.HasPrefix(fake.fatals[0], "spectest: ") {
+		t.Fatalf("teardown raised %q, want the stored server fault with the spectest: prefix", fake.fatals)
+	}
+}
+
+func TestTeardownRaisesEveryStoredFaultUnderOnePrefix(t *testing.T) {
+	fake := &fakeT{}
+	env := Start(fake)
+	second := env.StartServer()
+	env.Server.mu.Lock()
+	env.Server.faultErr = fmt.Errorf("spectest: stored fault one")
+	env.Server.mu.Unlock()
+	second.mu.Lock()
+	second.faultErr = fmt.Errorf("spectest: stored fault two")
+	second.mu.Unlock()
+
+	raised := fatalPanics(func() {
+		for i := len(fake.cleanups) - 1; i >= 0; i-- {
+			fake.cleanups[i]()
+		}
+	})
+	if !raised {
+		t.Fatalf("teardown did not raise the stored server faults")
+	}
+	if len(fake.fatals) != 1 {
+		t.Fatalf("teardown failed %d times for two stored faults, want one joined message", len(fake.fatals))
+	}
+	if !strings.HasPrefix(fake.fatals[0], "spectest: ") {
+		t.Fatalf("the joined teardown failure %q does not start with the spectest: prefix the known-defect gate reads", fake.fatals[0])
+	}
+	if !strings.Contains(fake.fatals[0], "stored fault one") || !strings.Contains(fake.fatals[0], "stored fault two") {
+		t.Fatalf("the joined teardown failure %q does not name both stored faults", fake.fatals[0])
 	}
 }
 
@@ -487,7 +517,7 @@ func TestWaitHeldPublishPicksTheOldestOnTheNewestOpenConnection(t *testing.T) {
 	if !fatalPanics(func() { srv.WaitHeldPublish() }) {
 		t.Fatalf("WaitHeldPublish did not fail when every held request sits on a closed connection")
 	}
-	if len(fake.fatals) != 1 || fake.fatals[0] != "client sent no Publish request on an open connection; 1 held on closed connections were discarded" {
+	if len(fake.fatals) != 1 || fake.fatals[0] != "client sent no Publish request on an open connection; 1 held on closed connections were discarded and 0 arrived on already closed connections" {
 		t.Fatalf("WaitHeldPublish failed with %q, want the message naming the discarded closed-connection request", fake.fatals)
 	}
 	for _, cleanup := range fake.cleanups {
@@ -592,5 +622,30 @@ func TestCheckLastSequenceNumberFailsOnAValueMismatch(t *testing.T) {
 	}
 	for _, cleanup := range fake.cleanups {
 		cleanup()
+	}
+}
+
+func TestWaitUntilReconnectedTimesOutWhenTheClientNeverReconnects(t *testing.T) {
+	fake := &fakeT{}
+	e := &Environment{t: fake, waitTimeout: time.Millisecond, receivedSignal: make(chan struct{}, 1)}
+
+	if !fatalPanics(func() { e.WaitUntilReconnected() }) {
+		t.Fatalf("WaitUntilReconnected returned without failing, want the timeout Fatalf")
+	}
+	if len(fake.fatals) != 1 || !strings.Contains(fake.fatals[0], "client never entered Reconnecting within") {
+		t.Errorf("WaitUntilReconnected failed with %v, want the never-entered-Reconnecting message", fake.fatals)
+	}
+}
+
+func TestWaitUntilReconnectedTimesOutWhenTheClientNeverReachesConnected(t *testing.T) {
+	fake := &fakeT{}
+	e := &Environment{t: fake, waitTimeout: time.Millisecond, receivedSignal: make(chan struct{}, 1)}
+	e.states = []opcua.ConnState{opcua.Reconnecting}
+
+	if !fatalPanics(func() { e.WaitUntilReconnected() }) {
+		t.Fatalf("WaitUntilReconnected returned without failing, want the timeout Fatalf")
+	}
+	if len(fake.fatals) != 1 || !strings.Contains(fake.fatals[0], "client entered Reconnecting but did not reach Connected within") {
+		t.Errorf("WaitUntilReconnected failed with %v, want the never-reached-Connected message", fake.fatals)
 	}
 }

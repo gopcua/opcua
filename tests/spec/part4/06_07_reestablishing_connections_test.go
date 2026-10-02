@@ -340,13 +340,12 @@ var _ = Describe("Part 4 §6.7 Re-establishing connections https://reference.opc
 				preceded := false
 				if len(createSessions) > 0 {
 					for _, record := range requestsOfType[*ua.ActivateSessionRequest](requests) {
-						if record.Order >= createSessions[0].Order {
-							break
+						answer, answered := answerTo(record, responses)
+						if !answered {
+							continue
 						}
-						if answer, answered := answerTo(record, responses); answered {
-							if status, decoded := statusOf(answer); decoded && status == ua.StatusBadSessionIDInvalid {
-								preceded = true
-							}
+						if status, decoded := statusOf(answer); decoded && status == ua.StatusBadSessionIDInvalid && answer.Order < createSessions[0].Order {
+							preceded = true
 						}
 					}
 				}

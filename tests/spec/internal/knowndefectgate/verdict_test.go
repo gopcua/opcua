@@ -57,18 +57,18 @@ func withAdditional(s types.SpecReport, msgs ...string) types.SpecReport {
 
 func assertVerdict(t *testing.T, name string, specs []types.SpecReport, log string, wantExit int, contains []string, namesSpec *types.SpecReport) {
 	t.Helper()
-	got, msg := Verdict([]types.Report{{SpecReports: specs}}, log)
+	got, message := Verdict([]types.Report{{SpecReports: specs}}, log)
 	if got != wantExit {
-		t.Errorf("%s: Verdict exit = %d, want %d (message: %q)", name, got, wantExit, msg)
+		t.Errorf("%s: Verdict exit = %d, want %d (message: %q)", name, got, wantExit, message)
 	}
 	for _, want := range contains {
-		if !strings.Contains(msg, want) {
-			t.Errorf("%s: message %q does not contain %q", name, msg, want)
+		if !strings.Contains(message, want) {
+			t.Errorf("%s: message %q does not contain %q", name, message, want)
 		}
 	}
 	if namesSpec != nil {
-		if want := namesSpec.FullText(); !strings.Contains(msg, want) {
-			t.Errorf("%s: message %q does not name the spec %q", name, msg, want)
+		if want := namesSpec.FullText(); !strings.Contains(message, want) {
+			t.Errorf("%s: message %q does not name the spec %q", name, message, want)
 		}
 	}
 }
@@ -356,4 +356,15 @@ func TestRun(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestVerdictCountsAnInvalidSpecAsRan(t *testing.T) {
+	spec := knownDefectIt(types.SpecStateInvalid, plainDefectMsg)
+	exit, message := Verdict([]types.Report{{SpecReports: []types.SpecReport{spec}}}, "")
+	if exit != 1 {
+		t.Errorf("Verdict exit = %d, want 1 for an invalid known-defect spec", exit)
+	}
+	if strings.Contains(message, "none of them ran") {
+		t.Errorf("message %q also claims none of the known-defect specs ran", message)
+	}
 }

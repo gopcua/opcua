@@ -22,7 +22,6 @@ const (
 	serverStartAttempts = 5
 	scriptedNamespace   = "spectest.scripted"
 	scriptedNode        = "spectest_variable"
-	wraparoundFailure   = "spectest: sequence number wraparound is out of scope"
 )
 
 // ScriptedServer is an OPC UA server that holds every Publish request
@@ -30,21 +29,23 @@ const (
 // drops the rest, and records the subscriptions and the client handle
 // of the last monitored item created per subscription.
 type ScriptedServer struct {
-	t                   T
-	srv                 *server.Server
-	address             string
-	node                *ua.NodeID
-	recorder            *Recorder
-	heldWait            time.Duration
-	mu                  sync.Mutex
-	subscriptions       map[uint32]*harnessSub
-	first               *harnessSub
-	clientHandles       map[uint32]uint32
-	held                []*heldEntry
-	heldSignal          chan struct{}
-	faultErr            error
-	transferAnswer      *transferAnswer
-	deferredTransferSub *harnessSub
+	t                        T
+	srv                      *server.Server
+	address                  string
+	node                     *ua.NodeID
+	recorder                 *Recorder
+	heldWait                 time.Duration
+	mu                       sync.Mutex
+	subscriptions            map[uint32]*harnessSub
+	first                    *harnessSub
+	clientHandles            map[uint32]uint32
+	held                     []*heldEntry
+	heldSignal               chan struct{}
+	publishesDroppedOnClosed int
+	faultErr                 error
+	transferAnswer           *transferAnswer
+	deferredTransferSub      *harnessSub
+	retiredUnused            []string
 }
 
 type transferAnswer struct {
@@ -55,6 +56,7 @@ type transferAnswer struct {
 type harnessSub struct {
 	id                 uint32
 	next               uint32
+	deleted            bool
 	retained           map[uint32]int32
 	failRepublish      map[uint32]ua.StatusCode
 	unansweredRetained map[uint32]bool
@@ -91,11 +93,11 @@ func newScriptedServer(t T) *ScriptedServer {
 	for range serverStartAttempts {
 		listener, err := net.Listen("tcp", "127.0.0.1:0")
 		if err != nil {
-			t.Fatalf("spectest: reserving a free port failed: %v", err)
+			t.Fatalf("%s", harnessFault("reserving a free port failed: %v", err))
 		}
 		port := listener.Addr().(*net.TCPAddr).Port
 		if err := listener.Close(); err != nil {
-			t.Fatalf("spectest: releasing the reserved port failed: %v", err)
+			t.Fatalf("%s", harnessFault("releasing the reserved port failed: %v", err))
 		}
 
 		srv := server.New(
@@ -124,7 +126,7 @@ func newScriptedServer(t T) *ScriptedServer {
 		s.node = node
 		return s
 	}
-	t.Fatalf("spectest: the scripted server could not start on a free port in %d attempts, last error: %v", serverStartAttempts, lastErr)
+	t.Fatalf("%s", harnessFault("the scripted server could not start on a free port in %d attempts, last error: %v", serverStartAttempts, lastErr))
 	return nil
 }
 
@@ -145,13 +147,14 @@ func (s *ScriptedServer) WaitHeldPublish() HeldPublish {
 	timer := time.NewTimer(s.heldWait)
 	defer timer.Stop()
 	discarded := 0
+	dropped := 0
 	for {
 		s.mu.Lock()
 		discarded += s.pruneHeldLocked()
 		if s.faultErr != nil {
 			err := s.faultErr
 			s.mu.Unlock()
-			s.t.Fatalf("%v", err)
+			s.t.Fatalf("%s", err)
 			return HeldPublish{}
 		}
 		entry, found := s.oldestOnNewestLocked()
@@ -164,8 +167,11 @@ func (s *ScriptedServer) WaitHeldPublish() HeldPublish {
 		select {
 		case <-s.heldSignal:
 		case <-timer.C:
-			if discarded > 0 {
-				s.t.Fatalf("client sent no Publish request on an open connection; %d held on closed connections were discarded", discarded)
+			s.mu.Lock()
+			dropped = s.publishesDroppedOnClosed
+			s.mu.Unlock()
+			if discarded > 0 || dropped > 0 {
+				s.t.Fatalf("client sent no Publish request on an open connection; %d held on closed connections were discarded and %d arrived on already closed connections", discarded, dropped)
 			} else {
 				s.t.Fatalf("client sent no Publish request")
 			}
@@ -177,8 +183,12 @@ func (s *ScriptedServer) WaitHeldPublish() HeldPublish {
 func (s *ScriptedServer) fault(format string, args ...any) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.faultLocked(format, args...)
+}
+
+func (s *ScriptedServer) faultLocked(format string, args ...any) {
 	if s.faultErr == nil {
-		s.faultErr = fmt.Errorf(format, args...)
+		s.faultErr = fmt.Errorf("%s", harnessFault(format, args...))
 	}
 	select {
 	case s.heldSignal <- struct{}{}:
@@ -252,10 +262,13 @@ func (s *ScriptedServer) createSubscriptionRecord(create *ua.CreateSubscriptionR
 		s.mu.Unlock()
 		return true
 	}
-	if _, held := s.subscriptions[create.SubscriptionID]; held {
-		s.mu.Unlock()
-		s.fault("spectest: subscription id collision: CreateSubscription returned %d, which a live harness subscription already holds on this server", create.SubscriptionID)
-		return false
+	if existing, held := s.subscriptions[create.SubscriptionID]; held {
+		if !existing.deleted {
+			s.mu.Unlock()
+			s.fault("subscription id collision: CreateSubscription returned %d, which a live harness subscription already holds on this server", create.SubscriptionID)
+			return false
+		}
+		s.retireScriptsLocked(existing)
 	}
 	sub := newHarnessSub(create.SubscriptionID)
 	s.subscriptions[sub.id] = sub
@@ -266,17 +279,38 @@ func (s *ScriptedServer) createSubscriptionRecord(create *ua.CreateSubscriptionR
 	return true
 }
 
+func (s *ScriptedServer) retireScriptsLocked(sub *harnessSub) {
+	s.retiredUnused = append(s.retiredUnused, describeUnusedScripts(sub)...)
+}
+
+func describeUnusedScripts(sub *harnessSub) []string {
+	var scripts []string
+	for _, seq := range slices.Sorted(maps.Keys(sub.failRepublish)) {
+		scripts = append(scripts, fmt.Sprintf("FailRepublish(%d, %s) for subscription %d", seq, statusName(sub.failRepublish[seq]), sub.id))
+	}
+	for _, seq := range slices.Sorted(maps.Keys(sub.unansweredRetained)) {
+		scripts = append(scripts, fmt.Sprintf("retained %d for subscription %d", seq, sub.id))
+	}
+	return scripts
+}
+
 func (s *ScriptedServer) holdPublish(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
 	request, isPublish := r.(*ua.PublishRequest)
 	if !isPublish {
 		return nil, ua.StatusBadRequestTypeInvalid
 	}
-	connection, state := s.recorder.ConnectionOf(sc.RemoteAddr())
+	s.mu.Lock()
+	recorder := s.recorder
+	s.mu.Unlock()
+	connection, state := recorder.ConnectionOf(sc.RemoteAddr())
 	switch state {
 	case Closed:
+		s.mu.Lock()
+		s.publishesDroppedOnClosed++
+		s.mu.Unlock()
 		return nil, nil
 	case Unknown:
-		s.fault("spectest: the scripted server received a Publish request from %s, an address the relay never accepted", sc.RemoteAddr())
+		s.fault("the scripted server received a Publish request from %s, an address the relay never accepted", sc.RemoteAddr())
 		return nil, nil
 	}
 	s.mu.Lock()
@@ -314,12 +348,12 @@ func (s *ScriptedServer) deleteSubscriptions(sc *uasc.SecureChannel, r ua.Reques
 	s.mu.Lock()
 	results := make([]ua.StatusCode, len(request.SubscriptionIDs))
 	for i, subscriptionID := range request.SubscriptionIDs {
-		_, live := s.subscriptions[subscriptionID]
-		if !live {
+		sub, live := s.subscriptions[subscriptionID]
+		if !live || sub.deleted {
 			results[i] = ua.StatusBadSubscriptionIDInvalid
 			continue
 		}
-		delete(s.subscriptions, subscriptionID)
+		sub.deleted = true
 		results[i] = ua.StatusOK
 	}
 	s.mu.Unlock()
@@ -354,10 +388,13 @@ func (s *ScriptedServer) transferSubscriptions(sc *uasc.SecureChannel, r ua.Requ
 			continue
 		}
 		s.mu.Lock()
-		if _, held := s.subscriptions[subscriptionID]; held {
-			s.mu.Unlock()
-			s.fault("spectest: subscription id collision: TransferSubscriptions named %d, which a live harness subscription already holds on this server", subscriptionID)
-			return nil, ua.StatusBadInternalError
+		if existing, held := s.subscriptions[subscriptionID]; held {
+			if !existing.deleted {
+				s.mu.Unlock()
+				s.fault("subscription id collision: TransferSubscriptions named %d, which a live harness subscription already holds on this server", subscriptionID)
+				return nil, ua.StatusBadInternalError
+			}
+			s.retireScriptsLocked(existing)
 		}
 		sub := newHarnessSub(subscriptionID)
 		if i == 0 && s.deferredTransferSub != nil {
@@ -365,7 +402,13 @@ func (s *ScriptedServer) transferSubscriptions(sc *uasc.SecureChannel, r ua.Requ
 			sub.id = subscriptionID
 			s.deferredTransferSub = nil
 		}
-		sub.next = counterAfterRetain(sub.next, maxOf(queued.available))
+		next, err := counterAfterRetain(sub.next, maxOf(queued.available))
+		if err != nil {
+			s.mu.Unlock()
+			s.fault("%v", err)
+			return nil, ua.StatusBadInternalError
+		}
+		sub.next = next
 		s.subscriptions[subscriptionID] = sub
 		if s.first == nil {
 			s.first = sub
@@ -394,7 +437,8 @@ func maxOf(values []uint32) uint32 {
 // QueueTransferSuccess answers the next TransferSubscriptions with one
 // Good TransferResult per requested id, each carrying exactly the given
 // numbers as AvailableSequenceNumbers, and creates one harness
-// Subscription per id with its sequence counter at max(available)+1. It
+// Subscription per id, each with its sequence counter advanced by the
+// counterAfterRetain rule over the largest available number. It
 // returns the handle for the first requested id; the handle names that
 // subscription from the moment the transfer answers it, and until then
 // the subscription has id 0 and Retain and FailRepublish on the handle
@@ -429,15 +473,18 @@ func (s *ScriptedServer) WaitCreatedSubscription(m Mark) Subscription {
 		faultErr := s.faultErr
 		s.mu.Unlock()
 		if faultErr != nil {
-			s.t.Fatalf("%v", faultErr)
+			s.t.Fatalf("%s", faultErr)
 			return Subscription{}
 		}
-		if s.recorder == nil {
-			s.t.Fatalf("spectest: this server records no relay traffic, so no subscription can be waited for")
+		s.mu.Lock()
+		recorder := s.recorder
+		s.mu.Unlock()
+		if recorder == nil {
+			s.t.Fatalf("%s", harnessFault("this server records no relay traffic, so no subscription can be waited for"))
 			return Subscription{}
 		}
-		for _, record := range s.recorder.ResponsesSince(m) {
-			if s.recorder.connectionUpstreamOf(record.Connection) != ownAddress {
+		for _, record := range recorder.ResponsesSince(m) {
+			if recorder.connectionUpstreamOf(record.Connection) != ownAddress {
 				continue
 			}
 			message, forwarded := record.Message()
@@ -450,9 +497,14 @@ func (s *ScriptedServer) WaitCreatedSubscription(m Mark) Subscription {
 			}
 			s.mu.Lock()
 			sub, live := s.subscriptions[response.SubscriptionID]
+			deleted := live && sub.deleted
 			s.mu.Unlock()
 			if !live {
-				s.t.Fatalf("spectest: this server recorded a CreateSubscription response with id %d but no live harness subscription for it", response.SubscriptionID)
+				s.t.Fatalf("%s", harnessFault("this server recorded a CreateSubscription response with id %d but no live harness subscription for it", response.SubscriptionID))
+				return Subscription{}
+			}
+			if deleted {
+				s.t.Fatalf("client deleted the subscription it created (id %d)", response.SubscriptionID)
 				return Subscription{}
 			}
 			return Subscription{server: s, sub: sub}
@@ -475,7 +527,7 @@ func (s *ScriptedServer) republish(sc *uasc.SecureChannel, r ua.Request, reqID u
 	sequenceNumber := request.RetransmitSequenceNumber
 	s.mu.Lock()
 	sub, live := s.subscriptions[request.SubscriptionID]
-	if !live {
+	if !live || sub.deleted {
 		s.mu.Unlock()
 		return nil, ua.StatusBadSubscriptionIDInvalid
 	}
@@ -492,6 +544,7 @@ func (s *ScriptedServer) republish(sc *uasc.SecureChannel, r ua.Request, reqID u
 	handle, recorded := s.clientHandleOf(sub)
 	if !recorded {
 		s.mu.Unlock()
+		s.fault("the client republished subscription %d, for which no CreateMonitoredItems was recorded", request.SubscriptionID)
 		return nil, ua.StatusBadInternalError
 	}
 	delete(sub.unansweredRetained, sequenceNumber)
@@ -512,8 +565,15 @@ func (s *ScriptedServer) clientHandleOf(sub *harnessSub) (handle uint32, found b
 	return s.recorder.lastClientHandleOf(sub.id)
 }
 
-func counterAfterRetain(counter, sequenceNumber uint32) uint32 {
-	return max(counter, sequenceNumber+1)
+// counterAfterRetain returns the sequence counter after a claim of
+// seq: the larger of the counter and seq+1, so a later Answer reuses
+// no number at or below seq. It fails when seq is the largest uint32,
+// because the counter cannot move past that number.
+func counterAfterRetain(counter, sequenceNumber uint32) (uint32, error) {
+	if sequenceNumber == math.MaxUint32 {
+		return counter, fmt.Errorf("%s", harnessFault("sequence number wraparound is out of scope"))
+	}
+	return max(counter, sequenceNumber+1), nil
 }
 
 // Subscription identifies one subscription the client created on a
@@ -523,31 +583,53 @@ type Subscription struct {
 	sub    *harnessSub
 }
 
+func (s *ScriptedServer) holdsLocked(sub *harnessSub) bool {
+	return sub == s.deferredTransferSub || s.liveLocked(sub)
+}
+
+func (s *ScriptedServer) liveLocked(sub *harnessSub) bool {
+	current, live := s.subscriptions[sub.id]
+	return live && current == sub && !sub.deleted
+}
+
+func (s *ScriptedServer) requireHolderLocked(sub *harnessSub) bool {
+	if s.holdsLocked(sub) {
+		return true
+	}
+	s.faultLocked("the server holds no live subscription %d for this handle: it was deleted, replaced or never transferred", sub.id)
+	return false
+}
+
 // ID returns the subscription id the server handed the client.
 func (s Subscription) ID() uint32 {
+	s.server.mu.Lock()
+	defer s.server.mu.Unlock()
 	return s.sub.id
 }
 
 // Retain puts v in the subscription's retransmission queue at seq,
 // where it stays until a Publish acknowledges seq; the notification
 // message is built when a Republish or an Answer needs it, with the
-// client handle known at that moment. Retain also moves the
-// subscription's sequence counter to the larger of the counter and
-// seq+1 (the counterAfterRetain rule), so a later Answer reuses no
-// number at or below seq. Retain fails when seq is the largest uint32,
-// because the counter cannot move past it. On the handle
-// QueueTransferSuccess returned before the transfer answered, Retain
-// stages the value for the subscription the transfer creates.
+// client handle known at that moment. Retain also advances the
+// subscription's sequence counter by the counterAfterRetain rule.
+// On the handle QueueTransferSuccess returned before the transfer
+// answered, Retain stages the value for the subscription the transfer
+// creates.
 func (s Subscription) Retain(seq uint32, v int32) {
 	s.server.mu.Lock()
-	if seq == math.MaxUint32 {
+	if !s.server.requireHolderLocked(s.sub) {
 		s.server.mu.Unlock()
-		s.server.t.Fatalf("%s", wraparoundFailure)
+		return
+	}
+	next, err := counterAfterRetain(s.sub.next, seq)
+	if err != nil {
+		s.server.mu.Unlock()
+		s.server.t.Fatalf("%v", err)
 		return
 	}
 	s.sub.retained[seq] = v
 	s.sub.unansweredRetained[seq] = true
-	s.sub.next = counterAfterRetain(s.sub.next, seq)
+	s.sub.next = next
 	s.server.mu.Unlock()
 }
 
@@ -556,6 +638,10 @@ func (s Subscription) Retain(seq uint32, v int32) {
 // answer. The script answers one Republish and is then gone.
 func (s Subscription) FailRepublish(seq uint32, status ua.StatusCode) {
 	s.server.mu.Lock()
+	if !s.server.requireHolderLocked(s.sub) {
+		s.server.mu.Unlock()
+		return
+	}
 	s.sub.failRepublish[seq] = status
 	s.server.mu.Unlock()
 }
@@ -585,10 +671,8 @@ func (h HeldPublish) Answer(sub Subscription, v int32) {
 // AnswerWithSequenceNumber answers the held Publish request with one
 // data change notification carrying v for sub, with the sequence number
 // seq given explicitly, so a test can send a duplicate sequence number.
-// It also moves the subscription's sequence counter to the larger of
-// the counter and seq+1 (the counterAfterRetain rule), so a later Answer
-// reuses no number at or below seq. AnswerWithSequenceNumber fails when
-// seq is the largest uint32, because the counter cannot move past it.
+// It also advances the subscription's sequence counter by the
+// counterAfterRetain rule.
 func (h HeldPublish) AnswerWithSequenceNumber(sub Subscription, seq uint32, v int32) {
 	h.answer(sub, seq, v, false)
 }
@@ -596,7 +680,7 @@ func (h HeldPublish) AnswerWithSequenceNumber(sub Subscription, seq uint32, v in
 func (h HeldPublish) answer(sub Subscription, sequenceNumber uint32, v int32, useCounter bool) {
 	s := h.server
 	if sub.server != s {
-		s.t.Fatalf("spectest: answering a held Publish request of the scripted server at %s with a subscription of the scripted server at %s", s.address, sub.server.address)
+		s.t.Fatalf("%s", harnessFault("answering a held Publish request of the scripted server at %s with a subscription of the scripted server at %s", s.address, sub.server.address))
 		return
 	}
 	s.mu.Lock()
@@ -608,28 +692,23 @@ func (h HeldPublish) answer(sub Subscription, sequenceNumber uint32, v int32, us
 	}
 	if h.entry.answered {
 		s.mu.Unlock()
-		s.t.Fatalf("spectest: the held Publish request on connection %d was already answered", h.entry.connection)
+		s.t.Fatalf("%s", harnessFault("the held Publish request on connection %d was already answered", h.entry.connection))
 		return
 	}
 	if state := s.entryStateLocked(h.entry); state != Open {
 		s.mu.Unlock()
-		s.t.Fatalf("spectest: the connection the held Publish request arrived on (index %d) is not open", h.entry.connection)
+		s.t.Fatalf("%s", harnessFault("the connection the held Publish request arrived on (index %d) is not open", h.entry.connection))
 		return
 	}
-	if s.subscriptions[sub.sub.id] != sub.sub {
+	if !s.liveLocked(sub.sub) {
 		s.mu.Unlock()
-		s.t.Fatalf("spectest: the server holds no live subscription %d for this handle: it was deleted or never transferred", sub.sub.id)
-		return
-	}
-	if !useCounter && sequenceNumber == math.MaxUint32 {
-		s.mu.Unlock()
-		s.t.Fatalf("%s", wraparoundFailure)
+		s.t.Fatalf("%s", harnessFault("the server holds no live subscription %d for this handle: it was deleted, replaced or never transferred", sub.sub.id))
 		return
 	}
 	handle, recorded := s.clientHandleOf(sub.sub)
 	if !recorded {
 		s.mu.Unlock()
-		s.t.Fatalf("spectest: the client created no monitored item for subscription %d", sub.sub.id)
+		s.t.Fatalf("%s", harnessFault("the client created no monitored item for subscription %d", sub.sub.id))
 		return
 	}
 	if useCounter {
@@ -640,7 +719,13 @@ func (h HeldPublish) answer(sub Subscription, sequenceNumber uint32, v int32, us
 			delete(sub.sub.retained, acknowledgement.SequenceNumber)
 		}
 	}
-	sub.sub.next = counterAfterRetain(sub.sub.next, sequenceNumber)
+	next, err := counterAfterRetain(sub.sub.next, sequenceNumber)
+	if err != nil {
+		s.mu.Unlock()
+		s.t.Fatalf("%v", err)
+		return
+	}
+	sub.sub.next = next
 	h.entry.answered = true
 	results := make([]ua.StatusCode, len(h.entry.request.SubscriptionAcknowledgements))
 	for i := range results {
@@ -659,16 +744,24 @@ func (h HeldPublish) answer(sub Subscription, sequenceNumber uint32, v int32, us
 
 	sendErr := h.entry.channel.SendResponseWithContext(context.Background(), h.entry.requestID, response)
 	if sendErr != nil {
-		s.t.Fatalf("spectest: the connection of the held Publish request closed while answering: %v", sendErr)
+		s.t.Fatalf("%s", harnessFault("the connection of the held Publish request closed while answering: %v", sendErr))
 	}
 }
 
 // UnusedScripts returns one readable description per FailRepublish
 // script no Republish has answered with, per retained message no
 // Republish has answered from, and per queued transfer answer no
-// TransferSubscriptions consumed. Acknowledging a retained message
-// removes it from the retransmission queue but does not mark it used.
+// TransferSubscriptions consumed, plus the scripts a replaced deleted
+// subscription left behind. Acknowledging a retained message removes it
+// from the retransmission queue but does not mark it used.
 func (s *ScriptedServer) UnusedScripts() []string {
+	s.mu.Lock()
+	faultErr := s.faultErr
+	s.mu.Unlock()
+	if faultErr != nil {
+		s.t.Fatalf("%s", faultErr)
+		return nil
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	var scripts []string
@@ -679,18 +772,16 @@ func (s *ScriptedServer) UnusedScripts() []string {
 		for _, seq := range slices.Sorted(maps.Keys(s.deferredTransferSub.unansweredRetained)) {
 			scripts = append(scripts, fmt.Sprintf("staged retained %d for the pending transfer", seq))
 		}
+		for _, seq := range slices.Sorted(maps.Keys(s.deferredTransferSub.failRepublish)) {
+			scripts = append(scripts, fmt.Sprintf("staged FailRepublish(%d, %s) for the pending transfer", seq, statusName(s.deferredTransferSub.failRepublish[seq])))
+		}
 	}
 	for _, sub := range slices.SortedFunc(maps.Values(s.subscriptions), func(a, b *harnessSub) int {
 		return cmp.Compare(a.id, b.id)
 	}) {
-		for _, seq := range slices.Sorted(maps.Keys(sub.failRepublish)) {
-			scripts = append(scripts, fmt.Sprintf("FailRepublish(%d, %s) for subscription %d", seq, statusName(sub.failRepublish[seq]), sub.id))
-		}
-		for _, seq := range slices.Sorted(maps.Keys(sub.unansweredRetained)) {
-			scripts = append(scripts, fmt.Sprintf("retained %d for subscription %d", seq, sub.id))
-		}
+		scripts = append(scripts, describeUnusedScripts(sub)...)
 	}
-	return scripts
+	return append(scripts, s.retiredUnused...)
 }
 
 func statusName(status ua.StatusCode) string {
