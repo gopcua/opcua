@@ -318,4 +318,77 @@ var _ = Describe("Part 4 §6.7 Re-establishing connections https://reference.opc
 			}, Label("P4-6.7", "known-defect")),
 		)
 	})
+
+	Context("when the session is gone", func() {
+		var second *spectest.ScriptedServer
+		var last uint32
+		var m spectest.Mark
+		BeforeEach(func() {
+			second = env.StartServer()
+			env.Relay.RedirectTo(second.Address())
+			last = env.LastSequenceNumber()
+		})
+
+		It("creates a new session only after ActivateSession fails", Label("P4-6.7"), func() {
+			m = env.Mark()
+			env.Relay.Cut()
+			env.WaitUntilReconnected()
+			Eventually(func(g Gomega) {
+				requests := env.Recorder.RequestsSince(m)
+				responses := env.Recorder.ResponsesSince(m)
+				createSessions := requestsOfType[*ua.CreateSessionRequest](requests)
+				preceded := false
+				if len(createSessions) > 0 {
+					for _, record := range requestsOfType[*ua.ActivateSessionRequest](requests) {
+						if record.Order >= createSessions[0].Order {
+							break
+						}
+						if answer, answered := answerTo(record, responses); answered {
+							if status, decoded := statusOf(answer); decoded && status == ua.StatusBadSessionIDInvalid {
+								preceded = true
+							}
+						}
+					}
+				}
+				g.Expect(preceded).To(BeTrue(), "client created a new session without first trying to activate the old one and being refused Bad_SessionIdInvalid; requests after the first cut: %v", requestTypeNames(requests))
+			}, 15*time.Second).Should(Succeed())
+		})
+
+		DescribeTable("transfers, and creates new subscriptions when the transfer fails",
+			func(arm func(second *spectest.ScriptedServer), flow func(env *spectest.Environment, second *spectest.ScriptedServer, m spectest.Mark, last uint32)) {
+				arm(second)
+				m = env.Mark()
+				env.Relay.Cut()
+				env.WaitUntilReconnected()
+				flow(env, second, m, last)
+			},
+			Entry("refused per subscription with Bad_SubscriptionIdInvalid",
+				func(second *spectest.ScriptedServer) { second.QueueTransferRefusal(ua.StatusBadSubscriptionIDInvalid) },
+				func(env *spectest.Environment, second *spectest.ScriptedServer, m spectest.Mark, last uint32) {
+					transferFailedFlow(env, second, m, transferRefusedPerResult(ua.StatusBadSubscriptionIDInvalid), noExtraTransferCheck)
+				},
+				Label("P4-6.7", "P4-5.14.7", "should")),
+			Entry("unsupported, with Bad_ServiceUnsupported",
+				func(second *spectest.ScriptedServer) {},
+				func(env *spectest.Environment, second *spectest.ScriptedServer, m spectest.Mark, last uint32) {
+					transferFailedFlow(env, second, m, transferAnsweredWithStatus(ua.StatusBadServiceUnsupported), noExtraTransferCheck)
+				},
+				Label("P4-6.7", "should")),
+			Entry("refused per subscription with Bad_UserAccessDenied",
+				func(second *spectest.ScriptedServer) { second.QueueTransferRefusal(ua.StatusBadUserAccessDenied) },
+				func(env *spectest.Environment, second *spectest.ScriptedServer, m spectest.Mark, last uint32) {
+					transferFailedFlow(env, second, m, transferRefusedPerResult(ua.StatusBadUserAccessDenied), requireNoRepublishBetween)
+				},
+				Label("P4-6.7", "P4-7.38.1", "known-defect")),
+			Entry("transferred, with the last delivered notification still available",
+				func(second *spectest.ScriptedServer) {
+					moved := second.QueueTransferSuccess(last, last+1)
+					moved.Retain(last+1, valueRetained)
+				},
+				func(env *spectest.Environment, second *spectest.ScriptedServer, m spectest.Mark, last uint32) {
+					transferredFlow(env, second, m, last)
+				},
+				Label("P4-6.7", "P4-5.14.7")),
+		)
+	})
 })
