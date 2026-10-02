@@ -185,6 +185,38 @@ func newRecorder(t T) *Recorder {
 	return recorder
 }
 
+// Notification is one data change notification the recorder saw inside a
+// forwarded PublishResponse, with the wire order and connection it
+// arrived on, the subscription it was published on and the value it
+// carried.
+type Notification struct {
+	Order          int
+	Connection     int
+	SubscriptionID uint32
+	SequenceNumber uint32
+	Value          int32
+}
+
+// Notifications returns the data change notifications the recorder saw
+// inside forwarded PublishResponses, in wire order.
+func (r *Recorder) Notifications() []Notification {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.raiseLocked()
+	answered := answeredPublishes(r.responses)
+	notifications := make([]Notification, len(answered))
+	for i, publish := range answered {
+		notifications[i] = Notification{
+			Order:          publish.order,
+			Connection:     publish.connection,
+			SubscriptionID: publish.subscriptionID,
+			SequenceNumber: publish.sequenceNumber,
+			Value:          publish.value,
+		}
+	}
+	return notifications
+}
+
 // Requests returns a copy of the recorded client-to-server messages,
 // oldest first.
 func (r *Recorder) Requests() []ServiceRecord[ua.Request] {

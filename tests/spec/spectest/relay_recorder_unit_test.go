@@ -86,3 +86,33 @@ func TestTransportRecordsAServerError(t *testing.T) {
 		cleanup()
 	}
 }
+
+func TestNotificationsReturnsThePublishNotificationsOnly(t *testing.T) {
+	fake := &fakeT{}
+	recorder := newRecorder(fake)
+	first := &ua.PublishResponse{
+		SubscriptionID:      4,
+		NotificationMessage: dataChangeNotificationMessage(2, 1, 7001),
+	}
+	republish := &ua.RepublishResponse{
+		NotificationMessage: dataChangeNotificationMessage(1, 1, 9001),
+	}
+	second := &ua.PublishResponse{
+		SubscriptionID:      4,
+		NotificationMessage: dataChangeNotificationMessage(3, 1, 7002),
+	}
+	recorder.appendService(1, 0, serverToClient, 10, Forwarded, first)
+	recorder.appendService(2, 0, serverToClient, 11, Forwarded, republish)
+	recorder.appendService(3, 1, serverToClient, 12, Forwarded, second)
+
+	notifications := recorder.Notifications()
+	if len(notifications) != 2 {
+		t.Fatalf("Notifications returned %d notifications, want the two from the Publish responses", len(notifications))
+	}
+	if notifications[0].Order != 1 || notifications[0].Connection != 0 || notifications[0].SubscriptionID != 4 || notifications[0].SequenceNumber != 2 || notifications[0].Value != 7001 {
+		t.Errorf("Notifications[0] = %+v, want order 1, connection 0, subscription 4, sequence number 2, value 7001", notifications[0])
+	}
+	if notifications[1].Order != 3 || notifications[1].Connection != 1 || notifications[1].SubscriptionID != 4 || notifications[1].SequenceNumber != 3 || notifications[1].Value != 7002 {
+		t.Errorf("Notifications[1] = %+v, want order 3, connection 1, subscription 4, sequence number 3, value 7002", notifications[1])
+	}
+}

@@ -486,6 +486,9 @@ func (e *Environment) teardown(drained chan struct{}) {
 }
 
 type answeredPublish struct {
+	order                    int
+	connection               int
+	subscriptionID           uint32
 	sequenceNumber           uint32
 	value                    int32
 	results                  []ua.StatusCode
@@ -509,6 +512,9 @@ func answeredPublishes(responses []ServiceRecord[ua.Response]) []answeredPublish
 		}
 		valueInt32, _ := value.(int32)
 		answered = append(answered, answeredPublish{
+			order:                    record.Order,
+			connection:               record.Connection,
+			subscriptionID:           response.SubscriptionID,
 			sequenceNumber:           response.NotificationMessage.SequenceNumber,
 			value:                    valueInt32,
 			results:                  response.Results,

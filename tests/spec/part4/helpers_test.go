@@ -63,6 +63,15 @@ func preCutSessionToken(env *spectest.Environment) *ua.NodeID {
 	return nil
 }
 
+func notificationCarryingValue(env *spectest.Environment, value int32) (spectest.Notification, bool) {
+	for _, notification := range env.Recorder.Notifications() {
+		if notification.Value == value {
+			return notification, true
+		}
+	}
+	return spectest.Notification{}, false
+}
+
 func badMessageNotAvailableAnswer(env *spectest.Environment, m spectest.Mark) (spectest.ServiceRecord[ua.Response], bool) {
 	responses := env.Recorder.ResponsesSince(m)
 	for _, republish := range requestsOfType[*ua.RepublishRequest](env.Recorder.RequestsSince(m)) {

@@ -27,11 +27,13 @@ var _ = Describe("Part 4 §6.7 Re-establishing connections https://reference.opc
 		var sub spectest.Subscription
 		var last uint32
 		var m spectest.Mark
+		var newConnection int
 		BeforeEach(func() {
 			sub = env.Subscription()
 			last = env.LastSequenceNumber()
 			sub.Retain(last+1, valueRetained)
 			m = env.Mark()
+			newConnection = env.Relay.ConnectionCount()
 			env.Relay.Cut()
 			env.WaitUntilReconnected()
 		})
@@ -138,6 +140,47 @@ var _ = Describe("Part 4 §6.7 Re-establishing connections https://reference.opc
 			Consistently(func(g Gomega) {
 				g.Expect(requestsOfType[*ua.CreateSubscriptionRequest](env.Recorder.RequestsSince(m))).To(BeEmpty(), "client created a new subscription instead of keeping subscription %d", sub.ID())
 			}, 2*time.Second).Should(Succeed())
+		})
+
+		It("delivers the retained notification, then the following ones, each once and in order", Label("P4-6.7", "issue-879", "known-defect"), MustPassRepeatedly(10), func() {
+			waitAnsweredBadMessageNotAvailable(env, m)
+			env.Server.WaitHeldPublish().Answer(sub, valueAfterReconnect)
+			env.Server.WaitHeldPublish().Answer(sub, valueSentinel)
+			Eventually(func(g Gomega) {
+				g.Expect(env.ReceivedSince(m)).To(Equal([]int32{valueRetained, valueAfterReconnect, valueSentinel}), "client did not deliver the retained notification then the following ones, each once and in order; delivered: %v", env.ReceivedSince(m))
+			}, 15*time.Second).Should(Succeed())
+			reconnectNotification, reconnectAnswered := notificationCarryingValue(env, valueAfterReconnect)
+			Expect(reconnectAnswered).To(BeTrue(), "the recorder saw no answered Publish response carrying %d", valueAfterReconnect)
+			Expect(reconnectNotification.SequenceNumber).To(Equal(last+2), "the Publish answered with valueAfterReconnect carried sequence number %d, want %d", reconnectNotification.SequenceNumber, last+2)
+			sentinelNotification, sentinelAnswered := notificationCarryingValue(env, valueSentinel)
+			Expect(sentinelAnswered).To(BeTrue(), "the recorder saw no answered Publish response carrying %d", valueSentinel)
+			Expect(sentinelNotification.SequenceNumber).To(Equal(last+3), "the Publish answered with valueSentinel carried sequence number %d, want %d", sentinelNotification.SequenceNumber, last+3)
+			Expect(env.Server.UnusedScripts()).To(BeEmpty(), "scripts this spec armed were never used: %v", env.Server.UnusedScripts())
+		})
+
+		It("keeps publishing when a pause and a resume arrive together", Label("P4-5.14.1.2", "issue-895", "known-defect", "racy"), MustPassRepeatedly(20), func() {
+			held := env.Server.WaitHeldPublish()
+			Expect(held.Connection()).To(Equal(newConnection), "client sent no Publish request on the new connection")
+			held.Answer(sub, valueAfterReconnect)
+			second := env.Server.WaitHeldPublish()
+			Expect(second.Connection()).To(Equal(newConnection), "client sent no further Publish request after the first one was answered")
+		})
+
+		It("does not deliver a sequence number twice", Label("P4-6.7", "interop", "known-defect"), func() {
+			waitAnsweredBadMessageNotAvailable(env, m)
+			env.Server.WaitHeldPublish().AnswerWithSequenceNumber(sub, last+1, valueDuplicate)
+			env.Server.WaitHeldPublish().Answer(sub, valueSentinel)
+			Eventually(func(g Gomega) {
+				g.Expect(env.ReceivedSince(m)).To(ContainElement(valueSentinel), "client did not deliver the notification sent after the duplicated sequence number; delivered: %v", env.ReceivedSince(m))
+			}, 15*time.Second).Should(Succeed())
+			Expect(env.ReceivedSince(m)).To(Equal([]int32{valueRetained, valueSentinel}), "client delivered %v after the cut, want the retained notification then the sentinel with the duplicated sequence number dropped", env.ReceivedSince(m))
+			duplicateNotification, duplicateAnswered := notificationCarryingValue(env, valueDuplicate)
+			Expect(duplicateAnswered).To(BeTrue(), "the recorder saw no answered Publish response carrying %d", valueDuplicate)
+			Expect(duplicateNotification.SequenceNumber).To(Equal(last+1), "the Publish answered with valueDuplicate carried sequence number %d, want %d", duplicateNotification.SequenceNumber, last+1)
+			sentinelNotification, sentinelAnswered := notificationCarryingValue(env, valueSentinel)
+			Expect(sentinelAnswered).To(BeTrue(), "the recorder saw no answered Publish response carrying %d", valueSentinel)
+			Expect(sentinelNotification.SequenceNumber).To(Equal(last+2), "the Publish answered with valueSentinel carried sequence number %d, want %d", sentinelNotification.SequenceNumber, last+2)
+			Expect(env.Server.UnusedScripts()).To(BeEmpty(), "scripts this spec armed were never used: %v", env.Server.UnusedScripts())
 		})
 	})
 })
