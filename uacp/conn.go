@@ -56,6 +56,13 @@ func nextid() uint32 {
 	return atomic.AddUint32(&connid, 1)
 }
 
+// PreResolver gives the caller a chance to resolve endpoint URLs to IPs before the dialer attempts a DNS lookup.
+// `nil, nil` means no resolution was done.
+// `*, err` means resolution failed.
+type PreResolver interface {
+	LookupIPAddr(ctx context.Context, host string) ([]net.IPAddr, error)
+}
+
 // Dialer establishes a connection to an endpoint.
 type Dialer struct {
 	// Dialer establishes the TCP connection. Defaults to net.Dialer.
@@ -64,12 +71,16 @@ type Dialer struct {
 	// ClientACK defines the connection parameters requested by the client.
 	// Defaults to DefaultClientACK.
 	ClientACK *Acknowledge
+
+	// PreResolver allows the caller to resolve endpoint URLs to IPs
+	// before the dialer attempts a DNS lookup.
+	PreResolver PreResolver
 }
 
 func (d *Dialer) Dial(ctx context.Context, endpoint string) (*Conn, error) {
 	debug.Printf("uacp: connecting to %s", endpoint)
 
-	_, raddr, err := ResolveEndpoint(ctx, endpoint)
+	_, raddr, err := ResolveEndpoint(ctx, endpoint, d.PreResolver)
 	if err != nil {
 		return nil, err
 	}
@@ -124,7 +135,7 @@ func Listen(ctx context.Context, endpoint string, ack *Acknowledge) (*Listener, 
 	if ack == nil {
 		ack = DefaultServerACK
 	}
-	_, laddr, err := ResolveEndpoint(ctx, endpoint)
+	_, laddr, err := ResolveEndpoint(ctx, endpoint, nil)
 	if err != nil {
 		return nil, err
 	}
