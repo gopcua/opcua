@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"strings"
 	"testing"
 
 	"github.com/gopcua/opcua/tests/spec/spectest"
@@ -13,7 +12,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func resolveFilters(visit func(func(*flag.Flag)), labelFlag string, focusFlag []string, getenv func(string) string) (labelFilter string, focus []string, sources string) {
+func resolveFilters(visit func(func(*flag.Flag)), labelFlag string, focusFlag []string, getenv func(string) string) (labelFilter string, focus []string, labelSource string, focusSource string) {
 	var labelPassed, focusPassed bool
 	visit(func(passed *flag.Flag) {
 		switch passed.Name {
@@ -27,28 +26,28 @@ func resolveFilters(visit func(func(*flag.Flag)), labelFlag string, focusFlag []
 	focusEnv := getenv("SPECTEST_FOCUS")
 	labelFilter = spectest.LabelFilter(labelPassed, labelFlag, labelEnv)
 	focus = spectest.FocusFilter(focusPassed, focusFlag, focusEnv)
-	labelSource := "default"
+	labelSource = "default"
 	if labelPassed {
 		labelSource = "flag"
 	} else if labelEnv != "" {
 		labelSource = "SPECTEST_LABEL_FILTER"
 	}
-	focusSource := "default"
+	focusSource = "default"
 	if focusPassed {
 		focusSource = "flag"
 	} else if focusEnv != "" {
 		focusSource = "SPECTEST_FOCUS"
 	}
-	return labelFilter, focus, labelSource + "; " + focusSource
+	return labelFilter, focus, labelSource, focusSource
 }
 
 func TestPart4(t *testing.T) {
 	suiteConfig, reporterConfig := GinkgoConfiguration()
-	labelFilter, focus, sources := resolveFilters(flag.Visit, suiteConfig.LabelFilter, suiteConfig.FocusStrings, os.Getenv)
-	labelSource, focusSource, _ := strings.Cut(sources, "; ")
+	labelFilter, focus, labelSource, focusSource := resolveFilters(flag.Visit, suiteConfig.LabelFilter, suiteConfig.FocusStrings, os.Getenv)
 	fmt.Printf("part4: label filter %q from %s; focus %v from %s\n", labelFilter, labelSource, focus, focusSource)
 	suiteConfig.LabelFilter = labelFilter
 	suiteConfig.FocusStrings = focus
+	suiteConfig.FailOnEmpty = true
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "OPC UA Part 4", suiteConfig, reporterConfig)
 }
