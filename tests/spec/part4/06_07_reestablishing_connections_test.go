@@ -144,7 +144,9 @@ var _ = Describe("Part 4 §6.7 Re-establishing connections https://reference.opc
 
 		It("delivers the retained notification, then the following ones, each once and in order", Label("P4-6.7", "issue-879", "known-defect"), MustPassRepeatedly(10), func() {
 			waitAnsweredBadMessageNotAvailable(env, m)
+			requireSubscriptionAlive(env, m, sub, "after the cut")
 			env.Server.WaitHeldPublish().Answer(sub, valueAfterReconnect)
+			requireSubscriptionAlive(env, m, sub, "after the cut")
 			env.Server.WaitHeldPublish().Answer(sub, valueSentinel)
 			Eventually(func(g Gomega) {
 				g.Expect(env.ReceivedSince(m)).To(Equal([]int32{valueRetained, valueAfterReconnect, valueSentinel}), "client did not deliver the retained notification then the following ones, each once and in order; delivered: %v", env.ReceivedSince(m))
@@ -161,6 +163,7 @@ var _ = Describe("Part 4 §6.7 Re-establishing connections https://reference.opc
 		It("keeps publishing when a pause and a resume arrive together", Label("P4-5.14.1.2", "issue-895", "known-defect", "racy"), MustPassRepeatedly(20), func() {
 			held := env.Server.WaitHeldPublish()
 			Expect(held.Connection()).To(Equal(newConnection), "client sent no Publish request on the new connection")
+			requireSubscriptionAlive(env, m, sub, "after the cut")
 			held.Answer(sub, valueAfterReconnect)
 			second := env.Server.WaitHeldPublish()
 			Expect(second.Connection()).To(Equal(newConnection), "client sent no further Publish request after the first one was answered")
@@ -168,7 +171,9 @@ var _ = Describe("Part 4 §6.7 Re-establishing connections https://reference.opc
 
 		It("does not deliver a sequence number twice", Label("P4-6.7", "interop", "known-defect"), func() {
 			waitAnsweredBadMessageNotAvailable(env, m)
+			requireSubscriptionAlive(env, m, sub, "after the cut")
 			env.Server.WaitHeldPublish().AnswerWithSequenceNumber(sub, last+1, valueDuplicate)
+			requireSubscriptionAlive(env, m, sub, "after the cut")
 			env.Server.WaitHeldPublish().Answer(sub, valueSentinel)
 			Eventually(func(g Gomega) {
 				g.Expect(env.ReceivedSince(m)).To(ContainElement(valueSentinel), "client did not deliver the notification sent after the duplicated sequence number; delivered: %v", env.ReceivedSince(m))
@@ -218,5 +223,99 @@ var _ = Describe("Part 4 §6.7 Re-establishing connections https://reference.opc
 			Expect(second.Connection()).To(Equal(held.Connection()), "client sent no further Publish request on the recreated subscription after the first one was answered")
 			Expect(env.Server.UnusedScripts()).To(BeEmpty(), "scripts this spec armed were never used: %v", env.Server.UnusedScripts())
 		})
+	})
+
+	Context("when the connection drops again during Republish recovery", func() {
+		var sub spectest.Subscription
+		var last uint32
+		var m spectest.Mark
+		BeforeEach(func() {
+			sub = env.Subscription()
+			last = env.LastSequenceNumber()
+			sub.Retain(last+1, valueRetained)
+		})
+
+		DescribeTable("the second cut during Republish recovery",
+			func(moment spectest.Moment, check func(env *spectest.Environment, m spectest.Mark, recovery int)) {
+				env.Relay.CutAt(moment, spectest.Republish)
+				m = env.Mark()
+				env.Relay.Cut()
+				env.WaitUntilReconnected()
+				Eventually(func(g Gomega) {
+					g.Expect(env.Relay.ArmedCuts()).To(BeEmpty(), "the armed cut never fired: %v", env.Relay.ArmedCuts())
+				}, 15*time.Second).Should(Succeed())
+				env.WaitUntilReconnected()
+				recovery := 0
+				Eventually(func(g Gomega) {
+					g.Expect(env.ConnectionsSince(m)).To(Equal(2), "the relay accepted %d connections after the first cut, want exactly two", env.ConnectionsSince(m))
+					recovery = env.Relay.ConnectionCount() - 1
+				}, 15*time.Second).Should(Succeed())
+				check(env, m, recovery)
+				requireSubscriptionAlive(env, m, sub, "after the second cut")
+				env.Server.WaitHeldPublish().Answer(sub, valueSentinel)
+				Eventually(func(g Gomega) {
+					g.Expect(env.ReceivedSince(m)).To(Equal([]int32{valueRetained, valueSentinel}), "client did not deliver the retained notification then the sentinel after the first cut; delivered: %v; errors: %v", env.ReceivedSince(m), env.ReceivedErrorsSince(m))
+				}, 15*time.Second).Should(Succeed())
+				sessionToken := preCutSessionToken(env)
+				Expect(sessionToken).NotTo(BeNil(), "the recorder saw no ActivateSession request, so the pre-cut session token is unknown")
+				Eventually(func(g Gomega) {
+					activations := requestsOfType[*ua.ActivateSessionRequest](env.Recorder.RequestsSince(m))
+					onRecovery := false
+					for _, record := range activations {
+						if record.Connection == recovery {
+							onRecovery = true
+						}
+					}
+					g.Expect(onRecovery).To(BeTrue(), "client sent no ActivateSession request on the recovery connection")
+				}, 15*time.Second).Should(Succeed())
+				Consistently(func(g Gomega) {
+					g.Expect(requestsOfType[*ua.CreateSessionRequest](env.Recorder.RequestsSince(m))).To(BeEmpty(), "client sent a CreateSession request after the first cut")
+					for _, record := range requestsOfType[*ua.ActivateSessionRequest](env.Recorder.RequestsSince(m)) {
+						message, decoded := record.Message()
+						if !decoded {
+							continue
+						}
+						g.Expect(message.Header().AuthenticationToken.Equal(sessionToken)).To(BeTrue(), "client sent an ActivateSession request carrying an authentication token other than the pre-cut session's")
+					}
+				}, 2*time.Second).Should(Succeed())
+			},
+			Entry("the Republish request is lost (`BeforeRequestReachesServer`)", spectest.BeforeRequestReachesServer, func(env *spectest.Environment, m spectest.Mark, recovery int) {
+				Eventually(func(g Gomega) {
+					requests := env.Recorder.RequestsSince(m)
+					answer, answered := badMessageNotAvailableAnswer(env, m)
+					republish, sent := republishForSequence(recordsOnConnection(requests, recovery), last+1)
+					g.Expect(sent).To(BeTrue(), "client sent no Republish request for sequence number %d on the recovery connection", last+1)
+					g.Expect(answered).To(BeTrue(), "client sent no Republish request answered Bad_MessageNotAvailable")
+					g.Expect(answer.Connection).To(Equal(recovery), "the Republish request answered Bad_MessageNotAvailable ran on connection %d, want the recovery connection %d", answer.Connection, recovery)
+					g.Expect(answer.Order).To(BeNumerically(">", republish.Order), "the Republish request answered Bad_MessageNotAvailable did not follow the Republish request for sequence number %d on the recovery connection", last+1)
+				}, 15*time.Second).Should(Succeed())
+			}, Label("P4-6.7", "known-defect")),
+			Entry("the connection drops right after the Republish response is delivered (`AfterResponseReachesClient`)", spectest.AfterResponseReachesClient, func(env *spectest.Environment, m spectest.Mark, recovery int) {
+				Eventually(func(g Gomega) {
+					requests := env.Recorder.RequestsSince(m)
+					seen := len(recordsOnConnection(requestsOfType[*ua.RepublishRequest](requests), recovery)) > 0 || len(recordsOnConnection(requestsOfType[*ua.PublishRequest](requests), recovery)) > 0
+					g.Expect(seen).To(BeTrue(), "client sent no Republish or Publish request on the recovery connection")
+				}, 15*time.Second).Should(Succeed())
+				Consistently(func(g Gomega) {
+					requests := env.Recorder.RequestsSince(m)
+					notifications := env.Recorder.Notifications()
+					for _, record := range recordsOnConnection(requestsOfType[*ua.RepublishRequest](requests), recovery) {
+						highestDelivered := uint32(0)
+						for _, notification := range notifications {
+							if notification.Order < record.Order && notification.SequenceNumber > highestDelivered {
+								highestDelivered = notification.SequenceNumber
+							}
+						}
+						message, decoded := record.Message()
+						if !decoded {
+							continue
+						}
+						if request, is := message.(*ua.RepublishRequest); is {
+							g.Expect(request.RetransmitSequenceNumber).To(BeNumerically(">", highestDelivered), "client sent a Republish request on the recovery connection for sequence number %d at or below %d, the highest delivered before it", request.RetransmitSequenceNumber, highestDelivered)
+						}
+					}
+				}, 2*time.Second).Should(Succeed())
+			}, Label("P4-6.7", "known-defect")),
+		)
 	})
 })

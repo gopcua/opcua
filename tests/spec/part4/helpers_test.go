@@ -1,6 +1,7 @@
 package part4
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/gopcua/opcua/tests/spec/spectest"
@@ -21,6 +22,16 @@ func requestsOfType[T ua.Request](records []spectest.ServiceRecord[ua.Request]) 
 		}
 	}
 	return matched
+}
+
+func recordsOnConnection[M any](records []spectest.ServiceRecord[M], connection int) []spectest.ServiceRecord[M] {
+	var on []spectest.ServiceRecord[M]
+	for _, record := range records {
+		if record.Connection == connection {
+			on = append(on, record)
+		}
+	}
+	return on
 }
 
 func answerTo(request spectest.ServiceRecord[ua.Request], responses []spectest.ServiceRecord[ua.Response]) (spectest.ServiceRecord[ua.Response], bool) {
@@ -51,6 +62,38 @@ func republishForSequence(records []spectest.ServiceRecord[ua.Request], sequence
 		}
 	}
 	return spectest.ServiceRecord[ua.Request]{}, false
+}
+
+func requireSubscriptionAlive(env *spectest.Environment, m spectest.Mark, sub spectest.Subscription, deletedWhen string) {
+	requests := env.Recorder.RequestsSince(m)
+	deleted := false
+	for _, record := range requests {
+		message, decoded := record.Message()
+		if !decoded {
+			continue
+		}
+		if request, is := message.(*ua.DeleteSubscriptionsRequest); is {
+			for _, id := range request.SubscriptionIDs {
+				if id == sub.ID() {
+					deleted = true
+				}
+			}
+		}
+	}
+	Expect(deleted).To(BeFalse(), "client deleted subscription %d %s instead of republishing it; requests after the first cut: %v", sub.ID(), deletedWhen, requestTypeNames(requests))
+	Expect(requestsOfType[*ua.CreateSubscriptionRequest](requests)).To(BeEmpty(), "client created a new subscription %s instead of republishing subscription %d; requests after the first cut: %v", deletedWhen, sub.ID(), requestTypeNames(requests))
+}
+
+func requestTypeNames(records []spectest.ServiceRecord[ua.Request]) []string {
+	names := make([]string, 0, len(records))
+	for _, record := range records {
+		message, decoded := record.Message()
+		if !decoded {
+			continue
+		}
+		names = append(names, fmt.Sprintf("%T", message))
+	}
+	return names
 }
 
 func preCutSessionToken(env *spectest.Environment) *ua.NodeID {
