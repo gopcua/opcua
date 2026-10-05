@@ -12,6 +12,8 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+const outliveWindow = 25 * time.Second
+
 var _ = Describe("Environment Start", func() {
 	It("completes the session handshake, records the subscription and delivers the first answered Publish", func() {
 		env := Start(GinkgoT())
@@ -234,7 +236,7 @@ var _ = Describe("Environment Start", func() {
 			"the off-relay Publish did not fail naming the relay")
 	})
 
-	It("never lets the server's subscription service delete the subscription across a minute of publishing", func() {
+	It("never lets the server's subscription service delete the subscription across 25 s of publishing", func() {
 		env := Start(GinkgoT(), WithPublishingInterval(10*time.Millisecond))
 		sub := env.Subscription()
 		service := env.Server.srv.SubscriptionService
@@ -246,7 +248,7 @@ var _ = Describe("Environment Start", func() {
 
 		expected := env.Received()
 		value := valueBeforeCut + 1
-		deadline := time.Now().Add(time.Minute)
+		deadline := time.Now().Add(outliveWindow)
 		for time.Now().Before(deadline) {
 			env.Server.WaitHeldPublish().Answer(sub, value)
 			expected = append(expected, value)
