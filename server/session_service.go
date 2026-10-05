@@ -102,6 +102,8 @@ func (s *SessionService) ActivateSession(sc *uasc.SecureChannel, r ua.Request, r
 	if sess == nil {
 		return nil, ua.StatusBadSessionIDInvalid
 	}
+	sess.activateMu.Lock()
+	defer sess.activateMu.Unlock()
 
 	err = sc.VerifySessionSignature(sess.remoteCertificate, sess.serverNonce, req.ClientSignature.Signature)
 	if err != nil {

@@ -368,6 +368,14 @@ func (s *Server) monitorConnections(ctx context.Context) {
 			continue
 		}
 
+		// ActivateSession calls the user authenticators, which can be slow on
+		// purpose (e.g. bcrypt). Handle it off the loop so one login does not
+		// stall the requests of all other clients.
+		if _, ok := msg.Request().(*ua.ActivateSessionRequest); ok {
+			go s.handleService(ctx, sc, msg.RequestID, msg.Request())
+			continue
+		}
+
 		// todo: should this be delegated to another goroutine in case handling this hangs?
 		s.handleService(ctx, sc, msg.RequestID, msg.Request())
 	}

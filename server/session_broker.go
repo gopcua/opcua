@@ -18,6 +18,10 @@ type session struct {
 	serverNonce       []byte
 	remoteCertificate []byte
 
+	// activateMu serializes ActivateSession calls for this session, which run
+	// concurrently to the message loop. It guards serverNonce after creation.
+	activateMu sync.Mutex
+
 	// mu guards activated and identity
 	mu        sync.Mutex
 	activated bool
