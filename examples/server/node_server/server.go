@@ -83,6 +83,7 @@ func main() {
 		server.EnableAuthMode(ua.UserTokenTypeAnonymous),
 		// server.UserNameAuth(server.StaticUsers(map[string]string{"user": "password"})),
 		// server.X509Auth(server.TrustedUserCerts(trustedUserCertPool)),
+		// For bcrypt-hashed users in a users.yaml file see contrib/userstore.
 	)
 
 	// Here we're automatically adding the hostname and localhost to the endpoint list.
