@@ -80,14 +80,12 @@ func main() {
 	)
 
 	// Set your user authentication options.
+	// UserName and Certificate auth are only offered on endpoints with a
+	// security policy other than None, so credentials are always encrypted.
 	opts = append(opts,
 		server.EnableAuthMode(ua.UserTokenTypeAnonymous),
-		/*
-			These authentication modes are not implemented yet
-			server.EnableAuthMode(ua.UserTokenTypeUserName),
-			server.EnableAuthMode(ua.UserTokenTypeCertificate),
-		*/
-		//		server.EnableAuthWithoutEncryption(), // Dangerous and not recommended, shown for illustration only
+		// server.UserNameAuth(server.StaticUsers(map[string]string{"user": "password"})),
+		// server.X509Auth(server.TrustedUserCerts(trustedUserCertPool)),
 	)
 
 	// Here we're automatically adding the hostname and localhost to the endpoint list.
