@@ -155,7 +155,7 @@ func TestVerdict(t *testing.T) {
 			wantExit: 0,
 		},
 		{
-			name: "racy on the container, passed",
+			name: "known-defect and a second label on the container, passed",
 			spec: types.SpecReport{
 				ContainerHierarchyTexts:  []string{"when the session survives a transport loss"},
 				ContainerHierarchyLabels: [][]string{{"known-defect", "racy"}},
@@ -163,7 +163,7 @@ func TestVerdict(t *testing.T) {
 				LeafNodeType:             types.NodeTypeIt,
 				State:                    types.SpecStatePassed,
 			},
-			wantExit:  0,
+			wantExit:  1,
 			namesSpec: true,
 		},
 		{

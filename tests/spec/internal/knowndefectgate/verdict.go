@@ -61,11 +61,7 @@ func Verdict(reports []types.Report, log string) (exit int, message string) {
 			switch spec.State {
 			case types.SpecStatePassed:
 				ran = true
-				if slices.Contains(spec.Labels(), "racy") {
-					lines = append(lines, name+": passes, but is racy, so the pass is not evidence the defect is fixed")
-				} else {
-					fail("%s: passes now; remove its known-defect label", name)
-				}
+				fail("%s: passes now; remove its known-defect label", name)
 			case types.SpecStateFailed:
 				ran = true
 				if harness, ok := spectestFailure(spec); ok {
