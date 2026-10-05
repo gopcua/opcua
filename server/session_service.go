@@ -111,12 +111,18 @@ func (s *SessionService) ActivateSession(sc *uasc.SecureChannel, r ua.Request, r
 		return nil, ua.StatusBadSecurityChecksFailed
 	}
 
+	identity, status := s.authenticate(sc, sess, req)
+	if status != ua.StatusOK {
+		return nil, status
+	}
+
 	nonce := make([]byte, sessionNonceLength)
 	if _, err := rand.Read(nonce); err != nil {
 		log.Printf("error creating session nonce")
 		return nil, ua.StatusBadInternalError
 	}
 	sess.serverNonce = nonce
+	sess.activate(identity)
 
 	response := &ua.ActivateSessionResponse{
 		ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusOK),

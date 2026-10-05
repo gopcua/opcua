@@ -67,6 +67,9 @@ type serverConfig struct {
 	enabledSec  []security
 	enabledAuth []authMode
 
+	userNameAuth UserNameAuthenticator
+	x509Auth     X509Authenticator
+
 	cap ServerCapabilities
 
 	logger Logger
@@ -248,6 +251,7 @@ func (s *Server) Start(ctx context.Context) error {
 
 	// Register all service handlers
 	s.initHandlers()
+	s.warnAuthConfig()
 
 	if s.url == "" {
 		s.url = defaultListenAddr
