@@ -192,6 +192,10 @@ type Client struct {
 
 	// monitorOnce ensures only one connection monitor is running
 	monitorOnce sync.Once
+
+	// loops counts the reconnect monitor and the publish loop, so Close
+	// can wait for both to end.
+	loops sync.WaitGroup
 }
 
 // NewClient creates a new Client.
@@ -280,8 +284,15 @@ func (c *Client) Connect(ctx context.Context) error {
 	mctx, mcancel := context.WithCancel(context.Background())
 	c.mcancel = mcancel
 	c.monitorOnce.Do(func() {
-		go c.monitor(mctx)
-		go c.monitorSubscriptions(mctx)
+		c.loops.Add(2)
+		go func() {
+			defer c.loops.Done()
+			c.monitor(mctx)
+		}()
+		go func() {
+			defer c.loops.Done()
+			c.monitorSubscriptions(mctx)
+		}()
 	})
 
 	// todo(fs): we might need to guard this with an option in case of a broken
@@ -663,6 +674,22 @@ func (c *Client) Close(ctx context.Context) error {
 	// anything we can do about it anyway
 	if c.conn != nil {
 		c.conn.Close()
+	}
+
+	// Wait for the reconnect monitor and the publish loop to end, bounded
+	// by ctx. Cancelled above, they end promptly (every step they block in
+	// honours their ctx); without the wait one caught mid-step ran on past
+	// Close and could still call back into the caller — OnSessionAbandoned
+	// with the session its cancelled restore gave up, StateChangedFunc —
+	// after the caller had torn its own side down.
+	done := make(chan struct{})
+	go func() {
+		c.loops.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-ctx.Done():
 	}
 
 	return nil
