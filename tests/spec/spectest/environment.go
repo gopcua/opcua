@@ -64,17 +64,18 @@ type Environment struct {
 	Server   *ScriptedServer
 	Recorder *Recorder
 
-	t              T
-	mu             sync.Mutex
-	received       []int32
-	receivedErrors []error
-	states         []opcua.ConnState
-	receivedSignal chan struct{}
-	everConnected  bool
-	cutStates      int
-	waitTimeout    time.Duration
-	servers        []*ScriptedServer
-	onClientClosed func()
+	t                  T
+	mu                 sync.Mutex
+	clientSubscription *opcua.Subscription
+	received           []int32
+	receivedErrors     []error
+	states             []opcua.ConnState
+	receivedSignal     chan struct{}
+	everConnected      bool
+	cutStates          int
+	waitTimeout        time.Duration
+	servers            []*ScriptedServer
+	onClientClosed     func()
 }
 
 // Start creates and returns a running Environment (see the Environment
@@ -142,6 +143,7 @@ func Start(t T, opts ...Option) *Environment {
 		t.Fatalf("the client created no subscription: %v", err)
 		return nil
 	}
+	e.clientSubscription = subscription
 	ctx, cancel = context.WithTimeout(context.Background(), startTimeout)
 	_, monitorErr := subscription.Monitor(ctx, ua.TimestampsToReturnBoth,
 		opcua.NewMonitoredItemCreateRequestWithDefaults(e.Server.node, ua.AttributeIDValue, monitorClientHandle))
@@ -204,6 +206,12 @@ func (e *Environment) Subscription() Subscription {
 		e.t.Fatalf("the client created no subscription")
 	}
 	return Subscription{server: e.Server, sub: e.Server.first}
+}
+
+// ClientSubscription returns the subscription Start created on the
+// client, whose Notifs channel feeds the Environment's received values.
+func (e *Environment) ClientSubscription() *opcua.Subscription {
+	return e.clientSubscription
 }
 
 // StartServer starts a second, independent scripted server with the

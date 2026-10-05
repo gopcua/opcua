@@ -189,6 +189,35 @@ func TestAnswerIncrementsTheSequenceCounter(t *testing.T) {
 	}
 }
 
+func TestClientSubscriptionIsTheOneStartCreated(t *testing.T) {
+	env := Start(t)
+	sub := env.ClientSubscription()
+	if sub == nil {
+		t.Fatalf("Start exposed no client-side subscription")
+	}
+	if sub.SubscriptionID != env.Subscription().ID() {
+		t.Fatalf("the client-side subscription carries id %d, want the id the server recorded for it, %d", sub.SubscriptionID, env.Subscription().ID())
+	}
+	env.Server.WaitHeldPublish().Answer(env.Subscription(), 4321)
+	deadline := time.NewTimer(startTimeout)
+	defer deadline.Stop()
+	for {
+		received := env.Received()
+		if len(received) >= 2 {
+			if received[len(received)-1] != 4321 {
+				t.Fatalf("the client delivered %v, want the pre-cut value then 4321 through the client-side subscription's Notifs channel", received)
+			}
+			return
+		}
+		select {
+		case <-deadline.C:
+			t.Fatalf("the client delivered %v, want the pre-cut value then 4321 through the client-side subscription's Notifs channel", env.Received())
+			return
+		case <-time.After(statePollInterval):
+		}
+	}
+}
+
 func TestWithClientOptionsApplyAfterStartOptions(t *testing.T) {
 	env := Start(t, WithClientOptions(opcua.RequestTimeout(777*time.Millisecond)))
 

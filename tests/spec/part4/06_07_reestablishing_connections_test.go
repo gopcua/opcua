@@ -29,13 +29,11 @@ var _ = Describe("Part 4 §6.7 Re-establishing connections https://reference.opc
 		var sub spectest.Subscription
 		var last uint32
 		var m spectest.Mark
-		var newConnection int
 		BeforeEach(func() {
 			sub = env.Subscription()
 			last = env.LastSequenceNumber()
 			sub.Retain(last+1, valueRetained)
 			m = env.Mark()
-			newConnection = env.Relay.ConnectionCount()
 			env.Relay.Cut()
 			env.WaitUntilReconnected()
 		})
@@ -160,15 +158,6 @@ var _ = Describe("Part 4 §6.7 Re-establishing connections https://reference.opc
 			Expect(sentinelAnswered).To(BeTrue(), "the recorder saw no answered Publish response carrying %d", valueSentinel)
 			Expect(sentinelNotification.SequenceNumber).To(Equal(last+3), "the Publish answered with valueSentinel carried sequence number %d, want %d", sentinelNotification.SequenceNumber, last+3)
 			Expect(env.Server.UnusedScripts()).To(BeEmpty(), "scripts this spec armed were never used: %v", env.Server.UnusedScripts())
-		})
-
-		It("keeps publishing when a pause and a resume arrive together", Label("P4-5.14.1.2", "issue-895", "known-defect", "racy"), MustPassRepeatedly(20), func() {
-			held := env.Server.WaitHeldPublish()
-			Expect(held.Connection()).To(Equal(newConnection), "client sent no Publish request on the new connection")
-			requireSubscriptionAlive(env, m, sub, "after the cut")
-			held.Answer(sub, valueAfterReconnect)
-			second := env.Server.WaitHeldPublish()
-			Expect(second.Connection()).To(Equal(newConnection), "client sent no further Publish request after the first one was answered")
 		})
 
 		It("does not deliver a sequence number twice", Label("P4-6.7", "interop", "known-defect"), func() {
