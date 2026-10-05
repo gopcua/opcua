@@ -102,6 +102,8 @@ func (s *SessionService) ActivateSession(sc *uasc.SecureChannel, r ua.Request, r
 	if sess == nil {
 		return nil, ua.StatusBadSessionIDInvalid
 	}
+	sess.activateMu.Lock()
+	defer sess.activateMu.Unlock()
 
 	err = sc.VerifySessionSignature(sess.remoteCertificate, sess.serverNonce, req.ClientSignature.Signature)
 	if err != nil {
@@ -111,12 +113,18 @@ func (s *SessionService) ActivateSession(sc *uasc.SecureChannel, r ua.Request, r
 		return nil, ua.StatusBadSecurityChecksFailed
 	}
 
+	identity, status := s.authenticate(sc, sess, req)
+	if status != ua.StatusOK {
+		return nil, status
+	}
+
 	nonce := make([]byte, sessionNonceLength)
 	if _, err := rand.Read(nonce); err != nil {
 		log.Printf("error creating session nonce")
 		return nil, ua.StatusBadInternalError
 	}
 	sess.serverNonce = nonce
+	sess.activate(identity)
 
 	response := &ua.ActivateSessionResponse{
 		ResponseHeader: responseHeader(req.RequestHeader.RequestHandle, ua.StatusOK),
