@@ -100,7 +100,7 @@ func registerCase(c Case) {
 func assertCheck(check Check, before, after invariants.Observed, outcome Outcome) {
 	switch check.Name {
 	case "HaveFired":
-		gomega.Expect(before.Fired).To(gomega.BeTrue(), "the fault never fired")
+		gomega.Expect(after.Fired).To(gomega.BeTrue(), "the fault never fired")
 	case "ResumePublishing":
 		gomega.Expect(before).To(invariants.ResumePublishing(15*time.Second), "the sentinel did not resume publishing within its window")
 	case "KeepOneSessionOpen":

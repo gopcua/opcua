@@ -169,7 +169,6 @@ func checksOf(suite Suite, scenario Scenario, category Category, f faults.Fault,
 		base = append(base, "message-"+target)
 	}
 
-	before("HaveFired", withLabels(base, "invariant")...)
 	before("ResumePublishing", withLabels(base, "invariant")...)
 	before("KeepOneSessionOpen", withLabels(base, "invariant")...)
 	before("KeepOneSubscriptionPerClientSubscription", withLabels(base, "invariant")...)
@@ -182,6 +181,7 @@ func checksOf(suite Suite, scenario Scenario, category Category, f faults.Fault,
 		checks = append(checks, Check{Name: rule.Name, Labels: labels, Phase: BeforeClose})
 	}
 
+	after("HaveFired", withLabels(base, "invariant")...)
 	after("DeliverEachValueOnce", withLabels(base, "invariant")...)
 	after("DeliverInOrder", withLabels(base, "invariant")...)
 	after("CloseEveryKnownSession", withLabels(base, "invariant")...)

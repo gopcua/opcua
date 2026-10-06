@@ -130,16 +130,16 @@ func TestPlanOrdersInvariantChecksBeforeRules(t *testing.T) {
 		got = append(got, check.Name)
 	}
 	want := []string{
-		"HaveFired", "ResumePublishing", "KeepOneSessionOpen", "KeepOneSubscriptionPerClientSubscription",
+		"ResumePublishing", "KeepOneSessionOpen", "KeepOneSubscriptionPerClientSubscription",
 		"ReactivatesSession", "CreatesNoSession",
-		"DeliverEachValueOnce", "DeliverInOrder", "CloseEveryKnownSession",
+		"HaveFired", "DeliverEachValueOnce", "DeliverInOrder", "CloseEveryKnownSession",
 	}
 	if strings.Join(got, ",") != strings.Join(want, ",") {
 		t.Fatalf("the checks are %v, want %v", got, want)
 	}
 	for _, check := range cases[0].Checks {
 		switch check.Name {
-		case "DeliverEachValueOnce", "DeliverInOrder", "CloseEveryKnownSession":
+		case "HaveFired", "DeliverEachValueOnce", "DeliverInOrder", "CloseEveryKnownSession":
 			if check.Phase != AfterClose {
 				t.Errorf("%s has phase %d, want AfterClose", check.Name, check.Phase)
 			}
