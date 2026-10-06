@@ -18,10 +18,13 @@ import (
 var registered []Suite
 
 // RegisterSuites turns the plan into Ginkgo nodes: ginkgo.Describe(clause) ›
-// ginkgo.Describe(scenario) › ginkgo.Describe(fault, ginkgo.Ordered). A skipped case is one
+// ginkgo.Describe(scenario) › ginkgo.Describe(fault, ginkgo.Ordered,
+// ginkgo.ContinueOnFailure). A skipped case is one
 // It that skips with the fault's reason; every check of an applicable
 // case is one It with its labels, reading the snapshots the case's
-// BeforeAll took. It panics when the plan cannot be built.
+// BeforeAll took. One failing check retires only itself, so the checks
+// behind it still run and report. It panics when the plan cannot be
+// built.
 func RegisterSuites(suites []Suite, defects []KnownDefect, all ...faults.Fault) {
 	registered = append(registered, suites...)
 	cases, err := Plan(suites, all, defects)
@@ -51,7 +54,7 @@ func registerCase(c Case) {
 	}
 	ginkgo.Describe(path[0], func() {
 		ginkgo.Describe(path[1], func() {
-			ginkgo.Describe(path[2], ginkgo.Ordered, func() {
+			ginkgo.Describe(path[2], ginkgo.Ordered, ginkgo.ContinueOnFailure, func() {
 				var before invariants.Observed
 				var after invariants.Observed
 				var outcome Outcome
