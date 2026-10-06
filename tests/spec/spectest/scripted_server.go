@@ -68,6 +68,7 @@ type harnessSub struct {
 	retained           map[uint32]int32
 	failRepublish      map[uint32]ua.StatusCode
 	unansweredRetained map[uint32]bool
+	sent               map[uint32]bool
 }
 
 func newHarnessSub(id uint32) *harnessSub {
@@ -77,6 +78,7 @@ func newHarnessSub(id uint32) *harnessSub {
 		retained:           make(map[uint32]int32),
 		failRepublish:      make(map[uint32]ua.StatusCode),
 		unansweredRetained: make(map[uint32]bool),
+		sent:               make(map[uint32]bool),
 	}
 }
 
@@ -483,11 +485,15 @@ func (s *ScriptedServer) QueueTransferSuccess(available ...uint32) Subscription 
 // subscription: at the Retain or transfer staging that queued it, or
 // at the answer that sent it. SubscriptionID is the subscription the
 // value belongs to, which for a value staged on a QueueTransferSuccess
-// handle is the id the transfer created it under.
+// handle is the id the transfer created it under. Repeated is true
+// when the server had already sent that subscription and sequence
+// number before it produced the value, in an answer or a retransmitted
+// Republish.
 type Produced struct {
 	SubscriptionID uint32
 	SequenceNumber uint32
 	Value          int32
+	Repeated       bool
 }
 
 // Produced returns every value the server produced, in production
@@ -498,8 +504,8 @@ func (s *ScriptedServer) Produced() []Produced {
 	return slices.Clone(s.produced)
 }
 
-func (s *ScriptedServer) recordProducedLocked(sub *harnessSub, sequenceNumber uint32, v int32) {
-	s.produced = append(s.produced, Produced{SubscriptionID: sub.id, SequenceNumber: sequenceNumber, Value: v})
+func (s *ScriptedServer) recordProducedLocked(sub *harnessSub, sequenceNumber uint32, v int32, repeated bool) {
+	s.produced = append(s.produced, Produced{SubscriptionID: sub.id, SequenceNumber: sequenceNumber, Value: v, Repeated: repeated})
 	if s.producedBySub == nil {
 		s.producedBySub = make(map[*harnessSub][]int)
 	}
@@ -780,6 +786,7 @@ func (s *ScriptedServer) republish(sc *uasc.SecureChannel, r ua.Request, reqID u
 		return nil, ua.StatusBadInternalError
 	}
 	delete(sub.unansweredRetained, sequenceNumber)
+	sub.sent[sequenceNumber] = true
 	s.mu.Unlock()
 	return &ua.RepublishResponse{
 		ResponseHeader:      responseHeader(request.RequestHeader.RequestHandle),
@@ -862,7 +869,7 @@ func (s Subscription) Retain(seq uint32, v int32) {
 	s.sub.retained[seq] = v
 	s.sub.unansweredRetained[seq] = true
 	s.sub.next = next
-	s.server.recordProducedLocked(s.sub, seq, v)
+	s.server.recordProducedLocked(s.sub, seq, v, false)
 	s.server.mu.Unlock()
 }
 
@@ -990,6 +997,7 @@ func (h HeldPublish) answer(sub Subscription, sequenceNumber uint32, v int32, us
 			s.nextAnswerSkip = false
 		}
 	}
+	repeated := sub.sub.sent[sequenceNumber]
 	for _, acknowledgement := range h.entry.request.SubscriptionAcknowledgements {
 		if acknowledgement != nil && acknowledgement.SubscriptionID == sub.sub.id {
 			delete(sub.sub.retained, acknowledgement.SequenceNumber)
@@ -1003,7 +1011,8 @@ func (h HeldPublish) answer(sub Subscription, sequenceNumber uint32, v int32, us
 	}
 	sub.sub.next = next
 	sub.sub.lastSent = sequenceNumber
-	s.recordProducedLocked(sub.sub, sequenceNumber, v)
+	sub.sub.sent[sequenceNumber] = true
+	s.recordProducedLocked(sub.sub, sequenceNumber, v, repeated)
 	if s.retention {
 		sub.sub.retained[sequenceNumber] = v
 	}

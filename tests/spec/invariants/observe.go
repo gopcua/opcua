@@ -41,6 +41,7 @@ func Observe(env *spectest.Environment, fault *spectest.Injected) Observed {
 				SequenceNumber: entry.SequenceNumber,
 				ServerIndex:    index,
 				Reachable:      states[index].Reachable,
+				Repeated:       entry.Repeated,
 			})
 		}
 	}

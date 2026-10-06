@@ -15,12 +15,15 @@ import (
 
 // Produced is one value a server produced, with the subscription and
 // sequence number it was enqueued under and the server that holds it.
+// Repeated is true when the server had already sent that subscription
+// and sequence number before it produced the value.
 type Produced struct {
 	Value          int32
 	SubscriptionID uint32
 	SequenceNumber uint32
 	ServerIndex    int
 	Reachable      bool
+	Repeated       bool
 }
 
 // ServerState is one server the environment created, with the session
@@ -77,7 +80,11 @@ func connectedServers(observed Observed) []ServerState {
 // DeliverEachValueOnce says every value a reachable server produced
 // was received exactly once, and nothing else was received. Produced
 // values are deduplicated by value — a retransmission produces the
-// same value twice — received values are not.
+// same value twice — received values are not. A value produced under
+// a sequence number the server had already sent (Produced.Repeated)
+// must not be received at all: Part 4 identifies a notification by its
+// sequence number, so a client must not deliver a second notification
+// under a number it already received.
 func DeliverEachValueOnce() types.GomegaMatcher {
 	return &deliverEachValueOnce{}
 }
@@ -112,6 +119,13 @@ func (m *deliverEachValueOnce) Match(actual any) (bool, error) {
 		}
 	}
 	for _, entry := range observed.Produced {
+		if entry.Repeated {
+			if received[entry.Value] > 0 {
+				m.failure = fmt.Sprintf("the client received %d, produced at sequence number %d the server had already sent; a repeated notification must not be delivered", entry.Value, entry.SequenceNumber)
+				return false, nil
+			}
+			continue
+		}
 		if entry.Reachable && received[entry.Value] == 0 {
 			m.failure = fmt.Sprintf("server %d produced %d at sequence %d, but the client never received it", entry.ServerIndex, entry.Value, entry.SequenceNumber)
 			return false, nil

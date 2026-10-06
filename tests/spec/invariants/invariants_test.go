@@ -12,6 +12,10 @@ func produced(value int32, subscription uint32, sequence uint32, server int, rea
 	return Produced{Value: value, SubscriptionID: subscription, SequenceNumber: sequence, ServerIndex: server, Reachable: reachable}
 }
 
+func repeated(value int32, subscription uint32, sequence uint32, server int, reachable bool) Produced {
+	return Produced{Value: value, SubscriptionID: subscription, SequenceNumber: sequence, ServerIndex: server, Reachable: reachable, Repeated: true}
+}
+
 func server(index int, reachable, connected bool, sessions, subscriptions int) ServerState {
 	return ServerState{Index: index, Reachable: reachable, Connected: connected, KnownSessions: sessions, LiveSubscriptions: subscriptions}
 }
@@ -70,6 +74,16 @@ func TestDeliverEachValueOnce(t *testing.T) {
 			Observed{
 				Produced: []Produced{produced(101, 1, 3, 0, true), produced(101, 1, 3, 0, true)},
 				Received: []int32{101},
+			}, true, ""},
+		{"a value under an already-sent sequence number is received",
+			Observed{
+				Produced: []Produced{produced(101, 1, 1, 0, true), repeated(107, 1, 1, 0, true)},
+				Received: []int32{101, 107},
+			}, false, "107, produced at sequence number 1"},
+		{"a value under an already-sent sequence number is not received, the rest once",
+			Observed{
+				Produced: []Produced{produced(101, 1, 1, 0, true), repeated(107, 1, 1, 0, true), produced(108, 1, 2, 0, true)},
+				Received: []int32{101, 108},
 			}, true, ""},
 	}
 	for _, c := range cases {

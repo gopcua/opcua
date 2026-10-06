@@ -1,6 +1,8 @@
 package matrix
 
 import (
+	"flag"
+	"os"
 	"testing"
 	"time"
 
@@ -61,11 +63,85 @@ func (idleScenario) Run(env *spectest.Environment, f faults.Fault) Outcome {
 	}
 }
 
-func init() {
-	RegisterSuites([]Suite{idleSuite{}}, nil, faultNamed("Server/Pause"), faultNamed("Server/DuplicateSequence"))
+// selfSpecDefects labels the DuplicateSequence case's delivery check:
+// the client delivers a notification whose sequence number it already
+// received, which the invariant now catches.
+var selfSpecDefects = []KnownDefect{
+	{
+		Issue: Unfiled("client delivers a notification whose sequence number it already received (S9)"),
+		Check: "DeliverEachValueOnce",
+		Applies: func(scenario string, f faults.Fault) bool {
+			return f.Name() == "Server/DuplicateSequence"
+		},
+	},
 }
 
+func init() {
+	RegisterSuites([]Suite{idleSuite{}}, selfSpecDefects, faultNamed("Server/Pause"), faultNamed("Server/DuplicateSequence"))
+}
+
+// TestSelfSpecDefectKeepsTheCaseRunning asserts the labelled case is
+// neither skipped nor emptied: a known defect may retire one check of
+// a case, never the case itself.
+func TestSelfSpecDefectKeepsTheCaseRunning(t *testing.T) {
+	cases, err := Plan([]Suite{idleSuite{}}, []faults.Fault{faultNamed("Server/Pause"), faultNamed("Server/DuplicateSequence")}, selfSpecDefects)
+	if err != nil {
+		t.Fatalf("Plan over the self-spec returned an error: %v", err)
+	}
+	var duplicate *Case
+	for i := range cases {
+		if cases[i].Path[2] == "Server/DuplicateSequence" {
+			duplicate = &cases[i]
+		}
+	}
+	if duplicate == nil {
+		t.Fatalf("Plan built no DuplicateSequence case; paths: %v", casePaths(cases))
+	}
+	if duplicate.Skip != nil {
+		t.Fatalf("the DuplicateSequence case is skipped: %s", duplicate.Skip.Text)
+	}
+	var labelled, unlabelled int
+	for _, check := range duplicate.Checks {
+		if contains(check.Labels, "known-defect") {
+			labelled++
+			continue
+		}
+		unlabelled++
+	}
+	if labelled != 1 {
+		t.Fatalf("the DuplicateSequence case carries %d labelled checks, want exactly the delivery check", labelled)
+	}
+	if unlabelled == 0 {
+		t.Fatalf("the DuplicateSequence case carries no unlabelled check, so the default filter would run nothing of it")
+	}
+}
+
+func casePaths(cases []Case) []string {
+	var paths []string
+	for _, c := range cases {
+		paths = append(paths, c.Path[0]+"/"+c.Path[1]+"/"+c.Path[2])
+	}
+	return paths
+}
+
+// TestSelfSpec runs the registered suites without the matrix variable.
+// The label filter resolves exactly as TestMatrix does, so the default
+// run excludes the labelled known-defect checks. It skips when
+// SPECTEST_MATRIX is set: ginkgo fails a second RunSpecs call in one
+// binary, and the matrix run covers this suite inside TestMatrix.
 func TestSelfSpec(t *testing.T) {
+	if os.Getenv("SPECTEST_MATRIX") != "" {
+		t.Skip("the failure matrix run runs the self-spec suite inside TestMatrix; a second RunSpecs would fail")
+		return
+	}
+	suiteConfig, reporterConfig := GinkgoConfiguration()
+	var labelPassed bool
+	flag.Visit(func(passed *flag.Flag) {
+		if passed.Name == "ginkgo.label-filter" {
+			labelPassed = true
+		}
+	})
+	suiteConfig.LabelFilter = spectest.LabelFilter(labelPassed, suiteConfig.LabelFilter, os.Getenv("SPECTEST_LABEL_FILTER"))
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "matrix self-spec")
+	RunSpecs(t, "matrix self-spec", suiteConfig, reporterConfig)
 }
