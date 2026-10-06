@@ -48,6 +48,10 @@ const (
 	// Aborted marks a message the sender cancelled with an abort
 	// chunk.
 	Aborted
+	// Stalled marks a message the relay read on a stalled connection,
+	// or an ACK a DiscardNextACK armed discarded, and never wrote; the
+	// record still holds its decoded message.
+	Stalled
 )
 
 // ServiceRecord is one service message the relay observed on one
@@ -66,9 +70,10 @@ type ServiceRecord[M any] struct {
 }
 
 // Message returns the decoded service and whether the relay
-// forwarded it or a cut CutAt armed dropped it.
+// forwarded it, a cut CutAt armed dropped it, or it arrived on a
+// connection whose forwarding a link fault stopped.
 func (r ServiceRecord[M]) Message() (M, bool) {
-	if r.Fate != Forwarded && r.Fate != Dropped {
+	if r.Fate != Forwarded && r.Fate != Dropped && r.Fate != Stalled {
 		var zero M
 		return zero, false
 	}
@@ -456,6 +461,10 @@ func (r *Recorder) forward(connection int, flow flow, data []byte, write func([]
 			r.relay.closeConnection(connection, cut.claim)
 			return err
 		}
+		if r.relay.discards(connection, flow, message) {
+			r.markStalled(connection, flow, message)
+			continue
+		}
 		if writeErr := write(message); writeErr != nil {
 			if cut.index >= 0 {
 				r.relay.release(cut.claim)
@@ -472,6 +481,76 @@ func (r *Recorder) forward(connection int, flow flow, data []byte, write func([]
 		}
 	}
 	return err
+}
+
+func (r *Recorder) markStalled(connection int, flow flow, message []byte) {
+	decoded, err := decodeFrame(message)
+	if err != nil {
+		return
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	switch frame := decoded.(type) {
+	case *transportFrame:
+		for i := range r.transport {
+			record := &r.transport[i]
+			if record.Connection == connection && record.Fate == Forwarded && record.WrittenAt.IsZero() && matchesTransport(record, frame) {
+				record.Fate = Stalled
+				return
+			}
+		}
+	case *chunkFrame:
+		if frame.chunkType == uacp.ChunkTypeIntermediate {
+			return
+		}
+		if flow == clientToServer {
+			for i := range r.requests {
+				record := &r.requests[i]
+				if record.Connection == connection && record.RequestID == frame.requestID && record.Fate == Forwarded && record.WrittenAt.IsZero() {
+					record.Fate = Stalled
+					return
+				}
+			}
+			return
+		}
+		for i := range r.responses {
+			record := &r.responses[i]
+			if record.Connection == connection && record.RequestID == frame.requestID && record.Fate == Forwarded && record.WrittenAt.IsZero() {
+				record.Fate = Stalled
+				return
+			}
+		}
+	}
+}
+
+// discards says whether the relay must not write this message: the
+// connection is stalled, or the message is the ACK a DiscardNextACK
+// armed discards, whose claim it consumes.
+func (r *Relay) discards(connection int, flow flow, message []byte) bool {
+	r.mu.Lock()
+	stalled := r.stalled[connection]
+	discardACKConn := r.discardACKConn
+	r.mu.Unlock()
+	if stalled {
+		return true
+	}
+	if discardACKConn != connection || flow != serverToClient {
+		return false
+	}
+	decoded, err := decodeFrame(message)
+	if err != nil {
+		return false
+	}
+	frame, isTransport := decoded.(*transportFrame)
+	if !isTransport || frame.messageType != uacp.MessageTypeAcknowledge {
+		return false
+	}
+	r.mu.Lock()
+	if r.discardACKConn == connection {
+		r.discardACKConn = -1
+	}
+	r.mu.Unlock()
+	return true
 }
 
 func (r *Recorder) noteWritten(connection int, flow flow, message []byte) {
@@ -896,20 +975,23 @@ func (c armedCut) describe() string {
 // Relay accepts client connections and forwards them to a fixed
 // upstream server while a Recorder observes the traffic.
 type Relay struct {
-	listener    net.Listener
-	recorder    *Recorder
-	t           T
-	mu          sync.Mutex
-	connections []relayConn
-	count       int
-	wg          sync.WaitGroup
-	closed      bool
-	onCut       func()
-	nextCutID   int
-	armed       []armedCut
-	armedDelay  *armedDelay
-	draining    map[int]bool
-	upstream    string
+	listener        net.Listener
+	recorder        *Recorder
+	t               T
+	mu              sync.Mutex
+	connections     []relayConn
+	count           int
+	wg              sync.WaitGroup
+	closed          bool
+	onCut           func()
+	nextCutID       int
+	armed           []armedCut
+	armedDelay      *armedDelay
+	draining        map[int]bool
+	stalled         map[int]bool
+	closeNextAccept int
+	discardACKConn  int
+	upstream        string
 }
 
 type armedDelay struct {
@@ -1157,13 +1239,21 @@ func newRelay(t T, upstream string, onCut func()) (*Relay, *Recorder) {
 	if err != nil {
 		t.Fatalf("%s", harnessFault("the relay could not listen on 127.0.0.1: %v", err))
 	}
-	relay := &Relay{listener: listener, t: t, onCut: onCut, draining: make(map[int]bool)}
+	relay := &Relay{
+		listener:       listener,
+		t:              t,
+		onCut:          onCut,
+		draining:       make(map[int]bool),
+		stalled:        make(map[int]bool),
+		discardACKConn: -1,
+		upstream:       strings.TrimPrefix(upstream, "opc.tcp://"),
+	}
 	relay.wg.Add(1)
 	recorder := newRecorder(t)
 	relay.recorder = recorder
 	recorder.relay = relay
 	t.Cleanup(relay.close)
-	go relay.acceptLoop(upstream, recorder)
+	go relay.acceptLoop(recorder)
 	return relay, recorder
 }
 
@@ -1176,22 +1266,107 @@ func (r *Relay) close() {
 	r.wg.Wait()
 }
 
-func (r *Relay) acceptLoop(upstream string, recorder *Recorder) {
-	defer r.wg.Done()
+// CloseNextAccepts makes the relay close the next n accepted
+// connections before it dials the upstream server, so the client sees
+// EOF on a connection that never carried its traffic. The closed
+// connections still count in ConnectionCount.
+func (r *Relay) CloseNextAccepts(n int) {
 	r.mu.Lock()
-	r.upstream = strings.TrimPrefix(upstream, "opc.tcp://")
+	defer r.mu.Unlock()
+	r.closeNextAccept += n
+}
+
+// CloseListenerFor closes the relay's listener now and reopens a
+// listener on the same address after d, so dials in between are
+// refused and the address stays the same.
+func (r *Relay) CloseListenerFor(d time.Duration) {
+	r.mu.Lock()
+	if r.closed {
+		r.mu.Unlock()
+		return
+	}
+	address := r.listener.Addr().String()
+	_ = r.listener.Close()
 	r.mu.Unlock()
+	time.AfterFunc(d, func() {
+		listener, err := net.Listen("tcp", address)
+		if err != nil {
+			r.t.Fatalf("%s", harnessFault("the relay could not reopen its listener on %s: %v", address, err))
+			return
+		}
+		r.mu.Lock()
+		reopened := !r.closed
+		if reopened {
+			r.listener = listener
+		}
+		r.mu.Unlock()
+		if !reopened {
+			_ = listener.Close()
+		}
+	})
+}
+
+// Stall stops the relay forwarding on every currently open
+// connection, in both directions: it keeps reading and recording what
+// each side sends, records it Stalled and writes nothing, while the
+// sockets stay open. Connections accepted later forward normally.
+func (r *Relay) Stall() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, conn := range r.connections {
+		r.stalled[conn.index] = true
+	}
+}
+
+// DiscardNextACK makes the relay discard the ACK the server sends on
+// the next accepted connection, after forwarding that connection's
+// HEL: the client's handshake never completes while the connection
+// stays open.
+func (r *Relay) DiscardNextACK() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.discardACKConn = -2
+}
+
+func (r *Relay) acceptLoop(recorder *Recorder) {
+	defer r.wg.Done()
 	for {
-		clientConn, err := r.listener.Accept()
+		r.mu.Lock()
+		listener := r.listener
+		closed := r.closed
+		r.mu.Unlock()
+		if closed {
+			return
+		}
+		clientConn, err := listener.Accept()
 		if err != nil {
 			if errors.Is(err, net.ErrClosed) {
-				return
+				// The listener was closed for a window or the relay is
+				// closing; re-check which one it was.
+				time.Sleep(5 * time.Millisecond)
+				continue
 			}
 			recorder.setRelayError(fmt.Errorf("the relay stopped accepting client connections: %w", err))
 			_ = r.listener.Close()
 			return
 		}
 		r.mu.Lock()
+		if r.closed {
+			r.mu.Unlock()
+			_ = clientConn.Close()
+			return
+		}
+		connection := r.count
+		r.count++
+		if r.closeNextAccept > 0 {
+			r.closeNextAccept--
+			r.mu.Unlock()
+			_ = clientConn.Close()
+			continue
+		}
+		if r.discardACKConn == -2 {
+			r.discardACKConn = connection
+		}
 		addr := r.upstream
 		r.mu.Unlock()
 		serverConn, err := net.Dial("tcp", addr)
@@ -1207,8 +1382,6 @@ func (r *Relay) acceptLoop(upstream string, recorder *Recorder) {
 			_ = serverConn.Close()
 			return
 		}
-		connection := r.count
-		r.count++
 		r.connections = append(r.connections, relayConn{index: connection, client: clientConn, server: serverConn})
 		r.wg.Add(2)
 		r.mu.Unlock()
