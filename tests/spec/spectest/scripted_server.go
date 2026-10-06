@@ -14,6 +14,7 @@ import (
 
 	"github.com/gopcua/opcua/id"
 	"github.com/gopcua/opcua/server"
+	"github.com/gopcua/opcua/tests/spec/faults"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uasc"
 )
@@ -47,6 +48,7 @@ type ScriptedServer struct {
 	deferredTransferSub      *harnessSub
 	retiredUnused            []string
 	retention                bool
+	nextFault                *armedAnswer
 	produced                 []Produced
 	producedBySub            map[*harnessSub][]int
 }
@@ -249,6 +251,9 @@ func (s *ScriptedServer) removeHeldLocked(entry *heldEntry) {
 }
 
 func (s *ScriptedServer) createSubscription(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
+	if response, err, handled := s.intercept(r); handled {
+		return response, err
+	}
 	response, err := s.srv.SubscriptionService.CreateSubscription(sc, r, reqID)
 	if err != nil {
 		return nil, err
@@ -300,6 +305,9 @@ func describeUnusedScripts(sub *harnessSub) []string {
 }
 
 func (s *ScriptedServer) holdPublish(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
+	if response, err, handled := s.intercept(r); handled {
+		return response, err
+	}
 	request, isPublish := r.(*ua.PublishRequest)
 	if !isPublish {
 		return nil, ua.StatusBadRequestTypeInvalid
@@ -329,6 +337,9 @@ func (s *ScriptedServer) holdPublish(sc *uasc.SecureChannel, r ua.Request, reqID
 }
 
 func (s *ScriptedServer) createMonitoredItems(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
+	if response, err, handled := s.intercept(r); handled {
+		return response, err
+	}
 	response, err := s.srv.MonitoredItemService.CreateMonitoredItems(sc, r, reqID)
 	if err != nil {
 		return nil, err
@@ -346,6 +357,9 @@ func (s *ScriptedServer) createMonitoredItems(sc *uasc.SecureChannel, r ua.Reque
 }
 
 func (s *ScriptedServer) deleteSubscriptions(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
+	if response, err, handled := s.intercept(r); handled {
+		return response, err
+	}
 	request, isDelete := r.(*ua.DeleteSubscriptionsRequest)
 	if !isDelete {
 		return nil, ua.StatusBadRequestTypeInvalid
@@ -370,6 +384,9 @@ func (s *ScriptedServer) deleteSubscriptions(sc *uasc.SecureChannel, r ua.Reques
 }
 
 func (s *ScriptedServer) transferSubscriptions(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
+	if response, err, handled := s.intercept(r); handled {
+		return response, err
+	}
 	request, isTransfer := r.(*ua.TransferSubscriptionsRequest)
 	if !isTransfer {
 		return nil, ua.StatusBadRequestTypeInvalid
@@ -512,6 +529,140 @@ func (s *ScriptedServer) LiveSubscriptions() int {
 	return live
 }
 
+// KnownSessions returns the number of sessions the recorder saw the
+// server create with a Good CreateSession response, forward that
+// response to the client, and not see a Good CloseSession response
+// for since. A session whose CreateSession response the relay dropped
+// is not counted, although the server holds it open.
+func (s *ScriptedServer) KnownSessions() int {
+	_, known := s.sessionCounts()
+	return known
+}
+
+// sessionCounts scans the recorded traffic and returns how many
+// sessions the server holds open, and how many of those the relay
+// forwarded a CreateSession response for. A session is open from a
+// Good CreateSession response on a connection of this server until a
+// Good CloseSession response for its token.
+func (s *ScriptedServer) sessionCounts() (open, known int) {
+	s.mu.Lock()
+	address := strings.TrimPrefix(s.address, "opc.tcp://")
+	recorder := s.recorder
+	s.mu.Unlock()
+	if recorder == nil {
+		return 0, 0
+	}
+	type sessionState struct {
+		open    bool
+		forward bool
+		closed  bool
+	}
+	sessions := make(map[string]*sessionState)
+	closes := make(map[chunkKey]string)
+	for _, entry := range recorder.Log() {
+		switch record := entry.(type) {
+		case ServiceRecord[ua.Request]:
+			if recorder.connectionUpstreamOf(record.Connection) != address {
+				continue
+			}
+			message, ok := record.Message()
+			if !ok {
+				continue
+			}
+			if request, isClose := message.(*ua.CloseSessionRequest); isClose && request.Header() != nil {
+				closes[chunkKey{connection: record.Connection, requestID: record.RequestID}] = sessionTokenOf(request.Header().AuthenticationToken)
+			}
+		case ServiceRecord[ua.Response]:
+			if recorder.connectionUpstreamOf(record.Connection) != address {
+				continue
+			}
+			message, ok := record.Message()
+			if !ok {
+				continue
+			}
+			switch response := message.(type) {
+			case *ua.CreateSessionResponse:
+				token := sessionTokenOf(response.AuthenticationToken)
+				state := sessions[token]
+				if state == nil {
+					state = &sessionState{}
+					sessions[token] = state
+				}
+				state.open = true
+				state.forward = record.Fate == Forwarded
+			case *ua.CloseSessionResponse:
+				token, pending := closes[chunkKey{connection: record.Connection, requestID: record.RequestID}]
+				if !pending {
+					continue
+				}
+				if state := sessions[token]; state != nil {
+					state.closed = true
+				}
+			}
+		}
+	}
+	for _, state := range sessions {
+		if !state.open || state.closed {
+			continue
+		}
+		open++
+		if state.forward {
+			known++
+		}
+	}
+	return open, known
+}
+
+func sessionTokenOf(token *ua.NodeID) string {
+	if token == nil {
+		return ""
+	}
+	return token.String()
+}
+
+// AnswerNextWith makes the server answer the next request of
+// message's service with a ServiceFault carrying status, whichever
+// harness handler serves it today, instead of the normal answer; for
+// Publish the next request is answered at once instead of held. Only
+// the six services the scripted server serves itself can be answered:
+// the in-tree server keeps every other one unexported.
+func (s *ScriptedServer) AnswerNextWith(message faults.Message, status ua.StatusCode) {
+	switch message {
+	case faults.CreateSubscription, faults.CreateMonitoredItems, faults.Publish,
+		faults.Republish, faults.TransferSubscriptions, faults.DeleteSubscriptions:
+	default:
+		s.t.Fatalf("%s", harnessFault("the scripted server cannot answer %s: only the six services it serves itself can be answered", message))
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.nextFault = &armedAnswer{message: message, status: status}
+}
+
+type armedAnswer struct {
+	message faults.Message
+	status  ua.StatusCode
+}
+
+// intercept applies the fault AnswerNextWith armed to the next
+// matching request. handled is true when the caller must return the
+// fault response and error.
+func (s *ScriptedServer) intercept(r ua.Request) (ua.Response, error, bool) {
+	s.mu.Lock()
+	var fault *armedAnswer
+	if s.nextFault != nil {
+		if message, named := messageOfRequest(r); named && message == s.nextFault.message {
+			fault = s.nextFault
+			s.nextFault = nil
+		}
+	}
+	s.mu.Unlock()
+	if fault != nil {
+		return nil, fault.status, true
+	}
+	return nil, nil, false
+}
+
 // QueueTransferRefusal answers the next TransferSubscriptions with
 // status for every requested id, once.
 func (s *ScriptedServer) QueueTransferRefusal(status ua.StatusCode) {
@@ -580,6 +731,9 @@ func (s *ScriptedServer) WaitCreatedSubscription(m Mark) Subscription {
 }
 
 func (s *ScriptedServer) republish(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
+	if response, err, handled := s.intercept(r); handled {
+		return response, err
+	}
 	request, isRepublish := r.(*ua.RepublishRequest)
 	if !isRepublish {
 		return nil, ua.StatusBadRequestTypeInvalid

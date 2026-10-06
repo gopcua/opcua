@@ -793,6 +793,9 @@ func (r *Recorder) recordLocked(order, connection int, flow flow, state *streamS
 					r.appendService(order, connection, flow, message.requestID, Forwarded, message.service)
 					return cut, false, true, 0, nil
 				}
+				if d, armed := r.relay.takeResponseHold(); armed {
+					delay = d
+				}
 			}
 			r.appendService(order, connection, flow, message.requestID, Forwarded, message.service)
 			return armedCut{}, false, false, delay, nil
@@ -996,6 +999,7 @@ type Relay struct {
 	nextCutID       int
 	armed           []armedCut
 	armedDelay      *armedDelay
+	responseHold    *time.Duration
 	draining        map[int]bool
 	stalled         map[int]bool
 	dialled         map[int]bool
@@ -1102,6 +1106,29 @@ func (r *Relay) DelayAt(message faults.Message, d time.Duration) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.armedDelay = &armedDelay{message: message, hold: d}
+}
+
+// HoldNextResponse holds the next server-to-client service response
+// for d before the relay writes it to the client; later messages in
+// that direction on that connection wait behind it and all are
+// released in their original order at one moment.
+func (r *Relay) HoldNextResponse(d time.Duration) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	hold := d
+	r.responseHold = &hold
+}
+
+// takeResponseHold reports and consumes the armed response hold.
+func (r *Relay) takeResponseHold() (time.Duration, bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.responseHold == nil {
+		return 0, false
+	}
+	hold := *r.responseHold
+	r.responseHold = nil
+	return hold, true
 }
 
 // takeDelay reports the hold armed for message, marking it firing so
