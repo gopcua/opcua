@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/gopcua/opcua"
-	"github.com/gopcua/opcua/tests/spec/faults"
+	"github.com/gopcua/opcua/tests/spec/message"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uacp"
 )
@@ -38,14 +38,14 @@ func TestHarnessFaultPathsCarryExactlyOnePrefix(t *testing.T) {
 
 	fake := &fakeT{}
 	relay := &Relay{t: fake, draining: map[int]bool{}}
-	if !fatalPanics(func() { relay.CutAt(Moment(9), faults.Read) }) {
+	if !fatalPanics(func() { relay.CutAt(Moment(9), message.Read) }) {
 		t.Fatalf("CutAt with an unknown Moment returned without failing")
 	}
 	assertSinglePrefix(t, fake, "CutAt with an unknown Moment")
 
 	fake = &fakeT{}
 	relay = &Relay{t: fake, draining: map[int]bool{}}
-	if !fatalPanics(func() { relay.CutAt(BeforeRequestReachesServer, faults.Message(0)) }) {
+	if !fatalPanics(func() { relay.CutAt(BeforeRequestReachesServer, message.Message(0)) }) {
 		t.Fatalf("CutAt with an unknown Message returned without failing")
 	}
 	assertSinglePrefix(t, fake, "CutAt with an unknown Message")

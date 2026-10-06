@@ -3,56 +3,9 @@ package faults
 import (
 	"fmt"
 	"slices"
+
+	"github.com/gopcua/opcua/tests/spec/message"
 )
-
-// Message names a message the client sends to a server, from the UACP HEL
-// handshake through the secure-channel messages to the OPC UA service
-// requests. The zero value is not a valid message; it only anchors the
-// constant block, so every member below it has a non-zero value.
-type Message int
-
-const (
-	messageInvalid Message = iota
-	HEL
-	OpenSecureChannel
-	CloseSecureChannel
-	CreateSession
-	ActivateSession
-	CloseSession
-	Read
-	CreateSubscription
-	CreateMonitoredItems
-	DeleteSubscriptions
-	Publish
-	Republish
-	TransferSubscriptions
-)
-
-var messageNames = [...]string{
-	messageInvalid:        "messageInvalid",
-	HEL:                   "HEL",
-	OpenSecureChannel:     "OpenSecureChannel",
-	CloseSecureChannel:    "CloseSecureChannel",
-	CreateSession:         "CreateSession",
-	ActivateSession:       "ActivateSession",
-	CloseSession:          "CloseSession",
-	Read:                  "Read",
-	CreateSubscription:    "CreateSubscription",
-	CreateMonitoredItems:  "CreateMonitoredItems",
-	DeleteSubscriptions:   "DeleteSubscriptions",
-	Publish:               "Publish",
-	Republish:             "Republish",
-	TransferSubscriptions: "TransferSubscriptions",
-}
-
-// String returns the constant's name, "ActivateSession" or "HEL" for
-// example.
-func (m Message) String() string {
-	if m < 0 || int(m) >= len(messageNames) {
-		return fmt.Sprintf("Message(%d)", int(m))
-	}
-	return messageNames[m]
-}
 
 // Reason explains why a fault cannot occur in a given run.
 type Reason struct{ Text string }
@@ -63,7 +16,7 @@ type Reason struct{ Text string }
 // it cannot otherwise.
 type Fault interface {
 	Name() string
-	Available(sends []Message) *Reason
+	Available(sends []message.Message) *Reason
 }
 
 type messageKind int
@@ -166,14 +119,14 @@ func (k serverKind) String() string {
 
 type messageFault struct {
 	kind messageKind
-	msg  Message
+	msg  message.Message
 }
 
 func (f messageFault) Name() string {
 	return f.kind.String() + "/" + f.msg.String()
 }
 
-func (f messageFault) Available(sends []Message) *Reason {
+func (f messageFault) Available(sends []message.Message) *Reason {
 	if !slices.Contains(sends, f.msg) {
 		return &Reason{Text: f.msg.String() + " is not sent"}
 	}
@@ -182,14 +135,14 @@ func (f messageFault) Available(sends []Message) *Reason {
 
 type overloadFault struct {
 	status  overloadStatus
-	service Message
+	service message.Message
 }
 
 func (f overloadFault) Name() string {
 	return "Overload/" + f.service.String() + "/" + f.status.String()
 }
 
-func (f overloadFault) Available(sends []Message) *Reason {
+func (f overloadFault) Available(sends []message.Message) *Reason {
 	if !slices.Contains(sends, f.service) {
 		return &Reason{Text: f.service.String() + " is not sent"}
 	}
@@ -200,10 +153,10 @@ type linkFault struct{ kind linkKind }
 
 func (f linkFault) Name() string { return "Link/" + f.kind.String() }
 
-func (f linkFault) Available(sends []Message) *Reason {
+func (f linkFault) Available(sends []message.Message) *Reason {
 	switch f.kind {
 	case closedOnAccept, listenerClosed, helUnanswered:
-		if !slices.Contains(sends, HEL) {
+		if !slices.Contains(sends, message.HEL) {
 			return &Reason{Text: "no reconnect: HEL is not sent"}
 		}
 	}
@@ -214,10 +167,10 @@ type serverFault struct{ kind serverKind }
 
 func (f serverFault) Name() string { return "Server/" + f.kind.String() }
 
-func (f serverFault) Available(sends []Message) *Reason {
+func (f serverFault) Available(sends []message.Message) *Reason {
 	switch f.kind {
 	case duplicateSequence, skippedSequence:
-		if !slices.Contains(sends, Publish) {
+		if !slices.Contains(sends, message.Publish) {
 			return &Reason{Text: "Publish is not sent"}
 		}
 	}
@@ -226,8 +179,8 @@ func (f serverFault) Available(sends []Message) *Reason {
 
 type consumerFault struct{}
 
-func (consumerFault) Name() string                      { return "Consumer/Slow" }
-func (consumerFault) Available(sends []Message) *Reason { return nil }
+func (consumerFault) Name() string                              { return "Consumer/Slow" }
+func (consumerFault) Available(sends []message.Message) *Reason { return nil }
 
 // AllFaults is the full fault catalogue, built once at package init. The
 // matrix enumerates it in full; it is never sampled.
@@ -236,11 +189,11 @@ var AllFaults = buildAllFaults()
 func buildAllFaults() []Fault {
 	var faults []Fault
 	for _, k := range []messageKind{requestLost, responseLost, cutAfterResponse, delayBelowTimeout, delayAboveTimeout} {
-		for m := HEL; int(m) < len(messageNames); m++ {
-			if k == delayAboveTimeout && m == HEL {
+		for _, m := range message.Members() {
+			if k == delayAboveTimeout && m == message.HEL {
 				continue
 			}
-			if k != requestLost && m == CloseSecureChannel {
+			if k != requestLost && m == message.CloseSecureChannel {
 				continue
 			}
 			faults = append(faults, messageFault{kind: k, msg: m})
@@ -251,7 +204,7 @@ func buildAllFaults() []Fault {
 			faults = append(faults, overloadFault{status: s, service: svc})
 		}
 	}
-	faults = append(faults, overloadFault{status: badTooManyPublishRequests, service: Publish})
+	faults = append(faults, overloadFault{status: badTooManyPublishRequests, service: message.Publish})
 	for _, k := range []linkKind{closedOnAccept, listenerClosed, stall, helUnanswered} {
 		faults = append(faults, linkFault{kind: k})
 	}
@@ -266,13 +219,13 @@ func buildAllFaults() []Fault {
 // itself, the only ones an overload fault can answer: the in-tree
 // server keeps the session services and Read unexported, so the
 // harness cannot answer those without changing server code.
-func overloadedServices() []Message {
-	return []Message{
-		CreateSubscription,
-		CreateMonitoredItems,
-		DeleteSubscriptions,
-		Publish,
-		Republish,
-		TransferSubscriptions,
+func overloadedServices() []message.Message {
+	return []message.Message{
+		message.CreateSubscription,
+		message.CreateMonitoredItems,
+		message.DeleteSubscriptions,
+		message.Publish,
+		message.Republish,
+		message.TransferSubscriptions,
 	}
 }

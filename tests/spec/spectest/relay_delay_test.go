@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/gopcua/opcua"
-	"github.com/gopcua/opcua/tests/spec/faults"
+	"github.com/gopcua/opcua/tests/spec/message"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uacp"
 	. "github.com/onsi/ginkgo/v2"
@@ -14,7 +14,7 @@ import (
 var _ = Describe("Relay DelayAt", func() {
 	It("holds the reconnect's Read below the client's request timeout", func() {
 		env := Start(GinkgoT(), WithClientOptions(opcua.RequestTimeout(2*time.Second)))
-		env.Relay.DelayAt(faults.Read, time.Second)
+		env.Relay.DelayAt(message.Read, time.Second)
 		m := env.Mark()
 
 		env.Relay.Cut()
@@ -52,7 +52,7 @@ var _ = Describe("Relay DelayAt", func() {
 
 	It("holds the reconnect's Read past the client's request timeout", func() {
 		env := Start(GinkgoT(), WithClientOptions(opcua.RequestTimeout(2*time.Second)))
-		env.Relay.DelayAt(faults.Read, 4*time.Second)
+		env.Relay.DelayAt(message.Read, 4*time.Second)
 		m := env.Mark()
 
 		env.Relay.Cut()
@@ -90,7 +90,7 @@ var _ = Describe("Relay DelayAt", func() {
 
 	It("writes later messages of the held connection after the held one, in their order", func() {
 		relay, recorder, _ := newInjectedRelay()
-		relay.DelayAt(faults.Read, 500*time.Millisecond)
+		relay.DelayAt(message.Read, 500*time.Millisecond)
 
 		first, err := readRequestWire(31)
 		Expect(err).NotTo(HaveOccurred(), "encoding the Read failed")
@@ -126,7 +126,7 @@ var _ = Describe("Relay DelayAt", func() {
 
 	It("writes the first chunk of a two-chunk request at once and the final chunk after the delay", func() {
 		relay, recorder, _ := newInjectedRelay()
-		relay.DelayAt(faults.Read, 500*time.Millisecond)
+		relay.DelayAt(message.Read, 500*time.Millisecond)
 
 		typeID := ua.ServiceTypeID(&ua.ReadRequest{})
 		Expect(typeID).NotTo(BeZero(), "ua.ServiceTypeID returned 0 for *ua.ReadRequest")
@@ -166,9 +166,9 @@ var _ = Describe("Relay DelayAt", func() {
 		ft := &fakeT{}
 		relay.t = ft
 
-		Expect(fatalPanics(func() { relay.DelayAt(faults.CloseSecureChannel, time.Second) })).To(BeTrue(),
+		Expect(fatalPanics(func() { relay.DelayAt(message.CloseSecureChannel, time.Second) })).To(BeTrue(),
 			"DelayAt did not fail for CloseSecureChannel")
-		Expect(fatalPanics(func() { relay.DelayAt(faults.Message(0), time.Second) })).To(BeTrue(),
+		Expect(fatalPanics(func() { relay.DelayAt(message.Message(0), time.Second) })).To(BeTrue(),
 			"DelayAt did not fail for an unknown Message")
 		Expect(ft.fatals).To(HaveLen(2),
 			"DelayAt failed %d times, want twice", len(ft.fatals))

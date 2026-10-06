@@ -10,7 +10,7 @@ import (
 
 	"github.com/gopcua/opcua"
 	"github.com/gopcua/opcua/id"
-	"github.com/gopcua/opcua/tests/spec/faults"
+	"github.com/gopcua/opcua/tests/spec/message"
 	"github.com/gopcua/opcua/ua"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -48,7 +48,7 @@ func responseOf(responses []ServiceRecord[ua.Response], connection int, requestI
 var _ = Describe("Relay CutAt", func() {
 	It("drops the next Read before it reaches the server and cuts the connection", func() {
 		env := Start(GinkgoT())
-		env.Relay.CutAt(BeforeRequestReachesServer, faults.Read)
+		env.Relay.CutAt(BeforeRequestReachesServer, message.Read)
 		m := env.Mark()
 
 		readErr := readNodeExpectingFailure(env.Client, env.Server.node)
@@ -86,7 +86,7 @@ var _ = Describe("Relay CutAt", func() {
 
 	It("writes the Read response to the client before the after-response cut closes the connection", func() {
 		env := Start(GinkgoT())
-		env.Relay.CutAt(AfterResponseReachesClient, faults.Read)
+		env.Relay.CutAt(AfterResponseReachesClient, message.Read)
 		m := env.Mark()
 
 		readResp, readErr := readNodeOnce(env.Client, env.Server.node)
@@ -127,8 +127,8 @@ var _ = Describe("Relay CutAt", func() {
 
 	It("lists armed cuts until they fire and fires two armed cuts in order on two consecutive Reads", func() {
 		env := Start(GinkgoT())
-		env.Relay.CutAt(BeforeRequestReachesServer, faults.Read)
-		env.Relay.CutAt(BeforeRequestReachesServer, faults.Read)
+		env.Relay.CutAt(BeforeRequestReachesServer, message.Read)
+		env.Relay.CutAt(BeforeRequestReachesServer, message.Read)
 		Expect(env.Relay.ArmedCuts()).To(Equal([]string{
 			"before a Read request reaches the server",
 			"before a Read request reaches the server",
@@ -177,7 +177,7 @@ var _ = Describe("Relay CutAt", func() {
 
 	It("does not fire a cut armed for Republish on a Read", func() {
 		env := Start(GinkgoT())
-		env.Relay.CutAt(BeforeRequestReachesServer, faults.Republish)
+		env.Relay.CutAt(BeforeRequestReachesServer, message.Republish)
 		m := env.Mark()
 
 		readResp := readNode(env.Client, env.Server.node)
@@ -192,7 +192,7 @@ var _ = Describe("Relay CutAt", func() {
 
 	It("does not fire a cut armed for a Republish response on a Read round trip", func() {
 		env := Start(GinkgoT())
-		env.Relay.CutAt(AfterResponseReachesClient, faults.Republish)
+		env.Relay.CutAt(AfterResponseReachesClient, message.Republish)
 		m := env.Mark()
 
 		readResp := readNode(env.Client, env.Server.node)
@@ -223,7 +223,7 @@ var _ = Describe("Relay CutAt", func() {
 
 		cutFired := make(chan struct{}, 1)
 		relay, _ := newRelay(t, upstreamListener.Addr().String(), func() { cutFired <- struct{}{} })
-		relay.CutAt(BeforeRequestReachesServer, faults.Read)
+		relay.CutAt(BeforeRequestReachesServer, message.Read)
 
 		firstClient, err := net.Dial("tcp", relay.address())
 		Expect(err).NotTo(HaveOccurred(), "dialing the relay for the first connection failed")
@@ -282,7 +282,7 @@ var _ = Describe("Relay CutAt", func() {
 		}()
 
 		relay, _ := newRelay(t, upstreamListener.Addr().String(), nil)
-		relay.CutAt(AfterResponseReachesClient, faults.Read)
+		relay.CutAt(AfterResponseReachesClient, message.Read)
 
 		clientConn, err := net.Dial("tcp", relay.address())
 		Expect(err).NotTo(HaveOccurred(), "dialing the relay failed")
@@ -332,7 +332,7 @@ var _ = Describe("Relay CutAt", func() {
 
 // newInjectedRelay builds a relay whose recorder the injected-batch
 // specs feed raw wire bytes, with a fake T that collects harness
-// faults.
+// message.
 func newInjectedRelay() (*Relay, *Recorder, *fakeT) {
 	ft := &fakeT{}
 	relay, recorder := newRelay(ft, "opc.tcp://127.0.0.1:1", nil)
@@ -348,7 +348,7 @@ var _ = Describe("Relay CutAt injected batches", func() {
 
 	It("fires a cut armed for Republish on an injected Republish request", func() {
 		relay, recorder, _ := newInjectedRelay()
-		relay.CutAt(BeforeRequestReachesServer, faults.Republish)
+		relay.CutAt(BeforeRequestReachesServer, message.Republish)
 
 		wire, err := republishRequestWire(21)
 		Expect(err).NotTo(HaveOccurred(), "encoding the Republish failed")
@@ -384,7 +384,7 @@ var _ = Describe("Relay CutAt injected batches", func() {
 
 	It("records and writes nothing after the message a before-request cut fires on", func() {
 		relay, recorder, _ := newInjectedRelay()
-		relay.CutAt(BeforeRequestReachesServer, faults.Read)
+		relay.CutAt(BeforeRequestReachesServer, message.Read)
 
 		first, err := readRequestWire(31)
 		Expect(err).NotTo(HaveOccurred(), "encoding the first Read failed")
@@ -412,7 +412,7 @@ var _ = Describe("Relay CutAt injected batches", func() {
 
 	It("does not fire an after-response cut on a response whose request was never recorded", func() {
 		relay, recorder, _ := newInjectedRelay()
-		relay.CutAt(AfterResponseReachesClient, faults.Read)
+		relay.CutAt(AfterResponseReachesClient, message.Read)
 		finished := false
 
 		response, err := readResponseWire(77)
@@ -437,7 +437,7 @@ var _ = Describe("Relay CutAt injected batches", func() {
 
 	It("does not fire an after-response cut on a response to a request of another connection", func() {
 		relay, recorder, _ := newInjectedRelay()
-		relay.CutAt(AfterResponseReachesClient, faults.Read)
+		relay.CutAt(AfterResponseReachesClient, message.Read)
 		finished := false
 
 		staged, err := readRequestWire(9)
@@ -465,7 +465,7 @@ var _ = Describe("Relay CutAt injected batches", func() {
 
 	It("does not fire an after-response cut on a response to a request of another service", func() {
 		relay, recorder, _ := newInjectedRelay()
-		relay.CutAt(AfterResponseReachesClient, faults.Read)
+		relay.CutAt(AfterResponseReachesClient, message.Read)
 		finished := false
 
 		staged, err := republishRequestWire(9)
@@ -493,7 +493,7 @@ var _ = Describe("Relay CutAt injected batches", func() {
 
 	It("fires an after-response cut on a ServiceFault answering the recorded request", func() {
 		relay, recorder, _ := newInjectedRelay()
-		relay.CutAt(AfterResponseReachesClient, faults.Read)
+		relay.CutAt(AfterResponseReachesClient, message.Read)
 		finished := false
 
 		staged, err := readRequestWire(9)
@@ -532,7 +532,7 @@ var _ = Describe("Relay CutAt injected batches", func() {
 
 	It("writes the cut's response and records nothing after it in the same read", func() {
 		relay, recorder, _ := newInjectedRelay()
-		relay.CutAt(AfterResponseReachesClient, faults.Read)
+		relay.CutAt(AfterResponseReachesClient, message.Read)
 		var events []string
 
 		staged, err := readRequestWire(9)
@@ -570,7 +570,7 @@ var _ = Describe("Relay CutAt injected batches", func() {
 
 	It("reports a failed half-close as a harness fault and still finishes the cut", func() {
 		relay, recorder, ft := newInjectedRelay()
-		relay.CutAt(AfterResponseReachesClient, faults.Read)
+		relay.CutAt(AfterResponseReachesClient, message.Read)
 		finished := false
 
 		staged, err := readRequestWire(9)
@@ -599,7 +599,7 @@ var _ = Describe("Relay CutAt injected batches", func() {
 
 	It("records observed messages without claiming armed cuts", func() {
 		relay, recorder, _ := newInjectedRelay()
-		relay.CutAt(BeforeRequestReachesServer, faults.Read)
+		relay.CutAt(BeforeRequestReachesServer, message.Read)
 
 		request, err := readRequestWire(11)
 		Expect(err).NotTo(HaveOccurred(), "encoding the request failed")
@@ -610,7 +610,7 @@ var _ = Describe("Relay CutAt injected batches", func() {
 		Expect(requests[0].Fate).To(Equal(Forwarded),
 			"observing the request claimed the armed cut instead of only recording it")
 
-		relay.CutAt(AfterResponseReachesClient, faults.Read)
+		relay.CutAt(AfterResponseReachesClient, message.Read)
 		staged, err := readRequestWire(12)
 		Expect(err).NotTo(HaveOccurred(), "encoding the staged request failed")
 		recorder.observe(0, clientToServer, staged)
@@ -631,7 +631,7 @@ var _ = Describe("Relay CutAt injected batches", func() {
 
 	It("releases a claimed drop cut when a write before the cut fails, so the next matching message fires it", func() {
 		relay, recorder, _ := newInjectedRelay()
-		relay.CutAt(BeforeRequestReachesServer, faults.Read)
+		relay.CutAt(BeforeRequestReachesServer, message.Read)
 
 		ignored, err := republishRequestWire(31)
 		Expect(err).NotTo(HaveOccurred(), "encoding the ignored Republish failed")
@@ -666,7 +666,7 @@ var _ = Describe("Relay CutAt injected batches", func() {
 
 	It("releases a claimed after-response cut when the write of its response fails, so the next matching response fires it", func() {
 		relay, recorder, _ := newInjectedRelay()
-		relay.CutAt(AfterResponseReachesClient, faults.Read)
+		relay.CutAt(AfterResponseReachesClient, message.Read)
 
 		staged, err := readRequestWire(9)
 		Expect(err).NotTo(HaveOccurred(), "encoding the request failed")
@@ -701,8 +701,8 @@ var _ = Describe("Relay CutAt injected batches", func() {
 
 	It("leaves the second of two identical armed cuts listed and armed while the first fires", func() {
 		relay, recorder, _ := newInjectedRelay()
-		relay.CutAt(BeforeRequestReachesServer, faults.Read)
-		relay.CutAt(BeforeRequestReachesServer, faults.Read)
+		relay.CutAt(BeforeRequestReachesServer, message.Read)
+		relay.CutAt(BeforeRequestReachesServer, message.Read)
 
 		first, err := readRequestWire(41)
 		Expect(err).NotTo(HaveOccurred(), "encoding the first Read failed")
@@ -739,28 +739,28 @@ func TestCutAtRejectsUnknownMomentAndMessage(t *testing.T) {
 		}
 	}()
 
-	if !fatalPanics(func() { relay.CutAt(Moment(9), faults.Read) }) {
+	if !fatalPanics(func() { relay.CutAt(Moment(9), message.Read) }) {
 		t.Fatalf("CutAt did not fail for an unknown Moment")
 	}
 	if len(ft.fatals) != 1 || !strings.HasPrefix(ft.fatals[0], "spectest:") || !strings.Contains(ft.fatals[0], "unknown Moment") {
 		t.Fatalf("CutAt failed with %q, want the harness fault naming the unknown Moment", ft.fatals)
 	}
 
-	if !fatalPanics(func() { relay.CutAt(BeforeRequestReachesServer, faults.Message(0)) }) {
+	if !fatalPanics(func() { relay.CutAt(BeforeRequestReachesServer, message.Message(0)) }) {
 		t.Fatalf("CutAt did not fail for an unknown Message")
 	}
 	if len(ft.fatals) != 2 || !strings.HasPrefix(ft.fatals[1], "spectest:") || !strings.Contains(ft.fatals[1], "unknown Message") {
 		t.Fatalf("CutAt failed with %q, want the harness fault naming the unknown Message", ft.fatals)
 	}
 
-	if !fatalPanics(func() { relay.CutAt(AfterResponseReachesClient, faults.CloseSecureChannel) }) {
+	if !fatalPanics(func() { relay.CutAt(AfterResponseReachesClient, message.CloseSecureChannel) }) {
 		t.Fatalf("CutAt did not fail for a response moment on CloseSecureChannel")
 	}
 	if len(ft.fatals) != 3 || !strings.HasPrefix(ft.fatals[2], "spectest:") || !strings.Contains(ft.fatals[2], "CloseSecureChannel") {
 		t.Fatalf("CutAt failed with %q, want the harness fault naming the response-less CloseSecureChannel", ft.fatals)
 	}
 
-	if !fatalPanics(func() { relay.CutAt(ResponseNeverReachesClient, faults.CloseSecureChannel) }) {
+	if !fatalPanics(func() { relay.CutAt(ResponseNeverReachesClient, message.CloseSecureChannel) }) {
 		t.Fatalf("CutAt did not fail for the response-never moment on CloseSecureChannel")
 	}
 	if len(ft.fatals) != 4 || !strings.HasPrefix(ft.fatals[3], "spectest:") || !strings.Contains(ft.fatals[3], "CloseSecureChannel") {

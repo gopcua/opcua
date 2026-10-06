@@ -14,7 +14,7 @@ import (
 
 	"github.com/gopcua/opcua/id"
 	"github.com/gopcua/opcua/server"
-	"github.com/gopcua/opcua/tests/spec/faults"
+	"github.com/gopcua/opcua/tests/spec/message"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uasc"
 )
@@ -626,21 +626,21 @@ func sessionTokenOf(token *ua.NodeID) string {
 // Publish the next request is answered at once instead of held. Only
 // the six services the scripted server serves itself can be answered:
 // the in-tree server keeps every other one unexported.
-func (s *ScriptedServer) AnswerNextWith(message faults.Message, status ua.StatusCode) {
-	switch message {
-	case faults.CreateSubscription, faults.CreateMonitoredItems, faults.Publish,
-		faults.Republish, faults.TransferSubscriptions, faults.DeleteSubscriptions:
+func (s *ScriptedServer) AnswerNextWith(msg message.Message, status ua.StatusCode) {
+	switch msg {
+	case message.CreateSubscription, message.CreateMonitoredItems, message.Publish,
+		message.Republish, message.TransferSubscriptions, message.DeleteSubscriptions:
 	default:
-		s.t.Fatalf("%s", harnessFault("the scripted server cannot answer %s: only the six services it serves itself can be answered", message))
+		s.t.Fatalf("%s", harnessFault("the scripted server cannot answer %s: only the six services it serves itself can be answered", msg))
 		return
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.nextFault = &armedAnswer{message: message, status: status}
+	s.nextFault = &armedAnswer{message: msg, status: status}
 }
 
 type armedAnswer struct {
-	message faults.Message
+	message message.Message
 	status  ua.StatusCode
 }
 

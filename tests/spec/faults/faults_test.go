@@ -8,6 +8,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/gopcua/opcua/tests/spec/message"
 )
 
 func TestAllFaultsSize(t *testing.T) {
@@ -100,26 +102,26 @@ func TestMessageFaultsCoverEveryMember(t *testing.T) {
 func TestAvailable(t *testing.T) {
 	cases := []struct {
 		fault   string
-		sends   []Message
+		sends   []message.Message
 		wantNil bool
 	}{
-		{"RequestLost/HEL", []Message{Publish}, false},
-		{"RequestLost/HEL", []Message{HEL, Publish}, true},
-		{"Overload/Publish/Bad_TooManyPublishRequests", []Message{Read}, false},
-		{"Overload/Publish/Bad_TooManyPublishRequests", []Message{Publish}, true},
-		{"Link/ClosedOnAccept", []Message{Publish}, false},
-		{"Link/ListenerClosed", []Message{Publish}, false},
-		{"Link/HELUnanswered", []Message{Publish}, false},
-		{"Link/ClosedOnAccept", []Message{HEL}, true},
-		{"Link/ListenerClosed", []Message{HEL}, true},
-		{"Link/HELUnanswered", []Message{HEL}, true},
-		{"Link/Stall", []Message{}, true},
-		{"Server/Pause", []Message{}, true},
-		{"Consumer/Slow", []Message{}, true},
-		{"Server/DuplicateSequence", []Message{Read}, false},
-		{"Server/SkippedSequence", []Message{Read}, false},
-		{"Server/DuplicateSequence", []Message{Publish}, true},
-		{"Server/SkippedSequence", []Message{Publish}, true},
+		{"RequestLost/HEL", []message.Message{message.Publish}, false},
+		{"RequestLost/HEL", []message.Message{message.HEL, message.Publish}, true},
+		{"Overload/Publish/Bad_TooManyPublishRequests", []message.Message{message.Read}, false},
+		{"Overload/Publish/Bad_TooManyPublishRequests", []message.Message{message.Publish}, true},
+		{"Link/ClosedOnAccept", []message.Message{message.Publish}, false},
+		{"Link/ListenerClosed", []message.Message{message.Publish}, false},
+		{"Link/HELUnanswered", []message.Message{message.Publish}, false},
+		{"Link/ClosedOnAccept", []message.Message{message.HEL}, true},
+		{"Link/ListenerClosed", []message.Message{message.HEL}, true},
+		{"Link/HELUnanswered", []message.Message{message.HEL}, true},
+		{"Link/Stall", []message.Message{}, true},
+		{"Server/Pause", []message.Message{}, true},
+		{"Consumer/Slow", []message.Message{}, true},
+		{"Server/DuplicateSequence", []message.Message{message.Read}, false},
+		{"Server/SkippedSequence", []message.Message{message.Read}, false},
+		{"Server/DuplicateSequence", []message.Message{message.Publish}, true},
+		{"Server/SkippedSequence", []message.Message{message.Publish}, true},
 	}
 	byName := faultsByName()
 	for _, c := range cases {
@@ -142,7 +144,7 @@ func TestAvailable(t *testing.T) {
 }
 
 func TestEveryReasonHasText(t *testing.T) {
-	sendSets := [][]Message{{}, {Publish}, {HEL}, {Read, Publish}}
+	sendSets := [][]message.Message{{}, {message.Publish}, {message.HEL}, {message.Read, message.Publish}}
 	for _, f := range AllFaults {
 		for _, sends := range sendSets {
 			if r := f.Available(sends); r != nil && r.Text == "" {
@@ -163,7 +165,7 @@ func faultsByName() map[string]Fault {
 func messageMembersFromSource(t *testing.T) []string {
 	t.Helper()
 	fset := token.NewFileSet()
-	entries, err := os.ReadDir(".")
+	entries, err := os.ReadDir("../message")
 	if err != nil {
 		t.Fatalf("read package dir: %v", err)
 	}
@@ -173,7 +175,7 @@ func messageMembersFromSource(t *testing.T) []string {
 		if entry.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
 			continue
 		}
-		file, err := parser.ParseFile(fset, name, nil, 0)
+		file, err := parser.ParseFile(fset, "../message/"+name, nil, 0)
 		if err != nil {
 			t.Fatalf("parse %s: %v", name, err)
 		}

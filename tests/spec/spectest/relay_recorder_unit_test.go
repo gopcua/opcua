@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gopcua/opcua/tests/spec/faults"
+	"github.com/gopcua/opcua/tests/spec/message"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uacp"
 )
@@ -42,21 +42,21 @@ func TestServiceRecordMessagePerFate(t *testing.T) {
 func TestMessageOfRequest(t *testing.T) {
 	cases := []struct {
 		service any
-		want    faults.Message
+		want    message.Message
 		named   bool
 	}{
-		{&ua.RepublishRequest{}, faults.Republish, true},
-		{&ua.ReadRequest{}, faults.Read, true},
-		{&ua.PublishRequest{}, faults.Publish, true},
-		{&ua.OpenSecureChannelRequest{}, faults.OpenSecureChannel, true},
-		{&ua.CloseSecureChannelRequest{}, faults.CloseSecureChannel, true},
-		{&ua.CreateSessionRequest{}, faults.CreateSession, true},
-		{&ua.ActivateSessionRequest{}, faults.ActivateSession, true},
-		{&ua.CloseSessionRequest{}, faults.CloseSession, true},
-		{&ua.CreateSubscriptionRequest{}, faults.CreateSubscription, true},
-		{&ua.CreateMonitoredItemsRequest{}, faults.CreateMonitoredItems, true},
-		{&ua.DeleteSubscriptionsRequest{}, faults.DeleteSubscriptions, true},
-		{&ua.TransferSubscriptionsRequest{}, faults.TransferSubscriptions, true},
+		{&ua.RepublishRequest{}, message.Republish, true},
+		{&ua.ReadRequest{}, message.Read, true},
+		{&ua.PublishRequest{}, message.Publish, true},
+		{&ua.OpenSecureChannelRequest{}, message.OpenSecureChannel, true},
+		{&ua.CloseSecureChannelRequest{}, message.CloseSecureChannel, true},
+		{&ua.CreateSessionRequest{}, message.CreateSession, true},
+		{&ua.ActivateSessionRequest{}, message.ActivateSession, true},
+		{&ua.CloseSessionRequest{}, message.CloseSession, true},
+		{&ua.CreateSubscriptionRequest{}, message.CreateSubscription, true},
+		{&ua.CreateMonitoredItemsRequest{}, message.CreateMonitoredItems, true},
+		{&ua.DeleteSubscriptionsRequest{}, message.DeleteSubscriptions, true},
+		{&ua.TransferSubscriptionsRequest{}, message.TransferSubscriptions, true},
 		{&ua.ReadResponse{}, 0, false},
 		{nil, 0, false},
 	}
@@ -266,7 +266,7 @@ func TestArmedCutsListsACutUntilItsPositionIsMarked(t *testing.T) {
 	relay, recorder = newRelay(ft, "opc.tcp://127.0.0.1:1", func() {
 		listedOnCut = relay.ArmedCuts()
 	})
-	relay.CutAt(BeforeRequestReachesServer, faults.Republish)
+	relay.CutAt(BeforeRequestReachesServer, message.Republish)
 
 	wire, err := republishRequestWire(21)
 	if err != nil {
@@ -290,8 +290,8 @@ func TestArmedCutsListsACutUntilItsPositionIsMarked(t *testing.T) {
 func TestASecondMatchingMessageDoesNotClaimACutWhileItFires(t *testing.T) {
 	ft := &fakeT{}
 	relay, _ := newRelay(ft, "opc.tcp://127.0.0.1:1", nil)
-	relay.CutAt(BeforeRequestReachesServer, faults.Read)
-	matches := func(c armedCut) bool { return c.moment == BeforeRequestReachesServer && c.message == faults.Read }
+	relay.CutAt(BeforeRequestReachesServer, message.Read)
+	matches := func(c armedCut) bool { return c.moment == BeforeRequestReachesServer && c.message == message.Read }
 
 	if _, fired := relay.takeArmed(matches); !fired {
 		t.Fatalf("the first matching message claimed no cut")
@@ -310,9 +310,9 @@ func TestASecondMatchingMessageDoesNotClaimACutWhileItFires(t *testing.T) {
 func TestDisarmingOneOfTwoIdenticalFiringCutsLeavesTheOtherAbleToFire(t *testing.T) {
 	ft := &fakeT{}
 	relay, _ := newRelay(ft, "opc.tcp://127.0.0.1:1", nil)
-	relay.CutAt(BeforeRequestReachesServer, faults.Read)
-	relay.CutAt(BeforeRequestReachesServer, faults.Read)
-	matches := func(c armedCut) bool { return c.moment == BeforeRequestReachesServer && c.message == faults.Read }
+	relay.CutAt(BeforeRequestReachesServer, message.Read)
+	relay.CutAt(BeforeRequestReachesServer, message.Read)
+	matches := func(c armedCut) bool { return c.moment == BeforeRequestReachesServer && c.message == message.Read }
 
 	first, fired := relay.takeArmed(matches)
 	if !fired {
@@ -373,7 +373,7 @@ func TestCutAfterResponseDisarmsBeforeDrainingTheClient(t *testing.T) {
 	relay, recorder := newRelay(ft, "opc.tcp://127.0.0.1:1", func() {
 		listedOnCut = relay.ArmedCuts()
 	})
-	relay.CutAt(AfterResponseReachesClient, faults.Read)
+	relay.CutAt(AfterResponseReachesClient, message.Read)
 
 	staged, err := readRequestWire(9)
 	if err != nil {

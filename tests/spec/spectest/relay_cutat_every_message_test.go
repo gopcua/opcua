@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/gopcua/opcua"
-	"github.com/gopcua/opcua/tests/spec/faults"
+	"github.com/gopcua/opcua/tests/spec/message"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uacp"
 	. "github.com/onsi/ginkgo/v2"
@@ -20,18 +20,18 @@ type cutAtDriver struct {
 	fire  func(env *Environment)
 }
 
-func cutAtDriverFor(message faults.Message) cutAtDriver {
-	switch message {
-	case faults.HEL, faults.OpenSecureChannel, faults.ActivateSession, faults.Read:
+func cutAtDriverFor(msg message.Message) cutAtDriver {
+	switch msg {
+	case message.HEL, message.OpenSecureChannel, message.ActivateSession, message.Read:
 		return cutAtDriver{fire: func(env *Environment) { env.Relay.Cut() }}
-	case faults.CreateSession:
+	case message.CreateSession:
 		return cutAtDriver{
 			setup: func(env *Environment) {
 				env.Relay.RedirectTo(env.StartServer().Address())
 			},
 			fire: func(env *Environment) { env.Relay.Cut() },
 		}
-	case faults.TransferSubscriptions:
+	case message.TransferSubscriptions:
 		return cutAtDriver{
 			setup: func(env *Environment) {
 				second := env.StartServer()
@@ -40,7 +40,7 @@ func cutAtDriverFor(message faults.Message) cutAtDriver {
 			},
 			fire: func(env *Environment) { env.Relay.Cut() },
 		}
-	case faults.Republish:
+	case message.Republish:
 		return cutAtDriver{
 			setup: func(env *Environment) {
 				last := env.LastSequenceNumber()
@@ -51,7 +51,7 @@ func cutAtDriverFor(message faults.Message) cutAtDriver {
 			},
 			fire: func(env *Environment) { env.Relay.Cut() },
 		}
-	case faults.CreateSubscription:
+	case message.CreateSubscription:
 		return cutAtDriver{fire: func(env *Environment) {
 			notifications := make(chan *opcua.PublishNotificationData, notificationBuffer)
 			ctx, cancel := context.WithTimeout(context.Background(), specWait)
@@ -62,7 +62,7 @@ func cutAtDriverFor(message faults.Message) cutAtDriver {
 				MaxKeepAliveCount: maxKeepAliveCount,
 			}, notifications)
 		}}
-	case faults.CreateMonitoredItems:
+	case message.CreateMonitoredItems:
 		return cutAtDriver{fire: func(env *Environment) {
 			notifications := make(chan *opcua.PublishNotificationData, notificationBuffer)
 			ctx, cancel := context.WithTimeout(context.Background(), specWait)
@@ -77,13 +77,13 @@ func cutAtDriverFor(message faults.Message) cutAtDriver {
 					opcua.NewMonitoredItemCreateRequestWithDefaults(env.Server.node, ua.AttributeIDValue, monitorClientHandle))
 			}
 		}}
-	case faults.DeleteSubscriptions:
+	case message.DeleteSubscriptions:
 		return cutAtDriver{fire: func(env *Environment) {
 			ctx, cancel := context.WithTimeout(context.Background(), specWait)
 			defer cancel()
 			_ = env.ClientSubscription().Cancel(ctx)
 		}}
-	case faults.Publish:
+	case message.Publish:
 		var held HeldPublish
 		return cutAtDriver{
 			setup: func(env *Environment) {
@@ -93,21 +93,21 @@ func cutAtDriverFor(message faults.Message) cutAtDriver {
 				held.Answer(env.Subscription(), valueCutTarget)
 			},
 		}
-	case faults.CloseSession, faults.CloseSecureChannel:
+	case message.CloseSession, message.CloseSecureChannel:
 		return cutAtDriver{fire: func(env *Environment) {
 			ctx, cancel := context.WithTimeout(context.Background(), specWait)
 			defer cancel()
 			_ = env.Client.Close(ctx)
 		}}
 	}
-	Fail("no driver for message " + message.String())
+	Fail("no driver for message " + msg.String())
 	return cutAtDriver{}
 }
 
 var _ = DescribeTable("Relay CutAt on every message",
-	func(message faults.Message, moment Moment) {
+	func(msg message.Message, moment Moment) {
 		var opts []Option
-		if message == faults.CloseSession || message == faults.CloseSecureChannel {
+		if msg == message.CloseSession || msg == message.CloseSecureChannel {
 			// The driver closes the client while the cut has severed its
 			// connection; a redialling client would race Close's c.conn read
 			// against Dial's write (issue #883), and nothing these entries
@@ -115,69 +115,69 @@ var _ = DescribeTable("Relay CutAt on every message",
 			opts = append(opts, WithClientOptions(opcua.AutoReconnect(false)))
 		}
 		env := Start(GinkgoT(), opts...)
-		driver := cutAtDriverFor(message)
+		driver := cutAtDriverFor(msg)
 		if driver.setup != nil {
 			driver.setup(env)
 		}
-		env.Relay.CutAt(moment, message)
+		env.Relay.CutAt(moment, msg)
 		m := env.Mark()
 		driver.fire(env)
 
 		Eventually(func(g Gomega) {
 			g.Expect(env.Relay.ArmedCuts()).To(BeEmpty(),
-				"the cut armed for %s at %s never fired: %v", message, momentName(moment), env.Relay.ArmedCuts())
+				"the cut armed for %s at %s never fired: %v", msg, momentName(moment), env.Relay.ArmedCuts())
 		}, specWait).Should(Succeed())
 
-		if message == faults.HEL {
+		if msg == message.HEL {
 			assertHelCut(env, m, moment)
 			return
 		}
 		switch moment {
 		case BeforeRequestReachesServer:
-			assertRequestDroppedCut(env, m, message)
+			assertRequestDroppedCut(env, m, msg)
 		case ResponseNeverReachesClient:
-			assertResponseDroppedCut(env, m, message)
+			assertResponseDroppedCut(env, m, msg)
 		case AfterResponseReachesClient:
-			assertResponseDeliveredCut(env, m, message)
+			assertResponseDeliveredCut(env, m, msg)
 		}
 	},
-	Entry("HEL before the request reaches the server", faults.HEL, BeforeRequestReachesServer),
-	Entry("HEL with the response never reaching the client", faults.HEL, ResponseNeverReachesClient),
-	Entry("HEL after the response reaches the client", faults.HEL, AfterResponseReachesClient),
-	Entry("OpenSecureChannel before the request reaches the server", faults.OpenSecureChannel, BeforeRequestReachesServer),
-	Entry("OpenSecureChannel with the response never reaching the client", faults.OpenSecureChannel, ResponseNeverReachesClient),
-	Entry("OpenSecureChannel after the response reaches the client", faults.OpenSecureChannel, AfterResponseReachesClient),
-	Entry("CreateSession before the request reaches the server", faults.CreateSession, BeforeRequestReachesServer),
-	Entry("CreateSession with the response never reaching the client", faults.CreateSession, ResponseNeverReachesClient),
-	Entry("CreateSession after the response reaches the client", faults.CreateSession, AfterResponseReachesClient),
-	Entry("ActivateSession before the request reaches the server", faults.ActivateSession, BeforeRequestReachesServer),
-	Entry("ActivateSession with the response never reaching the client", faults.ActivateSession, ResponseNeverReachesClient),
-	Entry("ActivateSession after the response reaches the client", faults.ActivateSession, AfterResponseReachesClient),
-	Entry("CloseSession before the request reaches the server", faults.CloseSession, BeforeRequestReachesServer),
-	Entry("CloseSession with the response never reaching the client", faults.CloseSession, ResponseNeverReachesClient),
-	Entry("CloseSession after the response reaches the client", faults.CloseSession, AfterResponseReachesClient),
-	Entry("Read before the request reaches the server", faults.Read, BeforeRequestReachesServer),
-	Entry("Read with the response never reaching the client", faults.Read, ResponseNeverReachesClient),
-	Entry("Read after the response reaches the client", faults.Read, AfterResponseReachesClient),
-	Entry("CreateSubscription before the request reaches the server", faults.CreateSubscription, BeforeRequestReachesServer),
-	Entry("CreateSubscription with the response never reaching the client", faults.CreateSubscription, ResponseNeverReachesClient),
-	Entry("CreateSubscription after the response reaches the client", faults.CreateSubscription, AfterResponseReachesClient),
-	Entry("CreateMonitoredItems before the request reaches the server", faults.CreateMonitoredItems, BeforeRequestReachesServer),
-	Entry("CreateMonitoredItems with the response never reaching the client", faults.CreateMonitoredItems, ResponseNeverReachesClient),
-	Entry("CreateMonitoredItems after the response reaches the client", faults.CreateMonitoredItems, AfterResponseReachesClient),
-	Entry("DeleteSubscriptions before the request reaches the server", faults.DeleteSubscriptions, BeforeRequestReachesServer),
-	Entry("DeleteSubscriptions with the response never reaching the client", faults.DeleteSubscriptions, ResponseNeverReachesClient),
-	Entry("DeleteSubscriptions after the response reaches the client", faults.DeleteSubscriptions, AfterResponseReachesClient),
-	Entry("Publish before the request reaches the server", faults.Publish, BeforeRequestReachesServer),
-	Entry("Publish with the response never reaching the client", faults.Publish, ResponseNeverReachesClient),
-	Entry("Publish after the response reaches the client", faults.Publish, AfterResponseReachesClient),
-	Entry("Republish before the request reaches the server", faults.Republish, BeforeRequestReachesServer),
-	Entry("Republish with the response never reaching the client", faults.Republish, ResponseNeverReachesClient),
-	Entry("Republish after the response reaches the client", faults.Republish, AfterResponseReachesClient),
-	Entry("TransferSubscriptions before the request reaches the server", faults.TransferSubscriptions, BeforeRequestReachesServer),
-	Entry("TransferSubscriptions with the response never reaching the client", faults.TransferSubscriptions, ResponseNeverReachesClient),
-	Entry("TransferSubscriptions after the response reaches the client", faults.TransferSubscriptions, AfterResponseReachesClient),
-	Entry("CloseSecureChannel before the request reaches the server", faults.CloseSecureChannel, BeforeRequestReachesServer),
+	Entry("HEL before the request reaches the server", message.HEL, BeforeRequestReachesServer),
+	Entry("HEL with the response never reaching the client", message.HEL, ResponseNeverReachesClient),
+	Entry("HEL after the response reaches the client", message.HEL, AfterResponseReachesClient),
+	Entry("OpenSecureChannel before the request reaches the server", message.OpenSecureChannel, BeforeRequestReachesServer),
+	Entry("OpenSecureChannel with the response never reaching the client", message.OpenSecureChannel, ResponseNeverReachesClient),
+	Entry("OpenSecureChannel after the response reaches the client", message.OpenSecureChannel, AfterResponseReachesClient),
+	Entry("CreateSession before the request reaches the server", message.CreateSession, BeforeRequestReachesServer),
+	Entry("CreateSession with the response never reaching the client", message.CreateSession, ResponseNeverReachesClient),
+	Entry("CreateSession after the response reaches the client", message.CreateSession, AfterResponseReachesClient),
+	Entry("ActivateSession before the request reaches the server", message.ActivateSession, BeforeRequestReachesServer),
+	Entry("ActivateSession with the response never reaching the client", message.ActivateSession, ResponseNeverReachesClient),
+	Entry("ActivateSession after the response reaches the client", message.ActivateSession, AfterResponseReachesClient),
+	Entry("CloseSession before the request reaches the server", message.CloseSession, BeforeRequestReachesServer),
+	Entry("CloseSession with the response never reaching the client", message.CloseSession, ResponseNeverReachesClient),
+	Entry("CloseSession after the response reaches the client", message.CloseSession, AfterResponseReachesClient),
+	Entry("Read before the request reaches the server", message.Read, BeforeRequestReachesServer),
+	Entry("Read with the response never reaching the client", message.Read, ResponseNeverReachesClient),
+	Entry("Read after the response reaches the client", message.Read, AfterResponseReachesClient),
+	Entry("CreateSubscription before the request reaches the server", message.CreateSubscription, BeforeRequestReachesServer),
+	Entry("CreateSubscription with the response never reaching the client", message.CreateSubscription, ResponseNeverReachesClient),
+	Entry("CreateSubscription after the response reaches the client", message.CreateSubscription, AfterResponseReachesClient),
+	Entry("CreateMonitoredItems before the request reaches the server", message.CreateMonitoredItems, BeforeRequestReachesServer),
+	Entry("CreateMonitoredItems with the response never reaching the client", message.CreateMonitoredItems, ResponseNeverReachesClient),
+	Entry("CreateMonitoredItems after the response reaches the client", message.CreateMonitoredItems, AfterResponseReachesClient),
+	Entry("DeleteSubscriptions before the request reaches the server", message.DeleteSubscriptions, BeforeRequestReachesServer),
+	Entry("DeleteSubscriptions with the response never reaching the client", message.DeleteSubscriptions, ResponseNeverReachesClient),
+	Entry("DeleteSubscriptions after the response reaches the client", message.DeleteSubscriptions, AfterResponseReachesClient),
+	Entry("Publish before the request reaches the server", message.Publish, BeforeRequestReachesServer),
+	Entry("Publish with the response never reaching the client", message.Publish, ResponseNeverReachesClient),
+	Entry("Publish after the response reaches the client", message.Publish, AfterResponseReachesClient),
+	Entry("Republish before the request reaches the server", message.Republish, BeforeRequestReachesServer),
+	Entry("Republish with the response never reaching the client", message.Republish, ResponseNeverReachesClient),
+	Entry("Republish after the response reaches the client", message.Republish, AfterResponseReachesClient),
+	Entry("TransferSubscriptions before the request reaches the server", message.TransferSubscriptions, BeforeRequestReachesServer),
+	Entry("TransferSubscriptions with the response never reaching the client", message.TransferSubscriptions, ResponseNeverReachesClient),
+	Entry("TransferSubscriptions after the response reaches the client", message.TransferSubscriptions, AfterResponseReachesClient),
+	Entry("CloseSecureChannel before the request reaches the server", message.CloseSecureChannel, BeforeRequestReachesServer),
 )
 
 func momentName(moment Moment) string {
@@ -192,35 +192,35 @@ func momentName(moment Moment) string {
 	return "unknown"
 }
 
-func messageOfResponse(service any) (faults.Message, bool) {
+func messageOfResponse(service any) (message.Message, bool) {
 	switch service.(type) {
 	case *ua.OpenSecureChannelResponse:
-		return faults.OpenSecureChannel, true
+		return message.OpenSecureChannel, true
 	case *ua.CreateSessionResponse:
-		return faults.CreateSession, true
+		return message.CreateSession, true
 	case *ua.ActivateSessionResponse:
-		return faults.ActivateSession, true
+		return message.ActivateSession, true
 	case *ua.CloseSessionResponse:
-		return faults.CloseSession, true
+		return message.CloseSession, true
 	case *ua.ReadResponse:
-		return faults.Read, true
+		return message.Read, true
 	case *ua.CreateSubscriptionResponse:
-		return faults.CreateSubscription, true
+		return message.CreateSubscription, true
 	case *ua.CreateMonitoredItemsResponse:
-		return faults.CreateMonitoredItems, true
+		return message.CreateMonitoredItems, true
 	case *ua.DeleteSubscriptionsResponse:
-		return faults.DeleteSubscriptions, true
+		return message.DeleteSubscriptions, true
 	case *ua.PublishResponse:
-		return faults.Publish, true
+		return message.Publish, true
 	case *ua.RepublishResponse:
-		return faults.Republish, true
+		return message.Republish, true
 	case *ua.TransferSubscriptionsResponse:
-		return faults.TransferSubscriptions, true
+		return message.TransferSubscriptions, true
 	}
 	return 0, false
 }
 
-func cutAtRequestsSince(env *Environment, m Mark, message faults.Message) []ServiceRecord[ua.Request] {
+func cutAtRequestsSince(env *Environment, m Mark, message message.Message) []ServiceRecord[ua.Request] {
 	var matched []ServiceRecord[ua.Request]
 	for _, record := range env.Recorder.RequestsSince(m) {
 		decoded, ok := record.Message()
@@ -234,7 +234,7 @@ func cutAtRequestsSince(env *Environment, m Mark, message faults.Message) []Serv
 	return matched
 }
 
-func cutAtResponsesSince(env *Environment, m Mark, message faults.Message) []ServiceRecord[ua.Response] {
+func cutAtResponsesSince(env *Environment, m Mark, message message.Message) []ServiceRecord[ua.Response] {
 	var matched []ServiceRecord[ua.Response]
 	for _, record := range env.Recorder.ResponsesSince(m) {
 		decoded, ok := record.Message()
@@ -258,7 +258,7 @@ func transportsOfTypeSince(env *Environment, m Mark, typ TransportType) []Transp
 	return matched
 }
 
-func cutAtPairedRequest(env *Environment, connection int, requestID uint32, message faults.Message) (ServiceRecord[ua.Request], bool) {
+func cutAtPairedRequest(env *Environment, connection int, requestID uint32, message message.Message) (ServiceRecord[ua.Request], bool) {
 	for _, record := range env.Recorder.Requests() {
 		if record.Connection != connection || record.RequestID != requestID {
 			continue
@@ -293,7 +293,7 @@ func ackRecordsOnConnection(env *Environment, connection int) []TransportRecord 
 	return matched
 }
 
-func assertRequestDroppedCut(env *Environment, m Mark, message faults.Message) {
+func assertRequestDroppedCut(env *Environment, m Mark, message message.Message) {
 	var target ServiceRecord[ua.Request]
 	Eventually(func(g Gomega) {
 		var dropped []ServiceRecord[ua.Request]
@@ -319,7 +319,7 @@ func assertRequestDroppedCut(env *Environment, m Mark, message faults.Message) {
 		"the dropped record decodes to %T, want the %s request", decoded, message)
 }
 
-func assertResponseDroppedCut(env *Environment, m Mark, message faults.Message) {
+func assertResponseDroppedCut(env *Environment, m Mark, message message.Message) {
 	var target ServiceRecord[ua.Response]
 	Eventually(func(g Gomega) {
 		var dropped []ServiceRecord[ua.Response]
@@ -348,7 +348,7 @@ func assertResponseDroppedCut(env *Environment, m Mark, message faults.Message) 
 		"the dropped record decodes to %T, want the %s response", decoded, message)
 }
 
-func assertResponseDeliveredCut(env *Environment, m Mark, message faults.Message) {
+func assertResponseDeliveredCut(env *Environment, m Mark, message message.Message) {
 	var target ServiceRecord[ua.Response]
 	Eventually(func(g Gomega) {
 		var delivered []ServiceRecord[ua.Response]
@@ -448,7 +448,7 @@ func assertHelCut(env *Environment, m Mark, moment Moment) {
 var _ = Describe("Relay CutAt transport pairing", func() {
 	It("fires a HEL response cut on the ACK of the connection that carried the HEL", func() {
 		relay, recorder, _ := newInjectedRelay()
-		relay.CutAt(AfterResponseReachesClient, faults.HEL)
+		relay.CutAt(AfterResponseReachesClient, message.HEL)
 		finished := false
 
 		hello, err := helloWire()
@@ -485,7 +485,7 @@ var _ = Describe("Relay CutAt transport pairing", func() {
 
 	It("does not fire a HEL response cut on an ACK of a connection that never carried a HEL", func() {
 		relay, recorder, _ := newInjectedRelay()
-		relay.CutAt(AfterResponseReachesClient, faults.HEL)
+		relay.CutAt(AfterResponseReachesClient, message.HEL)
 		finished := false
 
 		hello, err := helloWire()

@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/gopcua/opcua"
-	"github.com/gopcua/opcua/tests/spec/faults"
+	"github.com/gopcua/opcua/tests/spec/message"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uacp"
 	. "github.com/onsi/ginkgo/v2"
@@ -53,7 +53,7 @@ var _ = Describe("ScriptedServer sessions and services", func() {
 		env := Start(GinkgoT())
 		second := env.StartServer()
 		env.Relay.RedirectTo(second.Address())
-		env.Relay.CutAt(ResponseNeverReachesClient, faults.CreateSession)
+		env.Relay.CutAt(ResponseNeverReachesClient, message.CreateSession)
 
 		env.Relay.Cut()
 		env.WaitUntilReconnected()
@@ -118,7 +118,7 @@ var _ = Describe("ScriptedServer sessions and services", func() {
 
 	It("answers the next CreateSubscription with the scripted ServiceFault", func() {
 		env := Start(GinkgoT())
-		env.Server.AnswerNextWith(faults.CreateSubscription, ua.StatusBadTooManyOperations)
+		env.Server.AnswerNextWith(message.CreateSubscription, ua.StatusBadTooManyOperations)
 		m := env.Mark()
 
 		notifications := make(chan *opcua.PublishNotificationData, notificationBuffer)
@@ -159,7 +159,7 @@ var _ = Describe("ScriptedServer sessions and services", func() {
 	It("answers the next Publish at once with the scripted ServiceFault", func() {
 		env := Start(GinkgoT())
 		held := env.Server.WaitHeldPublish()
-		env.Server.AnswerNextWith(faults.Publish, ua.StatusBadTooManyPublishRequests)
+		env.Server.AnswerNextWith(message.Publish, ua.StatusBadTooManyPublishRequests)
 		m := env.Mark()
 		held.Answer(env.Subscription(), valueOverloaded)
 
@@ -191,11 +191,11 @@ var _ = Describe("ScriptedServer sessions and services", func() {
 		env := Start(GinkgoT())
 		fake := &fakeT{}
 		env.Server.t = fake
-		Expect(fatalPanics(func() { env.Server.AnswerNextWith(faults.Read, ua.StatusBadTooManyOperations) })).To(BeTrue(),
+		Expect(fatalPanics(func() { env.Server.AnswerNextWith(message.Read, ua.StatusBadTooManyOperations) })).To(BeTrue(),
 			"AnswerNextWith did not fail for Read")
-		Expect(fatalPanics(func() { env.Server.AnswerNextWith(faults.CreateSession, ua.StatusBadTooManyOperations) })).To(BeTrue(),
+		Expect(fatalPanics(func() { env.Server.AnswerNextWith(message.CreateSession, ua.StatusBadTooManyOperations) })).To(BeTrue(),
 			"AnswerNextWith did not fail for CreateSession")
-		Expect(fatalPanics(func() { env.Server.AnswerNextWith(faults.CloseSecureChannel, ua.StatusBadTooManyOperations) })).To(BeTrue(),
+		Expect(fatalPanics(func() { env.Server.AnswerNextWith(message.CloseSecureChannel, ua.StatusBadTooManyOperations) })).To(BeTrue(),
 			"AnswerNextWith did not fail for CloseSecureChannel")
 		env.Server.t = GinkgoT()
 		Expect(fake.fatals).To(HaveLen(3),

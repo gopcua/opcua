@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gopcua/opcua/tests/spec/faults"
 	"github.com/gopcua/opcua/tests/spec/internal/harnessfault"
+	"github.com/gopcua/opcua/tests/spec/message"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uacp"
 )
@@ -453,7 +453,7 @@ func (r *Recorder) forward(connection int, flow flow, data []byte, write func([]
 	// The writes stay outside the recorder lock: a write to a peer
 	// that stopped reading blocks, and every connection's pump
 	// shares this lock.
-	for i, message := range messages {
+	for i, msg := range messages {
 		if hold.index == i {
 			time.Sleep(time.Until(hold.releaseAt))
 		}
@@ -461,17 +461,17 @@ func (r *Recorder) forward(connection int, flow flow, data []byte, write func([]
 			r.relay.closeConnection(connection, cut.claim)
 			return err
 		}
-		if r.relay.discards(connection, flow, message) {
-			r.markStalled(connection, flow, message)
+		if r.relay.discards(connection, flow, msg) {
+			r.markStalled(connection, flow, msg)
 			continue
 		}
-		if writeErr := write(message); writeErr != nil {
+		if writeErr := write(msg); writeErr != nil {
 			if cut.index >= 0 {
 				r.relay.release(cut.claim)
 			}
 			return writeErr
 		}
-		r.noteWritten(connection, flow, message)
+		r.noteWritten(connection, flow, msg)
 		if cut.index == i {
 			if finishErr := finishAfterResponse(cut.claim); finishErr != nil {
 				r.setRelayError(fmt.Errorf("the relay could not half-close the client side after the response it wrote: %w", finishErr))
@@ -655,12 +655,12 @@ func (r *Recorder) observeLocked(connection int, flow flow, data []byte, claimCu
 	cut := firedCut{index: -1}
 	hold := heldCut{index: -1}
 	readAt := time.Now()
-	for i, message := range messages {
+	for i, msg := range messages {
 		offset := state.consumed
-		state.consumed += len(message)
+		state.consumed += len(msg)
 		order := r.nextOrderLocked()
-		claim, dropped, afterResponse, delay, recordErr := r.recordLocked(order, connection, flow, state, message, claimCuts)
-		r.stampReadAtLocked(connection, flow, message, readAt)
+		claim, dropped, afterResponse, delay, recordErr := r.recordLocked(order, connection, flow, state, msg, claimCuts)
+		r.stampReadAtLocked(connection, flow, msg, readAt)
 		if recordErr != nil {
 			r.setErrorLocked(connection, flow, offset, recordErr)
 		}
@@ -680,8 +680,8 @@ func (r *Recorder) observeLocked(connection int, flow flow, data []byte, claimCu
 	return messages, cut, hold, nil
 }
 
-func (r *Recorder) stampReadAtLocked(connection int, flow flow, message []byte, readAt time.Time) {
-	decoded, err := decodeFrame(message)
+func (r *Recorder) stampReadAtLocked(connection int, flow flow, msg []byte, readAt time.Time) {
+	decoded, err := decodeFrame(msg)
 	if err != nil {
 		return
 	}
@@ -715,8 +715,8 @@ func (r *Recorder) stampReadAtLocked(connection int, flow flow, message []byte, 
 	}
 }
 
-func (r *Recorder) recordLocked(order, connection int, flow flow, state *streamState, message []byte, claimCuts bool) (claimed armedCut, dropped bool, afterResponse bool, delay time.Duration, err error) {
-	decoded, err := decodeFrame(message)
+func (r *Recorder) recordLocked(order, connection int, flow flow, state *streamState, msg []byte, claimCuts bool) (claimed armedCut, dropped bool, afterResponse bool, delay time.Duration, err error) {
+	decoded, err := decodeFrame(msg)
 	if err != nil {
 		return armedCut{}, false, false, 0, err
 	}
@@ -728,14 +728,14 @@ func (r *Recorder) recordLocked(order, connection int, flow flow, state *streamS
 		afterResponse = false
 		if claimCuts && flow == clientToServer && frame.messageType == uacp.MessageTypeHello {
 			if cut, fired := r.relay.takeArmed(func(c armedCut) bool {
-				return c.moment == BeforeRequestReachesServer && c.message == faults.HEL && !r.hasTransportLocked(connection, HEL)
+				return c.moment == BeforeRequestReachesServer && c.message == message.HEL && !r.hasTransportLocked(connection, HEL)
 			}); fired {
 				claim, dropped, fate = cut, true, Dropped
 			}
 		}
 		if claimCuts && flow == serverToClient && frame.messageType == uacp.MessageTypeAcknowledge {
 			if cut, fired := r.relay.takeArmed(func(c armedCut) bool {
-				return isResponseMoment(c.moment) && c.message == faults.HEL && r.hasTransportLocked(connection, HEL)
+				return isResponseMoment(c.moment) && c.message == message.HEL && r.hasTransportLocked(connection, HEL)
 			}); fired {
 				claim = cut
 				if cut.moment == ResponseNeverReachesClient {
@@ -746,7 +746,7 @@ func (r *Recorder) recordLocked(order, connection int, flow flow, state *streamS
 			}
 		}
 		if claimCuts && flow == clientToServer && frame.messageType == uacp.MessageTypeHello {
-			if d, armed := r.relay.takeDelay(faults.HEL); armed {
+			if d, armed := r.relay.takeDelay(message.HEL); armed {
 				delay = d
 			}
 		}
@@ -764,17 +764,17 @@ func (r *Recorder) recordLocked(order, connection int, flow flow, state *streamS
 		if !complete {
 			return armedCut{}, false, false, 0, nil
 		}
-		switch message := service.(type) {
+		switch svc := service.(type) {
 		case *completeMessage:
-			if flowErr := serviceDirectionError(flow, message.service); flowErr != nil {
+			if flowErr := serviceDirectionError(flow, svc.service); flowErr != nil {
 				return armedCut{}, false, false, 0, flowErr
 			}
 			if claimCuts && flow == clientToServer {
-				if target, named := messageOfRequest(message.service); named {
+				if target, named := messageOfRequest(svc.service); named {
 					if cut, fired := r.relay.takeArmed(func(c armedCut) bool {
 						return c.moment == BeforeRequestReachesServer && c.message == target
 					}); fired {
-						r.appendService(order, connection, flow, message.requestID, Dropped, message.service)
+						r.appendService(order, connection, flow, svc.requestID, Dropped, svc.service)
 						return cut, true, false, 0, nil
 					}
 					if d, armed := r.relay.takeDelay(target); armed {
@@ -784,23 +784,23 @@ func (r *Recorder) recordLocked(order, connection int, flow flow, state *streamS
 			}
 			if claimCuts && flow == serverToClient {
 				if cut, fired := r.relay.takeArmed(func(c armedCut) bool {
-					return isResponseMoment(c.moment) && r.hasRecordedRequestLocked(connection, message.requestID, c.message)
+					return isResponseMoment(c.moment) && r.hasRecordedRequestLocked(connection, svc.requestID, c.message)
 				}); fired {
 					if cut.moment == ResponseNeverReachesClient {
-						r.appendService(order, connection, flow, message.requestID, Dropped, message.service)
+						r.appendService(order, connection, flow, svc.requestID, Dropped, svc.service)
 						return cut, true, false, 0, nil
 					}
-					r.appendService(order, connection, flow, message.requestID, Forwarded, message.service)
+					r.appendService(order, connection, flow, svc.requestID, Forwarded, svc.service)
 					return cut, false, true, 0, nil
 				}
 				if d, armed := r.relay.takeResponseHold(); armed {
 					delay = d
 				}
 			}
-			r.appendService(order, connection, flow, message.requestID, Forwarded, message.service)
+			r.appendService(order, connection, flow, svc.requestID, Forwarded, svc.service)
 			return armedCut{}, false, false, delay, nil
 		case *abortedMessage:
-			r.appendService(order, connection, flow, message.requestID, Aborted, nil)
+			r.appendService(order, connection, flow, svc.requestID, Aborted, nil)
 			return armedCut{}, false, false, 0, nil
 		}
 	}
@@ -829,7 +829,7 @@ func (r *Recorder) lastClientHandleOf(subscriptionID uint32) (handle uint32, fou
 	return 0, false
 }
 
-func (r *Recorder) hasRecordedRequestLocked(connection int, requestID uint32, message faults.Message) bool {
+func (r *Recorder) hasRecordedRequestLocked(connection int, requestID uint32, message message.Message) bool {
 	for _, record := range r.requests {
 		if record.Connection != connection || record.RequestID != requestID {
 			continue
@@ -923,35 +923,35 @@ func isResponseMoment(moment Moment) bool {
 	return moment == AfterResponseReachesClient || moment == ResponseNeverReachesClient
 }
 
-// messageOfRequest maps a decoded client request to the faults.Message
+// messageOfRequest maps a decoded client request to the message.Message
 // naming it. The bool is false for a request the catalogue does not
 // name.
-func messageOfRequest(service any) (faults.Message, bool) {
+func messageOfRequest(service any) (message.Message, bool) {
 	switch service.(type) {
 	case *ua.OpenSecureChannelRequest:
-		return faults.OpenSecureChannel, true
+		return message.OpenSecureChannel, true
 	case *ua.CloseSecureChannelRequest:
-		return faults.CloseSecureChannel, true
+		return message.CloseSecureChannel, true
 	case *ua.CreateSessionRequest:
-		return faults.CreateSession, true
+		return message.CreateSession, true
 	case *ua.ActivateSessionRequest:
-		return faults.ActivateSession, true
+		return message.ActivateSession, true
 	case *ua.CloseSessionRequest:
-		return faults.CloseSession, true
+		return message.CloseSession, true
 	case *ua.ReadRequest:
-		return faults.Read, true
+		return message.Read, true
 	case *ua.CreateSubscriptionRequest:
-		return faults.CreateSubscription, true
+		return message.CreateSubscription, true
 	case *ua.CreateMonitoredItemsRequest:
-		return faults.CreateMonitoredItems, true
+		return message.CreateMonitoredItems, true
 	case *ua.DeleteSubscriptionsRequest:
-		return faults.DeleteSubscriptions, true
+		return message.DeleteSubscriptions, true
 	case *ua.PublishRequest:
-		return faults.Publish, true
+		return message.Publish, true
 	case *ua.RepublishRequest:
-		return faults.Republish, true
+		return message.Republish, true
 	case *ua.TransferSubscriptionsRequest:
-		return faults.TransferSubscriptions, true
+		return message.TransferSubscriptions, true
 	}
 	return 0, false
 }
@@ -959,7 +959,7 @@ func messageOfRequest(service any) (faults.Message, bool) {
 type armedCut struct {
 	id      int
 	moment  Moment
-	message faults.Message
+	message message.Message
 	firing  bool
 }
 
@@ -1009,7 +1009,7 @@ type Relay struct {
 }
 
 type armedDelay struct {
-	message faults.Message
+	message message.Message
 	hold    time.Duration
 	firing  bool
 }
@@ -1051,7 +1051,7 @@ func (r *Relay) Cut() {
 	}
 }
 
-// CutAt arms one cut: a Moment and a faults.Message the cut fires on,
+// CutAt arms one cut: a Moment and a message.Message the cut fires on,
 // on the next message that matches both. A cut armed for
 // BeforeRequestReachesServer drops the matching request, records it
 // Dropped and closes the connection it rode on. A cut armed for
@@ -1062,27 +1062,27 @@ func (r *Relay) Cut() {
 // drops the matching response without writing it, records it Dropped
 // and closes the connection like BeforeRequestReachesServer does.
 // Transport messages pair by position on their connection: a HEL pairs
-// with the ACK that answers it and a faults.OpenSecureChannel request
+// with the ACK that answers it and a message.OpenSecureChannel request
 // with its response, so a cut armed for a transport message or its
 // moment fires on that pair. The CloseSecureChannel the client sends
 // at Close gets no response, so a cut armed on it for a response
 // moment is a harness fault, as are an unknown Moment and a Message
 // the catalogue does not name.
-func (r *Relay) CutAt(moment Moment, message faults.Message) {
+func (r *Relay) CutAt(moment Moment, msg message.Message) {
 	if moment != BeforeRequestReachesServer && !isResponseMoment(moment) {
 		r.t.Fatalf("%s", harnessFault("CutAt received an unknown Moment %d", int(moment)))
 		return
 	}
-	if message < faults.HEL || message > faults.TransferSubscriptions {
-		r.t.Fatalf("%s", harnessFault("CutAt received an unknown Message %d", int(message)))
+	if msg < message.HEL || msg > message.TransferSubscriptions {
+		r.t.Fatalf("%s", harnessFault("CutAt received an unknown Message %d", int(msg)))
 		return
 	}
-	if isResponseMoment(moment) && message == faults.CloseSecureChannel {
+	if isResponseMoment(moment) && msg == message.CloseSecureChannel {
 		r.t.Fatalf("%s", harnessFault("CloseSecureChannel has no response a response-moment cut could fire on"))
 		return
 	}
 	r.mu.Lock()
-	r.armed = append(r.armed, armedCut{id: r.nextCutID, moment: moment, message: message})
+	r.armed = append(r.armed, armedCut{id: r.nextCutID, moment: moment, message: msg})
 	r.nextCutID++
 	r.mu.Unlock()
 }
@@ -1094,18 +1094,18 @@ func (r *Relay) CutAt(moment Moment, message faults.Message) {
 // order at one moment. The service of a request is known only at its
 // last chunk, so earlier chunks of the held request are already
 // forwarded; the hold starts at the last chunk.
-func (r *Relay) DelayAt(message faults.Message, d time.Duration) {
-	if message == faults.CloseSecureChannel {
+func (r *Relay) DelayAt(msg message.Message, d time.Duration) {
+	if msg == message.CloseSecureChannel {
 		r.t.Fatalf("%s", harnessFault("the client sends CloseSecureChannel only while closing, so no request of it can arrive to delay"))
 		return
 	}
-	if message < faults.HEL || message > faults.TransferSubscriptions {
-		r.t.Fatalf("%s", harnessFault("DelayAt received an unknown Message %d", int(message)))
+	if msg < message.HEL || msg > message.TransferSubscriptions {
+		r.t.Fatalf("%s", harnessFault("DelayAt received an unknown Message %d", int(msg)))
 		return
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.armedDelay = &armedDelay{message: message, hold: d}
+	r.armedDelay = &armedDelay{message: msg, hold: d}
 }
 
 // HoldNextResponse holds the next server-to-client service response
@@ -1133,10 +1133,10 @@ func (r *Relay) takeResponseHold() (time.Duration, bool) {
 
 // takeDelay reports the hold armed for message, marking it firing so
 // one armed hold delays one matching request only.
-func (r *Relay) takeDelay(message faults.Message) (time.Duration, bool) {
+func (r *Relay) takeDelay(msg message.Message) (time.Duration, bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if r.armedDelay == nil || r.armedDelay.firing || r.armedDelay.message != message {
+	if r.armedDelay == nil || r.armedDelay.firing || r.armedDelay.message != msg {
 		return 0, false
 	}
 	r.armedDelay.firing = true
