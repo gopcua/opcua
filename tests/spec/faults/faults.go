@@ -240,6 +240,9 @@ func buildAllFaults() []Fault {
 			if k == delayAboveTimeout && m == HEL {
 				continue
 			}
+			if k != requestLost && m == CloseSecureChannel {
+				continue
+			}
 			faults = append(faults, messageFault{kind: k, msg: m})
 		}
 	}

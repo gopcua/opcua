@@ -11,8 +11,8 @@ import (
 )
 
 func TestAllFaultsSize(t *testing.T) {
-	if len(AllFaults) != 93 {
-		t.Fatalf("len(AllFaults) = %d, want 93", len(AllFaults))
+	if len(AllFaults) != 89 {
+		t.Fatalf("len(AllFaults) = %d, want 89", len(AllFaults))
 	}
 }
 
@@ -45,6 +45,7 @@ func TestCatalogueNames(t *testing.T) {
 		"Server/DuplicateSequence",
 		"Server/SkippedSequence",
 		"Consumer/Slow",
+		"RequestLost/CloseSecureChannel",
 	}
 	for _, want := range present {
 		if _, ok := byName[want]; !ok {
@@ -54,6 +55,10 @@ func TestCatalogueNames(t *testing.T) {
 	absent := []string{
 		"DelayAboveTimeout/HEL",
 		"Overload/HEL/Bad_TooManyOperations",
+		"ResponseLost/CloseSecureChannel",
+		"CutAfterResponse/CloseSecureChannel",
+		"DelayBelowTimeout/CloseSecureChannel",
+		"DelayAboveTimeout/CloseSecureChannel",
 	}
 	for _, name := range absent {
 		if _, ok := byName[name]; ok {
@@ -68,16 +73,18 @@ func TestMessageFaultsCoverEveryMember(t *testing.T) {
 		t.Fatalf("parsed %d Message members from source, want 13: %v", len(members), members)
 	}
 	byName := faultsByName()
-	kinds := []string{"RequestLost", "ResponseLost", "CutAfterResponse", "DelayBelowTimeout"}
 	for _, m := range members {
+		var kinds []string
+		switch m {
+		case "HEL":
+			kinds = []string{"RequestLost", "ResponseLost", "CutAfterResponse", "DelayBelowTimeout"}
+		case "CloseSecureChannel":
+			kinds = []string{"RequestLost"}
+		default:
+			kinds = []string{"RequestLost", "ResponseLost", "CutAfterResponse", "DelayBelowTimeout", "DelayAboveTimeout"}
+		}
 		for _, k := range kinds {
 			want := k + "/" + m
-			if _, ok := byName[want]; !ok {
-				t.Errorf("AllFaults is missing %s", want)
-			}
-		}
-		if m != "HEL" {
-			want := "DelayAboveTimeout/" + m
 			if _, ok := byName[want]; !ok {
 				t.Errorf("AllFaults is missing %s", want)
 			}
