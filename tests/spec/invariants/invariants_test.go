@@ -9,7 +9,11 @@ import (
 )
 
 func produced(value int32, subscription uint32, sequence uint32, server int, reachable bool) Produced {
-	return Produced{Value: value, SubscriptionID: subscription, SequenceNumber: sequence, ServerIndex: server, Reachable: reachable}
+	return Produced{Value: value, SubscriptionID: subscription, SequenceNumber: sequence, ServerIndex: server, Reachable: reachable, SubscriptionInstance: int(subscription)}
+}
+
+func incarnation(value int32, subscription uint32, instance int, sequence uint32, server int, reachable bool) Produced {
+	return Produced{Value: value, SubscriptionID: subscription, SequenceNumber: sequence, ServerIndex: server, Reachable: reachable, SubscriptionInstance: instance}
 }
 
 func repeated(value int32, subscription uint32, sequence uint32, server int, reachable bool) Produced {
@@ -109,6 +113,26 @@ func TestDeliverInOrder(t *testing.T) {
 			Observed{
 				Produced: []Produced{produced(201, 2, 1, 0, true), produced(101, 1, 1, 0, true), produced(202, 2, 2, 0, true), produced(102, 1, 2, 0, true)},
 				Received: []int32{201, 101, 202, 102},
+			}, true, ""},
+		{"a recreated subscription reuses the id and restarts at one",
+			Observed{
+				Produced: []Produced{
+					incarnation(101, 1, 1, 1, 0, true),
+					incarnation(102, 1, 1, 2, 0, true),
+					incarnation(103, 1, 2, 1, 0, true),
+					incarnation(104, 1, 2, 2, 0, true),
+				},
+				Received: []int32{101, 102, 103, 104},
+			}, true, ""},
+		{"the same subscription on two servers, each in order",
+			Observed{
+				Produced: []Produced{
+					incarnation(101, 1, 1, 2, 0, true),
+					incarnation(102, 1, 1, 3, 0, true),
+					incarnation(201, 1, 1, 1, 1, true),
+					incarnation(202, 1, 1, 2, 1, true),
+				},
+				Received: []int32{101, 102, 201, 202},
 			}, true, ""},
 	}
 	for _, c := range cases {

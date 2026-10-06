@@ -16,14 +16,19 @@ import (
 // Produced is one value a server produced, with the subscription and
 // sequence number it was enqueued under and the server that holds it.
 // Repeated is true when the server had already sent that subscription
-// and sequence number before it produced the value.
+// and sequence number before it produced the value. SubscriptionInstance
+// is the incarnation ordinal of the subscription on its server: a
+// recreated subscription reuses the wire id of a deleted one while
+// restarting its sequence numbers, so only the instance tells the two
+// apart.
 type Produced struct {
-	Value          int32
-	SubscriptionID uint32
-	SequenceNumber uint32
-	ServerIndex    int
-	Reachable      bool
-	Repeated       bool
+	Value                int32
+	SubscriptionID       uint32
+	SequenceNumber       uint32
+	ServerIndex          int
+	Reachable            bool
+	Repeated             bool
+	SubscriptionInstance int
 }
 
 // ServerState is one server the environment created, with the session
@@ -142,8 +147,9 @@ func (m *deliverEachValueOnce) NegatedFailureMessage(actual any) string {
 	return "Expected the observed snapshot not to deliver each value once, but it did"
 }
 
-// DeliverInOrder says the received values of one subscription appear
-// in the sequence order their server produced them under.
+// DeliverInOrder says the received values of one subscription
+// incarnation appear in the sequence order their server produced them
+// under.
 func DeliverInOrder() types.GomegaMatcher {
 	return &deliverInOrder{}
 }
@@ -152,24 +158,31 @@ type deliverInOrder struct {
 	failure string
 }
 
+type subscriptionIdentity struct {
+	server   int
+	instance int
+}
+
 func (m *deliverInOrder) Match(actual any) (bool, error) {
 	observed, err := asObserved(actual)
 	if err != nil {
 		return false, err
 	}
 	sequenceOf := make(map[int32]uint32)
-	subscriptionOf := make(map[int32]uint32)
+	subscriptionOf := make(map[int32]subscriptionIdentity)
+	idOf := make(map[int32]uint32)
 	for _, entry := range observed.Produced {
 		if _, seen := sequenceOf[entry.Value]; !seen {
 			sequenceOf[entry.Value] = entry.SequenceNumber
-			subscriptionOf[entry.Value] = entry.SubscriptionID
+			subscriptionOf[entry.Value] = subscriptionIdentity{server: entry.ServerIndex, instance: entry.SubscriptionInstance}
+			idOf[entry.Value] = entry.SubscriptionID
 		}
 	}
 	type lastSeen struct {
 		value    int32
 		sequence uint32
 	}
-	lastOf := make(map[uint32]lastSeen)
+	lastOf := make(map[subscriptionIdentity]lastSeen)
 	for _, value := range observed.Received {
 		sequence, produced := sequenceOf[value]
 		if !produced {
@@ -177,7 +190,7 @@ func (m *deliverInOrder) Match(actual any) (bool, error) {
 		}
 		subscription := subscriptionOf[value]
 		if previous, seen := lastOf[subscription]; seen && sequence < previous.sequence {
-			m.failure = fmt.Sprintf("the client received %d (sequence %d) before %d (sequence %d) of subscription %d, against their produced order", previous.value, previous.sequence, value, sequence, subscription)
+			m.failure = fmt.Sprintf("the client received %d (sequence %d) before %d (sequence %d) of subscription %d, against their produced order", previous.value, previous.sequence, value, sequence, idOf[value])
 			return false, nil
 		}
 		lastOf[subscription] = lastSeen{value: value, sequence: sequence}

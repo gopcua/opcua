@@ -53,6 +53,7 @@ type ScriptedServer struct {
 	nextAnswerSkip           bool
 	produced                 []Produced
 	producedBySub            map[*harnessSub][]int
+	subInstances             int
 }
 
 type transferAnswer struct {
@@ -62,6 +63,7 @@ type transferAnswer struct {
 
 type harnessSub struct {
 	id                 uint32
+	instance           int
 	next               uint32
 	lastSent           uint32
 	deleted            bool
@@ -80,6 +82,17 @@ func newHarnessSub(id uint32) *harnessSub {
 		unansweredRetained: make(map[uint32]bool),
 		sent:               make(map[uint32]bool),
 	}
+}
+
+// newHarnessSub builds one subscription incarnation under the server's
+// lock, stamped with the next incarnation ordinal, so two
+// subscriptions that share a wire id stay distinguishable in the
+// produced record.
+func (s *ScriptedServer) newHarnessSub(id uint32) *harnessSub {
+	s.subInstances++
+	sub := newHarnessSub(id)
+	sub.instance = s.subInstances
+	return sub
 }
 
 type heldEntry struct {
@@ -315,7 +328,7 @@ func (s *ScriptedServer) createSubscriptionRecord(create *ua.CreateSubscriptionR
 		}
 		s.retireScriptsLocked(existing)
 	}
-	sub := newHarnessSub(create.SubscriptionID)
+	sub := s.newHarnessSub(create.SubscriptionID)
 	s.subscriptions[sub.id] = sub
 	if s.first == nil {
 		s.first = sub
@@ -453,7 +466,7 @@ func (s *ScriptedServer) transferSubscriptions(sc *uasc.SecureChannel, r ua.Requ
 			}
 			s.retireScriptsLocked(existing)
 		}
-		sub := newHarnessSub(subscriptionID)
+		sub := s.newHarnessSub(subscriptionID)
 		if i == 0 && s.deferredTransferSub != nil {
 			sub = s.deferredTransferSub
 			sub.id = subscriptionID
@@ -507,7 +520,7 @@ func (s *ScriptedServer) QueueTransferSuccess(available ...uint32) Subscription 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.transferAnswer = &transferAnswer{available: slices.Clone(available)}
-	deferred := newHarnessSub(0)
+	deferred := s.newHarnessSub(0)
 	s.deferredTransferSub = deferred
 	return Subscription{server: s, sub: deferred}
 }
@@ -519,12 +532,16 @@ func (s *ScriptedServer) QueueTransferSuccess(available ...uint32) Subscription 
 // handle is the id the transfer created it under. Repeated is true
 // when the server had already sent that subscription and sequence
 // number before it produced the value, in an answer or a retransmitted
-// Republish.
+// Republish. SubscriptionInstance is the incarnation ordinal of the
+// subscription on this server: a recreated subscription reuses the
+// wire id of a deleted one while restarting its sequence numbers, so
+// only the instance tells the two apart.
 type Produced struct {
-	SubscriptionID uint32
-	SequenceNumber uint32
-	Value          int32
-	Repeated       bool
+	SubscriptionID       uint32
+	SequenceNumber       uint32
+	Value                int32
+	Repeated             bool
+	SubscriptionInstance int
 }
 
 // Produced returns every value the server produced, in production
@@ -536,7 +553,7 @@ func (s *ScriptedServer) Produced() []Produced {
 }
 
 func (s *ScriptedServer) recordProducedLocked(sub *harnessSub, sequenceNumber uint32, v int32, repeated bool) {
-	s.produced = append(s.produced, Produced{SubscriptionID: sub.id, SequenceNumber: sequenceNumber, Value: v, Repeated: repeated})
+	s.produced = append(s.produced, Produced{SubscriptionID: sub.id, SequenceNumber: sequenceNumber, Value: v, Repeated: repeated, SubscriptionInstance: sub.instance})
 	if s.producedBySub == nil {
 		s.producedBySub = make(map[*harnessSub][]int)
 	}

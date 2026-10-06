@@ -36,12 +36,13 @@ func Observe(env *spectest.Environment, fault *spectest.Injected) Observed {
 	for index, server := range servers {
 		for _, entry := range server.Produced() {
 			produced = append(produced, Produced{
-				Value:          entry.Value,
-				SubscriptionID: entry.SubscriptionID,
-				SequenceNumber: entry.SequenceNumber,
-				ServerIndex:    index,
-				Reachable:      states[index].Reachable,
-				Repeated:       entry.Repeated,
+				Value:                entry.Value,
+				SubscriptionID:       entry.SubscriptionID,
+				SequenceNumber:       entry.SequenceNumber,
+				ServerIndex:          index,
+				Reachable:            states[index].Reachable,
+				Repeated:             entry.Repeated,
+				SubscriptionInstance: entry.SubscriptionInstance,
 			})
 		}
 	}
