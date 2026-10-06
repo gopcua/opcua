@@ -3,7 +3,9 @@ package spectest
 import (
 	"context"
 	"fmt"
+	"time"
 
+	"github.com/gopcua/opcua"
 	"github.com/gopcua/opcua/ua"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -157,6 +159,57 @@ var _ = Describe("ScriptedServer Republish", func() {
 
 		Expect(env.Server.UnusedScripts()).To(BeEmpty(),
 			"the retained message was answered and the FailRepublish script was used, so no script stays unused: %v", env.Server.UnusedScripts())
+	})
+})
+
+var _ = Describe("ScriptedServer TryWaitHeldPublish", func() {
+	It("returns the next held Publish when one arrives within the timeout", func() {
+		env := Start(GinkgoT())
+		held, ok := env.Server.TryWaitHeldPublish(specWait)
+		Expect(ok).To(BeTrue(), "the client sent no Publish request within %s", specWait)
+		Expect(held.Connection()).To(Equal(0),
+			"the held Publish did not arrive on the live connection")
+		held.Answer(env.Subscription(), 7301)
+		Eventually(func() []int32 { return env.Received() }).WithTimeout(specWait).
+			Should(ContainElement(int32(7301)),
+				"the client delivered no value the returned held Publish was answered with")
+	})
+
+	It("reports no held Publish on a server the client never connects to", func() {
+		env := Start(GinkgoT())
+		second := env.StartServer()
+		_, ok := second.TryWaitHeldPublish(200 * time.Millisecond)
+		Expect(ok).To(BeFalse(),
+			"a server the client never connected to held a Publish request")
+	})
+})
+
+var _ = Describe("ScriptedServer TryWaitCreatedSubscription", func() {
+	It("returns a subscription the client created after the mark", func() {
+		env := Start(GinkgoT())
+		m := env.Mark()
+		notifications := make(chan *opcua.PublishNotificationData, notificationBuffer)
+		subscribeCtx, subscribeCancel := context.WithTimeout(context.Background(), specWait)
+		defer subscribeCancel()
+		_, err := env.Client.Subscribe(subscribeCtx, &opcua.SubscriptionParameters{
+			Interval:          100 * time.Millisecond,
+			LifetimeCount:     lifetimeCount,
+			MaxKeepAliveCount: maxKeepAliveCount,
+		}, notifications)
+		Expect(err).NotTo(HaveOccurred(), "the client created no second subscription: %v", err)
+		created, ok := env.Server.TryWaitCreatedSubscription(m, specWait)
+		Expect(ok).To(BeTrue(),
+			"TryWaitCreatedSubscription reported no subscription although the client created one")
+		Expect(created.ID()).NotTo(Equal(env.Subscription().ID()),
+			"the returned subscription is the one created before the mark")
+	})
+
+	It("reports no subscription on a server the client never connects to", func() {
+		env := Start(GinkgoT())
+		second := env.StartServer()
+		_, ok := second.TryWaitCreatedSubscription(env.Mark(), 200*time.Millisecond)
+		Expect(ok).To(BeFalse(),
+			"a server the client never connected to created a subscription")
 	})
 })
 

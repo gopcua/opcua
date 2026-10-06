@@ -320,6 +320,38 @@ func (e *Environment) WaitUntilReconnected() {
 	}
 }
 
+// TryWaitUntilReconnected waits up to timeout for the client to pass
+// through Reconnecting back to Connected after the most recent cut the
+// relay made, by Relay.Cut or by a fired CutAt, and reports whether it
+// did: the failure-matrix workloads bound every wait instead of
+// failing the spec.
+func (e *Environment) TryWaitUntilReconnected(timeout time.Duration) bool {
+	e.mu.Lock()
+	cut := e.cutStates
+	e.mu.Unlock()
+	if !e.hasStateSince(cut, opcua.Reconnecting) {
+		deadline := time.Now().Add(timeout)
+		for !e.hasStateSince(cut, opcua.Reconnecting) {
+			if !time.Now().Before(deadline) {
+				return false
+			}
+			time.Sleep(statePollInterval)
+		}
+	}
+	reconnecting := e.lastStateIndex(opcua.Reconnecting)
+	if e.hasStateSince(reconnecting+1, opcua.Connected) {
+		return true
+	}
+	deadline := time.Now().Add(timeout)
+	for !e.hasStateSince(reconnecting+1, opcua.Connected) {
+		if !time.Now().Before(deadline) {
+			return false
+		}
+		time.Sleep(statePollInterval)
+	}
+	return true
+}
+
 func (e *Environment) lastStateIndex(state opcua.ConnState) int {
 	e.mu.Lock()
 	defer e.mu.Unlock()

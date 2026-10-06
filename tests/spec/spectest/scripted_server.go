@@ -191,6 +191,37 @@ func (s *ScriptedServer) WaitHeldPublish() HeldPublish {
 	}
 }
 
+// TryWaitHeldPublish waits up to timeout for a Publish request to hold
+// and returns it, or false when none arrived within the timeout: the
+// failure-matrix workloads bound every wait instead of failing the
+// spec. A harness fault still fails the run.
+func (s *ScriptedServer) TryWaitHeldPublish(timeout time.Duration) (HeldPublish, bool) {
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+	for {
+		s.mu.Lock()
+		s.pruneHeldLocked()
+		if s.faultErr != nil {
+			err := s.faultErr
+			s.mu.Unlock()
+			s.t.Fatalf("%s", err)
+			return HeldPublish{}, false
+		}
+		entry, found := s.oldestOnNewestLocked()
+		if found {
+			s.removeHeldLocked(entry)
+			s.mu.Unlock()
+			return HeldPublish{server: s, entry: entry}, true
+		}
+		s.mu.Unlock()
+		select {
+		case <-s.heldSignal:
+		case <-timer.C:
+			return HeldPublish{}, false
+		}
+	}
+}
+
 func (s *ScriptedServer) fault(format string, args ...any) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -750,6 +781,61 @@ func (s *ScriptedServer) WaitCreatedSubscription(m Mark) Subscription {
 		case <-deadline.C:
 			s.t.Fatalf("client created no subscription")
 			return Subscription{}
+		}
+	}
+}
+
+// TryWaitCreatedSubscription waits up to timeout for the first
+// CreateSubscriptionResponse this server sent after m whose harness
+// subscription is still live, and returns that subscription; false
+// when none arrived within the timeout. A response whose subscription
+// the client deleted is skipped: the failure-matrix workloads bound
+// every wait instead of failing the spec.
+func (s *ScriptedServer) TryWaitCreatedSubscription(m Mark, timeout time.Duration) (Subscription, bool) {
+	deadline := time.NewTimer(timeout)
+	defer deadline.Stop()
+	ownAddress := strings.TrimPrefix(s.address, "opc.tcp://")
+	for {
+		s.mu.Lock()
+		faultErr := s.faultErr
+		recorder := s.recorder
+		s.mu.Unlock()
+		if faultErr != nil {
+			s.t.Fatalf("%s", faultErr)
+			return Subscription{}, false
+		}
+		if recorder != nil {
+			for _, record := range recorder.ResponsesSince(m) {
+				if recorder.connectionUpstreamOf(record.Connection) != ownAddress {
+					continue
+				}
+				message, forwarded := record.Message()
+				if !forwarded {
+					continue
+				}
+				response, isCreate := message.(*ua.CreateSubscriptionResponse)
+				if !isCreate {
+					continue
+				}
+				s.mu.Lock()
+				sub, live := s.subscriptions[response.SubscriptionID]
+				deleted := live && sub.deleted
+				s.mu.Unlock()
+				if !live {
+					s.t.Fatalf("%s", harnessFault("this server recorded a CreateSubscription response with id %d but no harness subscription for it", response.SubscriptionID))
+					return Subscription{}, false
+				}
+				if deleted {
+					continue
+				}
+				return Subscription{server: s, sub: sub}, true
+			}
+		}
+		select {
+		case <-s.heldSignal:
+		case <-time.After(statePollInterval):
+		case <-deadline.C:
+			return Subscription{}, false
 		}
 	}
 }

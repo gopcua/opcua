@@ -1,0 +1,247 @@
+// Package suites holds the failure matrix's scenario suites, one per
+// Part 4 clause: each suite's scenarios drive a real client through
+// one workload per fault and return the context the clause's rules
+// read.
+package suites
+
+import (
+	"strings"
+	"sync/atomic"
+	"time"
+
+	"github.com/gopcua/opcua"
+	"github.com/gopcua/opcua/tests/spec/faults"
+	"github.com/gopcua/opcua/tests/spec/matrix"
+	"github.com/gopcua/opcua/tests/spec/message"
+	"github.com/gopcua/opcua/tests/spec/rules"
+	"github.com/gopcua/opcua/tests/spec/spectest"
+	"github.com/gopcua/opcua/ua"
+)
+
+// P4_06_07 returns the Part 4 §6.7 suite: three scenarios whose base
+// action decides what the client must re-establish after the relay
+// cuts — the session, the session on a second server that refuses the
+// transfer, or the subscriptions on a server that forgot them.
+func P4_06_07() matrix.Suite { return p4_06_07{} }
+
+type p4_06_07 struct{}
+
+func (p4_06_07) Clause() string { return "P4-6.7" }
+
+func (p4_06_07) Scenarios() []matrix.Scenario {
+	return []matrix.Scenario{
+		scenario06_07{
+			name: "SessionSurvives",
+			sends: []message.Message{
+				message.HEL, message.OpenSecureChannel, message.ActivateSession, message.Read,
+				message.Republish, message.Publish, message.CloseSession, message.CloseSecureChannel,
+			},
+			own:  matrix.SessionSurvives,
+			base: baseSessionSurvives,
+		},
+		scenario06_07{
+			name: "SessionLost",
+			sends: []message.Message{
+				message.HEL, message.OpenSecureChannel, message.ActivateSession, message.CreateSession, message.Read,
+				message.TransferSubscriptions, message.CreateSubscription, message.CreateMonitoredItems,
+				message.Publish, message.CloseSession, message.CloseSecureChannel,
+			},
+			own:  matrix.SessionLost,
+			base: baseSessionLost,
+		},
+		scenario06_07{
+			name: "SubscriptionsLost",
+			sends: []message.Message{
+				message.HEL, message.OpenSecureChannel, message.ActivateSession, message.Read,
+				message.Republish, message.CreateSubscription, message.CreateMonitoredItems,
+				message.Publish, message.CloseSession, message.CloseSecureChannel,
+			},
+			own:  matrix.SubscriptionsLost,
+			base: baseSubscriptionsLost,
+		},
+	}
+}
+
+func (p4_06_07) Rules(c matrix.Category) []rules.Rule {
+	switch c {
+	case matrix.SessionSurvives:
+		return []rules.Rule{
+			rules.ReactivatesSession,
+			rules.CreatesNoSession,
+			rules.RepublishesFromNextSequence,
+			rules.SendsNoPublishBeforeNotAvailable,
+			rules.KeepsSubscriptionID,
+			rules.SendsNoTransferForOwnSubscription,
+		}
+	case matrix.SessionLost:
+		return []rules.Rule{
+			rules.CreatesSessionOnlyAfterActivateFailed,
+			rules.RecreatesAfterRefusal,
+		}
+	case matrix.SubscriptionsLost:
+		return []rules.Rule{
+			rules.RecreatesAfterRefusal,
+			rules.RepublishesRecreatedFromOne,
+		}
+	case matrix.ActivationFailed:
+		return []rules.Rule{rules.CreatesSessionOnlyAfterActivateFailed}
+	}
+	return nil
+}
+
+// scenario06_07 is one §6.7 scenario: the messages a correct client
+// sends after the arm point, the category the clause prescribes when
+// the fault leaves it to the scenario, and the base action that
+// breaks the connection and names the target the client must recover
+// on.
+type scenario06_07 struct {
+	name  string
+	sends []message.Message
+	own   matrix.Category
+	base  func(env *spectest.Environment) target06_07
+}
+
+// target06_07 is what a base action leaves the workload with: the
+// server the client must end on, whether it must recreate its
+// subscription there, and how the scripted transfer answer refuses
+// when the base action queued one.
+type target06_07 struct {
+	server          *spectest.ScriptedServer
+	recreate        bool
+	transferRefusal func(spectest.ServiceRecord[ua.Response]) bool
+}
+
+func (s scenario06_07) Name() string { return s.name }
+
+func (s scenario06_07) Sends() []message.Message { return s.sends }
+
+func (s scenario06_07) Options() []spectest.Option {
+	return []spectest.Option{
+		spectest.WithRetentionQueue(),
+		spectest.WithPublishingInterval(10 * time.Millisecond),
+		spectest.WithClientOptions(opcua.RequestTimeout(2 * time.Second)),
+	}
+}
+
+func (s scenario06_07) Category(f faults.Fault) matrix.Category {
+	switch {
+	case f.Name() == "DelayAboveTimeout/ActivateSession":
+		return matrix.ActivationFailed
+	case strings.HasPrefix(f.Name(), "DelayAboveTimeout/"):
+		return matrix.Unspecified
+	case strings.HasPrefix(f.Name(), "Overload/"):
+		return matrix.Unspecified
+	}
+	return s.own
+}
+
+func (s scenario06_07) Run(env *spectest.Environment, f faults.Fault) matrix.Outcome {
+	values := nextCaseValues()
+	sub := env.Subscription()
+	if held, ok := env.Server.TryWaitHeldPublish(15 * time.Second); ok {
+		held.Answer(sub, values.v1)
+	}
+	last := env.LastSequenceNumber()
+	sub.Retain(last+1, values.v2)
+	m := env.Mark()
+	injected := f.Inject(env)
+	t := s.base(env)
+	env.TryWaitUntilReconnected(30 * time.Second)
+	faultEnd := time.Now()
+
+	answering := sub
+	recreated := spectest.Subscription{}
+	canAnswer := true
+	if t.recreate {
+		created, ok := t.server.TryWaitCreatedSubscription(m, 15*time.Second)
+		if ok {
+			answering = created
+			recreated = created
+		} else {
+			canAnswer = false
+		}
+	}
+	sentinel := int32(0)
+	var answeredAt time.Time
+	if canAnswer {
+		if held, ok := t.server.TryWaitHeldPublish(15 * time.Second); ok {
+			held.Answer(answering, values.v3)
+			if next, ok := t.server.TryWaitHeldPublish(15 * time.Second); ok {
+				next.Answer(answering, values.sentinel)
+				sentinel = values.sentinel
+				answeredAt = time.Now()
+			}
+		}
+	}
+	return matrix.Outcome{
+		Injected:   injected,
+		FaultEnd:   faultEnd,
+		Sentinel:   sentinel,
+		AnsweredAt: answeredAt,
+		Rules: rules.Context{
+			Env:             env,
+			Mark:            m,
+			LastSeq:         last,
+			Sub:             sub,
+			Recreated:       recreated,
+			Server:          t.server,
+			TransferRefusal: t.transferRefusal,
+		},
+	}
+}
+
+// baseSessionSurvives cuts the relay, leaving the session and its
+// subscription on the one server the client was connected to.
+func baseSessionSurvives(env *spectest.Environment) target06_07 {
+	env.Relay.Cut()
+	return target06_07{server: env.Server}
+}
+
+// baseSessionLost starts a second server that inherits the retention
+// queue, refuses the next transfer with Bad_SubscriptionIdInvalid,
+// sends the client's reconnects to it, and cuts: the client must
+// recreate its session and its subscription there.
+func baseSessionLost(env *spectest.Environment) target06_07 {
+	second := env.StartServer()
+	second.QueueTransferRefusal(ua.StatusBadSubscriptionIDInvalid)
+	env.Relay.RedirectTo(second.Address())
+	env.Relay.Cut()
+	return target06_07{server: second, recreate: true, transferRefusal: refusedBadSubscriptionIDInvalid}
+}
+
+// baseSubscriptionsLost marks every subscription on the server
+// deleted and cuts: the session survives, but the server answers no
+// subscription the client holds.
+func baseSubscriptionsLost(env *spectest.Environment) target06_07 {
+	env.Server.ForgetSubscriptions()
+	env.Relay.Cut()
+	return target06_07{server: env.Server, recreate: true}
+}
+
+// refusedBadSubscriptionIDInvalid recognizes the transfer answer the
+// SessionLost base action scripts: one result, Bad_SubscriptionIdInvalid.
+func refusedBadSubscriptionIDInvalid(answer spectest.ServiceRecord[ua.Response]) bool {
+	message, decoded := answer.Message()
+	if !decoded {
+		return false
+	}
+	response, isTransfer := message.(*ua.TransferSubscriptionsResponse)
+	return isTransfer && len(response.Results) == 1 && response.Results[0].StatusCode == ua.StatusBadSubscriptionIDInvalid
+}
+
+// caseValues are the values one case answers, unique per case: 1000
+// times the case index plus a per-value offset, so a received value
+// matches the notification that carried it by value.
+type caseValues struct {
+	v1       int32
+	v2       int32
+	v3       int32
+	sentinel int32
+}
+
+var caseIndex atomic.Int64
+
+func nextCaseValues() caseValues {
+	base := int32(1000 * caseIndex.Add(1))
+	return caseValues{v1: base + 1, v2: base + 2, v3: base + 3, sentinel: base + 999}
+}

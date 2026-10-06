@@ -276,6 +276,21 @@ var _ = Describe("Environment Start", func() {
 	})
 })
 
+var _ = Describe("Environment TryWaitUntilReconnected", func() {
+	It("reports the reconnect after a cut", func() {
+		env := Start(GinkgoT())
+		env.Relay.Cut()
+		Expect(env.TryWaitUntilReconnected(specWait)).To(BeTrue(),
+			"the client did not pass through Reconnecting back to Connected within %s of the cut", specWait)
+	})
+
+	It("reports no reconnect when the connection never dropped", func() {
+		env := Start(GinkgoT())
+		Expect(env.TryWaitUntilReconnected(200*time.Millisecond)).To(BeFalse(),
+			"TryWaitUntilReconnected reported a reconnect although the connection never dropped")
+	})
+})
+
 type addr string
 
 func (a addr) Network() string { return "tcp" }
