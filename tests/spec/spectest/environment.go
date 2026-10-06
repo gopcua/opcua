@@ -39,6 +39,8 @@ type options struct {
 	publishingInterval    time.Duration
 	publishingIntervalSet bool
 	retention             bool
+	notificationBuffer    int
+	drainGap              time.Duration
 }
 
 // WithClientOptions appends client options after the ones Start sets itself.
@@ -56,6 +58,24 @@ func WithClientOptions(opts ...opcua.Option) Option {
 func WithRetentionQueue() Option {
 	return func(o *options) {
 		o.retention = true
+	}
+}
+
+// WithNotificationBuffer sets the capacity of the channel the client
+// delivers the subscription's notifications to. With a small buffer and
+// WithSlowConsumer the channel fills and the client blocks writing to
+// it, which ConsumerBlocked reports.
+func WithNotificationBuffer(n int) Option {
+	return func(o *options) {
+		o.notificationBuffer = n
+	}
+}
+
+// WithSlowConsumer makes the environment's notification drain read one
+// notification per gap, so notifications pile up in the channel.
+func WithSlowConsumer(gap time.Duration) Option {
+	return func(o *options) {
+		o.drainGap = gap
 	}
 }
 
@@ -83,6 +103,8 @@ type Environment struct {
 	receivedErrors     []error
 	states             []opcua.ConnState
 	retention          bool
+	drainGap           time.Duration
+	consumerBlocked    bool
 	receivedSignal     chan struct{}
 	everConnected      bool
 	cutStates          int
@@ -108,7 +130,7 @@ func Start(t T, opts ...Option) *Environment {
 		t.Fatalf("%s", harnessFault("publishing interval %s times lifetime count %d stays below one hour, so the server's subscription service could delete the subscription before the test ends", publishing, lifetimeCount))
 		return nil
 	}
-	e := &Environment{t: t, receivedSignal: make(chan struct{}, 1), retention: o.retention}
+	e := &Environment{t: t, receivedSignal: make(chan struct{}, 1), retention: o.retention, drainGap: o.drainGap}
 	e.Server = newScriptedServer(t)
 	e.Server.retention = o.retention
 	e.Relay, e.Recorder = newRelay(t, e.Server.Address(), e.noteCut)
@@ -116,8 +138,12 @@ func Start(t T, opts ...Option) *Environment {
 	e.Server.recorder = e.Recorder
 	e.Server.mu.Unlock()
 
+	buffer := notificationBuffer
+	if o.notificationBuffer > 0 {
+		buffer = o.notificationBuffer
+	}
 	states := make(chan opcua.ConnState, notificationBuffer)
-	notifications := make(chan *opcua.PublishNotificationData, notificationBuffer)
+	notifications := make(chan *opcua.PublishNotificationData, buffer)
 	drained := make(chan struct{})
 	go e.drain(notifications, drained)
 	go e.drainStates(states, drained)
@@ -431,14 +457,39 @@ func (e *Environment) statesFrom(start int) []opcua.ConnState {
 }
 
 func (e *Environment) drain(notifications <-chan *opcua.PublishNotificationData, drained <-chan struct{}) {
+	noteIfFull := func() {
+		if cap(notifications) > 0 && len(notifications) == cap(notifications) {
+			e.mu.Lock()
+			e.consumerBlocked = true
+			e.mu.Unlock()
+		}
+	}
 	for {
 		select {
 		case <-drained:
 			return
 		case notification := <-notifications:
 			e.accept(notification)
+			noteIfFull()
+			if e.drainGap > 0 {
+				select {
+				case <-drained:
+					return
+				case <-time.After(e.drainGap):
+				}
+				noteIfFull()
+			}
 		}
 	}
+}
+
+// ConsumerBlocked reports whether the environment's notification drain
+// ever saw the notification channel full, which means the client was
+// blocked writing to it.
+func (e *Environment) ConsumerBlocked() bool {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.consumerBlocked
 }
 
 func (e *Environment) drainStates(states <-chan opcua.ConnState, drained <-chan struct{}) {
