@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gopcua/opcua"
+	"github.com/gopcua/opcua/tests/spec/faults"
 	"github.com/gopcua/opcua/tests/spec/spectest"
 	"github.com/gopcua/opcua/ua"
 
@@ -228,7 +229,7 @@ var _ = Describe("Part 4 §6.7 Re-establishing connections https://reference.opc
 
 		DescribeTable("the second cut during Republish recovery",
 			func(moment spectest.Moment, check func(env *spectest.Environment, m spectest.Mark, recovery int)) {
-				env.Relay.CutAt(moment, spectest.Republish)
+				env.Relay.CutAt(moment, faults.Republish)
 				m = env.Mark()
 				env.Relay.Cut()
 				env.WaitUntilReconnected()

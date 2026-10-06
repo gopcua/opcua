@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gopcua/opcua/tests/spec/faults"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uacp"
 )
@@ -38,20 +39,31 @@ func TestServiceRecordMessagePerFate(t *testing.T) {
 	}
 }
 
-func TestServiceMatches(t *testing.T) {
+func TestMessageOfRequest(t *testing.T) {
 	cases := []struct {
-		service Service
-		message any
-		want    bool
+		service any
+		want    faults.Message
+		named   bool
 	}{
-		{Republish, &ua.RepublishRequest{}, true},
-		{Republish, &ua.ReadRequest{}, false},
-		{Read, &ua.ReadRequest{}, true},
-		{Read, &ua.RepublishRequest{}, false},
+		{&ua.RepublishRequest{}, faults.Republish, true},
+		{&ua.ReadRequest{}, faults.Read, true},
+		{&ua.PublishRequest{}, faults.Publish, true},
+		{&ua.OpenSecureChannelRequest{}, faults.OpenSecureChannel, true},
+		{&ua.CloseSecureChannelRequest{}, faults.CloseSecureChannel, true},
+		{&ua.CreateSessionRequest{}, faults.CreateSession, true},
+		{&ua.ActivateSessionRequest{}, faults.ActivateSession, true},
+		{&ua.CloseSessionRequest{}, faults.CloseSession, true},
+		{&ua.CreateSubscriptionRequest{}, faults.CreateSubscription, true},
+		{&ua.CreateMonitoredItemsRequest{}, faults.CreateMonitoredItems, true},
+		{&ua.DeleteSubscriptionsRequest{}, faults.DeleteSubscriptions, true},
+		{&ua.TransferSubscriptionsRequest{}, faults.TransferSubscriptions, true},
+		{&ua.ReadResponse{}, 0, false},
+		{nil, 0, false},
 	}
 	for _, c := range cases {
-		if got := c.service.matches(c.message); got != c.want {
-			t.Errorf("%s.matches(%T) = %v, want %v", c.service.name(), c.message, got, c.want)
+		got, named := messageOfRequest(c.service)
+		if named != c.named || got != c.want {
+			t.Errorf("messageOfRequest(%T) = (%v, %v), want (%v, %v)", c.service, got, named, c.want, c.named)
 		}
 	}
 }
@@ -254,7 +266,7 @@ func TestArmedCutsListsACutUntilItsPositionIsMarked(t *testing.T) {
 	relay, recorder = newRelay(ft, "opc.tcp://127.0.0.1:1", func() {
 		listedOnCut = relay.ArmedCuts()
 	})
-	relay.CutAt(BeforeRequestReachesServer, Republish)
+	relay.CutAt(BeforeRequestReachesServer, faults.Republish)
 
 	wire, err := republishRequestWire(21)
 	if err != nil {
@@ -278,8 +290,8 @@ func TestArmedCutsListsACutUntilItsPositionIsMarked(t *testing.T) {
 func TestASecondMatchingMessageDoesNotClaimACutWhileItFires(t *testing.T) {
 	ft := &fakeT{}
 	relay, _ := newRelay(ft, "opc.tcp://127.0.0.1:1", nil)
-	relay.CutAt(BeforeRequestReachesServer, Read)
-	matches := func(c armedCut) bool { return c.moment == BeforeRequestReachesServer && c.service == Read }
+	relay.CutAt(BeforeRequestReachesServer, faults.Read)
+	matches := func(c armedCut) bool { return c.moment == BeforeRequestReachesServer && c.message == faults.Read }
 
 	if _, fired := relay.takeArmed(matches); !fired {
 		t.Fatalf("the first matching message claimed no cut")
@@ -298,9 +310,9 @@ func TestASecondMatchingMessageDoesNotClaimACutWhileItFires(t *testing.T) {
 func TestDisarmingOneOfTwoIdenticalFiringCutsLeavesTheOtherAbleToFire(t *testing.T) {
 	ft := &fakeT{}
 	relay, _ := newRelay(ft, "opc.tcp://127.0.0.1:1", nil)
-	relay.CutAt(BeforeRequestReachesServer, Read)
-	relay.CutAt(BeforeRequestReachesServer, Read)
-	matches := func(c armedCut) bool { return c.moment == BeforeRequestReachesServer && c.service == Read }
+	relay.CutAt(BeforeRequestReachesServer, faults.Read)
+	relay.CutAt(BeforeRequestReachesServer, faults.Read)
+	matches := func(c armedCut) bool { return c.moment == BeforeRequestReachesServer && c.message == faults.Read }
 
 	first, fired := relay.takeArmed(matches)
 	if !fired {
@@ -361,7 +373,7 @@ func TestCutAfterResponseDisarmsBeforeDrainingTheClient(t *testing.T) {
 	relay, recorder := newRelay(ft, "opc.tcp://127.0.0.1:1", func() {
 		listedOnCut = relay.ArmedCuts()
 	})
-	relay.CutAt(AfterResponseReachesClient, Read)
+	relay.CutAt(AfterResponseReachesClient, faults.Read)
 
 	staged, err := readRequestWire(9)
 	if err != nil {
