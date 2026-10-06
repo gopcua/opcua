@@ -198,6 +198,18 @@ type consumerFault struct{}
 func (consumerFault) Name() string                              { return "Consumer/Slow" }
 func (consumerFault) Available(sends []message.Message) *Reason { return nil }
 
+// controlFault arms nothing: its case runs the scenario without any
+// fault, so the checks measure what the client does to a plain
+// transport loss.
+type controlFault struct{}
+
+func (controlFault) Name() string                              { return "Control/None" }
+func (controlFault) Available(sends []message.Message) *Reason { return nil }
+func (controlFault) Options() []spectest.Option                { return nil }
+func (controlFault) Inject(env *spectest.Environment) *spectest.Injected {
+	return spectest.NewInjected(func() bool { return true })
+}
+
 // AllFaults is the full fault catalogue, built once at package init. The
 // matrix enumerates it in full; it is never sampled.
 var AllFaults = buildAllFaults()
@@ -228,6 +240,7 @@ func buildAllFaults() []Fault {
 		faults = append(faults, serverFault{kind: k})
 	}
 	faults = append(faults, consumerFault{})
+	faults = append(faults, controlFault{})
 	return faults
 }
 

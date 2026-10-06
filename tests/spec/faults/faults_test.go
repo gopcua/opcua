@@ -13,8 +13,8 @@ import (
 )
 
 func TestAllFaultsSize(t *testing.T) {
-	if len(AllFaults) != 81 {
-		t.Fatalf("len(AllFaults) = %d, want 81", len(AllFaults))
+	if len(AllFaults) != 82 {
+		t.Fatalf("len(AllFaults) = %d, want 82", len(AllFaults))
 	}
 }
 
@@ -46,6 +46,7 @@ func TestCatalogueNames(t *testing.T) {
 		"Server/DuplicateSequence",
 		"Server/SkippedSequence",
 		"Consumer/Slow",
+		"Control/None",
 		"RequestLost/CloseSecureChannel",
 		"Overload/CreateSubscription/Bad_ResourceUnavailable",
 	}
@@ -122,6 +123,7 @@ func TestAvailable(t *testing.T) {
 		{"Server/SkippedSequence", []message.Message{message.Read}, false},
 		{"Server/DuplicateSequence", []message.Message{message.Publish}, true},
 		{"Server/SkippedSequence", []message.Message{message.Publish}, true},
+		{"Control/None", []message.Message{}, true},
 	}
 	byName := faultsByName()
 	for _, c := range cases {
