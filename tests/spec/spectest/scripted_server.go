@@ -46,6 +46,9 @@ type ScriptedServer struct {
 	transferAnswer           *transferAnswer
 	deferredTransferSub      *harnessSub
 	retiredUnused            []string
+	retention                bool
+	produced                 []Produced
+	producedBySub            map[*harnessSub][]int
 }
 
 type transferAnswer struct {
@@ -56,6 +59,7 @@ type transferAnswer struct {
 type harnessSub struct {
 	id                 uint32
 	next               uint32
+	lastSent           uint32
 	deleted            bool
 	retained           map[uint32]int32
 	failRepublish      map[uint32]ua.StatusCode
@@ -88,6 +92,7 @@ func newScriptedServer(t T) *ScriptedServer {
 		subscriptions: make(map[uint32]*harnessSub),
 		clientHandles: make(map[uint32]uint32),
 		heldSignal:    make(chan struct{}, 1),
+		producedBySub: make(map[*harnessSub][]int),
 	}
 	var lastErr error
 	for range serverStartAttempts {
@@ -401,6 +406,9 @@ func (s *ScriptedServer) transferSubscriptions(sc *uasc.SecureChannel, r ua.Requ
 			sub = s.deferredTransferSub
 			sub.id = subscriptionID
 			s.deferredTransferSub = nil
+			for _, index := range s.producedBySub[sub] {
+				s.produced[index].SubscriptionID = subscriptionID
+			}
 		}
 		next, err := counterAfterRetain(sub.next, maxOf(queued.available))
 		if err != nil {
@@ -450,6 +458,58 @@ func (s *ScriptedServer) QueueTransferSuccess(available ...uint32) Subscription 
 	deferred := newHarnessSub(0)
 	s.deferredTransferSub = deferred
 	return Subscription{server: s, sub: deferred}
+}
+
+// Produced is one value the scripted server enqueued for a
+// subscription: at the Retain or transfer staging that queued it, or
+// at the answer that sent it. SubscriptionID is the subscription the
+// value belongs to, which for a value staged on a QueueTransferSuccess
+// handle is the id the transfer created it under.
+type Produced struct {
+	SubscriptionID uint32
+	SequenceNumber uint32
+	Value          int32
+}
+
+// Produced returns every value the server produced, in production
+// order.
+func (s *ScriptedServer) Produced() []Produced {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return slices.Clone(s.produced)
+}
+
+func (s *ScriptedServer) recordProducedLocked(sub *harnessSub, sequenceNumber uint32, v int32) {
+	s.produced = append(s.produced, Produced{SubscriptionID: sub.id, SequenceNumber: sequenceNumber, Value: v})
+	if s.producedBySub == nil {
+		s.producedBySub = make(map[*harnessSub][]int)
+	}
+	s.producedBySub[sub] = append(s.producedBySub[sub], len(s.produced)-1)
+}
+
+// ForgetSubscriptions marks every harness subscription deleted, so
+// the server answers nothing for them anymore: LiveSubscriptions drops
+// to zero and a Republish for an old id fails.
+func (s *ScriptedServer) ForgetSubscriptions() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, sub := range s.subscriptions {
+		sub.deleted = true
+	}
+}
+
+// LiveSubscriptions returns how many harness subscriptions the server
+// holds that are not deleted.
+func (s *ScriptedServer) LiveSubscriptions() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	live := 0
+	for _, sub := range s.subscriptions {
+		if !sub.deleted {
+			live++
+		}
+	}
+	return live
 }
 
 // QueueTransferRefusal answers the next TransferSubscriptions with
@@ -630,6 +690,7 @@ func (s Subscription) Retain(seq uint32, v int32) {
 	s.sub.retained[seq] = v
 	s.sub.unansweredRetained[seq] = true
 	s.sub.next = next
+	s.server.recordProducedLocked(s.sub, seq, v)
 	s.server.mu.Unlock()
 }
 
@@ -690,6 +751,27 @@ func (h HeldPublish) AnswerWithSequenceNumber(sub Subscription, seq uint32, v in
 	h.answer(sub, seq, v, false)
 }
 
+// AnswerDuplicate answers the held Publish request with one data
+// change notification carrying v for sub at the last sequence number
+// the server sent for sub.
+func (h HeldPublish) AnswerDuplicate(sub Subscription, v int32) {
+	h.server.mu.Lock()
+	seq := sub.sub.lastSent
+	h.server.mu.Unlock()
+	h.answer(sub, seq, v, false)
+}
+
+// AnswerSkipping answers the held Publish request with one data
+// change notification carrying v for sub at the sequence number two
+// past the last one the server sent for sub, so the answer skips one
+// number.
+func (h HeldPublish) AnswerSkipping(sub Subscription, v int32) {
+	h.server.mu.Lock()
+	seq := sub.sub.lastSent + 2
+	h.server.mu.Unlock()
+	h.answer(sub, seq, v, false)
+}
+
 func (h HeldPublish) answer(sub Subscription, sequenceNumber uint32, v int32, useCounter bool) {
 	s := h.server
 	if sub.server != s {
@@ -739,6 +821,11 @@ func (h HeldPublish) answer(sub Subscription, sequenceNumber uint32, v int32, us
 		return
 	}
 	sub.sub.next = next
+	sub.sub.lastSent = sequenceNumber
+	s.recordProducedLocked(sub.sub, sequenceNumber, v)
+	if s.retention {
+		sub.sub.retained[sequenceNumber] = v
+	}
 	h.entry.answered = true
 	results := make([]ua.StatusCode, len(h.entry.request.SubscriptionAcknowledgements))
 	for i := range results {

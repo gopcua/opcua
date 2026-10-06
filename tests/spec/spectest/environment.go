@@ -38,12 +38,24 @@ type options struct {
 	clientOptions         []opcua.Option
 	publishingInterval    time.Duration
 	publishingIntervalSet bool
+	retention             bool
 }
 
 // WithClientOptions appends client options after the ones Start sets itself.
 func WithClientOptions(opts ...opcua.Option) Option {
 	return func(o *options) {
 		o.clientOptions = append(o.clientOptions, opts...)
+	}
+}
+
+// WithRetentionQueue makes every server Start or StartServer creates
+// keep each value it answers in the subscription's retransmission
+// queue until a Publish acknowledges it, as Part 4 §5.14.1 describes.
+// Without the option an answered value is gone from the queue
+// immediately.
+func WithRetentionQueue() Option {
+	return func(o *options) {
+		o.retention = true
 	}
 }
 
@@ -70,6 +82,7 @@ type Environment struct {
 	received           []int32
 	receivedErrors     []error
 	states             []opcua.ConnState
+	retention          bool
 	receivedSignal     chan struct{}
 	everConnected      bool
 	cutStates          int
@@ -95,8 +108,9 @@ func Start(t T, opts ...Option) *Environment {
 		t.Fatalf("%s", harnessFault("publishing interval %s times lifetime count %d stays below one hour, so the server's subscription service could delete the subscription before the test ends", publishing, lifetimeCount))
 		return nil
 	}
-	e := &Environment{t: t, receivedSignal: make(chan struct{}, 1)}
+	e := &Environment{t: t, receivedSignal: make(chan struct{}, 1), retention: o.retention}
 	e.Server = newScriptedServer(t)
+	e.Server.retention = o.retention
 	e.Relay, e.Recorder = newRelay(t, e.Server.Address(), e.noteCut)
 	e.Server.mu.Lock()
 	e.Server.recorder = e.Recorder
@@ -221,6 +235,7 @@ func (e *Environment) ClientSubscription() *opcua.Subscription {
 // teardown closes it, after the client and the relay.
 func (e *Environment) StartServer() *ScriptedServer {
 	second := newScriptedServer(e.t)
+	second.retention = e.retention
 	second.mu.Lock()
 	second.recorder = e.Recorder
 	second.mu.Unlock()
