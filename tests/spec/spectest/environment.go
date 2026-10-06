@@ -11,6 +11,7 @@ import (
 
 	"github.com/gopcua/opcua"
 	"github.com/gopcua/opcua/ua"
+	"github.com/gopcua/opcua/uasc"
 	ginkgo "github.com/onsi/ginkgo/v2"
 )
 
@@ -105,6 +106,8 @@ type Environment struct {
 	retention          bool
 	drainGap           time.Duration
 	consumerBlocked    bool
+	publishingInterval time.Duration
+	reconnectInterval  time.Duration
 	receivedSignal     chan struct{}
 	everConnected      bool
 	cutStates          int
@@ -130,7 +133,7 @@ func Start(t T, opts ...Option) *Environment {
 		t.Fatalf("%s", harnessFault("publishing interval %s times lifetime count %d stays below one hour, so the server's subscription service could delete the subscription before the test ends", publishing, lifetimeCount))
 		return nil
 	}
-	e := &Environment{t: t, receivedSignal: make(chan struct{}, 1), retention: o.retention, drainGap: o.drainGap}
+	e := &Environment{t: t, receivedSignal: make(chan struct{}, 1), retention: o.retention, drainGap: o.drainGap, publishingInterval: publishing, reconnectInterval: reconnect}
 	e.Server = newScriptedServer(t)
 	e.Server.retention = o.retention
 	e.Relay, e.Recorder = newRelay(t, e.Server.Address(), e.noteCut)
@@ -490,6 +493,31 @@ func (e *Environment) ConsumerBlocked() bool {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	return e.consumerBlocked
+}
+
+// RequestTimeout returns the request timeout the client runs with.
+func (e *Environment) RequestTimeout() time.Duration {
+	return e.Client.RequestTimeout()
+}
+
+// PublishTimeout returns the Publish timeout the client computes for
+// its subscription: the keep-alive count times the publishing
+// interval, at least the request timeout.
+func (e *Environment) PublishTimeout() time.Duration {
+	timeout := time.Duration(maxKeepAliveCount) * e.publishingInterval
+	if timeout > uasc.MaxTimeout {
+		return uasc.MaxTimeout
+	}
+	if timeout < e.RequestTimeout() {
+		return e.RequestTimeout()
+	}
+	return timeout
+}
+
+// ReconnectInterval returns the interval the client waits between two
+// reconnection attempts.
+func (e *Environment) ReconnectInterval() time.Duration {
+	return e.reconnectInterval
 }
 
 func (e *Environment) drainStates(states <-chan opcua.ConnState, drained <-chan struct{}) {

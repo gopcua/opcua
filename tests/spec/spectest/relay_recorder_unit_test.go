@@ -61,9 +61,9 @@ func TestMessageOfRequest(t *testing.T) {
 		{nil, 0, false},
 	}
 	for _, c := range cases {
-		got, named := messageOfRequest(c.service)
+		got, named := MessageOf(c.service)
 		if named != c.named || got != c.want {
-			t.Errorf("messageOfRequest(%T) = (%v, %v), want (%v, %v)", c.service, got, named, c.want, c.named)
+			t.Errorf("MessageOf(%T) = (%v, %v), want (%v, %v)", c.service, got, named, c.want, c.named)
 		}
 	}
 }

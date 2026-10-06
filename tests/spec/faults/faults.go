@@ -5,6 +5,8 @@ import (
 	"slices"
 
 	"github.com/gopcua/opcua/tests/spec/message"
+	"github.com/gopcua/opcua/tests/spec/spectest"
+	"github.com/gopcua/opcua/ua"
 )
 
 // Reason explains why a fault cannot occur in a given run.
@@ -17,6 +19,8 @@ type Reason struct{ Text string }
 type Fault interface {
 	Name() string
 	Available(sends []message.Message) *Reason
+	Options() []spectest.Option
+	Inject(env *spectest.Environment) *spectest.Injected
 }
 
 type messageKind int
@@ -60,6 +64,18 @@ var overloadStatusNames = [...]string{
 	badTooManyOperations:      "Bad_TooManyOperations",
 	badResourceUnavailable:    "Bad_ResourceUnavailable",
 	badTooManyPublishRequests: "Bad_TooManyPublishRequests",
+}
+
+func (s overloadStatus) StatusCode() ua.StatusCode {
+	switch s {
+	case badTooManyOperations:
+		return ua.StatusBadTooManyOperations
+	case badResourceUnavailable:
+		return ua.StatusBadResourceUnavailable
+	case badTooManyPublishRequests:
+		return ua.StatusBadTooManyPublishRequests
+	}
+	return 0
 }
 
 func (s overloadStatus) String() string {

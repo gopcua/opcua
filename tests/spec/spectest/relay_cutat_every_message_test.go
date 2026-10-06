@@ -227,7 +227,7 @@ func cutAtRequestsSince(env *Environment, m Mark, message message.Message) []Ser
 		if !ok {
 			continue
 		}
-		if named, isNamed := messageOfRequest(decoded); isNamed && named == message {
+		if named, isNamed := MessageOf(decoded); isNamed && named == message {
 			matched = append(matched, record)
 		}
 	}
@@ -267,7 +267,7 @@ func cutAtPairedRequest(env *Environment, connection int, requestID uint32, mess
 		if !ok {
 			continue
 		}
-		if named, isNamed := messageOfRequest(decoded); isNamed && named == message {
+		if named, isNamed := MessageOf(decoded); isNamed && named == message {
 			return record, true
 		}
 	}
@@ -314,7 +314,7 @@ func assertRequestDroppedCut(env *Environment, m Mark, message message.Message) 
 	decoded, ok := target.Message()
 	Expect(ok).To(BeTrue(),
 		"the dropped %s record does not yield its decoded message", message)
-	named, isNamed := messageOfRequest(decoded)
+	named, isNamed := MessageOf(decoded)
 	Expect(isNamed && named == message).To(BeTrue(),
 		"the dropped record decodes to %T, want the %s request", decoded, message)
 }

@@ -770,7 +770,7 @@ func (r *Recorder) recordLocked(order, connection int, flow flow, state *streamS
 				return armedCut{}, false, false, 0, flowErr
 			}
 			if claimCuts && flow == clientToServer {
-				if target, named := messageOfRequest(svc.service); named {
+				if target, named := MessageOf(svc.service); named {
 					if cut, fired := r.relay.takeArmed(func(c armedCut) bool {
 						return c.moment == BeforeRequestReachesServer && c.message == target
 					}); fired {
@@ -835,7 +835,7 @@ func (r *Recorder) hasRecordedRequestLocked(connection int, requestID uint32, me
 			continue
 		}
 		if record.message != nil {
-			if named, ok := messageOfRequest(record.message); ok && named == message {
+			if named, ok := MessageOf(record.message); ok && named == message {
 				return true
 			}
 		}
@@ -923,10 +923,10 @@ func isResponseMoment(moment Moment) bool {
 	return moment == AfterResponseReachesClient || moment == ResponseNeverReachesClient
 }
 
-// messageOfRequest maps a decoded client request to the message.Message
+// MessageOf maps a decoded client request to the message.Message
 // naming it. The bool is false for a request the catalogue does not
 // name.
-func messageOfRequest(service any) (message.Message, bool) {
+func MessageOf(service any) (message.Message, bool) {
 	switch service.(type) {
 	case *ua.OpenSecureChannelRequest:
 		return message.OpenSecureChannel, true

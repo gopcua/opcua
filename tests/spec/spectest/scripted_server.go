@@ -49,6 +49,8 @@ type ScriptedServer struct {
 	retiredUnused            []string
 	retention                bool
 	nextFault                *armedAnswer
+	nextAnswerDuplicate      bool
+	nextAnswerSkip           bool
 	produced                 []Produced
 	producedBySub            map[*harnessSub][]int
 }
@@ -639,6 +641,22 @@ func (s *ScriptedServer) AnswerNextWith(msg message.Message, status ua.StatusCod
 	s.nextFault = &armedAnswer{message: msg, status: status}
 }
 
+// DuplicateNextAnswer makes the server's next Answer repeat the last
+// sequence number it sent for the subscription it answers, once.
+func (s *ScriptedServer) DuplicateNextAnswer() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.nextAnswerDuplicate = true
+}
+
+// SkipNextAnswer makes the server's next Answer skip one sequence
+// number, once.
+func (s *ScriptedServer) SkipNextAnswer() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.nextAnswerSkip = true
+}
+
 type armedAnswer struct {
 	message message.Message
 	status  ua.StatusCode
@@ -651,7 +669,7 @@ func (s *ScriptedServer) intercept(r ua.Request) (ua.Response, error, bool) {
 	s.mu.Lock()
 	var fault *armedAnswer
 	if s.nextFault != nil {
-		if message, named := messageOfRequest(r); named && message == s.nextFault.message {
+		if message, named := MessageOf(r); named && message == s.nextFault.message {
 			fault = s.nextFault
 			s.nextFault = nil
 		}
@@ -962,6 +980,15 @@ func (h HeldPublish) answer(sub Subscription, sequenceNumber uint32, v int32, us
 	}
 	if useCounter {
 		sequenceNumber = sub.sub.next
+	}
+	if s.nextAnswerDuplicate || s.nextAnswerSkip {
+		if s.nextAnswerDuplicate {
+			sequenceNumber = sub.sub.lastSent
+			s.nextAnswerDuplicate = false
+		} else {
+			sequenceNumber = sub.sub.lastSent + 2
+			s.nextAnswerSkip = false
+		}
 	}
 	for _, acknowledgement := range h.entry.request.SubscriptionAcknowledgements {
 		if acknowledgement != nil && acknowledgement.SubscriptionID == sub.sub.id {
