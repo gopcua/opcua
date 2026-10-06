@@ -15,7 +15,7 @@ import (
 
 func init() {
 	if os.Getenv("SPECTEST_MATRIX") != "" {
-		matrix.RegisterSuites([]matrix.Suite{suites.P4_06_07()}, nil, faults.AllFaults...)
+		matrix.RegisterSuites([]matrix.Suite{suites.P4_06_07()}, matrix.KnownDefects(), faults.AllFaults...)
 	}
 }
 
@@ -43,10 +43,11 @@ func TestMatrix(t *testing.T) {
 }
 
 // TestPlanOverTheRealSuite asserts the plan over the §6.7 suite and
-// the full fault catalogue builds one case per scenario × fault, and
-// prints how many apply and how many skip per scenario.
+// the full fault catalogue builds one case per scenario × fault with
+// the predicted defect table attached, and prints how many apply and
+// how many skip per scenario.
 func TestPlanOverTheRealSuite(t *testing.T) {
-	cases, err := matrix.Plan([]matrix.Suite{suites.P4_06_07()}, faults.AllFaults, nil)
+	cases, err := matrix.Plan([]matrix.Suite{suites.P4_06_07()}, faults.AllFaults, matrix.KnownDefects())
 	if err != nil {
 		t.Fatalf("Plan over the §6.7 suite returned an error: %v", err)
 	}
