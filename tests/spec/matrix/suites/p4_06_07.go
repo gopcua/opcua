@@ -18,10 +18,11 @@ import (
 	"github.com/gopcua/opcua/ua"
 )
 
-// P4_06_07 returns the Part 4 §6.7 suite: three scenarios whose base
-// action decides what the client must re-establish after the relay
-// cuts — the session, the session on a second server that refuses the
-// transfer, or the subscriptions on a server that forgot them.
+// P4_06_07 returns the Part 4 §6.7 suite: three scenarios whose prepare
+// step and transport loss decide what the client must re-establish
+// after the relay cuts — the session, the session on a second server
+// that refuses the transfer, or the subscriptions on a server that
+// forgot them.
 func P4_06_07() matrix.Suite { return p4_06_07{} }
 
 type p4_06_07 struct{}
@@ -36,8 +37,8 @@ func (p4_06_07) Scenarios() []matrix.Scenario {
 				message.HEL, message.OpenSecureChannel, message.ActivateSession, message.Read,
 				message.Republish, message.Publish, message.CloseSession, message.CloseSecureChannel,
 			},
-			own:  matrix.SessionSurvives,
-			base: baseSessionSurvives,
+			own:     matrix.SessionSurvives,
+			prepare: prepareSessionSurvives,
 		},
 		scenario06_07{
 			name: "SessionLost",
@@ -46,8 +47,8 @@ func (p4_06_07) Scenarios() []matrix.Scenario {
 				message.TransferSubscriptions, message.CreateSubscription, message.CreateMonitoredItems,
 				message.Publish, message.CloseSession, message.CloseSecureChannel,
 			},
-			own:  matrix.SessionLost,
-			base: baseSessionLost,
+			own:     matrix.SessionLost,
+			prepare: prepareSessionLost,
 		},
 		scenario06_07{
 			name: "SubscriptionsLost",
@@ -56,8 +57,8 @@ func (p4_06_07) Scenarios() []matrix.Scenario {
 				message.Republish, message.CreateSubscription, message.CreateMonitoredItems,
 				message.Publish, message.CloseSession, message.CloseSecureChannel,
 			},
-			own:  matrix.SubscriptionsLost,
-			base: baseSubscriptionsLost,
+			own:     matrix.SubscriptionsLost,
+			prepare: prepareSubscriptionsLost,
 		},
 	}
 }
@@ -91,20 +92,20 @@ func (p4_06_07) Rules(c matrix.Category) []rules.Rule {
 
 // scenario06_07 is one §6.7 scenario: the messages a correct client
 // sends after the arm point, the category the clause prescribes when
-// the fault leaves it to the scenario, and the base action that
-// breaks the connection and names the target the client must recover
-// on.
+// the fault leaves it to the scenario, and the prepare step that
+// stages the server side of the transport loss and names the target
+// the client must recover on.
 type scenario06_07 struct {
-	name  string
-	sends []message.Message
-	own   matrix.Category
-	base  func(env *spectest.Environment) target06_07
+	name    string
+	sends   []message.Message
+	own     matrix.Category
+	prepare func(env *spectest.Environment) target06_07
 }
 
-// target06_07 is what a base action leaves the workload with: the
-// server the client must end on, whether it must recreate its
-// subscription there, and how the scripted transfer answer refuses
-// when the base action queued one.
+// target06_07 is what a scenario's prepare step leaves the workload
+// with: the server the client must end on, whether it must recreate
+// its subscription there, and how the scripted transfer answer
+// refuses when the prepare queued one.
 type target06_07 struct {
 	server          *spectest.ScriptedServer
 	recreate        bool
@@ -149,9 +150,10 @@ func (s scenario06_07) Run(env *spectest.Environment, f faults.Fault) matrix.Out
 	}
 	last := env.LastSequenceNumber()
 	sub.Retain(last+1, values.v2)
+	t := s.prepare(env)
 	m := env.Mark()
 	injected := f.Inject(env)
-	t := s.base(env)
+	env.Relay.Cut()
 	env.TryWaitUntilReconnected(30 * time.Second)
 	faultEnd := time.Now()
 
@@ -198,31 +200,32 @@ func (s scenario06_07) Run(env *spectest.Environment, f faults.Fault) matrix.Out
 	}
 }
 
-// baseSessionSurvives cuts the relay, leaving the session and its
-// subscription on the one server the client was connected to.
-func baseSessionSurvives(env *spectest.Environment) target06_07 {
-	env.Relay.Cut()
+// prepareSessionSurvives leaves the session and its subscription on
+// the one server the client is connected to; the cut after the arm
+// point is the transport loss.
+func prepareSessionSurvives(env *spectest.Environment) target06_07 {
 	return target06_07{server: env.Server}
 }
 
-// baseSessionLost starts a second server that inherits the retention
-// queue, refuses the next transfer with Bad_SubscriptionIdInvalid,
-// sends the client's reconnects to it, and cuts: the client must
-// recreate its session and its subscription there.
-func baseSessionLost(env *spectest.Environment) target06_07 {
+// prepareSessionLost starts a second server that inherits the
+// retention queue, refuses the next transfer with
+// Bad_SubscriptionIdInvalid and sends the client's reconnects to it,
+// all before the arm point so server-side faults arm there; the cut
+// after the arm point is the transport loss, and the client must
+// recreate its session and its subscription on the second server.
+func prepareSessionLost(env *spectest.Environment) target06_07 {
 	second := env.StartServer()
 	second.QueueTransferRefusal(ua.StatusBadSubscriptionIDInvalid)
 	env.Relay.RedirectTo(second.Address())
-	env.Relay.Cut()
 	return target06_07{server: second, recreate: true, transferRefusal: refusedBadSubscriptionIDInvalid}
 }
 
-// baseSubscriptionsLost marks every subscription on the server
-// deleted and cuts: the session survives, but the server answers no
-// subscription the client holds.
-func baseSubscriptionsLost(env *spectest.Environment) target06_07 {
+// prepareSubscriptionsLost marks every subscription on the server
+// deleted: the session survives, but the server answers no
+// subscription the client holds; the cut after the arm point is the
+// transport loss.
+func prepareSubscriptionsLost(env *spectest.Environment) target06_07 {
 	env.Server.ForgetSubscriptions()
-	env.Relay.Cut()
 	return target06_07{server: env.Server, recreate: true}
 }
 

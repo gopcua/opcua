@@ -195,7 +195,7 @@ func (f overloadFault) Options() []spectest.Option { return nil }
 
 func (f overloadFault) Inject(env *spectest.Environment) *spectest.Injected {
 	o := observe(env)
-	env.Server.AnswerNextWith(f.service, f.status.StatusCode())
+	env.UpstreamServer().AnswerNextWith(f.service, f.status.StatusCode())
 	return spectest.NewInjected(func() bool { return o.serviceFaultWritten(f.service) })
 }
 
@@ -235,9 +235,9 @@ func (f serverFault) Inject(env *spectest.Environment) *spectest.Injected {
 	case pause:
 		env.Relay.HoldNextResponse(time.Second)
 	case duplicateSequence:
-		env.Server.DuplicateNextAnswer()
+		env.UpstreamServer().DuplicateNextAnswer()
 	case skippedSequence:
-		env.Server.SkipNextAnswer()
+		env.UpstreamServer().SkipNextAnswer()
 	}
 	return spectest.NewInjected(func() bool { return o.responseWritten() })
 }

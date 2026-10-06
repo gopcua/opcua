@@ -2,6 +2,7 @@ package faults
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/gopcua/opcua"
@@ -170,6 +171,59 @@ var _ = DescribeTable("Inject arms and Fired observes",
 		}
 	}, nil),
 )
+
+var _ = Describe("Inject arms on the server the client reconnects to", func() {
+	It("answers the reconnect's CreateSubscription on the second server with the scripted fault", func() {
+		env := spectest.Start(GinkgoT(),
+			spectest.WithClientOptions(opcua.RequestTimeout(2*time.Second)),
+			spectest.WithPublishingInterval(10*time.Millisecond))
+		second := env.StartServer()
+		second.QueueTransferRefusal(ua.StatusBadSubscriptionIDInvalid)
+		env.Relay.RedirectTo(second.Address())
+		Expect(env.UpstreamServer()).To(Equal(second),
+			"UpstreamServer did not name the server the redirect points at")
+		fault := faultNamed("Overload/CreateSubscription/Bad_TooManyOperations")
+		injected := fault.Inject(env)
+		Expect(injected).NotTo(BeNil(), "the overload fault returned no Injected")
+		env.Relay.Cut()
+		env.WaitUntilReconnected()
+
+		ownAddress := strings.TrimPrefix(second.Address(), "opc.tcp://")
+		Eventually(func(g Gomega) {
+			responses := env.Recorder.Responses()
+			saw := false
+			for _, record := range env.Recorder.Requests() {
+				message, decoded := record.Message()
+				if !decoded {
+					continue
+				}
+				if _, isCreate := message.(*ua.CreateSubscriptionRequest); !isCreate {
+					continue
+				}
+				if env.Recorder.UpstreamOf(record.Connection) != ownAddress {
+					continue
+				}
+				for i := range responses {
+					answer := responses[i]
+					if answer.Connection != record.Connection || answer.RequestID != record.RequestID {
+						continue
+					}
+					answerMessage, answerDecoded := answer.Message()
+					if !answerDecoded {
+						continue
+					}
+					if faultMessage, isFault := answerMessage.(*ua.ServiceFault); isFault && faultMessage.ResponseHeader.ServiceResult == ua.StatusBadTooManyOperations {
+						saw = true
+					}
+				}
+			}
+			g.Expect(saw).To(BeTrue(),
+				"the CreateSubscription on the second server was answered with no Bad_TooManyOperations ServiceFault")
+		}, 15*time.Second).Should(Succeed())
+		Eventually(injected.Fired).Within(15*time.Second).Should(BeTrue(),
+			"the fault never fired although the reconnect's CreateSubscription reached the second server")
+	})
+})
 
 var _ = Describe("Inject over the whole catalogue", func() {
 	It("arms every fault with a stable name and no options but the consumer's", func() {

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -263,6 +264,19 @@ func (e *Environment) Servers() []*ScriptedServer {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	return append([]*ScriptedServer{e.Server}, e.servers...)
+}
+
+// UpstreamServer returns the scripted server the relay's next
+// connection dials: the server a RedirectTo pointed at, or the
+// environment's own when no redirect is in place.
+func (e *Environment) UpstreamServer() *ScriptedServer {
+	upstream := strings.TrimPrefix(e.Relay.Upstream(), "opc.tcp://")
+	for _, server := range e.Servers() {
+		if strings.TrimPrefix(server.Address(), "opc.tcp://") == upstream {
+			return server
+		}
+	}
+	return e.Server
 }
 
 // StartServer starts a second, independent scripted server with the
