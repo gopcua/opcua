@@ -153,6 +153,11 @@ func (s scenario06_07) Run(env *spectest.Environment, f faults.Fault) matrix.Out
 	t := s.prepare(env)
 	m := env.Mark()
 	injected := f.Inject(env)
+	for i := range consumerBurst(f) {
+		if held, ok := env.Server.TryWaitHeldPublish(15 * time.Second); ok {
+			held.Answer(sub, values.burst[i])
+		}
+	}
 	if breaksTransport(f) {
 		env.Relay.Cut()
 	}
@@ -238,6 +243,16 @@ func breaksTransport(f faults.Fault) bool {
 	return f.Name() != "Link/Stall"
 }
 
+// consumerBurst says how many values the workload answers in a row
+// right after the arm point: the slow consumer's channel, four deep,
+// fills only when a burst outruns its 200 ms drain.
+func consumerBurst(f faults.Fault) int {
+	if f.Name() == "Consumer/Slow" {
+		return 8
+	}
+	return 0
+}
+
 // refusedBadSubscriptionIDInvalid recognizes the transfer answer the
 // SessionLost base action scripts: one result, Bad_SubscriptionIdInvalid.
 func refusedBadSubscriptionIDInvalid(answer spectest.ServiceRecord[ua.Response]) bool {
@@ -251,17 +266,23 @@ func refusedBadSubscriptionIDInvalid(answer spectest.ServiceRecord[ua.Response])
 
 // caseValues are the values one case answers, unique per case: 1000
 // times the case index plus a per-value offset, so a received value
-// matches the notification that carried it by value.
+// matches the notification that carried it by value. The burst is the
+// eight values the slow consumer's case answers right after arming.
 type caseValues struct {
 	v1       int32
 	v2       int32
 	v3       int32
 	sentinel int32
+	burst    [8]int32
 }
 
 var caseIndex atomic.Int64
 
 func nextCaseValues() caseValues {
 	base := int32(1000 * caseIndex.Add(1))
-	return caseValues{v1: base + 1, v2: base + 2, v3: base + 3, sentinel: base + 999}
+	values := caseValues{v1: base + 1, v2: base + 2, v3: base + 3, sentinel: base + 999}
+	for i := range values.burst {
+		values.burst[i] = base + int32(11+i)
+	}
+	return values
 }

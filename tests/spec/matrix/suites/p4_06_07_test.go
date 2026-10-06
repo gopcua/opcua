@@ -41,3 +41,20 @@ func TestBreaksTransport(t *testing.T) {
 		}
 	}
 }
+
+// TestConsumerBurst pins how many values the workload answers right
+// after arming: only the slow consumer needs a burst, large enough to
+// fill its notification buffer.
+func TestConsumerBurst(t *testing.T) {
+	for name, want := range map[string]int{
+		"Consumer/Slow":                          8,
+		"Link/Stall":                             0,
+		"Server/Pause":                           0,
+		"RequestLost/Publish":                    0,
+		"Overload/Publish/Bad_TooManyOperations": 0,
+	} {
+		if got := consumerBurst(faultByName(t, name)); got != want {
+			t.Errorf("consumerBurst(%s) = %d, want %d", name, got, want)
+		}
+	}
+}
