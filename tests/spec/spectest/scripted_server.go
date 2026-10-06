@@ -857,6 +857,52 @@ func (s *ScriptedServer) TryWaitCreatedSubscription(m Mark, timeout time.Duratio
 	}
 }
 
+// SubscriptionCreatedSince returns the first subscription this
+// server recorded a CreateSubscriptionResponse for after m whose
+// harness subscription is still live, without waiting; false when the
+// traffic since m created none. A response whose subscription the
+// client deleted is skipped.
+func (s *ScriptedServer) SubscriptionCreatedSince(m Mark) (Subscription, bool) {
+	ownAddress := strings.TrimPrefix(s.address, "opc.tcp://")
+	s.mu.Lock()
+	faultErr := s.faultErr
+	recorder := s.recorder
+	s.mu.Unlock()
+	if faultErr != nil {
+		s.t.Fatalf("%s", faultErr)
+		return Subscription{}, false
+	}
+	if recorder == nil {
+		return Subscription{}, false
+	}
+	for _, record := range recorder.ResponsesSince(m) {
+		if recorder.connectionUpstreamOf(record.Connection) != ownAddress {
+			continue
+		}
+		message, forwarded := record.Message()
+		if !forwarded {
+			continue
+		}
+		response, isCreate := message.(*ua.CreateSubscriptionResponse)
+		if !isCreate {
+			continue
+		}
+		s.mu.Lock()
+		sub, live := s.subscriptions[response.SubscriptionID]
+		deleted := live && sub.deleted
+		s.mu.Unlock()
+		if !live {
+			s.t.Fatalf("%s", harnessFault("this server recorded a CreateSubscription response with id %d but no harness subscription for it", response.SubscriptionID))
+			return Subscription{}, false
+		}
+		if deleted {
+			continue
+		}
+		return Subscription{server: s, sub: sub}, true
+	}
+	return Subscription{}, false
+}
+
 func (s *ScriptedServer) republish(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
 	if response, err, handled := s.intercept(r); handled {
 		return response, err

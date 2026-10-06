@@ -184,6 +184,36 @@ var _ = Describe("ScriptedServer TryWaitHeldPublish", func() {
 	})
 })
 
+var _ = Describe("ScriptedServer SubscriptionCreatedSince", func() {
+	It("returns a subscription the client created after the mark, without waiting", func() {
+		env := Start(GinkgoT())
+		m := env.Mark()
+		_, ok := env.Server.SubscriptionCreatedSince(m)
+		Expect(ok).To(BeFalse(), "SubscriptionCreatedSince reported a subscription although the client created none")
+
+		notifications := make(chan *opcua.PublishNotificationData, notificationBuffer)
+		subscribeCtx, subscribeCancel := context.WithTimeout(context.Background(), specWait)
+		defer subscribeCancel()
+		_, err := env.Client.Subscribe(subscribeCtx, &opcua.SubscriptionParameters{
+			Interval:          100 * time.Millisecond,
+			LifetimeCount:     lifetimeCount,
+			MaxKeepAliveCount: maxKeepAliveCount,
+		}, notifications)
+		Expect(err).NotTo(HaveOccurred(), "the client created no second subscription: %v", err)
+		created, ok := env.Server.SubscriptionCreatedSince(m)
+		Expect(ok).To(BeTrue(), "SubscriptionCreatedSince reported no subscription although the client created one")
+		Expect(created.ID()).NotTo(Equal(env.Subscription().ID()),
+			"the returned subscription is the one created before the mark")
+	})
+
+	It("reports no subscription on a server the client never connects to", func() {
+		env := Start(GinkgoT())
+		second := env.StartServer()
+		_, ok := second.SubscriptionCreatedSince(env.Mark())
+		Expect(ok).To(BeFalse(), "a server the client never connected to created a subscription")
+	})
+})
+
 var _ = Describe("ScriptedServer TryWaitCreatedSubscription", func() {
 	It("returns a subscription the client created after the mark", func() {
 		env := Start(GinkgoT())

@@ -135,6 +135,12 @@ func (s scenario06_07) Category(f faults.Fault) matrix.Category {
 	return s.own
 }
 
+// Run drives one §6.7 case. The workload answers v3 and the sentinel
+// on the subscription the client publishes with: the one the recreate
+// scenarios make it create, or — when the scenario keeps the session —
+// whatever live subscription the client holds, because a client that
+// recreates its subscription there violates KeepsSubscriptionID and
+// the case must still reach its checks.
 func (s scenario06_07) Run(env *spectest.Environment, f faults.Fault) matrix.Outcome {
 	values := nextCaseValues()
 	sub := env.Subscription()
@@ -160,6 +166,8 @@ func (s scenario06_07) Run(env *spectest.Environment, f faults.Fault) matrix.Out
 		} else {
 			canAnswer = false
 		}
+	} else if created, ok := t.server.SubscriptionCreatedSince(m); ok {
+		answering = created
 	}
 	sentinel := int32(0)
 	var answeredAt time.Time
