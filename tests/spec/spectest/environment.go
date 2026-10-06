@@ -257,6 +257,14 @@ func (e *Environment) ClientSubscription() *opcua.Subscription {
 	return e.clientSubscription
 }
 
+// Servers returns every server the environment created: its own and
+// every one StartServer made, in creation order.
+func (e *Environment) Servers() []*ScriptedServer {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return append([]*ScriptedServer{e.Server}, e.servers...)
+}
+
 // StartServer starts a second, independent scripted server with the
 // same namespace and node as the Environment's own, sharing the
 // Environment's recorder. Its traffic flows through the relay only

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/gopcua/opcua/tests/spec/spectest"
 	"github.com/onsi/gomega/types"
 )
 
@@ -51,6 +52,8 @@ type Observed struct {
 	FaultEnd            time.Time
 	Sentinel            *Sentinel
 	Fired               bool
+
+	env *spectest.Environment
 }
 
 func asObserved(actual any) (Observed, error) {

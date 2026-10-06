@@ -317,6 +317,21 @@ func (r *Recorder) ConnectionOf(addr net.Addr) (int, ConnectionState) {
 	return entry.index, Open
 }
 
+// Upstream returns the upstream address the relay dials for
+// connections it accepts from now on.
+func (r *Relay) Upstream() string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.upstream
+}
+
+// UpstreamOf returns the upstream address the relay dialled for the
+// connection with the given index, or "" for a connection that never
+// dialled one.
+func (r *Recorder) UpstreamOf(index int) string {
+	return r.connectionUpstreamOf(index)
+}
+
 // ConnectionStateOf returns the state of the relay connection with the
 // given index.
 func (r *Recorder) ConnectionStateOf(index int) ConnectionState {
