@@ -523,6 +523,15 @@ func (r *Recorder) markStalled(connection int, flow flow, message []byte) {
 	}
 }
 
+// dialledUpstream says whether the relay dialled the upstream server
+// for the connection with the given index, including a dial whose
+// connection it then closed.
+func (r *Relay) dialledUpstream(index int) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.dialled[index]
+}
+
 // discards says whether the relay must not write this message: the
 // connection is stalled, or the message is the ACK a DiscardNextACK
 // armed discards, whose claim it consumes.
@@ -989,6 +998,7 @@ type Relay struct {
 	armedDelay      *armedDelay
 	draining        map[int]bool
 	stalled         map[int]bool
+	dialled         map[int]bool
 	closeNextAccept int
 	discardACKConn  int
 	upstream        string
@@ -1245,6 +1255,7 @@ func newRelay(t T, upstream string, onCut func()) (*Relay, *Recorder) {
 		onCut:          onCut,
 		draining:       make(map[int]bool),
 		stalled:        make(map[int]bool),
+		dialled:        make(map[int]bool),
 		discardACKConn: -1,
 		upstream:       strings.TrimPrefix(upstream, "opc.tcp://"),
 	}
@@ -1375,6 +1386,9 @@ func (r *Relay) acceptLoop(recorder *Recorder) {
 			recorder.setRelayError(fmt.Errorf("the relay could not connect to the upstream server at %s: %w", addr, err))
 			continue
 		}
+		r.mu.Lock()
+		r.dialled[connection] = true
+		r.mu.Unlock()
 		r.mu.Lock()
 		if r.closed {
 			r.mu.Unlock()

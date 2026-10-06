@@ -24,13 +24,19 @@ var _ = Describe("Relay link faults", func() {
 				"the relay accepted %d connections after the cut, want at least four: three closed on accept and the fourth connected", env.ConnectionsSince(m))
 		}, specWait).Should(Succeed())
 		var withoutUpstream []int
+		var dialled []int
 		for index := m.connections; index < env.Relay.ConnectionCount(); index++ {
 			if env.Recorder.connectionUpstreamOf(index) == "" {
 				withoutUpstream = append(withoutUpstream, index)
 			}
+			if env.Relay.dialledUpstream(index) {
+				dialled = append(dialled, index)
+			}
 		}
 		Expect(withoutUpstream).To(Equal([]int{m.connections, m.connections + 1, m.connections + 2}),
 			"the connections with no upstream are %v, want exactly the first three accepted after the cut", withoutUpstream)
+		Expect(dialled).To(Equal([]int{m.connections + 3}),
+			"the relay dialled the upstream server for connections %v, want only the first connection it did not close on accept", dialled)
 		readNode(env.Client, env.Server.node)
 	})
 
@@ -65,6 +71,10 @@ var _ = Describe("Relay link faults", func() {
 		m := env.Mark()
 
 		env.Relay.Stall()
+		// The stalled connection swallows the request, so the read
+		// fails on the client's request timeout; it only has to make
+		// the client send one.
+		go func() { _, _ = readNodeOnce(env.Client, env.Server.node) }()
 		var stalled []ServiceRecord[ua.Request]
 		Eventually(func(g Gomega) {
 			stalled = nil
