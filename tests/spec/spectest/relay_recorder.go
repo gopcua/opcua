@@ -52,12 +52,16 @@ const (
 
 // ServiceRecord is one service message the relay observed on one
 // connection; a Forwarded or Dropped record holds its decoded
-// message, the other Fates hold none.
+// message, the other Fates hold none. ReadAt is the moment the relay
+// read the message's final bytes and WrittenAt the moment it wrote
+// them upstream, so the two bracket a DelayAt hold.
 type ServiceRecord[M any] struct {
 	Order      int
 	Connection int
 	RequestID  uint32
 	Fate       Fate
+	ReadAt     time.Time
+	WrittenAt  time.Time
 	message    M
 }
 
@@ -91,12 +95,16 @@ type TransportError struct {
 
 // TransportRecord is one transport handshake or error message the
 // relay observed; Fate says whether the relay forwarded it or a cut
-// CutAt armed dropped it.
+// CutAt armed dropped it. ReadAt is the moment the relay read the
+// message and WrittenAt the moment it wrote it, so the two bracket a
+// DelayAt hold.
 type TransportRecord struct {
 	Order      int
 	Connection int
 	Type       TransportType
 	Fate       Fate
+	ReadAt     time.Time
+	WrittenAt  time.Time
 	Err        *TransportError
 }
 
@@ -167,27 +175,29 @@ func (e *harnessError) Error() string {
 // Recorder collects every message the relay observes. All methods are
 // safe for concurrent use and return copies.
 type Recorder struct {
-	t           T
-	relay       *Relay
-	mu          sync.Mutex
-	order       int
-	requests    []ServiceRecord[ua.Request]
-	responses   []ServiceRecord[ua.Response]
-	transport   []TransportRecord
-	log         []any
-	streams     map[streamKey]*streamState
-	chunkCounts map[chunkKey]int
-	connections map[string]*connectionEntry
-	err         error
-	reported    bool
+	t                   T
+	relay               *Relay
+	mu                  sync.Mutex
+	order               int
+	requests            []ServiceRecord[ua.Request]
+	responses           []ServiceRecord[ua.Response]
+	transport           []TransportRecord
+	log                 []any
+	streams             map[streamKey]*streamState
+	chunkCounts         map[chunkKey]int
+	intermediateWritten map[chunkKey]time.Time
+	connections         map[string]*connectionEntry
+	err                 error
+	reported            bool
 }
 
 func newRecorder(t T) *Recorder {
 	recorder := &Recorder{
-		t:           t,
-		streams:     make(map[streamKey]*streamState),
-		chunkCounts: make(map[chunkKey]int),
-		connections: make(map[string]*connectionEntry),
+		t:                   t,
+		streams:             make(map[streamKey]*streamState),
+		chunkCounts:         make(map[chunkKey]int),
+		intermediateWritten: make(map[chunkKey]time.Time),
+		connections:         make(map[string]*connectionEntry),
 	}
 	t.Cleanup(func() {
 		recorder.mu.Lock()
@@ -319,6 +329,26 @@ func (r *Recorder) ConnectionStateOf(index int) ConnectionState {
 	return Unknown
 }
 
+// TimesOf returns when the relay read the message of a record and when
+// it wrote it upstream, for a Forwarded record. The bool is false for
+// a record whose message was never written, or that the relay never
+// read through forward.
+func (r *Recorder) TimesOf(order int) (read time.Time, written time.Time, ok bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, candidate := range r.requests {
+		if candidate.Order == order {
+			return candidate.ReadAt, candidate.WrittenAt, !candidate.WrittenAt.IsZero()
+		}
+	}
+	for _, candidate := range r.responses {
+		if candidate.Order == order {
+			return candidate.ReadAt, candidate.WrittenAt, !candidate.WrittenAt.IsZero()
+		}
+	}
+	return time.Time{}, time.Time{}, false
+}
+
 func (r *Recorder) position() int {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -408,17 +438,20 @@ func (r *Recorder) setRelayError(err error) {
 func (r *Recorder) observe(connection int, flow flow, data []byte) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	_, _, _ = r.observeLocked(connection, flow, data, false)
+	_, _, _, _ = r.observeLocked(connection, flow, data, false)
 }
 
 func (r *Recorder) forward(connection int, flow flow, data []byte, write func([]byte) error, finishAfterResponse func(armedCut) error) error {
 	r.mu.Lock()
-	messages, cut, err := r.observeLocked(connection, flow, data, true)
+	messages, cut, hold, err := r.observeLocked(connection, flow, data, true)
 	r.mu.Unlock()
 	// The writes stay outside the recorder lock: a write to a peer
 	// that stopped reading blocks, and every connection's pump
 	// shares this lock.
 	for i, message := range messages {
+		if hold.index == i {
+			time.Sleep(time.Until(hold.releaseAt))
+		}
 		if cut.index == i && cut.drop {
 			r.relay.closeConnection(connection, cut.claim)
 			return err
@@ -429,6 +462,7 @@ func (r *Recorder) forward(connection int, flow flow, data []byte, write func([]
 			}
 			return writeErr
 		}
+		r.noteWritten(connection, flow, message)
 		if cut.index == i {
 			if finishErr := finishAfterResponse(cut.claim); finishErr != nil {
 				r.setRelayError(fmt.Errorf("the relay could not half-close the client side after the response it wrote: %w", finishErr))
@@ -438,6 +472,69 @@ func (r *Recorder) forward(connection int, flow flow, data []byte, write func([]
 		}
 	}
 	return err
+}
+
+func (r *Recorder) noteWritten(connection int, flow flow, message []byte) {
+	header, _, splitErr := splitMessages(message)
+	if splitErr != nil || len(header) != 1 {
+		return
+	}
+	decoded, err := decodeFrame(header[0])
+	if err != nil {
+		return
+	}
+	now := time.Now()
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	switch frame := decoded.(type) {
+	case *transportFrame:
+		for i := range r.transport {
+			record := &r.transport[i]
+			if record.Connection == connection && record.WrittenAt.IsZero() && matchesTransport(record, frame) {
+				record.WrittenAt = now
+				return
+			}
+		}
+	case *chunkFrame:
+		key := chunkKey{connection, flow, frame.requestID}
+		if frame.chunkType == uacp.ChunkTypeIntermediate {
+			r.intermediateWritten[key] = now
+			return
+		}
+		if r.intermediateWritten[key].After(now) {
+			now = r.intermediateWritten[key]
+		}
+		delete(r.intermediateWritten, key)
+		if flow == clientToServer {
+			for i := range r.requests {
+				record := &r.requests[i]
+				if record.Connection == connection && record.RequestID == frame.requestID && record.WrittenAt.IsZero() {
+					record.WrittenAt = now
+					return
+				}
+			}
+			return
+		}
+		for i := range r.responses {
+			record := &r.responses[i]
+			if record.Connection == connection && record.RequestID == frame.requestID && record.WrittenAt.IsZero() {
+				record.WrittenAt = now
+				return
+			}
+		}
+	}
+}
+
+func matchesTransport(record *TransportRecord, frame *transportFrame) bool {
+	switch record.Type {
+	case HEL:
+		return frame.messageType == uacp.MessageTypeHello
+	case ACK:
+		return frame.messageType == uacp.MessageTypeAcknowledge
+	case ERR:
+		return frame.messageType == uacp.MessageTypeError
+	}
+	return false
 }
 
 func (r *Recorder) observeClose(connection int, flow flow) {
@@ -457,7 +554,7 @@ func (r *Recorder) observeClose(connection int, flow flow) {
 	delete(r.streams, key)
 }
 
-func (r *Recorder) observeLocked(connection int, flow flow, data []byte, claimCuts bool) ([][]byte, firedCut, error) {
+func (r *Recorder) observeLocked(connection int, flow flow, data []byte, claimCuts bool) ([][]byte, firedCut, heldCut, error) {
 	key := streamKey{connection, flow}
 	state := r.streams[key]
 	if state == nil {
@@ -468,13 +565,19 @@ func (r *Recorder) observeLocked(connection int, flow flow, data []byte, claimCu
 	messages, rest, splitErr := splitMessages(stream)
 	state.rest = bytes.Clone(rest)
 	cut := firedCut{index: -1}
+	hold := heldCut{index: -1}
+	readAt := time.Now()
 	for i, message := range messages {
 		offset := state.consumed
 		state.consumed += len(message)
 		order := r.nextOrderLocked()
-		claim, dropped, afterResponse, recordErr := r.recordLocked(order, connection, flow, state, message, claimCuts)
+		claim, dropped, afterResponse, delay, recordErr := r.recordLocked(order, connection, flow, state, message, claimCuts)
+		r.stampReadAtLocked(connection, flow, message, readAt)
 		if recordErr != nil {
 			r.setErrorLocked(connection, flow, offset, recordErr)
+		}
+		if delay > 0 && hold.index < 0 {
+			hold = heldCut{index: i, releaseAt: readAt.Add(delay)}
 		}
 		if (dropped || afterResponse) && cut.index < 0 {
 			cut = firedCut{index: i, drop: dropped, claim: claim}
@@ -484,15 +587,50 @@ func (r *Recorder) observeLocked(connection int, flow flow, data []byte, claimCu
 	}
 	if splitErr != nil {
 		r.setErrorLocked(connection, flow, state.consumed, splitErr)
-		return messages, cut, splitErr
+		return messages, cut, hold, splitErr
 	}
-	return messages, cut, nil
+	return messages, cut, hold, nil
 }
 
-func (r *Recorder) recordLocked(order, connection int, flow flow, state *streamState, message []byte, claimCuts bool) (claimed armedCut, dropped bool, afterResponse bool, err error) {
+func (r *Recorder) stampReadAtLocked(connection int, flow flow, message []byte, readAt time.Time) {
 	decoded, err := decodeFrame(message)
 	if err != nil {
-		return armedCut{}, false, false, err
+		return
+	}
+	switch frame := decoded.(type) {
+	case *transportFrame:
+		for i := range r.transport {
+			record := &r.transport[i]
+			if record.Connection == connection && record.ReadAt.IsZero() && matchesTransport(record, frame) {
+				record.ReadAt = readAt
+				return
+			}
+		}
+	case *chunkFrame:
+		if flow == clientToServer {
+			for i := range r.requests {
+				record := &r.requests[i]
+				if record.Connection == connection && record.RequestID == frame.requestID && record.ReadAt.IsZero() {
+					record.ReadAt = readAt
+					return
+				}
+			}
+			return
+		}
+		for i := range r.responses {
+			record := &r.responses[i]
+			if record.Connection == connection && record.RequestID == frame.requestID && record.ReadAt.IsZero() {
+				record.ReadAt = readAt
+				return
+			}
+		}
+	}
+}
+
+func (r *Recorder) recordLocked(order, connection int, flow flow, state *streamState, message []byte, claimCuts bool) (claimed armedCut, dropped bool, afterResponse bool, delay time.Duration, err error) {
+	decoded, err := decodeFrame(message)
+	if err != nil {
+		return armedCut{}, false, false, 0, err
 	}
 	switch frame := decoded.(type) {
 	case *transportFrame:
@@ -519,24 +657,29 @@ func (r *Recorder) recordLocked(order, connection int, flow flow, state *streamS
 				}
 			}
 		}
+		if claimCuts && flow == clientToServer && frame.messageType == uacp.MessageTypeHello {
+			if d, armed := r.relay.takeDelay(faults.HEL); armed {
+				delay = d
+			}
+		}
 		record := transportRecord(order, connection, frame)
 		record.Fate = fate
 		r.transport = append(r.transport, record)
 		r.log = append(r.log, record)
-		return claim, dropped, afterResponse, nil
+		return claim, dropped, afterResponse, delay, nil
 	case *chunkFrame:
 		r.chunkCounts[chunkKey{connection, flow, frame.requestID}]++
 		service, complete, err := state.reassembler.add(frame)
 		if err != nil {
-			return armedCut{}, false, false, err
+			return armedCut{}, false, false, 0, err
 		}
 		if !complete {
-			return armedCut{}, false, false, nil
+			return armedCut{}, false, false, 0, nil
 		}
 		switch message := service.(type) {
 		case *completeMessage:
 			if flowErr := serviceDirectionError(flow, message.service); flowErr != nil {
-				return armedCut{}, false, false, flowErr
+				return armedCut{}, false, false, 0, flowErr
 			}
 			if claimCuts && flow == clientToServer {
 				if target, named := messageOfRequest(message.service); named {
@@ -544,7 +687,10 @@ func (r *Recorder) recordLocked(order, connection int, flow flow, state *streamS
 						return c.moment == BeforeRequestReachesServer && c.message == target
 					}); fired {
 						r.appendService(order, connection, flow, message.requestID, Dropped, message.service)
-						return cut, true, false, nil
+						return cut, true, false, 0, nil
+					}
+					if d, armed := r.relay.takeDelay(target); armed {
+						delay = d
 					}
 				}
 			}
@@ -554,20 +700,20 @@ func (r *Recorder) recordLocked(order, connection int, flow flow, state *streamS
 				}); fired {
 					if cut.moment == ResponseNeverReachesClient {
 						r.appendService(order, connection, flow, message.requestID, Dropped, message.service)
-						return cut, true, false, nil
+						return cut, true, false, 0, nil
 					}
 					r.appendService(order, connection, flow, message.requestID, Forwarded, message.service)
-					return cut, false, true, nil
+					return cut, false, true, 0, nil
 				}
 			}
 			r.appendService(order, connection, flow, message.requestID, Forwarded, message.service)
-			return armedCut{}, false, false, nil
+			return armedCut{}, false, false, delay, nil
 		case *abortedMessage:
 			r.appendService(order, connection, flow, message.requestID, Aborted, nil)
-			return armedCut{}, false, false, nil
+			return armedCut{}, false, false, 0, nil
 		}
 	}
-	return armedCut{}, false, false, nil
+	return armedCut{}, false, false, 0, nil
 }
 
 func (r *Recorder) lastClientHandleOf(subscriptionID uint32) (handle uint32, found bool) {
@@ -732,6 +878,11 @@ type firedCut struct {
 	claim armedCut
 }
 
+type heldCut struct {
+	index     int
+	releaseAt time.Time
+}
+
 func (c armedCut) describe() string {
 	switch c.moment {
 	case AfterResponseReachesClient:
@@ -756,8 +907,15 @@ type Relay struct {
 	onCut       func()
 	nextCutID   int
 	armed       []armedCut
+	armedDelay  *armedDelay
 	draining    map[int]bool
 	upstream    string
+}
+
+type armedDelay struct {
+	message faults.Message
+	hold    time.Duration
+	firing  bool
 }
 
 type relayConn struct {
@@ -831,6 +989,39 @@ func (r *Relay) CutAt(moment Moment, message faults.Message) {
 	r.armed = append(r.armed, armedCut{id: r.nextCutID, moment: moment, message: message})
 	r.nextCutID++
 	r.mu.Unlock()
+}
+
+// DelayAt arms one hold: the request of the first matching message
+// after arming, client-to-server only, is held for d before the relay
+// writes it upstream. Every later message in that direction on that
+// connection waits behind it, and all are released in their original
+// order at one moment. The service of a request is known only at its
+// last chunk, so earlier chunks of the held request are already
+// forwarded; the hold starts at the last chunk.
+func (r *Relay) DelayAt(message faults.Message, d time.Duration) {
+	if message == faults.CloseSecureChannel {
+		r.t.Fatalf("%s", harnessFault("the client sends CloseSecureChannel only while closing, so no request of it can arrive to delay"))
+		return
+	}
+	if message < faults.HEL || message > faults.TransferSubscriptions {
+		r.t.Fatalf("%s", harnessFault("DelayAt received an unknown Message %d", int(message)))
+		return
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.armedDelay = &armedDelay{message: message, hold: d}
+}
+
+// takeDelay reports the hold armed for message, marking it firing so
+// one armed hold delays one matching request only.
+func (r *Relay) takeDelay(message faults.Message) (time.Duration, bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.armedDelay == nil || r.armedDelay.firing || r.armedDelay.message != message {
+		return 0, false
+	}
+	r.armedDelay.firing = true
+	return r.armedDelay.hold, true
 }
 
 // ArmedCuts returns a readable description of every cut CutAt armed
