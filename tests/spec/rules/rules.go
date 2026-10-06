@@ -1,0 +1,381 @@
+package rules
+
+import (
+	"slices"
+	"time"
+
+	"github.com/gopcua/opcua/tests/spec/spectest"
+	"github.com/gopcua/opcua/ua"
+
+	"github.com/onsi/gomega"
+)
+
+// Rule is one Part 4 behaviour the specs assert: a stable Name the
+// known-defect table cites, the Clause label and Keyword of its
+// sentence in the standard, and the Check that asserts it against the
+// context the caller observed.
+type Rule struct {
+	Name    string
+	Clause  string
+	Keyword string
+	Check   func(c Context)
+}
+
+// Context is what a rule's Check needs: the environment the scenario
+// ran in, the Mark taken before the fault, the last sequence number
+// the client delivered, the subscription the client held before the
+// fault and the one it recreated when it did, the server the client
+// should end on, how a transfer answer refuses when the scenario
+// scripted one, and the value the scenario answered on the new
+// subscription.
+type Context struct {
+	Env             *spectest.Environment
+	Mark            spectest.Mark
+	LastSeq         uint32
+	Sub             spectest.Subscription
+	Recreated       spectest.Subscription
+	Server          *spectest.ScriptedServer
+	TransferRefusal func(spectest.ServiceRecord[ua.Response]) bool
+	Value           int32
+}
+
+// ReactivatesSession: after a transport loss the client re-activates
+// the session it had, carrying the authentication token the server
+// issued before the loss.
+var ReactivatesSession = Rule{
+	Name:    "ReactivatesSession",
+	Clause:  "P4-6.7",
+	Keyword: "shall",
+	Check: func(c Context) {
+		reactivationAnswer(c.Env, c.Mark)
+	},
+}
+
+// CreatesNoSession: the client creates no new session before the
+// re-activation of the old one was answered, and none after it
+// succeeded.
+var CreatesNoSession = Rule{
+	Name:    "CreatesNoSession",
+	Clause:  "P4-6.7",
+	Keyword: "shall",
+	Check: func(c Context) {
+		reactivation := reactivationAnswer(c.Env, c.Mark)
+		gomega.Expect(slices.ContainsFunc(RequestsOfType[*ua.CreateSessionRequest](c.Env.Recorder.RequestsSince(c.Mark)), func(request spectest.ServiceRecord[ua.Request]) bool {
+			return request.Order < reactivation.Order
+		})).To(gomega.BeFalse(), "client sent a CreateSession request before the server answered ActivateSession")
+		gomega.Consistently(func(g gomega.Gomega) {
+			g.Expect(RequestsOfType[*ua.CreateSessionRequest](c.Env.Recorder.RequestsSince(c.Mark))).To(gomega.BeEmpty(), "client sent a CreateSession request after the server answered ActivateSession")
+		}, 2*time.Second).Should(gomega.Succeed())
+	},
+}
+
+// RepublishesFromNextSequence: the client republishes from the next
+// expected sequence number, incrementing, until the server answers
+// Bad_MessageNotAvailable.
+var RepublishesFromNextSequence = Rule{
+	Name:    "RepublishesFromNextSequence",
+	Clause:  "P4-6.7",
+	Keyword: "shall",
+	Check: func(c Context) {
+		gomega.Eventually(func(g gomega.Gomega) {
+			requests := c.Env.Recorder.RequestsSince(c.Mark)
+			responses := c.Env.Recorder.ResponsesSince(c.Mark)
+			complete := false
+			first, firstSent := RepublishForSequence(requests, c.LastSeq+1)
+			if firstSent {
+				second, secondSent := RepublishForSequence(requests, c.LastSeq+2)
+				if secondSent && second.Order > first.Order {
+					if answer, answered := AnswerTo(second, responses); answered {
+						if status, decoded := StatusOf(answer); decoded && status == ua.StatusBadMessageNotAvailable {
+							complete = true
+						}
+					}
+				}
+			}
+			g.Expect(complete).To(gomega.BeTrue(), "no Republish request for sequence number %d followed by one for %d answered Bad_MessageNotAvailable was recorded after the reconnect", c.LastSeq+1, c.LastSeq+2)
+		}, 15*time.Second).Should(gomega.Succeed())
+		gomega.Consistently(func(g gomega.Gomega) {
+			republishes := RequestsOfType[*ua.RepublishRequest](c.Env.Recorder.RequestsSince(c.Mark))
+			g.Expect(republishes).To(gomega.HaveLen(2), "client sent more than the two expected Republish requests after the cut: %d recorded", len(republishes))
+		}, 2*time.Second).Should(gomega.Succeed())
+	},
+}
+
+// SendsNoPublishBeforeNotAvailable: the client sends no Publish
+// request on its new connection until the Republish the server
+// answered Bad_MessageNotAvailable.
+var SendsNoPublishBeforeNotAvailable = Rule{
+	Name:    "SendsNoPublishBeforeNotAvailable",
+	Clause:  "P4-6.7",
+	Keyword: "should",
+	Check: func(c Context) {
+		notAvailableAnswer := WaitAnsweredBadMessageNotAvailable(c.Env, c.Mark)
+		gomega.Expect(slices.ContainsFunc(RequestsOfType[*ua.PublishRequest](c.Env.Recorder.RequestsSince(c.Mark)), func(request spectest.ServiceRecord[ua.Request]) bool {
+			return request.Connection == notAvailableAnswer.Connection && request.Order < notAvailableAnswer.Order
+		})).To(gomega.BeFalse(), "client sent a Publish request on the new connection before the Republish was answered Bad_MessageNotAvailable")
+	},
+}
+
+// SendsNoTransferForOwnSubscription: the client sends no
+// TransferSubscriptions request for a subscription its own session
+// owns.
+var SendsNoTransferForOwnSubscription = Rule{
+	Name:    "SendsNoTransferForOwnSubscription",
+	Clause:  "P4-5.14.7.4",
+	Keyword: "shall",
+	Check: func(c Context) {
+		notAvailableAnswer := WaitAnsweredBadMessageNotAvailable(c.Env, c.Mark)
+		gomega.Expect(slices.ContainsFunc(RequestsOfType[*ua.TransferSubscriptionsRequest](c.Env.Recorder.RequestsSince(c.Mark)), func(request spectest.ServiceRecord[ua.Request]) bool {
+			return request.Order < notAvailableAnswer.Order
+		})).To(gomega.BeFalse(), "client sent a TransferSubscriptions request before the Republish was answered Bad_MessageNotAvailable")
+		gomega.Consistently(func(g gomega.Gomega) {
+			g.Expect(RequestsOfType[*ua.TransferSubscriptionsRequest](c.Env.Recorder.RequestsSince(c.Mark))).To(gomega.BeEmpty(), "client sent a TransferSubscriptions request for a subscription its own session owns")
+		}, 2*time.Second).Should(gomega.Succeed())
+	},
+}
+
+// KeepsSubscriptionID: the client republishes under the subscription
+// id it had before the cut, and creates no new subscription instead.
+var KeepsSubscriptionID = Rule{
+	Name:    "KeepsSubscriptionID",
+	Clause:  "P4-6.7",
+	Keyword: "shall",
+	Check: func(c Context) {
+		WaitAnsweredBadMessageNotAvailable(c.Env, c.Mark)
+		wrongID := false
+		for _, republish := range RequestsOfType[*ua.RepublishRequest](c.Env.Recorder.RequestsSince(c.Mark)) {
+			message, decoded := republish.Message()
+			if !decoded {
+				continue
+			}
+			if request, is := message.(*ua.RepublishRequest); is && request.SubscriptionID != c.Sub.ID() {
+				wrongID = true
+			}
+		}
+		gomega.Expect(wrongID).To(gomega.BeFalse(), "client sent a Republish request naming a subscription id other than %d", c.Sub.ID())
+		gomega.Consistently(func(g gomega.Gomega) {
+			g.Expect(RequestsOfType[*ua.CreateSubscriptionRequest](c.Env.Recorder.RequestsSince(c.Mark))).To(gomega.BeEmpty(), "client created a new subscription instead of keeping subscription %d", c.Sub.ID())
+		}, 2*time.Second).Should(gomega.Succeed())
+	},
+}
+
+// CreatesSessionOnlyAfterActivateFailed: the client creates a new
+// session only after trying to activate the old one and being refused
+// Bad_SessionIdInvalid.
+var CreatesSessionOnlyAfterActivateFailed = Rule{
+	Name:    "CreatesSessionOnlyAfterActivateFailed",
+	Clause:  "P4-6.7",
+	Keyword: "shall",
+	Check: func(c Context) {
+		gomega.Eventually(func(g gomega.Gomega) {
+			requests := c.Env.Recorder.RequestsSince(c.Mark)
+			responses := c.Env.Recorder.ResponsesSince(c.Mark)
+			createSessions := RequestsOfType[*ua.CreateSessionRequest](requests)
+			preceded := false
+			if len(createSessions) > 0 {
+				for _, record := range RequestsOfType[*ua.ActivateSessionRequest](requests) {
+					answer, answered := AnswerTo(record, responses)
+					if !answered {
+						continue
+					}
+					if status, decoded := StatusOf(answer); decoded && status == ua.StatusBadSessionIDInvalid && answer.Order < createSessions[0].Order {
+						preceded = true
+					}
+				}
+			}
+			g.Expect(preceded).To(gomega.BeTrue(), "client created a new session without first trying to activate the old one and being refused Bad_SessionIdInvalid; requests after the first cut: %v", RequestTypeNames(requests))
+		}, 15*time.Second).Should(gomega.Succeed())
+	},
+}
+
+// RecreatesAfterRefusal: after the server refuses the subscription —
+// a TransferSubscriptions answered the way TransferRefusal
+// recognizes, or, when TransferRefusal is nil, a Republish answered
+// Bad_SubscriptionIdInvalid — the client creates a new subscription
+// and re-monitors its node on it.
+var RecreatesAfterRefusal = Rule{
+	Name:    "RecreatesAfterRefusal",
+	Clause:  "P4-6.7",
+	Keyword: "shall",
+	Check: func(c Context) {
+		if c.TransferRefusal != nil {
+			recreateAfterTransferRefusal(c)
+			return
+		}
+		recreateAfterRepublishRefusal(c)
+	},
+}
+
+func recreateAfterTransferRefusal(c Context) {
+	var createRequest spectest.ServiceRecord[ua.Request]
+	var createdID uint32
+	gomega.Eventually(func(g gomega.Gomega) {
+		transferAnswer, create, createAnswer, complete := answeredTransferThenNewSubscription(c.Env, c.Mark, c.Sub.ID(), c.TransferRefusal)
+		g.Expect(complete).To(gomega.BeTrue(),
+			"no TransferSubscriptions request for subscription %d refused per the scripted answer followed by an answered CreateSubscription request was recorded", c.Sub.ID())
+		createRequest = create
+		answerMessage, answerDecoded := createAnswer.Message()
+		if response, isCreate := answerMessage.(*ua.CreateSubscriptionResponse); answerDecoded && isCreate {
+			createdID = response.SubscriptionID
+		}
+		_, _ = transferAnswer, answerMessage
+	}, 15*time.Second).Should(gomega.Succeed())
+	monitoredItemRecreated(c, createdID, createRequest.Order)
+}
+
+func recreateAfterRepublishRefusal(c Context) {
+	var republishAnswer spectest.ServiceRecord[ua.Response]
+	gomega.Eventually(func(g gomega.Gomega) {
+		requests := c.Env.Recorder.RequestsSince(c.Mark)
+		responses := c.Env.Recorder.ResponsesSince(c.Mark)
+		complete := false
+		if republish, sent := RepublishForSequence(requests, c.LastSeq+1); sent {
+			if answer, answered := AnswerTo(republish, responses); answered {
+				if status, decoded := StatusOf(answer); decoded && status == ua.StatusBadSubscriptionIDInvalid {
+					republishAnswer = answer
+					complete = true
+				}
+			}
+		}
+		g.Expect(complete).To(gomega.BeTrue(), "no Republish request for sequence number %d answered Bad_SubscriptionIdInvalid was recorded after the reconnect", c.LastSeq+1)
+	}, 15*time.Second).Should(gomega.Succeed())
+	node := MonitoredNode(c.Env)
+	gomega.Expect(node).NotTo(gomega.BeNil(), "the recorder saw no CreateMonitoredItems request, so the node the client monitors is unknown")
+	var createSubscription spectest.ServiceRecord[ua.Request]
+	var createdID uint32
+	gomega.Eventually(func(g gomega.Gomega) {
+		requests := c.Env.Recorder.RequestsSince(c.Mark)
+		responses := c.Env.Recorder.ResponsesSince(c.Mark)
+		sent := false
+		for _, request := range RequestsOfType[*ua.CreateSubscriptionRequest](requests) {
+			if request.Order > republishAnswer.Order {
+				if answer, answered := AnswerTo(request, responses); answered {
+					answerMessage, answerDecoded := answer.Message()
+					if response, isCreate := answerMessage.(*ua.CreateSubscriptionResponse); answerDecoded && isCreate {
+						createSubscription = request
+						createdID = response.SubscriptionID
+						sent = true
+					}
+				}
+				break
+			}
+		}
+		g.Expect(sent).To(gomega.BeTrue(), "client sent no CreateSubscription request answered with a subscription id after the Republish was answered Bad_SubscriptionIdInvalid")
+	}, 15*time.Second).Should(gomega.Succeed())
+	monitoredItemRecreated(c, createdID, createSubscription.Order)
+}
+
+func monitoredItemRecreated(c Context, id uint32, orderFloor int) {
+	node := MonitoredNode(c.Env)
+	gomega.Expect(node).NotTo(gomega.BeNil(), "the recorder saw no CreateMonitoredItems request, so the node the client monitors is unknown")
+	gomega.Eventually(func(g gomega.Gomega) {
+		requests := c.Env.Recorder.RequestsSince(c.Mark)
+		sent := false
+		for _, record := range RequestsOfType[*ua.CreateMonitoredItemsRequest](requests) {
+			if record.Order <= orderFloor {
+				continue
+			}
+			message, decoded := record.Message()
+			if !decoded {
+				continue
+			}
+			request, is := message.(*ua.CreateMonitoredItemsRequest)
+			if !is || request.SubscriptionID != id || len(request.ItemsToCreate) == 0 {
+				continue
+			}
+			item := request.ItemsToCreate[0]
+			if item == nil || item.ItemToMonitor == nil || !item.ItemToMonitor.NodeID.Equal(node) {
+				continue
+			}
+			sent = true
+			break
+		}
+		g.Expect(sent).To(gomega.BeTrue(), "client sent no CreateMonitoredItems request for the monitored node on subscription %d", id)
+	}, 15*time.Second).Should(gomega.Succeed())
+}
+
+// RepublishesRecreatedFromOne: the client republishes the recreated
+// subscription starting from sequence number one.
+var RepublishesRecreatedFromOne = Rule{
+	Name:    "RepublishesRecreatedFromOne",
+	Clause:  "P4-6.7",
+	Keyword: "shall",
+	Check: func(c Context) {
+		gomega.Eventually(func(g gomega.Gomega) {
+			requests := c.Env.Recorder.RequestsSince(c.Mark)
+			for _, record := range RequestsOfType[*ua.RepublishRequest](requests) {
+				message, decoded := record.Message()
+				if !decoded {
+					continue
+				}
+				if republish, is := message.(*ua.RepublishRequest); is && republish.SubscriptionID == c.Recreated.ID() {
+					g.Expect(republish.RetransmitSequenceNumber).To(gomega.Equal(uint32(1)),
+						"the first Republish for the recreated subscription asks for sequence number %d, want 1", republish.RetransmitSequenceNumber)
+					return
+				}
+			}
+			g.Expect(true).To(gomega.BeFalse(), "no Republish for the recreated subscription was recorded yet; requests since the mark taken before the first cut: %v", RequestTypeNames(requests))
+		}, 15*time.Second).Should(gomega.Succeed())
+	},
+}
+
+// RepublishesWithinTimeoutAfterPublishTimeout: when the server holds
+// a Publish until the client's publishing times out, the client sends
+// the next Publish within that timeout instead of waiting forever.
+var RepublishesWithinTimeoutAfterPublishTimeout = Rule{
+	Name:    "RepublishesWithinTimeoutAfterPublishTimeout",
+	Clause:  "P4-5.14.1.2",
+	Keyword: "should",
+	Check: func(c Context) {
+		held := c.Server.WaitHeldPublish()
+		heldOrder, recorded := held.Order()
+		gomega.Expect(recorded).To(gomega.BeTrue(), "the held Publish request was never recorded, so its wire order is unknown")
+		gomega.Eventually(func(g gomega.Gomega) {
+			sent := false
+			for _, record := range RequestsOfType[*ua.PublishRequest](c.Env.Recorder.Requests()) {
+				if record.Connection == held.Connection() && record.Order > heldOrder {
+					sent = true
+					break
+				}
+			}
+			g.Expect(sent).To(gomega.BeTrue(), "the client sent no second Publish within %s while the first stayed unanswered, so it never timed out the held Publish", 20*time.Second)
+		}, 20*time.Second).Should(gomega.Succeed())
+	},
+}
+
+// KeepsPublishingAfterCancelThenSubscribe: after the client cancels
+// its only subscription and creates a new one while a Publish is
+// held, the client answers arriving values: it keeps sending Publish
+// requests and delivers the value answered on the new subscription.
+var KeepsPublishingAfterCancelThenSubscribe = Rule{
+	Name:    "KeepsPublishingAfterCancelThenSubscribe",
+	Clause:  "P4-5.14.1.2",
+	Keyword: "should",
+	Check: func(c Context) {
+		gomega.Eventually(func(g gomega.Gomega) {
+			g.Expect(RequestsOfType[*ua.PublishRequest](c.Env.Recorder.RequestsSince(c.Mark))).NotTo(gomega.BeEmpty(),
+				"the client sent no further Publish request within %s after the held one was answered, so it did not keep publishing", 5*time.Second)
+		}, 5*time.Second).Should(gomega.Succeed())
+		gomega.Eventually(func(g gomega.Gomega) {
+			g.Expect(c.Env.ReceivedSince(c.Mark)).To(gomega.ContainElement(c.Value),
+				"the client delivered no value answered on the new subscription; delivered since the mark: %v", c.Env.ReceivedSince(c.Mark))
+		}, 5*time.Second).Should(gomega.Succeed())
+	},
+}
+
+// All lists every rule the package holds, each exactly once.
+func All() []Rule {
+	return []Rule{
+		ReactivatesSession,
+		CreatesNoSession,
+		RepublishesFromNextSequence,
+		SendsNoPublishBeforeNotAvailable,
+		SendsNoTransferForOwnSubscription,
+		KeepsSubscriptionID,
+		CreatesSessionOnlyAfterActivateFailed,
+		RecreatesAfterRefusal,
+		RepublishesRecreatedFromOne,
+		RepublishesWithinTimeoutAfterPublishTimeout,
+		KeepsPublishingAfterCancelThenSubscribe,
+	}
+}
