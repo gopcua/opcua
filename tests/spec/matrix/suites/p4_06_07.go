@@ -153,7 +153,9 @@ func (s scenario06_07) Run(env *spectest.Environment, f faults.Fault) matrix.Out
 	t := s.prepare(env)
 	m := env.Mark()
 	injected := f.Inject(env)
-	env.Relay.Cut()
+	if breaksTransport(f) {
+		env.Relay.Cut()
+	}
 	env.TryWaitUntilReconnected(30 * time.Second)
 	faultEnd := time.Now()
 
@@ -227,6 +229,13 @@ func prepareSessionLost(env *spectest.Environment) target06_07 {
 func prepareSubscriptionsLost(env *spectest.Environment) target06_07 {
 	env.Server.ForgetSubscriptions()
 	return target06_07{server: env.Server, recreate: true}
+}
+
+// breaksTransport says whether the workload cuts the relay after the
+// fault is armed: a stalled link is its own transport loss — the link
+// goes silent instead of closing — so arming it replaces the cut.
+func breaksTransport(f faults.Fault) bool {
+	return f.Name() != "Link/Stall"
 }
 
 // refusedBadSubscriptionIDInvalid recognizes the transfer answer the
