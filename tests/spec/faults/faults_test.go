@@ -11,8 +11,8 @@ import (
 )
 
 func TestAllFaultsSize(t *testing.T) {
-	if len(AllFaults) != 89 {
-		t.Fatalf("len(AllFaults) = %d, want 89", len(AllFaults))
+	if len(AllFaults) != 81 {
+		t.Fatalf("len(AllFaults) = %d, want 81", len(AllFaults))
 	}
 }
 
@@ -36,7 +36,6 @@ func TestCatalogueNames(t *testing.T) {
 		"DelayBelowTimeout/Read",
 		"DelayAboveTimeout/Publish",
 		"Overload/Publish/Bad_TooManyPublishRequests",
-		"Overload/Read/Bad_ResourceUnavailable",
 		"Link/ClosedOnAccept",
 		"Link/ListenerClosed",
 		"Link/Stall",
@@ -46,6 +45,7 @@ func TestCatalogueNames(t *testing.T) {
 		"Server/SkippedSequence",
 		"Consumer/Slow",
 		"RequestLost/CloseSecureChannel",
+		"Overload/CreateSubscription/Bad_ResourceUnavailable",
 	}
 	for _, want := range present {
 		if _, ok := byName[want]; !ok {
@@ -59,6 +59,11 @@ func TestCatalogueNames(t *testing.T) {
 		"CutAfterResponse/CloseSecureChannel",
 		"DelayBelowTimeout/CloseSecureChannel",
 		"DelayAboveTimeout/CloseSecureChannel",
+		"Overload/Read/Bad_ResourceUnavailable",
+		"Overload/Read/Bad_TooManyOperations",
+		"Overload/CreateSession/Bad_TooManyOperations",
+		"Overload/ActivateSession/Bad_ResourceUnavailable",
+		"Overload/CloseSession/Bad_TooManyOperations",
 	}
 	for _, name := range absent {
 		if _, ok := byName[name]; ok {

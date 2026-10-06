@@ -247,7 +247,7 @@ func buildAllFaults() []Fault {
 		}
 	}
 	for _, s := range []overloadStatus{badTooManyOperations, badResourceUnavailable} {
-		for _, svc := range serviceMessages() {
+		for _, svc := range overloadedServices() {
 			faults = append(faults, overloadFault{status: s, service: svc})
 		}
 	}
@@ -262,12 +262,17 @@ func buildAllFaults() []Fault {
 	return faults
 }
 
-func serviceMessages() []Message {
-	var services []Message
-	for m := HEL; int(m) < len(messageNames); m++ {
-		if m != HEL && m != OpenSecureChannel && m != CloseSecureChannel {
-			services = append(services, m)
-		}
+// overloadedServices returns the services the scripted server answers
+// itself, the only ones an overload fault can answer: the in-tree
+// server keeps the session services and Read unexported, so the
+// harness cannot answer those without changing server code.
+func overloadedServices() []Message {
+	return []Message{
+		CreateSubscription,
+		CreateMonitoredItems,
+		DeleteSubscriptions,
+		Publish,
+		Republish,
+		TransferSubscriptions,
 	}
-	return services
 }
