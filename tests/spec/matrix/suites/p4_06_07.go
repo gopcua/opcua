@@ -47,8 +47,9 @@ func (p4_06_07) Scenarios() []matrix.Scenario {
 				message.TransferSubscriptions, message.CreateSubscription, message.CreateMonitoredItems,
 				message.Publish, message.CloseSession, message.CloseSecureChannel,
 			},
-			own:     matrix.SessionLost,
-			prepare: prepareSessionLost,
+			own:              matrix.SessionLost,
+			prepare:          prepareSessionLost,
+			prepareBeforeArm: true,
 		},
 		scenario06_07{
 			name: "SubscriptionsLost",
@@ -94,12 +95,15 @@ func (p4_06_07) Rules(c matrix.Category) []rules.Rule {
 // sends after the arm point, the category the clause prescribes when
 // the fault leaves it to the scenario, and the prepare step that
 // stages the server side of the transport loss and names the target
-// the client must recover on.
+// the client must recover on. prepareBeforeArm says the prepare step
+// must run before the arm point — the redirect the server-side faults
+// arm behind — instead of after the consumer's burst.
 type scenario06_07 struct {
-	name    string
-	sends   []message.Message
-	own     matrix.Category
-	prepare func(env *spectest.Environment) target06_07
+	name             string
+	sends            []message.Message
+	own              matrix.Category
+	prepare          func(env *spectest.Environment) target06_07
+	prepareBeforeArm bool
 }
 
 // target06_07 is what a scenario's prepare step leaves the workload
@@ -141,7 +145,10 @@ func (s scenario06_07) Category(f faults.Fault) matrix.Category {
 // scenarios make it create, or — when the scenario keeps the session —
 // whatever live subscription the client holds, because a client that
 // recreates its subscription there violates KeepsSubscriptionID and
-// the case must still reach its checks.
+// the case must still reach its checks. The prepare step runs before
+// the arm point when the scenario's faults must arm behind its
+// redirect, and after the consumer's burst otherwise — SubscriptionsLost
+// forgets the old subscription only after the burst answered on it.
 func (s scenario06_07) Run(env *spectest.Environment, f faults.Fault) matrix.Outcome {
 	values := nextCaseValues()
 	sub := env.Subscription()
@@ -150,13 +157,19 @@ func (s scenario06_07) Run(env *spectest.Environment, f faults.Fault) matrix.Out
 	}
 	last := env.LastSequenceNumber()
 	sub.Retain(last+1, values.v2)
-	t := s.prepare(env)
+	var t target06_07
+	if s.prepareBeforeArm {
+		t = s.prepare(env)
+	}
 	m := env.Mark()
 	injected := f.Inject(env)
 	for i := range consumerBurst(f) {
 		if held, ok := env.Server.TryWaitHeldPublish(15 * time.Second); ok {
 			held.Answer(sub, values.burst[i])
 		}
+	}
+	if !s.prepareBeforeArm {
+		t = s.prepare(env)
 	}
 	if breaksTransport(f) {
 		env.Relay.Cut()
