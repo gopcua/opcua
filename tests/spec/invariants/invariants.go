@@ -33,11 +33,16 @@ type Produced struct {
 
 // ServerState is one server the environment created, with the session
 // and subscription counts the harness observed on it.
+// ClosingAttempted counts the open sessions for which the recorder saw
+// the client send a CloseSession the network never completed — dropped,
+// held past the client's lifetime, or never answered — which Part 4
+// leaves to the server's session timeout.
 type ServerState struct {
 	Index             int
 	Reachable         bool
 	Connected         bool
 	KnownSessions     int
+	ClosingAttempted  int
 	LiveSubscriptions int
 }
 
@@ -286,7 +291,9 @@ func (m *keepOneSessionOpen) NegatedFailureMessage(actual any) string {
 
 // CloseEveryKnownSession says no reachable server still holds a
 // known session. Unreachable servers are exempt: the client cannot
-// close what it can no longer reach.
+// close what it can no longer reach. A session whose CloseSession the
+// client sent but the network never completed is exempt too: Part 4
+// leaves such a session to the server's session timeout.
 func CloseEveryKnownSession() types.GomegaMatcher {
 	return &closeEveryKnownSession{}
 }
@@ -301,8 +308,8 @@ func (m *closeEveryKnownSession) Match(actual any) (bool, error) {
 		return false, err
 	}
 	for _, server := range observed.Servers {
-		if server.Reachable && server.KnownSessions > 0 {
-			m.failure = fmt.Sprintf("server %d still holds %d known sessions", server.Index, server.KnownSessions)
+		if server.Reachable && server.KnownSessions-server.ClosingAttempted > 0 {
+			m.failure = fmt.Sprintf("server %d still holds %d known sessions", server.Index, server.KnownSessions-server.ClosingAttempted)
 			return false, nil
 		}
 	}

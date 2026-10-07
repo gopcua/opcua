@@ -59,7 +59,7 @@ var _ = Describe("ScriptedServer sessions and services", func() {
 		env.WaitUntilReconnected()
 
 		Eventually(func(g Gomega) {
-			open, known := second.sessionCounts()
+			open, known, _ := second.sessionCounts()
 			g.Expect(open).To(BeNumerically(">=", 1),
 				"the redirected client recreated no session on the second server")
 			g.Expect(open).To(Equal(known+1),

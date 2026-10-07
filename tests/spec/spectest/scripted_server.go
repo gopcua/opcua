@@ -591,26 +591,38 @@ func (s *ScriptedServer) LiveSubscriptions() int {
 // for since. A session whose CreateSession response the relay dropped
 // is not counted, although the server holds it open.
 func (s *ScriptedServer) KnownSessions() int {
-	_, known := s.sessionCounts()
+	_, known, _ := s.sessionCounts()
 	return known
 }
 
+// SessionsClosingAttempted returns the number of open sessions this
+// server holds for which the recorder saw the client send a
+// CloseSession request the network never completed — the relay
+// dropped or held the request, or its response never came back.
+// Part 4 leaves such a session to the server's session timeout.
+func (s *ScriptedServer) SessionsClosingAttempted() int {
+	_, _, closing := s.sessionCounts()
+	return closing
+}
+
 // sessionCounts scans the recorded traffic and returns how many
-// sessions the server holds open, and how many of those the relay
-// forwarded a CreateSession response for. A session is open from a
-// Good CreateSession response on a connection of this server until a
-// Good CloseSession response for its token.
-func (s *ScriptedServer) sessionCounts() (open, known int) {
+// sessions the server holds open, how many of those the relay
+// forwarded a CreateSession response for, and how many the client
+// tried to close without the close completing. A session is open from
+// a Good CreateSession response on a connection of this server until
+// a Good CloseSession response for its token.
+func (s *ScriptedServer) sessionCounts() (open, known, closing int) {
 	s.mu.Lock()
 	address := strings.TrimPrefix(s.address, "opc.tcp://")
 	recorder := s.recorder
 	s.mu.Unlock()
 	if recorder == nil {
-		return 0, 0
+		return 0, 0, 0
 	}
 	type sessionState struct {
 		open    bool
 		forward bool
+		closing bool
 		closed  bool
 	}
 	sessions := make(map[string]*sessionState)
@@ -626,7 +638,14 @@ func (s *ScriptedServer) sessionCounts() (open, known int) {
 				continue
 			}
 			if request, isClose := message.(*ua.CloseSessionRequest); isClose && request.Header() != nil {
-				closes[chunkKey{connection: record.Connection, requestID: record.RequestID}] = sessionTokenOf(request.Header().AuthenticationToken)
+				token := sessionTokenOf(request.Header().AuthenticationToken)
+				closes[chunkKey{connection: record.Connection, requestID: record.RequestID}] = token
+				state := sessions[token]
+				if state == nil {
+					state = &sessionState{}
+					sessions[token] = state
+				}
+				state.closing = true
 			}
 		case ServiceRecord[ua.Response]:
 			if recorder.connectionUpstreamOf(record.Connection) != address {
@@ -664,9 +683,12 @@ func (s *ScriptedServer) sessionCounts() (open, known int) {
 		open++
 		if state.forward {
 			known++
+			if state.closing {
+				closing++
+			}
 		}
 	}
-	return open, known
+	return open, known, closing
 }
 
 func sessionTokenOf(token *ua.NodeID) string {

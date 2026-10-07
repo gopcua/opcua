@@ -206,6 +206,10 @@ func TestCloseEveryKnownSession(t *testing.T) {
 			Observed{Servers: []ServerState{server(0, true, false, 1, 0)}}, false, "1"},
 		{"only an unreachable server still holds a known session",
 			Observed{Servers: []ServerState{server(1, false, false, 1, 0), server(0, true, false, 0, 0)}}, true, ""},
+		{"a session whose CloseSession the client sent but the network lost",
+			Observed{Servers: []ServerState{{Index: 0, Reachable: true, KnownSessions: 1, ClosingAttempted: 1}}}, true, ""},
+		{"one of two sessions closing-attempted still fails for the other",
+			Observed{Servers: []ServerState{{Index: 0, Reachable: true, KnownSessions: 2, ClosingAttempted: 1}}}, false, "1"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

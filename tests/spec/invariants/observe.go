@@ -29,6 +29,7 @@ func Observe(env *spectest.Environment, fault *spectest.Injected) Observed {
 			Reachable:         reachable,
 			Connected:         connected,
 			KnownSessions:     server.KnownSessions(),
+			ClosingAttempted:  server.SessionsClosingAttempted(),
 			LiveSubscriptions: server.LiveSubscriptions(),
 		})
 	}
