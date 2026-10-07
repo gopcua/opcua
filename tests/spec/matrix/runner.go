@@ -2,6 +2,7 @@ package matrix
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/gopcua/opcua"
@@ -81,6 +82,17 @@ func registerCase(c Case) {
 					defer cancel()
 					gomega.Expect(env.Client.Close(ctx)).To(gomega.Succeed(), "closing the client failed")
 
+					// A delayed request is released only after Close
+					// returns: the after-close snapshot must wait for
+					// the hold, or a fault on the held message reads
+					// as never fired.
+					if isHoldFault(f) {
+						deadline := time.Now().Add(10 * time.Second)
+						for !outcome.Injected.Fired() && time.Now().Before(deadline) {
+							time.Sleep(50 * time.Millisecond)
+						}
+					}
+
 					after = invariants.Observe(env, outcome.Injected)
 					after.WithFaultEnd(outcome.FaultEnd)
 					after.WithSentinel(outcome.Sentinel, outcome.AnsweredAt)
@@ -147,6 +159,13 @@ func waitUntilConnected(env *spectest.Environment) {
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
+}
+
+// isHoldFault says whether the fault holds a message past the moment
+// Close returns, so the after-close snapshot must wait for its
+// release.
+func isHoldFault(f faults.Fault) bool {
+	return strings.HasPrefix(f.Name(), "DelayAboveTimeout/") || strings.HasPrefix(f.Name(), "DelayBelowTimeout/")
 }
 
 func scenarioNamed(clause, name string) Scenario {
