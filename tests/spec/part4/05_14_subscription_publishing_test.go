@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/gopcua/opcua"
-	"github.com/gopcua/opcua/tests/spec/rules"
-	"github.com/gopcua/opcua/tests/spec/spectest"
+	"github.com/gopcua/opcua/tests/spec/internal/rules"
+	"github.com/gopcua/opcua/tests/spec/internal/spectest"
 	"github.com/gopcua/opcua/ua"
 
 	. "github.com/onsi/ginkgo/v2"

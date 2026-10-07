@@ -6,8 +6,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/gopcua/opcua/tests/spec/spectest"
-
+	"github.com/gopcua/opcua/tests/spec/internal/spectest"
 	"github.com/gopcua/opcua/tests/spec/internal/suitegate"
 
 	. "github.com/onsi/ginkgo/v2"
