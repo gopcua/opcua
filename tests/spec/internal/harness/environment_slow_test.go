@@ -9,7 +9,7 @@ import (
 
 var _ = Describe("Environment slow consumer", func() {
 	It("reports the blocked drain of a small notification buffer and delivers every value", func() {
-		env := Start(GinkgoT(), WithNotificationBuffer(4), WithSlowConsumer(200*time.Millisecond))
+		env := New(GinkgoT(), WithNotificationBuffer(4), WithSlowConsumer(200*time.Millisecond))
 		sub := env.Subscription()
 		m := env.Mark()
 		expected := []int32{valueBeforeCut}
@@ -31,7 +31,7 @@ var _ = Describe("Environment slow consumer", func() {
 	})
 
 	It("never reports a blocked drain with the default buffer and pace", func() {
-		env := Start(GinkgoT())
+		env := New(GinkgoT())
 		sub := env.Subscription()
 		m := env.Mark()
 

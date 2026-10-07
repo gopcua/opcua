@@ -114,7 +114,7 @@ var _ = DescribeTable("Relay CutAt on every message",
 			// assert needs a reconnect.
 			opts = append(opts, WithClientOptions(opcua.AutoReconnect(false)))
 		}
-		env := Start(GinkgoT(), opts...)
+		env := New(GinkgoT(), opts...)
 		driver := cutAtDriverFor(msg)
 		if driver.setup != nil {
 			driver.setup(env)

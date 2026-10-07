@@ -49,7 +49,7 @@ func producedEntry(produced []Produced, value int32) (Produced, bool) {
 
 var _ = Describe("ScriptedServer record", func() {
 	It("keeps an answered value in the retransmission queue until a Publish acknowledges it", func() {
-		env := Start(GinkgoT(), WithRetentionQueue())
+		env := New(GinkgoT(), WithRetentionQueue())
 		sub := env.Subscription()
 		held := env.Server.WaitHeldPublish()
 		held.Answer(sub, valueRecorded1)
@@ -81,7 +81,7 @@ var _ = Describe("ScriptedServer record", func() {
 	})
 
 	It("answers no value past the Publish that acknowledged it without the retention option", func() {
-		env := Start(GinkgoT())
+		env := New(GinkgoT())
 		sub := env.Subscription()
 		held := env.Server.WaitHeldPublish()
 		held.Answer(sub, valueRecorded1)
@@ -98,7 +98,7 @@ var _ = Describe("ScriptedServer record", func() {
 	})
 
 	It("records every produced value with its subscription id and sequence number", func() {
-		env := Start(GinkgoT())
+		env := New(GinkgoT())
 		sub := env.Subscription()
 		staged := env.LastSequenceNumber() + 1
 
@@ -171,7 +171,7 @@ var _ = Describe("ScriptedServer record", func() {
 	})
 
 	It("forgets every subscription, and a Republish for a forgotten id fails", func() {
-		env := Start(GinkgoT())
+		env := New(GinkgoT())
 		sub := env.Subscription()
 		Expect(env.Server.LiveSubscriptions()).To(Equal(1),
 			"a server with one client subscription holds %d live subscriptions, want 1", env.Server.LiveSubscriptions())
@@ -186,7 +186,7 @@ var _ = Describe("ScriptedServer record", func() {
 	})
 
 	It("answers the next Publish with the last sequence number again, or with one skipped", func() {
-		env := Start(GinkgoT())
+		env := New(GinkgoT())
 		sub := env.Subscription()
 		env.Server.WaitHeldPublish().Answer(sub, valueRecorded1)
 		var last Notification

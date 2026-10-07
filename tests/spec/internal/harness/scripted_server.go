@@ -582,7 +582,7 @@ func (s *ScriptedServer) ForgetSubscriptions() {
 	}
 }
 
-// Node returns the node the harness watches, the one Start monitored:
+// Node returns the node the harness watches, the one New monitored:
 // the variable the environment answers its values on, so a workload can
 // monitor it on a subscription it created.
 func (s *ScriptedServer) Node() *ua.NodeID {

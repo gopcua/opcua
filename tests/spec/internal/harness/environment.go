@@ -33,7 +33,7 @@ const (
 
 const valueBeforeCut int32 = 9001
 
-// Option changes how Start builds the Environment.
+// Option changes how New builds the Environment.
 type Option func(*options)
 
 type options struct {
@@ -47,7 +47,7 @@ type options struct {
 	firstValueSet         bool
 }
 
-// WithFirstValue makes Start answer the first held Publish request
+// WithFirstValue makes New answer the first held Publish request
 // with v instead of its default valueBeforeCut, so a suite can keep
 // every value of a run unique to its own case.
 func WithFirstValue(v int32) Option {
@@ -57,14 +57,14 @@ func WithFirstValue(v int32) Option {
 	}
 }
 
-// WithClientOptions appends client options after the ones Start sets itself.
+// WithClientOptions appends client options after the ones New sets itself.
 func WithClientOptions(opts ...opcua.Option) Option {
 	return func(o *options) {
 		o.clientOptions = append(o.clientOptions, opts...)
 	}
 }
 
-// WithRetentionQueue makes every server Start or StartServer creates
+// WithRetentionQueue makes every server New or StartServer creates
 // keep each value it answers in the subscription's retransmission
 // queue until a Publish acknowledges it, as Part 4 §5.14.1 describes.
 // Without the option an answered value is gone from the queue
@@ -94,7 +94,7 @@ func WithSlowConsumer(gap time.Duration) Option {
 }
 
 // WithPublishingInterval sets the publishing interval of the subscription
-// Start creates.
+// New creates.
 func WithPublishingInterval(d time.Duration) Option {
 	return func(o *options) {
 		o.publishingInterval = d
@@ -129,10 +129,10 @@ type Environment struct {
 	onClientClosed     func()
 }
 
-// Start creates and returns a running Environment (see the Environment
+// New creates and returns a running Environment (see the Environment
 // type) and answers the first held Publish request (see HeldPublish)
 // with valueBeforeCut.
-func Start(t T, opts ...Option) *Environment {
+func New(t T, opts ...Option) *Environment {
 	var o options
 	for _, opt := range opts {
 		opt(&o)
@@ -259,7 +259,7 @@ func (e *Environment) Mark() Mark {
 }
 
 // Subscription returns the subscription the client created before
-// Start answered the first held Publish request (HeldPublish).
+// New answered the first held Publish request (HeldPublish).
 func (e *Environment) Subscription() Subscription {
 	e.Server.mu.Lock()
 	defer e.Server.mu.Unlock()
@@ -269,7 +269,7 @@ func (e *Environment) Subscription() Subscription {
 	return Subscription{server: e.Server, sub: e.Server.first}
 }
 
-// ClientSubscription returns the subscription Start created on the
+// ClientSubscription returns the subscription New created on the
 // client, whose Notifs channel feeds the Environment's received values.
 func (e *Environment) ClientSubscription() *opcua.Subscription {
 	return e.clientSubscription

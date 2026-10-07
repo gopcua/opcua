@@ -9,7 +9,7 @@ import (
 )
 
 func TestSequenceCounterFollowsRetainAndAnswerWithSequenceNumber(t *testing.T) {
-	env := Start(t)
+	env := New(t)
 	sub := env.Subscription()
 	if sequenceNumber := env.LastSequenceNumber(); sequenceNumber != 1 {
 		t.Fatalf("the first answered Publish response carries sequence number %d, want 1: the counter must start at 1 when the subscription is created", sequenceNumber)

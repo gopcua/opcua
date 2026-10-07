@@ -47,7 +47,7 @@ func responseOf(responses []ServiceRecord[ua.Response], connection int, requestI
 
 var _ = Describe("Relay CutAt", func() {
 	It("drops the next Read before it reaches the server and cuts the connection", func() {
-		env := Start(GinkgoT())
+		env := New(GinkgoT())
 		env.Relay.CutAt(BeforeRequestReachesServer, message.Read)
 		m := env.Mark()
 
@@ -85,7 +85,7 @@ var _ = Describe("Relay CutAt", func() {
 	})
 
 	It("writes the Read response to the client before the after-response cut closes the connection", func() {
-		env := Start(GinkgoT())
+		env := New(GinkgoT())
 		env.Relay.CutAt(AfterResponseReachesClient, message.Read)
 		m := env.Mark()
 
@@ -126,7 +126,7 @@ var _ = Describe("Relay CutAt", func() {
 	})
 
 	It("lists armed cuts until they fire and fires two armed cuts in order on two consecutive Reads", func() {
-		env := Start(GinkgoT())
+		env := New(GinkgoT())
 		env.Relay.CutAt(BeforeRequestReachesServer, message.Read)
 		env.Relay.CutAt(BeforeRequestReachesServer, message.Read)
 		Expect(env.Relay.ArmedCuts()).To(Equal([]string{
@@ -176,7 +176,7 @@ var _ = Describe("Relay CutAt", func() {
 	})
 
 	It("does not fire a cut armed for Republish on a Read", func() {
-		env := Start(GinkgoT())
+		env := New(GinkgoT())
 		env.Relay.CutAt(BeforeRequestReachesServer, message.Republish)
 		m := env.Mark()
 
@@ -191,7 +191,7 @@ var _ = Describe("Relay CutAt", func() {
 	})
 
 	It("does not fire a cut armed for a Republish response on a Read round trip", func() {
-		env := Start(GinkgoT())
+		env := New(GinkgoT())
 		env.Relay.CutAt(AfterResponseReachesClient, message.Republish)
 		m := env.Mark()
 

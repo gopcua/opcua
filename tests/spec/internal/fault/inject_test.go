@@ -67,7 +67,7 @@ var _ = DescribeTable("Inject arms and Fired observes",
 			harness.WithPublishingInterval(10 * time.Millisecond),
 		}
 		opts = append(opts, fault.Options()...)
-		env := harness.Start(GinkgoT(), opts...)
+		env := harness.New(GinkgoT(), opts...)
 		if setup != nil {
 			setup(env)
 		}
@@ -174,7 +174,7 @@ var _ = DescribeTable("Inject arms and Fired observes",
 
 var _ = Describe("Inject arms on the server the client reconnects to", func() {
 	It("answers the reconnect's CreateSubscription on the second server with the scripted fault", func() {
-		env := harness.Start(GinkgoT(),
+		env := harness.New(GinkgoT(),
 			harness.WithClientOptions(opcua.RequestTimeout(2*time.Second)),
 			harness.WithPublishingInterval(10*time.Millisecond))
 		second := env.StartServer()
@@ -227,7 +227,7 @@ var _ = Describe("Inject arms on the server the client reconnects to", func() {
 
 var _ = Describe("Inject over the whole catalogue", func() {
 	It("arms every fault with a stable name and no options but the consumer's", func() {
-		env := harness.Start(GinkgoT(),
+		env := harness.New(GinkgoT(),
 			harness.WithClientOptions(opcua.RequestTimeout(2*time.Second)),
 			harness.WithPublishingInterval(10*time.Millisecond))
 		for _, fault := range AllFaults {

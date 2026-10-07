@@ -100,7 +100,7 @@ func TestResolveIntervalsPrecedence(t *testing.T) {
 
 func TestStartRejectsDegeneratePublishingInterval(t *testing.T) {
 	fake := &fakeT{}
-	if !fatalPanics(func() { Start(fake, WithPublishingInterval(time.Millisecond)) }) {
+	if !fatalPanics(func() { New(fake, WithPublishingInterval(time.Millisecond)) }) {
 		t.Fatalf("Start did not fail for a degenerate publishing interval")
 	}
 	if len(fake.fatals) != 1 {
@@ -116,7 +116,7 @@ func TestStartRejectsDegeneratePublishingInterval(t *testing.T) {
 
 func TestStartRejectsZeroPublishingIntervalOption(t *testing.T) {
 	fake := &fakeT{}
-	if !fatalPanics(func() { Start(fake, WithPublishingInterval(0)) }) {
+	if !fatalPanics(func() { New(fake, WithPublishingInterval(0)) }) {
 		t.Fatalf("Start did not fail for a zero publishing interval")
 	}
 	if len(fake.fatals) != 1 {
@@ -132,7 +132,7 @@ func TestStartRejectsZeroPublishingIntervalOption(t *testing.T) {
 
 func TestStartAppliesThePublishingIntervalEnvVar(t *testing.T) {
 	t.Setenv(publishingIntervalEnv, "250ms")
-	env := Start(t)
+	env := New(t)
 	for _, r := range env.Recorder.Requests() {
 		m, ok := r.Message()
 		if !ok {
@@ -151,7 +151,7 @@ func TestStartAppliesThePublishingIntervalEnvVar(t *testing.T) {
 }
 
 func TestAnswerIncrementsTheSequenceCounter(t *testing.T) {
-	env := Start(t)
+	env := New(t)
 	if env.LastSequenceNumber() != 1 {
 		t.Fatalf("the sequence counter does not start at 1: %d", env.LastSequenceNumber())
 	}
@@ -190,7 +190,7 @@ func TestAnswerIncrementsTheSequenceCounter(t *testing.T) {
 }
 
 func TestClientSubscriptionIsTheOneStartCreated(t *testing.T) {
-	env := Start(t)
+	env := New(t)
 	sub := env.ClientSubscription()
 	if sub == nil {
 		t.Fatalf("Start exposed no client-side subscription")
@@ -219,7 +219,7 @@ func TestClientSubscriptionIsTheOneStartCreated(t *testing.T) {
 }
 
 func TestWithClientOptionsApplyAfterStartOptions(t *testing.T) {
-	env := Start(t, WithClientOptions(opcua.RequestTimeout(777*time.Millisecond)))
+	env := New(t, WithClientOptions(opcua.RequestTimeout(777*time.Millisecond)))
 
 	for _, r := range env.Recorder.Requests() {
 		m, ok := r.Message()
@@ -402,7 +402,7 @@ func TestEnvironmentSinceScope(t *testing.T) {
 
 func TestTeardownClosesTheClientBeforeTheServers(t *testing.T) {
 	fake := &fakeT{}
-	env := Start(fake)
+	env := New(fake)
 	second := env.StartServer()
 	serversOpenWhenClientClosed := false
 	env.onClientClosed = func() {
@@ -426,7 +426,7 @@ func TestTeardownClosesTheClientBeforeTheServers(t *testing.T) {
 
 func TestTeardownSkipsTheConnectedWaitWhenTheClientIsAlreadyClosed(t *testing.T) {
 	fake := &fakeT{}
-	env := Start(fake)
+	env := New(fake)
 	ctx, cancel := context.WithTimeout(context.Background(), specWait)
 	defer cancel()
 	if err := env.Client.Close(ctx); err != nil {
@@ -446,7 +446,7 @@ func TestTeardownSkipsTheConnectedWaitWhenTheClientIsAlreadyClosed(t *testing.T)
 
 func TestTeardownRaisesAStoredServerFault(t *testing.T) {
 	fake := &fakeT{}
-	env := Start(fake)
+	env := New(fake)
 	env.Server.mu.Lock()
 	env.Server.faultErr = fmt.Errorf("spectest: stored server fault")
 	env.Server.mu.Unlock()
@@ -466,7 +466,7 @@ func TestTeardownRaisesAStoredServerFault(t *testing.T) {
 
 func TestTeardownRaisesEveryStoredFaultUnderOnePrefix(t *testing.T) {
 	fake := &fakeT{}
-	env := Start(fake)
+	env := New(fake)
 	second := env.StartServer()
 	env.Server.mu.Lock()
 	env.Server.faultErr = fmt.Errorf("spectest: stored fault one")

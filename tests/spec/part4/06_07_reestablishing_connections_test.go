@@ -24,7 +24,7 @@ const (
 
 var _ = Describe("Part 4 §6.7 Re-establishing connections https://reference.opcfoundation.org/Core/Part4/v105/docs/6.7", func() {
 	var env *harness.Environment
-	BeforeEach(func() { env = harness.Start(GinkgoT()) })
+	BeforeEach(func() { env = harness.New(GinkgoT()) })
 
 	Context("when the session survives a transport loss", func() {
 		var sub harness.Subscription
@@ -329,7 +329,7 @@ const dataRaceWindow = 3 * time.Second
 var _ = Describe("when the client is closed while it re-dials", func() {
 	It("does not race Close against the reconnect Dial", Label("P4-6.7", "issue-883", "known-defect"), func() {
 		AddReportEntry("data-race", []string{"(*Client).Close", "(*Client).Dial"})
-		env := harness.Start(GinkgoT())
+		env := harness.New(GinkgoT())
 		ctx := context.Background()
 		deadline := time.Now().Add(dataRaceWindow)
 		var closing, dialing sync.WaitGroup
@@ -388,7 +388,7 @@ const (
 
 var _ = Describe("when the reconnect interval is long", func() {
 	It("reconnects without waiting the reconnect interval when the first redial succeeds", Label("P4-6.7"), func() {
-		env := harness.Start(GinkgoT(), harness.WithClientOptions(opcua.ReconnectInterval(reconnectIntervalLong)))
+		env := harness.New(GinkgoT(), harness.WithClientOptions(opcua.ReconnectInterval(reconnectIntervalLong)))
 		m := env.Mark()
 		env.Relay.Cut()
 		Eventually(func(g Gomega) {
@@ -412,7 +412,7 @@ const (
 
 var _ = Describe("when the request timeout is short", func() {
 	It("keeps a Publish open past the request timeout after recreating the subscription", Label("P4-6.7"), func() {
-		env := harness.Start(GinkgoT(), harness.WithClientOptions(opcua.RequestTimeout(publishHoldRequestTimeout)))
+		env := harness.New(GinkgoT(), harness.WithClientOptions(opcua.RequestTimeout(publishHoldRequestTimeout)))
 		second := env.StartServer()
 		env.Relay.RedirectTo(second.Address())
 		second.QueueTransferRefusal(ua.StatusBadSubscriptionIDInvalid)

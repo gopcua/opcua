@@ -63,7 +63,7 @@ func registerCase(c Case) {
 				ginkgo.BeforeAll(func() {
 					opts := append([]harness.Option{}, scenario.Options(f)...)
 					opts = append(opts, f.Options()...)
-					env := harness.Start(ginkgo.GinkgoT(), opts...)
+					env := harness.New(ginkgo.GinkgoT(), opts...)
 
 					outcome = scenario.Run(env, f)
 

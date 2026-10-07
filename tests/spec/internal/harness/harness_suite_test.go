@@ -11,9 +11,9 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestSpectest(t *testing.T) {
+func TestHarness(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "spectest")
+	RunSpecs(t, "harness")
 }
 
 // TestMain runs the package's tests only when the spec suite runs, so

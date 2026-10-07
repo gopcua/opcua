@@ -10,7 +10,7 @@ import (
 
 var _ = Describe("Connected hold", func() {
 	It("releases the Connected hold only after the relay recorded the cut connection closed", func() {
-		env := Start(GinkgoT())
+		env := New(GinkgoT())
 
 		// A Connected report with no fired after-response cut must not
 		// wait: a client that never armed one is never delayed.

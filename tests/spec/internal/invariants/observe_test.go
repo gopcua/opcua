@@ -25,7 +25,7 @@ func closeClient(env *harness.Environment) {
 
 var _ = Describe("Observe", func() {
 	It("matches every invariant on an undisturbed environment", func() {
-		env := harness.Start(GinkgoT(), harness.WithRetentionQueue())
+		env := harness.New(GinkgoT(), harness.WithRetentionQueue())
 		sub := env.Subscription()
 		caseStart := time.Now()
 		env.Server.WaitHeldPublish().Answer(sub, 101)
@@ -51,7 +51,7 @@ var _ = Describe("Observe", func() {
 	})
 
 	It("names a planted loss", func() {
-		env := harness.Start(GinkgoT(), harness.WithRetentionQueue())
+		env := harness.New(GinkgoT(), harness.WithRetentionQueue())
 		sub := env.Subscription()
 		caseStart := time.Now()
 		env.Server.WaitHeldPublish().Answer(sub, 101)

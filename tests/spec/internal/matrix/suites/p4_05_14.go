@@ -104,7 +104,7 @@ func (s scenario05_14) Category(f fault.Fault) matrix.Category {
 }
 
 // caseValues05_14 are the values one §5.14 case answers, unique per
-// case: the first one Start answers, the arm exchange's answer, the
+// case: the first one New answers, the arm exchange's answer, the
 // steady stream's values, the cycle values and the sentinel, every one
 // derived from the case's own block.
 type caseValues05_14 struct {
@@ -116,7 +116,7 @@ type caseValues05_14 struct {
 }
 
 // values returns the value block of one §5.14 case, derived from the
-// case's scenario and fault alone so the Start options and the workload
+// case's scenario and fault alone so the New options and the workload
 // read the same block.
 func (s scenario05_14) values(f fault.Fault) caseValues05_14 {
 	base := int32(1000 * caseOrdinal(s.name, f))

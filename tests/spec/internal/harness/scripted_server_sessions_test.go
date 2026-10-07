@@ -35,7 +35,7 @@ func readPairSince(env *Environment, m Mark) (ServiceRecord[ua.Request], Service
 
 var _ = Describe("ScriptedServer sessions and services", func() {
 	It("counts one known session after Start and none after the client closes", func() {
-		env := Start(GinkgoT())
+		env := New(GinkgoT())
 		Expect(env.Server.KnownSessions()).To(Equal(1),
 			"a client with one open session leaves the server counting %d known sessions, want 1", env.Server.KnownSessions())
 
@@ -50,7 +50,7 @@ var _ = Describe("ScriptedServer sessions and services", func() {
 	})
 
 	It("does not count a session whose CreateSession response the relay dropped", func() {
-		env := Start(GinkgoT())
+		env := New(GinkgoT())
 		second := env.StartServer()
 		env.Relay.RedirectTo(second.Address())
 		env.Relay.CutAt(ResponseNeverReachesClient, message.CreateSession)
@@ -68,7 +68,7 @@ var _ = Describe("ScriptedServer sessions and services", func() {
 	})
 
 	It("ignores a CloseSession for a token it did not create", func() {
-		env := Start(GinkgoT())
+		env := New(GinkgoT())
 		Expect(env.Server.KnownSessions()).To(Equal(1),
 			"a client with one open session leaves the server counting %d known sessions, want 1", env.Server.KnownSessions())
 
@@ -93,7 +93,7 @@ var _ = Describe("ScriptedServer sessions and services", func() {
 	})
 
 	It("follows the client's subscriptions in LiveSubscriptions", func() {
-		env := Start(GinkgoT())
+		env := New(GinkgoT())
 		Expect(env.Server.LiveSubscriptions()).To(Equal(1),
 			"a client with one subscription leaves the server counting %d live subscriptions, want 1", env.Server.LiveSubscriptions())
 
@@ -117,7 +117,7 @@ var _ = Describe("ScriptedServer sessions and services", func() {
 	})
 
 	It("answers the next CreateSubscription with the scripted ServiceFault", func() {
-		env := Start(GinkgoT())
+		env := New(GinkgoT())
 		env.Server.AnswerNextWith(message.CreateSubscription, ua.StatusBadTooManyOperations)
 		m := env.Mark()
 
@@ -157,7 +157,7 @@ var _ = Describe("ScriptedServer sessions and services", func() {
 	})
 
 	It("answers the next Publish at once with the scripted ServiceFault", func() {
-		env := Start(GinkgoT())
+		env := New(GinkgoT())
 		held := env.Server.WaitHeldPublish()
 		env.Server.AnswerNextWith(message.Publish, ua.StatusBadTooManyPublishRequests)
 		m := env.Mark()
@@ -188,7 +188,7 @@ var _ = Describe("ScriptedServer sessions and services", func() {
 	})
 
 	It("rejects AnswerNextWith for a message the harness does not serve", func() {
-		env := Start(GinkgoT())
+		env := New(GinkgoT())
 		fake := &fakeT{}
 		env.Server.t = fake
 		Expect(fatalPanics(func() { env.Server.AnswerNextWith(message.Read, ua.StatusBadTooManyOperations) })).To(BeTrue(),
@@ -209,7 +209,7 @@ var _ = Describe("ScriptedServer sessions and services", func() {
 	})
 
 	It("holds the next response the relay writes to the client", func() {
-		env := Start(GinkgoT())
+		env := New(GinkgoT())
 		env.Relay.HoldNextResponse(time.Second)
 		m := env.Mark()
 

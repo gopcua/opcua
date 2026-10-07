@@ -13,7 +13,7 @@ import (
 
 var _ = Describe("Relay DelayAt", func() {
 	It("holds the reconnect's Read below the client's request timeout", func() {
-		env := Start(GinkgoT(), WithClientOptions(opcua.RequestTimeout(2*time.Second)))
+		env := New(GinkgoT(), WithClientOptions(opcua.RequestTimeout(2*time.Second)))
 		env.Relay.DelayAt(message.Read, time.Second)
 		m := env.Mark()
 
@@ -51,7 +51,7 @@ var _ = Describe("Relay DelayAt", func() {
 	})
 
 	It("holds the reconnect's Read past the client's request timeout", func() {
-		env := Start(GinkgoT(), WithClientOptions(opcua.RequestTimeout(2*time.Second)))
+		env := New(GinkgoT(), WithClientOptions(opcua.RequestTimeout(2*time.Second)))
 		env.Relay.DelayAt(message.Read, 4*time.Second)
 		m := env.Mark()
 

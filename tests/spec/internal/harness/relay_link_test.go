@@ -12,7 +12,7 @@ import (
 
 var _ = Describe("Relay link faults", func() {
 	It("closes the next three accepted connections before dialling upstream", func() {
-		env := Start(GinkgoT())
+		env := New(GinkgoT())
 		env.Relay.CloseNextAccepts(3)
 		m := env.Mark()
 
@@ -41,7 +41,7 @@ var _ = Describe("Relay link faults", func() {
 	})
 
 	It("closes the listener for a window and reopens it on the same address", func() {
-		env := Start(GinkgoT())
+		env := New(GinkgoT())
 		_, reconnect, err := resolveIntervals(options{}, os.Getenv)
 		Expect(err).NotTo(HaveOccurred(), "resolving the reconnect interval failed")
 		window := 3 * reconnect
@@ -66,7 +66,7 @@ var _ = Describe("Relay link faults", func() {
 	})
 
 	It("stalls the current connection in both directions while later connections forward normally", func() {
-		env := Start(GinkgoT())
+		env := New(GinkgoT())
 		stalledIndex := env.Relay.ConnectionCount() - 1
 		m := env.Mark()
 
@@ -117,7 +117,7 @@ var _ = Describe("Relay link faults", func() {
 	})
 
 	It("forwards HEL and discards the ACK of the next accepted connection", func() {
-		env := Start(GinkgoT())
+		env := New(GinkgoT())
 		env.Relay.DiscardNextACK()
 		m := env.Mark()
 

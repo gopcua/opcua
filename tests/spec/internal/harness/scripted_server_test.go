@@ -28,7 +28,7 @@ func sendRepublish(env *Environment, subscriptionID, sequenceNumber uint32) (ua.
 
 var _ = Describe("ScriptedServer Republish", func() {
 	It("answers a Republish for an id with no harness subscription with Bad_SubscriptionIdInvalid", func() {
-		env := Start(GinkgoT())
+		env := New(GinkgoT())
 		sub := env.Subscription()
 
 		response, err := sendRepublish(env, sub.ID()+100, 1)
@@ -41,7 +41,7 @@ var _ = Describe("ScriptedServer Republish", func() {
 	})
 
 	It("answers a Republish for an unretained sequence number with Bad_MessageNotAvailable", func() {
-		env := Start(GinkgoT())
+		env := New(GinkgoT())
 		sub := env.Subscription()
 
 		response, err := sendRepublish(env, sub.ID(), 44)
@@ -54,7 +54,7 @@ var _ = Describe("ScriptedServer Republish", func() {
 	})
 
 	It("answers one Republish with a scripted ServiceFault through FailRepublish, and the script is then gone", func() {
-		env := Start(GinkgoT())
+		env := New(GinkgoT())
 		sub := env.Subscription()
 		sub.FailRepublish(7, ua.StatusBadSubscriptionIDInvalid)
 
@@ -77,7 +77,7 @@ var _ = Describe("ScriptedServer Republish", func() {
 	})
 
 	It("answers two Republish requests for a retained sequence number with the retained message", func() {
-		env := Start(GinkgoT())
+		env := New(GinkgoT())
 		sub := env.Subscription()
 		sub.Retain(6, 7100)
 
@@ -102,7 +102,7 @@ var _ = Describe("ScriptedServer Republish", func() {
 	})
 
 	It("records the explicit sequence number of AnswerWithSequenceNumber", func() {
-		env := Start(GinkgoT())
+		env := New(GinkgoT())
 		sub := env.Subscription()
 
 		env.Server.WaitHeldPublish().AnswerWithSequenceNumber(sub, 9, 7600)
@@ -116,7 +116,7 @@ var _ = Describe("ScriptedServer Republish", func() {
 	})
 
 	It("removes a retained message when the Publish request acknowledges its sequence number", func() {
-		env := Start(GinkgoT())
+		env := New(GinkgoT())
 		sub := env.Subscription()
 		sub.Retain(30, 7500)
 
@@ -142,7 +142,7 @@ var _ = Describe("ScriptedServer Republish", func() {
 	})
 
 	It("lists unused FailRepublish scripts and unanswered retained messages", func() {
-		env := Start(GinkgoT())
+		env := New(GinkgoT())
 		sub := env.Subscription()
 		sub.FailRepublish(5, ua.StatusBadSubscriptionIDInvalid)
 		sub.Retain(4, 7104)
@@ -164,7 +164,7 @@ var _ = Describe("ScriptedServer Republish", func() {
 
 var _ = Describe("ScriptedServer TryWaitHeldPublish", func() {
 	It("returns the next held Publish when one arrives within the timeout", func() {
-		env := Start(GinkgoT())
+		env := New(GinkgoT())
 		held, ok := env.Server.TryWaitHeldPublish(specWait)
 		Expect(ok).To(BeTrue(), "the client sent no Publish request within %s", specWait)
 		Expect(held.Connection()).To(Equal(0),
@@ -176,7 +176,7 @@ var _ = Describe("ScriptedServer TryWaitHeldPublish", func() {
 	})
 
 	It("reports no held Publish on a server the client never connects to", func() {
-		env := Start(GinkgoT())
+		env := New(GinkgoT())
 		second := env.StartServer()
 		_, ok := second.TryWaitHeldPublish(200 * time.Millisecond)
 		Expect(ok).To(BeFalse(),
@@ -186,7 +186,7 @@ var _ = Describe("ScriptedServer TryWaitHeldPublish", func() {
 
 var _ = Describe("ScriptedServer SubscriptionCreatedSince", func() {
 	It("returns a subscription the client created after the mark, without waiting", func() {
-		env := Start(GinkgoT())
+		env := New(GinkgoT())
 		m := env.Mark()
 		_, ok := env.Server.SubscriptionCreatedSince(m)
 		Expect(ok).To(BeFalse(), "SubscriptionCreatedSince reported a subscription although the client created none")
@@ -207,7 +207,7 @@ var _ = Describe("ScriptedServer SubscriptionCreatedSince", func() {
 	})
 
 	It("reports no subscription on a server the client never connects to", func() {
-		env := Start(GinkgoT())
+		env := New(GinkgoT())
 		second := env.StartServer()
 		_, ok := second.SubscriptionCreatedSince(env.Mark())
 		Expect(ok).To(BeFalse(), "a server the client never connected to created a subscription")
@@ -216,7 +216,7 @@ var _ = Describe("ScriptedServer SubscriptionCreatedSince", func() {
 
 var _ = Describe("ScriptedServer TryWaitCreatedSubscription", func() {
 	It("returns a subscription the client created after the mark", func() {
-		env := Start(GinkgoT())
+		env := New(GinkgoT())
 		m := env.Mark()
 		notifications := make(chan *opcua.PublishNotificationData, notificationBuffer)
 		subscribeCtx, subscribeCancel := context.WithTimeout(context.Background(), specWait)
@@ -235,7 +235,7 @@ var _ = Describe("ScriptedServer TryWaitCreatedSubscription", func() {
 	})
 
 	It("reports no subscription on a server the client never connects to", func() {
-		env := Start(GinkgoT())
+		env := New(GinkgoT())
 		second := env.StartServer()
 		_, ok := second.TryWaitCreatedSubscription(env.Mark(), 200*time.Millisecond)
 		Expect(ok).To(BeFalse(),

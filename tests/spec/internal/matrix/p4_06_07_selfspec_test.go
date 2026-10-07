@@ -46,7 +46,7 @@ func TestResponseLostPublishDropsTheArmAnswer(t *testing.T) {
 	}
 
 	opts := append(scenario.Options(f), f.Options()...)
-	env := harness.Start(t, opts...)
+	env := harness.New(t, opts...)
 	outcome := scenario.Run(env, f)
 
 	deadline := time.Now().Add(15 * time.Second)

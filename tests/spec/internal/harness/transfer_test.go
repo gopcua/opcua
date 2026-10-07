@@ -20,7 +20,7 @@ const (
 
 var _ = Describe("ScriptedServer transfer, delete and redirect", func() {
 	It("answers the old session's ActivateSession with Bad_SessionIdInvalid and accepts a fresh session after RedirectTo", func() {
-		env := Start(GinkgoT())
+		env := New(GinkgoT())
 		second := env.StartServer()
 		env.Relay.RedirectTo(second.Address())
 		m := env.Mark()
@@ -90,7 +90,7 @@ var _ = Describe("ScriptedServer transfer, delete and redirect", func() {
 	})
 
 	It("answers a queued transfer refusal with the scripted status per id", func() {
-		env := Start(GinkgoT())
+		env := New(GinkgoT())
 		env.Server.QueueTransferRefusal(ua.StatusBadUserAccessDenied)
 
 		response, err := sendTransfer(env.Client, []uint32{1, 2})
@@ -107,7 +107,7 @@ var _ = Describe("ScriptedServer transfer, delete and redirect", func() {
 	})
 
 	It("answers an unqueued TransferSubscriptions with Bad_ServiceUnsupported", func() {
-		env := Start(GinkgoT())
+		env := New(GinkgoT())
 		m := env.Mark()
 
 		_, err := sendTransfer(env.Client, []uint32{1})
@@ -147,7 +147,7 @@ var _ = Describe("ScriptedServer transfer, delete and redirect", func() {
 	})
 
 	It("lists an unused queued transfer answer in UnusedScripts", func() {
-		env := Start(GinkgoT())
+		env := New(GinkgoT())
 		env.Server.QueueTransferRefusal(ua.StatusBadUserAccessDenied)
 
 		Expect(env.Server.UnusedScripts()).To(ConsistOf("queued transfer answer never used"),
@@ -155,7 +155,7 @@ var _ = Describe("ScriptedServer transfer, delete and redirect", func() {
 	})
 
 	It("answers DeleteSubscriptions Good for a live id and Bad_SubscriptionIDInvalid for an unknown one, and never reuses an id", func() {
-		env := Start(GinkgoT())
+		env := New(GinkgoT())
 		live := env.Subscription()
 
 		deleteResponse, err := sendDelete(env.Client, []uint32{live.ID(), live.ID() + 100})
@@ -333,7 +333,7 @@ func holdRawPublish(client *opcua.Client, srv *ScriptedServer) (HeldPublish, fun
 }
 
 func TestWaitCreatedSubscriptionReturnsTheFirstSubscriptionAfterTheMark(t *testing.T) {
-	env := Start(t)
+	env := New(t)
 	before, err := sendCreate(env.Client)
 	if err != nil {
 		t.Fatalf("the CreateSubscription before the mark failed: %v", err)
@@ -357,7 +357,7 @@ func TestWaitCreatedSubscriptionReturnsTheFirstSubscriptionAfterTheMark(t *testi
 }
 
 func TestWaitCreatedSubscriptionSkipsTheOtherServersSubscriptions(t *testing.T) {
-	env := Start(t)
+	env := New(t)
 	second := env.StartServer()
 	m := env.Mark()
 	_, err := sendCreate(env.Client)
@@ -377,7 +377,7 @@ func TestWaitCreatedSubscriptionSkipsTheOtherServersSubscriptions(t *testing.T) 
 }
 
 func TestUnusedScriptsListsStagedRetainsOnThePendingTransfer(t *testing.T) {
-	env := Start(t)
+	env := New(t)
 	moved := env.Server.QueueTransferSuccess(5, 6)
 	moved.Retain(6, valueRetained)
 

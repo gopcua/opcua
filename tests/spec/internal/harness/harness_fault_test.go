@@ -190,13 +190,13 @@ func TestHarnessFaultPathsCarryExactlyOnePrefix(t *testing.T) {
 	assertPrefixedFault(t, fake, "UnusedScripts with a stored server fault")
 }
 
-// Start's subscribe, monitor and first-delivery failures have no
-// deterministic trigger through Start's options, so only the connect
+// New's subscribe, monitor and first-delivery failures have no
+// deterministic trigger through New's options, so only the connect
 // failure and Subscription() are covered.
 func TestClientFailuresCarryNoPrefix(t *testing.T) {
 	fake := &fakeT{}
 	if !fatalPanics(func() {
-		Start(fake, WithClientOptions(opcua.Dialer(&uacp.Dialer{Dialer: &net.Dialer{Timeout: time.Nanosecond}})))
+		New(fake, WithClientOptions(opcua.Dialer(&uacp.Dialer{Dialer: &net.Dialer{Timeout: time.Nanosecond}})))
 	}) {
 		t.Fatalf("Start returned without failing although its client cannot connect")
 	}

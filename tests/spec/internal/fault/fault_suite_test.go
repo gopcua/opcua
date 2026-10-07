@@ -11,9 +11,9 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestFaults(t *testing.T) {
+func TestFault(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "faults")
+	RunSpecs(t, "fault")
 }
 
 // TestMain runs the package's tests only when the spec suite runs, so

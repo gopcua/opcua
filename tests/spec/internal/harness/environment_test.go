@@ -16,7 +16,7 @@ const outliveWindow = 25 * time.Second
 
 var _ = Describe("Environment Start", func() {
 	It("completes the session handshake, records the subscription and delivers the first answered Publish", func() {
-		env := Start(GinkgoT())
+		env := New(GinkgoT())
 
 		wantSequence := []string{
 			"*ua.OpenSecureChannelRequest",
@@ -65,7 +65,7 @@ var _ = Describe("Environment Start", func() {
 	})
 
 	It("reconnects through exactly one fresh relay connection and records the state path", func() {
-		env := Start(GinkgoT())
+		env := New(GinkgoT())
 		m := env.Mark()
 		before := env.Relay.ConnectionCount()
 		oldAddr := serverAddrOf(env.Recorder, 0)
@@ -116,7 +116,7 @@ var _ = Describe("Environment Start", func() {
 	})
 
 	It("delivers no received value and no error notification from a cut", func() {
-		env := Start(GinkgoT())
+		env := New(GinkgoT())
 		m := env.Mark()
 
 		env.Relay.Cut()
@@ -129,7 +129,7 @@ var _ = Describe("Environment Start", func() {
 	})
 
 	It("fails spectest: when a held Publish is answered twice", func() {
-		env := Start(GinkgoT())
+		env := New(GinkgoT())
 		held := env.Server.WaitHeldPublish()
 		Expect(held.Connection()).To(Equal(0),
 			"the held Publish the client sent while connected did not arrive on connection 0")
@@ -150,7 +150,7 @@ var _ = Describe("Environment Start", func() {
 	})
 
 	It("fails spectest: when a held Publish is answered after its connection was cut", func() {
-		env := Start(GinkgoT())
+		env := New(GinkgoT())
 		held := env.Server.WaitHeldPublish()
 		env.Relay.Cut()
 
@@ -187,7 +187,7 @@ var _ = Describe("Environment Start", func() {
 	})
 
 	It("fails spectest: when a client bypasses the relay and publishes to the scripted server", func() {
-		env := Start(GinkgoT())
+		env := New(GinkgoT())
 		direct, err := opcua.NewClient(env.Server.Address(), opcua.SecurityMode(ua.MessageSecurityModeNone))
 		Expect(err).NotTo(HaveOccurred(), "creating the direct client failed")
 		connectCtx, connectCancel := context.WithTimeout(context.Background(), specWait)
@@ -237,7 +237,7 @@ var _ = Describe("Environment Start", func() {
 	})
 
 	It("never lets the server's subscription service delete the subscription across 25 s of publishing", func() {
-		env := Start(GinkgoT(), WithPublishingInterval(10*time.Millisecond))
+		env := New(GinkgoT(), WithPublishingInterval(10*time.Millisecond))
 		sub := env.Subscription()
 		service := env.Server.srv.SubscriptionService
 		service.Mu.Lock()
@@ -278,14 +278,14 @@ var _ = Describe("Environment Start", func() {
 
 var _ = Describe("Environment TryWaitUntilReconnected", func() {
 	It("reports the reconnect after a cut", func() {
-		env := Start(GinkgoT())
+		env := New(GinkgoT())
 		env.Relay.Cut()
 		Expect(env.TryWaitUntilReconnected(specWait)).To(BeTrue(),
 			"the client did not pass through Reconnecting back to Connected within %s of the cut", specWait)
 	})
 
 	It("reports no reconnect when the connection never dropped", func() {
-		env := Start(GinkgoT())
+		env := New(GinkgoT())
 		Expect(env.TryWaitUntilReconnected(200*time.Millisecond)).To(BeFalse(),
 			"TryWaitUntilReconnected reported a reconnect although the connection never dropped")
 	})

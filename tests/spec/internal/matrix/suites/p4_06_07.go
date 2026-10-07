@@ -319,7 +319,7 @@ func refusedBadSubscriptionIDInvalid(answer harness.ServiceRecord[ua.Response]) 
 }
 
 // caseValues are the values one case answers, unique per case: every
-// value, the first one Start answers included, derives from the case's
+// value, the first one New answers included, derives from the case's
 // own block — 1000 times the case's ordinal among every scenario ×
 // fault pair plus a per-value offset — so a received value matches the
 // notification that carried it by value and never a value another case
@@ -338,7 +338,7 @@ type caseValues struct {
 }
 
 // values returns the value block of one case, derived from the case's
-// scenario and fault alone so the Start options and the workload read
+// scenario and fault alone so the New options and the workload read
 // the same block.
 func (s scenario06_07) values(f fault.Fault) caseValues {
 	base := int32(1000 * caseOrdinal(s.name, f))
