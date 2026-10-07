@@ -182,7 +182,8 @@ func WaitAnsweredBadMessageNotAvailable(env *spectest.Environment, m spectest.Ma
 // answeredTransferThenNewSubscription says whether the recorded
 // traffic already holds a TransferSubscriptions request for oldID
 // answered per transferRefusal, followed by an answered
-// CreateSubscription request, and returns their records.
+// CreateSubscription request whose answer the relay forwarded to the
+// client, and returns their records.
 func answeredTransferThenNewSubscription(env *spectest.Environment, m spectest.Mark, oldID uint32, transferRefusal func(spectest.ServiceRecord[ua.Response]) bool) (transferAnswer spectest.ServiceRecord[ua.Response], createRequest spectest.ServiceRecord[ua.Request], createAnswer spectest.ServiceRecord[ua.Response], complete bool) {
 	requests := env.Recorder.RequestsSince(m)
 	responses := env.Recorder.ResponsesSince(m)
@@ -204,6 +205,9 @@ func answeredTransferThenNewSubscription(env *spectest.Environment, m spectest.M
 			}
 			createAnswer, created := AnswerTo(create, responses)
 			if !created {
+				continue
+			}
+			if createAnswer.Fate != spectest.Forwarded {
 				continue
 			}
 			if _, isCreate := createAnswer.Message(); isCreate {
