@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/gopcua/opcua/tests/spec/faults"
+	"github.com/gopcua/opcua/tests/spec/matrix"
 )
 
 func faultByName(t *testing.T, name string) faults.Fault {
@@ -70,10 +71,14 @@ func TestConsumerBurst(t *testing.T) {
 // that carried it by value and never a value another case answered.
 func TestCaseValuesNeverOverlap(t *testing.T) {
 	seen := map[int32]string{}
-	for _, scenario := range P4_06_07().Scenarios() {
+	var every []matrix.Scenario
+	for _, suite := range []matrix.Suite{P4_06_07(), P4_05_14()} {
+		every = append(every, suite.Scenarios()...)
+	}
+	for _, scenario := range every {
 		for _, f := range faults.AllFaults {
 			owner := scenario.Name() + "/" + f.Name()
-			for _, value := range caseValuesOf(scenario, f) {
+			for _, value := range caseValuesOfAny(scenario, f) {
 				if previous, taken := seen[value]; taken {
 					t.Errorf("value %d belongs to %s and %s", value, previous, owner)
 				}

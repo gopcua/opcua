@@ -15,7 +15,7 @@ import (
 
 func init() {
 	if os.Getenv("SPECTEST_MATRIX") != "" {
-		matrix.RegisterSuites([]matrix.Suite{suites.P4_06_07()}, matrix.KnownDefects(), faults.AllFaults...)
+		matrix.RegisterSuites([]matrix.Suite{suites.P4_06_07(), suites.P4_05_14()}, matrix.KnownDefects(), faults.AllFaults...)
 	}
 }
 
@@ -42,17 +42,22 @@ func TestMatrix(t *testing.T) {
 	RunSpecs(t, "matrix", suiteConfig, reporterConfig)
 }
 
-// TestPlanOverTheRealSuite asserts the plan over the §6.7 suite and
-// the full fault catalogue builds one case per scenario × fault with
-// the predicted defect table attached, and prints how many apply and
-// how many skip per scenario.
+// TestPlanOverTheRealSuite asserts the plan over both suites and the
+// full fault catalogue builds one case per scenario × fault with the
+// predicted defect table attached, and prints how many apply and how
+// many skip per scenario.
 func TestPlanOverTheRealSuite(t *testing.T) {
-	cases, err := matrix.Plan([]matrix.Suite{suites.P4_06_07()}, faults.AllFaults, matrix.KnownDefects())
+	all := append([]matrix.Suite{suites.P4_06_07()}, suites.P4_05_14())
+	cases, err := matrix.Plan(all, faults.AllFaults, matrix.KnownDefects())
 	if err != nil {
-		t.Fatalf("Plan over the §6.7 suite returned an error: %v", err)
+		t.Fatalf("Plan over the suites returned an error: %v", err)
 	}
-	if len(cases) != 3*len(faults.AllFaults) {
-		t.Fatalf("Plan built %d cases, want %d (3 scenarios × %d faults)", len(cases), 3*len(faults.AllFaults), len(faults.AllFaults))
+	scenarioCount := 0
+	for _, suite := range all {
+		scenarioCount += len(suite.Scenarios())
+	}
+	if len(cases) != scenarioCount*len(faults.AllFaults) {
+		t.Fatalf("Plan built %d cases, want %d (%d scenarios × %d faults)", len(cases), scenarioCount*len(faults.AllFaults), scenarioCount, len(faults.AllFaults))
 	}
 	applicable := map[string]int{}
 	skipped := map[string]int{}
@@ -63,7 +68,9 @@ func TestPlanOverTheRealSuite(t *testing.T) {
 		}
 		applicable[c.Path[1]]++
 	}
-	for _, scenario := range suites.P4_06_07().Scenarios() {
-		t.Logf("%s: %d applicable, %d skipped", scenario.Name(), applicable[scenario.Name()], skipped[scenario.Name()])
+	for _, suite := range all {
+		for _, scenario := range suite.Scenarios() {
+			t.Logf("%s: %d applicable, %d skipped", scenario.Name(), applicable[scenario.Name()], skipped[scenario.Name()])
+		}
 	}
 }

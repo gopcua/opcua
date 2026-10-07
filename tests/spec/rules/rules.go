@@ -37,6 +37,17 @@ type Context struct {
 	Server          *spectest.ScriptedServer
 	TransferRefusal func(spectest.ServiceRecord[ua.Response]) bool
 	Value           int32
+	// CyclesCompleted and CyclesWanted say how many cancel-then-subscribe
+	// cycles the workload drove and how many it wanted to complete; a
+	// client that parks its publish loop stops them early.
+	CyclesCompleted int
+	CyclesWanted    int
+	// HeldOrder is the recorded Order of the Publish request the workload
+	// held past the client's publish timeout; HeldAnswerOrder is the
+	// recorded Order of the response it then sent to it, or 0 when it
+	// never answered it.
+	HeldOrder       int
+	HeldAnswerOrder int
 }
 
 // ReactivatesSession: after a transport loss the client re-activates
@@ -353,36 +364,45 @@ var RepublishesRecreatedFromOne = Rule{
 // RepublishesWithinTimeoutAfterPublishTimeout: when the server holds
 // a Publish until the client's publishing times out, the client sends
 // the next Publish within that timeout instead of waiting forever.
+// The check reads recorded traffic: a Publish request on the held
+// one's connection after its order and before the answer the workload
+// gave it, or after it when the workload gave none.
 var RepublishesWithinTimeoutAfterPublishTimeout = Rule{
 	Name:    "RepublishesWithinTimeoutAfterPublishTimeout",
 	Clause:  "P4-5.14.1.2",
 	Keyword: "should",
 	Check: func(c Context) {
-		held := c.Server.WaitHeldPublish()
-		heldOrder, recorded := held.Order()
-		gomega.Expect(recorded).To(gomega.BeTrue(), "the held Publish request was never recorded, so its wire order is unknown")
-		gomega.Eventually(func(g gomega.Gomega) {
-			sent := false
-			for _, record := range RequestsOfType[*ua.PublishRequest](c.Env.Recorder.Requests()) {
-				if record.Connection == held.Connection() && record.Order > heldOrder {
-					sent = true
-					break
-				}
+		sent := false
+		for _, record := range RequestsOfType[*ua.PublishRequest](c.Env.Recorder.RequestsSince(c.Mark)) {
+			if record.Connection != c.Env.Recorder.ConnectionOfOrder(c.HeldOrder) {
+				continue
 			}
-			g.Expect(sent).To(gomega.BeTrue(), "the client sent no second Publish within %s while the first stayed unanswered, so it never timed out the held Publish", 20*time.Second)
-		}, 20*time.Second).Should(gomega.Succeed())
+			if record.Order > c.HeldOrder && (c.HeldAnswerOrder == 0 || record.Order < c.HeldAnswerOrder) {
+				sent = true
+				break
+			}
+		}
+		gomega.Expect(sent).To(gomega.BeTrue(), "the client sent no Publish request on connection %d after the held one (order %d) and before its answer (order %d), so it never timed out the held Publish",
+			c.Env.Recorder.ConnectionOfOrder(c.HeldOrder), c.HeldOrder, c.HeldAnswerOrder)
 	},
 }
 
 // KeepsPublishingAfterCancelThenSubscribe: after the client cancels
 // its only subscription and creates a new one while a Publish is
-// held, the client answers arriving values: it keeps sending Publish
-// requests and delivers the value answered on the new subscription.
+// held, the client answers arriving values: it completes every
+// cancel-then-subscribe cycle the workload drives, keeps sending
+// Publish requests and delivers the value answered on the new
+// subscription.
 var KeepsPublishingAfterCancelThenSubscribe = Rule{
 	Name:    "KeepsPublishingAfterCancelThenSubscribe",
 	Clause:  "P4-5.14.1.2",
 	Keyword: "should",
 	Check: func(c Context) {
+		if c.CyclesWanted > 0 {
+			gomega.Expect(c.CyclesCompleted).To(gomega.Equal(c.CyclesWanted),
+				"the client parked its publish loop after cycle %d of %d: the cancel and the resume raced",
+				c.CyclesCompleted+1, c.CyclesWanted)
+		}
 		gomega.Eventually(func(g gomega.Gomega) {
 			g.Expect(RequestsOfType[*ua.PublishRequest](c.Env.Recorder.RequestsSince(c.Mark))).NotTo(gomega.BeEmpty(),
 				"the client sent no further Publish request within %s after the held one was answered, so it did not keep publishing", 5*time.Second)

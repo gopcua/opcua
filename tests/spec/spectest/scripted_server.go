@@ -582,6 +582,15 @@ func (s *ScriptedServer) ForgetSubscriptions() {
 	}
 }
 
+// Node returns the node the harness watches, the one Start monitored:
+// the variable the environment answers its values on, so a workload can
+// monitor it on a subscription it created.
+func (s *ScriptedServer) Node() *ua.NodeID {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.node
+}
+
 // LiveSubscriptions returns how many harness subscriptions the server
 // holds that are not deleted.
 func (s *ScriptedServer) LiveSubscriptions() int {
@@ -1087,6 +1096,19 @@ func (h HeldPublish) Connection() int {
 // matches the held one.
 func (h HeldPublish) Order() (int, bool) {
 	for _, record := range h.server.recorder.Requests() {
+		if record.Connection == h.entry.connection && record.RequestID == h.entry.requestID {
+			return record.Order, true
+		}
+	}
+	return 0, false
+}
+
+// AnswerOrder returns the recorder Order of the response the server
+// sent to the held Publish request, so a rule can bound the requests
+// that raced the answer. The bool is false while the request is
+// unanswered.
+func (h HeldPublish) AnswerOrder() (int, bool) {
+	for _, record := range h.server.recorder.Responses() {
 		if record.Connection == h.entry.connection && record.RequestID == h.entry.requestID {
 			return record.Order, true
 		}

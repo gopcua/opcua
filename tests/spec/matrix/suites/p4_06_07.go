@@ -372,9 +372,11 @@ func caseOrdinal(scenario string, f faults.Fault) int {
 }
 
 var scenarioOrdinals = map[string]int{
-	"SessionSurvives":   0,
-	"SessionLost":       1,
-	"SubscriptionsLost": 2,
+	"SessionSurvives":     0,
+	"SessionLost":         1,
+	"SubscriptionsLost":   2,
+	"SteadyPublishing":    3,
+	"CancelThenSubscribe": 4,
 }
 
 // caseValuesOf returns every value of one case's block, for the test
@@ -384,4 +386,14 @@ func caseValuesOf(scenario matrix.Scenario, f faults.Fault) []int32 {
 	values := s.values(f)
 	all := []int32{values.first, values.v1, values.v2, values.v3, values.vArm, values.sentinel}
 	return append(all, values.burst[:]...)
+}
+
+// caseValuesOfAny returns every value of one case's block whatever
+// suite its scenario belongs to, for the test that pins every suite's
+// blocks apart.
+func caseValuesOfAny(scenario matrix.Scenario, f faults.Fault) []int32 {
+	if _, is := scenario.(scenario06_07); is {
+		return caseValuesOf(scenario, f)
+	}
+	return caseValuesOf05_14(scenario, f)
 }

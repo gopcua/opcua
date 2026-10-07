@@ -349,6 +349,25 @@ func (r *Recorder) ConnectionStateOf(index int) ConnectionState {
 	return Unknown
 }
 
+// ConnectionOfOrder returns the relay connection index the record with
+// the given Order rode, for a rule that pairs a held request with the
+// later requests on its connection.
+func (r *Recorder) ConnectionOfOrder(order int) int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, record := range r.requests {
+		if record.Order == order {
+			return record.Connection
+		}
+	}
+	for _, record := range r.responses {
+		if record.Order == order {
+			return record.Connection
+		}
+	}
+	return -1
+}
+
 // TimesOf returns when the relay read the message of a record and when
 // it wrote it upstream, for a Forwarded record. The bool is false for
 // a record whose message was never written, or that the relay never

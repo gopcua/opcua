@@ -21,7 +21,14 @@ const (
 var _ = Describe("when the publishing interval is 10 ms", func() {
 	It("times out a held Publish on its first subscription", Label("P4-5.14.1.2"), func() {
 		env := spectest.Start(GinkgoT(), spectest.WithPublishingInterval(timeoutPublishingInterval))
-		rules.RepublishesWithinTimeoutAfterPublishTimeout.Check(rules.Context{Env: env, Server: env.Server})
+		held := env.Server.WaitHeldPublish()
+		heldOrder, recorded := held.Order()
+		Expect(recorded).To(BeTrue(), "the held Publish request was never recorded, so its wire order is unknown")
+		// Hold the Publish unanswered past the client's publish
+		// timeout: the request times out on the client, which must
+		// publish again while the first stays unanswered.
+		time.Sleep(env.PublishTimeout() + 2*time.Second)
+		rules.RepublishesWithinTimeoutAfterPublishTimeout.Check(rules.Context{Env: env, Server: env.Server, HeldOrder: heldOrder})
 	})
 
 	It("times out a held Publish after recreating the subscription", Label("P4-5.14.1.2", "known-defect"), func() {
@@ -33,7 +40,11 @@ var _ = Describe("when the publishing interval is 10 ms", func() {
 		env.Relay.Cut()
 		env.WaitUntilReconnected()
 		second.WaitCreatedSubscription(m)
-		rules.RepublishesWithinTimeoutAfterPublishTimeout.Check(rules.Context{Env: env, Server: second})
+		held := second.WaitHeldPublish()
+		heldOrder, recorded := held.Order()
+		Expect(recorded).To(BeTrue(), "the held Publish request was never recorded, so its wire order is unknown")
+		time.Sleep(env.PublishTimeout() + 2*time.Second)
+		rules.RepublishesWithinTimeoutAfterPublishTimeout.Check(rules.Context{Env: env, Server: second, HeldOrder: heldOrder})
 		Expect(second.UnusedScripts()).To(BeEmpty(), "scripts this spec armed were never used: %v", second.UnusedScripts())
 	})
 })
