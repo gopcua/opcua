@@ -69,7 +69,7 @@ func (idleScenario) Run(env *spectest.Environment, f faults.Fault) Outcome {
 // received, which the invariant now catches.
 var selfSpecDefects = []KnownDefect{
 	{
-		Issue: Unfiled("client delivers a notification whose sequence number it already received (S9)"),
+		Issue: Unfiled("duplicate-sequence", "client delivers a notification whose sequence number it already received (S9)"),
 		Check: "DeliverEachValueOnce",
 		Applies: func(scenario string, f faults.Fault) bool {
 			return f.Name() == "Server/DuplicateSequence"

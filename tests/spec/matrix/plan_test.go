@@ -1,6 +1,7 @@
 package matrix
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -8,6 +9,7 @@ import (
 	"github.com/gopcua/opcua/tests/spec/message"
 	"github.com/gopcua/opcua/tests/spec/rules"
 	"github.com/gopcua/opcua/tests/spec/spectest"
+	"github.com/onsi/gomega"
 )
 
 // fakes for the unit tests: one suite with two scenarios, three faults,
@@ -289,18 +291,52 @@ func TestPlanRejectsDuplicateScenarioNames(t *testing.T) {
 }
 
 func TestUnfiledRecords(t *testing.T) {
-	label := Unfiled("the client eats a notification under load")
-	if label == "" {
-		t.Fatalf("Unfiled returned an empty label")
-	}
-	listed := UnfiledDefects()
-	found := false
-	for _, text := range listed {
-		if strings.Contains(text, "the client eats a notification under load") && strings.HasPrefix(text, label+": ") {
-			found = true
+	const slug = "eats-notification-under-load"
+	const text = "the client eats a notification under load"
+
+	t.Run("derives the label from the slug", func(t *testing.T) {
+		if label := Unfiled(slug, text); label != "unfiled-"+slug {
+			t.Fatalf("Unfiled returned %q, want %q", label, "unfiled-"+slug)
 		}
-	}
-	if !found {
-		t.Fatalf("UnfiledDefects is missing the recorded text under its label: %v", listed)
-	}
+	})
+	// The fixture must not leak into the listings of later tests in this
+	// binary: UnfiledDefects is the PR body's source of real defects.
+	t.Cleanup(func() {
+		unfiledMu.Lock()
+		delete(unfiledTexts, "unfiled-"+slug)
+		unfiledMu.Unlock()
+	})
+	t.Run("rejects a malformed slug", func(t *testing.T) {
+		g := gomega.NewWithT(t)
+		for _, bad := range []string{"Eats", "", "-eats", "double--hyphen", "under_score", "has space"} {
+			g.Expect(func() { Unfiled(bad, text) }).To(gomega.Panic(), "Unfiled accepted the malformed slug %q", bad)
+		}
+	})
+	t.Run("re-registers one slug and text without panicking", func(t *testing.T) {
+		if label := Unfiled(slug, text); label != "unfiled-"+slug {
+			t.Fatalf("re-registration returned %q, want the same label %q", label, "unfiled-"+slug)
+		}
+	})
+	t.Run("rejects one slug under a second text", func(t *testing.T) {
+		g := gomega.NewWithT(t)
+		Unfiled(slug, text)
+		g.Expect(func() { Unfiled(slug, text+" again") }).To(gomega.Panic(), "Unfiled re-registered a second text under the slug %q", slug)
+	})
+	t.Run("lists the recorded texts sorted by label", func(t *testing.T) {
+		listed := UnfiledDefects()
+		var labels []string
+		for _, entry := range listed {
+			label, _, found := strings.Cut(entry, ": ")
+			if !found {
+				t.Fatalf("UnfiledDefects listed an entry without a label: %q", entry)
+			}
+			labels = append(labels, label)
+		}
+		if !slices.IsSorted(labels) {
+			t.Fatalf("UnfiledDefects is not sorted by label: %v", listed)
+		}
+		if !slices.Contains(listed, "unfiled-"+slug+": "+text) {
+			t.Fatalf("UnfiledDefects is missing the recorded text under its label: %v", listed)
+		}
+	})
 }

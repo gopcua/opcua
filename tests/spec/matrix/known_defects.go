@@ -10,11 +10,11 @@ import (
 // The unfiled issues the triage named, one label per group of cases
 // with one root cause.
 var (
-	issueFailedSubscriptionStep      = Unfiled("a failed subscription step during reconnect makes recreateSession drop a healthy session without closing it")
-	issueConnectionFailureOnActivate = Unfiled("a connection failure during ActivateSession makes the client forget its session without retrying or closing it")
-	issueTimedOutActivationSession   = Unfiled("after an ActivateSession timeout the old session stays open on the server")
-	issueDrainedConnectionError      = Unfiled("the reconnect loop's error drain discards a connection error, so the client reports Connected on a dead channel")
-	issueHELHandshakeHang            = Unfiled("the HEL/ACK handshake ignores its context, so a reconnect hangs on an unanswered HEL; PR #919 fixes it")
+	issueFailedSubscriptionStep      = Unfiled("failed-subscription-step", "a failed subscription step during reconnect makes recreateSession drop a healthy session without closing it")
+	issueConnectionFailureOnActivate = Unfiled("connection-failure-on-activate", "a connection failure during ActivateSession makes the client forget its session without retrying or closing it")
+	issueTimedOutActivationSession   = Unfiled("timed-out-activation-session", "after an ActivateSession timeout the old session stays open on the server")
+	issueDrainedConnectionError      = Unfiled("drained-connection-error", "the reconnect loop's error drain discards a connection error, so the client reports Connected on a dead channel")
+	issueHELHandshakeHang            = Unfiled("hel-handshake-hang", "the HEL/ACK handshake ignores its context, so a reconnect hangs on an unanswered HEL; PR #919 fixes it")
 )
 
 // recreatePathFaults lists the faults under which the client does not

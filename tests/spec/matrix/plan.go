@@ -7,14 +7,17 @@ package matrix
 
 import (
 	"fmt"
+	"maps"
+	"regexp"
+	"slices"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/gopcua/opcua/tests/spec/faults"
 	"github.com/gopcua/opcua/tests/spec/message"
 	"github.com/gopcua/opcua/tests/spec/rules"
 	"github.com/gopcua/opcua/tests/spec/spectest"
-	"time"
 )
 
 // Category names the rule set a clause prescribes for one fault in
@@ -267,28 +270,35 @@ var (
 	unfiledTexts = make(map[string]string)
 )
 
+// slugPattern says which slugs Unfiled accepts.
+var slugPattern = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
+
 // Unfiled records a finding no issue names yet and returns the label
-// its defect carries. The PR body lists UnfiledDefects so each one
-// gets an issue or an explanation.
-func Unfiled(text string) string {
+// its defect carries, so the label names the defect and survives
+// moving it to another file. The PR body lists UnfiledDefects so each
+// one gets an issue or an explanation.
+func Unfiled(slug, text string) string {
 	unfiledMu.Lock()
 	defer unfiledMu.Unlock()
-	unfiledSeq++
-	label := fmt.Sprintf("unfiled-%d", unfiledSeq)
+	if !slugPattern.MatchString(slug) {
+		panic("Unfiled: slug " + slug + " does not match " + slugPattern.String())
+	}
+	label := "unfiled-" + slug
+	if old, recorded := unfiledTexts[label]; recorded && old != text {
+		panic("Unfiled: slug " + slug + " already records " + old + ", not " + text)
+	}
 	unfiledTexts[label] = text
 	return label
 }
 
-var unfiledSeq int
-
 // UnfiledDefects lists every text Unfiled recorded, each paired with
-// the label its defect carries.
+// the label its defect carries, sorted by label.
 func UnfiledDefects() []string {
 	unfiledMu.Lock()
 	defer unfiledMu.Unlock()
 	var texts []string
-	for label, text := range unfiledTexts {
-		texts = append(texts, label+": "+text)
+	for _, label := range slices.Sorted(maps.Keys(unfiledTexts)) {
+		texts = append(texts, label+": "+unfiledTexts[label])
 	}
 	return texts
 }
