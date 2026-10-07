@@ -16,11 +16,11 @@ var (
 	issueDrainedConnectionError      = Unfiled("the reconnect loop's error drain discards a connection error, so the client reports Connected on a dead channel")
 )
 
-// recreatePathFaults lists the faults whose labelled
-// DeliverEachValueOnce, ResumePublishing and
-// KeepOneSubscriptionPerClientSubscription checks passed in every one
-// of runs 7, 8 and 9, so the delivery and publishing entries below do
-// not cover them.
+// recreatePathFaults lists the faults under which the client does not
+// reactivate its session but creates a new one. On that path it
+// recreates its subscriptions and resumes publishing, so the delivery
+// and publishing entries below, which belong to the reactivation path,
+// do not cover them.
 var recreatePathFaults = []string{
 	"CutAfterResponse/OpenSecureChannel", "DelayAboveTimeout/ActivateSession",
 	"RequestLost/ActivateSession", "ResponseLost/ActivateSession"}
