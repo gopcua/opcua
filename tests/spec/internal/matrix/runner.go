@@ -6,10 +6,10 @@ import (
 	"time"
 
 	"github.com/gopcua/opcua"
-	"github.com/gopcua/opcua/tests/spec/internal/faults"
+	"github.com/gopcua/opcua/tests/spec/internal/fault"
+	"github.com/gopcua/opcua/tests/spec/internal/harness"
 	"github.com/gopcua/opcua/tests/spec/internal/invariants"
 	"github.com/gopcua/opcua/tests/spec/internal/rules"
-	"github.com/gopcua/opcua/tests/spec/internal/spectest"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
@@ -26,7 +26,7 @@ var registered []Suite
 // BeforeAll took. One failing check retires only itself, so the checks
 // behind it still run and report. It panics when the plan cannot be
 // built.
-func RegisterSuites(suites []Suite, defects []KnownDefect, all ...faults.Fault) {
+func RegisterSuites(suites []Suite, defects []KnownDefect, all ...fault.Fault) {
 	registered = append(registered, suites...)
 	cases, err := Plan(suites, all, defects)
 	if err != nil {
@@ -61,9 +61,9 @@ func registerCase(c Case) {
 				var outcome Outcome
 
 				ginkgo.BeforeAll(func() {
-					opts := append([]spectest.Option{}, scenario.Options(f)...)
+					opts := append([]harness.Option{}, scenario.Options(f)...)
 					opts = append(opts, f.Options()...)
-					env := spectest.Start(ginkgo.GinkgoT(), opts...)
+					env := harness.Start(ginkgo.GinkgoT(), opts...)
 
 					outcome = scenario.Run(env, f)
 
@@ -133,7 +133,7 @@ func assertCheck(check Check, before, after invariants.Observed, outcome Outcome
 // waitForSentinel waits up to 15 s for the client to receive the
 // sentinel, so the snapshot's ResumePublishing reads a delivery that
 // happened rather than one still in flight.
-func waitForSentinel(env *spectest.Environment, sentinel int32) {
+func waitForSentinel(env *harness.Environment, sentinel int32) {
 	if sentinel == 0 {
 		return
 	}
@@ -150,7 +150,7 @@ func waitForSentinel(env *spectest.Environment, sentinel int32) {
 
 // waitUntilConnected waits up to 15 s for the client to report
 // Connected, as the case runner's settle step.
-func waitUntilConnected(env *spectest.Environment) {
+func waitUntilConnected(env *harness.Environment) {
 	deadline := time.Now().Add(15 * time.Second)
 	for time.Now().Before(deadline) {
 		states := env.States()
@@ -164,7 +164,7 @@ func waitUntilConnected(env *spectest.Environment) {
 // isHoldFault says whether the fault holds a message past the moment
 // Close returns, so the after-close snapshot must wait for its
 // release.
-func isHoldFault(f faults.Fault) bool {
+func isHoldFault(f fault.Fault) bool {
 	return strings.HasPrefix(f.Name(), "DelayAboveTimeout/") || strings.HasPrefix(f.Name(), "DelayBelowTimeout/")
 }
 
@@ -183,8 +183,8 @@ func scenarioNamed(clause, name string) Scenario {
 	return nil
 }
 
-func faultNamed(name string) faults.Fault {
-	for _, f := range faults.AllFaults {
+func faultNamed(name string) fault.Fault {
+	for _, f := range fault.AllFaults {
 		if f.Name() == name {
 			return f
 		}

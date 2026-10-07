@@ -5,10 +5,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gopcua/opcua/tests/spec/internal/faults"
+	"github.com/gopcua/opcua/tests/spec/internal/fault"
+	"github.com/gopcua/opcua/tests/spec/internal/harness"
 	"github.com/gopcua/opcua/tests/spec/internal/message"
 	"github.com/gopcua/opcua/tests/spec/internal/rules"
-	"github.com/gopcua/opcua/tests/spec/internal/spectest"
 	"github.com/onsi/gomega"
 )
 
@@ -20,11 +20,11 @@ type fakeScenario struct {
 	sends []message.Message
 }
 
-func (s fakeScenario) Name() string                           { return s.name }
-func (s fakeScenario) Sends() []message.Message               { return s.sends }
-func (s fakeScenario) Options(faults.Fault) []spectest.Option { return nil }
-func (s fakeScenario) Category(f faults.Fault) Category       { return SessionSurvives }
-func (s fakeScenario) Run(env *spectest.Environment, f faults.Fault) Outcome {
+func (s fakeScenario) Name() string                         { return s.name }
+func (s fakeScenario) Sends() []message.Message             { return s.sends }
+func (s fakeScenario) Options(fault.Fault) []harness.Option { return nil }
+func (s fakeScenario) Category(f fault.Fault) Category      { return SessionSurvives }
+func (s fakeScenario) Run(env *harness.Environment, f fault.Fault) Outcome {
 	return Outcome{}
 }
 
@@ -43,9 +43,9 @@ func (s fakeSuite) Rules(c Category) []rules.Rule {
 	return s.byCategory[c]
 }
 
-func namedFault(t *testing.T, name string) faults.Fault {
+func namedFault(t *testing.T, name string) fault.Fault {
 	t.Helper()
-	for _, f := range faults.AllFaults {
+	for _, f := range fault.AllFaults {
 		if f.Name() == name {
 			return f
 		}
@@ -82,7 +82,7 @@ func TestPlanBuildsOneCasePerCombination(t *testing.T) {
 	publishFault := namedFault(t, "RequestLost/Publish")
 	readFault := namedFault(t, "RequestLost/Read")
 	stallFault := namedFault(t, "Link/Stall")
-	all := []faults.Fault{publishFault, readFault, stallFault}
+	all := []fault.Fault{publishFault, readFault, stallFault}
 
 	cases, err := Plan([]Suite{suite}, all, nil)
 	if err != nil {
@@ -120,7 +120,7 @@ func TestPlanOrdersInvariantChecksBeforeRules(t *testing.T) {
 		},
 	}
 	stall := namedFault(t, "Link/Stall")
-	cases, err := Plan([]Suite{suite}, []faults.Fault{stall}, nil)
+	cases, err := Plan([]Suite{suite}, []fault.Fault{stall}, nil)
 	if err != nil {
 		t.Fatalf("Plan returned an error: %v", err)
 	}
@@ -162,7 +162,7 @@ func TestPlanLabels(t *testing.T) {
 		},
 	}
 	publishFault := namedFault(t, "RequestLost/Publish")
-	cases, err := Plan([]Suite{suite}, []faults.Fault{publishFault}, nil)
+	cases, err := Plan([]Suite{suite}, []fault.Fault{publishFault}, nil)
 	if err != nil {
 		t.Fatalf("Plan returned an error: %v", err)
 	}
@@ -212,11 +212,11 @@ func TestPlanLabelsOnlyMatchingDefects(t *testing.T) {
 	defect := KnownDefect{
 		Issue: "issue-879",
 		Check: "HaveFired",
-		Applies: func(scenario string, f faults.Fault) bool {
+		Applies: func(scenario string, f fault.Fault) bool {
 			return f.Name() == "RequestLost/Publish"
 		},
 	}
-	cases, err := Plan([]Suite{suite}, []faults.Fault{publishFault, stall}, []KnownDefect{defect})
+	cases, err := Plan([]Suite{suite}, []fault.Fault{publishFault, stall}, []KnownDefect{defect})
 	if err != nil {
 		t.Fatalf("Plan returned an error: %v", err)
 	}
@@ -252,11 +252,11 @@ func TestPlanRejectsBadDefects(t *testing.T) {
 	skippedDefect := KnownDefect{
 		Issue: "issue-879",
 		Check: "HaveFired",
-		Applies: func(scenario string, f faults.Fault) bool {
+		Applies: func(scenario string, f fault.Fault) bool {
 			return f.Name() == "RequestLost/Publish"
 		},
 	}
-	_, err := Plan([]Suite{suite}, []faults.Fault{readFault, stall, namedFault(t, "RequestLost/Publish")}, []KnownDefect{skippedDefect})
+	_, err := Plan([]Suite{suite}, []fault.Fault{readFault, stall, namedFault(t, "RequestLost/Publish")}, []KnownDefect{skippedDefect})
 	if err == nil || !strings.Contains(err.Error(), "issue-879") {
 		t.Fatalf("a defect matching only skipped cases returned %v, want an error naming it", err)
 	}
@@ -265,11 +265,11 @@ func TestPlanRejectsBadDefects(t *testing.T) {
 	unknownDefect := KnownDefect{
 		Issue: "issue-900",
 		Check: "NoSuchCheck",
-		Applies: func(scenario string, f faults.Fault) bool {
+		Applies: func(scenario string, f fault.Fault) bool {
 			return true
 		},
 	}
-	_, err = Plan([]Suite{suite}, []faults.Fault{readFault, stall}, []KnownDefect{unknownDefect})
+	_, err = Plan([]Suite{suite}, []fault.Fault{readFault, stall}, []KnownDefect{unknownDefect})
 	if err == nil || !strings.Contains(err.Error(), "issue-900") {
 		t.Fatalf("a defect matching no check returned %v, want an error naming it", err)
 	}
@@ -284,7 +284,7 @@ func TestPlanRejectsDuplicateScenarioNames(t *testing.T) {
 		},
 		byCategory: map[Category][]rules.Rule{},
 	}
-	_, err := Plan([]Suite{suite}, []faults.Fault{namedFault(t, "Link/Stall")}, nil)
+	_, err := Plan([]Suite{suite}, []fault.Fault{namedFault(t, "Link/Stall")}, nil)
 	if err == nil || !strings.Contains(err.Error(), "A") {
 		t.Fatalf("duplicate scenario names returned %v, want an error naming the name", err)
 	}

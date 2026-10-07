@@ -3,14 +3,14 @@ package part4
 import (
 	"time"
 
+	"github.com/gopcua/opcua/tests/spec/internal/harness"
 	"github.com/gopcua/opcua/tests/spec/internal/rules"
-	"github.com/gopcua/opcua/tests/spec/internal/spectest"
 	"github.com/gopcua/opcua/ua"
 
 	. "github.com/onsi/gomega"
 )
 
-func deleteNamesSubscription(requests []spectest.ServiceRecord[ua.Request], orderFloor int, id uint32) bool {
+func deleteNamesSubscription(requests []harness.ServiceRecord[ua.Request], orderFloor int, id uint32) bool {
 	for _, record := range requests {
 		if record.Order <= orderFloor {
 			continue
@@ -30,19 +30,19 @@ func deleteNamesSubscription(requests []spectest.ServiceRecord[ua.Request], orde
 	return false
 }
 
-func requireNotDeleted(env *spectest.Environment, m spectest.Mark, sub spectest.Subscription, deletedWhen, reason string, orderFloor int) {
+func requireNotDeleted(env *harness.Environment, m harness.Mark, sub harness.Subscription, deletedWhen, reason string, orderFloor int) {
 	requests := env.Recorder.RequestsSince(m)
 	Expect(deleteNamesSubscription(requests, orderFloor, sub.ID())).To(BeFalse(), "client deleted subscription %d %s instead of %s; requests after the first cut: %v", sub.ID(), deletedWhen, reason, rules.RequestTypeNames(requests))
 }
 
-func requireSubscriptionAlive(env *spectest.Environment, m spectest.Mark, sub spectest.Subscription, deletedWhen string) {
+func requireSubscriptionAlive(env *harness.Environment, m harness.Mark, sub harness.Subscription, deletedWhen string) {
 	requireNotDeleted(env, m, sub, deletedWhen, "republishing it", 0)
 	requests := env.Recorder.RequestsSince(m)
 	Expect(rules.RequestsOfType[*ua.CreateSubscriptionRequest](requests)).To(BeEmpty(), "client created a new subscription %s instead of republishing subscription %d; requests after the first cut: %v", deletedWhen, sub.ID(), rules.RequestTypeNames(requests))
 }
 
-func transferRefusedPerResult(status ua.StatusCode) func(spectest.ServiceRecord[ua.Response]) bool {
-	return func(answer spectest.ServiceRecord[ua.Response]) bool {
+func transferRefusedPerResult(status ua.StatusCode) func(harness.ServiceRecord[ua.Response]) bool {
+	return func(answer harness.ServiceRecord[ua.Response]) bool {
 		message, decoded := answer.Message()
 		if !decoded {
 			return false
@@ -52,14 +52,14 @@ func transferRefusedPerResult(status ua.StatusCode) func(spectest.ServiceRecord[
 	}
 }
 
-func transferAnsweredWithStatus(status ua.StatusCode) func(spectest.ServiceRecord[ua.Response]) bool {
-	return func(answer spectest.ServiceRecord[ua.Response]) bool {
+func transferAnsweredWithStatus(status ua.StatusCode) func(harness.ServiceRecord[ua.Response]) bool {
+	return func(answer harness.ServiceRecord[ua.Response]) bool {
 		answerStatus, decoded := rules.StatusOf(answer)
 		return decoded && answerStatus == status
 	}
 }
 
-func requireNoRepublishBetween(env *spectest.Environment, m spectest.Mark, transferAnswer, createAnswer spectest.ServiceRecord[ua.Response]) {
+func requireNoRepublishBetween(env *harness.Environment, m harness.Mark, transferAnswer, createAnswer harness.ServiceRecord[ua.Response]) {
 	sentBetween := false
 	for _, record := range rules.RequestsOfType[*ua.RepublishRequest](env.Recorder.RequestsSince(m)) {
 		if record.Order > transferAnswer.Order && record.Order < createAnswer.Order {
@@ -69,7 +69,7 @@ func requireNoRepublishBetween(env *spectest.Environment, m spectest.Mark, trans
 	Expect(sentBetween).To(BeFalse(), "client sent a Republish request between the transfer response and the CreateSubscription response; requests after the first cut: %v", rules.RequestTypeNames(env.Recorder.RequestsSince(m)))
 }
 
-func transferFailedFlow(env *spectest.Environment, second *spectest.ScriptedServer, m spectest.Mark, transferAnswered func(spectest.ServiceRecord[ua.Response]) bool, extra func(env *spectest.Environment, m spectest.Mark, transferAnswer, createAnswer spectest.ServiceRecord[ua.Response])) {
+func transferFailedFlow(env *harness.Environment, second *harness.ScriptedServer, m harness.Mark, transferAnswered func(harness.ServiceRecord[ua.Response]) bool, extra func(env *harness.Environment, m harness.Mark, transferAnswer, createAnswer harness.ServiceRecord[ua.Response])) {
 	oldID := env.Subscription().ID()
 	rules.RecreatesAfterRefusal.Check(rules.Context{Env: env, Mark: m, Sub: env.Subscription(), TransferRefusal: transferAnswered})
 	transferAnswer, createRequest, createAnswer := rules.FindAnsweredTransferThenNewSubscription(env, m, oldID, transferAnswered)
@@ -83,7 +83,7 @@ func transferFailedFlow(env *spectest.Environment, second *spectest.ScriptedServ
 	Expect(second.UnusedScripts()).To(BeEmpty(), "scripts this spec armed were never used: %v", second.UnusedScripts())
 }
 
-func transferredFlow(env *spectest.Environment, second *spectest.ScriptedServer, m spectest.Mark, last uint32) {
+func transferredFlow(env *harness.Environment, second *harness.ScriptedServer, m harness.Mark, last uint32) {
 	Eventually(func(g Gomega) {
 		g.Expect(env.ReceivedSince(m)).To(Equal([]int32{valueRetained}), "client did not deliver the retained notification of the transferred subscription; delivered: %v; errors: %v", env.ReceivedSince(m), env.ReceivedErrorsSince(m))
 	}, 15*time.Second).Should(Succeed())
@@ -107,11 +107,11 @@ func transferredFlow(env *spectest.Environment, second *spectest.ScriptedServer,
 	Expect(second.UnusedScripts()).To(BeEmpty(), "scripts this spec armed were never used: %v", second.UnusedScripts())
 }
 
-func notificationCarryingValue(env *spectest.Environment, value int32) (spectest.Notification, bool) {
+func notificationCarryingValue(env *harness.Environment, value int32) (harness.Notification, bool) {
 	for _, notification := range env.Recorder.Notifications() {
 		if notification.Value == value {
 			return notification, true
 		}
 	}
-	return spectest.Notification{}, false
+	return harness.Notification{}, false
 }

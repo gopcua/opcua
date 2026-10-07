@@ -4,7 +4,7 @@ import (
 	"slices"
 	"time"
 
-	"github.com/gopcua/opcua/tests/spec/internal/spectest"
+	"github.com/gopcua/opcua/tests/spec/internal/harness"
 	"github.com/gopcua/opcua/ua"
 
 	"github.com/onsi/gomega"
@@ -29,13 +29,13 @@ type Rule struct {
 // scripted one, and the value the scenario answered on the new
 // subscription.
 type Context struct {
-	Env             *spectest.Environment
-	Mark            spectest.Mark
+	Env             *harness.Environment
+	Mark            harness.Mark
 	LastSeq         uint32
-	Sub             spectest.Subscription
-	Recreated       spectest.Subscription
-	Server          *spectest.ScriptedServer
-	TransferRefusal func(spectest.ServiceRecord[ua.Response]) bool
+	Sub             harness.Subscription
+	Recreated       harness.Subscription
+	Server          *harness.ScriptedServer
+	TransferRefusal func(harness.ServiceRecord[ua.Response]) bool
 	Value           int32
 	// CyclesCompleted and CyclesWanted say how many cancel-then-subscribe
 	// cycles the workload drove and how many it wanted to complete; a
@@ -71,7 +71,7 @@ var CreatesNoSession = Rule{
 	Keyword: "shall",
 	Check: func(c Context) {
 		reactivation := reactivationAnswer(c.Env, c.Mark)
-		gomega.Expect(slices.ContainsFunc(RequestsOfType[*ua.CreateSessionRequest](c.Env.Recorder.RequestsSince(c.Mark)), func(request spectest.ServiceRecord[ua.Request]) bool {
+		gomega.Expect(slices.ContainsFunc(RequestsOfType[*ua.CreateSessionRequest](c.Env.Recorder.RequestsSince(c.Mark)), func(request harness.ServiceRecord[ua.Request]) bool {
 			return request.Order < reactivation.Order
 		})).To(gomega.BeFalse(), "client sent a CreateSession request before the server answered ActivateSession")
 		gomega.Consistently(func(g gomega.Gomega) {
@@ -121,7 +121,7 @@ var SendsNoPublishBeforeNotAvailable = Rule{
 	Keyword: "should",
 	Check: func(c Context) {
 		notAvailableAnswer := WaitAnsweredBadMessageNotAvailable(c.Env, c.Mark)
-		gomega.Expect(slices.ContainsFunc(RequestsOfType[*ua.PublishRequest](c.Env.Recorder.RequestsSince(c.Mark)), func(request spectest.ServiceRecord[ua.Request]) bool {
+		gomega.Expect(slices.ContainsFunc(RequestsOfType[*ua.PublishRequest](c.Env.Recorder.RequestsSince(c.Mark)), func(request harness.ServiceRecord[ua.Request]) bool {
 			return request.Connection == notAvailableAnswer.Connection && request.Order < notAvailableAnswer.Order
 		})).To(gomega.BeFalse(), "client sent a Publish request on the new connection before the Republish was answered Bad_MessageNotAvailable")
 	},
@@ -136,7 +136,7 @@ var SendsNoTransferForOwnSubscription = Rule{
 	Keyword: "shall",
 	Check: func(c Context) {
 		notAvailableAnswer := WaitAnsweredBadMessageNotAvailable(c.Env, c.Mark)
-		gomega.Expect(slices.ContainsFunc(RequestsOfType[*ua.TransferSubscriptionsRequest](c.Env.Recorder.RequestsSince(c.Mark)), func(request spectest.ServiceRecord[ua.Request]) bool {
+		gomega.Expect(slices.ContainsFunc(RequestsOfType[*ua.TransferSubscriptionsRequest](c.Env.Recorder.RequestsSince(c.Mark)), func(request harness.ServiceRecord[ua.Request]) bool {
 			return request.Order < notAvailableAnswer.Order
 		})).To(gomega.BeFalse(), "client sent a TransferSubscriptions request before the Republish was answered Bad_MessageNotAvailable")
 		gomega.Consistently(func(g gomega.Gomega) {
@@ -249,7 +249,7 @@ var RecreatesAfterRefusal = Rule{
 }
 
 func recreateAfterTransferRefusal(c Context) {
-	var createRequest spectest.ServiceRecord[ua.Request]
+	var createRequest harness.ServiceRecord[ua.Request]
 	var createdID uint32
 	gomega.Eventually(func(g gomega.Gomega) {
 		transferAnswer, create, createAnswer, complete := answeredTransferThenNewSubscription(c.Env, c.Mark, c.Sub.ID(), c.TransferRefusal)
@@ -266,7 +266,7 @@ func recreateAfterTransferRefusal(c Context) {
 }
 
 func recreateAfterRepublishRefusal(c Context) {
-	var republishAnswer spectest.ServiceRecord[ua.Response]
+	var republishAnswer harness.ServiceRecord[ua.Response]
 	gomega.Eventually(func(g gomega.Gomega) {
 		requests := c.Env.Recorder.RequestsSince(c.Mark)
 		responses := c.Env.Recorder.ResponsesSince(c.Mark)
@@ -283,7 +283,7 @@ func recreateAfterRepublishRefusal(c Context) {
 	}, 15*time.Second).Should(gomega.Succeed())
 	node := MonitoredNode(c.Env)
 	gomega.Expect(node).NotTo(gomega.BeNil(), "the recorder saw no CreateMonitoredItems request, so the node the client monitors is unknown")
-	var createSubscription spectest.ServiceRecord[ua.Request]
+	var createSubscription harness.ServiceRecord[ua.Request]
 	var createdID uint32
 	gomega.Eventually(func(g gomega.Gomega) {
 		requests := c.Env.Recorder.RequestsSince(c.Mark)
@@ -450,7 +450,7 @@ var PublishesAgainAfterTooManyPublishRequests = Rule{
 				continue
 			}
 			token := refusedMessage.Header().AuthenticationToken
-			var later spectest.ServiceRecord[ua.Request]
+			var later harness.ServiceRecord[ua.Request]
 			found := false
 			for _, publish := range RequestsOfType[*ua.PublishRequest](requests) {
 				if publish.Order <= refused.answer.Order {
@@ -469,7 +469,7 @@ var PublishesAgainAfterTooManyPublishRequests = Rule{
 				refused.request.Connection, refused.request.RequestID)
 			delivered := false
 			for _, response := range responses {
-				if response.Fate != spectest.Forwarded || response.Order <= later.Order {
+				if response.Fate != harness.Forwarded || response.Order <= later.Order {
 					continue
 				}
 				responseMessage, responseDecoded := response.Message()

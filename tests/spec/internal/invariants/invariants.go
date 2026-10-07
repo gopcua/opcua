@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/gopcua/opcua/tests/spec/internal/spectest"
+	"github.com/gopcua/opcua/tests/spec/internal/harness"
 	"github.com/onsi/gomega/types"
 )
 
@@ -69,7 +69,7 @@ type Observed struct {
 	Sentinel            *Sentinel
 	Fired               bool
 
-	env *spectest.Environment
+	env *harness.Environment
 }
 
 func asObserved(actual any) (Observed, error) {

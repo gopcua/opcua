@@ -7,10 +7,10 @@ import (
 	"time"
 
 	"github.com/gopcua/opcua"
-	"github.com/gopcua/opcua/tests/spec/internal/faults"
+	"github.com/gopcua/opcua/tests/spec/internal/fault"
+	"github.com/gopcua/opcua/tests/spec/internal/harness"
 	"github.com/gopcua/opcua/tests/spec/internal/matrix"
 	"github.com/gopcua/opcua/tests/spec/internal/matrix/suites"
-	"github.com/gopcua/opcua/tests/spec/internal/spectest"
 	"github.com/gopcua/opcua/tests/spec/internal/suitegate"
 	"github.com/gopcua/opcua/ua"
 )
@@ -35,8 +35,8 @@ func TestResponseLostPublishDropsTheArmAnswer(t *testing.T) {
 	if scenario == nil {
 		t.Fatalf("the §6.7 suite has no SessionSurvives scenario")
 	}
-	var f faults.Fault
-	for _, candidate := range faults.AllFaults {
+	var f fault.Fault
+	for _, candidate := range fault.AllFaults {
 		if candidate.Name() == "ResponseLost/Publish" {
 			f = candidate
 		}
@@ -46,7 +46,7 @@ func TestResponseLostPublishDropsTheArmAnswer(t *testing.T) {
 	}
 
 	opts := append(scenario.Options(f), f.Options()...)
-	env := spectest.Start(t, opts...)
+	env := harness.Start(t, opts...)
 	outcome := scenario.Run(env, f)
 
 	deadline := time.Now().Add(15 * time.Second)
@@ -68,7 +68,7 @@ func TestResponseLostPublishDropsTheArmAnswer(t *testing.T) {
 
 	var dropped []int32
 	for _, record := range env.Recorder.Responses() {
-		if record.Fate != spectest.Dropped {
+		if record.Fate != harness.Dropped {
 			continue
 		}
 		decoded, ok := record.Message()

@@ -14,10 +14,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gopcua/opcua/tests/spec/internal/faults"
+	"github.com/gopcua/opcua/tests/spec/internal/fault"
+	"github.com/gopcua/opcua/tests/spec/internal/harness"
 	"github.com/gopcua/opcua/tests/spec/internal/message"
 	"github.com/gopcua/opcua/tests/spec/internal/rules"
-	"github.com/gopcua/opcua/tests/spec/internal/spectest"
 )
 
 // Category names the rule set a clause prescribes for one fault in
@@ -62,16 +62,16 @@ type Suite interface {
 type Scenario interface {
 	Name() string
 	Sends() []message.Message
-	Options(f faults.Fault) []spectest.Option
-	Category(faults.Fault) Category
-	Run(env *spectest.Environment, f faults.Fault) Outcome
+	Options(f fault.Fault) []harness.Option
+	Category(fault.Fault) Category
+	Run(env *harness.Environment, f fault.Fault) Outcome
 }
 
 // Outcome is what a scenario's Run observed: the armed fault, the
 // fault's end event, the sentinel value with the moment its answer
 // was sent, and the rules' context.
 type Outcome struct {
-	Injected   *spectest.Injected
+	Injected   *harness.Injected
 	FaultEnd   time.Time
 	Sentinel   int32
 	AnsweredAt time.Time
@@ -83,7 +83,7 @@ type Outcome struct {
 type KnownDefect struct {
 	Issue   string
 	Check   string
-	Applies func(scenario string, f faults.Fault) bool
+	Applies func(scenario string, f fault.Fault) bool
 }
 
 // Phase says whether a check runs before or after the client closes.
@@ -113,7 +113,7 @@ type Check struct {
 // checks.
 type Case struct {
 	Path   []string
-	Skip   *faults.Reason
+	Skip   *fault.Reason
 	Checks []Check
 }
 
@@ -122,7 +122,7 @@ type Case struct {
 // the known defects that label them. It returns an error — never
 // panics — for a defect that matches no applicable check, a zero
 // category or two scenarios of one suite with the same name.
-func Plan(suites []Suite, all []faults.Fault, defects []KnownDefect) ([]Case, error) {
+func Plan(suites []Suite, all []fault.Fault, defects []KnownDefect) ([]Case, error) {
 	var cases []Case
 	for _, suite := range suites {
 		seen := make(map[string]bool)
@@ -157,7 +157,7 @@ func Plan(suites []Suite, all []faults.Fault, defects []KnownDefect) ([]Case, er
 	return cases, nil
 }
 
-func checksOf(suite Suite, scenario Scenario, category Category, f faults.Fault, defects []KnownDefect) ([]Check, error) {
+func checksOf(suite Suite, scenario Scenario, category Category, f fault.Fault, defects []KnownDefect) ([]Check, error) {
 	_ = categoryInvalid
 	_ = phaseInvalid
 	var checks []Check
@@ -204,7 +204,7 @@ func withLabels(base []string, extra ...string) []string {
 	return append(append([]string{}, base...), extra...)
 }
 
-func faultGroup(f faults.Fault) string {
+func faultGroup(f fault.Fault) string {
 	group := f.Name()
 	if index := strings.Index(group, "/"); index >= 0 {
 		group = group[:index]
@@ -218,7 +218,7 @@ func faultGroup(f faults.Fault) string {
 
 // faultTarget returns the message name of a message-targeting fault
 // and whether it names one.
-func faultTarget(f faults.Fault) (string, bool) {
+func faultTarget(f fault.Fault) (string, bool) {
 	name := f.Name()
 	parts := strings.Split(name, "/")
 	switch parts[0] {
@@ -256,8 +256,8 @@ func defectsMatch(defects []KnownDefect, cases []Case) error {
 	return nil
 }
 
-func namedFaultFor(name string) faults.Fault {
-	for _, f := range faults.AllFaults {
+func namedFaultFor(name string) fault.Fault {
+	for _, f := range fault.AllFaults {
 		if f.Name() == name {
 			return f
 		}

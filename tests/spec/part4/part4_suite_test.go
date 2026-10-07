@@ -6,7 +6,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/gopcua/opcua/tests/spec/internal/spectest"
+	"github.com/gopcua/opcua/tests/spec/internal/harness"
 	"github.com/gopcua/opcua/tests/spec/internal/suitegate"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -25,8 +25,8 @@ func resolveFilters(visit func(func(*flag.Flag)), labelFlag string, focusFlag []
 	})
 	labelEnv := getenv("SPECTEST_LABEL_FILTER")
 	focusEnv := getenv("SPECTEST_FOCUS")
-	labelFilter = spectest.LabelFilter(labelPassed, labelFlag, labelEnv)
-	focus = spectest.FocusFilter(focusPassed, focusFlag, focusEnv)
+	labelFilter = harness.LabelFilter(labelPassed, labelFlag, labelEnv)
+	focus = harness.FocusFilter(focusPassed, focusFlag, focusEnv)
 	labelSource = "default"
 	if labelPassed {
 		labelSource = "flag"

@@ -6,11 +6,11 @@ import (
 	"time"
 
 	"github.com/gopcua/opcua"
-	"github.com/gopcua/opcua/tests/spec/internal/faults"
+	"github.com/gopcua/opcua/tests/spec/internal/fault"
+	"github.com/gopcua/opcua/tests/spec/internal/harness"
 	"github.com/gopcua/opcua/tests/spec/internal/matrix"
 	"github.com/gopcua/opcua/tests/spec/internal/message"
 	"github.com/gopcua/opcua/tests/spec/internal/rules"
-	"github.com/gopcua/opcua/tests/spec/internal/spectest"
 	"github.com/gopcua/opcua/ua"
 )
 
@@ -78,25 +78,25 @@ type scenario05_14 struct {
 	name  string
 	sends []message.Message
 	own   matrix.Category
-	drive func(env *spectest.Environment, f faults.Fault, s scenario05_14) matrix.Outcome
+	drive func(env *harness.Environment, f fault.Fault, s scenario05_14) matrix.Outcome
 }
 
 func (s scenario05_14) Name() string             { return s.name }
 func (s scenario05_14) Sends() []message.Message { return s.sends }
 
-func (s scenario05_14) Options(f faults.Fault) []spectest.Option {
-	return []spectest.Option{
-		spectest.WithRetentionQueue(),
-		spectest.WithPublishingInterval(10 * time.Millisecond),
-		spectest.WithClientOptions(opcua.RequestTimeout(2 * time.Second)),
-		spectest.WithFirstValue(s.values(f).first),
+func (s scenario05_14) Options(f fault.Fault) []harness.Option {
+	return []harness.Option{
+		harness.WithRetentionQueue(),
+		harness.WithPublishingInterval(10 * time.Millisecond),
+		harness.WithClientOptions(opcua.RequestTimeout(2 * time.Second)),
+		harness.WithFirstValue(s.values(f).first),
 	}
 }
 
 // Category is the scenario's own, except for a DelayAboveTimeout or
 // Overload fault on a service other than Publish, where Part 4
 // prescribes no reaction the rules read: the invariants only.
-func (s scenario05_14) Category(f faults.Fault) matrix.Category {
+func (s scenario05_14) Category(f fault.Fault) matrix.Category {
 	if (strings.HasPrefix(f.Name(), "DelayAboveTimeout/") || strings.HasPrefix(f.Name(), "Overload/")) && !targetsPublish(f) {
 		return matrix.Unspecified
 	}
@@ -118,7 +118,7 @@ type caseValues05_14 struct {
 // values returns the value block of one §5.14 case, derived from the
 // case's scenario and fault alone so the Start options and the workload
 // read the same block.
-func (s scenario05_14) values(f faults.Fault) caseValues05_14 {
+func (s scenario05_14) values(f fault.Fault) caseValues05_14 {
 	base := int32(1000 * caseOrdinal(s.name, f))
 	values := caseValues05_14{first: base + 1, vArm: base + 11, sentinel: base + 999}
 	for i := range values.steady {
@@ -134,7 +134,7 @@ func (s scenario05_14) values(f faults.Fault) caseValues05_14 {
 // holds one Publish past the client's publish timeout, answers the
 // rest, and returns the rules' context. The fault is the interruption:
 // no relay connection is cut.
-func driveSteadyPublishing(env *spectest.Environment, f faults.Fault, s scenario05_14) matrix.Outcome {
+func driveSteadyPublishing(env *harness.Environment, f fault.Fault, s scenario05_14) matrix.Outcome {
 	values := s.values(f)
 	sub := env.Subscription()
 
@@ -211,7 +211,7 @@ const cancelCycles = 20
 // while a Publish is held, answering one value per cycle and stopping
 // at the first cycle whose value the client did not deliver. The fault
 // is the interruption: no relay connection is cut.
-func driveCancelThenSubscribe(env *spectest.Environment, f faults.Fault, s scenario05_14) matrix.Outcome {
+func driveCancelThenSubscribe(env *harness.Environment, f fault.Fault, s scenario05_14) matrix.Outcome {
 	values := s.values(f)
 	sub := env.Subscription()
 
@@ -309,13 +309,13 @@ cycle:
 
 // Run drives one §5.14 case: the scenario's workload, with the values
 // of the case's own block.
-func (s scenario05_14) Run(env *spectest.Environment, f faults.Fault) matrix.Outcome {
+func (s scenario05_14) Run(env *harness.Environment, f fault.Fault) matrix.Outcome {
 	return s.drive(env, f, s)
 }
 
 // caseValuesOf05_14 returns every value of one §5.14 case's block, for
 // the test that pins the blocks apart.
-func caseValuesOf05_14(scenario matrix.Scenario, f faults.Fault) []int32 {
+func caseValuesOf05_14(scenario matrix.Scenario, f fault.Fault) []int32 {
 	s := scenario.(scenario05_14)
 	values := s.values(f)
 	all := []int32{values.first, values.vArm, values.sentinel}

@@ -3,15 +3,15 @@ package suites
 import (
 	"testing"
 
-	"github.com/gopcua/opcua/tests/spec/internal/faults"
+	"github.com/gopcua/opcua/tests/spec/internal/fault"
 	"github.com/gopcua/opcua/tests/spec/internal/matrix"
 )
 
-func faultByName(t *testing.T, name string) faults.Fault {
+func faultByName(t *testing.T, name string) fault.Fault {
 	t.Helper()
-	for _, fault := range faults.AllFaults {
-		if fault.Name() == name {
-			return fault
+	for _, f := range fault.AllFaults {
+		if f.Name() == name {
+			return f
 		}
 	}
 	t.Fatalf("no fault named %s", name)
@@ -76,7 +76,7 @@ func TestCaseValuesNeverOverlap(t *testing.T) {
 		every = append(every, suite.Scenarios()...)
 	}
 	for _, scenario := range every {
-		for _, f := range faults.AllFaults {
+		for _, f := range fault.AllFaults {
 			owner := scenario.Name() + "/" + f.Name()
 			for _, value := range caseValuesOfAny(scenario, f) {
 				if previous, taken := seen[value]; taken {

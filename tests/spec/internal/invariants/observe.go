@@ -4,7 +4,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gopcua/opcua/tests/spec/internal/spectest"
+	"github.com/gopcua/opcua/tests/spec/internal/harness"
 )
 
 // Observe collects a snapshot of what the environment observed: the
@@ -16,7 +16,7 @@ import (
 // fault fired. WithFaultEnd and WithSentinel fill the fields only the
 // caller knows; WithSentinel fills the sentinel's ReceivedAt from
 // the environment when the client received the value.
-func Observe(env *spectest.Environment, fault *spectest.Injected) Observed {
+func Observe(env *harness.Environment, fault *harness.Injected) Observed {
 	servers := env.Servers()
 	var states []ServerState
 	current := env.Relay.ConnectionCount() - 1

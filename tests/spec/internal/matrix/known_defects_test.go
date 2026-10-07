@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gopcua/opcua/tests/spec/internal/faults"
+	"github.com/gopcua/opcua/tests/spec/internal/fault"
 	"github.com/gopcua/opcua/tests/spec/internal/matrix"
 	"github.com/gopcua/opcua/tests/spec/internal/matrix/suites"
 )
@@ -172,7 +172,7 @@ func TestKnownDefectsMatchExactlyTheTriageCases(t *testing.T) {
 	expected := map[string][]string{}
 	for _, row := range triageCases {
 		issue := resolve(row.issue)
-		for _, f := range faults.AllFaults {
+		for _, f := range fault.AllFaults {
 			if row.faults != nil && !slices.Contains(row.faults, f.Name()) {
 				continue
 			}
@@ -190,7 +190,7 @@ func TestKnownDefectsMatchExactlyTheTriageCases(t *testing.T) {
 		t.Fatalf("the triage's case lists produced no expected labelling, so the test matched nothing")
 	}
 
-	cases, err := matrix.Plan([]matrix.Suite{suites.P4_06_07(), suites.P4_05_14()}, faults.AllFaults, matrix.KnownDefects())
+	cases, err := matrix.Plan([]matrix.Suite{suites.P4_06_07(), suites.P4_05_14()}, fault.AllFaults, matrix.KnownDefects())
 	if err != nil {
 		t.Fatalf("Plan over the §6.7 suite returned an error: %v", err)
 	}

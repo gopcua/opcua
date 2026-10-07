@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gopcua/opcua/tests/spec/internal/spectest"
+	"github.com/gopcua/opcua/tests/spec/internal/harness"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -17,7 +17,7 @@ func TestInvariants(t *testing.T) {
 	RunSpecs(t, "invariants")
 }
 
-func closeClient(env *spectest.Environment) {
+func closeClient(env *harness.Environment) {
 	ctx, cancel := context.WithTimeout(context.Background(), specWait)
 	defer cancel()
 	Expect(env.Client.Close(ctx)).To(Succeed(), "closing the client failed")
@@ -25,7 +25,7 @@ func closeClient(env *spectest.Environment) {
 
 var _ = Describe("Observe", func() {
 	It("matches every invariant on an undisturbed environment", func() {
-		env := spectest.Start(GinkgoT(), spectest.WithRetentionQueue())
+		env := harness.Start(GinkgoT(), harness.WithRetentionQueue())
 		sub := env.Subscription()
 		caseStart := time.Now()
 		env.Server.WaitHeldPublish().Answer(sub, 101)
@@ -51,7 +51,7 @@ var _ = Describe("Observe", func() {
 	})
 
 	It("names a planted loss", func() {
-		env := spectest.Start(GinkgoT(), spectest.WithRetentionQueue())
+		env := harness.Start(GinkgoT(), harness.WithRetentionQueue())
 		sub := env.Subscription()
 		caseStart := time.Now()
 		env.Server.WaitHeldPublish().Answer(sub, 101)

@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gopcua/opcua/tests/spec/internal/faults"
+	"github.com/gopcua/opcua/tests/spec/internal/fault"
+	"github.com/gopcua/opcua/tests/spec/internal/harness"
 	"github.com/gopcua/opcua/tests/spec/internal/message"
 	"github.com/gopcua/opcua/tests/spec/internal/rules"
-	"github.com/gopcua/opcua/tests/spec/internal/spectest"
 	"github.com/gopcua/opcua/tests/spec/internal/suitegate"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -43,11 +43,11 @@ func (idleScenario) Sends() []message.Message {
 	return []message.Message{message.Publish}
 }
 
-func (idleScenario) Options(faults.Fault) []spectest.Option { return nil }
+func (idleScenario) Options(fault.Fault) []harness.Option { return nil }
 
-func (idleScenario) Category(f faults.Fault) Category { return Unspecified }
+func (idleScenario) Category(f fault.Fault) Category { return Unspecified }
 
-func (idleScenario) Run(env *spectest.Environment, f faults.Fault) Outcome {
+func (idleScenario) Run(env *harness.Environment, f fault.Fault) Outcome {
 	sub := env.Subscription()
 	env.Server.WaitHeldPublish().Answer(sub, idleValue1)
 	env.Server.WaitHeldPublish().Answer(sub, idleValue2)
@@ -71,7 +71,7 @@ var selfSpecDefects = []KnownDefect{
 	{
 		Issue: Unfiled("duplicate-sequence", "client delivers a notification whose sequence number it already received (S9)"),
 		Check: "DeliverEachValueOnce",
-		Applies: func(scenario string, f faults.Fault) bool {
+		Applies: func(scenario string, f fault.Fault) bool {
 			return f.Name() == "Server/DuplicateSequence"
 		},
 	},
@@ -85,7 +85,7 @@ func init() {
 // neither skipped nor emptied: a known defect may retire one check of
 // a case, never the case itself.
 func TestSelfSpecDefectKeepsTheCaseRunning(t *testing.T) {
-	cases, err := Plan([]Suite{idleSuite{}}, []faults.Fault{faultNamed("Server/Pause"), faultNamed("Server/DuplicateSequence")}, selfSpecDefects)
+	cases, err := Plan([]Suite{idleSuite{}}, []fault.Fault{faultNamed("Server/Pause"), faultNamed("Server/DuplicateSequence")}, selfSpecDefects)
 	if err != nil {
 		t.Fatalf("Plan over the self-spec returned an error: %v", err)
 	}
@@ -142,7 +142,7 @@ func TestSelfSpec(t *testing.T) {
 			labelPassed = true
 		}
 	})
-	suiteConfig.LabelFilter = spectest.LabelFilter(labelPassed, suiteConfig.LabelFilter, os.Getenv("SPECTEST_LABEL_FILTER"))
+	suiteConfig.LabelFilter = harness.LabelFilter(labelPassed, suiteConfig.LabelFilter, os.Getenv("SPECTEST_LABEL_FILTER"))
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "matrix self-spec", suiteConfig, reporterConfig)
 }

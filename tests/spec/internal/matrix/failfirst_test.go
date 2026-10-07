@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gopcua/opcua/tests/spec/internal/faults"
+	"github.com/gopcua/opcua/tests/spec/internal/fault"
+	"github.com/gopcua/opcua/tests/spec/internal/harness"
 	"github.com/gopcua/opcua/tests/spec/internal/message"
 	"github.com/gopcua/opcua/tests/spec/internal/rules"
-	"github.com/gopcua/opcua/tests/spec/internal/spectest"
 	"github.com/gopcua/opcua/tests/spec/internal/suitegate"
 )
 
@@ -44,11 +44,11 @@ func (failFirstScenario) Sends() []message.Message {
 	return []message.Message{message.Read}
 }
 
-func (failFirstScenario) Options(faults.Fault) []spectest.Option { return nil }
+func (failFirstScenario) Options(fault.Fault) []harness.Option { return nil }
 
-func (failFirstScenario) Category(faults.Fault) Category { return Unspecified }
+func (failFirstScenario) Category(fault.Fault) Category { return Unspecified }
 
-func (failFirstScenario) Run(env *spectest.Environment, f faults.Fault) Outcome {
+func (failFirstScenario) Run(env *harness.Environment, f fault.Fault) Outcome {
 	sub := env.Subscription()
 	env.Server.WaitHeldPublish().Answer(sub, failFirstValue1)
 	env.Server.WaitHeldPublish().Answer(sub, failFirstValue2)

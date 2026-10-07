@@ -12,7 +12,7 @@ import (
 	"slices"
 	"time"
 
-	"github.com/gopcua/opcua/tests/spec/internal/spectest"
+	"github.com/gopcua/opcua/tests/spec/internal/harness"
 	"github.com/gopcua/opcua/ua"
 
 	"github.com/onsi/gomega"
@@ -20,8 +20,8 @@ import (
 
 // RequestsOfType returns the recorded client requests whose decoded
 // message is of the request type T.
-func RequestsOfType[T ua.Request](records []spectest.ServiceRecord[ua.Request]) []spectest.ServiceRecord[ua.Request] {
-	var matched []spectest.ServiceRecord[ua.Request]
+func RequestsOfType[T ua.Request](records []harness.ServiceRecord[ua.Request]) []harness.ServiceRecord[ua.Request] {
+	var matched []harness.ServiceRecord[ua.Request]
 	for _, record := range records {
 		message, decoded := record.Message()
 		if !decoded {
@@ -36,8 +36,8 @@ func RequestsOfType[T ua.Request](records []spectest.ServiceRecord[ua.Request]) 
 
 // RecordsOnConnection returns the recorded messages that rode the
 // given relay connection.
-func RecordsOnConnection[M any](records []spectest.ServiceRecord[M], connection int) []spectest.ServiceRecord[M] {
-	var on []spectest.ServiceRecord[M]
+func RecordsOnConnection[M any](records []harness.ServiceRecord[M], connection int) []harness.ServiceRecord[M] {
+	var on []harness.ServiceRecord[M]
 	for _, record := range records {
 		if record.Connection == connection {
 			on = append(on, record)
@@ -48,17 +48,17 @@ func RecordsOnConnection[M any](records []spectest.ServiceRecord[M], connection 
 
 // AnswerTo returns the recorded response that answers the request,
 // paired by connection and request id.
-func AnswerTo(request spectest.ServiceRecord[ua.Request], responses []spectest.ServiceRecord[ua.Response]) (spectest.ServiceRecord[ua.Response], bool) {
+func AnswerTo(request harness.ServiceRecord[ua.Request], responses []harness.ServiceRecord[ua.Response]) (harness.ServiceRecord[ua.Response], bool) {
 	for _, response := range responses {
 		if response.Connection == request.Connection && response.RequestID == request.RequestID {
 			return response, true
 		}
 	}
-	return spectest.ServiceRecord[ua.Response]{}, false
+	return harness.ServiceRecord[ua.Response]{}, false
 }
 
 // StatusOf returns the service result a recorded response carries.
-func StatusOf(response spectest.ServiceRecord[ua.Response]) (ua.StatusCode, bool) {
+func StatusOf(response harness.ServiceRecord[ua.Response]) (ua.StatusCode, bool) {
 	message, decoded := response.Message()
 	if !decoded {
 		return 0, false
@@ -68,7 +68,7 @@ func StatusOf(response spectest.ServiceRecord[ua.Response]) (ua.StatusCode, bool
 
 // RepublishForSequence returns the recorded Republish request that
 // names the sequence number.
-func RepublishForSequence(records []spectest.ServiceRecord[ua.Request], sequenceNumber uint32) (spectest.ServiceRecord[ua.Request], bool) {
+func RepublishForSequence(records []harness.ServiceRecord[ua.Request], sequenceNumber uint32) (harness.ServiceRecord[ua.Request], bool) {
 	for _, record := range RequestsOfType[*ua.RepublishRequest](records) {
 		message, decoded := record.Message()
 		if !decoded {
@@ -78,12 +78,12 @@ func RepublishForSequence(records []spectest.ServiceRecord[ua.Request], sequence
 			return record, true
 		}
 	}
-	return spectest.ServiceRecord[ua.Request]{}, false
+	return harness.ServiceRecord[ua.Request]{}, false
 }
 
 // RequestTypeNames returns the decoded message type of every recorded
 // request, for failure messages.
-func RequestTypeNames(records []spectest.ServiceRecord[ua.Request]) []string {
+func RequestTypeNames(records []harness.ServiceRecord[ua.Request]) []string {
 	names := make([]string, 0, len(records))
 	for _, record := range records {
 		message, decoded := record.Message()
@@ -97,7 +97,7 @@ func RequestTypeNames(records []spectest.ServiceRecord[ua.Request]) []string {
 
 // MonitoredNode returns the node the client's CreateMonitoredItems
 // requests monitored, the harness node the specs read.
-func MonitoredNode(env *spectest.Environment) *ua.NodeID {
+func MonitoredNode(env *harness.Environment) *ua.NodeID {
 	for _, record := range RequestsOfType[*ua.CreateMonitoredItemsRequest](env.Recorder.Requests()) {
 		message, decoded := record.Message()
 		if !decoded {
@@ -113,7 +113,7 @@ func MonitoredNode(env *spectest.Environment) *ua.NodeID {
 // PreCutSessionToken returns the authentication token the client's
 // first ActivateSession request carried, the token the pre-cut session
 // was activated with.
-func PreCutSessionToken(env *spectest.Environment) *ua.NodeID {
+func PreCutSessionToken(env *harness.Environment) *ua.NodeID {
 	for _, record := range RequestsOfType[*ua.ActivateSessionRequest](env.Recorder.Requests()) {
 		message, decoded := record.Message()
 		if decoded {
@@ -125,10 +125,10 @@ func PreCutSessionToken(env *spectest.Environment) *ua.NodeID {
 
 // reactivationAnswer waits for the recorded answer to the client's
 // ActivateSession carrying the pre-cut session token, and returns it.
-func reactivationAnswer(env *spectest.Environment, m spectest.Mark) spectest.ServiceRecord[ua.Response] {
+func reactivationAnswer(env *harness.Environment, m harness.Mark) harness.ServiceRecord[ua.Response] {
 	sessionToken := PreCutSessionToken(env)
 	gomega.Expect(sessionToken).NotTo(gomega.BeNil(), "the recorder saw no ActivateSession request before the cut")
-	var answer spectest.ServiceRecord[ua.Response]
+	var answer harness.ServiceRecord[ua.Response]
 	gomega.Eventually(func(g gomega.Gomega) {
 		requests := env.Recorder.RequestsSince(m)
 		responses := env.Recorder.ResponsesSince(m)
@@ -155,7 +155,7 @@ func reactivationAnswer(env *spectest.Environment, m spectest.Mark) spectest.Ser
 
 // BadMessageNotAvailableAnswer returns the recorded answer that the
 // server answered Bad_MessageNotAvailable to a Republish request.
-func BadMessageNotAvailableAnswer(env *spectest.Environment, m spectest.Mark) (spectest.ServiceRecord[ua.Response], bool) {
+func BadMessageNotAvailableAnswer(env *harness.Environment, m harness.Mark) (harness.ServiceRecord[ua.Response], bool) {
 	responses := env.Recorder.ResponsesSince(m)
 	for _, republish := range RequestsOfType[*ua.RepublishRequest](env.Recorder.RequestsSince(m)) {
 		if answer, answered := AnswerTo(republish, responses); answered {
@@ -164,14 +164,14 @@ func BadMessageNotAvailableAnswer(env *spectest.Environment, m spectest.Mark) (s
 			}
 		}
 	}
-	return spectest.ServiceRecord[ua.Response]{}, false
+	return harness.ServiceRecord[ua.Response]{}, false
 }
 
 // WaitAnsweredBadMessageNotAvailable waits for the client's Republish
 // request the server answered Bad_MessageNotAvailable and returns the
 // recorded answer.
-func WaitAnsweredBadMessageNotAvailable(env *spectest.Environment, m spectest.Mark) spectest.ServiceRecord[ua.Response] {
-	var answer spectest.ServiceRecord[ua.Response]
+func WaitAnsweredBadMessageNotAvailable(env *harness.Environment, m harness.Mark) harness.ServiceRecord[ua.Response] {
+	var answer harness.ServiceRecord[ua.Response]
 	gomega.Eventually(func(g gomega.Gomega) {
 		var answered bool
 		answer, answered = BadMessageNotAvailableAnswer(env, m)
@@ -185,7 +185,7 @@ func WaitAnsweredBadMessageNotAvailable(env *spectest.Environment, m spectest.Ma
 // answered per transferRefusal, followed by an answered
 // CreateSubscription request whose answer the relay forwarded to the
 // client, and returns their records.
-func answeredTransferThenNewSubscription(env *spectest.Environment, m spectest.Mark, oldID uint32, transferRefusal func(spectest.ServiceRecord[ua.Response]) bool) (transferAnswer spectest.ServiceRecord[ua.Response], createRequest spectest.ServiceRecord[ua.Request], createAnswer spectest.ServiceRecord[ua.Response], complete bool) {
+func answeredTransferThenNewSubscription(env *harness.Environment, m harness.Mark, oldID uint32, transferRefusal func(harness.ServiceRecord[ua.Response]) bool) (transferAnswer harness.ServiceRecord[ua.Response], createRequest harness.ServiceRecord[ua.Request], createAnswer harness.ServiceRecord[ua.Response], complete bool) {
 	requests := env.Recorder.RequestsSince(m)
 	responses := env.Recorder.ResponsesSince(m)
 	for _, record := range RequestsOfType[*ua.TransferSubscriptionsRequest](requests) {
@@ -208,7 +208,7 @@ func answeredTransferThenNewSubscription(env *spectest.Environment, m spectest.M
 			if !created {
 				continue
 			}
-			if createAnswer.Fate != spectest.Forwarded {
+			if createAnswer.Fate != harness.Forwarded {
 				continue
 			}
 			if _, isCreate := createAnswer.Message(); isCreate {
@@ -217,7 +217,7 @@ func answeredTransferThenNewSubscription(env *spectest.Environment, m spectest.M
 		}
 		break
 	}
-	return spectest.ServiceRecord[ua.Response]{}, spectest.ServiceRecord[ua.Request]{}, spectest.ServiceRecord[ua.Response]{}, false
+	return harness.ServiceRecord[ua.Response]{}, harness.ServiceRecord[ua.Request]{}, harness.ServiceRecord[ua.Response]{}, false
 }
 
 // FindAnsweredTransferThenNewSubscription returns the records of a
@@ -225,7 +225,7 @@ func answeredTransferThenNewSubscription(env *spectest.Environment, m spectest.M
 // transferRefusal and the CreateSubscription request answered after
 // it, without asserting they exist; a caller whose rule already
 // proved them uses it to pass the records on.
-func FindAnsweredTransferThenNewSubscription(env *spectest.Environment, m spectest.Mark, oldID uint32, transferRefusal func(spectest.ServiceRecord[ua.Response]) bool) (spectest.ServiceRecord[ua.Response], spectest.ServiceRecord[ua.Request], spectest.ServiceRecord[ua.Response]) {
+func FindAnsweredTransferThenNewSubscription(env *harness.Environment, m harness.Mark, oldID uint32, transferRefusal func(harness.ServiceRecord[ua.Response]) bool) (harness.ServiceRecord[ua.Response], harness.ServiceRecord[ua.Request], harness.ServiceRecord[ua.Response]) {
 	transferAnswer, createRequest, createAnswer, _ := answeredTransferThenNewSubscription(env, m, oldID, transferRefusal)
 	return transferAnswer, createRequest, createAnswer
 }
@@ -244,10 +244,10 @@ type receivedNotification struct {
 // relay forwarded to the client: Publish responses name their
 // subscription, and a Republish response belongs to the subscription
 // its paired Republish request named.
-func receivedNotifications(requests []spectest.ServiceRecord[ua.Request], responses []spectest.ServiceRecord[ua.Response]) []receivedNotification {
+func receivedNotifications(requests []harness.ServiceRecord[ua.Request], responses []harness.ServiceRecord[ua.Response]) []receivedNotification {
 	var notifications []receivedNotification
 	for _, record := range responses {
-		if record.Fate != spectest.Forwarded {
+		if record.Fate != harness.Forwarded {
 			continue
 		}
 		message, decoded := record.Message()
@@ -282,7 +282,7 @@ func receivedNotifications(requests []spectest.ServiceRecord[ua.Request], respon
 
 // republishSubscriptionID returns the subscription id the Republish
 // request paired with the response named.
-func republishSubscriptionID(requests []spectest.ServiceRecord[ua.Request], response spectest.ServiceRecord[ua.Response]) uint32 {
+func republishSubscriptionID(requests []harness.ServiceRecord[ua.Request], response harness.ServiceRecord[ua.Response]) uint32 {
 	for _, record := range requests {
 		if record.Connection != response.Connection || record.RequestID != response.RequestID {
 			continue
@@ -343,13 +343,13 @@ func skippedSequenceNumbers(notifications []receivedNotification) []uint32 {
 // publishAnsweredTooMany is one Publish request the server answered
 // Bad_TooManyPublishRequests, with its answer.
 type publishAnsweredTooMany struct {
-	request spectest.ServiceRecord[ua.Request]
-	answer  spectest.ServiceRecord[ua.Response]
+	request harness.ServiceRecord[ua.Request]
+	answer  harness.ServiceRecord[ua.Response]
 }
 
 // publishesAnsweredTooMany returns every recorded Publish request the
 // server answered Bad_TooManyPublishRequests, with its answer.
-func publishesAnsweredTooMany(requests []spectest.ServiceRecord[ua.Request], responses []spectest.ServiceRecord[ua.Response]) []publishAnsweredTooMany {
+func publishesAnsweredTooMany(requests []harness.ServiceRecord[ua.Request], responses []harness.ServiceRecord[ua.Response]) []publishAnsweredTooMany {
 	var refused []publishAnsweredTooMany
 	for _, request := range RequestsOfType[*ua.PublishRequest](requests) {
 		answer, answered := AnswerTo(request, responses)

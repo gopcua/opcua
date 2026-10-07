@@ -6,10 +6,10 @@ import (
 	"os"
 	"testing"
 
-	"github.com/gopcua/opcua/tests/spec/internal/faults"
+	"github.com/gopcua/opcua/tests/spec/internal/fault"
+	"github.com/gopcua/opcua/tests/spec/internal/harness"
 	"github.com/gopcua/opcua/tests/spec/internal/matrix"
 	"github.com/gopcua/opcua/tests/spec/internal/matrix/suites"
-	"github.com/gopcua/opcua/tests/spec/internal/spectest"
 	"github.com/gopcua/opcua/tests/spec/internal/suitegate"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -30,7 +30,7 @@ func TestMatrix(t *testing.T) {
 		t.Skip(suitegate.SkipReason())
 		return
 	}
-	matrix.RegisterSuites([]matrix.Suite{suites.P4_06_07(), suites.P4_05_14()}, matrix.KnownDefects(), faults.AllFaults...)
+	matrix.RegisterSuites([]matrix.Suite{suites.P4_06_07(), suites.P4_05_14()}, matrix.KnownDefects(), fault.AllFaults...)
 	suiteConfig, reporterConfig := GinkgoConfiguration()
 	var labelPassed bool
 	flag.Visit(func(passed *flag.Flag) {
@@ -38,7 +38,7 @@ func TestMatrix(t *testing.T) {
 			labelPassed = true
 		}
 	})
-	suiteConfig.LabelFilter = spectest.LabelFilter(labelPassed, suiteConfig.LabelFilter, os.Getenv("SPECTEST_LABEL_FILTER"))
+	suiteConfig.LabelFilter = harness.LabelFilter(labelPassed, suiteConfig.LabelFilter, os.Getenv("SPECTEST_LABEL_FILTER"))
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "matrix", suiteConfig, reporterConfig)
 }
@@ -49,7 +49,7 @@ func TestMatrix(t *testing.T) {
 // many skip per scenario.
 func TestPlanOverTheRealSuite(t *testing.T) {
 	all := append([]matrix.Suite{suites.P4_06_07()}, suites.P4_05_14())
-	cases, err := matrix.Plan(all, faults.AllFaults, matrix.KnownDefects())
+	cases, err := matrix.Plan(all, fault.AllFaults, matrix.KnownDefects())
 	if err != nil {
 		t.Fatalf("Plan over the suites returned an error: %v", err)
 	}
@@ -57,8 +57,8 @@ func TestPlanOverTheRealSuite(t *testing.T) {
 	for _, suite := range all {
 		scenarioCount += len(suite.Scenarios())
 	}
-	if len(cases) != scenarioCount*len(faults.AllFaults) {
-		t.Fatalf("Plan built %d cases, want %d (%d scenarios × %d faults)", len(cases), scenarioCount*len(faults.AllFaults), scenarioCount, len(faults.AllFaults))
+	if len(cases) != scenarioCount*len(fault.AllFaults) {
+		t.Fatalf("Plan built %d cases, want %d (%d scenarios × %d faults)", len(cases), scenarioCount*len(fault.AllFaults), scenarioCount, len(fault.AllFaults))
 	}
 	applicable := map[string]int{}
 	skipped := map[string]int{}

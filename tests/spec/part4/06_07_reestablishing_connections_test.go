@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"github.com/gopcua/opcua"
+	"github.com/gopcua/opcua/tests/spec/internal/harness"
 	"github.com/gopcua/opcua/tests/spec/internal/message"
 	"github.com/gopcua/opcua/tests/spec/internal/rules"
-	"github.com/gopcua/opcua/tests/spec/internal/spectest"
 	"github.com/gopcua/opcua/ua"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -23,13 +23,13 @@ const (
 )
 
 var _ = Describe("Part 4 §6.7 Re-establishing connections https://reference.opcfoundation.org/Core/Part4/v105/docs/6.7", func() {
-	var env *spectest.Environment
-	BeforeEach(func() { env = spectest.Start(GinkgoT()) })
+	var env *harness.Environment
+	BeforeEach(func() { env = harness.Start(GinkgoT()) })
 
 	Context("when the session survives a transport loss", func() {
-		var sub spectest.Subscription
+		var sub harness.Subscription
 		var last uint32
-		var m spectest.Mark
+		var m harness.Mark
 		BeforeEach(func() {
 			sub = env.Subscription()
 			last = env.LastSequenceNumber()
@@ -112,9 +112,9 @@ var _ = Describe("Part 4 §6.7 Re-establishing connections https://reference.opc
 	})
 
 	Context("when Republish answers Bad_SubscriptionIdInvalid", func() {
-		var sub spectest.Subscription
+		var sub harness.Subscription
 		var last uint32
-		var m spectest.Mark
+		var m harness.Mark
 		BeforeEach(func() {
 			sub = env.Subscription()
 			last = env.LastSequenceNumber()
@@ -148,9 +148,9 @@ var _ = Describe("Part 4 §6.7 Re-establishing connections https://reference.opc
 	})
 
 	Context("when the connection drops again during Republish recovery", func() {
-		var sub spectest.Subscription
+		var sub harness.Subscription
 		var last uint32
-		var m spectest.Mark
+		var m harness.Mark
 		BeforeEach(func() {
 			sub = env.Subscription()
 			last = env.LastSequenceNumber()
@@ -158,7 +158,7 @@ var _ = Describe("Part 4 §6.7 Re-establishing connections https://reference.opc
 		})
 
 		DescribeTable("the second cut during Republish recovery",
-			func(moment spectest.Moment, check func(env *spectest.Environment, m spectest.Mark, recovery int)) {
+			func(moment harness.Moment, check func(env *harness.Environment, m harness.Mark, recovery int)) {
 				env.Relay.CutAt(moment, message.Republish)
 				m = env.Mark()
 				env.Relay.Cut()
@@ -201,7 +201,7 @@ var _ = Describe("Part 4 §6.7 Re-establishing connections https://reference.opc
 					}
 				}, 2*time.Second).Should(Succeed())
 			},
-			Entry("the Republish request is lost (`BeforeRequestReachesServer`)", spectest.BeforeRequestReachesServer, func(env *spectest.Environment, m spectest.Mark, recovery int) {
+			Entry("the Republish request is lost (`BeforeRequestReachesServer`)", harness.BeforeRequestReachesServer, func(env *harness.Environment, m harness.Mark, recovery int) {
 				Eventually(func(g Gomega) {
 					requests := env.Recorder.RequestsSince(m)
 					answer, answered := rules.BadMessageNotAvailableAnswer(env, m)
@@ -212,7 +212,7 @@ var _ = Describe("Part 4 §6.7 Re-establishing connections https://reference.opc
 					g.Expect(answer.Order).To(BeNumerically(">", republish.Order), "the Republish request answered Bad_MessageNotAvailable did not follow the Republish request for sequence number %d on the recovery connection", last+1)
 				}, 15*time.Second).Should(Succeed())
 			}, Label("P4-6.7", "known-defect")),
-			Entry("the connection drops right after the Republish response is delivered (`AfterResponseReachesClient`)", spectest.AfterResponseReachesClient, func(env *spectest.Environment, m spectest.Mark, recovery int) {
+			Entry("the connection drops right after the Republish response is delivered (`AfterResponseReachesClient`)", harness.AfterResponseReachesClient, func(env *harness.Environment, m harness.Mark, recovery int) {
 				Eventually(func(g Gomega) {
 					requests := env.Recorder.RequestsSince(m)
 					seen := len(rules.RecordsOnConnection(rules.RequestsOfType[*ua.RepublishRequest](requests), recovery)) > 0 || len(rules.RecordsOnConnection(rules.RequestsOfType[*ua.PublishRequest](requests), recovery)) > 0
@@ -242,9 +242,9 @@ var _ = Describe("Part 4 §6.7 Re-establishing connections https://reference.opc
 	})
 
 	Context("when the session is gone", func() {
-		var second *spectest.ScriptedServer
+		var second *harness.ScriptedServer
 		var last uint32
-		var m spectest.Mark
+		var m harness.Mark
 		BeforeEach(func() {
 			second = env.StartServer()
 			env.Relay.RedirectTo(second.Address())
@@ -259,7 +259,7 @@ var _ = Describe("Part 4 §6.7 Re-establishing connections https://reference.opc
 		})
 
 		DescribeTable("transfers, and creates new subscriptions when the transfer fails",
-			func(arm func(second *spectest.ScriptedServer), flow func(env *spectest.Environment, second *spectest.ScriptedServer, m spectest.Mark, last uint32)) {
+			func(arm func(second *harness.ScriptedServer), flow func(env *harness.Environment, second *harness.ScriptedServer, m harness.Mark, last uint32)) {
 				arm(second)
 				m = env.Mark()
 				env.Relay.Cut()
@@ -267,29 +267,29 @@ var _ = Describe("Part 4 §6.7 Re-establishing connections https://reference.opc
 				flow(env, second, m, last)
 			},
 			Entry("refused per subscription with Bad_SubscriptionIdInvalid",
-				func(second *spectest.ScriptedServer) { second.QueueTransferRefusal(ua.StatusBadSubscriptionIDInvalid) },
-				func(env *spectest.Environment, second *spectest.ScriptedServer, m spectest.Mark, last uint32) {
+				func(second *harness.ScriptedServer) { second.QueueTransferRefusal(ua.StatusBadSubscriptionIDInvalid) },
+				func(env *harness.Environment, second *harness.ScriptedServer, m harness.Mark, last uint32) {
 					transferFailedFlow(env, second, m, transferRefusedPerResult(ua.StatusBadSubscriptionIDInvalid), requireRecreatedCarriesFirstSubscriptionParameters)
 				},
 				Label("P4-6.7", "P4-5.14.7", "should")),
 			Entry("unsupported, with Bad_ServiceUnsupported",
-				func(second *spectest.ScriptedServer) {},
-				func(env *spectest.Environment, second *spectest.ScriptedServer, m spectest.Mark, last uint32) {
+				func(second *harness.ScriptedServer) {},
+				func(env *harness.Environment, second *harness.ScriptedServer, m harness.Mark, last uint32) {
 					transferFailedFlow(env, second, m, transferAnsweredWithStatus(ua.StatusBadServiceUnsupported), requireRecreatedCarriesFirstSubscriptionParameters)
 				},
 				Label("P4-6.7", "should")),
 			Entry("refused per subscription with Bad_UserAccessDenied",
-				func(second *spectest.ScriptedServer) { second.QueueTransferRefusal(ua.StatusBadUserAccessDenied) },
-				func(env *spectest.Environment, second *spectest.ScriptedServer, m spectest.Mark, last uint32) {
+				func(second *harness.ScriptedServer) { second.QueueTransferRefusal(ua.StatusBadUserAccessDenied) },
+				func(env *harness.Environment, second *harness.ScriptedServer, m harness.Mark, last uint32) {
 					transferFailedFlow(env, second, m, transferRefusedPerResult(ua.StatusBadUserAccessDenied), requireNoRepublishBetween)
 				},
 				Label("P4-6.7", "P4-7.38.1", "known-defect")),
 			Entry("transferred, with the last delivered notification still available",
-				func(second *spectest.ScriptedServer) {
+				func(second *harness.ScriptedServer) {
 					moved := second.QueueTransferSuccess(last, last+1)
 					moved.Retain(last+1, valueRetained)
 				},
-				func(env *spectest.Environment, second *spectest.ScriptedServer, m spectest.Mark, last uint32) {
+				func(env *harness.Environment, second *harness.ScriptedServer, m harness.Mark, last uint32) {
 					transferredFlow(env, second, m, last)
 				},
 				Label("P4-6.7", "P4-5.14.7")),
@@ -329,7 +329,7 @@ const dataRaceWindow = 3 * time.Second
 var _ = Describe("when the client is closed while it re-dials", func() {
 	It("does not race Close against the reconnect Dial", Label("P4-6.7", "issue-883", "known-defect"), func() {
 		AddReportEntry("data-race", []string{"(*Client).Close", "(*Client).Dial"})
-		env := spectest.Start(GinkgoT())
+		env := harness.Start(GinkgoT())
 		ctx := context.Background()
 		deadline := time.Now().Add(dataRaceWindow)
 		var closing, dialing sync.WaitGroup
@@ -352,7 +352,7 @@ var _ = Describe("when the client is closed while it re-dials", func() {
 	})
 })
 
-func requireRecreatedCarriesFirstSubscriptionParameters(env *spectest.Environment, m spectest.Mark, _, createAnswer spectest.ServiceRecord[ua.Response]) {
+func requireRecreatedCarriesFirstSubscriptionParameters(env *harness.Environment, m harness.Mark, _, createAnswer harness.ServiceRecord[ua.Response]) {
 	var first *ua.CreateSubscriptionRequest
 	for _, record := range rules.RequestsOfType[*ua.CreateSubscriptionRequest](env.Recorder.Requests()) {
 		message, _ := record.Message()
@@ -388,7 +388,7 @@ const (
 
 var _ = Describe("when the reconnect interval is long", func() {
 	It("reconnects without waiting the reconnect interval when the first redial succeeds", Label("P4-6.7"), func() {
-		env := spectest.Start(GinkgoT(), spectest.WithClientOptions(opcua.ReconnectInterval(reconnectIntervalLong)))
+		env := harness.Start(GinkgoT(), harness.WithClientOptions(opcua.ReconnectInterval(reconnectIntervalLong)))
 		m := env.Mark()
 		env.Relay.Cut()
 		Eventually(func(g Gomega) {
@@ -412,7 +412,7 @@ const (
 
 var _ = Describe("when the request timeout is short", func() {
 	It("keeps a Publish open past the request timeout after recreating the subscription", Label("P4-6.7"), func() {
-		env := spectest.Start(GinkgoT(), spectest.WithClientOptions(opcua.RequestTimeout(publishHoldRequestTimeout)))
+		env := harness.Start(GinkgoT(), harness.WithClientOptions(opcua.RequestTimeout(publishHoldRequestTimeout)))
 		second := env.StartServer()
 		env.Relay.RedirectTo(second.Address())
 		second.QueueTransferRefusal(ua.StatusBadSubscriptionIDInvalid)

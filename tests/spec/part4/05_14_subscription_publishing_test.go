@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/gopcua/opcua"
+	"github.com/gopcua/opcua/tests/spec/internal/harness"
 	"github.com/gopcua/opcua/tests/spec/internal/rules"
-	"github.com/gopcua/opcua/tests/spec/internal/spectest"
 	"github.com/gopcua/opcua/ua"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -20,7 +20,7 @@ const (
 
 var _ = Describe("when the publishing interval is 10 ms", func() {
 	It("times out a held Publish on its first subscription", Label("P4-5.14.1.2"), func() {
-		env := spectest.Start(GinkgoT(), spectest.WithPublishingInterval(timeoutPublishingInterval))
+		env := harness.Start(GinkgoT(), harness.WithPublishingInterval(timeoutPublishingInterval))
 		held := env.Server.WaitHeldPublish()
 		heldOrder, recorded := held.Order()
 		Expect(recorded).To(BeTrue(), "the held Publish request was never recorded, so its wire order is unknown")
@@ -32,7 +32,7 @@ var _ = Describe("when the publishing interval is 10 ms", func() {
 	})
 
 	It("times out a held Publish after recreating the subscription", Label("P4-5.14.1.2", "known-defect"), func() {
-		env := spectest.Start(GinkgoT(), spectest.WithPublishingInterval(timeoutPublishingInterval))
+		env := harness.Start(GinkgoT(), harness.WithPublishingInterval(timeoutPublishingInterval))
 		second := env.StartServer()
 		env.Relay.RedirectTo(second.Address())
 		second.QueueTransferRefusal(ua.StatusBadSubscriptionIDInvalid)
@@ -51,7 +51,7 @@ var _ = Describe("when the publishing interval is 10 ms", func() {
 
 var _ = Describe("when the only subscription is cancelled and a new one created while a Publish is held", func() {
 	It("keeps publishing", Label("P4-5.14.1.2", "issue-895", "known-defect"), MustPassRepeatedly(20), func() {
-		env := spectest.Start(GinkgoT())
+		env := harness.Start(GinkgoT())
 		old := env.ClientSubscription()
 		held := env.Server.WaitHeldPublish()
 		m := env.Mark()
@@ -82,7 +82,7 @@ var _ = Describe("when the only subscription is cancelled and a new one created 
 	})
 })
 
-func requireSubscriptionDeleted(env *spectest.Environment, m spectest.Mark, id uint32) {
+func requireSubscriptionDeleted(env *harness.Environment, m harness.Mark, id uint32) {
 	responses := env.Recorder.ResponsesSince(m)
 	deleted := false
 	for _, record := range rules.RequestsOfType[*ua.DeleteSubscriptionsRequest](env.Recorder.RequestsSince(m)) {

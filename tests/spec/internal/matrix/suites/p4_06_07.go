@@ -10,11 +10,11 @@ import (
 	"time"
 
 	"github.com/gopcua/opcua"
-	"github.com/gopcua/opcua/tests/spec/internal/faults"
+	"github.com/gopcua/opcua/tests/spec/internal/fault"
+	"github.com/gopcua/opcua/tests/spec/internal/harness"
 	"github.com/gopcua/opcua/tests/spec/internal/matrix"
 	"github.com/gopcua/opcua/tests/spec/internal/message"
 	"github.com/gopcua/opcua/tests/spec/internal/rules"
-	"github.com/gopcua/opcua/tests/spec/internal/spectest"
 	"github.com/gopcua/opcua/ua"
 )
 
@@ -102,7 +102,7 @@ type scenario06_07 struct {
 	name             string
 	sends            []message.Message
 	own              matrix.Category
-	prepare          func(env *spectest.Environment) target06_07
+	prepare          func(env *harness.Environment) target06_07
 	prepareBeforeArm bool
 }
 
@@ -111,25 +111,25 @@ type scenario06_07 struct {
 // its subscription there, and how the scripted transfer answer
 // refuses when the prepare queued one.
 type target06_07 struct {
-	server          *spectest.ScriptedServer
+	server          *harness.ScriptedServer
 	recreate        bool
-	transferRefusal func(spectest.ServiceRecord[ua.Response]) bool
+	transferRefusal func(harness.ServiceRecord[ua.Response]) bool
 }
 
 func (s scenario06_07) Name() string { return s.name }
 
 func (s scenario06_07) Sends() []message.Message { return s.sends }
 
-func (s scenario06_07) Options(f faults.Fault) []spectest.Option {
-	return []spectest.Option{
-		spectest.WithRetentionQueue(),
-		spectest.WithPublishingInterval(10 * time.Millisecond),
-		spectest.WithClientOptions(opcua.RequestTimeout(2 * time.Second)),
-		spectest.WithFirstValue(s.values(f).first),
+func (s scenario06_07) Options(f fault.Fault) []harness.Option {
+	return []harness.Option{
+		harness.WithRetentionQueue(),
+		harness.WithPublishingInterval(10 * time.Millisecond),
+		harness.WithClientOptions(opcua.RequestTimeout(2 * time.Second)),
+		harness.WithFirstValue(s.values(f).first),
 	}
 }
 
-func (s scenario06_07) Category(f faults.Fault) matrix.Category {
+func (s scenario06_07) Category(f fault.Fault) matrix.Category {
 	switch {
 	case f.Name() == "DelayAboveTimeout/ActivateSession":
 		return matrix.ActivationFailed
@@ -150,7 +150,7 @@ func (s scenario06_07) Category(f faults.Fault) matrix.Category {
 // the arm point when the scenario's faults must arm behind its
 // redirect, and after the consumer's burst otherwise — SubscriptionsLost
 // forgets the old subscription only after the burst answered on it.
-func (s scenario06_07) Run(env *spectest.Environment, f faults.Fault) matrix.Outcome {
+func (s scenario06_07) Run(env *harness.Environment, f fault.Fault) matrix.Outcome {
 	values := s.values(f)
 	sub := env.Subscription()
 	if held, ok := env.Server.TryWaitHeldPublish(15 * time.Second); ok {
@@ -189,7 +189,7 @@ func (s scenario06_07) Run(env *spectest.Environment, f faults.Fault) matrix.Out
 	faultEnd := time.Now()
 
 	answering := sub
-	recreated := spectest.Subscription{}
+	recreated := harness.Subscription{}
 	canAnswer := true
 	if t.recreate {
 		created, ok := t.server.TryWaitCreatedSubscription(m, 15*time.Second)
@@ -234,7 +234,7 @@ func (s scenario06_07) Run(env *spectest.Environment, f faults.Fault) matrix.Out
 // prepareSessionSurvives leaves the session and its subscription on
 // the one server the client is connected to; the cut after the arm
 // point is the transport loss.
-func prepareSessionSurvives(env *spectest.Environment) target06_07 {
+func prepareSessionSurvives(env *harness.Environment) target06_07 {
 	return target06_07{server: env.Server}
 }
 
@@ -244,7 +244,7 @@ func prepareSessionSurvives(env *spectest.Environment) target06_07 {
 // all before the arm point so server-side faults arm there; the cut
 // after the arm point is the transport loss, and the client must
 // recreate its session and its subscription on the second server.
-func prepareSessionLost(env *spectest.Environment) target06_07 {
+func prepareSessionLost(env *harness.Environment) target06_07 {
 	second := env.StartServer()
 	second.QueueTransferRefusal(ua.StatusBadSubscriptionIDInvalid)
 	env.Relay.RedirectTo(second.Address())
@@ -255,7 +255,7 @@ func prepareSessionLost(env *spectest.Environment) target06_07 {
 // deleted: the session survives, but the server answers no
 // subscription the client holds; the cut after the arm point is the
 // transport loss.
-func prepareSubscriptionsLost(env *spectest.Environment) target06_07 {
+func prepareSubscriptionsLost(env *harness.Environment) target06_07 {
 	env.Server.ForgetSubscriptions()
 	return target06_07{server: env.Server, recreate: true}
 }
@@ -265,7 +265,7 @@ func prepareSubscriptionsLost(env *spectest.Environment) target06_07 {
 // goes silent instead of closing — and so is a Publish fault that cuts
 // the connection itself, because the arm exchange answers a held
 // Publish whose request or response fires the armed cut.
-func breaksTransport(f faults.Fault) bool {
+func breaksTransport(f fault.Fault) bool {
 	if f.Name() == "Link/Stall" {
 		return false
 	}
@@ -281,7 +281,7 @@ func breaksTransport(f faults.Fault) bool {
 // targetsPublish says whether the fault arms on the Publish service:
 // the message faults that name it and the overload faults that answer
 // it.
-func targetsPublish(f faults.Fault) bool {
+func targetsPublish(f fault.Fault) bool {
 	parts := strings.Split(f.Name(), "/")
 	return len(parts) >= 2 && parts[1] == "Publish"
 }
@@ -290,7 +290,7 @@ func targetsPublish(f faults.Fault) bool {
 // while the relay still holds the answer the client has not seen can
 // fire on that answer's own response, and whether it does is a race
 // between the relay's pump and the arm.
-func waitReceived(env *spectest.Environment, v int32) {
+func waitReceived(env *harness.Environment, v int32) {
 	deadline := time.Now().Add(15 * time.Second)
 	for !slices.Contains(env.Received(), v) && time.Now().Before(deadline) {
 		time.Sleep(time.Millisecond)
@@ -300,7 +300,7 @@ func waitReceived(env *spectest.Environment, v int32) {
 // consumerBurst says how many values the workload answers in a row
 // right after the arm point: the slow consumer's channel, four deep,
 // fills only when a burst outruns its 200 ms drain.
-func consumerBurst(f faults.Fault) int {
+func consumerBurst(f fault.Fault) int {
 	if f.Name() == "Consumer/Slow" {
 		return 8
 	}
@@ -309,7 +309,7 @@ func consumerBurst(f faults.Fault) int {
 
 // refusedBadSubscriptionIDInvalid recognizes the transfer answer the
 // SessionLost base action scripts: one result, Bad_SubscriptionIdInvalid.
-func refusedBadSubscriptionIDInvalid(answer spectest.ServiceRecord[ua.Response]) bool {
+func refusedBadSubscriptionIDInvalid(answer harness.ServiceRecord[ua.Response]) bool {
 	message, decoded := answer.Message()
 	if !decoded {
 		return false
@@ -340,7 +340,7 @@ type caseValues struct {
 // values returns the value block of one case, derived from the case's
 // scenario and fault alone so the Start options and the workload read
 // the same block.
-func (s scenario06_07) values(f faults.Fault) caseValues {
+func (s scenario06_07) values(f fault.Fault) caseValues {
 	base := int32(1000 * caseOrdinal(s.name, f))
 	values := caseValues{first: base + 1, v1: base + 2, v2: base + 3, v3: base + 4, vArm: base + 5, sentinel: base + 999}
 	for i := range values.burst {
@@ -353,22 +353,22 @@ func (s scenario06_07) values(f faults.Fault) caseValues {
 // Publish right after the fault is armed, so a spec can tell the arm
 // exchange's answer apart from the values the client received before
 // the arm.
-func ArmValueOf(scenario matrix.Scenario, f faults.Fault) int32 {
+func ArmValueOf(scenario matrix.Scenario, f fault.Fault) int32 {
 	return scenario.(scenario06_07).values(f).vArm
 }
 
 // caseOrdinal returns the case's ordinal among every scenario × fault
 // pair: the scenario's place among the suite's scenarios times the
 // fault catalogue's size, plus the fault's place in the catalogue.
-func caseOrdinal(scenario string, f faults.Fault) int {
+func caseOrdinal(scenario string, f fault.Fault) int {
 	faultOrdinal := 0
-	for i, candidate := range faults.AllFaults {
+	for i, candidate := range fault.AllFaults {
 		if candidate.Name() == f.Name() {
 			faultOrdinal = i
 			break
 		}
 	}
-	return scenarioOrdinals[scenario]*len(faults.AllFaults) + faultOrdinal + 1
+	return scenarioOrdinals[scenario]*len(fault.AllFaults) + faultOrdinal + 1
 }
 
 var scenarioOrdinals = map[string]int{
@@ -381,7 +381,7 @@ var scenarioOrdinals = map[string]int{
 
 // caseValuesOf returns every value of one case's block, for the test
 // that pins the blocks apart.
-func caseValuesOf(scenario matrix.Scenario, f faults.Fault) []int32 {
+func caseValuesOf(scenario matrix.Scenario, f fault.Fault) []int32 {
 	s := scenario.(scenario06_07)
 	values := s.values(f)
 	all := []int32{values.first, values.v1, values.v2, values.v3, values.vArm, values.sentinel}
@@ -391,7 +391,7 @@ func caseValuesOf(scenario matrix.Scenario, f faults.Fault) []int32 {
 // caseValuesOfAny returns every value of one case's block whatever
 // suite its scenario belongs to, for the test that pins every suite's
 // blocks apart.
-func caseValuesOfAny(scenario matrix.Scenario, f faults.Fault) []int32 {
+func caseValuesOfAny(scenario matrix.Scenario, f fault.Fault) []int32 {
 	if _, is := scenario.(scenario06_07); is {
 		return caseValuesOf(scenario, f)
 	}

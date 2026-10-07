@@ -4,7 +4,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/gopcua/opcua/tests/spec/internal/faults"
+	"github.com/gopcua/opcua/tests/spec/internal/fault"
 )
 
 // The unfiled issues the triage named, one label per group of cases
@@ -136,24 +136,24 @@ var knownDefects = []KnownDefect{
 }
 
 // everyFaultOf says a defect applies to every fault of one scenario.
-func everyFaultOf(name string) func(scenario string, f faults.Fault) bool {
-	return func(scenario string, _ faults.Fault) bool {
+func everyFaultOf(name string) func(scenario string, f fault.Fault) bool {
+	return func(scenario string, _ fault.Fault) bool {
 		return scenario == name
 	}
 }
 
 // everyFaultExcept says a defect applies to every fault of one
 // scenario except the named ones.
-func everyFaultExcept(name string, except ...string) func(scenario string, f faults.Fault) bool {
-	return func(scenario string, f faults.Fault) bool {
+func everyFaultExcept(name string, except ...string) func(scenario string, f fault.Fault) bool {
+	return func(scenario string, f fault.Fault) bool {
 		return scenario == name && !slices.Contains(except, f.Name())
 	}
 }
 
 // faultTargeting says a defect applies to every fault of one scenario
 // that targets one of the named services.
-func faultTargeting(scenario string, services ...string) func(string, faults.Fault) bool {
-	return func(name string, f faults.Fault) bool {
+func faultTargeting(scenario string, services ...string) func(string, fault.Fault) bool {
+	return func(name string, f fault.Fault) bool {
 		if name != scenario {
 			return false
 		}
@@ -172,25 +172,25 @@ func faultTargeting(scenario string, services ...string) func(string, faults.Fau
 // faultTargetingExcept says a defect applies to every fault of one
 // scenario that targets one of the named services, except the faults
 // the workload gives an exchange of their own to fire on.
-func faultTargetingExcept(scenario string, except []string, services ...string) func(string, faults.Fault) bool {
+func faultTargetingExcept(scenario string, except []string, services ...string) func(string, fault.Fault) bool {
 	targeting := faultTargeting(scenario, services...)
-	return func(name string, f faults.Fault) bool {
+	return func(name string, f fault.Fault) bool {
 		return targeting(name, f) && !slices.Contains(except, f.Name())
 	}
 }
 
 // faultsNamed says a defect applies to the named faults of one
 // scenario.
-func faultsNamed(scenario string, names ...string) func(string, faults.Fault) bool {
-	return func(name string, f faults.Fault) bool {
+func faultsNamed(scenario string, names ...string) func(string, fault.Fault) bool {
+	return func(name string, f fault.Fault) bool {
 		return name == scenario && slices.Contains(names, f.Name())
 	}
 }
 
 // faultsNamedIn says a defect applies to the named faults of any of
 // the scenarios.
-func faultsNamedIn(scenarios []string, names ...string) func(string, faults.Fault) bool {
-	return func(name string, f faults.Fault) bool {
+func faultsNamedIn(scenarios []string, names ...string) func(string, fault.Fault) bool {
+	return func(name string, f fault.Fault) bool {
 		return slices.Contains(scenarios, name) && slices.Contains(names, f.Name())
 	}
 }
