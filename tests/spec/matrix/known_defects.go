@@ -51,12 +51,10 @@ var knownDefects = []KnownDefect{
 	{Issue: "issue-879", Check: "HaveFired", Applies: faultTargetingExcept("SubscriptionsLost", cutPublishFaults, "CreateSubscription", "CreateMonitoredItems", "Publish", "Republish")},
 	{Issue: "issue-895", Check: "ResumePublishing", Applies: everyFaultExcept("SubscriptionsLost", recreatePathFaults...)},
 	{Issue: "issue-895", Check: "KeepOneSubscriptionPerClientSubscription", Applies: everyFaultExcept("SubscriptionsLost", recreatePathFaults...)},
-	{Issue: "issue-879", Check: "ResumePublishing", Applies: faultsNamedExcept("SessionLost",
-		[]string{"CutAfterResponse/Publish", "RequestLost/Publish", "ResponseLost/Publish"},
-		"CutAfterResponse/Publish", "DelayAboveTimeout/Read",
+	{Issue: "issue-879", Check: "ResumePublishing", Applies: faultsNamed("SessionLost",
+		"DelayAboveTimeout/Read",
 		"Overload/Publish/Bad_ResourceUnavailable", "Overload/Publish/Bad_TooManyOperations",
-		"Overload/Publish/Bad_TooManyPublishRequests", "RequestLost/Publish", "RequestLost/Read",
-		"ResponseLost/Publish", "ResponseLost/Read")},
+		"Overload/Publish/Bad_TooManyPublishRequests", "RequestLost/Read", "ResponseLost/Read")},
 	{Issue: "issue-879", Check: "KeepOneSubscriptionPerClientSubscription", Applies: faultsNamed("SessionLost",
 		"DelayAboveTimeout/Read", "RequestLost/Read", "ResponseLost/Read")},
 	{Issue: "issue-879", Check: "RecreatesAfterRefusal", Applies: faultsNamed("SessionLost",
@@ -165,15 +163,6 @@ func faultTargetingExcept(scenario string, except []string, services ...string) 
 	targeting := faultTargeting(scenario, services...)
 	return func(name string, f faults.Fault) bool {
 		return targeting(name, f) && !slices.Contains(except, f.Name())
-	}
-}
-
-// faultsNamedExcept says a defect applies to the named faults of one
-// scenario, except the faults the workload gives an exchange of their
-// own to fire on.
-func faultsNamedExcept(scenario string, except []string, names ...string) func(string, faults.Fault) bool {
-	return func(name string, f faults.Fault) bool {
-		return name == scenario && slices.Contains(names, f.Name()) && !slices.Contains(except, f.Name())
 	}
 }
 
