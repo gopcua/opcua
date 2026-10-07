@@ -16,6 +16,15 @@ var (
 	issueDrainedConnectionError      = Unfiled("the reconnect loop's error drain discards a connection error, so the client reports Connected on a dead channel")
 )
 
+// recreatePathFaults lists the faults whose labelled
+// DeliverEachValueOnce, ResumePublishing and
+// KeepOneSubscriptionPerClientSubscription checks passed in every one
+// of runs 7, 8 and 9, so the delivery and publishing entries below do
+// not cover them.
+var recreatePathFaults = []string{
+	"CutAfterResponse/OpenSecureChannel", "DelayAboveTimeout/ActivateSession",
+	"RequestLost/ActivateSession", "ResponseLost/ActivateSession"}
+
 // knownDefects holds the known-defect table of the §6.7 suite: the
 // predicted failures of the original run, and the entries the triage
 // of the corrected matrix's fault-specific failures added, one issue
@@ -27,15 +36,14 @@ var knownDefects = []KnownDefect{
 	{Issue: "issue-879", Check: "SendsNoPublishBeforeNotAvailable", Applies: everyFaultOf("SessionSurvives")},
 	{Issue: "issue-879", Check: "KeepsSubscriptionID", Applies: everyFaultOf("SessionSurvives")},
 	{Issue: "issue-879", Check: "SendsNoTransferForOwnSubscription", Applies: everyFaultOf("SessionSurvives")},
-	{Issue: "issue-879", Check: "DeliverEachValueOnce", Applies: everyFaultOf("SessionSurvives")},
-	{Issue: "issue-879", Check: "ResumePublishing", Applies: everyFaultOf("SessionSurvives")},
+	{Issue: "issue-879", Check: "DeliverEachValueOnce", Applies: everyFaultExcept("SessionSurvives", recreatePathFaults...)},
+	{Issue: "issue-879", Check: "ResumePublishing", Applies: everyFaultExcept("SessionSurvives", recreatePathFaults...)},
 	{Issue: "issue-879", Check: "HaveFired", Applies: faultTargeting("SessionSurvives", "Publish", "Republish")},
 	{Issue: "issue-879", Check: "RecreatesAfterRefusal", Applies: everyFaultOf("SubscriptionsLost")},
 	{Issue: "issue-879", Check: "RepublishesRecreatedFromOne", Applies: everyFaultOf("SubscriptionsLost")},
 	{Issue: "issue-879", Check: "HaveFired", Applies: faultTargeting("SubscriptionsLost", "CreateSubscription", "CreateMonitoredItems", "Publish", "Republish")},
-	{Issue: "issue-895", Check: "ResumePublishing", Applies: everyFaultOf("SubscriptionsLost")},
-	{Issue: "issue-895", Check: "KeepOneSubscriptionPerClientSubscription", Applies: everyFaultOf("SubscriptionsLost")},
-	{Issue: "issue-895", Check: "DeliverEachValueOnce", Applies: everyFaultOf("SubscriptionsLost")},
+	{Issue: "issue-895", Check: "ResumePublishing", Applies: everyFaultExcept("SubscriptionsLost", recreatePathFaults...)},
+	{Issue: "issue-895", Check: "KeepOneSubscriptionPerClientSubscription", Applies: everyFaultExcept("SubscriptionsLost", recreatePathFaults...)},
 	{Issue: "issue-879", Check: "ResumePublishing", Applies: faultsNamed("SessionLost",
 		"CutAfterResponse/Publish", "DelayAboveTimeout/Read",
 		"Overload/Publish/Bad_ResourceUnavailable", "Overload/Publish/Bad_TooManyOperations",
@@ -91,7 +99,6 @@ var knownDefects = []KnownDefect{
 	{Issue: "issue-919", Check: "CloseEveryKnownSession", Applies: faultsNamedIn([]string{"SessionSurvives", "SubscriptionsLost"}, "Link/HELUnanswered")},
 	{Issue: "issue-919", Check: "CreatesNoSession", Applies: faultsNamed("SessionSurvives", "Link/HELUnanswered")},
 	{Issue: "issue-919", Check: "ReactivatesSession", Applies: faultsNamed("SessionSurvives", "Link/HELUnanswered")},
-	{Issue: "issue-828", Check: "CloseEveryKnownSession", Applies: faultsNamedIn([]string{"SessionSurvives", "SubscriptionsLost"}, "Link/Stall")},
 	{Issue: "issue-828", Check: "CreatesSessionOnlyAfterActivateFailed", Applies: faultsNamed("SessionLost", "Link/Stall")},
 	{Issue: "issue-828", Check: "DeliverEachValueOnce", Applies: faultsNamed("SessionLost", "Link/Stall")},
 	{Issue: "issue-828", Check: "RecreatesAfterRefusal", Applies: faultsNamed("SessionLost", "Link/Stall")},
@@ -114,6 +121,14 @@ var knownDefects = []KnownDefect{
 func everyFaultOf(name string) func(scenario string, f faults.Fault) bool {
 	return func(scenario string, _ faults.Fault) bool {
 		return scenario == name
+	}
+}
+
+// everyFaultExcept says a defect applies to every fault of one
+// scenario except the named ones.
+func everyFaultExcept(name string, except ...string) func(scenario string, f faults.Fault) bool {
+	return func(scenario string, f faults.Fault) bool {
+		return scenario == name && !slices.Contains(except, f.Name())
 	}
 }
 

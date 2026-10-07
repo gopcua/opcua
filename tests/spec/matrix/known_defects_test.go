@@ -13,26 +13,33 @@ import (
 
 // The triage's case lists, restated: every row says which issue labels
 // one (scenario, check) triple carries for exactly its listed faults —
-// or, with no fault list, for every applicable fault of its scenario.
-// The unit test asserts the known-defect table labels every listed
-// case and nothing else.
+// or, with no fault list, for every applicable fault of its scenario
+// except those in the exception list. The unit test asserts the
+// known-defect table labels every listed case and nothing else.
+
+// recreatePathFaults lists the faults whose labelled checks passed in
+// every one of runs 7, 8 and 9, so no entry covers them.
+var recreatePathFaults = []string{
+	"CutAfterResponse/OpenSecureChannel", "DelayAboveTimeout/ActivateSession",
+	"RequestLost/ActivateSession", "ResponseLost/ActivateSession"}
+
 var triageCases = []struct {
 	issue    string
 	check    string
 	scenario string
 	faults   []string
+	except   []string
 }{
-	{"issue-879", "RepublishesFromNextSequence", "SessionSurvives", nil},
-	{"issue-879", "SendsNoPublishBeforeNotAvailable", "SessionSurvives", nil},
-	{"issue-879", "KeepsSubscriptionID", "SessionSurvives", nil},
-	{"issue-879", "SendsNoTransferForOwnSubscription", "SessionSurvives", nil},
-	{"issue-879", "DeliverEachValueOnce", "SessionSurvives", nil},
-	{"issue-879", "ResumePublishing", "SessionSurvives", nil},
-	{"issue-879", "RecreatesAfterRefusal", "SubscriptionsLost", nil},
-	{"issue-879", "RepublishesRecreatedFromOne", "SubscriptionsLost", nil},
-	{"issue-895", "ResumePublishing", "SubscriptionsLost", nil},
-	{"issue-895", "KeepOneSubscriptionPerClientSubscription", "SubscriptionsLost", nil},
-	{"issue-895", "DeliverEachValueOnce", "SubscriptionsLost", nil},
+	{"issue-879", "RepublishesFromNextSequence", "SessionSurvives", nil, nil},
+	{"issue-879", "SendsNoPublishBeforeNotAvailable", "SessionSurvives", nil, nil},
+	{"issue-879", "KeepsSubscriptionID", "SessionSurvives", nil, nil},
+	{"issue-879", "SendsNoTransferForOwnSubscription", "SessionSurvives", nil, nil},
+	{"issue-879", "DeliverEachValueOnce", "SessionSurvives", nil, recreatePathFaults},
+	{"issue-879", "ResumePublishing", "SessionSurvives", nil, recreatePathFaults},
+	{"issue-879", "RecreatesAfterRefusal", "SubscriptionsLost", nil, nil},
+	{"issue-879", "RepublishesRecreatedFromOne", "SubscriptionsLost", nil, nil},
+	{"issue-895", "ResumePublishing", "SubscriptionsLost", nil, recreatePathFaults},
+	{"issue-895", "KeepOneSubscriptionPerClientSubscription", "SubscriptionsLost", nil, recreatePathFaults},
 	{"issue-879", "HaveFired", "SessionSurvives", []string{
 		"CutAfterResponse/Publish", "CutAfterResponse/Republish",
 		"DelayAboveTimeout/Publish", "DelayAboveTimeout/Republish",
@@ -40,7 +47,7 @@ var triageCases = []struct {
 		"Overload/Publish/Bad_ResourceUnavailable", "Overload/Publish/Bad_TooManyOperations",
 		"Overload/Publish/Bad_TooManyPublishRequests", "Overload/Republish/Bad_ResourceUnavailable",
 		"Overload/Republish/Bad_TooManyOperations", "RequestLost/Publish", "RequestLost/Republish",
-		"ResponseLost/Publish", "ResponseLost/Republish"}},
+		"ResponseLost/Publish", "ResponseLost/Republish"}, nil},
 	{"issue-879", "HaveFired", "SubscriptionsLost", []string{
 		"CutAfterResponse/CreateMonitoredItems", "CutAfterResponse/CreateSubscription", "CutAfterResponse/Publish", "CutAfterResponse/Republish",
 		"DelayAboveTimeout/CreateMonitoredItems", "DelayAboveTimeout/CreateSubscription", "DelayAboveTimeout/Publish", "DelayAboveTimeout/Republish",
@@ -50,16 +57,16 @@ var triageCases = []struct {
 		"Overload/Publish/Bad_ResourceUnavailable", "Overload/Publish/Bad_TooManyOperations", "Overload/Publish/Bad_TooManyPublishRequests",
 		"Overload/Republish/Bad_ResourceUnavailable", "Overload/Republish/Bad_TooManyOperations",
 		"RequestLost/CreateMonitoredItems", "RequestLost/CreateSubscription", "RequestLost/Publish", "RequestLost/Republish",
-		"ResponseLost/CreateMonitoredItems", "ResponseLost/CreateSubscription", "ResponseLost/Publish", "ResponseLost/Republish"}},
+		"ResponseLost/CreateMonitoredItems", "ResponseLost/CreateSubscription", "ResponseLost/Publish", "ResponseLost/Republish"}, nil},
 	{"issue-879", "ResumePublishing", "SessionLost", []string{
 		"CutAfterResponse/Publish", "DelayAboveTimeout/Read",
 		"Overload/Publish/Bad_ResourceUnavailable", "Overload/Publish/Bad_TooManyOperations",
 		"Overload/Publish/Bad_TooManyPublishRequests", "RequestLost/Publish", "RequestLost/Read",
-		"ResponseLost/Publish", "ResponseLost/Read"}},
-	{"issue-879", "DeliverEachValueOnce", "SessionLost", []string{"ResponseLost/Publish"}},
+		"ResponseLost/Publish", "ResponseLost/Read"}, nil},
+	{"issue-879", "DeliverEachValueOnce", "SessionLost", []string{"ResponseLost/Publish"}, nil},
 	{"issue-879", "KeepOneSubscriptionPerClientSubscription", "SessionLost", []string{
-		"DelayAboveTimeout/Read", "RequestLost/Read", "ResponseLost/Read"}},
-	{"issue-879", "RecreatesAfterRefusal", "SessionLost", []string{"RequestLost/Read", "ResponseLost/Read"}},
+		"DelayAboveTimeout/Read", "RequestLost/Read", "ResponseLost/Read"}, nil},
+	{"issue-879", "RecreatesAfterRefusal", "SessionLost", []string{"RequestLost/Read", "ResponseLost/Read"}, nil},
 	{"a failed subscription step during reconnect makes recreateSession drop a healthy session without closing it",
 		"CloseEveryKnownSession", "SessionLost", []string{
 			"CutAfterResponse/CreateSubscription", "CutAfterResponse/Read", "CutAfterResponse/TransferSubscriptions",
@@ -67,7 +74,7 @@ var triageCases = []struct {
 			"Overload/CreateMonitoredItems/Bad_ResourceUnavailable", "Overload/CreateMonitoredItems/Bad_TooManyOperations",
 			"Overload/CreateSubscription/Bad_ResourceUnavailable", "Overload/CreateSubscription/Bad_TooManyOperations",
 			"RequestLost/CreateMonitoredItems", "RequestLost/CreateSubscription", "RequestLost/TransferSubscriptions",
-			"ResponseLost/CreateMonitoredItems", "ResponseLost/CreateSubscription", "ResponseLost/TransferSubscriptions"}},
+			"ResponseLost/CreateMonitoredItems", "ResponseLost/CreateSubscription", "ResponseLost/TransferSubscriptions"}, nil},
 	{"a failed subscription step during reconnect makes recreateSession drop a healthy session without closing it",
 		"KeepOneSessionOpen", "SessionLost", []string{
 			"CutAfterResponse/CreateSubscription", "CutAfterResponse/Read", "CutAfterResponse/TransferSubscriptions",
@@ -75,65 +82,63 @@ var triageCases = []struct {
 			"Overload/CreateMonitoredItems/Bad_ResourceUnavailable", "Overload/CreateMonitoredItems/Bad_TooManyOperations",
 			"Overload/CreateSubscription/Bad_ResourceUnavailable", "Overload/CreateSubscription/Bad_TooManyOperations",
 			"RequestLost/CreateMonitoredItems", "RequestLost/CreateSubscription", "RequestLost/TransferSubscriptions",
-			"ResponseLost/CreateMonitoredItems", "ResponseLost/CreateSubscription", "ResponseLost/TransferSubscriptions"}},
+			"ResponseLost/CreateMonitoredItems", "ResponseLost/CreateSubscription", "ResponseLost/TransferSubscriptions"}, nil},
 	{"a failed subscription step during reconnect makes recreateSession drop a healthy session without closing it",
-		"RecreatesAfterRefusal", "SessionLost", []string{"CutAfterResponse/CreateSubscription"}},
+		"RecreatesAfterRefusal", "SessionLost", []string{"CutAfterResponse/CreateSubscription"}, nil},
 	{"a connection failure during ActivateSession makes the client forget its session without retrying or closing it",
 		"CloseEveryKnownSession", "SessionSurvives", []string{
-			"CutAfterResponse/OpenSecureChannel", "RequestLost/ActivateSession", "ResponseLost/ActivateSession"}},
+			"CutAfterResponse/OpenSecureChannel", "RequestLost/ActivateSession", "ResponseLost/ActivateSession"}, nil},
 	{"a connection failure during ActivateSession makes the client forget its session without retrying or closing it",
 		"CloseEveryKnownSession", "SubscriptionsLost", []string{
-			"CutAfterResponse/OpenSecureChannel", "RequestLost/ActivateSession", "ResponseLost/ActivateSession"}},
+			"CutAfterResponse/OpenSecureChannel", "RequestLost/ActivateSession", "ResponseLost/ActivateSession"}, nil},
 	{"a connection failure during ActivateSession makes the client forget its session without retrying or closing it",
-		"CloseEveryKnownSession", "SessionLost", []string{"CutAfterResponse/CreateSession"}},
+		"CloseEveryKnownSession", "SessionLost", []string{"CutAfterResponse/CreateSession"}, nil},
 	{"a connection failure during ActivateSession makes the client forget its session without retrying or closing it",
 		"KeepOneSessionOpen", "SessionSurvives", []string{
-			"CutAfterResponse/OpenSecureChannel", "RequestLost/ActivateSession", "ResponseLost/ActivateSession"}},
+			"CutAfterResponse/OpenSecureChannel", "RequestLost/ActivateSession", "ResponseLost/ActivateSession"}, nil},
 	{"a connection failure during ActivateSession makes the client forget its session without retrying or closing it",
 		"KeepOneSessionOpen", "SubscriptionsLost", []string{
-			"CutAfterResponse/OpenSecureChannel", "RequestLost/ActivateSession", "ResponseLost/ActivateSession"}},
+			"CutAfterResponse/OpenSecureChannel", "RequestLost/ActivateSession", "ResponseLost/ActivateSession"}, nil},
 	{"a connection failure during ActivateSession makes the client forget its session without retrying or closing it",
-		"KeepOneSessionOpen", "SessionLost", []string{"CutAfterResponse/CreateSession"}},
+		"KeepOneSessionOpen", "SessionLost", []string{"CutAfterResponse/CreateSession"}, nil},
 	{"a connection failure during ActivateSession makes the client forget its session without retrying or closing it",
 		"CreatesNoSession", "SessionSurvives", []string{
-			"CutAfterResponse/OpenSecureChannel", "RequestLost/ActivateSession", "ResponseLost/ActivateSession"}},
+			"CutAfterResponse/OpenSecureChannel", "RequestLost/ActivateSession", "ResponseLost/ActivateSession"}, nil},
 	{"a connection failure during ActivateSession makes the client forget its session without retrying or closing it",
-		"ReactivatesSession", "SessionSurvives", []string{"CutAfterResponse/OpenSecureChannel", "RequestLost/ActivateSession"}},
+		"ReactivatesSession", "SessionSurvives", []string{"CutAfterResponse/OpenSecureChannel", "RequestLost/ActivateSession"}, nil},
 	{"a connection failure during ActivateSession makes the client forget its session without retrying or closing it",
-		"CreatesSessionOnlyAfterActivateFailed", "SessionLost", []string{"CutAfterResponse/OpenSecureChannel", "RequestLost/ActivateSession"}},
-	{"issue-919", "CreatesSessionOnlyAfterActivateFailed", "SessionLost", []string{"Link/HELUnanswered"}},
-	{"issue-919", "KeepOneSessionOpen", "SessionLost", []string{"Link/HELUnanswered"}},
-	{"issue-919", "KeepOneSubscriptionPerClientSubscription", "SessionLost", []string{"Link/HELUnanswered"}},
-	{"issue-919", "RecreatesAfterRefusal", "SessionLost", []string{"Link/HELUnanswered"}},
-	{"issue-919", "ResumePublishing", "SessionLost", []string{"Link/HELUnanswered"}},
-	{"issue-919", "CloseEveryKnownSession", "SessionSurvives", []string{"Link/HELUnanswered"}},
-	{"issue-919", "CloseEveryKnownSession", "SubscriptionsLost", []string{"Link/HELUnanswered"}},
-	{"issue-919", "CreatesNoSession", "SessionSurvives", []string{"Link/HELUnanswered"}},
-	{"issue-919", "ReactivatesSession", "SessionSurvives", []string{"Link/HELUnanswered"}},
-	{"issue-828", "CloseEveryKnownSession", "SessionSurvives", []string{"Link/Stall"}},
-	{"issue-828", "CloseEveryKnownSession", "SubscriptionsLost", []string{"Link/Stall"}},
-	{"issue-828", "CreatesSessionOnlyAfterActivateFailed", "SessionLost", []string{"Link/Stall"}},
-	{"issue-828", "DeliverEachValueOnce", "SessionLost", []string{"Link/Stall"}},
-	{"issue-828", "RecreatesAfterRefusal", "SessionLost", []string{"Link/Stall"}},
-	{"issue-828", "ResumePublishing", "SessionLost", []string{"Link/Stall"}},
-	{"issue-828", "CreatesNoSession", "SessionSurvives", []string{"Link/Stall"}},
-	{"issue-828", "ReactivatesSession", "SessionSurvives", []string{"Link/Stall"}},
+		"CreatesSessionOnlyAfterActivateFailed", "SessionLost", []string{"CutAfterResponse/OpenSecureChannel", "RequestLost/ActivateSession"}, nil},
+	{"issue-919", "CreatesSessionOnlyAfterActivateFailed", "SessionLost", []string{"Link/HELUnanswered"}, nil},
+	{"issue-919", "KeepOneSessionOpen", "SessionLost", []string{"Link/HELUnanswered"}, nil},
+	{"issue-919", "KeepOneSubscriptionPerClientSubscription", "SessionLost", []string{"Link/HELUnanswered"}, nil},
+	{"issue-919", "RecreatesAfterRefusal", "SessionLost", []string{"Link/HELUnanswered"}, nil},
+	{"issue-919", "ResumePublishing", "SessionLost", []string{"Link/HELUnanswered"}, nil},
+	{"issue-919", "CloseEveryKnownSession", "SessionSurvives", []string{"Link/HELUnanswered"}, nil},
+	{"issue-919", "CloseEveryKnownSession", "SubscriptionsLost", []string{"Link/HELUnanswered"}, nil},
+	{"issue-919", "CreatesNoSession", "SessionSurvives", []string{"Link/HELUnanswered"}, nil},
+	{"issue-919", "ReactivatesSession", "SessionSurvives", []string{"Link/HELUnanswered"}, nil},
+	{"issue-828", "CreatesSessionOnlyAfterActivateFailed", "SessionLost", []string{"Link/Stall"}, nil},
+	{"issue-828", "DeliverEachValueOnce", "SessionLost", []string{"Link/Stall"}, nil},
+	{"issue-828", "RecreatesAfterRefusal", "SessionLost", []string{"Link/Stall"}, nil},
+	{"issue-828", "ResumePublishing", "SessionLost", []string{"Link/Stall"}, nil},
+	{"issue-828", "CreatesNoSession", "SessionSurvives", []string{"Link/Stall"}, nil},
+	{"issue-828", "ReactivatesSession", "SessionSurvives", []string{"Link/Stall"}, nil},
 	{"after an ActivateSession timeout the old session stays open on the server",
-		"CloseEveryKnownSession", "SessionSurvives", []string{"DelayAboveTimeout/ActivateSession"}},
+		"CloseEveryKnownSession", "SessionSurvives", []string{"DelayAboveTimeout/ActivateSession"}, nil},
 	{"after an ActivateSession timeout the old session stays open on the server",
-		"CloseEveryKnownSession", "SubscriptionsLost", []string{"DelayAboveTimeout/ActivateSession"}},
+		"CloseEveryKnownSession", "SubscriptionsLost", []string{"DelayAboveTimeout/ActivateSession"}, nil},
 	{"after an ActivateSession timeout the old session stays open on the server",
-		"KeepOneSessionOpen", "SessionSurvives", []string{"DelayAboveTimeout/ActivateSession"}},
+		"KeepOneSessionOpen", "SessionSurvives", []string{"DelayAboveTimeout/ActivateSession"}, nil},
 	{"after an ActivateSession timeout the old session stays open on the server",
-		"KeepOneSessionOpen", "SubscriptionsLost", []string{"DelayAboveTimeout/ActivateSession"}},
+		"KeepOneSessionOpen", "SubscriptionsLost", []string{"DelayAboveTimeout/ActivateSession"}, nil},
 	{"the reconnect loop's error drain discards a connection error, so the client reports Connected on a dead channel",
-		"CloseEveryKnownSession", "SessionLost", []string{"CutAfterResponse/CreateMonitoredItems"}},
+		"CloseEveryKnownSession", "SessionLost", []string{"CutAfterResponse/CreateMonitoredItems"}, nil},
 	{"the reconnect loop's error drain discards a connection error, so the client reports Connected on a dead channel",
-		"CloseEveryKnownSession", "SessionSurvives", []string{"CutAfterResponse/Read"}},
+		"CloseEveryKnownSession", "SessionSurvives", []string{"CutAfterResponse/Read"}, nil},
 	{"the reconnect loop's error drain discards a connection error, so the client reports Connected on a dead channel",
-		"CloseEveryKnownSession", "SubscriptionsLost", []string{"CutAfterResponse/Read"}},
+		"CloseEveryKnownSession", "SubscriptionsLost", []string{"CutAfterResponse/Read"}, nil},
 	{"the reconnect loop's error drain discards a connection error, so the client reports Connected on a dead channel",
-		"ResumePublishing", "SessionLost", []string{"CutAfterResponse/CreateMonitoredItems"}},
+		"ResumePublishing", "SessionLost", []string{"CutAfterResponse/CreateMonitoredItems"}, nil},
 }
 
 // TestKnownDefectsMatchExactlyTheTriageCases asserts the known-defect
@@ -160,6 +165,9 @@ func TestKnownDefectsMatchExactlyTheTriageCases(t *testing.T) {
 		issue := resolve(row.issue)
 		for _, f := range faults.AllFaults {
 			if row.faults != nil && !slices.Contains(row.faults, f.Name()) {
+				continue
+			}
+			if slices.Contains(row.except, f.Name()) {
 				continue
 			}
 			key := row.scenario + "/" + f.Name() + "/" + row.check
