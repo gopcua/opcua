@@ -20,7 +20,9 @@ import (
 // is the incarnation ordinal of the subscription on its server: a
 // recreated subscription reuses the wire id of a deleted one while
 // restarting its sequence numbers, so only the instance tells the two
-// apart.
+// apart. Forgotten is true when the server deleted the subscription
+// the value was retained on, so no correct client can obtain it
+// anymore.
 type Produced struct {
 	Value                int32
 	SubscriptionID       uint32
@@ -29,6 +31,7 @@ type Produced struct {
 	Reachable            bool
 	Repeated             bool
 	SubscriptionInstance int
+	Forgotten            bool
 }
 
 // ServerState is one server the environment created, with the session
@@ -94,7 +97,9 @@ func connectedServers(observed Observed) []ServerState {
 // a sequence number the server had already sent (Produced.Repeated)
 // must not be received at all: Part 4 identifies a notification by its
 // sequence number, so a client must not deliver a second notification
-// under a number it already received.
+// under a number it already received. A value whose subscription the
+// server deleted (Produced.Forgotten) is exempt like a value on an
+// unreachable server: no correct client can obtain it anymore.
 func DeliverEachValueOnce() types.GomegaMatcher {
 	return &deliverEachValueOnce{}
 }
@@ -136,7 +141,7 @@ func (m *deliverEachValueOnce) Match(actual any) (bool, error) {
 			}
 			continue
 		}
-		if entry.Reachable && received[entry.Value] == 0 {
+		if entry.Reachable && !entry.Forgotten && received[entry.Value] == 0 {
 			m.failure = fmt.Sprintf("server %d produced %d at sequence %d, but the client never received it", entry.ServerIndex, entry.Value, entry.SequenceNumber)
 			return false, nil
 		}

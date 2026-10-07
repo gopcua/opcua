@@ -542,14 +542,25 @@ type Produced struct {
 	Value                int32
 	Repeated             bool
 	SubscriptionInstance int
+	Forgotten            bool
 }
 
 // Produced returns every value the server produced, in production
-// order.
+// order, marking the values whose subscription was deleted since: no
+// correct client can obtain those anymore.
 func (s *ScriptedServer) Produced() []Produced {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return slices.Clone(s.produced)
+	entries := slices.Clone(s.produced)
+	for sub, indices := range s.producedBySub {
+		if !sub.deleted {
+			continue
+		}
+		for _, index := range indices {
+			entries[index].Forgotten = true
+		}
+	}
+	return entries
 }
 
 func (s *ScriptedServer) recordProducedLocked(sub *harnessSub, sequenceNumber uint32, v int32, repeated bool) {

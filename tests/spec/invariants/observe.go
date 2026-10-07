@@ -44,6 +44,7 @@ func Observe(env *spectest.Environment, fault *spectest.Injected) Observed {
 				Reachable:            states[index].Reachable,
 				Repeated:             entry.Repeated,
 				SubscriptionInstance: entry.SubscriptionInstance,
+				Forgotten:            entry.Forgotten,
 			})
 		}
 	}
