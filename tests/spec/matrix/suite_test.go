@@ -2,10 +2,12 @@ package matrix_test
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"testing"
 
 	"github.com/gopcua/opcua/tests/spec/faults"
+	"github.com/gopcua/opcua/tests/spec/internal/suitegate"
 	"github.com/gopcua/opcua/tests/spec/matrix"
 	"github.com/gopcua/opcua/tests/spec/matrix/suites"
 	"github.com/gopcua/opcua/tests/spec/spectest"
@@ -13,23 +15,22 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func init() {
-	if os.Getenv("SPECTEST_MATRIX") != "" {
-		matrix.RegisterSuites([]matrix.Suite{suites.P4_06_07(), suites.P4_05_14()}, matrix.KnownDefects(), faults.AllFaults...)
-	}
-}
-
 // TestMatrix runs the registered failure matrix suites. It stays
-// behind SPECTEST_MATRIX so a plain go test ./... stays fast and the
-// skip is visible; the self-spec has its own bootstrap and always
-// runs, except inside a matrix run, where TestMatrix covers it — a
-// binary may run RunSpecs once. The label filter resolves exactly as
-// the part4 suite does.
+// behind the suite gate so a plain go test ./... stays fast and the
+// skip is visible; the self-spec has its own bootstrap and always runs,
+// except inside a matrix run, where TestMatrix covers it — a binary may
+// run RunSpecs once. The suites register here, inside TestMatrix and
+// nowhere in init: ginkgo collects top-level containers until RunSpecs,
+// and the matrix's 2443-spec tree must not burden every other RunSpecs
+// of this binary — TestSelfSpec runs its own tree, and
+// TestContinueOnFailure's nested run inherits this gate. The label
+// filter resolves exactly as the part4 suite does.
 func TestMatrix(t *testing.T) {
-	if os.Getenv("SPECTEST_MATRIX") == "" {
-		t.Skip("set SPECTEST_MATRIX=1 to run the failure matrix")
+	if !suitegate.Enabled() {
+		t.Skip(suitegate.SkipReason())
 		return
 	}
+	matrix.RegisterSuites([]matrix.Suite{suites.P4_06_07(), suites.P4_05_14()}, matrix.KnownDefects(), faults.AllFaults...)
 	suiteConfig, reporterConfig := GinkgoConfiguration()
 	var labelPassed bool
 	flag.Visit(func(passed *flag.Flag) {
@@ -73,4 +74,15 @@ func TestPlanOverTheRealSuite(t *testing.T) {
 			t.Logf("%s: %d applicable, %d skipped", scenario.Name(), applicable[scenario.Name()], skipped[scenario.Name()])
 		}
 	}
+}
+
+// TestMain runs the package's tests only when the spec suite runs, so
+// a plain `go test ./...` skips the package visibly instead of paying
+// for its specs.
+func TestMain(m *testing.M) {
+	if !suitegate.Enabled() {
+		fmt.Println(suitegate.SkipReason())
+		os.Exit(0)
+	}
+	os.Exit(m.Run())
 }

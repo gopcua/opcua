@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gopcua/opcua/tests/spec/faults"
+	"github.com/gopcua/opcua/tests/spec/internal/suitegate"
 	"github.com/gopcua/opcua/tests/spec/message"
 	"github.com/gopcua/opcua/tests/spec/rules"
 	"github.com/gopcua/opcua/tests/spec/spectest"
@@ -124,14 +125,14 @@ func casePaths(cases []Case) []string {
 	return paths
 }
 
-// TestSelfSpec runs the registered suites without the matrix variable.
-// The label filter resolves exactly as TestMatrix does, so the default
-// run excludes the labelled known-defect checks. It skips when
-// SPECTEST_MATRIX is set: ginkgo fails a second RunSpecs call in one
-// binary, and the matrix run covers this suite inside TestMatrix.
+// TestSelfSpec runs the registered suites standalone, focused by -run:
+// the label filter resolves exactly as TestMatrix does, so the default
+// run excludes the labelled known-defect checks. It skips whenever the
+// full matrix test runs in the same binary: ginkgo fails a second
+// RunSpecs call, and TestMatrix covers this suite inside itself.
 func TestSelfSpec(t *testing.T) {
-	if os.Getenv("SPECTEST_MATRIX") != "" {
-		t.Skip("the failure matrix run runs the self-spec suite inside TestMatrix; a second RunSpecs would fail")
+	if suitegate.MatrixRuns() {
+		t.Skip("TestMatrix runs the self-spec suite inside the matrix; a binary may run RunSpecs once")
 		return
 	}
 	suiteConfig, reporterConfig := GinkgoConfiguration()

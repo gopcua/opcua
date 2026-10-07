@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gopcua/opcua/tests/spec/faults"
+	"github.com/gopcua/opcua/tests/spec/internal/suitegate"
 	"github.com/gopcua/opcua/tests/spec/message"
 	"github.com/gopcua/opcua/tests/spec/rules"
 	"github.com/gopcua/opcua/tests/spec/spectest"
@@ -83,8 +84,8 @@ func TestContinueOnFailure(t *testing.T) {
 		t.Skip("the nested run of this test would recurse")
 		return
 	}
-	if os.Getenv("SPECTEST_MATRIX") != "" {
-		t.Skip("the failure matrix run covers the case container without this probe")
+	if suitegate.MatrixRuns() {
+		t.Skip("the matrix run covers the case container without this probe")
 		return
 	}
 	report := filepath.Join(t.TempDir(), "report.json")

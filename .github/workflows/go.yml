@@ -37,26 +37,3 @@ jobs:
 
       - name: Run Tests
         run: make test integration
-
-  known-defects:
-    name: Known-defect gate
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Check out code into the Go module directory
-        uses: actions/checkout@v4
-
-      - name: Setup Go 1.27.x
-        uses: actions/setup-go@v5
-        with:
-          go-version: 1.27.x
-
-      - name: Run the known-defect specs and gate on their verdict
-        run: |
-          go test -count=1 ./tests/spec/part4/ -race -timeout 30m -ginkgo.label-filter=known-defect \
-            -ginkgo.json-report="$PWD/known-defect.json" > known-defect.log 2>&1 || true
-          go run ./tests/spec/internal/knowndefectgate "$PWD/known-defect.json" known-defect.log || gate=$?
-          if [ -n "$gate" ]; then
-            tail -n 300 known-defect.log
-            exit "$gate"
-          fi

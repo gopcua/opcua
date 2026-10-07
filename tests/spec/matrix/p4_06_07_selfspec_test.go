@@ -2,13 +2,13 @@ package matrix_test
 
 import (
 	"context"
-	"os"
 	"slices"
 	"testing"
 	"time"
 
 	"github.com/gopcua/opcua"
 	"github.com/gopcua/opcua/tests/spec/faults"
+	"github.com/gopcua/opcua/tests/spec/internal/suitegate"
 	"github.com/gopcua/opcua/tests/spec/matrix"
 	"github.com/gopcua/opcua/tests/spec/matrix/suites"
 	"github.com/gopcua/opcua/tests/spec/spectest"
@@ -23,8 +23,8 @@ import (
 // workload must give the fault a response that exists only because it
 // armed first.
 func TestResponseLostPublishDropsTheArmAnswer(t *testing.T) {
-	if os.Getenv("SPECTEST_MATRIX") != "" {
-		t.Skip("the failure matrix run drives this case itself")
+	if suitegate.MatrixRuns() {
+		t.Skip("the matrix run drives this case itself")
 	}
 	var scenario matrix.Scenario
 	for _, s := range suites.P4_06_07().Scenarios() {
