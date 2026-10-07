@@ -9,6 +9,7 @@ package rules
 
 import (
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/gopcua/opcua/tests/spec/spectest"
@@ -227,4 +228,137 @@ func answeredTransferThenNewSubscription(env *spectest.Environment, m spectest.M
 func FindAnsweredTransferThenNewSubscription(env *spectest.Environment, m spectest.Mark, oldID uint32, transferRefusal func(spectest.ServiceRecord[ua.Response]) bool) (spectest.ServiceRecord[ua.Response], spectest.ServiceRecord[ua.Request], spectest.ServiceRecord[ua.Response]) {
 	transferAnswer, createRequest, createAnswer, _ := answeredTransferThenNewSubscription(env, m, oldID, transferRefusal)
 	return transferAnswer, createRequest, createAnswer
+}
+
+// receivedNotification is one data change notification a Forwarded
+// response carried to the client: its wire order, the subscription it
+// belongs to, its sequence number and its value.
+type receivedNotification struct {
+	order          int
+	subscriptionID uint32
+	sequenceNumber uint32
+	value          int32
+}
+
+// receivedNotifications returns the data change notifications the
+// relay forwarded to the client: Publish responses name their
+// subscription, and a Republish response belongs to the subscription
+// its paired Republish request named.
+func receivedNotifications(requests []spectest.ServiceRecord[ua.Request], responses []spectest.ServiceRecord[ua.Response]) []receivedNotification {
+	var notifications []receivedNotification
+	for _, record := range responses {
+		if record.Fate != spectest.Forwarded {
+			continue
+		}
+		message, decoded := record.Message()
+		if !decoded {
+			continue
+		}
+		var subscriptionID uint32
+		var notification *ua.NotificationMessage
+		switch response := message.(type) {
+		case *ua.PublishResponse:
+			subscriptionID = response.SubscriptionID
+			notification = response.NotificationMessage
+		case *ua.RepublishResponse:
+			subscriptionID = republishSubscriptionID(requests, record)
+			notification = response.NotificationMessage
+		default:
+			continue
+		}
+		value, carries := notificationValue(notification)
+		if !carries {
+			continue
+		}
+		notifications = append(notifications, receivedNotification{
+			order:          record.Order,
+			subscriptionID: subscriptionID,
+			sequenceNumber: notification.SequenceNumber,
+			value:          value,
+		})
+	}
+	return notifications
+}
+
+// republishSubscriptionID returns the subscription id the Republish
+// request paired with the response named.
+func republishSubscriptionID(requests []spectest.ServiceRecord[ua.Request], response spectest.ServiceRecord[ua.Response]) uint32 {
+	for _, record := range requests {
+		if record.Connection != response.Connection || record.RequestID != response.RequestID {
+			continue
+		}
+		message, decoded := record.Message()
+		if !decoded {
+			continue
+		}
+		if request, isRepublish := message.(*ua.RepublishRequest); isRepublish {
+			return request.SubscriptionID
+		}
+	}
+	return 0
+}
+
+// notificationValue returns the int32 data change value a notification
+// message carries, and whether it carries one.
+func notificationValue(message *ua.NotificationMessage) (int32, bool) {
+	if message == nil {
+		return 0, false
+	}
+	for _, data := range message.NotificationData {
+		if data == nil || data.Value == nil {
+			continue
+		}
+		change, isDataChange := data.Value.(*ua.DataChangeNotification)
+		if !isDataChange || len(change.MonitoredItems) == 0 || change.MonitoredItems[0].Value == nil {
+			continue
+		}
+		value := change.MonitoredItems[0].Value.Value.Value()
+		if number, isInt32 := value.(int32); isInt32 {
+			return number, true
+		}
+	}
+	return 0, false
+}
+
+// skippedSequenceNumbers returns every sequence number the server
+// skipped on a subscription: a number missing between two consecutive
+// notifications the client received on it, in wire order.
+func skippedSequenceNumbers(notifications []receivedNotification) []uint32 {
+	bySubscription := map[uint32][]receivedNotification{}
+	for _, notification := range notifications {
+		bySubscription[notification.subscriptionID] = append(bySubscription[notification.subscriptionID], notification)
+	}
+	var skipped []uint32
+	for _, group := range bySubscription {
+		for i := 1; i < len(group); i++ {
+			for missing := group[i-1].sequenceNumber + 1; missing < group[i].sequenceNumber; missing++ {
+				skipped = append(skipped, missing)
+			}
+		}
+	}
+	slices.Sort(skipped)
+	return skipped
+}
+
+// publishAnsweredTooMany is one Publish request the server answered
+// Bad_TooManyPublishRequests, with its answer.
+type publishAnsweredTooMany struct {
+	request spectest.ServiceRecord[ua.Request]
+	answer  spectest.ServiceRecord[ua.Response]
+}
+
+// publishesAnsweredTooMany returns every recorded Publish request the
+// server answered Bad_TooManyPublishRequests, with its answer.
+func publishesAnsweredTooMany(requests []spectest.ServiceRecord[ua.Request], responses []spectest.ServiceRecord[ua.Response]) []publishAnsweredTooMany {
+	var refused []publishAnsweredTooMany
+	for _, request := range RequestsOfType[*ua.PublishRequest](requests) {
+		answer, answered := AnswerTo(request, responses)
+		if !answered {
+			continue
+		}
+		if status, decoded := StatusOf(answer); decoded && status == ua.StatusBadTooManyPublishRequests {
+			refused = append(refused, publishAnsweredTooMany{request: request, answer: answer})
+		}
+	}
+	return refused
 }

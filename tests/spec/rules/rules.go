@@ -394,6 +394,90 @@ var KeepsPublishingAfterCancelThenSubscribe = Rule{
 	},
 }
 
+// RepublishesSkippedSequence: for every sequence number the server
+// skipped on a subscription — a number missing between two consecutive
+// notifications the client received on it — the client sends a Republish
+// for the missing number. No gap means the rule holds vacuously.
+var RepublishesSkippedSequence = Rule{
+	Name:    "RepublishesSkippedSequence",
+	Clause:  "P4-6.7",
+	Keyword: "should",
+	Check: func(c Context) {
+		requests := c.Env.Recorder.RequestsSince(c.Mark)
+		responses := c.Env.Recorder.ResponsesSince(c.Mark)
+		for _, missing := range skippedSequenceNumbers(receivedNotifications(requests, responses)) {
+			_, sent := RepublishForSequence(requests, missing)
+			gomega.Expect(sent).To(gomega.BeTrue(),
+				"client sent no Republish request for sequence number %d that the server skipped", missing)
+		}
+	},
+}
+
+// PublishesAgainAfterTooManyPublishRequests: for every Publish the
+// server answered Bad_TooManyPublishRequests, the client sends another
+// Publish on the same session, and a value answered after it is
+// delivered. No such answer means the rule holds vacuously.
+var PublishesAgainAfterTooManyPublishRequests = Rule{
+	Name:    "PublishesAgainAfterTooManyPublishRequests",
+	Clause:  "P4-5.14.5",
+	Keyword: "should",
+	Check: func(c Context) {
+		requests := c.Env.Recorder.RequestsSince(c.Mark)
+		responses := c.Env.Recorder.ResponsesSince(c.Mark)
+		for _, refused := range publishesAnsweredTooMany(requests, responses) {
+			refusedMessage, decoded := refused.request.Message()
+			if !decoded {
+				continue
+			}
+			token := refusedMessage.Header().AuthenticationToken
+			var later spectest.ServiceRecord[ua.Request]
+			found := false
+			for _, publish := range RequestsOfType[*ua.PublishRequest](requests) {
+				if publish.Order <= refused.answer.Order {
+					continue
+				}
+				publishMessage, publishDecoded := publish.Message()
+				if !publishDecoded || !publishMessage.Header().AuthenticationToken.Equal(token) {
+					continue
+				}
+				later = publish
+				found = true
+				break
+			}
+			gomega.Expect(found).To(gomega.BeTrue(),
+				"client sent no Publish after the server answered its Publish (connection %d, request id %d) with Bad_TooManyPublishRequests",
+				refused.request.Connection, refused.request.RequestID)
+			delivered := false
+			for _, response := range responses {
+				if response.Fate != spectest.Forwarded || response.Order <= later.Order {
+					continue
+				}
+				responseMessage, responseDecoded := response.Message()
+				if !responseDecoded {
+					continue
+				}
+				var notification *ua.NotificationMessage
+				switch answer := responseMessage.(type) {
+				case *ua.PublishResponse:
+					notification = answer.NotificationMessage
+				case *ua.RepublishResponse:
+					notification = answer.NotificationMessage
+				default:
+					continue
+				}
+				value, carries := notificationValue(notification)
+				if carries && slices.Contains(c.Env.Received(), value) {
+					delivered = true
+					break
+				}
+			}
+			gomega.Expect(delivered).To(gomega.BeTrue(),
+				"no value answered after the Publish that followed the server answering its Publish (connection %d, request id %d) with Bad_TooManyPublishRequests was delivered",
+				refused.request.Connection, refused.request.RequestID)
+		}
+	},
+}
+
 // All lists every rule the package holds, each exactly once.
 func All() []Rule {
 	return []Rule{
@@ -409,5 +493,7 @@ func All() []Rule {
 		RepublishesRecreatedFromOne,
 		RepublishesWithinTimeoutAfterPublishTimeout,
 		KeepsPublishingAfterCancelThenSubscribe,
+		RepublishesSkippedSequence,
+		PublishesAgainAfterTooManyPublishRequests,
 	}
 }
