@@ -32,12 +32,19 @@ var recreatePathFaults = []string{
 var cutPublishFaults = []string{
 	"CutAfterResponse/Publish", "RequestLost/Publish", "ResponseLost/Publish"}
 
-// knownDefects holds the known-defect table of the §6.7 suite: the
-// predicted failures of the original run, and the entries the triage
-// of the corrected matrix's fault-specific failures added, one issue
-// per group of cases with one root cause. Each entry applies to
-// exactly its group's cases: by scenario, by fault predicate, or by
+// knownDefects holds the known-defect table of the §6.7 suite and the
+// §5.14 predictions: the predicted failures of the original run, the
+// entries the triage of the corrected matrix's fault-specific failures
+// added, and the §5.14 entries measured before the suite existed —
+// one issue per group of cases with one root cause. Each entry applies
+// to exactly its group's cases: by scenario, by fault predicate, or by
 // enumerated fault name where no predicate fits.
+//
+// The §5.14 publish-timeout rule has no entry: a held Publish timed out
+// on a first subscription already passes on main. The two conditional
+// §5.14 rules — RepublishesSkippedSequence and
+// PublishesAgainAfterTooManyPublishRequests — have no measured verdict
+// on any tree yet, so they get no prediction; the measurement decides.
 var knownDefects = []KnownDefect{
 	{Issue: "issue-879", Check: "RepublishesFromNextSequence", Applies: everyFaultOf("SessionSurvives")},
 	{Issue: "issue-879", Check: "SendsNoPublishBeforeNotAvailable", Applies: everyFaultOf("SessionSurvives")},
@@ -120,6 +127,11 @@ var knownDefects = []KnownDefect{
 		Check: "CloseEveryKnownSession", Applies: faultsNamedIn([]string{"SessionSurvives", "SubscriptionsLost"}, "CutAfterResponse/Read")},
 	{Issue: issueDrainedConnectionError,
 		Check: "ResumePublishing", Applies: faultsNamed("SessionLost", "CutAfterResponse/CreateMonitoredItems")},
+	// The §5.14 predictions: the parked publish loop is the #895
+	// mechanism, so every fault of CancelThenSubscribe fails the cycle
+	// count and the sentinel both.
+	{Issue: "issue-895", Check: "KeepsPublishingAfterCancelThenSubscribe", Applies: everyFaultOf("CancelThenSubscribe")},
+	{Issue: "issue-895", Check: "ResumePublishing", Applies: everyFaultOf("CancelThenSubscribe")},
 }
 
 // everyFaultOf says a defect applies to every fault of one scenario.

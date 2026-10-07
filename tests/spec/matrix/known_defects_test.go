@@ -46,6 +46,8 @@ var triageCases = []struct {
 	{"issue-879", "RecreatesAfterRefusal", "SubscriptionsLost", nil, nil},
 	{"issue-879", "RepublishesRecreatedFromOne", "SubscriptionsLost", nil, nil},
 	{"issue-895", "ResumePublishing", "SubscriptionsLost", nil, recreatePathFaults},
+	{"issue-895", "KeepsPublishingAfterCancelThenSubscribe", "CancelThenSubscribe", nil, nil},
+	{"issue-895", "ResumePublishing", "CancelThenSubscribe", nil, nil},
 	{"issue-895", "KeepOneSubscriptionPerClientSubscription", "SubscriptionsLost", nil, recreatePathFaults},
 	{"issue-879", "HaveFired", "SessionSurvives", []string{
 		"CutAfterResponse/Publish", "CutAfterResponse/Republish",
@@ -188,7 +190,7 @@ func TestKnownDefectsMatchExactlyTheTriageCases(t *testing.T) {
 		t.Fatalf("the triage's case lists produced no expected labelling, so the test matched nothing")
 	}
 
-	cases, err := matrix.Plan([]matrix.Suite{suites.P4_06_07()}, faults.AllFaults, matrix.KnownDefects())
+	cases, err := matrix.Plan([]matrix.Suite{suites.P4_06_07(), suites.P4_05_14()}, faults.AllFaults, matrix.KnownDefects())
 	if err != nil {
 		t.Fatalf("Plan over the §6.7 suite returned an error: %v", err)
 	}
