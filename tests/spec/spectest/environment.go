@@ -171,6 +171,7 @@ func Start(t T, opts ...Option) *Environment {
 		opcua.ReconnectInterval(reconnect),
 		opcua.RequestTimeout(clientRequestTimeout),
 		opcua.StateChangedCh(states),
+		opcua.StateChangedFunc(e.holdConnectedAfterCutClose),
 	}, o.clientOptions...)
 	client, err := opcua.NewClient("opc.tcp://"+e.Relay.address(), clientOptions...)
 	if err != nil {
@@ -568,6 +569,37 @@ func (e *Environment) ConsumerBlocked() bool {
 // RequestTimeout returns the request timeout the client runs with.
 func (e *Environment) RequestTimeout() time.Duration {
 	return e.Client.RequestTimeout()
+}
+
+// connectedHoldBound bounds how long a Connected report waits for the
+// relay to record the close of a connection an after-response cut fired
+// on. The relay discards what the client sends on such a connection for
+// two seconds before it records the close; the bound must outlast that
+// window yet still release, so a client whose cut connection never
+// closes is not blocked forever.
+const connectedHoldBound = 5 * time.Second
+
+// holdConnectedAfterCutClose delays the client's Connected report until
+// the relay has recorded the close of every connection an
+// after-response cut fired on. Such a cut half-closes the connection
+// and keeps reading and discarding what the client sends for its drain
+// window before it records the close, and the client's channel
+// teardown races the monitor's reconnection cleanup in that window:
+// whether the teardown's error is already queued when the cleanup
+// drains decides whether the client notices the connection died.
+// Waiting for the recorded close pins the teardown first, so the
+// cleanup's outcome no longer depends on the race.
+func (e *Environment) holdConnectedAfterCutClose(state opcua.ConnState) {
+	if state != opcua.Connected {
+		return
+	}
+	deadline := time.Now().Add(connectedHoldBound)
+	for time.Now().Before(deadline) {
+		if !e.Relay.afterResponseCutPending() {
+			return
+		}
+		time.Sleep(statePollInterval)
+	}
 }
 
 // PublishTimeout returns the Publish timeout the client computes for

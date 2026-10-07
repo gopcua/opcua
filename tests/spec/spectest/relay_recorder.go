@@ -1171,6 +1171,25 @@ func (r *Relay) ArmedCuts() []string {
 	return descriptions
 }
 
+// afterResponseCutPending reports whether a connection an
+// after-response cut fired on is still without its recorded close: the
+// relay half-closed it and keeps discarding what the client sends for
+// its drain window before it records the close.
+func (r *Relay) afterResponseCutPending() bool {
+	r.mu.Lock()
+	indexes := make([]int, 0, len(r.draining))
+	for index := range r.draining {
+		indexes = append(indexes, index)
+	}
+	r.mu.Unlock()
+	for _, index := range indexes {
+		if r.recorder.ConnectionStateOf(index) != Closed {
+			return true
+		}
+	}
+	return false
+}
+
 func (r *Relay) takeArmed(match func(armedCut) bool) (armedCut, bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
