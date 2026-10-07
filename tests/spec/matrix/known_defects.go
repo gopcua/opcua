@@ -14,6 +14,7 @@ var (
 	issueConnectionFailureOnActivate = Unfiled("a connection failure during ActivateSession makes the client forget its session without retrying or closing it")
 	issueTimedOutActivationSession   = Unfiled("after an ActivateSession timeout the old session stays open on the server")
 	issueDrainedConnectionError      = Unfiled("the reconnect loop's error drain discards a connection error, so the client reports Connected on a dead channel")
+	issueHELHandshakeHang            = Unfiled("the HEL/ACK handshake ignores its context, so a reconnect hangs on an unanswered HEL; PR #919 fixes it")
 )
 
 // recreatePathFaults lists the faults under which the client does not
@@ -103,14 +104,14 @@ var knownDefects = []KnownDefect{
 	{Issue: issueConnectionFailureOnActivate,
 		Check: "CreatesSessionOnlyAfterActivateFailed", Applies: faultsNamed("SessionLost",
 			"CutAfterResponse/OpenSecureChannel", "RequestLost/ActivateSession")},
-	{Issue: "issue-919", Check: "CreatesSessionOnlyAfterActivateFailed", Applies: faultsNamed("SessionLost", "Link/HELUnanswered")},
-	{Issue: "issue-919", Check: "KeepOneSessionOpen", Applies: faultsNamed("SessionLost", "Link/HELUnanswered")},
-	{Issue: "issue-919", Check: "KeepOneSubscriptionPerClientSubscription", Applies: faultsNamed("SessionLost", "Link/HELUnanswered")},
-	{Issue: "issue-919", Check: "RecreatesAfterRefusal", Applies: faultsNamed("SessionLost", "Link/HELUnanswered")},
-	{Issue: "issue-919", Check: "ResumePublishing", Applies: faultsNamed("SessionLost", "Link/HELUnanswered")},
-	{Issue: "issue-919", Check: "CloseEveryKnownSession", Applies: faultsNamedIn([]string{"SessionSurvives", "SubscriptionsLost"}, "Link/HELUnanswered")},
-	{Issue: "issue-919", Check: "CreatesNoSession", Applies: faultsNamed("SessionSurvives", "Link/HELUnanswered")},
-	{Issue: "issue-919", Check: "ReactivatesSession", Applies: faultsNamed("SessionSurvives", "Link/HELUnanswered")},
+	{Issue: issueHELHandshakeHang, Check: "CreatesSessionOnlyAfterActivateFailed", Applies: faultsNamed("SessionLost", "Link/HELUnanswered")},
+	{Issue: issueHELHandshakeHang, Check: "KeepOneSessionOpen", Applies: faultsNamed("SessionLost", "Link/HELUnanswered")},
+	{Issue: issueHELHandshakeHang, Check: "KeepOneSubscriptionPerClientSubscription", Applies: faultsNamed("SessionLost", "Link/HELUnanswered")},
+	{Issue: issueHELHandshakeHang, Check: "RecreatesAfterRefusal", Applies: faultsNamed("SessionLost", "Link/HELUnanswered")},
+	{Issue: issueHELHandshakeHang, Check: "ResumePublishing", Applies: faultsNamed("SessionLost", "Link/HELUnanswered")},
+	{Issue: issueHELHandshakeHang, Check: "CloseEveryKnownSession", Applies: faultsNamedIn([]string{"SessionSurvives", "SubscriptionsLost"}, "Link/HELUnanswered")},
+	{Issue: issueHELHandshakeHang, Check: "CreatesNoSession", Applies: faultsNamed("SessionSurvives", "Link/HELUnanswered")},
+	{Issue: issueHELHandshakeHang, Check: "ReactivatesSession", Applies: faultsNamed("SessionSurvives", "Link/HELUnanswered")},
 	{Issue: "issue-828", Check: "CreatesSessionOnlyAfterActivateFailed", Applies: faultsNamed("SessionLost", "Link/Stall")},
 	{Issue: "issue-828", Check: "DeliverEachValueOnce", Applies: faultsNamed("SessionLost", "Link/Stall")},
 	{Issue: "issue-828", Check: "RecreatesAfterRefusal", Applies: faultsNamed("SessionLost", "Link/Stall")},
