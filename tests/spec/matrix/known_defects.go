@@ -7,27 +7,107 @@ import (
 	"github.com/gopcua/opcua/tests/spec/faults"
 )
 
-// knownDefects holds the predicted failures of the §6.7 suite on
-// main's client, written from the measured part4 verdicts before the
-// first matrix run, and the scenario-level failures the corrected
-// harness measured in its control cases and never-fired faults: one
-// entry per failing behaviour, labelled with its issue, applying to
-// every fault of the scenario — or, for the never-fired faults, to
-// every fault targeting the messages the client does not send.
+// The unfiled issues the triage named, one label per group of cases
+// with one root cause.
+var (
+	issueFailedSubscriptionStep      = Unfiled("a failed subscription step during reconnect makes recreateSession drop a healthy session without closing it")
+	issueConnectionFailureOnActivate = Unfiled("a connection failure during ActivateSession makes the client forget its session without retrying or closing it")
+	issueTimedOutActivationSession   = Unfiled("after an ActivateSession timeout the old session stays open on the server")
+	issueDrainedConnectionError      = Unfiled("the reconnect loop's error drain discards a connection error, so the client reports Connected on a dead channel")
+)
+
+// knownDefects holds the known-defect table of the §6.7 suite: the
+// predicted failures of the original run, and the entries the triage
+// of the corrected matrix's fault-specific failures added, one issue
+// per group of cases with one root cause. Each entry applies to
+// exactly its group's cases: by scenario, by fault predicate, or by
+// enumerated fault name where no predicate fits.
 var knownDefects = []KnownDefect{
 	{Issue: "issue-879", Check: "RepublishesFromNextSequence", Applies: everyFaultOf("SessionSurvives")},
 	{Issue: "issue-879", Check: "SendsNoPublishBeforeNotAvailable", Applies: everyFaultOf("SessionSurvives")},
 	{Issue: "issue-879", Check: "KeepsSubscriptionID", Applies: everyFaultOf("SessionSurvives")},
-	{Issue: Unfiled("client sends a TransferSubscriptions request for a subscription its own session owns"), Check: "SendsNoTransferForOwnSubscription", Applies: everyFaultOf("SessionSurvives")},
-	{Issue: "issue-895", Check: "RecreatesAfterRefusal", Applies: everyFaultOf("SubscriptionsLost")},
-	{Issue: "issue-879", Check: "RepublishesRecreatedFromOne", Applies: everyFaultOf("SubscriptionsLost")},
+	{Issue: "issue-879", Check: "SendsNoTransferForOwnSubscription", Applies: everyFaultOf("SessionSurvives")},
 	{Issue: "issue-879", Check: "DeliverEachValueOnce", Applies: everyFaultOf("SessionSurvives")},
 	{Issue: "issue-879", Check: "ResumePublishing", Applies: everyFaultOf("SessionSurvives")},
+	{Issue: "issue-879", Check: "HaveFired", Applies: faultTargeting("SessionSurvives", "Publish", "Republish")},
+	{Issue: "issue-879", Check: "RecreatesAfterRefusal", Applies: everyFaultOf("SubscriptionsLost")},
+	{Issue: "issue-879", Check: "RepublishesRecreatedFromOne", Applies: everyFaultOf("SubscriptionsLost")},
+	{Issue: "issue-879", Check: "HaveFired", Applies: faultTargeting("SubscriptionsLost", "CreateSubscription", "CreateMonitoredItems", "Publish", "Republish")},
 	{Issue: "issue-895", Check: "ResumePublishing", Applies: everyFaultOf("SubscriptionsLost")},
 	{Issue: "issue-895", Check: "KeepOneSubscriptionPerClientSubscription", Applies: everyFaultOf("SubscriptionsLost")},
-	{Issue: Unfiled("the retained value under the forgotten subscription is lost; a correct client cannot retransmit it either"), Check: "DeliverEachValueOnce", Applies: everyFaultOf("SubscriptionsLost")},
-	{Issue: "issue-879", Check: "HaveFired", Applies: faultTargeting("SessionSurvives", "Publish", "Republish")},
-	{Issue: "issue-879", Check: "HaveFired", Applies: faultTargeting("SubscriptionsLost", "CreateSubscription", "CreateMonitoredItems", "Publish", "Republish")},
+	{Issue: "issue-895", Check: "DeliverEachValueOnce", Applies: everyFaultOf("SubscriptionsLost")},
+	{Issue: "issue-879", Check: "ResumePublishing", Applies: faultsNamed("SessionLost",
+		"CutAfterResponse/Publish", "DelayAboveTimeout/Read",
+		"Overload/Publish/Bad_ResourceUnavailable", "Overload/Publish/Bad_TooManyOperations",
+		"Overload/Publish/Bad_TooManyPublishRequests", "RequestLost/Publish", "RequestLost/Read",
+		"ResponseLost/Publish", "ResponseLost/Read")},
+	{Issue: "issue-879", Check: "DeliverEachValueOnce", Applies: faultsNamed("SessionLost", "ResponseLost/Publish")},
+	{Issue: "issue-879", Check: "KeepOneSubscriptionPerClientSubscription", Applies: faultsNamed("SessionLost",
+		"DelayAboveTimeout/Read", "RequestLost/Read", "ResponseLost/Read")},
+	{Issue: "issue-879", Check: "RecreatesAfterRefusal", Applies: faultsNamed("SessionLost",
+		"RequestLost/Read", "ResponseLost/Read")},
+	{Issue: issueFailedSubscriptionStep,
+		Check: "CloseEveryKnownSession", Applies: faultsNamed("SessionLost",
+			"CutAfterResponse/CreateSubscription", "CutAfterResponse/Read", "CutAfterResponse/TransferSubscriptions",
+			"DelayAboveTimeout/CreateMonitoredItems", "DelayAboveTimeout/CreateSubscription",
+			"Overload/CreateMonitoredItems/Bad_ResourceUnavailable", "Overload/CreateMonitoredItems/Bad_TooManyOperations",
+			"Overload/CreateSubscription/Bad_ResourceUnavailable", "Overload/CreateSubscription/Bad_TooManyOperations",
+			"RequestLost/CreateMonitoredItems", "RequestLost/CreateSubscription", "RequestLost/TransferSubscriptions",
+			"ResponseLost/CreateMonitoredItems", "ResponseLost/CreateSubscription", "ResponseLost/TransferSubscriptions")},
+	{Issue: issueFailedSubscriptionStep,
+		Check: "KeepOneSessionOpen", Applies: faultsNamed("SessionLost",
+			"CutAfterResponse/CreateSubscription", "CutAfterResponse/Read", "CutAfterResponse/TransferSubscriptions",
+			"DelayAboveTimeout/CreateMonitoredItems", "DelayAboveTimeout/CreateSubscription",
+			"Overload/CreateMonitoredItems/Bad_ResourceUnavailable", "Overload/CreateMonitoredItems/Bad_TooManyOperations",
+			"Overload/CreateSubscription/Bad_ResourceUnavailable", "Overload/CreateSubscription/Bad_TooManyOperations",
+			"RequestLost/CreateMonitoredItems", "RequestLost/CreateSubscription", "RequestLost/TransferSubscriptions",
+			"ResponseLost/CreateMonitoredItems", "ResponseLost/CreateSubscription", "ResponseLost/TransferSubscriptions")},
+	{Issue: issueFailedSubscriptionStep,
+		Check: "RecreatesAfterRefusal", Applies: faultsNamed("SessionLost", "CutAfterResponse/CreateSubscription")},
+	{Issue: issueConnectionFailureOnActivate,
+		Check: "CloseEveryKnownSession", Applies: faultsNamedIn([]string{"SessionSurvives", "SubscriptionsLost"},
+			"CutAfterResponse/OpenSecureChannel", "RequestLost/ActivateSession", "ResponseLost/ActivateSession")},
+	{Issue: issueConnectionFailureOnActivate,
+		Check: "KeepOneSessionOpen", Applies: faultsNamedIn([]string{"SessionSurvives", "SubscriptionsLost"},
+			"CutAfterResponse/OpenSecureChannel", "RequestLost/ActivateSession", "ResponseLost/ActivateSession")},
+	{Issue: issueConnectionFailureOnActivate,
+		Check: "CloseEveryKnownSession", Applies: faultsNamed("SessionLost", "CutAfterResponse/CreateSession")},
+	{Issue: issueConnectionFailureOnActivate,
+		Check: "KeepOneSessionOpen", Applies: faultsNamed("SessionLost", "CutAfterResponse/CreateSession")},
+	{Issue: issueConnectionFailureOnActivate,
+		Check: "CreatesNoSession", Applies: faultsNamed("SessionSurvives",
+			"CutAfterResponse/OpenSecureChannel", "RequestLost/ActivateSession", "ResponseLost/ActivateSession")},
+	{Issue: issueConnectionFailureOnActivate,
+		Check: "ReactivatesSession", Applies: faultsNamed("SessionSurvives",
+			"CutAfterResponse/OpenSecureChannel", "RequestLost/ActivateSession")},
+	{Issue: issueConnectionFailureOnActivate,
+		Check: "CreatesSessionOnlyAfterActivateFailed", Applies: faultsNamed("SessionLost",
+			"CutAfterResponse/OpenSecureChannel", "RequestLost/ActivateSession")},
+	{Issue: "issue-919", Check: "CreatesSessionOnlyAfterActivateFailed", Applies: faultsNamed("SessionLost", "Link/HELUnanswered")},
+	{Issue: "issue-919", Check: "KeepOneSessionOpen", Applies: faultsNamed("SessionLost", "Link/HELUnanswered")},
+	{Issue: "issue-919", Check: "KeepOneSubscriptionPerClientSubscription", Applies: faultsNamed("SessionLost", "Link/HELUnanswered")},
+	{Issue: "issue-919", Check: "RecreatesAfterRefusal", Applies: faultsNamed("SessionLost", "Link/HELUnanswered")},
+	{Issue: "issue-919", Check: "ResumePublishing", Applies: faultsNamed("SessionLost", "Link/HELUnanswered")},
+	{Issue: "issue-919", Check: "CloseEveryKnownSession", Applies: faultsNamedIn([]string{"SessionSurvives", "SubscriptionsLost"}, "Link/HELUnanswered")},
+	{Issue: "issue-919", Check: "CreatesNoSession", Applies: faultsNamed("SessionSurvives", "Link/HELUnanswered")},
+	{Issue: "issue-919", Check: "ReactivatesSession", Applies: faultsNamed("SessionSurvives", "Link/HELUnanswered")},
+	{Issue: "issue-828", Check: "CloseEveryKnownSession", Applies: faultsNamedIn([]string{"SessionSurvives", "SubscriptionsLost"}, "Link/Stall")},
+	{Issue: "issue-828", Check: "CreatesSessionOnlyAfterActivateFailed", Applies: faultsNamed("SessionLost", "Link/Stall")},
+	{Issue: "issue-828", Check: "DeliverEachValueOnce", Applies: faultsNamed("SessionLost", "Link/Stall")},
+	{Issue: "issue-828", Check: "RecreatesAfterRefusal", Applies: faultsNamed("SessionLost", "Link/Stall")},
+	{Issue: "issue-828", Check: "ResumePublishing", Applies: faultsNamed("SessionLost", "Link/Stall")},
+	{Issue: "issue-828", Check: "CreatesNoSession", Applies: faultsNamed("SessionSurvives", "Link/Stall")},
+	{Issue: "issue-828", Check: "ReactivatesSession", Applies: faultsNamed("SessionSurvives", "Link/Stall")},
+	{Issue: issueTimedOutActivationSession,
+		Check: "CloseEveryKnownSession", Applies: faultsNamedIn([]string{"SessionSurvives", "SubscriptionsLost"}, "DelayAboveTimeout/ActivateSession")},
+	{Issue: issueTimedOutActivationSession,
+		Check: "KeepOneSessionOpen", Applies: faultsNamedIn([]string{"SessionSurvives", "SubscriptionsLost"}, "DelayAboveTimeout/ActivateSession")},
+	{Issue: issueDrainedConnectionError,
+		Check: "CloseEveryKnownSession", Applies: faultsNamed("SessionLost", "CutAfterResponse/CreateMonitoredItems")},
+	{Issue: issueDrainedConnectionError,
+		Check: "CloseEveryKnownSession", Applies: faultsNamedIn([]string{"SessionSurvives", "SubscriptionsLost"}, "CutAfterResponse/Read")},
+	{Issue: issueDrainedConnectionError,
+		Check: "ResumePublishing", Applies: faultsNamed("SessionLost", "CutAfterResponse/CreateMonitoredItems")},
 }
 
 // everyFaultOf says a defect applies to every fault of one scenario.
@@ -56,7 +136,23 @@ func faultTargeting(scenario string, services ...string) func(string, faults.Fau
 	}
 }
 
-// KnownDefects returns the predicted defect table of the §6.7 suite.
+// faultsNamed says a defect applies to the named faults of one
+// scenario.
+func faultsNamed(scenario string, names ...string) func(string, faults.Fault) bool {
+	return func(name string, f faults.Fault) bool {
+		return name == scenario && slices.Contains(names, f.Name())
+	}
+}
+
+// faultsNamedIn says a defect applies to the named faults of any of
+// the scenarios.
+func faultsNamedIn(scenarios []string, names ...string) func(string, faults.Fault) bool {
+	return func(name string, f faults.Fault) bool {
+		return slices.Contains(scenarios, name) && slices.Contains(names, f.Name())
+	}
+}
+
+// KnownDefects returns the known-defect table of the §6.7 suite.
 func KnownDefects() []KnownDefect {
 	return slices.Clone(knownDefects)
 }
