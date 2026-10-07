@@ -110,7 +110,7 @@ func TestEncryptionAlgorithms(t *testing.T) {
 
 			nonceLength := localAsymmetric.NonceLength()
 			localNonce, remoteNonce := makeNonce(nonceLength), makeNonce(nonceLength)
-			require.False(t, nonceLength == 0 && uri != ua.SecurityPolicyURINone, "client nonce length zero")
+			require.NotZero(t, nonceLength, "client nonce length zero")
 
 			localSymmetric, err := p.symmetric(localNonce, remoteNonce)
 			require.NoError(t, err, "failed local Symmetric: %s", err)
@@ -225,6 +225,16 @@ func TestMissingKey(t *testing.T) {
 		})
 
 	}
+}
+
+func TestNoneAsymmetricClientNonce(t *testing.T) {
+	algo, err := Asymmetric(ua.SecurityPolicyURINone, nil, nil)
+	require.NoError(t, err)
+	require.Equal(t, 1, algo.NonceLength())
+
+	nonce, err := algo.MakeNonce()
+	require.NoError(t, err)
+	require.Len(t, nonce, 1)
 }
 
 func TestZeroStruct(t *testing.T) {
