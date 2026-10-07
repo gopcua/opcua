@@ -18,8 +18,9 @@ func faultByName(t *testing.T, name string) faults.Fault {
 }
 
 // TestBreaksTransport pins which faults are their own transport loss:
-// a stalled link goes silent instead of closing, so the workload cuts
-// for no other fault than itself.
+// a stalled link goes silent instead of closing, and a Publish fault
+// that cuts the connection itself fires its cut on the arm exchange,
+// so the workload cuts for no other fault than those.
 func TestBreaksTransport(t *testing.T) {
 	cases := map[string]bool{
 		"Link/Stall":                                  false,
@@ -28,8 +29,11 @@ func TestBreaksTransport(t *testing.T) {
 		"Server/Pause":                                true,
 		"Server/DuplicateSequence":                    true,
 		"Consumer/Slow":                               true,
-		"RequestLost/Publish":                         true,
+		"RequestLost/Publish":                         false,
+		"RequestLost/Read":                            true,
+		"ResponseLost/Publish":                        false,
 		"ResponseLost/ActivateSession":                true,
+		"CutAfterResponse/Publish":                    false,
 		"CutAfterResponse/CloseSession":               true,
 		"DelayBelowTimeout/Publish":                   true,
 		"DelayAboveTimeout/ActivateSession":           true,

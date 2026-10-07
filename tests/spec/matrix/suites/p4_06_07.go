@@ -5,6 +5,7 @@
 package suites
 
 import (
+	"slices"
 	"strings"
 	"time"
 
@@ -154,6 +155,7 @@ func (s scenario06_07) Run(env *spectest.Environment, f faults.Fault) matrix.Out
 	sub := env.Subscription()
 	if held, ok := env.Server.TryWaitHeldPublish(15 * time.Second); ok {
 		held.Answer(sub, values.v1)
+		waitReceived(env, values.v1)
 	}
 	last := env.LastSequenceNumber()
 	sub.Retain(last+1, values.v2)
@@ -163,6 +165,15 @@ func (s scenario06_07) Run(env *spectest.Environment, f faults.Fault) matrix.Out
 	}
 	m := env.Mark()
 	injected := f.Inject(env)
+	// The arm exchange: a Publish-targeting fault gets a held Publish
+	// answered right after the arm, so its armed cut has a response to
+	// fire on that exists only because the workload armed first — not
+	// the answer of an exchange that raced the arm.
+	if targetsPublish(f) {
+		if held, ok := env.Server.TryWaitHeldPublish(15 * time.Second); ok {
+			held.Answer(sub, values.vArm)
+		}
+	}
 	for i := range consumerBurst(f) {
 		if held, ok := env.Server.TryWaitHeldPublish(15 * time.Second); ok {
 			held.Answer(sub, values.burst[i])
@@ -251,9 +262,39 @@ func prepareSubscriptionsLost(env *spectest.Environment) target06_07 {
 
 // breaksTransport says whether the workload cuts the relay after the
 // fault is armed: a stalled link is its own transport loss — the link
-// goes silent instead of closing — so arming it replaces the cut.
+// goes silent instead of closing — and so is a Publish fault that cuts
+// the connection itself, because the arm exchange answers a held
+// Publish whose request or response fires the armed cut.
 func breaksTransport(f faults.Fault) bool {
-	return f.Name() != "Link/Stall"
+	if f.Name() == "Link/Stall" {
+		return false
+	}
+	if targetsPublish(f) {
+		switch strings.Split(f.Name(), "/")[0] {
+		case "RequestLost", "ResponseLost", "CutAfterResponse":
+			return false
+		}
+	}
+	return true
+}
+
+// targetsPublish says whether the fault arms on the Publish service:
+// the message faults that name it and the overload faults that answer
+// it.
+func targetsPublish(f faults.Fault) bool {
+	parts := strings.Split(f.Name(), "/")
+	return len(parts) >= 2 && parts[1] == "Publish"
+}
+
+// waitReceived waits until the client has delivered v: a fault armed
+// while the relay still holds the answer the client has not seen can
+// fire on that answer's own response, and whether it does is a race
+// between the relay's pump and the arm.
+func waitReceived(env *spectest.Environment, v int32) {
+	deadline := time.Now().Add(15 * time.Second)
+	for !slices.Contains(env.Received(), v) && time.Now().Before(deadline) {
+		time.Sleep(time.Millisecond)
+	}
 }
 
 // consumerBurst says how many values the workload answers in a row
@@ -283,12 +324,15 @@ func refusedBadSubscriptionIDInvalid(answer spectest.ServiceRecord[ua.Response])
 // fault pair plus a per-value offset — so a received value matches the
 // notification that carried it by value and never a value another case
 // answered. The burst is the eight values the slow consumer's case
-// answers right after arming.
+// answers right after arming. vArm is answered on the held Publish
+// right after the arm point, so a Publish-targeting fault has an
+// exchange to fire on that exists only because the workload armed.
 type caseValues struct {
 	first    int32
 	v1       int32
 	v2       int32
 	v3       int32
+	vArm     int32
 	sentinel int32
 	burst    [8]int32
 }
@@ -298,11 +342,19 @@ type caseValues struct {
 // the same block.
 func (s scenario06_07) values(f faults.Fault) caseValues {
 	base := int32(1000 * caseOrdinal(s.name, f))
-	values := caseValues{first: base + 1, v1: base + 2, v2: base + 3, v3: base + 4, sentinel: base + 999}
+	values := caseValues{first: base + 1, v1: base + 2, v2: base + 3, v3: base + 4, vArm: base + 5, sentinel: base + 999}
 	for i := range values.burst {
 		values.burst[i] = base + int32(11+i)
 	}
 	return values
+}
+
+// ArmValueOf returns the value the workload answers on the held
+// Publish right after the fault is armed, so a spec can tell the arm
+// exchange's answer apart from the values the client received before
+// the arm.
+func ArmValueOf(scenario matrix.Scenario, f faults.Fault) int32 {
+	return scenario.(scenario06_07).values(f).vArm
 }
 
 // caseOrdinal returns the case's ordinal among every scenario × fault
@@ -330,6 +382,6 @@ var scenarioOrdinals = map[string]int{
 func caseValuesOf(scenario matrix.Scenario, f faults.Fault) []int32 {
 	s := scenario.(scenario06_07)
 	values := s.values(f)
-	all := []int32{values.first, values.v1, values.v2, values.v3, values.sentinel}
+	all := []int32{values.first, values.v1, values.v2, values.v3, values.vArm, values.sentinel}
 	return append(all, values.burst[:]...)
 }
