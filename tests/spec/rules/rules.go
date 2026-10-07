@@ -159,6 +159,37 @@ var KeepsSubscriptionID = Rule{
 	},
 }
 
+// CreatesSessionAfterActivateTimedOut: after the ActivateSession the
+// client sent was not answered within the request timeout, the client
+// creates a new session. A timeout is a failure, and Part 4 lets the
+// client create a new session once ActivateSession has failed.
+var CreatesSessionAfterActivateTimedOut = Rule{
+	Name:    "CreatesSessionAfterActivateTimedOut",
+	Clause:  "P4-6.7",
+	Keyword: "should",
+	Check: func(c Context) {
+		sessionToken := PreCutSessionToken(c.Env)
+		gomega.Expect(sessionToken).NotTo(gomega.BeNil(), "the recorder saw no ActivateSession request before the cut")
+		gomega.Eventually(func(g gomega.Gomega) {
+			requests := c.Env.Recorder.RequestsSince(c.Mark)
+			complete := false
+			for _, record := range RequestsOfType[*ua.ActivateSessionRequest](requests) {
+				message, decoded := record.Message()
+				if !decoded || !message.Header().AuthenticationToken.Equal(sessionToken) {
+					continue
+				}
+				for _, create := range RequestsOfType[*ua.CreateSessionRequest](requests) {
+					if create.Order > record.Order {
+						complete = true
+					}
+				}
+			}
+			g.Expect(complete).To(gomega.BeTrue(),
+				"client sent no CreateSession after the ActivateSession that timed out; requests since the mark: %v", RequestTypeNames(requests))
+		}, 15*time.Second).Should(gomega.Succeed())
+	},
+}
+
 // CreatesSessionOnlyAfterActivateFailed: the client creates a new
 // session only after trying to activate the old one and being refused
 // Bad_SessionIdInvalid.
@@ -372,6 +403,7 @@ func All() []Rule {
 		SendsNoPublishBeforeNotAvailable,
 		SendsNoTransferForOwnSubscription,
 		KeepsSubscriptionID,
+		CreatesSessionAfterActivateTimedOut,
 		CreatesSessionOnlyAfterActivateFailed,
 		RecreatesAfterRefusal,
 		RepublishesRecreatedFromOne,

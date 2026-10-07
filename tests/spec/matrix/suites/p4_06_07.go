@@ -85,7 +85,7 @@ func (p4_06_07) Rules(c matrix.Category) []rules.Rule {
 			rules.RepublishesRecreatedFromOne,
 		}
 	case matrix.ActivationFailed:
-		return []rules.Rule{rules.CreatesSessionOnlyAfterActivateFailed}
+		return []rules.Rule{rules.CreatesSessionAfterActivateTimedOut}
 	}
 	return nil
 }
