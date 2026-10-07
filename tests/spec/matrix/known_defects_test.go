@@ -23,6 +23,13 @@ var recreatePathFaults = []string{
 	"CutAfterResponse/OpenSecureChannel", "DelayAboveTimeout/ActivateSession",
 	"RequestLost/ActivateSession", "ResponseLost/ActivateSession"}
 
+// cutPublishFaults lists the faults that cut the connection on the
+// Publish service: the arm exchange answers one held Publish right
+// after the arm, so the cut fires there, and the sentinel exchange the
+// reconnect answers never reaches a fault.
+var cutPublishFaults = []string{
+	"CutAfterResponse/Publish", "RequestLost/Publish", "ResponseLost/Publish"}
+
 var triageCases = []struct {
 	issue    string
 	check    string
@@ -47,7 +54,7 @@ var triageCases = []struct {
 		"Overload/Publish/Bad_ResourceUnavailable", "Overload/Publish/Bad_TooManyOperations",
 		"Overload/Publish/Bad_TooManyPublishRequests", "Overload/Republish/Bad_ResourceUnavailable",
 		"Overload/Republish/Bad_TooManyOperations", "RequestLost/Publish", "RequestLost/Republish",
-		"ResponseLost/Publish", "ResponseLost/Republish"}, nil},
+		"ResponseLost/Publish", "ResponseLost/Republish"}, cutPublishFaults},
 	{"issue-879", "HaveFired", "SubscriptionsLost", []string{
 		"CutAfterResponse/CreateMonitoredItems", "CutAfterResponse/CreateSubscription", "CutAfterResponse/Publish", "CutAfterResponse/Republish",
 		"DelayAboveTimeout/CreateMonitoredItems", "DelayAboveTimeout/CreateSubscription", "DelayAboveTimeout/Publish", "DelayAboveTimeout/Republish",
@@ -57,13 +64,13 @@ var triageCases = []struct {
 		"Overload/Publish/Bad_ResourceUnavailable", "Overload/Publish/Bad_TooManyOperations", "Overload/Publish/Bad_TooManyPublishRequests",
 		"Overload/Republish/Bad_ResourceUnavailable", "Overload/Republish/Bad_TooManyOperations",
 		"RequestLost/CreateMonitoredItems", "RequestLost/CreateSubscription", "RequestLost/Publish", "RequestLost/Republish",
-		"ResponseLost/CreateMonitoredItems", "ResponseLost/CreateSubscription", "ResponseLost/Publish", "ResponseLost/Republish"}, nil},
+		"ResponseLost/CreateMonitoredItems", "ResponseLost/CreateSubscription", "ResponseLost/Publish", "ResponseLost/Republish"}, cutPublishFaults},
 	{"issue-879", "ResumePublishing", "SessionLost", []string{
 		"CutAfterResponse/Publish", "DelayAboveTimeout/Read",
 		"Overload/Publish/Bad_ResourceUnavailable", "Overload/Publish/Bad_TooManyOperations",
 		"Overload/Publish/Bad_TooManyPublishRequests", "RequestLost/Publish", "RequestLost/Read",
-		"ResponseLost/Publish", "ResponseLost/Read"}, nil},
-	{"issue-879", "DeliverEachValueOnce", "SessionLost", []string{"ResponseLost/Publish"}, nil},
+		"ResponseLost/Publish", "ResponseLost/Read"}, cutPublishFaults},
+	{"issue-879", "DeliverEachValueOnce", "SessionLost", []string{"ResponseLost/Publish"}, []string{"ResponseLost/Publish"}},
 	{"issue-879", "KeepOneSubscriptionPerClientSubscription", "SessionLost", []string{
 		"DelayAboveTimeout/Read", "RequestLost/Read", "ResponseLost/Read"}, nil},
 	{"issue-879", "RecreatesAfterRefusal", "SessionLost", []string{"RequestLost/Read", "ResponseLost/Read"}, nil},

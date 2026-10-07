@@ -25,6 +25,13 @@ var recreatePathFaults = []string{
 	"CutAfterResponse/OpenSecureChannel", "DelayAboveTimeout/ActivateSession",
 	"RequestLost/ActivateSession", "ResponseLost/ActivateSession"}
 
+// cutPublishFaults lists the faults that cut the connection on the
+// Publish service: the workload answers one held Publish right after
+// the arm on them, so their armed cut fires on that exchange and their
+// labelled HaveFired and ResumePublishing checks pass on main.
+var cutPublishFaults = []string{
+	"CutAfterResponse/Publish", "RequestLost/Publish", "ResponseLost/Publish"}
+
 // knownDefects holds the known-defect table of the §6.7 suite: the
 // predicted failures of the original run, and the entries the triage
 // of the corrected matrix's fault-specific failures added, one issue
@@ -38,18 +45,18 @@ var knownDefects = []KnownDefect{
 	{Issue: "issue-879", Check: "SendsNoTransferForOwnSubscription", Applies: everyFaultOf("SessionSurvives")},
 	{Issue: "issue-879", Check: "DeliverEachValueOnce", Applies: everyFaultExcept("SessionSurvives", recreatePathFaults...)},
 	{Issue: "issue-879", Check: "ResumePublishing", Applies: everyFaultExcept("SessionSurvives", recreatePathFaults...)},
-	{Issue: "issue-879", Check: "HaveFired", Applies: faultTargeting("SessionSurvives", "Publish", "Republish")},
+	{Issue: "issue-879", Check: "HaveFired", Applies: faultTargetingExcept("SessionSurvives", cutPublishFaults, "Publish", "Republish")},
 	{Issue: "issue-879", Check: "RecreatesAfterRefusal", Applies: everyFaultOf("SubscriptionsLost")},
 	{Issue: "issue-879", Check: "RepublishesRecreatedFromOne", Applies: everyFaultOf("SubscriptionsLost")},
-	{Issue: "issue-879", Check: "HaveFired", Applies: faultTargeting("SubscriptionsLost", "CreateSubscription", "CreateMonitoredItems", "Publish", "Republish")},
+	{Issue: "issue-879", Check: "HaveFired", Applies: faultTargetingExcept("SubscriptionsLost", cutPublishFaults, "CreateSubscription", "CreateMonitoredItems", "Publish", "Republish")},
 	{Issue: "issue-895", Check: "ResumePublishing", Applies: everyFaultExcept("SubscriptionsLost", recreatePathFaults...)},
 	{Issue: "issue-895", Check: "KeepOneSubscriptionPerClientSubscription", Applies: everyFaultExcept("SubscriptionsLost", recreatePathFaults...)},
-	{Issue: "issue-879", Check: "ResumePublishing", Applies: faultsNamed("SessionLost",
+	{Issue: "issue-879", Check: "ResumePublishing", Applies: faultsNamedExcept("SessionLost",
+		[]string{"CutAfterResponse/Publish", "RequestLost/Publish", "ResponseLost/Publish"},
 		"CutAfterResponse/Publish", "DelayAboveTimeout/Read",
 		"Overload/Publish/Bad_ResourceUnavailable", "Overload/Publish/Bad_TooManyOperations",
 		"Overload/Publish/Bad_TooManyPublishRequests", "RequestLost/Publish", "RequestLost/Read",
 		"ResponseLost/Publish", "ResponseLost/Read")},
-	{Issue: "issue-879", Check: "DeliverEachValueOnce", Applies: faultsNamed("SessionLost", "ResponseLost/Publish")},
 	{Issue: "issue-879", Check: "KeepOneSubscriptionPerClientSubscription", Applies: faultsNamed("SessionLost",
 		"DelayAboveTimeout/Read", "RequestLost/Read", "ResponseLost/Read")},
 	{Issue: "issue-879", Check: "RecreatesAfterRefusal", Applies: faultsNamed("SessionLost",
@@ -148,6 +155,25 @@ func faultTargeting(scenario string, services ...string) func(string, faults.Fau
 			return slices.Contains(services, parts[1])
 		}
 		return false
+	}
+}
+
+// faultTargetingExcept says a defect applies to every fault of one
+// scenario that targets one of the named services, except the faults
+// the workload gives an exchange of their own to fire on.
+func faultTargetingExcept(scenario string, except []string, services ...string) func(string, faults.Fault) bool {
+	targeting := faultTargeting(scenario, services...)
+	return func(name string, f faults.Fault) bool {
+		return targeting(name, f) && !slices.Contains(except, f.Name())
+	}
+}
+
+// faultsNamedExcept says a defect applies to the named faults of one
+// scenario, except the faults the workload gives an exchange of their
+// own to fire on.
+func faultsNamedExcept(scenario string, except []string, names ...string) func(string, faults.Fault) bool {
+	return func(name string, f faults.Fault) bool {
+		return name == scenario && slices.Contains(names, f.Name()) && !slices.Contains(except, f.Name())
 	}
 }
 
