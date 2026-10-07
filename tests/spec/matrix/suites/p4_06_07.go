@@ -6,7 +6,6 @@ package suites
 
 import (
 	"strings"
-	"sync/atomic"
 	"time"
 
 	"github.com/gopcua/opcua"
@@ -120,11 +119,12 @@ func (s scenario06_07) Name() string { return s.name }
 
 func (s scenario06_07) Sends() []message.Message { return s.sends }
 
-func (s scenario06_07) Options() []spectest.Option {
+func (s scenario06_07) Options(f faults.Fault) []spectest.Option {
 	return []spectest.Option{
 		spectest.WithRetentionQueue(),
 		spectest.WithPublishingInterval(10 * time.Millisecond),
 		spectest.WithClientOptions(opcua.RequestTimeout(2 * time.Second)),
+		spectest.WithFirstValue(s.values(f).first),
 	}
 }
 
@@ -150,7 +150,7 @@ func (s scenario06_07) Category(f faults.Fault) matrix.Category {
 // redirect, and after the consumer's burst otherwise — SubscriptionsLost
 // forgets the old subscription only after the burst answered on it.
 func (s scenario06_07) Run(env *spectest.Environment, f faults.Fault) matrix.Outcome {
-	values := nextCaseValues()
+	values := s.values(f)
 	sub := env.Subscription()
 	if held, ok := env.Server.TryWaitHeldPublish(15 * time.Second); ok {
 		held.Answer(sub, values.v1)
@@ -277,11 +277,15 @@ func refusedBadSubscriptionIDInvalid(answer spectest.ServiceRecord[ua.Response])
 	return isTransfer && len(response.Results) == 1 && response.Results[0].StatusCode == ua.StatusBadSubscriptionIDInvalid
 }
 
-// caseValues are the values one case answers, unique per case: 1000
-// times the case index plus a per-value offset, so a received value
-// matches the notification that carried it by value. The burst is the
-// eight values the slow consumer's case answers right after arming.
+// caseValues are the values one case answers, unique per case: every
+// value, the first one Start answers included, derives from the case's
+// own block — 1000 times the case's ordinal among every scenario ×
+// fault pair plus a per-value offset — so a received value matches the
+// notification that carried it by value and never a value another case
+// answered. The burst is the eight values the slow consumer's case
+// answers right after arming.
 type caseValues struct {
+	first    int32
 	v1       int32
 	v2       int32
 	v3       int32
@@ -289,13 +293,43 @@ type caseValues struct {
 	burst    [8]int32
 }
 
-var caseIndex atomic.Int64
-
-func nextCaseValues() caseValues {
-	base := int32(1000 * caseIndex.Add(1))
-	values := caseValues{v1: base + 1, v2: base + 2, v3: base + 3, sentinel: base + 999}
+// values returns the value block of one case, derived from the case's
+// scenario and fault alone so the Start options and the workload read
+// the same block.
+func (s scenario06_07) values(f faults.Fault) caseValues {
+	base := int32(1000 * caseOrdinal(s.name, f))
+	values := caseValues{first: base + 1, v1: base + 2, v2: base + 3, v3: base + 4, sentinel: base + 999}
 	for i := range values.burst {
 		values.burst[i] = base + int32(11+i)
 	}
 	return values
+}
+
+// caseOrdinal returns the case's ordinal among every scenario × fault
+// pair: the scenario's place among the suite's scenarios times the
+// fault catalogue's size, plus the fault's place in the catalogue.
+func caseOrdinal(scenario string, f faults.Fault) int {
+	faultOrdinal := 0
+	for i, candidate := range faults.AllFaults {
+		if candidate.Name() == f.Name() {
+			faultOrdinal = i
+			break
+		}
+	}
+	return scenarioOrdinals[scenario]*len(faults.AllFaults) + faultOrdinal + 1
+}
+
+var scenarioOrdinals = map[string]int{
+	"SessionSurvives":   0,
+	"SessionLost":       1,
+	"SubscriptionsLost": 2,
+}
+
+// caseValuesOf returns every value of one case's block, for the test
+// that pins the blocks apart.
+func caseValuesOf(scenario matrix.Scenario, f faults.Fault) []int32 {
+	s := scenario.(scenario06_07)
+	values := s.values(f)
+	all := []int32{values.first, values.v1, values.v2, values.v3, values.sentinel}
+	return append(all, values.burst[:]...)
 }

@@ -58,3 +58,26 @@ func TestConsumerBurst(t *testing.T) {
 		}
 	}
 }
+
+// TestCaseValuesNeverOverlap pins that no two cases of the suite share
+// a value: every case derives its block — first value, answered
+// values, retained value, sentinel and consumer burst alike — from its
+// own scenario and fault, so a received value matches the notification
+// that carried it by value and never a value another case answered.
+func TestCaseValuesNeverOverlap(t *testing.T) {
+	seen := map[int32]string{}
+	for _, scenario := range P4_06_07().Scenarios() {
+		for _, f := range faults.AllFaults {
+			owner := scenario.Name() + "/" + f.Name()
+			for _, value := range caseValuesOf(scenario, f) {
+				if previous, taken := seen[value]; taken {
+					t.Errorf("value %d belongs to %s and %s", value, previous, owner)
+				}
+				seen[value] = owner
+			}
+		}
+	}
+	if len(seen) < 100 {
+		t.Fatalf("collected %d distinct values over every case, want at least one per case and value", len(seen))
+	}
+}

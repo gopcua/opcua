@@ -43,7 +43,7 @@ func (failFirstScenario) Sends() []message.Message {
 	return []message.Message{message.Read}
 }
 
-func (failFirstScenario) Options() []spectest.Option { return nil }
+func (failFirstScenario) Options(faults.Fault) []spectest.Option { return nil }
 
 func (failFirstScenario) Category(faults.Fault) Category { return Unspecified }
 

@@ -61,7 +61,7 @@ func registerCase(c Case) {
 				var outcome Outcome
 
 				ginkgo.BeforeAll(func() {
-					opts := append([]spectest.Option{}, scenario.Options()...)
+					opts := append([]spectest.Option{}, scenario.Options(f)...)
 					opts = append(opts, f.Options()...)
 					env := spectest.Start(ginkgo.GinkgoT(), opts...)
 

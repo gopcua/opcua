@@ -43,6 +43,18 @@ type options struct {
 	retention             bool
 	notificationBuffer    int
 	drainGap              time.Duration
+	firstValue            int32
+	firstValueSet         bool
+}
+
+// WithFirstValue makes Start answer the first held Publish request
+// with v instead of its default valueBeforeCut, so a suite can keep
+// every value of a run unique to its own case.
+func WithFirstValue(v int32) Option {
+	return func(o *options) {
+		o.firstValue = v
+		o.firstValueSet = true
+	}
 }
 
 // WithClientOptions appends client options after the ones Start sets itself.
@@ -196,7 +208,11 @@ func Start(t T, opts ...Option) *Environment {
 		t.Fatalf("the client monitored no node: %v", monitorErr)
 		return nil
 	}
-	e.Server.WaitHeldPublish().Answer(e.Subscription(), valueBeforeCut)
+	firstValue := valueBeforeCut
+	if o.firstValueSet {
+		firstValue = o.firstValue
+	}
+	e.Server.WaitHeldPublish().Answer(e.Subscription(), firstValue)
 
 	timer := time.NewTimer(startTimeout)
 	defer timer.Stop()

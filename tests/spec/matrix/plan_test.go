@@ -18,10 +18,10 @@ type fakeScenario struct {
 	sends []message.Message
 }
 
-func (s fakeScenario) Name() string                     { return s.name }
-func (s fakeScenario) Sends() []message.Message         { return s.sends }
-func (s fakeScenario) Options() []spectest.Option       { return nil }
-func (s fakeScenario) Category(f faults.Fault) Category { return SessionSurvives }
+func (s fakeScenario) Name() string                           { return s.name }
+func (s fakeScenario) Sends() []message.Message               { return s.sends }
+func (s fakeScenario) Options(faults.Fault) []spectest.Option { return nil }
+func (s fakeScenario) Category(f faults.Fault) Category       { return SessionSurvives }
 func (s fakeScenario) Run(env *spectest.Environment, f faults.Fault) Outcome {
 	return Outcome{}
 }

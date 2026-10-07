@@ -53,13 +53,13 @@ type Suite interface {
 }
 
 // Scenario is one workload of a suite: the messages a correct client
-// sends after the arm point, the Start options it needs, the category
-// the clause prescribes per fault, and the Run that drives the client
-// and injects the fault at its arm point.
+// sends after the arm point, the Start options it needs per fault, the
+// category the clause prescribes per fault, and the Run that drives
+// the client and injects the fault at its arm point.
 type Scenario interface {
 	Name() string
 	Sends() []message.Message
-	Options() []spectest.Option
+	Options(f faults.Fault) []spectest.Option
 	Category(faults.Fault) Category
 	Run(env *spectest.Environment, f faults.Fault) Outcome
 }

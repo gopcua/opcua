@@ -42,7 +42,7 @@ func (idleScenario) Sends() []message.Message {
 	return []message.Message{message.Publish}
 }
 
-func (idleScenario) Options() []spectest.Option { return nil }
+func (idleScenario) Options(faults.Fault) []spectest.Option { return nil }
 
 func (idleScenario) Category(f faults.Fault) Category { return Unspecified }
 
