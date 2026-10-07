@@ -2,15 +2,13 @@ package matrix_test
 
 import (
 	"flag"
-	"fmt"
 	"os"
 	"testing"
 
 	"github.com/gopcua/opcua/tests/spec/internal/fault"
-	"github.com/gopcua/opcua/tests/spec/internal/harness"
 	"github.com/gopcua/opcua/tests/spec/internal/matrix"
 	"github.com/gopcua/opcua/tests/spec/internal/matrix/suites"
-	"github.com/gopcua/opcua/tests/spec/internal/suitegate"
+	"github.com/gopcua/opcua/tests/spec/internal/specrun"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -26,8 +24,8 @@ import (
 // TestContinueOnFailure's nested run inherits this gate. The label
 // filter resolves exactly as the part4 suite does.
 func TestMatrix(t *testing.T) {
-	if !suitegate.Enabled() {
-		t.Skip(suitegate.SkipReason())
+	if !specrun.Enabled() {
+		t.Skip(specrun.SkipReason())
 		return
 	}
 	matrix.RegisterSuites([]matrix.Suite{suites.P4_06_07(), suites.P4_05_14()}, matrix.KnownDefects(), fault.AllFaults...)
@@ -38,7 +36,7 @@ func TestMatrix(t *testing.T) {
 			labelPassed = true
 		}
 	})
-	suiteConfig.LabelFilter = harness.LabelFilter(labelPassed, suiteConfig.LabelFilter, os.Getenv("SPECTEST_LABEL_FILTER"))
+	suiteConfig.LabelFilter = specrun.LabelFilter(labelPassed, suiteConfig.LabelFilter, os.Getenv("SPECTEST_LABEL_FILTER"))
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "matrix", suiteConfig, reporterConfig)
 }
@@ -80,9 +78,5 @@ func TestPlanOverTheRealSuite(t *testing.T) {
 // a plain `go test ./...` skips the package visibly instead of paying
 // for its specs.
 func TestMain(m *testing.M) {
-	if !suitegate.Enabled() {
-		fmt.Println(suitegate.SkipReason())
-		os.Exit(0)
-	}
-	os.Exit(m.Run())
+	specrun.Main(m)
 }

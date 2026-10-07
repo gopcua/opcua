@@ -12,7 +12,7 @@ import (
 	"github.com/gopcua/opcua/tests/spec/internal/harness"
 	"github.com/gopcua/opcua/tests/spec/internal/message"
 	"github.com/gopcua/opcua/tests/spec/internal/rules"
-	"github.com/gopcua/opcua/tests/spec/internal/suitegate"
+	"github.com/gopcua/opcua/tests/spec/internal/specrun"
 )
 
 const (
@@ -84,7 +84,7 @@ func TestContinueOnFailure(t *testing.T) {
 		t.Skip("the nested run of this test would recurse")
 		return
 	}
-	if suitegate.MatrixRuns() {
+	if specrun.MatrixRuns() {
 		t.Skip("the matrix run covers the case container without this probe")
 		return
 	}

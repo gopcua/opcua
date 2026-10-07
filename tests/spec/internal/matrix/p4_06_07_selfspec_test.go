@@ -11,7 +11,7 @@ import (
 	"github.com/gopcua/opcua/tests/spec/internal/harness"
 	"github.com/gopcua/opcua/tests/spec/internal/matrix"
 	"github.com/gopcua/opcua/tests/spec/internal/matrix/suites"
-	"github.com/gopcua/opcua/tests/spec/internal/suitegate"
+	"github.com/gopcua/opcua/tests/spec/internal/specrun"
 	"github.com/gopcua/opcua/ua"
 )
 
@@ -23,7 +23,7 @@ import (
 // workload must give the fault a response that exists only because it
 // armed first.
 func TestResponseLostPublishDropsTheArmAnswer(t *testing.T) {
-	if suitegate.MatrixRuns() {
+	if specrun.MatrixRuns() {
 		t.Skip("the matrix run drives this case itself")
 	}
 	var scenario matrix.Scenario

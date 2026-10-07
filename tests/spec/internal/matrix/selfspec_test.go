@@ -10,7 +10,7 @@ import (
 	"github.com/gopcua/opcua/tests/spec/internal/harness"
 	"github.com/gopcua/opcua/tests/spec/internal/message"
 	"github.com/gopcua/opcua/tests/spec/internal/rules"
-	"github.com/gopcua/opcua/tests/spec/internal/suitegate"
+	"github.com/gopcua/opcua/tests/spec/internal/specrun"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -131,7 +131,7 @@ func casePaths(cases []Case) []string {
 // full matrix test runs in the same binary: ginkgo fails a second
 // RunSpecs call, and TestMatrix covers this suite inside itself.
 func TestSelfSpec(t *testing.T) {
-	if suitegate.MatrixRuns() {
+	if specrun.MatrixRuns() {
 		t.Skip("TestMatrix runs the self-spec suite inside the matrix; a binary may run RunSpecs once")
 		return
 	}
@@ -142,7 +142,7 @@ func TestSelfSpec(t *testing.T) {
 			labelPassed = true
 		}
 	})
-	suiteConfig.LabelFilter = harness.LabelFilter(labelPassed, suiteConfig.LabelFilter, os.Getenv("SPECTEST_LABEL_FILTER"))
+	suiteConfig.LabelFilter = specrun.LabelFilter(labelPassed, suiteConfig.LabelFilter, os.Getenv("SPECTEST_LABEL_FILTER"))
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "matrix self-spec", suiteConfig, reporterConfig)
 }

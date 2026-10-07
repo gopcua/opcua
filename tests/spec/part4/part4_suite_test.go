@@ -6,8 +6,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/gopcua/opcua/tests/spec/internal/harness"
-	"github.com/gopcua/opcua/tests/spec/internal/suitegate"
+	"github.com/gopcua/opcua/tests/spec/internal/specrun"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -25,8 +24,8 @@ func resolveFilters(visit func(func(*flag.Flag)), labelFlag string, focusFlag []
 	})
 	labelEnv := getenv("SPECTEST_LABEL_FILTER")
 	focusEnv := getenv("SPECTEST_FOCUS")
-	labelFilter = harness.LabelFilter(labelPassed, labelFlag, labelEnv)
-	focus = harness.FocusFilter(focusPassed, focusFlag, focusEnv)
+	labelFilter = specrun.LabelFilter(labelPassed, labelFlag, labelEnv)
+	focus = specrun.FocusFilter(focusPassed, focusFlag, focusEnv)
 	labelSource = "default"
 	if labelPassed {
 		labelSource = "flag"
@@ -57,9 +56,5 @@ func TestPart4(t *testing.T) {
 // a plain `go test ./...` skips the package visibly instead of paying
 // for its specs.
 func TestMain(m *testing.M) {
-	if !suitegate.Enabled() {
-		fmt.Println(suitegate.SkipReason())
-		os.Exit(0)
-	}
-	os.Exit(m.Run())
+	specrun.Main(m)
 }

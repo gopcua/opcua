@@ -1,4 +1,4 @@
-package harness
+package specrun
 
 // LabelFilter resolves the spec label filter: an explicitly passed flag wins
 // (even when empty), otherwise the environment value, otherwise the default

@@ -1,20 +1,30 @@
-// Package suitegate decides whether the spec suite runs: every test
+// Package specrun decides whether the spec suite runs: every test
 // package under tests/spec skips unless the environment variable
 // SPECTEST is set to 1, so a plain `go test ./...` stays fast and the
-// skip stays visible in every package's output.
-package suitegate
+// skip stays visible in every package's `go test -v` and `-json`
+// output.
+package specrun
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"strings"
+	"testing"
 )
 
-const enabled = "SPECTEST=1"
+// envSpecTest and enableValue spell the gate's variable and value
+// once; both the check and the skip message read them.
+const (
+	envSpecTest = "SPECTEST"
+	enableValue = "1"
+)
+
+var enabled = envSpecTest + "=" + enableValue
 
 // Enabled reports whether the spec suite runs: SPECTEST=1.
 func Enabled() bool {
-	return os.Getenv("SPECTEST") == "1"
+	return os.Getenv(envSpecTest) == enableValue
 }
 
 // SkipReason is the message a test that skips reports.
@@ -35,4 +45,13 @@ func MatrixRuns() bool {
 		return true
 	}
 	return strings.Contains(run.Value.String(), "TestMatrix")
+}
+
+// Main runs a test package's tests behind the suite gate.
+func Main(m *testing.M) {
+	if !Enabled() {
+		fmt.Println(SkipReason())
+		os.Exit(0)
+	}
+	os.Exit(m.Run())
 }
