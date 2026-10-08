@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"reflect"
 	"slices"
 	"strings"
 	"sync"
@@ -957,37 +958,29 @@ func isResponseMoment(moment Moment) bool {
 	return moment == AfterResponseReachesClient || moment == ResponseNeverReachesClient
 }
 
-// MessageOf maps a decoded client request to the message.Message
-// naming it. The bool is false for a request the catalogue does not
-// name.
+// MessageOf names the service of a decoded ua request or response
+// after its type: *ua.ReadRequest and *ua.ReadResponse are both
+// message.Read, and *ua.BrowseRequest is message.Of("Browse"). The
+// bool is false for anything else, a *ua.ServiceFault included.
 func MessageOf(service any) (message.Message, bool) {
+	var suffix string
 	switch service.(type) {
-	case *ua.OpenSecureChannelRequest:
-		return message.OpenSecureChannel, true
-	case *ua.CloseSecureChannelRequest:
-		return message.CloseSecureChannel, true
-	case *ua.CreateSessionRequest:
-		return message.CreateSession, true
-	case *ua.ActivateSessionRequest:
-		return message.ActivateSession, true
-	case *ua.CloseSessionRequest:
-		return message.CloseSession, true
-	case *ua.ReadRequest:
-		return message.Read, true
-	case *ua.CreateSubscriptionRequest:
-		return message.CreateSubscription, true
-	case *ua.CreateMonitoredItemsRequest:
-		return message.CreateMonitoredItems, true
-	case *ua.DeleteSubscriptionsRequest:
-		return message.DeleteSubscriptions, true
-	case *ua.PublishRequest:
-		return message.Publish, true
-	case *ua.RepublishRequest:
-		return message.Republish, true
-	case *ua.TransferSubscriptionsRequest:
-		return message.TransferSubscriptions, true
+	case ua.Request:
+		suffix = "Request"
+	case ua.Response:
+		suffix = "Response"
+	default:
+		return 0, false
 	}
-	return 0, false
+	typ := reflect.TypeOf(service)
+	if typ.Kind() != reflect.Pointer {
+		return 0, false
+	}
+	name, ok := strings.CutSuffix(typ.Elem().Name(), suffix)
+	if !ok || name == "" {
+		return 0, false
+	}
+	return message.Of(name), true
 }
 
 type armedCut struct {
@@ -1101,13 +1094,13 @@ func (r *Relay) Cut() {
 // moment fires on that pair. The CloseSecureChannel the client sends
 // at Close gets no response, so a cut armed on it for a response
 // moment is a harness fault, as are an unknown Moment and a Message
-// the catalogue does not name.
+// that is not Named.
 func (r *Relay) CutAt(moment Moment, msg message.Message) {
 	if moment != BeforeRequestReachesServer && !isResponseMoment(moment) {
 		r.t.Fatalf("%s", harnessFault("CutAt received an unknown Moment %d", int(moment)))
 		return
 	}
-	if msg < message.HEL || msg > message.TransferSubscriptions {
+	if !msg.Named() {
 		r.t.Fatalf("%s", harnessFault("CutAt received an unknown Message %d", int(msg)))
 		return
 	}
@@ -1133,7 +1126,7 @@ func (r *Relay) DelayAt(msg message.Message, d time.Duration) {
 		r.t.Fatalf("%s", harnessFault("the client sends CloseSecureChannel only while closing, so no request of it can arrive to delay"))
 		return
 	}
-	if msg < message.HEL || msg > message.TransferSubscriptions {
+	if !msg.Named() {
 		r.t.Fatalf("%s", harnessFault("DelayAt received an unknown Message %d", int(msg)))
 		return
 	}

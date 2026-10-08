@@ -57,7 +57,7 @@ func TestMessageOfRequest(t *testing.T) {
 		{&ua.CreateMonitoredItemsRequest{}, message.CreateMonitoredItems, true},
 		{&ua.DeleteSubscriptionsRequest{}, message.DeleteSubscriptions, true},
 		{&ua.TransferSubscriptionsRequest{}, message.TransferSubscriptions, true},
-		{&ua.ReadResponse{}, 0, false},
+		{&ua.ReadResponse{}, message.Read, true},
 		{nil, 0, false},
 	}
 	for _, c := range cases {
@@ -65,6 +65,46 @@ func TestMessageOfRequest(t *testing.T) {
 		if named != c.named || got != c.want {
 			t.Errorf("MessageOf(%T) = (%v, %v), want (%v, %v)", c.service, got, named, c.want, c.named)
 		}
+	}
+}
+
+func TestMessageOfNamesEveryService(t *testing.T) {
+	// Fault names, labels and spec texts contain these names, so
+	// MessageOf must keep giving each one.
+	before := []struct {
+		request any
+		name    string
+	}{
+		{&ua.OpenSecureChannelRequest{}, "OpenSecureChannel"},
+		{&ua.CloseSecureChannelRequest{}, "CloseSecureChannel"},
+		{&ua.CreateSessionRequest{}, "CreateSession"},
+		{&ua.ActivateSessionRequest{}, "ActivateSession"},
+		{&ua.CloseSessionRequest{}, "CloseSession"},
+		{&ua.ReadRequest{}, "Read"},
+		{&ua.CreateSubscriptionRequest{}, "CreateSubscription"},
+		{&ua.CreateMonitoredItemsRequest{}, "CreateMonitoredItems"},
+		{&ua.DeleteSubscriptionsRequest{}, "DeleteSubscriptions"},
+		{&ua.PublishRequest{}, "Publish"},
+		{&ua.RepublishRequest{}, "Republish"},
+		{&ua.TransferSubscriptionsRequest{}, "TransferSubscriptions"},
+	}
+	for _, c := range before {
+		got, named := MessageOf(c.request)
+		if !named || got.String() != c.name {
+			t.Errorf("MessageOf(%T) = (%v, %v), want (%s, true)", c.request, got, named, c.name)
+		}
+	}
+
+	request, requestNamed := MessageOf(&ua.BrowseRequest{})
+	response, responseNamed := MessageOf(&ua.BrowseResponse{})
+	if !requestNamed || request.String() != "Browse" {
+		t.Errorf("MessageOf(*ua.BrowseRequest) = (%v, %v), want (Browse, true)", request, requestNamed)
+	}
+	if !responseNamed || response != request {
+		t.Errorf("MessageOf(*ua.BrowseResponse) = (%v, %v), want the Browse request's Message %v", response, responseNamed, request)
+	}
+	if !request.Named() {
+		t.Errorf("the Message MessageOf gives a Browse request is not Named, so CutAt and DelayAt would reject it")
 	}
 }
 

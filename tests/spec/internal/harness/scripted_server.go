@@ -104,7 +104,14 @@ type heldEntry struct {
 	answered   bool
 }
 
-func newScriptedServer(t T) *ScriptedServer {
+// serviceHandler answers the requests whose binary encoding id is
+// requestEncodingID.
+type serviceHandler struct {
+	requestEncodingID uint16
+	handle            server.Handler
+}
+
+func newScriptedServer(t T, extra ...serviceHandler) *ScriptedServer {
 	s := &ScriptedServer{
 		t:             t,
 		heldWait:      startTimeout,
@@ -112,6 +119,22 @@ func newScriptedServer(t T) *ScriptedServer {
 		clientHandles: make(map[uint32]uint32),
 		heldSignal:    make(chan struct{}, 1),
 		producedBySub: make(map[*harnessSub][]int),
+	}
+	handlers := append([]serviceHandler{
+		{id.CreateSubscriptionRequest_Encoding_DefaultBinary, s.createSubscription},
+		{id.PublishRequest_Encoding_DefaultBinary, s.holdPublish},
+		{id.CreateMonitoredItemsRequest_Encoding_DefaultBinary, s.createMonitoredItems},
+		{id.RepublishRequest_Encoding_DefaultBinary, s.republish},
+		{id.TransferSubscriptionsRequest_Encoding_DefaultBinary, s.transferSubscriptions},
+		{id.DeleteSubscriptionsRequest_Encoding_DefaultBinary, s.deleteSubscriptions},
+	}, extra...)
+	registered := make(map[uint16]bool, len(handlers))
+	for _, h := range handlers {
+		if registered[h.requestEncodingID] {
+			t.Fatalf("%s", harnessFault("a second handler for %s: the in-tree server keeps the first one it is given and ignores the rest", id.Name(uint32(h.requestEncodingID))))
+			return nil
+		}
+		registered[h.requestEncodingID] = true
 	}
 	var lastErr error
 	for range serverStartAttempts {
@@ -133,12 +156,9 @@ func newScriptedServer(t T) *ScriptedServer {
 		srv.AddNamespace(namespace)
 		node := namespace.AddNewVariableStringNode(scriptedNode, int32(0)).ID()
 
-		srv.RegisterHandler(id.CreateSubscriptionRequest_Encoding_DefaultBinary, s.createSubscription)
-		srv.RegisterHandler(id.PublishRequest_Encoding_DefaultBinary, s.holdPublish)
-		srv.RegisterHandler(id.CreateMonitoredItemsRequest_Encoding_DefaultBinary, s.createMonitoredItems)
-		srv.RegisterHandler(id.RepublishRequest_Encoding_DefaultBinary, s.republish)
-		srv.RegisterHandler(id.TransferSubscriptionsRequest_Encoding_DefaultBinary, s.transferSubscriptions)
-		srv.RegisterHandler(id.DeleteSubscriptionsRequest_Encoding_DefaultBinary, s.deleteSubscriptions)
+		for _, h := range handlers {
+			srv.RegisterHandler(h.requestEncodingID, h.handle)
+		}
 
 		if err := srv.Start(context.Background()); err != nil {
 			lastErr = err

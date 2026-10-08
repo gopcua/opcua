@@ -44,3 +44,12 @@ returns a `HeldPublish` to answer; use `Subscription` for retained
 notifications and Republish faults. To drop the connection at a chosen
 moment, use `Relay.Cut` or `Relay.CutAt`.
 `part4/reestablishing_connections_test.go` shows a worked example.
+
+A clause file can answer a service the scripted server leaves to the in-tree
+server's default handlers. Pass
+`harness.WithHandler(id.BrowseRequest_Encoding_DefaultBinary, handle)` to
+`harness.New`, and `handle` answers every Browse request instead of the
+default handler. A handler for a service the scripted server already answers
+fails the test as a harness fault. Any service can be a fault target:
+`harness.MessageOf(&ua.BrowseRequest{})` returns the `message.Message` that
+`Relay.CutAt` and `Relay.DelayAt` take.

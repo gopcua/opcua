@@ -1,6 +1,7 @@
 package harness
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"slices"
@@ -8,7 +9,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gopcua/opcua/id"
 	"github.com/gopcua/opcua/ua"
+	"github.com/gopcua/opcua/uasc"
 )
 
 func TestRetainFailsOnSequenceNumberWraparound(t *testing.T) {
@@ -623,5 +626,55 @@ func TestUnusedScriptsRaisesAStoredServerFault(t *testing.T) {
 	}
 	if len(fake.fatals) != 1 || fake.fatals[0] != harnessFault("the scripted server misused") {
 		t.Errorf("UnusedScripts failed with %v, want the stored fault raised once", fake.fatals)
+	}
+}
+
+func TestScriptedServerHandlerFromTest(t *testing.T) {
+	// The default Browse handler never answers a result with this
+	// status, so seeing it proves the test's handler answered.
+	marker := ua.StatusBadViewIDUnknown
+	browseWithMarker := func(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
+		return &ua.BrowseResponse{
+			ResponseHeader: responseHeader(r.Header().RequestHandle),
+			Results:        []*ua.BrowseResult{{StatusCode: marker}},
+		}, nil
+	}
+	browse := func(env *Environment) ua.StatusCode {
+		t.Helper()
+		ctx, cancel := context.WithTimeout(context.Background(), specWait)
+		defer cancel()
+		resp, err := env.Client.Browse(ctx, &ua.BrowseRequest{
+			NodesToBrowse: []*ua.BrowseDescription{{
+				NodeID:          env.Server.Node(),
+				BrowseDirection: ua.BrowseDirectionForward,
+				IncludeSubtypes: true,
+				ResultMask:      uint32(ua.BrowseResultMaskAll),
+			}},
+		})
+		if err != nil {
+			t.Fatalf("browsing the scripted node failed: %v", err)
+		}
+		if len(resp.Results) != 1 {
+			t.Fatalf("browsing one node returned %d results, want 1", len(resp.Results))
+		}
+		return resp.Results[0].StatusCode
+	}
+
+	withHandler := New(t, WithHandler(id.BrowseRequest_Encoding_DefaultBinary, browseWithMarker))
+	if got := browse(withHandler); got != marker {
+		t.Errorf("a Browse to a server given a Browse handler answered with result status %s, want %s from that handler", got, marker)
+	}
+
+	withDefault := New(t)
+	if got := browse(withDefault); got == marker {
+		t.Errorf("a Browse to a server given no Browse handler answered with result status %s, want the default handler's answer", got)
+	}
+
+	fake := &fakeT{}
+	if !fatalPanics(func() { New(fake, WithHandler(id.PublishRequest_Encoding_DefaultBinary, browseWithMarker)) }) {
+		t.Fatalf("New given a handler for Publish, which the scripted server answers itself, did not fail")
+	}
+	if len(fake.fatals) != 1 || !strings.HasPrefix(fake.fatals[0], "spectest:") || !strings.Contains(fake.fatals[0], "PublishRequest_Encoding_DefaultBinary") {
+		t.Errorf("New given a handler for Publish failed with %q, want one harness fault naming PublishRequest_Encoding_DefaultBinary", fake.fatals)
 	}
 }

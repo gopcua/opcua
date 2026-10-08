@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gopcua/opcua"
+	"github.com/gopcua/opcua/server"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uasc"
 	ginkgo "github.com/onsi/ginkgo/v2"
@@ -45,6 +46,7 @@ type options struct {
 	drainGap              time.Duration
 	firstValue            int32
 	firstValueSet         bool
+	handlers              []serviceHandler
 }
 
 // WithFirstValue makes New answer the first held Publish request
@@ -93,6 +95,19 @@ func WithSlowConsumer(gap time.Duration) Option {
 	}
 }
 
+// WithHandler makes every server New or StartServer creates answer
+// the service whose request has the binary encoding id
+// requestEncodingID with handle, instead of the in-tree server's
+// default handler. For Browse the id is
+// id.BrowseRequest_Encoding_DefaultBinary. New fails with a harness
+// fault when the scripted server already answers that service or
+// another WithHandler names it too.
+func WithHandler(requestEncodingID uint16, handle server.Handler) Option {
+	return func(o *options) {
+		o.handlers = append(o.handlers, serviceHandler{requestEncodingID: requestEncodingID, handle: handle})
+	}
+}
+
 // WithPublishingInterval sets the publishing interval of the subscription
 // New creates.
 func WithPublishingInterval(d time.Duration) Option {
@@ -127,6 +142,7 @@ type Environment struct {
 	waitTimeout        time.Duration
 	servers            []*ScriptedServer
 	onClientClosed     func()
+	handlers           []serviceHandler
 }
 
 // New creates and returns a running Environment (see the Environment
@@ -146,8 +162,8 @@ func New(t T, opts ...Option) *Environment {
 		t.Fatalf("%s", harnessFault("publishing interval %s times lifetime count %d stays below one hour, so the server's subscription service could delete the subscription before the test ends", publishing, lifetimeCount))
 		return nil
 	}
-	e := &Environment{t: t, receivedSignal: make(chan struct{}, 1), retention: o.retention, drainGap: o.drainGap, publishingInterval: publishing, reconnectInterval: reconnect}
-	e.Server = newScriptedServer(t)
+	e := &Environment{t: t, receivedSignal: make(chan struct{}, 1), retention: o.retention, drainGap: o.drainGap, publishingInterval: publishing, reconnectInterval: reconnect, handlers: o.handlers}
+	e.Server = newScriptedServer(t, e.handlers...)
 	e.Server.retention = o.retention
 	e.Relay, e.Recorder = newRelay(t, e.Server.Address(), e.noteCut)
 	e.Server.mu.Lock()
@@ -302,7 +318,7 @@ func (e *Environment) UpstreamServer() *ScriptedServer {
 // after RedirectTo sends new connections to it. The Environment's
 // teardown closes it, after the client and the relay.
 func (e *Environment) StartServer() *ScriptedServer {
-	second := newScriptedServer(e.t)
+	second := newScriptedServer(e.t, e.handlers...)
 	second.retention = e.retention
 	second.mu.Lock()
 	second.recorder = e.Recorder
