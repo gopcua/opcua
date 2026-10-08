@@ -32,7 +32,7 @@ var _ = Describe("when the publishing interval is 10 ms", func() {
 		// timeout: the request times out on the client, which must
 		// publish again while the first stays unanswered.
 		time.Sleep(env.PublishTimeout() + 2*time.Second)
-		rules.RepublishesWithinTimeoutAfterPublishTimeout.Check(rules.Context{Env: env, Server: env.Server, HeldOrder: heldOrder})
+		rules.RepublishesWithinTimeoutAfterPublishTimeout.Check(matrix.Context{Env: env, Server: env.Server, HeldOrder: heldOrder})
 	})
 
 	It("times out a held Publish after recreating the subscription", Label("P4-5.14.1.2", "known-defect"), func() {
@@ -48,7 +48,7 @@ var _ = Describe("when the publishing interval is 10 ms", func() {
 		heldOrder, recorded := held.Order()
 		Expect(recorded).To(BeTrue(), "the held Publish request was never recorded, so its wire order is unknown")
 		time.Sleep(env.PublishTimeout() + 2*time.Second)
-		rules.RepublishesWithinTimeoutAfterPublishTimeout.Check(rules.Context{Env: env, Server: second, HeldOrder: heldOrder})
+		rules.RepublishesWithinTimeoutAfterPublishTimeout.Check(matrix.Context{Env: env, Server: second, HeldOrder: heldOrder})
 		Expect(second.UnusedScripts()).To(BeEmpty(), "scripts this spec armed were never used: %v", second.UnusedScripts())
 	})
 })
@@ -81,7 +81,7 @@ var _ = Describe("when the only subscription is cancelled and a new one created 
 		monitorCancel()
 		Expect(monitorErr).NotTo(HaveOccurred(), "the client monitored no node on the new subscription: %v", monitorErr)
 		held.Answer(created, valueAfterReconnect)
-		rules.KeepsPublishingAfterCancelThenSubscribe.Check(rules.Context{Env: env, Mark: m, Value: valueAfterReconnect})
+		rules.KeepsPublishingAfterCancelThenSubscribe.Check(matrix.Context{Env: env, Mark: m, Value: valueAfterReconnect})
 		Expect(env.Server.UnusedScripts()).To(BeEmpty(), "scripts this spec armed were never used: %v", env.Server.UnusedScripts())
 	})
 })
@@ -167,11 +167,11 @@ var steadyPublishing = matrix.Scenario{
 	Workload: driveSteadyPublishing,
 	// The steady stream must publish again past its own timeout, ask
 	// for what the server skipped and publish again after a refusal.
-	Rules: func(f fault.Fault) []rules.Rule {
+	Rules: func(f fault.Fault) []matrix.Rule {
 		if publishingUnspecified(f) {
 			return nil
 		}
-		return []rules.Rule{
+		return []matrix.Rule{
 			rules.RepublishesWithinTimeoutAfterPublishTimeout,
 			rules.RepublishesSkippedSequence,
 			rules.PublishesAgainAfterTooManyPublishRequests,
@@ -192,11 +192,11 @@ var cancelThenSubscribe = matrix.Scenario{
 	Workload: driveCancelThenSubscribe,
 	// The subscription swap must keep publishing through it, ask for
 	// what the server skipped and publish again after a refusal.
-	Rules: func(f fault.Fault) []rules.Rule {
+	Rules: func(f fault.Fault) []matrix.Rule {
 		if publishingUnspecified(f) {
 			return nil
 		}
-		return []rules.Rule{
+		return []matrix.Rule{
 			rules.KeepsPublishingAfterCancelThenSubscribe,
 			rules.RepublishesSkippedSequence,
 			rules.PublishesAgainAfterTooManyPublishRequests,
@@ -310,7 +310,7 @@ func driveSteadyPublishing(env *harness.Environment, f fault.Fault, block int32)
 		FaultEnd:   faultEnd,
 		Sentinel:   sentinel,
 		AnsweredAt: answeredAt,
-		Rules: rules.Context{
+		Rules: matrix.Context{
 			Env:             env,
 			Mark:            m,
 			Sub:             sub,
@@ -418,7 +418,7 @@ cycle:
 		FaultEnd:   faultEnd,
 		Sentinel:   sentinel,
 		AnsweredAt: answeredAt,
-		Rules: rules.Context{
+		Rules: matrix.Context{
 			Env:             env,
 			Mark:            m,
 			Sub:             sub,

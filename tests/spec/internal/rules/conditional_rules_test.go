@@ -6,6 +6,7 @@ import (
 
 	"github.com/gopcua/opcua/server"
 	"github.com/gopcua/opcua/tests/spec/internal/harness"
+	"github.com/gopcua/opcua/tests/spec/internal/matrix"
 	"github.com/gopcua/opcua/ua"
 	"github.com/onsi/gomega"
 )
@@ -59,7 +60,7 @@ func republishFor(order int, subscriptionID, sequenceNumber uint32) harness.Serv
 
 // checkPasses asserts a rule's Check passes against the context the
 // hand-built records define.
-func checkPasses(t *testing.T, rule Rule, c Context) {
+func checkPasses(t *testing.T, rule matrix.Rule, c matrix.Context) {
 	t.Helper()
 	var failures []string
 	gomega.RegisterFailHandler(func(message string, _ ...int) { failures = append(failures, message) })
@@ -71,7 +72,7 @@ func checkPasses(t *testing.T, rule Rule, c Context) {
 
 // checkFails asserts a rule's Check fails against the context the
 // hand-built records define, with a message naming want.
-func checkFails(t *testing.T, rule Rule, c Context, want string) {
+func checkFails(t *testing.T, rule matrix.Rule, c matrix.Context, want string) {
 	t.Helper()
 	var failures []string
 	gomega.RegisterFailHandler(func(message string, _ ...int) { failures = append(failures, message) })
@@ -90,7 +91,7 @@ func TestRepublishesSkippedSequence(t *testing.T) {
 	// No gap: no notification carries a sequence number missing between
 	// two the client received on one subscription, so the rule holds
 	// vacuously.
-	checkPasses(t, RepublishesSkippedSequence, Context{Env: harness.RecordedEnvironment(t,
+	checkPasses(t, RepublishesSkippedSequence, matrix.Context{Env: harness.RecordedEnvironment(t,
 		[]harness.ServiceRecord[ua.Request]{
 			publishRequest(1, 10, ua.NewTwoByteNodeID(1)),
 		},
@@ -101,7 +102,7 @@ func TestRepublishesSkippedSequence(t *testing.T) {
 		nil)})
 
 	// A gap the client closes with a Republish for the missing number.
-	checkPasses(t, RepublishesSkippedSequence, Context{Env: harness.RecordedEnvironment(t,
+	checkPasses(t, RepublishesSkippedSequence, matrix.Context{Env: harness.RecordedEnvironment(t,
 		[]harness.ServiceRecord[ua.Request]{
 			publishRequest(1, 10, ua.NewTwoByteNodeID(1)),
 			republishFor(4, 5, 2),
@@ -114,7 +115,7 @@ func TestRepublishesSkippedSequence(t *testing.T) {
 
 	// A gap no Republish closes: the rule fails naming the skipped
 	// number.
-	checkFails(t, RepublishesSkippedSequence, Context{Env: harness.RecordedEnvironment(t,
+	checkFails(t, RepublishesSkippedSequence, matrix.Context{Env: harness.RecordedEnvironment(t,
 		[]harness.ServiceRecord[ua.Request]{
 			publishRequest(1, 10, ua.NewTwoByteNodeID(1)),
 			republishFor(4, 5, 8),
@@ -129,7 +130,7 @@ func TestRepublishesSkippedSequence(t *testing.T) {
 func TestPublishesAgainAfterTooManyPublishRequests(t *testing.T) {
 	// No Publish was answered Bad_TooManyPublishRequests, so the rule
 	// holds vacuously.
-	checkPasses(t, PublishesAgainAfterTooManyPublishRequests, Context{Env: harness.RecordedEnvironment(t,
+	checkPasses(t, PublishesAgainAfterTooManyPublishRequests, matrix.Context{Env: harness.RecordedEnvironment(t,
 		[]harness.ServiceRecord[ua.Request]{
 			publishRequest(1, 10, ua.NewTwoByteNodeID(1)),
 		},
@@ -140,7 +141,7 @@ func TestPublishesAgainAfterTooManyPublishRequests(t *testing.T) {
 
 	// One was, and the client sent another Publish on the same session,
 	// and a value answered after it was delivered.
-	checkPasses(t, PublishesAgainAfterTooManyPublishRequests, Context{Env: harness.RecordedEnvironment(t,
+	checkPasses(t, PublishesAgainAfterTooManyPublishRequests, matrix.Context{Env: harness.RecordedEnvironment(t,
 		[]harness.ServiceRecord[ua.Request]{
 			publishRequest(1, 10, ua.NewTwoByteNodeID(1)),
 			publishRequest(3, 11, ua.NewTwoByteNodeID(1)),
@@ -153,7 +154,7 @@ func TestPublishesAgainAfterTooManyPublishRequests(t *testing.T) {
 
 	// One was, and the client sent no Publish after it: the rule fails
 	// naming the refused request.
-	checkFails(t, PublishesAgainAfterTooManyPublishRequests, Context{Env: harness.RecordedEnvironment(t,
+	checkFails(t, PublishesAgainAfterTooManyPublishRequests, matrix.Context{Env: harness.RecordedEnvironment(t,
 		[]harness.ServiceRecord[ua.Request]{
 			publishRequest(1, 10, ua.NewTwoByteNodeID(1)),
 			publishRequest(3, 11, ua.NewTwoByteNodeID(2)),
@@ -167,7 +168,7 @@ func TestPublishesAgainAfterTooManyPublishRequests(t *testing.T) {
 	// One was, another Publish followed on the same session, but no
 	// value answered after it was delivered: the rule fails naming the
 	// refused request.
-	checkFails(t, PublishesAgainAfterTooManyPublishRequests, Context{Env: harness.RecordedEnvironment(t,
+	checkFails(t, PublishesAgainAfterTooManyPublishRequests, matrix.Context{Env: harness.RecordedEnvironment(t,
 		[]harness.ServiceRecord[ua.Request]{
 			publishRequest(1, 10, ua.NewTwoByteNodeID(1)),
 			publishRequest(3, 11, ua.NewTwoByteNodeID(1)),

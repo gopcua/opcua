@@ -6,6 +6,7 @@ import (
 
 	"github.com/gopcua/opcua/tests/spec/internal/fault"
 	"github.com/gopcua/opcua/tests/spec/internal/harness"
+	"github.com/gopcua/opcua/tests/spec/internal/matrix"
 	"github.com/gopcua/opcua/tests/spec/internal/rules"
 	"github.com/gopcua/opcua/ua"
 
@@ -73,7 +74,7 @@ func requireNoRepublishBetween(env *harness.Environment, m harness.Mark, transfe
 
 func transferFailedFlow(env *harness.Environment, second *harness.ScriptedServer, m harness.Mark, transferAnswered func(harness.ServiceRecord[ua.Response]) bool, extra func(env *harness.Environment, m harness.Mark, transferAnswer, createAnswer harness.ServiceRecord[ua.Response])) {
 	oldID := env.Subscription().ID()
-	rules.RecreatesAfterRefusal.Check(rules.Context{Env: env, Mark: m, Sub: env.Subscription(), TransferRefusal: transferAnswered})
+	rules.RecreatesAfterRefusal.Check(matrix.Context{Env: env, Mark: m, Sub: env.Subscription(), TransferRefusal: transferAnswered})
 	transferAnswer, createRequest, createAnswer := rules.FindAnsweredTransferThenNewSubscription(env, m, oldID, transferAnswered)
 	extra(env, m, transferAnswer, createAnswer)
 	created := second.WaitCreatedSubscription(m)

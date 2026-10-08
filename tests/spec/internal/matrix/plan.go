@@ -15,7 +15,6 @@ import (
 
 	"github.com/gopcua/opcua/tests/spec/internal/fault"
 	"github.com/gopcua/opcua/tests/spec/internal/harness"
-	"github.com/gopcua/opcua/tests/spec/internal/rules"
 )
 
 // Outcome is what a scenario's Workload observed: the armed fault, the
@@ -26,7 +25,7 @@ type Outcome struct {
 	FaultEnd   time.Time
 	Sentinel   int32
 	AnsweredAt time.Time
-	Rules      rules.Context
+	Rules      Context
 }
 
 // Phase picks the snapshot an invariant asserts on. A rule check

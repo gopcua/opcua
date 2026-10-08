@@ -9,19 +9,25 @@ import (
 	"github.com/gopcua/opcua/tests/spec/internal/fault"
 	"github.com/gopcua/opcua/tests/spec/internal/invariants"
 	"github.com/gopcua/opcua/tests/spec/internal/message"
-	"github.com/gopcua/opcua/tests/spec/internal/rules"
 	"github.com/onsi/gomega"
+)
+
+// standInShall and standInShould stand in for a clause's rules: the
+// plan reads only their name, clause and keyword.
+var (
+	standInShall  = Rule{Name: "StandInShall", Clause: "P4-6.7", Keyword: "shall"}
+	standInShould = Rule{Name: "StandInShould", Clause: "P4-6.7", Keyword: "should"}
 )
 
 // scenarioOf builds a scenario for the unit tests: clause P4-1, the
 // subscription invariants, and the given rules under every fault.
-func scenarioOf(name string, ordinal int, sends []message.Message, ruleSet ...rules.Rule) Scenario {
+func scenarioOf(name string, ordinal int, sends []message.Message, ruleSet ...Rule) Scenario {
 	return Scenario{
 		Clause:     "P4-1",
 		Name:       name,
 		Ordinal:    ordinal,
 		Sends:      sends,
-		Rules:      func(fault.Fault) []rules.Rule { return ruleSet },
+		Rules:      func(fault.Fault) []Rule { return ruleSet },
 		Invariants: SubscriptionInvariants,
 	}
 }
@@ -102,7 +108,7 @@ func TestPlanBuildsOneCasePerCombination(t *testing.T) {
 func TestPlanOrdersInvariantChecksBeforeRules(t *testing.T) {
 	stall := namedFault(t, "Link/Stall")
 	cases := casesOf(t, []fault.Fault{stall},
-		scenarioOf("A", 1, []message.Message{message.Publish}, rules.ReactivatesSession, rules.CreatesNoSession))
+		scenarioOf("A", 1, []message.Message{message.Publish}, standInShall, standInShould))
 	if len(cases) != 1 {
 		t.Fatalf("Plan built %d cases, want 1", len(cases))
 	}
@@ -112,7 +118,7 @@ func TestPlanOrdersInvariantChecksBeforeRules(t *testing.T) {
 	}
 	want := []string{
 		"ResumePublishing", "KeepOneSessionOpen", "KeepOneSubscriptionPerClientSubscription",
-		"ReactivatesSession", "CreatesNoSession",
+		"StandInShall", "StandInShould",
 		"HaveFired", "DeliverEachValueOnce", "DeliverInOrder", "CloseEveryKnownSession",
 	}
 	if strings.Join(got, ",") != strings.Join(want, ",") {
@@ -178,12 +184,7 @@ func TestPlanOrdersInvariantChecksBeforeRules(t *testing.T) {
 				t.Errorf("the runner's %s reads the snapshots %v, want only %v", name, current, phase)
 			}
 		}
-		for _, rule := range rules.All() {
-			if _, isInvariant := want[rule.Name]; isInvariant {
-				t.Errorf("the rule %s shares an invariant's name, so the runner would assert the invariant instead", rule.Name)
-			}
-		}
-		observed := &Observation{outcome: Outcome{Rules: rules.Context{Value: 7}}}
+		observed := &Observation{outcome: Outcome{Rules: Context{Value: 7}}}
 		if read := observed.Context(); read.Value != 7 {
 			t.Errorf("the runner handed a rule the context %+v, want the workload's", read)
 		}
@@ -223,8 +224,8 @@ func brokenSnapshot() invariants.Observed {
 func TestPlanLabels(t *testing.T) {
 	publishFault := namedFault(t, "RequestLost/Publish")
 	cases := casesOf(t, []fault.Fault{publishFault},
-		scenarioOf("A", 1, []message.Message{message.Publish}, rules.ReactivatesSession, rules.SendsNoPublishBeforeNotAvailable))
-	check := checkNamed(t, cases, []string{"P4-1", "A", "RequestLost/Publish"}, "SendsNoPublishBeforeNotAvailable")
+		scenarioOf("A", 1, []message.Message{message.Publish}, standInShall, standInShould))
+	check := checkNamed(t, cases, []string{"P4-1", "A", "RequestLost/Publish"}, "StandInShould")
 	if !contains(check.Labels, "P4-1") {
 		t.Errorf("a rule check misses its suite's clause label: %v", check.Labels)
 	}
@@ -234,7 +235,7 @@ func TestPlanLabels(t *testing.T) {
 	if !contains(check.Labels, "should") {
 		t.Errorf("a should-rule check misses the should label: %v", check.Labels)
 	}
-	check = checkNamed(t, cases, []string{"P4-1", "A", "RequestLost/Publish"}, "ReactivatesSession")
+	check = checkNamed(t, cases, []string{"P4-1", "A", "RequestLost/Publish"}, "StandInShall")
 	if contains(check.Labels, "should") {
 		t.Errorf("a shall-rule check carries the should label: %v", check.Labels)
 	}

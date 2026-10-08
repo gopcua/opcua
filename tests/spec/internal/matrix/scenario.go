@@ -11,7 +11,6 @@ import (
 	"github.com/gopcua/opcua/tests/spec/internal/harness"
 	"github.com/gopcua/opcua/tests/spec/internal/invariants"
 	"github.com/gopcua/opcua/tests/spec/internal/message"
-	"github.com/gopcua/opcua/tests/spec/internal/rules"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
@@ -40,7 +39,7 @@ type Scenario struct {
 	Workload func(env *harness.Environment, f fault.Fault, block int32) Outcome
 	// Rules returns the rules the clause prescribes under the fault.
 	// None means the case asserts the invariants only.
-	Rules func(f fault.Fault) []rules.Rule
+	Rules func(f fault.Fault) []Rule
 	// Invariants are the checks the workload owes under every fault,
 	// because of what kind of workload it is.
 	Invariants []Invariant
@@ -213,7 +212,7 @@ func (s Scenario) caseOf(f fault.Fault) Case {
 
 // rulesUnder returns the rules the clause prescribes under the fault,
 // none when the scenario declares no Rules.
-func (s Scenario) rulesUnder(f fault.Fault) []rules.Rule {
+func (s Scenario) rulesUnder(f fault.Fault) []Rule {
 	if s.Rules == nil {
 		return nil
 	}

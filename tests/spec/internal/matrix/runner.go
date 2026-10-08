@@ -11,7 +11,6 @@ import (
 	"github.com/gopcua/opcua/tests/spec/internal/fault"
 	"github.com/gopcua/opcua/tests/spec/internal/harness"
 	"github.com/gopcua/opcua/tests/spec/internal/invariants"
-	"github.com/gopcua/opcua/tests/spec/internal/rules"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
@@ -137,11 +136,11 @@ func (o *Observation) assertInvariant(invariant Invariant) {
 
 // Applies says whether the scenario's Rules prescribe the rule under
 // the case's fault, so the clause file registers its It.
-func (o *Observation) Applies(rule rules.Rule) bool {
+func (o *Observation) Applies(rule Rule) bool {
 	if o.planned.Skip != nil {
 		return false
 	}
-	return slices.ContainsFunc(o.scenario.rulesUnder(o.fault), func(r rules.Rule) bool { return r.Name == rule.Name })
+	return slices.ContainsFunc(o.scenario.rulesUnder(o.fault), func(r Rule) bool { return r.Name == rule.Name })
 }
 
 // Labels returns the labels of the case's check named name: its
@@ -161,7 +160,7 @@ func (o *Observation) Labels(name string) ginkgo.Labels {
 
 // Context returns the rules' context the workload returned. A rule's
 // It reads it, after the BeforeAll ran.
-func (o *Observation) Context() rules.Context {
+func (o *Observation) Context() Context {
 	return o.outcome.Rules
 }
 

@@ -36,6 +36,31 @@ func TestPlanOverTheRealSuite(t *testing.T) {
 	}
 }
 
+// TestRuleNamesDifferFromInvariantNames pins that no rule a scenario
+// returns under any fault shares a name with an invariant of that
+// scenario or with HaveFired. The plan and the known-defect table find
+// a check by its name, so a shared name would make them confuse the
+// rule with the invariant.
+func TestRuleNamesDifferFromInvariantNames(t *testing.T) {
+	scenarios := []matrix.Scenario{sessionSurvives, sessionLost, subscriptionsLost, steadyPublishing, cancelThenSubscribe}
+	for _, scenario := range scenarios {
+		invariantNames := map[string]bool{"HaveFired": true}
+		for _, invariant := range scenario.Invariants {
+			invariantNames[invariant.Name] = true
+		}
+		if scenario.Rules == nil {
+			continue
+		}
+		for _, f := range fault.AllFaults {
+			for _, rule := range scenario.Rules(f) {
+				if invariantNames[rule.Name] {
+					t.Errorf("the rule %s of %s under %s shares an invariant's name, so the runner would assert the invariant instead", rule.Name, scenario.Name, f.Name())
+				}
+			}
+		}
+	}
+}
+
 // TestCaseValuesNeverOverlap pins that no two cases of the matrix share
 // a value: every case derives its values — first value, answered
 // values, retained value, sentinel and consumer burst alike — from its

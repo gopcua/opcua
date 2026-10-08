@@ -10,7 +10,7 @@ import (
 	"github.com/gopcua/opcua/tests/spec/internal/harness"
 	"github.com/gopcua/opcua/tests/spec/internal/message"
 	"github.com/gopcua/opcua/tests/spec/internal/specrun"
-	. "github.com/onsi/ginkgo/v2"
+	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
@@ -59,8 +59,8 @@ var idle = Scenario{
 // idleFaults are the faults the self-spec crosses idle with.
 var idleFaults = []fault.Fault{faultNamed("Server/Pause"), faultNamed("Server/DuplicateSequence")}
 
-var _ = Describe("P4-0", func() {
-	DescribeTableSubtree(idle.Name, func(f fault.Fault) {
+var _ = ginkgo.Describe("P4-0", func() {
+	ginkgo.DescribeTableSubtree(idle.Name, func(f fault.Fault) {
 		obs := Run(idle, f)
 		obs.BeforeCloseInvariants()
 		obs.AfterCloseInvariants()
@@ -125,7 +125,7 @@ func casePaths(cases []Case) []string {
 // label filter resolves through specrun.LabelFilter, so the default
 // run excludes the labelled known-defect checks.
 func TestSelfSpec(t *testing.T) {
-	suiteConfig, reporterConfig := GinkgoConfiguration()
+	suiteConfig, reporterConfig := ginkgo.GinkgoConfiguration()
 	var labelPassed bool
 	flag.Visit(func(passed *flag.Flag) {
 		if passed.Name == "ginkgo.label-filter" {
@@ -133,6 +133,6 @@ func TestSelfSpec(t *testing.T) {
 		}
 	})
 	suiteConfig.LabelFilter = specrun.LabelFilter(labelPassed, suiteConfig.LabelFilter, os.Getenv("SPECTEST_LABEL_FILTER"))
-	RegisterFailHandler(Fail)
-	RunSpecs(t, "matrix self-spec", suiteConfig, reporterConfig)
+	RegisterFailHandler(ginkgo.Fail)
+	ginkgo.RunSpecs(t, "matrix self-spec", suiteConfig, reporterConfig)
 }

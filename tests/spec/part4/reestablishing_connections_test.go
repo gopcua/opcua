@@ -44,7 +44,7 @@ var _ = Describe("Part 4 §6.7 Re-establishing connections https://reference.opc
 		})
 
 		It("reactivates the existing session instead of creating one", Label("P4-6.7"), func() {
-			ctx := rules.Context{Env: env, Mark: m}
+			ctx := matrix.Context{Env: env, Mark: m}
 			rules.ReactivatesSession.Check(ctx)
 			rules.CreatesNoSession.Check(ctx)
 			Expect(env.ConnectionsSince(m)).To(Equal(1), "the relay accepted %d connections after the cut, want exactly one", env.ConnectionsSince(m))
@@ -58,22 +58,22 @@ var _ = Describe("Part 4 §6.7 Re-establishing connections https://reference.opc
 		})
 
 		It("calls Republish from the next expected sequence number, incrementing, until the server answers Bad_MessageNotAvailable", Label("P4-6.7", "issue-879", "known-defect"), func() {
-			rules.RepublishesFromNextSequence.Check(rules.Context{Env: env, Mark: m, LastSeq: last})
+			rules.RepublishesFromNextSequence.Check(matrix.Context{Env: env, Mark: m, LastSeq: last})
 			Expect(env.Server.UnusedScripts()).To(BeEmpty(), "scripts this spec armed were never used: %v", env.Server.UnusedScripts())
 		})
 
 		It("sends no Publish until Republish has answered Bad_MessageNotAvailable", Label("P4-6.7", "issue-879", "known-defect"), func() {
-			rules.SendsNoPublishBeforeNotAvailable.Check(rules.Context{Env: env, Mark: m})
+			rules.SendsNoPublishBeforeNotAvailable.Check(matrix.Context{Env: env, Mark: m})
 			Expect(env.Server.UnusedScripts()).To(BeEmpty(), "scripts this spec armed were never used: %v", env.Server.UnusedScripts())
 		})
 
 		It("sends no TransferSubscriptions for a subscription its own session owns", Label("P4-6.7", "P4-5.14.7.4", "known-defect"), func() {
-			rules.SendsNoTransferForOwnSubscription.Check(rules.Context{Env: env, Mark: m})
+			rules.SendsNoTransferForOwnSubscription.Check(matrix.Context{Env: env, Mark: m})
 			Expect(env.Server.UnusedScripts()).To(BeEmpty(), "scripts this spec armed were never used: %v", env.Server.UnusedScripts())
 		})
 
 		It("keeps the subscription id it had before the cut", Label("P4-6.7", "issue-879", "known-defect"), func() {
-			rules.KeepsSubscriptionID.Check(rules.Context{Env: env, Mark: m, Sub: sub})
+			rules.KeepsSubscriptionID.Check(matrix.Context{Env: env, Mark: m, Sub: sub})
 			Expect(env.Server.UnusedScripts()).To(BeEmpty(), "scripts this spec armed were never used: %v", env.Server.UnusedScripts())
 		})
 
@@ -129,12 +129,12 @@ var _ = Describe("Part 4 §6.7 Re-establishing connections https://reference.opc
 		})
 
 		It("creates a new subscription", Label("P4-6.7", "should", "known-defect"), func() {
-			rules.RecreatesAfterRefusal.Check(rules.Context{Env: env, Mark: m, LastSeq: last})
+			rules.RecreatesAfterRefusal.Check(matrix.Context{Env: env, Mark: m, LastSeq: last})
 			Expect(env.Server.UnusedScripts()).To(BeEmpty(), "scripts this spec armed were never used: %v", env.Server.UnusedScripts())
 		})
 
 		It("resumes publishing with the new subscription", Label("P4-6.7", "issue-895", "known-defect"), MustPassRepeatedly(10), func() {
-			rules.RecreatesAfterRefusal.Check(rules.Context{Env: env, Mark: m, LastSeq: last})
+			rules.RecreatesAfterRefusal.Check(matrix.Context{Env: env, Mark: m, LastSeq: last})
 			created := env.Server.WaitCreatedSubscription(m)
 			held := env.Server.WaitHeldPublish()
 			held.Answer(created, valueAfterReconnect)
@@ -259,7 +259,7 @@ var _ = Describe("Part 4 §6.7 Re-establishing connections https://reference.opc
 			m = env.Mark()
 			env.Relay.Cut()
 			env.WaitUntilReconnected()
-			rules.CreatesSessionOnlyAfterActivateFailed.Check(rules.Context{Env: env, Mark: m})
+			rules.CreatesSessionOnlyAfterActivateFailed.Check(matrix.Context{Env: env, Mark: m})
 		})
 
 		DescribeTable("transfers, and creates new subscriptions when the transfer fails",
@@ -322,7 +322,7 @@ var _ = Describe("Part 4 §6.7 Re-establishing connections https://reference.opc
 			env.WaitUntilReconnected()
 			created := second.WaitCreatedSubscription(m)
 			env.Relay.Cut()
-			rules.RepublishesRecreatedFromOne.Check(rules.Context{Env: env, Mark: m, Recreated: created})
+			rules.RepublishesRecreatedFromOne.Check(matrix.Context{Env: env, Mark: m, Recreated: created})
 			Expect(second.UnusedScripts()).To(BeEmpty(), "scripts this spec armed were never used: %v", second.UnusedScripts())
 		})
 	})
@@ -734,11 +734,11 @@ var subscriptionsLost = matrix.Scenario{
 // ActivateSession that timed out must be followed by a new session, a
 // DelayAboveTimeout or Overload fault on any other service leaves the
 // invariants only, and every other fault the scenario's own rules.
-func reestablishingRules(own ...rules.Rule) func(fault.Fault) []rules.Rule {
-	return func(f fault.Fault) []rules.Rule {
+func reestablishingRules(own ...matrix.Rule) func(fault.Fault) []matrix.Rule {
+	return func(f fault.Fault) []matrix.Rule {
 		switch {
 		case f.Name() == "DelayAboveTimeout/ActivateSession":
-			return []rules.Rule{rules.CreatesSessionAfterActivateTimedOut}
+			return []matrix.Rule{rules.CreatesSessionAfterActivateTimedOut}
 		case strings.HasPrefix(f.Name(), "DelayAboveTimeout/"):
 			return nil
 		case strings.HasPrefix(f.Name(), "Overload/"):
@@ -856,7 +856,7 @@ func (s reestablishing) workload(env *harness.Environment, f fault.Fault, block 
 		FaultEnd:   faultEnd,
 		Sentinel:   sentinel,
 		AnsweredAt: answeredAt,
-		Rules: rules.Context{
+		Rules: matrix.Context{
 			Env:             env,
 			Mark:            m,
 			LastSeq:         last,

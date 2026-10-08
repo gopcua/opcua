@@ -53,7 +53,7 @@ func TestAllListsEveryRule(t *testing.T) {
 			if !isComposite {
 				return true
 			}
-			if identifier, isIdent := literal.Type.(*ast.Ident); isIdent && identifier.Name == "Rule" {
+			if selector, isSelector := literal.Type.(*ast.SelectorExpr); isSelector && selector.Sel.Name == "Rule" {
 				literals++
 			}
 			return true

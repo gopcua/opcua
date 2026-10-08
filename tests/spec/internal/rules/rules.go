@@ -5,59 +5,20 @@ import (
 	"time"
 
 	"github.com/gopcua/opcua/tests/spec/internal/harness"
+	"github.com/gopcua/opcua/tests/spec/internal/matrix"
 	"github.com/gopcua/opcua/ua"
 
 	"github.com/onsi/gomega"
 )
 
-// Rule is one Part 4 behaviour the specs assert: a stable Name the
-// known-defect table cites, the Clause label and Keyword of its
-// sentence in the standard, and the Check that asserts it against the
-// context the caller observed.
-type Rule struct {
-	Name    string
-	Clause  string
-	Keyword string
-	Check   func(c Context)
-}
-
-// Context is what a rule's Check needs: the environment the scenario
-// ran in, the Mark taken before the fault, the last sequence number
-// the client delivered, the subscription the client held before the
-// fault and the one it recreated when it did, the server the client
-// should end on, how a transfer answer refuses when the scenario
-// scripted one, and the value the scenario answered on the new
-// subscription.
-type Context struct {
-	Env             *harness.Environment
-	Mark            harness.Mark
-	LastSeq         uint32
-	Sub             harness.Subscription
-	Recreated       harness.Subscription
-	Server          *harness.ScriptedServer
-	TransferRefusal func(harness.ServiceRecord[ua.Response]) bool
-	Value           int32
-	// CyclesCompleted and CyclesWanted say how many cancel-then-subscribe
-	// cycles the workload drove and how many it wanted to complete; a
-	// client that parks its publish loop stops them early.
-	CyclesCompleted int
-	CyclesWanted    int
-	// HeldOrder is the recorded Order of the Publish request the workload
-	// held past the client's publish timeout; HeldAnswerOrder is the
-	// recorded Order of the response it then sent to it, or 0 when it
-	// never answered it.
-	HeldOrder       int
-	HeldAnswerOrder int
-}
-
 // ReactivatesSession: after a transport loss the client re-activates
 // the session it had, carrying the authentication token the server
 // issued before the loss.
-var ReactivatesSession = Rule{
+var ReactivatesSession = matrix.Rule{
 	Name:    "ReactivatesSession",
 	Clause:  "P4-6.7",
 	Keyword: "shall",
-	Check: func(c Context) {
+	Check: func(c matrix.Context) {
 		reactivationAnswer(c.Env, c.Mark)
 	},
 }
@@ -65,11 +26,11 @@ var ReactivatesSession = Rule{
 // CreatesNoSession: the client creates no new session before the
 // re-activation of the old one was answered, and none after it
 // succeeded.
-var CreatesNoSession = Rule{
+var CreatesNoSession = matrix.Rule{
 	Name:    "CreatesNoSession",
 	Clause:  "P4-6.7",
 	Keyword: "shall",
-	Check: func(c Context) {
+	Check: func(c matrix.Context) {
 		reactivation := reactivationAnswer(c.Env, c.Mark)
 		gomega.Expect(slices.ContainsFunc(RequestsOfType[*ua.CreateSessionRequest](c.Env.Recorder.RequestsSince(c.Mark)), func(request harness.ServiceRecord[ua.Request]) bool {
 			return request.Order < reactivation.Order
@@ -83,11 +44,11 @@ var CreatesNoSession = Rule{
 // RepublishesFromNextSequence: the client republishes from the next
 // expected sequence number, incrementing, until the server answers
 // Bad_MessageNotAvailable.
-var RepublishesFromNextSequence = Rule{
+var RepublishesFromNextSequence = matrix.Rule{
 	Name:    "RepublishesFromNextSequence",
 	Clause:  "P4-6.7",
 	Keyword: "shall",
-	Check: func(c Context) {
+	Check: func(c matrix.Context) {
 		gomega.Eventually(func(g gomega.Gomega) {
 			requests := c.Env.Recorder.RequestsSince(c.Mark)
 			responses := c.Env.Recorder.ResponsesSince(c.Mark)
@@ -115,11 +76,11 @@ var RepublishesFromNextSequence = Rule{
 // SendsNoPublishBeforeNotAvailable: the client sends no Publish
 // request on its new connection until the Republish the server
 // answered Bad_MessageNotAvailable.
-var SendsNoPublishBeforeNotAvailable = Rule{
+var SendsNoPublishBeforeNotAvailable = matrix.Rule{
 	Name:    "SendsNoPublishBeforeNotAvailable",
 	Clause:  "P4-6.7",
 	Keyword: "should",
-	Check: func(c Context) {
+	Check: func(c matrix.Context) {
 		notAvailableAnswer := WaitAnsweredBadMessageNotAvailable(c.Env, c.Mark)
 		gomega.Expect(slices.ContainsFunc(RequestsOfType[*ua.PublishRequest](c.Env.Recorder.RequestsSince(c.Mark)), func(request harness.ServiceRecord[ua.Request]) bool {
 			return request.Connection == notAvailableAnswer.Connection && request.Order < notAvailableAnswer.Order
@@ -130,11 +91,11 @@ var SendsNoPublishBeforeNotAvailable = Rule{
 // SendsNoTransferForOwnSubscription: the client sends no
 // TransferSubscriptions request for a subscription its own session
 // owns.
-var SendsNoTransferForOwnSubscription = Rule{
+var SendsNoTransferForOwnSubscription = matrix.Rule{
 	Name:    "SendsNoTransferForOwnSubscription",
 	Clause:  "P4-5.14.7.4",
 	Keyword: "shall",
-	Check: func(c Context) {
+	Check: func(c matrix.Context) {
 		notAvailableAnswer := WaitAnsweredBadMessageNotAvailable(c.Env, c.Mark)
 		gomega.Expect(slices.ContainsFunc(RequestsOfType[*ua.TransferSubscriptionsRequest](c.Env.Recorder.RequestsSince(c.Mark)), func(request harness.ServiceRecord[ua.Request]) bool {
 			return request.Order < notAvailableAnswer.Order
@@ -147,11 +108,11 @@ var SendsNoTransferForOwnSubscription = Rule{
 
 // KeepsSubscriptionID: the client republishes under the subscription
 // id it had before the cut, and creates no new subscription instead.
-var KeepsSubscriptionID = Rule{
+var KeepsSubscriptionID = matrix.Rule{
 	Name:    "KeepsSubscriptionID",
 	Clause:  "P4-6.7",
 	Keyword: "shall",
-	Check: func(c Context) {
+	Check: func(c matrix.Context) {
 		WaitAnsweredBadMessageNotAvailable(c.Env, c.Mark)
 		wrongID := false
 		for _, republish := range RequestsOfType[*ua.RepublishRequest](c.Env.Recorder.RequestsSince(c.Mark)) {
@@ -174,11 +135,11 @@ var KeepsSubscriptionID = Rule{
 // client sent was not answered within the request timeout, the client
 // creates a new session. A timeout is a failure, and Part 4 lets the
 // client create a new session once ActivateSession has failed.
-var CreatesSessionAfterActivateTimedOut = Rule{
+var CreatesSessionAfterActivateTimedOut = matrix.Rule{
 	Name:    "CreatesSessionAfterActivateTimedOut",
 	Clause:  "P4-6.7",
 	Keyword: "should",
-	Check: func(c Context) {
+	Check: func(c matrix.Context) {
 		sessionToken := PreCutSessionToken(c.Env)
 		gomega.Expect(sessionToken).NotTo(gomega.BeNil(), "the recorder saw no ActivateSession request before the cut")
 		gomega.Eventually(func(g gomega.Gomega) {
@@ -204,11 +165,11 @@ var CreatesSessionAfterActivateTimedOut = Rule{
 // CreatesSessionOnlyAfterActivateFailed: the client creates a new
 // session only after trying to activate the old one and being refused
 // Bad_SessionIdInvalid.
-var CreatesSessionOnlyAfterActivateFailed = Rule{
+var CreatesSessionOnlyAfterActivateFailed = matrix.Rule{
 	Name:    "CreatesSessionOnlyAfterActivateFailed",
 	Clause:  "P4-6.7",
 	Keyword: "shall",
-	Check: func(c Context) {
+	Check: func(c matrix.Context) {
 		gomega.Eventually(func(g gomega.Gomega) {
 			requests := c.Env.Recorder.RequestsSince(c.Mark)
 			responses := c.Env.Recorder.ResponsesSince(c.Mark)
@@ -235,11 +196,11 @@ var CreatesSessionOnlyAfterActivateFailed = Rule{
 // recognizes, or, when TransferRefusal is nil, a Republish answered
 // Bad_SubscriptionIdInvalid — the client creates a new subscription
 // and re-monitors its node on it.
-var RecreatesAfterRefusal = Rule{
+var RecreatesAfterRefusal = matrix.Rule{
 	Name:    "RecreatesAfterRefusal",
 	Clause:  "P4-6.7",
 	Keyword: "shall",
-	Check: func(c Context) {
+	Check: func(c matrix.Context) {
 		if c.TransferRefusal != nil {
 			recreateAfterTransferRefusal(c)
 			return
@@ -248,7 +209,7 @@ var RecreatesAfterRefusal = Rule{
 	},
 }
 
-func recreateAfterTransferRefusal(c Context) {
+func recreateAfterTransferRefusal(c matrix.Context) {
 	var createRequest harness.ServiceRecord[ua.Request]
 	var createdID uint32
 	gomega.Eventually(func(g gomega.Gomega) {
@@ -265,7 +226,7 @@ func recreateAfterTransferRefusal(c Context) {
 	monitoredItemRecreated(c, createdID, createRequest.Order)
 }
 
-func recreateAfterRepublishRefusal(c Context) {
+func recreateAfterRepublishRefusal(c matrix.Context) {
 	var republishAnswer harness.ServiceRecord[ua.Response]
 	gomega.Eventually(func(g gomega.Gomega) {
 		requests := c.Env.Recorder.RequestsSince(c.Mark)
@@ -307,7 +268,7 @@ func recreateAfterRepublishRefusal(c Context) {
 	monitoredItemRecreated(c, createdID, createSubscription.Order)
 }
 
-func monitoredItemRecreated(c Context, id uint32, orderFloor int) {
+func monitoredItemRecreated(c matrix.Context, id uint32, orderFloor int) {
 	node := MonitoredNode(c.Env)
 	gomega.Expect(node).NotTo(gomega.BeNil(), "the recorder saw no CreateMonitoredItems request, so the node the client monitors is unknown")
 	gomega.Eventually(func(g gomega.Gomega) {
@@ -338,11 +299,11 @@ func monitoredItemRecreated(c Context, id uint32, orderFloor int) {
 
 // RepublishesRecreatedFromOne: the client republishes the recreated
 // subscription starting from sequence number one.
-var RepublishesRecreatedFromOne = Rule{
+var RepublishesRecreatedFromOne = matrix.Rule{
 	Name:    "RepublishesRecreatedFromOne",
 	Clause:  "P4-6.7",
 	Keyword: "shall",
-	Check: func(c Context) {
+	Check: func(c matrix.Context) {
 		gomega.Eventually(func(g gomega.Gomega) {
 			requests := c.Env.Recorder.RequestsSince(c.Mark)
 			for _, record := range RequestsOfType[*ua.RepublishRequest](requests) {
@@ -367,11 +328,11 @@ var RepublishesRecreatedFromOne = Rule{
 // The check reads recorded traffic: a Publish request on the held
 // one's connection after its order and before the answer the workload
 // gave it, or after it when the workload gave none.
-var RepublishesWithinTimeoutAfterPublishTimeout = Rule{
+var RepublishesWithinTimeoutAfterPublishTimeout = matrix.Rule{
 	Name:    "RepublishesWithinTimeoutAfterPublishTimeout",
 	Clause:  "P4-5.14.1.2",
 	Keyword: "should",
-	Check: func(c Context) {
+	Check: func(c matrix.Context) {
 		sent := false
 		for _, record := range RequestsOfType[*ua.PublishRequest](c.Env.Recorder.RequestsSince(c.Mark)) {
 			if record.Connection != c.Env.Recorder.ConnectionOfOrder(c.HeldOrder) {
@@ -393,11 +354,11 @@ var RepublishesWithinTimeoutAfterPublishTimeout = Rule{
 // cancel-then-subscribe cycle the workload drives, keeps sending
 // Publish requests and delivers the value answered on the new
 // subscription.
-var KeepsPublishingAfterCancelThenSubscribe = Rule{
+var KeepsPublishingAfterCancelThenSubscribe = matrix.Rule{
 	Name:    "KeepsPublishingAfterCancelThenSubscribe",
 	Clause:  "P4-5.14.1.2",
 	Keyword: "should",
-	Check: func(c Context) {
+	Check: func(c matrix.Context) {
 		if c.CyclesWanted > 0 {
 			gomega.Expect(c.CyclesCompleted).To(gomega.Equal(c.CyclesWanted),
 				"the client parked its publish loop after cycle %d of %d: the cancel and the resume raced",
@@ -418,11 +379,11 @@ var KeepsPublishingAfterCancelThenSubscribe = Rule{
 // skipped on a subscription — a number missing between two consecutive
 // notifications the client received on it — the client sends a Republish
 // for the missing number. No gap means the rule holds vacuously.
-var RepublishesSkippedSequence = Rule{
+var RepublishesSkippedSequence = matrix.Rule{
 	Name:    "RepublishesSkippedSequence",
 	Clause:  "P4-6.7",
 	Keyword: "should",
-	Check: func(c Context) {
+	Check: func(c matrix.Context) {
 		requests := c.Env.Recorder.RequestsSince(c.Mark)
 		responses := c.Env.Recorder.ResponsesSince(c.Mark)
 		for _, missing := range skippedSequenceNumbers(receivedNotifications(requests, responses)) {
@@ -437,11 +398,11 @@ var RepublishesSkippedSequence = Rule{
 // server answered Bad_TooManyPublishRequests, the client sends another
 // Publish on the same session, and a value answered after it is
 // delivered. No such answer means the rule holds vacuously.
-var PublishesAgainAfterTooManyPublishRequests = Rule{
+var PublishesAgainAfterTooManyPublishRequests = matrix.Rule{
 	Name:    "PublishesAgainAfterTooManyPublishRequests",
 	Clause:  "P4-5.14.5",
 	Keyword: "should",
-	Check: func(c Context) {
+	Check: func(c matrix.Context) {
 		requests := c.Env.Recorder.RequestsSince(c.Mark)
 		responses := c.Env.Recorder.ResponsesSince(c.Mark)
 		for _, refused := range publishesAnsweredTooMany(requests, responses) {
@@ -499,8 +460,8 @@ var PublishesAgainAfterTooManyPublishRequests = Rule{
 }
 
 // All lists every rule the package holds, each exactly once.
-func All() []Rule {
-	return []Rule{
+func All() []matrix.Rule {
+	return []matrix.Rule{
 		ReactivatesSession,
 		CreatesNoSession,
 		RepublishesFromNextSequence,
