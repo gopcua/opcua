@@ -18,7 +18,8 @@ import (
 
 // Scenario is one workload a clause file crosses with the fault
 // catalogue. A clause file declares it as a value and registers it
-// with ginkgo.DescribeTableSubtree, Entries and Run.
+// with ginkgo.DescribeTableSubtree, Entries and Run, and writes the
+// case's check Its with the Observation that Run returns.
 type Scenario struct {
 	// Clause is the text of the clause container and the first label
 	// of every check, "P4-6.7" for example.

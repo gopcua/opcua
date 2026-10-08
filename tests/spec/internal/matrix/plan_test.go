@@ -153,20 +153,27 @@ func TestPlanOrdersInvariantChecksBeforeRules(t *testing.T) {
 			}
 			return reads
 		}
-		subscription := Scenario{Invariants: SubscriptionInvariants}
 		var names []string
+		invariantNamed := map[string]Invariant{}
 		for _, invariant := range SubscriptionInvariants {
 			names = append(names, invariant.Name)
+			invariantNamed[invariant.Name] = invariant
 		}
 		if len(names) != len(want) {
 			t.Fatalf("the subscription invariants are %v, want exactly the %d pinned here", names, len(want))
 		}
 		for name, phase := range want {
-			assert := subscription.assertion(name, nil)
-			if fails(func() { assert(healthy, healthy, Outcome{}) }) {
+			invariant, found := invariantNamed[name]
+			if !found {
+				t.Fatalf("the subscription invariants hold no %s", name)
+			}
+			assert := func(before, after invariants.Observed) {
+				(&Observation{before: before, after: after}).assertInvariant(invariant)
+			}
+			if fails(func() { assert(healthy, healthy) }) {
 				t.Fatalf("%s fails on the healthy snapshot, so the fixture cannot show which snapshot it reads", name)
 			}
-			current := readsOf(func(before, after invariants.Observed) { assert(before, after, Outcome{}) })
+			current := readsOf(assert)
 			if !slices.Equal(current, []Phase{phase}) {
 				t.Errorf("the runner's %s reads the snapshots %v, want only %v", name, current, phase)
 			}
@@ -176,12 +183,8 @@ func TestPlanOrdersInvariantChecksBeforeRules(t *testing.T) {
 				t.Errorf("the rule %s shares an invariant's name, so the runner would assert the invariant instead", rule.Name)
 			}
 		}
-		var read rules.Context
-		withRule := Scenario{Rules: func(fault.Fault) []rules.Rule {
-			return []rules.Rule{{Name: "ReadsTheContext", Check: func(c rules.Context) { read = c }}}
-		}}
-		withRule.assertion("ReadsTheContext", nil)(broken, broken, Outcome{Rules: rules.Context{Value: 7}})
-		if read.Value != 7 {
+		observed := &Observation{outcome: Outcome{Rules: rules.Context{Value: 7}}}
+		if read := observed.Context(); read.Value != 7 {
 			t.Errorf("the runner handed a rule the context %+v, want the workload's", read)
 		}
 	})

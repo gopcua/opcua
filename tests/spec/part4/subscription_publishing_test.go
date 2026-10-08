@@ -114,11 +114,45 @@ func requireSubscriptionDeleted(env *harness.Environment, m harness.Mark, id uin
 // relay connection of its own.
 var _ = Describe("P4-5.14", func() {
 	DescribeTableSubtree(steadyPublishing.Name, func(f fault.Fault) {
-		matrix.Run(steadyPublishing, f)
+		obs := matrix.Run(steadyPublishing, f)
+		obs.BeforeCloseInvariants()
+		if obs.Applies(rules.RepublishesWithinTimeoutAfterPublishTimeout) {
+			It("RepublishesWithinTimeoutAfterPublishTimeout", obs.Labels("RepublishesWithinTimeoutAfterPublishTimeout"), func() {
+				rules.RepublishesWithinTimeoutAfterPublishTimeout.Check(obs.Context())
+			})
+		}
+		if obs.Applies(rules.RepublishesSkippedSequence) {
+			It("RepublishesSkippedSequence", obs.Labels("RepublishesSkippedSequence"), func() {
+				rules.RepublishesSkippedSequence.Check(obs.Context())
+			})
+		}
+		if obs.Applies(rules.PublishesAgainAfterTooManyPublishRequests) {
+			It("PublishesAgainAfterTooManyPublishRequests", obs.Labels("PublishesAgainAfterTooManyPublishRequests"), func() {
+				rules.PublishesAgainAfterTooManyPublishRequests.Check(obs.Context())
+			})
+		}
+		obs.AfterCloseInvariants()
 	}, matrix.Entries(steadyPublishing, fault.AllFaults...))
 
 	DescribeTableSubtree(cancelThenSubscribe.Name, func(f fault.Fault) {
-		matrix.Run(cancelThenSubscribe, f)
+		obs := matrix.Run(cancelThenSubscribe, f)
+		obs.BeforeCloseInvariants()
+		if obs.Applies(rules.KeepsPublishingAfterCancelThenSubscribe) {
+			It("KeepsPublishingAfterCancelThenSubscribe", obs.Labels("KeepsPublishingAfterCancelThenSubscribe"), func() {
+				rules.KeepsPublishingAfterCancelThenSubscribe.Check(obs.Context())
+			})
+		}
+		if obs.Applies(rules.RepublishesSkippedSequence) {
+			It("RepublishesSkippedSequence", obs.Labels("RepublishesSkippedSequence"), func() {
+				rules.RepublishesSkippedSequence.Check(obs.Context())
+			})
+		}
+		if obs.Applies(rules.PublishesAgainAfterTooManyPublishRequests) {
+			It("PublishesAgainAfterTooManyPublishRequests", obs.Labels("PublishesAgainAfterTooManyPublishRequests"), func() {
+				rules.PublishesAgainAfterTooManyPublishRequests.Check(obs.Context())
+			})
+		}
+		obs.AfterCloseInvariants()
 	}, matrix.Entries(cancelThenSubscribe, fault.AllFaults...))
 })
 

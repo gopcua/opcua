@@ -476,18 +476,89 @@ var _ = Describe("when the request timeout is short", func() {
 // transport loss decide what the client must re-establish after the
 // relay cuts — the session, the session on a second server that
 // refuses the transfer, or the subscriptions on a server that forgot
-// them.
+// them. reestablishingRules decides which rule Its a fault registers.
 var _ = Describe("P4-6.7", func() {
 	DescribeTableSubtree(sessionSurvives.Name, func(f fault.Fault) {
-		matrix.Run(sessionSurvives, f)
+		obs := matrix.Run(sessionSurvives, f)
+		obs.BeforeCloseInvariants()
+		if obs.Applies(rules.ReactivatesSession) {
+			It("ReactivatesSession", obs.Labels("ReactivatesSession"), func() {
+				rules.ReactivatesSession.Check(obs.Context())
+			})
+		}
+		if obs.Applies(rules.CreatesNoSession) {
+			It("CreatesNoSession", obs.Labels("CreatesNoSession"), func() {
+				rules.CreatesNoSession.Check(obs.Context())
+			})
+		}
+		if obs.Applies(rules.RepublishesFromNextSequence) {
+			It("RepublishesFromNextSequence", obs.Labels("RepublishesFromNextSequence"), func() {
+				rules.RepublishesFromNextSequence.Check(obs.Context())
+			})
+		}
+		if obs.Applies(rules.SendsNoPublishBeforeNotAvailable) {
+			It("SendsNoPublishBeforeNotAvailable", obs.Labels("SendsNoPublishBeforeNotAvailable"), func() {
+				rules.SendsNoPublishBeforeNotAvailable.Check(obs.Context())
+			})
+		}
+		if obs.Applies(rules.KeepsSubscriptionID) {
+			It("KeepsSubscriptionID", obs.Labels("KeepsSubscriptionID"), func() {
+				rules.KeepsSubscriptionID.Check(obs.Context())
+			})
+		}
+		if obs.Applies(rules.SendsNoTransferForOwnSubscription) {
+			It("SendsNoTransferForOwnSubscription", obs.Labels("SendsNoTransferForOwnSubscription"), func() {
+				rules.SendsNoTransferForOwnSubscription.Check(obs.Context())
+			})
+		}
+		if obs.Applies(rules.CreatesSessionAfterActivateTimedOut) {
+			It("CreatesSessionAfterActivateTimedOut", obs.Labels("CreatesSessionAfterActivateTimedOut"), func() {
+				rules.CreatesSessionAfterActivateTimedOut.Check(obs.Context())
+			})
+		}
+		obs.AfterCloseInvariants()
 	}, matrix.Entries(sessionSurvives, fault.AllFaults...))
 
 	DescribeTableSubtree(sessionLost.Name, func(f fault.Fault) {
-		matrix.Run(sessionLost, f)
+		obs := matrix.Run(sessionLost, f)
+		obs.BeforeCloseInvariants()
+		if obs.Applies(rules.CreatesSessionOnlyAfterActivateFailed) {
+			It("CreatesSessionOnlyAfterActivateFailed", obs.Labels("CreatesSessionOnlyAfterActivateFailed"), func() {
+				rules.CreatesSessionOnlyAfterActivateFailed.Check(obs.Context())
+			})
+		}
+		if obs.Applies(rules.RecreatesAfterRefusal) {
+			It("RecreatesAfterRefusal", obs.Labels("RecreatesAfterRefusal"), func() {
+				rules.RecreatesAfterRefusal.Check(obs.Context())
+			})
+		}
+		if obs.Applies(rules.CreatesSessionAfterActivateTimedOut) {
+			It("CreatesSessionAfterActivateTimedOut", obs.Labels("CreatesSessionAfterActivateTimedOut"), func() {
+				rules.CreatesSessionAfterActivateTimedOut.Check(obs.Context())
+			})
+		}
+		obs.AfterCloseInvariants()
 	}, matrix.Entries(sessionLost, fault.AllFaults...))
 
 	DescribeTableSubtree(subscriptionsLost.Name, func(f fault.Fault) {
-		matrix.Run(subscriptionsLost, f)
+		obs := matrix.Run(subscriptionsLost, f)
+		obs.BeforeCloseInvariants()
+		if obs.Applies(rules.RecreatesAfterRefusal) {
+			It("RecreatesAfterRefusal", obs.Labels("RecreatesAfterRefusal"), func() {
+				rules.RecreatesAfterRefusal.Check(obs.Context())
+			})
+		}
+		if obs.Applies(rules.RepublishesRecreatedFromOne) {
+			It("RepublishesRecreatedFromOne", obs.Labels("RepublishesRecreatedFromOne"), func() {
+				rules.RepublishesRecreatedFromOne.Check(obs.Context())
+			})
+		}
+		if obs.Applies(rules.CreatesSessionAfterActivateTimedOut) {
+			It("CreatesSessionAfterActivateTimedOut", obs.Labels("CreatesSessionAfterActivateTimedOut"), func() {
+				rules.CreatesSessionAfterActivateTimedOut.Check(obs.Context())
+			})
+		}
+		obs.AfterCloseInvariants()
 	}, matrix.Entries(subscriptionsLost, fault.AllFaults...))
 })
 

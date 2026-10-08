@@ -2,6 +2,8 @@ package matrix
 
 import (
 	"context"
+	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -9,25 +11,41 @@ import (
 	"github.com/gopcua/opcua/tests/spec/internal/fault"
 	"github.com/gopcua/opcua/tests/spec/internal/harness"
 	"github.com/gopcua/opcua/tests/spec/internal/invariants"
+	"github.com/gopcua/opcua/tests/spec/internal/rules"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 
+// Observation is one case of a scenario as the clause file registers
+// it: the planned case, and what the case's BeforeAll observed, for
+// the check Its to read.
+type Observation struct {
+	scenario Scenario
+	fault    fault.Fault
+	planned  Case
+	before   invariants.Observed
+	after    invariants.Observed
+	outcome  Outcome
+	// written lists the checks whose Its asked for their labels, in
+	// the order they registered.
+	written []string
+}
+
 // Run registers one case of the scenario: when the fault does not
 // apply, one It that skips with the reason; otherwise a BeforeAll that
 // runs the workload and takes a snapshot before and after the client
-// closes, and one It per check with its labels.
-func Run(s Scenario, f fault.Fault) {
-	c := s.caseOf(f)
+// closes. The clause file then registers the case's check Its with
+// the returned Observation: BeforeCloseInvariants, one It per rule
+// that Applies, then AfterCloseInvariants.
+func Run(s Scenario, f fault.Fault) *Observation {
+	o := &Observation{scenario: s, fault: f, planned: s.caseOf(f)}
+	c := o.planned
 	if c.Skip != nil {
 		ginkgo.It("does not apply: "+c.Skip.Text, func() {
 			ginkgo.Skip(c.Skip.Text)
 		})
-		return
+		return o
 	}
-	var before invariants.Observed
-	var after invariants.Observed
-	var outcome Outcome
 
 	ginkgo.BeforeAll(func() {
 		var opts []harness.Option
@@ -37,18 +55,18 @@ func Run(s Scenario, f fault.Fault) {
 		opts = append(opts, f.Options()...)
 		env := harness.New(ginkgo.GinkgoT(), opts...)
 
-		outcome = s.Workload(env, f, c.Block)
+		o.outcome = s.Workload(env, f, c.Block)
 
 		// Settle: the sentinel reaches the client before the
 		// snapshot reads it, and the case ends with the client
 		// reporting Connected, so the teardown closes a live
 		// client instead of racing its reconnect Dial (#883).
-		waitForSentinel(env, outcome.Sentinel)
+		waitForSentinel(env, o.outcome.Sentinel)
 		waitUntilConnected(env)
 
-		before = invariants.Observe(env, outcome.Injected)
-		before.WithFaultEnd(outcome.FaultEnd)
-		before.WithSentinel(outcome.Sentinel, outcome.AnsweredAt)
+		o.before = invariants.Observe(env, o.outcome.Injected)
+		o.before.WithFaultEnd(o.outcome.FaultEnd)
+		o.before.WithSentinel(o.outcome.Sentinel, o.outcome.AnsweredAt)
 
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
@@ -60,43 +78,91 @@ func Run(s Scenario, f fault.Fault) {
 		// as never fired.
 		if isHoldFault(f) {
 			deadline := time.Now().Add(10 * time.Second)
-			for !outcome.Injected.Fired() && time.Now().Before(deadline) {
+			for !o.outcome.Injected.Fired() && time.Now().Before(deadline) {
 				time.Sleep(50 * time.Millisecond)
 			}
 		}
 
-		after = invariants.Observe(env, outcome.Injected)
-		after.WithFaultEnd(outcome.FaultEnd)
-		after.WithSentinel(outcome.Sentinel, outcome.AnsweredAt)
+		o.after = invariants.Observe(env, o.outcome.Injected)
+		o.after.WithFaultEnd(o.outcome.FaultEnd)
+		o.after.WithSentinel(o.outcome.Sentinel, o.outcome.AnsweredAt)
 	})
+	return o
+}
 
-	for _, check := range c.Checks {
-		assert := s.assertion(check.Name, f)
-		ginkgo.It(check.Name, ginkgo.Label(check.Labels...), func() {
-			assert(before, after, outcome)
-		})
+// BeforeCloseInvariants registers one It per invariant of the
+// scenario that reads the snapshot taken before the client closes.
+func (o *Observation) BeforeCloseInvariants() {
+	o.invariantsIn(BeforeClose)
+}
+
+// AfterCloseInvariants registers one It per invariant of the scenario
+// that reads the snapshot taken after the client closes. It is the
+// case's last call, so it panics when the Its registered so far differ
+// from the case's planned checks, which carry the known-defect labels.
+func (o *Observation) AfterCloseInvariants() {
+	o.invariantsIn(AfterClose)
+	var planned []string
+	for _, check := range o.planned.Checks {
+		planned = append(planned, check.Name)
+	}
+	if !slices.Equal(o.written, planned) {
+		panic(fmt.Sprintf("scenario %s under %s registers the checks %v, but plans %v",
+			strings.Join(o.planned.Path[:2], "/"), o.planned.Path[2], o.written, planned))
 	}
 }
 
-// assertion returns what the check named name asserts: an invariant
-// reads the snapshot its phase names, a rule reads the context the
-// workload returned.
-func (s Scenario) assertion(name string, f fault.Fault) func(before, after invariants.Observed, outcome Outcome) {
-	for _, invariant := range s.Invariants {
-		if invariant.Name != name {
-			continue
-		}
-		if invariant.Phase == BeforeClose {
-			return func(before, _ invariants.Observed, _ Outcome) { invariant.Assert(before) }
-		}
-		return func(_, after invariants.Observed, _ Outcome) { invariant.Assert(after) }
+func (o *Observation) invariantsIn(phase Phase) {
+	if o.planned.Skip != nil {
+		return
 	}
-	for _, rule := range s.rulesUnder(f) {
-		if rule.Name == name {
-			return func(_, _ invariants.Observed, outcome Outcome) { rule.Check(outcome.Rules) }
+	for _, invariant := range o.scenario.Invariants {
+		if invariant.Phase == phase {
+			ginkgo.It(invariant.Name, o.Labels(invariant.Name), func() {
+				o.assertInvariant(invariant)
+			})
 		}
 	}
-	panic("scenario " + s.Name + " has no check named " + name)
+}
+
+// assertInvariant asserts the invariant on the snapshot its phase
+// names.
+func (o *Observation) assertInvariant(invariant Invariant) {
+	if invariant.Phase == BeforeClose {
+		invariant.Assert(o.before)
+		return
+	}
+	invariant.Assert(o.after)
+}
+
+// Applies says whether the scenario's Rules prescribe the rule under
+// the case's fault, so the clause file registers its It.
+func (o *Observation) Applies(rule rules.Rule) bool {
+	if o.planned.Skip != nil {
+		return false
+	}
+	return slices.ContainsFunc(o.scenario.rulesUnder(o.fault), func(r rules.Rule) bool { return r.Name == rule.Name })
+}
+
+// Labels returns the labels of the case's check named name: its
+// clause, fault and message labels, and the known-defect labels the
+// scenario predicts for it. It panics when the case plans no such
+// check.
+func (o *Observation) Labels(name string) ginkgo.Labels {
+	for _, check := range o.planned.Checks {
+		if check.Name == name {
+			o.written = append(o.written, name)
+			return ginkgo.Label(check.Labels...)
+		}
+	}
+	panic(fmt.Sprintf("scenario %s under %s plans no check named %s",
+		strings.Join(o.planned.Path[:2], "/"), o.planned.Path[2], name))
+}
+
+// Context returns the rules' context the workload returned. A rule's
+// It reads it, after the BeforeAll ran.
+func (o *Observation) Context() rules.Context {
+	return o.outcome.Rules
 }
 
 // waitForSentinel waits up to 15 s for the client to receive the

@@ -61,7 +61,9 @@ var idleFaults = []fault.Fault{faultNamed("Server/Pause"), faultNamed("Server/Du
 
 var _ = Describe("P4-0", func() {
 	DescribeTableSubtree(idle.Name, func(f fault.Fault) {
-		Run(idle, f)
+		obs := Run(idle, f)
+		obs.BeforeCloseInvariants()
+		obs.AfterCloseInvariants()
 	}, Entries(idle, idleFaults...))
 })
 

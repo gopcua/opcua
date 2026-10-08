@@ -56,7 +56,9 @@ func init() {
 	if os.Getenv("SPECTEST_FAILFIRST") != "" {
 		ginkgo.Describe(failFirst.Clause, func() {
 			ginkgo.DescribeTableSubtree(failFirst.Name, func(f fault.Fault) {
-				Run(failFirst, f)
+				obs := Run(failFirst, f)
+				obs.BeforeCloseInvariants()
+				obs.AfterCloseInvariants()
 			}, Entries(failFirst, faultNamed("RequestLost/Read")))
 		})
 	}

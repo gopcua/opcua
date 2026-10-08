@@ -16,8 +16,10 @@ import (
 // except those in the exception list. The unit test asserts the
 // known-defect table labels every listed case and nothing else.
 
-// triageRecreatePathFaults lists the faults whose labelled checks passed in
-// every one of runs 7, 8 and 9, so no entry covers them.
+// triageRecreatePathFaults lists the faults under which the client
+// creates a new session instead of reactivating its old one. The
+// listed checks passed under each of them in three full runs of the
+// matrix, so no entry covers them.
 var triageRecreatePathFaults = []string{
 	"CutAfterResponse/OpenSecureChannel", "DelayAboveTimeout/ActivateSession",
 	"RequestLost/ActivateSession", "ResponseLost/ActivateSession"}
