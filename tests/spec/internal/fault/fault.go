@@ -211,7 +211,14 @@ func (controlFault) Inject(env *harness.Environment) *harness.Injected {
 }
 
 // AllFaults is the full fault catalogue, built once at package init. The
-// matrix enumerates it in full; it is never sampled.
+// matrix enumerates it in full; it is never sampled. Most names are
+// generated as a cross product — fault kind × message for the
+// message-targeting faults, overload status × service for the
+// overloads — so a name such as DelayBelowTimeout/CreateMonitoredItems
+// appears nowhere literally.
+// TestMessageFaultsCoverEveryMember derives every kind × message name
+// from the message package's source and asserts the catalogue carries
+// each one; TestAllFaultsSize pins the catalogue's size.
 var AllFaults = buildAllFaults()
 
 func buildAllFaults() []Fault {

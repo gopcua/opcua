@@ -34,7 +34,9 @@ standard does not cover. `issue-N` and `pr-N` cite GitHub.
 
 A known-defect label is a prediction that its spec fails on `main`. A later
 PR gates CI on it: a run that makes a known-defect spec pass fails the gate,
-so a fix removes the label.
+so a fix removes the label. A defect with no issue yet carries the label
+`matrix.Unfiled` returns, on the per-fault matrix checks it predicts
+fail; a hand-written spec for such a defect carries `known-defect` alone.
 
 A failure message starting with `spectest:` reports a fault in the harness
 itself. Any other failure reports client behaviour.

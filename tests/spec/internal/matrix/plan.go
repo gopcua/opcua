@@ -29,21 +29,25 @@ type Outcome struct {
 	Rules      rules.Context
 }
 
-// Phase says whether a check runs before or after the client closes.
+// Phase picks the snapshot an invariant asserts on. A rule check
+// carries a phase too, but nothing reads it at run time: a rule reads
+// the recorder through the workload's rules context, after the client
+// closed (Observation.Context).
 type Phase int
 
 // The zero Phase is invalid; no check carries it.
 const (
-	// BeforeClose: the check reads the first snapshot, taken while the
-	// client is still connected.
+	// BeforeClose: the invariant asserts on the snapshot taken while
+	// the client is still connected.
 	BeforeClose Phase = iota + 1
-	// AfterClose: the check reads the second snapshot, taken after the
-	// client closed.
+	// AfterClose: the invariant asserts on the snapshot taken after
+	// the client closed.
 	AfterClose
 )
 
 // Check is one assertion a case runs: an invariant's or a rule's
-// name, the labels it carries and the phase it runs in.
+// name, the labels it carries and its phase (see Phase for what the
+// phase does).
 type Check struct {
 	Name   string
 	Labels []string
