@@ -30,8 +30,8 @@ type failFirstSuite struct{}
 
 func (failFirstSuite) Clause() string { return "P4-COF" }
 
-func (failFirstSuite) Scenarios() []Scenario {
-	return []Scenario{failFirstScenario{}}
+func (failFirstSuite) Scenarios() []SuiteScenario {
+	return []SuiteScenario{failFirstScenario{}}
 }
 
 func (failFirstSuite) Rules(Category) []rules.Rule { return nil }

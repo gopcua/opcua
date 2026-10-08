@@ -3,11 +3,14 @@ package matrix_test
 import (
 	"flag"
 	"os"
+	"reflect"
+	"slices"
 	"testing"
 
 	"github.com/gopcua/opcua/tests/spec/internal/fault"
 	"github.com/gopcua/opcua/tests/spec/internal/matrix"
 	"github.com/gopcua/opcua/tests/spec/internal/matrix/suites"
+	"github.com/gopcua/opcua/tests/spec/internal/rules"
 	"github.com/gopcua/opcua/tests/spec/internal/specrun"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -72,6 +75,97 @@ func TestPlanOverTheRealSuite(t *testing.T) {
 			t.Logf("%s: %d applicable, %d skipped", scenario.Name(), applicable[scenario.Name()], skipped[scenario.Name()])
 		}
 	}
+
+	t.Run("the scenario values plan the same cases", func(t *testing.T) {
+		var planned []matrix.Case
+		for _, suite := range all {
+			for _, scenario := range asScenarios(suite, matrix.KnownDefects()) {
+				scenarioCases, err := scenario.Cases(fault.AllFaults)
+				if err != nil {
+					t.Fatalf("planning %s returned an error: %v", scenario.Name, err)
+				}
+				planned = append(planned, scenarioCases...)
+			}
+		}
+		samePlans(t, all, cases, planned)
+	})
+}
+
+// clauseOrdinals are the ordinals the clause files give the suites'
+// scenarios.
+var clauseOrdinals = map[string]int{
+	"SessionSurvives": 1, "SessionLost": 2, "SubscriptionsLost": 3, "SteadyPublishing": 4, "CancelThenSubscribe": 5,
+}
+
+// asScenarios restates one suite's scenarios as scenario values: the
+// rules of each fault's category, the subscription invariants, and the
+// known defects that apply to the scenario under some fault.
+func asScenarios(suite matrix.Suite, defects []matrix.SuiteDefect) []matrix.Scenario {
+	var scenarios []matrix.Scenario
+	for _, old := range suite.Scenarios() {
+		name := old.Name()
+		var own []matrix.KnownDefect
+		for _, defect := range defects {
+			if !slices.ContainsFunc(fault.AllFaults, func(f fault.Fault) bool { return defect.Applies(name, f) }) {
+				continue
+			}
+			own = append(own, matrix.KnownDefect{Issue: defect.Issue, Check: defect.Check, Applies: func(f fault.Fault) bool { return defect.Applies(name, f) }})
+		}
+		scenarios = append(scenarios, matrix.Scenario{
+			Clause:       suite.Clause(),
+			Name:         name,
+			Ordinal:      clauseOrdinals[name],
+			Sends:        old.Sends(),
+			Rules:        func(f fault.Fault) []rules.Rule { return suite.Rules(old.Category(f)) },
+			Invariants:   matrix.SubscriptionInvariants,
+			KnownDefects: own,
+		})
+	}
+	return scenarios
+}
+
+// samePlans asserts the scenario values planned exactly the suites'
+// cases: the same paths in the same order, the same skip reasons, the
+// same checks in order with the same labels and phases, and the value
+// block the suite derives.
+func samePlans(t *testing.T, clauses []matrix.Suite, old, planned []matrix.Case) {
+	t.Helper()
+	if len(planned) != len(old) {
+		t.Fatalf("the scenario values planned %d cases, the suites %d", len(planned), len(old))
+	}
+	scenarioNamed := map[string]matrix.SuiteScenario{}
+	for _, suite := range clauses {
+		for _, scenario := range suite.Scenarios() {
+			scenarioNamed[suite.Clause()+"/"+scenario.Name()] = scenario
+		}
+	}
+	for i := range old {
+		was, now := old[i], planned[i]
+		if !slices.Equal(was.Path, now.Path) {
+			t.Fatalf("case %d is %v in the scenario values, %v in the suites", i, now.Path, was.Path)
+		}
+		if (was.Skip == nil) != (now.Skip == nil) || (was.Skip != nil && *was.Skip != *now.Skip) {
+			t.Errorf("%v skips with %v in the scenario values, %v in the suites", now.Path, now.Skip, was.Skip)
+		}
+		if !reflect.DeepEqual(was.Checks, now.Checks) {
+			t.Errorf("%v has the checks\n%+v\nin the scenario values, and\n%+v\nin the suites", now.Path, now.Checks, was.Checks)
+		}
+		f := namedFault(t, was.Path[2])
+		if want := suites.CaseBlock(scenarioNamed[was.Path[0]+"/"+was.Path[1]], f); now.Block != want {
+			t.Errorf("%v has the value block %d in the scenario values, %d in the suites", now.Path, now.Block, want)
+		}
+	}
+}
+
+func namedFault(t *testing.T, name string) fault.Fault {
+	t.Helper()
+	for _, f := range fault.AllFaults {
+		if f.Name() == name {
+			return f
+		}
+	}
+	t.Fatalf("no fault named %s", name)
+	return nil
 }
 
 // TestMain runs the package's tests only when the spec suite runs, so

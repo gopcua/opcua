@@ -71,7 +71,7 @@ func TestConsumerBurst(t *testing.T) {
 // that carried it by value and never a value another case answered.
 func TestCaseValuesNeverOverlap(t *testing.T) {
 	seen := map[int32]string{}
-	var every []matrix.Scenario
+	var every []matrix.SuiteScenario
 	for _, suite := range []matrix.Suite{P4_06_07(), P4_05_14()} {
 		every = append(every, suite.Scenarios()...)
 	}

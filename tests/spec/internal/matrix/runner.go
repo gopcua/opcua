@@ -26,7 +26,7 @@ var registered []Suite
 // BeforeAll took. One failing check retires only itself, so the checks
 // behind it still run and report. It panics when the plan cannot be
 // built.
-func RegisterSuites(suites []Suite, defects []KnownDefect, all ...fault.Fault) {
+func RegisterSuites(suites []Suite, defects []SuiteDefect, all ...fault.Fault) {
 	registered = append(registered, suites...)
 	cases, err := Plan(suites, all, defects)
 	if err != nil {
@@ -168,7 +168,7 @@ func isHoldFault(f fault.Fault) bool {
 	return strings.HasPrefix(f.Name(), "DelayAboveTimeout/") || strings.HasPrefix(f.Name(), "DelayBelowTimeout/")
 }
 
-func scenarioNamed(clause, name string) Scenario {
+func scenarioNamed(clause, name string) SuiteScenario {
 	for _, suite := range registered {
 		if suite.Clause() != clause {
 			continue

@@ -51,15 +51,15 @@ const (
 // categories prescribe.
 type Suite interface {
 	Clause() string
-	Scenarios() []Scenario
+	Scenarios() []SuiteScenario
 	Rules(Category) []rules.Rule
 }
 
-// Scenario is one workload of a suite: the messages a correct client
+// SuiteScenario is one workload of a suite: the messages a correct client
 // sends after the arm point, the New options it needs per fault, the
 // category the clause prescribes per fault, and the Run that drives
 // the client and injects the fault at its arm point.
-type Scenario interface {
+type SuiteScenario interface {
 	Name() string
 	Sends() []message.Message
 	Options(f fault.Fault) []harness.Option
@@ -78,9 +78,9 @@ type Outcome struct {
 	Rules      rules.Context
 }
 
-// KnownDefect is one prediction that a check fails on this tree: the
+// SuiteDefect is one prediction that a check fails on this tree: the
 // issue that names it, the check it labels and where it applies.
-type KnownDefect struct {
+type SuiteDefect struct {
 	Issue   string
 	Check   string
 	Applies func(scenario string, f fault.Fault) bool
@@ -109,12 +109,13 @@ type Check struct {
 }
 
 // Case is one suite × scenario × fault combination the plan decided:
-// its path, its skip reason when the fault does not apply, and its
-// checks.
+// its path, its skip reason when the fault does not apply, its checks,
+// and the first number of its value block.
 type Case struct {
 	Path   []string
 	Skip   *fault.Reason
 	Checks []Check
+	Block  int32
 }
 
 // Plan decides what the failure matrix runs: one case per suite ×
@@ -122,7 +123,7 @@ type Case struct {
 // the known defects that label them. It returns an error — never
 // panics — for a defect that matches no applicable check, a zero
 // category or two scenarios of one suite with the same name.
-func Plan(suites []Suite, all []fault.Fault, defects []KnownDefect) ([]Case, error) {
+func Plan(suites []Suite, all []fault.Fault, defects []SuiteDefect) ([]Case, error) {
 	var cases []Case
 	for _, suite := range suites {
 		seen := make(map[string]bool)
@@ -157,7 +158,7 @@ func Plan(suites []Suite, all []fault.Fault, defects []KnownDefect) ([]Case, err
 	return cases, nil
 }
 
-func checksOf(suite Suite, scenario Scenario, category Category, f fault.Fault, defects []KnownDefect) ([]Check, error) {
+func checksOf(suite Suite, scenario SuiteScenario, category Category, f fault.Fault, defects []SuiteDefect) ([]Check, error) {
 	_ = categoryInvalid
 	_ = phaseInvalid
 	var checks []Check
@@ -233,7 +234,7 @@ func faultTarget(f fault.Fault) (string, bool) {
 
 // defectsMatch verifies every defect labels at least one check of an
 // applicable, non-skipped case.
-func defectsMatch(defects []KnownDefect, cases []Case) error {
+func defectsMatch(defects []SuiteDefect, cases []Case) error {
 	for _, defect := range defects {
 		matched := false
 		for _, c := range cases {

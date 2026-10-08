@@ -46,7 +46,7 @@ var cutPublishFaults = []string{
 // §5.14 rules — RepublishesSkippedSequence and
 // PublishesAgainAfterTooManyPublishRequests — have no measured verdict
 // on any tree yet, so they get no prediction; the measurement decides.
-var knownDefects = []KnownDefect{
+var knownDefects = []SuiteDefect{
 	{Issue: "issue-879", Check: "RepublishesFromNextSequence", Applies: everyFaultOf("SessionSurvives")},
 	{Issue: "issue-879", Check: "SendsNoPublishBeforeNotAvailable", Applies: everyFaultOf("SessionSurvives")},
 	{Issue: "issue-879", Check: "KeepsSubscriptionID", Applies: everyFaultOf("SessionSurvives")},
@@ -196,6 +196,6 @@ func faultsNamedIn(scenarios []string, names ...string) func(string, fault.Fault
 }
 
 // KnownDefects returns the known-defect table of the §6.7 suite.
-func KnownDefects() []KnownDefect {
+func KnownDefects() []SuiteDefect {
 	return slices.Clone(knownDefects)
 }

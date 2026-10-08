@@ -29,8 +29,8 @@ type p4_06_07 struct{}
 
 func (p4_06_07) Clause() string { return "P4-6.7" }
 
-func (p4_06_07) Scenarios() []matrix.Scenario {
-	return []matrix.Scenario{
+func (p4_06_07) Scenarios() []matrix.SuiteScenario {
+	return []matrix.SuiteScenario{
 		scenario06_07{
 			name: "SessionSurvives",
 			sends: []message.Message{
@@ -353,7 +353,7 @@ func (s scenario06_07) values(f fault.Fault) caseValues {
 // Publish right after the fault is armed, so a spec can tell the arm
 // exchange's answer apart from the values the client received before
 // the arm.
-func ArmValueOf(scenario matrix.Scenario, f fault.Fault) int32 {
+func ArmValueOf(scenario matrix.SuiteScenario, f fault.Fault) int32 {
 	return scenario.(scenario06_07).values(f).vArm
 }
 
@@ -371,6 +371,12 @@ func caseOrdinal(scenario string, f fault.Fault) int {
 	return scenarioOrdinals[scenario]*len(fault.AllFaults) + faultOrdinal + 1
 }
 
+// CaseBlock returns the first number of one case's value block, so a
+// plan built another way can be compared with it.
+func CaseBlock(scenario matrix.SuiteScenario, f fault.Fault) int32 {
+	return int32(1000 * caseOrdinal(scenario.Name(), f))
+}
+
 var scenarioOrdinals = map[string]int{
 	"SessionSurvives":     0,
 	"SessionLost":         1,
@@ -381,7 +387,7 @@ var scenarioOrdinals = map[string]int{
 
 // caseValuesOf returns every value of one case's block, for the test
 // that pins the blocks apart.
-func caseValuesOf(scenario matrix.Scenario, f fault.Fault) []int32 {
+func caseValuesOf(scenario matrix.SuiteScenario, f fault.Fault) []int32 {
 	s := scenario.(scenario06_07)
 	values := s.values(f)
 	all := []int32{values.first, values.v1, values.v2, values.v3, values.vArm, values.sentinel}
@@ -391,7 +397,7 @@ func caseValuesOf(scenario matrix.Scenario, f fault.Fault) []int32 {
 // caseValuesOfAny returns every value of one case's block whatever
 // suite its scenario belongs to, for the test that pins every suite's
 // blocks apart.
-func caseValuesOfAny(scenario matrix.Scenario, f fault.Fault) []int32 {
+func caseValuesOfAny(scenario matrix.SuiteScenario, f fault.Fault) []int32 {
 	if _, is := scenario.(scenario06_07); is {
 		return caseValuesOf(scenario, f)
 	}

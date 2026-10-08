@@ -29,8 +29,8 @@ type idleSuite struct{}
 
 func (idleSuite) Clause() string { return "P4-0" }
 
-func (idleSuite) Scenarios() []Scenario {
-	return []Scenario{idleScenario{}}
+func (idleSuite) Scenarios() []SuiteScenario {
+	return []SuiteScenario{idleScenario{}}
 }
 
 func (idleSuite) Rules(Category) []rules.Rule { return nil }
@@ -67,7 +67,7 @@ func (idleScenario) Run(env *harness.Environment, f fault.Fault) Outcome {
 // selfSpecDefects labels the DuplicateSequence case's delivery check:
 // the client delivers a notification whose sequence number it already
 // received, which the invariant now catches.
-var selfSpecDefects = []KnownDefect{
+var selfSpecDefects = []SuiteDefect{
 	{
 		Issue: Unfiled("duplicate-sequence", "client delivers a notification whose sequence number it already received (S9)"),
 		Check: "DeliverEachValueOnce",

@@ -26,7 +26,7 @@ func TestResponseLostPublishDropsTheArmAnswer(t *testing.T) {
 	if specrun.MatrixRuns() {
 		t.Skip("the matrix run drives this case itself")
 	}
-	var scenario matrix.Scenario
+	var scenario matrix.SuiteScenario
 	for _, s := range suites.P4_06_07().Scenarios() {
 		if s.Name() == "SessionSurvives" {
 			scenario = s

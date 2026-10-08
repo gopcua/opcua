@@ -25,8 +25,8 @@ type p4_05_14 struct{}
 
 func (p4_05_14) Clause() string { return "P4-5.14" }
 
-func (p4_05_14) Scenarios() []matrix.Scenario {
-	return []matrix.Scenario{
+func (p4_05_14) Scenarios() []matrix.SuiteScenario {
+	return []matrix.SuiteScenario{
 		scenario05_14{
 			name: "SteadyPublishing",
 			sends: []message.Message{
@@ -315,7 +315,7 @@ func (s scenario05_14) Run(env *harness.Environment, f fault.Fault) matrix.Outco
 
 // caseValuesOf05_14 returns every value of one §5.14 case's block, for
 // the test that pins the blocks apart.
-func caseValuesOf05_14(scenario matrix.Scenario, f fault.Fault) []int32 {
+func caseValuesOf05_14(scenario matrix.SuiteScenario, f fault.Fault) []int32 {
 	s := scenario.(scenario05_14)
 	values := s.values(f)
 	all := []int32{values.first, values.vArm, values.sentinel}
