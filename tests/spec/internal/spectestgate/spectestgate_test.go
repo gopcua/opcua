@@ -2,8 +2,14 @@ package spectestgate_test
 
 import (
 	"encoding/json"
+	"go/ast"
+	"go/parser"
+	"go/token"
+	"io/fs"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -113,4 +119,57 @@ func spectestUnset(environ []string) []string {
 		kept = append(kept, entry)
 	}
 	return kept
+}
+
+// TestInternalCitesNoClause asserts no non-test code under
+// tests/spec/internal/ cites a clause of the standard: internal/ makes
+// the suite happen and records what happened, while the clause files
+// under tests/spec/part4/ say what must hold, so a clause label or an
+// import of a part package in internal/ would put Part 4 content back
+// into the engine. Comments may cite the standard.
+func TestInternalCitesNoClause(t *testing.T) {
+	modRoot, err := exec.Command("go", "list", "-m", "-f", "{{.Dir}}").Output()
+	if err != nil {
+		t.Fatalf("go list -m failed: %v", err)
+	}
+	internal := filepath.Join(strings.TrimSpace(string(modRoot)), "tests", "spec", "internal")
+
+	clause := regexp.MustCompile(`^"P[0-9]+-`)
+	fset := token.NewFileSet()
+	parsed := 0
+	err = filepath.WalkDir(internal, func(path string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		file, err := parser.ParseFile(fset, path, nil, 0)
+		if err != nil {
+			return err
+		}
+		parsed++
+		for _, imported := range file.Imports {
+			if strings.Contains(strings.Trim(imported.Path.Value, `"`), "/tests/spec/part") {
+				t.Errorf("%s imports %s, a part package: what a clause demands belongs in its clause file, not in internal/", path, imported.Path.Value)
+			}
+		}
+		ast.Inspect(file, func(node ast.Node) bool {
+			literal, isString := node.(*ast.BasicLit)
+			if !isString || literal.Kind != token.STRING {
+				return true
+			}
+			if clause.MatchString(literal.Value) {
+				t.Errorf("%s holds the clause label %s: a clause label belongs in the clause files under tests/spec/part, not in internal/", path, literal.Value)
+			}
+			return true
+		})
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walking %s failed: %v", internal, err)
+	}
+	if parsed == 0 {
+		t.Fatalf("parsed no non-test .go file under %s, so the check matched nothing", internal)
+	}
 }
