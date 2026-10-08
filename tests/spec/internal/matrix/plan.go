@@ -1,8 +1,13 @@
 // Package matrix runs the failure matrix: a clause file declares each
 // scenario as a value and registers it, and the matrix plans one case
 // per fault with its checks and known-defect labels, then runs a real
-// client through each case and asserts the invariants and rules
-// against what it observed.
+// client through each case and asserts its checks against what it
+// observed. A rule is a Rule value in the clause file of the clause it
+// cites, and an invariant an Invariant value in the clause package's
+// invariants file, part4/invariants_test.go. The matrix adds
+// the HaveFired check to every applicable case itself. Nothing under
+// internal/ cites a clause in code; spectestgate's
+// TestInternalCitesNoClause fails the suite when it does.
 package matrix
 
 import (

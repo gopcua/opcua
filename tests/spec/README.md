@@ -28,6 +28,13 @@ A spec's labels name what it cites. `P4-6.7` cites Part 4 clause 6.7
 `should` marks a recommendation and `interop` tolerates server behaviour the
 standard does not cover. `issue-N` and `pr-N` cite GitHub.
 
+A rule is a `matrix.Rule` value in the clause file of the clause it cites.
+An invariant is a `matrix.Invariant` value in `part4/invariants_test.go`.
+Nothing under `internal/` cites a clause in code: `internal/` holds the
+harness, the faults and the matrix runner, and a gate test in
+`internal/spectestgate` fails the suite when its non-test code names a
+clause.
+
 A known-defect label is a prediction that its spec fails on `main`. A later
 PR gates CI on it: a run that makes a known-defect spec pass fails the gate,
 so a fix removes the label. A defect with no issue yet carries the label
