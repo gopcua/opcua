@@ -295,3 +295,6 @@ func (s Scenario) block(f fault.Fault) int32 {
 	})
 	return int32(1000 * ((s.Ordinal-1)*len(fault.AllFaults) + faultOrdinal + 1))
 }
+
+// EveryFault says a known defect applies under every fault.
+func EveryFault(fault.Fault) bool { return true }

@@ -1,8 +1,10 @@
 package part4
 
 import (
+	"strings"
 	"time"
 
+	"github.com/gopcua/opcua/tests/spec/internal/fault"
 	"github.com/gopcua/opcua/tests/spec/internal/harness"
 	"github.com/gopcua/opcua/tests/spec/internal/rules"
 	"github.com/gopcua/opcua/ua"
@@ -114,4 +116,12 @@ func notificationCarryingValue(env *harness.Environment, value int32) (harness.N
 		}
 	}
 	return harness.Notification{}, false
+}
+
+// targetsPublish says whether the fault arms on the Publish service:
+// the message faults that name it and the overload faults that answer
+// it.
+func targetsPublish(f fault.Fault) bool {
+	parts := strings.Split(f.Name(), "/")
+	return len(parts) >= 2 && parts[1] == "Publish"
 }
