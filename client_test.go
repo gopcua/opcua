@@ -2,7 +2,10 @@ package opcua
 
 import (
 	"context"
+	"net"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/gopcua/opcua/id"
 	"github.com/gopcua/opcua/ua"
@@ -277,4 +280,44 @@ func TestClient_LoadNil(t *testing.T) {
 		assert.Nil(t, c.SecureChannel())
 		assert.Nil(t, c.Session())
 	})
+}
+
+// TestClient_DialCloseRace runs Dial and Close concurrently, as the
+// auto-reconnect monitor and a user calling Close do. Run it with -race.
+// See https://github.com/gopcua/opcua/issues/883
+func TestClient_DialCloseRace(t *testing.T) {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	defer l.Close()
+	go func() {
+		for {
+			conn, err := l.Accept()
+			if err != nil {
+				return
+			}
+			conn.Close()
+		}
+	}()
+
+	c, err := NewClient("opc.tcp://" + l.Addr().String())
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		for ctx.Err() == nil {
+			c.Dial(ctx)
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		for ctx.Err() == nil {
+			c.Close(ctx)
+		}
+	}()
+	wg.Wait()
 }
