@@ -6,10 +6,8 @@
 package specrun
 
 import (
-	"flag"
 	"fmt"
 	"os"
-	"strings"
 	"testing"
 )
 
@@ -30,21 +28,6 @@ func Enabled() bool {
 // SkipReason is the message a test that skips reports.
 func SkipReason() string {
 	return "set " + enabled + " to run the spec suite"
-}
-
-// MatrixRuns reports whether the full matrix test runs in this binary:
-// the suite gate is open and -run does not exclude TestMatrix. A test
-// that cannot share the binary with the matrix's RunSpecs — a second
-// RunSpecs fails — skips on it.
-func MatrixRuns() bool {
-	if !Enabled() {
-		return false
-	}
-	run := flag.Lookup("test.run")
-	if run == nil || run.Value.String() == "" {
-		return true
-	}
-	return strings.Contains(run.Value.String(), "TestMatrix")
 }
 
 // Main runs a test package's tests behind the suite gate.

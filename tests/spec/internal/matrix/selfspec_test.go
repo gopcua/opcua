@@ -125,16 +125,10 @@ func casePaths(cases []Case) []string {
 	return paths
 }
 
-// TestSelfSpec runs the registered suites standalone, focused by -run:
-// the label filter resolves exactly as TestMatrix does, so the default
-// run excludes the labelled known-defect checks. It skips whenever the
-// full matrix test runs in the same binary: ginkgo fails a second
-// RunSpecs call, and TestMatrix covers this suite inside itself.
+// TestSelfSpec runs the registered self-spec scenarios standalone: the
+// label filter resolves through specrun.LabelFilter, so the default
+// run excludes the labelled known-defect checks.
 func TestSelfSpec(t *testing.T) {
-	if specrun.MatrixRuns() {
-		t.Skip("TestMatrix runs the self-spec suite inside the matrix; a binary may run RunSpecs once")
-		return
-	}
 	suiteConfig, reporterConfig := GinkgoConfiguration()
 	var labelPassed bool
 	flag.Visit(func(passed *flag.Flag) {

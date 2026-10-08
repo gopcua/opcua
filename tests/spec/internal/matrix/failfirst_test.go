@@ -12,7 +12,6 @@ import (
 	"github.com/gopcua/opcua/tests/spec/internal/harness"
 	"github.com/gopcua/opcua/tests/spec/internal/message"
 	"github.com/gopcua/opcua/tests/spec/internal/rules"
-	"github.com/gopcua/opcua/tests/spec/internal/specrun"
 )
 
 const (
@@ -82,10 +81,6 @@ func init() {
 func TestContinueOnFailure(t *testing.T) {
 	if os.Getenv("SPECTEST_FAILFIRST") != "" {
 		t.Skip("the nested run of this test would recurse")
-		return
-	}
-	if specrun.MatrixRuns() {
-		t.Skip("the matrix run covers the case container without this probe")
 		return
 	}
 	report := filepath.Join(t.TempDir(), "report.json")
