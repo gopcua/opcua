@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/gopcua/opcua/tests/spec/internal/fault"
-	"github.com/gopcua/opcua/tests/spec/internal/invariants"
 	"github.com/gopcua/opcua/tests/spec/internal/message"
 	"github.com/onsi/gomega"
 )
@@ -19,8 +18,22 @@ var (
 	standInShould = Rule{Name: "StandInShould", Clause: "P4-6.7", Keyword: "should"}
 )
 
+// standInBefore and standInAfter stand in for a scenario's invariants:
+// the plan reads only their name and phase, and each fails on the
+// broken snapshot and passes on the healthy one, so the fixture in
+// TestPlanOrdersInvariantChecksBeforeRules can show which snapshot a
+// check reads.
+var (
+	standInBefore = Invariant{Name: "StandInBefore", Phase: BeforeClose, Assert: func(observed Observed) {
+		gomega.Expect(observed.Servers[0].KnownSessions).To(gomega.Equal(1), "the stand-in server holds the wrong session count")
+	}}
+	standInAfter = Invariant{Name: "StandInAfter", Phase: AfterClose, Assert: func(observed Observed) {
+		gomega.Expect(observed.Received).To(gomega.HaveLen(1), "the stand-in client received the wrong values")
+	}}
+)
+
 // scenarioOf builds a scenario for the unit tests: clause P4-1, the
-// subscription invariants, and the given rules under every fault.
+// stand-in invariants, and the given rules under every fault.
 func scenarioOf(name string, ordinal int, sends []message.Message, ruleSet ...Rule) Scenario {
 	return Scenario{
 		Clause:     "P4-1",
@@ -28,7 +41,7 @@ func scenarioOf(name string, ordinal int, sends []message.Message, ruleSet ...Ru
 		Ordinal:    ordinal,
 		Sends:      sends,
 		Rules:      func(fault.Fault) []Rule { return ruleSet },
-		Invariants: SubscriptionInvariants,
+		Invariants: []Invariant{standInBefore, standInAfter},
 	}
 }
 
@@ -117,16 +130,15 @@ func TestPlanOrdersInvariantChecksBeforeRules(t *testing.T) {
 		got = append(got, check.Name)
 	}
 	want := []string{
-		"ResumePublishing", "KeepOneSessionOpen", "KeepOneSubscriptionPerClientSubscription",
-		"StandInShall", "StandInShould",
-		"HaveFired", "DeliverEachValueOnce", "DeliverInOrder", "CloseEveryKnownSession",
+		"StandInBefore", "StandInShall", "StandInShould",
+		"HaveFired", "StandInAfter",
 	}
 	if strings.Join(got, ",") != strings.Join(want, ",") {
 		t.Fatalf("the checks are %v, want %v", got, want)
 	}
 	for _, check := range cases[0].Checks {
 		switch check.Name {
-		case "HaveFired", "DeliverEachValueOnce", "DeliverInOrder", "CloseEveryKnownSession":
+		case "HaveFired", "StandInAfter":
 			if check.Phase != AfterClose {
 				t.Errorf("%s has phase %d, want AfterClose", check.Name, check.Phase)
 			}
@@ -142,14 +154,15 @@ func TestPlanOrdersInvariantChecksBeforeRules(t *testing.T) {
 		// InterceptGomegaFailures needs registered.
 		gomega.RegisterTestingT(t)
 		want := map[string]Phase{
-			"ResumePublishing": BeforeClose, "KeepOneSessionOpen": BeforeClose, "KeepOneSubscriptionPerClientSubscription": BeforeClose,
-			"HaveFired": AfterClose, "DeliverEachValueOnce": AfterClose, "DeliverInOrder": AfterClose, "CloseEveryKnownSession": AfterClose,
+			"StandInBefore": BeforeClose,
+			"HaveFired":     AfterClose,
+			"StandInAfter":  AfterClose,
 		}
 		healthy, broken := healthySnapshot(), brokenSnapshot()
 		// fails reports whether the assertion fails, so a snapshot that
-		// fails every invariant shows which snapshot a check reads.
+		// fails every check shows which snapshot a check reads.
 		fails := func(assert func()) bool { return len(gomega.InterceptGomegaFailures(assert)) > 0 }
-		readsOf := func(assert func(before, after invariants.Observed)) []Phase {
+		readsOf := func(assert func(before, after Observed)) []Phase {
 			var reads []Phase
 			if fails(func() { assert(broken, healthy) }) {
 				reads = append(reads, BeforeClose)
@@ -159,29 +172,23 @@ func TestPlanOrdersInvariantChecksBeforeRules(t *testing.T) {
 			}
 			return reads
 		}
-		var names []string
-		invariantNamed := map[string]Invariant{}
-		for _, invariant := range SubscriptionInvariants {
-			names = append(names, invariant.Name)
-			invariantNamed[invariant.Name] = invariant
+		checks := []Invariant{standInBefore, standInAfter, haveFiredInvariant}
+		if len(checks) != len(want) {
+			t.Fatalf("the stand-in checks are %d, want exactly the %d pinned here", len(checks), len(want))
 		}
-		if len(names) != len(want) {
-			t.Fatalf("the subscription invariants are %v, want exactly the %d pinned here", names, len(want))
-		}
-		for name, phase := range want {
-			invariant, found := invariantNamed[name]
-			if !found {
-				t.Fatalf("the subscription invariants hold no %s", name)
+		for _, invariant := range checks {
+			if _, found := want[invariant.Name]; !found {
+				t.Fatalf("the stand-in checks hold no %s", invariant.Name)
 			}
-			assert := func(before, after invariants.Observed) {
+			assert := func(before, after Observed) {
 				(&Observation{before: before, after: after}).assertInvariant(invariant)
 			}
 			if fails(func() { assert(healthy, healthy) }) {
-				t.Fatalf("%s fails on the healthy snapshot, so the fixture cannot show which snapshot it reads", name)
+				t.Fatalf("%s fails on the healthy snapshot, so the fixture cannot show which snapshot it reads", invariant.Name)
 			}
 			current := readsOf(assert)
-			if !slices.Equal(current, []Phase{phase}) {
-				t.Errorf("the runner's %s reads the snapshots %v, want only %v", name, current, phase)
+			if !slices.Equal(current, []Phase{want[invariant.Name]}) {
+				t.Errorf("the runner's %s reads the snapshots %v, want only %v", invariant.Name, current, want[invariant.Name])
 			}
 		}
 		observed := &Observation{outcome: Outcome{Rules: Context{Value: 7}}}
@@ -191,32 +198,34 @@ func TestPlanOrdersInvariantChecksBeforeRules(t *testing.T) {
 	})
 }
 
-// healthySnapshot passes every invariant: one session and one
-// subscription on the connected server, the one produced value
-// received once, the sentinel received, and the fault fired.
-func healthySnapshot() invariants.Observed {
-	return invariants.Observed{
-		Produced:            []invariants.Produced{{Value: 1, SubscriptionID: 1, SequenceNumber: 1, Reachable: true, SubscriptionInstance: 1}},
+// healthySnapshot passes every stand-in check and HaveFired: one
+// session and one subscription on the connected server, the one
+// produced value received once, the sentinel received, and the fault
+// fired.
+func healthySnapshot() Observed {
+	return Observed{
+		Produced:            []Produced{{Value: 1, SubscriptionID: 1, SequenceNumber: 1, Reachable: true, SubscriptionInstance: 1}},
 		Received:            []int32{1},
-		Servers:             []invariants.ServerState{{Reachable: true, Connected: true, KnownSessions: 1, ClosingAttempted: 1, LiveSubscriptions: 1}},
+		Servers:             []ServerState{{Reachable: true, Connected: true, KnownSessions: 1, ClosingAttempted: 1, LiveSubscriptions: 1}},
 		ClientSubscriptions: 1,
 		FaultEnd:            time.Unix(1, 0),
-		Sentinel:            &invariants.Sentinel{Value: 1, AnsweredAt: time.Unix(1, 0), ReceivedAt: time.Unix(2, 0)},
+		Sentinel:            &Sentinel{Value: 1, AnsweredAt: time.Unix(1, 0), ReceivedAt: time.Unix(2, 0)},
 		Fired:               true,
 	}
 }
 
-// brokenSnapshot fails every invariant: two open sessions and no live
-// subscription on the connected server, a value received twice and
-// out of its produced order, no sentinel, and the fault never fired.
-func brokenSnapshot() invariants.Observed {
-	return invariants.Observed{
-		Produced: []invariants.Produced{
+// brokenSnapshot fails every stand-in check and HaveFired: two open
+// sessions and no live subscription on the connected server, a value
+// received twice and out of its produced order, no sentinel, and the
+// fault never fired.
+func brokenSnapshot() Observed {
+	return Observed{
+		Produced: []Produced{
 			{Value: 1, SubscriptionID: 1, SequenceNumber: 2, Reachable: true, SubscriptionInstance: 1},
 			{Value: 2, SubscriptionID: 1, SequenceNumber: 1, Reachable: true, SubscriptionInstance: 1},
 		},
 		Received:            []int32{1, 2, 2},
-		Servers:             []invariants.ServerState{{Reachable: true, Connected: true, KnownSessions: 2}},
+		Servers:             []ServerState{{Reachable: true, Connected: true, KnownSessions: 2}},
 		ClientSubscriptions: 1,
 	}
 }
@@ -314,7 +323,7 @@ func TestPlanRejectsBadDefects(t *testing.T) {
 
 func TestPlanRejectsDuplicateScenarioNames(t *testing.T) {
 	// The fixture must not leak into the registrations of later tests
-	// in this binary: the self-spec registers its own scenarios.
+	// in this binary.
 	t.Cleanup(func() {
 		registeredMu.Lock()
 		defer registeredMu.Unlock()

@@ -625,7 +625,7 @@ var sessionSurvives = matrix.Scenario{
 		rules.KeepsSubscriptionID,
 		rules.SendsNoTransferForOwnSubscription,
 	),
-	Invariants: matrix.SubscriptionInvariants,
+	Invariants: subscriptionInvariants,
 	KnownDefects: []matrix.KnownDefect{
 		{Issue: "issue-879", Check: "RepublishesFromNextSequence", Applies: matrix.EveryFault},
 		{Issue: "issue-879", Check: "SendsNoPublishBeforeNotAvailable", Applies: matrix.EveryFault},
@@ -667,7 +667,7 @@ var sessionLost = matrix.Scenario{
 		rules.CreatesSessionOnlyAfterActivateFailed,
 		rules.RecreatesAfterRefusal,
 	),
-	Invariants: matrix.SubscriptionInvariants,
+	Invariants: subscriptionInvariants,
 	KnownDefects: []matrix.KnownDefect{
 		{Issue: "issue-879", Check: "ResumePublishing", Applies: matrix.FaultsNamed(
 			"DelayAboveTimeout/Read",
@@ -714,7 +714,7 @@ var subscriptionsLost = matrix.Scenario{
 		rules.RecreatesAfterRefusal,
 		rules.RepublishesRecreatedFromOne,
 	),
-	Invariants: matrix.SubscriptionInvariants,
+	Invariants: subscriptionInvariants,
 	KnownDefects: []matrix.KnownDefect{
 		{Issue: "issue-879", Check: "RecreatesAfterRefusal", Applies: matrix.EveryFault},
 		{Issue: "issue-879", Check: "RepublishesRecreatedFromOne", Applies: matrix.EveryFault},

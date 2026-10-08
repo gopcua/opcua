@@ -177,7 +177,7 @@ var steadyPublishing = matrix.Scenario{
 			rules.PublishesAgainAfterTooManyPublishRequests,
 		}
 	},
-	Invariants: matrix.SubscriptionInvariants,
+	Invariants: subscriptionInvariants,
 }
 
 var cancelThenSubscribe = matrix.Scenario{
@@ -202,7 +202,7 @@ var cancelThenSubscribe = matrix.Scenario{
 			rules.PublishesAgainAfterTooManyPublishRequests,
 		}
 	},
-	Invariants: matrix.SubscriptionInvariants,
+	Invariants: subscriptionInvariants,
 	// The parked publish loop is the #895 mechanism, so every fault
 	// fails the cycle count and the sentinel both.
 	KnownDefects: []matrix.KnownDefect{

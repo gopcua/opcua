@@ -61,6 +61,36 @@ func TestRuleNamesDifferFromInvariantNames(t *testing.T) {
 	}
 }
 
+// TestSubscriptionInvariantPhases pins the subscription invariants: a
+// scenario that publishes on a subscription and answers a sentinel
+// last owes exactly these six checks, each reading the snapshot its
+// phase names. The matrix adds the HaveFired check itself, so no
+// entry here pins it.
+func TestSubscriptionInvariantPhases(t *testing.T) {
+	want := []struct {
+		name  string
+		phase matrix.Phase
+	}{
+		{"ResumePublishing", matrix.BeforeClose},
+		{"KeepOneSessionOpen", matrix.BeforeClose},
+		{"KeepOneSubscriptionPerClientSubscription", matrix.BeforeClose},
+		{"DeliverEachValueOnce", matrix.AfterClose},
+		{"DeliverInOrder", matrix.AfterClose},
+		{"CloseEveryKnownSession", matrix.AfterClose},
+	}
+	if len(subscriptionInvariants) != len(want) {
+		t.Fatalf("the subscription invariants hold %d entries, want the %d pinned here", len(subscriptionInvariants), len(want))
+	}
+	for i, entry := range want {
+		if subscriptionInvariants[i].Name != entry.name {
+			t.Errorf("invariant %d is %s, want %s", i, subscriptionInvariants[i].Name, entry.name)
+		}
+		if subscriptionInvariants[i].Phase != entry.phase {
+			t.Errorf("%s reads phase %d, want %d", entry.name, subscriptionInvariants[i].Phase, entry.phase)
+		}
+	}
+}
+
 // TestCaseValuesNeverOverlap pins that no two cases of the matrix share
 // a value: every case derives its values — first value, answered
 // values, retained value, sentinel and consumer burst alike — from its

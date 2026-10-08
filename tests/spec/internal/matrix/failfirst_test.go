@@ -12,6 +12,7 @@ import (
 	"github.com/gopcua/opcua/tests/spec/internal/harness"
 	"github.com/gopcua/opcua/tests/spec/internal/message"
 	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 )
 
 const (
@@ -20,6 +21,49 @@ const (
 	failFirstValue3   int32 = 353
 	failFirstSentinel int32 = 399
 )
+
+// failFirstInvariants are the stand-ins the failure-continuation case
+// asserts in place of the subscription invariants, which live in part4
+// and cannot be imported here. Every stand-in reads the after-close
+// snapshot, so HaveFired, which the matrix adds between the rules and
+// the after-close invariants, is the case's first check and fails
+// while the stand-ins behind it pass. failFirst's doc says why the
+// fault never fires.
+var failFirstInvariants = []Invariant{
+	{Name: "StandInReceivedAnswers", Phase: AfterClose, Assert: func(observed Observed) {
+		gomega.Expect(observed.Received).To(gomega.ContainElements(failFirstValue1, failFirstValue2, failFirstValue3, failFirstSentinel), "the stand-in client missed an answered value")
+	}},
+	{Name: "StandInEachValueOnce", Phase: AfterClose, Assert: func(observed Observed) {
+		counts := map[int32]int{}
+		for _, value := range observed.Received {
+			counts[value]++
+		}
+		for value, count := range counts {
+			gomega.Expect(count).To(gomega.Equal(1), "the stand-in client received %d %d times", value, count)
+		}
+	}},
+	{Name: "StandInOnlyProduced", Phase: AfterClose, Assert: func(observed Observed) {
+		produced := map[int32]bool{}
+		for _, entry := range observed.Produced {
+			produced[entry.Value] = true
+		}
+		for _, value := range observed.Received {
+			gomega.Expect(produced[value]).To(gomega.BeTrue(), "the stand-in client received %d, which no server produced", value)
+		}
+	}},
+	{Name: "StandInOneServer", Phase: AfterClose, Assert: func(observed Observed) {
+		gomega.Expect(observed.Servers).To(gomega.HaveLen(1), "the stand-in environment created the wrong server count")
+	}},
+	{Name: "StandInSentinelReceived", Phase: AfterClose, Assert: func(observed Observed) {
+		gomega.Expect(observed.Sentinel).NotTo(gomega.BeNil(), "the stand-in client staged no sentinel")
+		gomega.Expect(observed.Sentinel.ReceivedAt).NotTo(gomega.BeZero(), "the stand-in client never received the sentinel")
+	}},
+	{Name: "StandInSessionsClosed", Phase: AfterClose, Assert: func(observed Observed) {
+		for _, server := range observed.Servers {
+			gomega.Expect(server.KnownSessions-server.ClosingAttempted).To(gomega.BeZero(), "the stand-in server %d still holds a session", server.Index)
+		}
+	}},
+}
 
 // failFirst is the self-spec of the case runner's failure
 // continuation: one case whose first check fails while every later
@@ -46,7 +90,7 @@ var failFirst = Scenario{
 			AnsweredAt: answeredAt,
 		}
 	},
-	Invariants: SubscriptionInvariants,
+	Invariants: failFirstInvariants,
 }
 
 // The failure-continuation suite registers only in the nested run, so

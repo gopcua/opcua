@@ -5,14 +5,11 @@ import (
 	"slices"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/gopcua/opcua/tests/spec/internal/fault"
 	"github.com/gopcua/opcua/tests/spec/internal/harness"
-	"github.com/gopcua/opcua/tests/spec/internal/invariants"
 	"github.com/gopcua/opcua/tests/spec/internal/message"
 	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
 )
 
 // Scenario is one workload a clause file crosses with the fault
@@ -61,33 +58,7 @@ type KnownDefect struct {
 type Invariant struct {
 	Name   string
 	Phase  Phase
-	Assert func(observed invariants.Observed)
-}
-
-// SubscriptionInvariants are the invariants of a workload that
-// publishes on a subscription and answers a sentinel last.
-var SubscriptionInvariants = []Invariant{
-	{Name: "ResumePublishing", Phase: BeforeClose, Assert: func(observed invariants.Observed) {
-		gomega.Expect(observed).To(invariants.ResumePublishing(15*time.Second), "the sentinel did not resume publishing within its window")
-	}},
-	{Name: "KeepOneSessionOpen", Phase: BeforeClose, Assert: func(observed invariants.Observed) {
-		gomega.Expect(observed).To(invariants.KeepOneSessionOpen(), "the connected server holds the wrong session count")
-	}},
-	{Name: "KeepOneSubscriptionPerClientSubscription", Phase: BeforeClose, Assert: func(observed invariants.Observed) {
-		gomega.Expect(observed).To(invariants.KeepOneSubscriptionPerClientSubscription(), "the live subscriptions do not match the client's")
-	}},
-	{Name: "HaveFired", Phase: AfterClose, Assert: func(observed invariants.Observed) {
-		gomega.Expect(observed.Fired).To(gomega.BeTrue(), "the fault never fired")
-	}},
-	{Name: "DeliverEachValueOnce", Phase: AfterClose, Assert: func(observed invariants.Observed) {
-		gomega.Expect(observed).To(invariants.DeliverEachValueOnce(), "a value was not delivered exactly once")
-	}},
-	{Name: "DeliverInOrder", Phase: AfterClose, Assert: func(observed invariants.Observed) {
-		gomega.Expect(observed).To(invariants.DeliverInOrder(), "values were delivered out of order")
-	}},
-	{Name: "CloseEveryKnownSession", Phase: AfterClose, Assert: func(observed invariants.Observed) {
-		gomega.Expect(observed).To(invariants.CloseEveryKnownSession(), "a reachable server still holds a session")
-	}},
+	Assert func(observed Observed)
 }
 
 var (
@@ -173,7 +144,7 @@ func (s Scenario) Cases(faults []fault.Fault) ([]Case, error) {
 // caseOf plans one case: its path, its value block, and either the
 // reason the fault does not apply or its checks. The invariants read
 // before the client closes come first, then the rules, then the
-// invariants read after it closes.
+// HaveFired check, then the invariants read after it closes.
 func (s Scenario) caseOf(f fault.Fault) Case {
 	c := Case{Path: []string{s.Clause, s.Name, f.Name()}, Block: s.block(f)}
 	if reason := f.Available(s.Sends); reason != nil {
@@ -199,6 +170,7 @@ func (s Scenario) caseOf(f fault.Fault) Case {
 		}
 		c.Checks = append(c.Checks, Check{Name: rule.Name, Labels: labels, Phase: BeforeClose})
 	}
+	c.Checks = append(c.Checks, Check{Name: haveFiredInvariant.Name, Labels: withLabels(base, "invariant"), Phase: haveFiredInvariant.Phase})
 	invariantsIn(AfterClose)
 	for i := range c.Checks {
 		for _, defect := range s.KnownDefects {

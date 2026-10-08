@@ -10,7 +10,6 @@ import (
 	"github.com/gopcua/opcua"
 	"github.com/gopcua/opcua/tests/spec/internal/fault"
 	"github.com/gopcua/opcua/tests/spec/internal/harness"
-	"github.com/gopcua/opcua/tests/spec/internal/invariants"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
@@ -22,8 +21,8 @@ type Observation struct {
 	scenario Scenario
 	fault    fault.Fault
 	planned  Case
-	before   invariants.Observed
-	after    invariants.Observed
+	before   Observed
+	after    Observed
 	outcome  Outcome
 	// written lists the checks whose Its asked for their labels, in
 	// the order they registered.
@@ -63,7 +62,7 @@ func Run(s Scenario, f fault.Fault) *Observation {
 		waitForSentinel(env, o.outcome.Sentinel)
 		waitUntilConnected(env)
 
-		o.before = invariants.Observe(env, o.outcome.Injected)
+		o.before = Observe(env, o.outcome.Injected)
 		o.before.WithFaultEnd(o.outcome.FaultEnd)
 		o.before.WithSentinel(o.outcome.Sentinel, o.outcome.AnsweredAt)
 
@@ -82,7 +81,7 @@ func Run(s Scenario, f fault.Fault) *Observation {
 			}
 		}
 
-		o.after = invariants.Observe(env, o.outcome.Injected)
+		o.after = Observe(env, o.outcome.Injected)
 		o.after.WithFaultEnd(o.outcome.FaultEnd)
 		o.after.WithSentinel(o.outcome.Sentinel, o.outcome.AnsweredAt)
 	})
@@ -95,11 +94,25 @@ func (o *Observation) BeforeCloseInvariants() {
 	o.invariantsIn(BeforeClose)
 }
 
-// AfterCloseInvariants registers one It per invariant of the scenario
-// that reads the snapshot taken after the client closes. It is the
-// case's last call, so it panics when the Its registered so far differ
-// from the case's planned checks, which carry the known-defect labels.
+// haveFiredInvariant asserts on the after-close snapshot that the
+// fault armed for the case fired.
+var haveFiredInvariant = Invariant{
+	Name:  "HaveFired",
+	Phase: AfterClose,
+	Assert: func(observed Observed) {
+		gomega.Expect(observed.Fired).To(gomega.BeTrue(), "the fault never fired")
+	},
+}
+
+// AfterCloseInvariants registers the HaveFired check, then one It per
+// invariant of the scenario that reads the snapshot taken after the
+// client closes. It is the case's last call, so it panics when the Its
+// registered so far differ from the case's planned checks, which carry
+// the known-defect labels.
 func (o *Observation) AfterCloseInvariants() {
+	if o.planned.Skip == nil {
+		o.invariant(haveFiredInvariant)
+	}
 	o.invariantsIn(AfterClose)
 	var planned []string
 	for _, check := range o.planned.Checks {
@@ -117,11 +130,17 @@ func (o *Observation) invariantsIn(phase Phase) {
 	}
 	for _, invariant := range o.scenario.Invariants {
 		if invariant.Phase == phase {
-			ginkgo.It(invariant.Name, o.Labels(invariant.Name), func() {
-				o.assertInvariant(invariant)
-			})
+			o.invariant(invariant)
 		}
 	}
+}
+
+// invariant registers one invariant's It, on the snapshot its phase
+// names.
+func (o *Observation) invariant(invariant Invariant) {
+	ginkgo.It(invariant.Name, o.Labels(invariant.Name), func() {
+		o.assertInvariant(invariant)
+	})
 }
 
 // assertInvariant asserts the invariant on the snapshot its phase
