@@ -330,9 +330,10 @@ var _ = Describe("Part 4 §6.7 Re-establishing connections https://reference.opc
 
 const dataRaceWindow = 3 * time.Second
 
+// The spec asserts nothing itself: under -race, the race detector fails
+// the test binary if Close and Dial race on the client's connection again.
 var _ = Describe("when the client is closed while it re-dials", func() {
-	It("does not race Close against the reconnect Dial", Label("P4-6.7", "issue-883", "known-defect"), func() {
-		AddReportEntry("data-race", []string{"(*Client).Close", "(*Client).Dial"})
+	It("does not race Close against the reconnect Dial", Label("P4-6.7", "issue-883"), func() {
 		env := harness.New(GinkgoT())
 		ctx := context.Background()
 		deadline := time.Now().Add(dataRaceWindow)

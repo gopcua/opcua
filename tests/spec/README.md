@@ -17,10 +17,6 @@ defects:
 
     SPECTEST=1 go test -race -timeout 30m ./tests/spec/part4/ -ginkgo.label-filter=''
 
-Until gopcua/opcua#897 merges, that run fails under `-race`. Spec C1 calls
-`Close` while the client is redialling, which reproduces the data race of
-issue #883, and the race detector then fails the test binary.
-
 Under the `ginkgo` CLI an empty `--label-filter` never reaches the test
 binary, so the known defects stay skipped (measured with ginkgo v2.33.0); set
 the environment variable to a filter that matches everything:
