@@ -7,42 +7,37 @@ import (
 	"time"
 
 	"github.com/gopcua/opcua/tests/spec/internal/fault"
-	"github.com/gopcua/opcua/tests/spec/internal/harness"
 	"github.com/gopcua/opcua/tests/spec/internal/invariants"
 	"github.com/gopcua/opcua/tests/spec/internal/message"
 	"github.com/gopcua/opcua/tests/spec/internal/rules"
 	"github.com/onsi/gomega"
 )
 
-// fakes for the unit tests: one suite with two scenarios, three faults,
-// and defects the cases label.
-
-type fakeScenario struct {
-	name  string
-	sends []message.Message
-}
-
-func (s fakeScenario) Name() string                         { return s.name }
-func (s fakeScenario) Sends() []message.Message             { return s.sends }
-func (s fakeScenario) Options(fault.Fault) []harness.Option { return nil }
-func (s fakeScenario) Category(f fault.Fault) Category      { return SessionSurvives }
-func (s fakeScenario) Run(env *harness.Environment, f fault.Fault) Outcome {
-	return Outcome{}
-}
-
-type fakeSuite struct {
-	clause     string
-	scenarios  []SuiteScenario
-	byCategory map[Category][]rules.Rule
-}
-
-func (s fakeSuite) Clause() string             { return s.clause }
-func (s fakeSuite) Scenarios() []SuiteScenario { return s.scenarios }
-func (s fakeSuite) Rules(c Category) []rules.Rule {
-	if c == Category(0) {
-		panic("zero category")
+// scenarioOf builds a scenario for the unit tests: clause P4-1, the
+// subscription invariants, and the given rules under every fault.
+func scenarioOf(name string, ordinal int, sends []message.Message, ruleSet ...rules.Rule) Scenario {
+	return Scenario{
+		Clause:     "P4-1",
+		Name:       name,
+		Ordinal:    ordinal,
+		Sends:      sends,
+		Rules:      func(fault.Fault) []rules.Rule { return ruleSet },
+		Invariants: SubscriptionInvariants,
 	}
-	return s.byCategory[c]
+}
+
+// casesOf plans every scenario over the faults, in order.
+func casesOf(t *testing.T, faults []fault.Fault, scenarios ...Scenario) []Case {
+	t.Helper()
+	var cases []Case
+	for _, s := range scenarios {
+		planned, err := s.Cases(faults)
+		if err != nil {
+			t.Fatalf("Plan returned an error: %v", err)
+		}
+		cases = append(cases, planned...)
+	}
+	return cases
 }
 
 func namedFault(t *testing.T, name string) fault.Fault {
@@ -73,23 +68,14 @@ func checkNamed(t *testing.T, cases []Case, path []string, name string) Check {
 }
 
 func TestPlanBuildsOneCasePerCombination(t *testing.T) {
-	suite := fakeSuite{
-		clause: "P4-1",
-		scenarios: []SuiteScenario{
-			fakeScenario{name: "A", sends: []message.Message{message.Publish}},
-			fakeScenario{name: "B", sends: []message.Message{message.Read}},
-		},
-		byCategory: map[Category][]rules.Rule{},
-	}
 	publishFault := namedFault(t, "RequestLost/Publish")
 	readFault := namedFault(t, "RequestLost/Read")
 	stallFault := namedFault(t, "Link/Stall")
 	all := []fault.Fault{publishFault, readFault, stallFault}
 
-	cases, err := Plan([]Suite{suite}, all, nil)
-	if err != nil {
-		t.Fatalf("Plan returned an error: %v", err)
-	}
+	cases := casesOf(t, all,
+		scenarioOf("A", 1, []message.Message{message.Publish}),
+		scenarioOf("B", 2, []message.Message{message.Read}))
 	if len(cases) != 6 {
 		t.Fatalf("Plan built %d cases, want 6 (1 suite × 2 scenarios × 3 faults)", len(cases))
 	}
@@ -114,18 +100,9 @@ func TestPlanBuildsOneCasePerCombination(t *testing.T) {
 }
 
 func TestPlanOrdersInvariantChecksBeforeRules(t *testing.T) {
-	suite := fakeSuite{
-		clause:    "P4-1",
-		scenarios: []SuiteScenario{fakeScenario{name: "A", sends: []message.Message{message.Publish}}},
-		byCategory: map[Category][]rules.Rule{
-			SessionSurvives: {rules.ReactivatesSession, rules.CreatesNoSession},
-		},
-	}
 	stall := namedFault(t, "Link/Stall")
-	cases, err := Plan([]Suite{suite}, []fault.Fault{stall}, nil)
-	if err != nil {
-		t.Fatalf("Plan returned an error: %v", err)
-	}
+	cases := casesOf(t, []fault.Fault{stall},
+		scenarioOf("A", 1, []message.Message{message.Publish}, rules.ReactivatesSession, rules.CreatesNoSession))
 	if len(cases) != 1 {
 		t.Fatalf("Plan built %d cases, want 1", len(cases))
 	}
@@ -185,22 +162,18 @@ func TestPlanOrdersInvariantChecksBeforeRules(t *testing.T) {
 			t.Fatalf("the subscription invariants are %v, want exactly the %d pinned here", names, len(want))
 		}
 		for name, phase := range want {
-			if fails(func() { assertCheck(Check{Name: name}, healthy, healthy, Outcome{}) }) {
+			assert := subscription.assertion(name, nil)
+			if fails(func() { assert(healthy, healthy, Outcome{}) }) {
 				t.Fatalf("%s fails on the healthy snapshot, so the fixture cannot show which snapshot it reads", name)
 			}
-			old := readsOf(func(before, after invariants.Observed) { assertCheck(Check{Name: name}, before, after, Outcome{}) })
-			if !slices.Equal(old, []Phase{phase}) {
-				t.Errorf("the suite runner's %s reads the snapshots %v, want only %v", name, old, phase)
-			}
-			assert := subscription.assertion(name, nil)
 			current := readsOf(func(before, after invariants.Observed) { assert(before, after, Outcome{}) })
 			if !slices.Equal(current, []Phase{phase}) {
-				t.Errorf("the scenario runner's %s reads the snapshots %v, want only %v", name, current, phase)
+				t.Errorf("the runner's %s reads the snapshots %v, want only %v", name, current, phase)
 			}
 		}
 		for _, rule := range rules.All() {
 			if _, isInvariant := want[rule.Name]; isInvariant {
-				t.Errorf("the rule %s shares an invariant's name, so the suite runner would assert the invariant instead", rule.Name)
+				t.Errorf("the rule %s shares an invariant's name, so the runner would assert the invariant instead", rule.Name)
 			}
 		}
 		var read rules.Context
@@ -209,7 +182,7 @@ func TestPlanOrdersInvariantChecksBeforeRules(t *testing.T) {
 		}}
 		withRule.assertion("ReadsTheContext", nil)(broken, broken, Outcome{Rules: rules.Context{Value: 7}})
 		if read.Value != 7 {
-			t.Errorf("the scenario runner handed a rule the context %+v, want the workload's", read)
+			t.Errorf("the runner handed a rule the context %+v, want the workload's", read)
 		}
 	})
 }
@@ -245,18 +218,9 @@ func brokenSnapshot() invariants.Observed {
 }
 
 func TestPlanLabels(t *testing.T) {
-	suite := fakeSuite{
-		clause:    "P4-1",
-		scenarios: []SuiteScenario{fakeScenario{name: "A", sends: []message.Message{message.Publish}}},
-		byCategory: map[Category][]rules.Rule{
-			SessionSurvives: {rules.ReactivatesSession, rules.SendsNoPublishBeforeNotAvailable},
-		},
-	}
 	publishFault := namedFault(t, "RequestLost/Publish")
-	cases, err := Plan([]Suite{suite}, []fault.Fault{publishFault}, nil)
-	if err != nil {
-		t.Fatalf("Plan returned an error: %v", err)
-	}
+	cases := casesOf(t, []fault.Fault{publishFault},
+		scenarioOf("A", 1, []message.Message{message.Publish}, rules.ReactivatesSession, rules.SendsNoPublishBeforeNotAvailable))
 	check := checkNamed(t, cases, []string{"P4-1", "A", "RequestLost/Publish"}, "SendsNoPublishBeforeNotAvailable")
 	if !contains(check.Labels, "P4-1") {
 		t.Errorf("a rule check misses its suite's clause label: %v", check.Labels)
@@ -293,24 +257,11 @@ func contains(labels []string, want string) bool {
 }
 
 func TestPlanLabelsOnlyMatchingDefects(t *testing.T) {
-	suite := fakeSuite{
-		clause:     "P4-1",
-		scenarios:  []SuiteScenario{fakeScenario{name: "A", sends: []message.Message{message.Publish}}},
-		byCategory: map[Category][]rules.Rule{},
-	}
 	publishFault := namedFault(t, "RequestLost/Publish")
 	stall := namedFault(t, "Link/Stall")
-	defect := SuiteDefect{
-		Issue: "issue-879",
-		Check: "HaveFired",
-		Applies: func(scenario string, f fault.Fault) bool {
-			return f.Name() == "RequestLost/Publish"
-		},
-	}
-	cases, err := Plan([]Suite{suite}, []fault.Fault{publishFault, stall}, []SuiteDefect{defect})
-	if err != nil {
-		t.Fatalf("Plan returned an error: %v", err)
-	}
+	scenario := scenarioOf("A", 1, []message.Message{message.Publish})
+	scenario.KnownDefects = []KnownDefect{{Issue: "issue-879", Check: "HaveFired", Applies: FaultsNamed("RequestLost/Publish")}}
+	cases := casesOf(t, []fault.Fault{publishFault, stall}, scenario)
 	for _, c := range cases {
 		for _, check := range c.Checks {
 			if check.Name != "HaveFired" {
@@ -331,53 +282,57 @@ func TestPlanLabelsOnlyMatchingDefects(t *testing.T) {
 }
 
 func TestPlanRejectsBadDefects(t *testing.T) {
-	suite := fakeSuite{
-		clause:     "P4-1",
-		scenarios:  []SuiteScenario{fakeScenario{name: "A", sends: []message.Message{message.Read}}},
-		byCategory: map[Category][]rules.Rule{},
-	}
 	readFault := namedFault(t, "RequestLost/Read")
 	stall := namedFault(t, "Link/Stall")
 
 	// a defect whose Applies is true only on skipped cases
-	skippedDefect := SuiteDefect{
-		Issue: "issue-879",
-		Check: "HaveFired",
-		Applies: func(scenario string, f fault.Fault) bool {
-			return f.Name() == "RequestLost/Publish"
-		},
-	}
-	_, err := Plan([]Suite{suite}, []fault.Fault{readFault, stall, namedFault(t, "RequestLost/Publish")}, []SuiteDefect{skippedDefect})
+	scenario := scenarioOf("A", 1, []message.Message{message.Read})
+	scenario.KnownDefects = []KnownDefect{{Issue: "issue-879", Check: "HaveFired", Applies: FaultsNamed("RequestLost/Publish")}}
+	_, err := scenario.Cases([]fault.Fault{readFault, stall, namedFault(t, "RequestLost/Publish")})
 	if err == nil || !strings.Contains(err.Error(), "issue-879") {
 		t.Fatalf("a defect matching only skipped cases returned %v, want an error naming it", err)
 	}
 
 	// a defect whose Check names no check
-	unknownDefect := SuiteDefect{
-		Issue: "issue-900",
-		Check: "NoSuchCheck",
-		Applies: func(scenario string, f fault.Fault) bool {
-			return true
-		},
-	}
-	_, err = Plan([]Suite{suite}, []fault.Fault{readFault, stall}, []SuiteDefect{unknownDefect})
+	scenario.KnownDefects = []KnownDefect{{Issue: "issue-900", Check: "NoSuchCheck", Applies: EveryFault}}
+	_, err = scenario.Cases([]fault.Fault{readFault, stall})
 	if err == nil || !strings.Contains(err.Error(), "issue-900") {
 		t.Fatalf("a defect matching no check returned %v, want an error naming it", err)
+	}
+
+	// an ordinal left at zero
+	scenario = scenarioOf("A", 0, []message.Message{message.Read})
+	_, err = scenario.Cases([]fault.Fault{stall})
+	if err == nil || !strings.Contains(err.Error(), "ordinal 0") {
+		t.Fatalf("a zero ordinal returned %v, want an error naming it", err)
 	}
 }
 
 func TestPlanRejectsDuplicateScenarioNames(t *testing.T) {
-	suite := fakeSuite{
-		clause: "P4-1",
-		scenarios: []SuiteScenario{
-			fakeScenario{name: "A", sends: []message.Message{message.Publish}},
-			fakeScenario{name: "A", sends: []message.Message{message.Read}},
-		},
-		byCategory: map[Category][]rules.Rule{},
+	// The fixture must not leak into the registrations of later tests
+	// in this binary: the self-spec registers its own scenarios.
+	t.Cleanup(func() {
+		registeredMu.Lock()
+		defer registeredMu.Unlock()
+		for _, ordinal := range []int{901, 902, 903} {
+			delete(ordinalOwner, ordinal)
+		}
+		delete(ordinalOf, "P4-1/A")
+		delete(ordinalOf, "P4-1/B")
+	})
+	if err := register(scenarioOf("A", 901, nil)); err != nil {
+		t.Fatalf("registering the first scenario returned %v", err)
 	}
-	_, err := Plan([]Suite{suite}, []fault.Fault{namedFault(t, "Link/Stall")}, nil)
+	err := register(scenarioOf("A", 902, nil))
 	if err == nil || !strings.Contains(err.Error(), "A") {
 		t.Fatalf("duplicate scenario names returned %v, want an error naming the name", err)
+	}
+	err = register(scenarioOf("B", 901, nil))
+	if err == nil || !strings.Contains(err.Error(), "ordinal 901") {
+		t.Fatalf("a duplicate ordinal returned %v, want an error naming it", err)
+	}
+	if err := register(scenarioOf("A", 901, nil)); err != nil {
+		t.Fatalf("registering the same scenario twice returned %v, want none", err)
 	}
 }
 

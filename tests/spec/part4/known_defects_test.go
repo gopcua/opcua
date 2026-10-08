@@ -1,4 +1,4 @@
-package matrix_test
+package part4
 
 import (
 	"slices"
@@ -8,7 +8,6 @@ import (
 
 	"github.com/gopcua/opcua/tests/spec/internal/fault"
 	"github.com/gopcua/opcua/tests/spec/internal/matrix"
-	"github.com/gopcua/opcua/tests/spec/internal/matrix/suites"
 )
 
 // The triage's case lists, restated: every row says which issue labels
@@ -17,17 +16,17 @@ import (
 // except those in the exception list. The unit test asserts the
 // known-defect table labels every listed case and nothing else.
 
-// recreatePathFaults lists the faults whose labelled checks passed in
+// triageRecreatePathFaults lists the faults whose labelled checks passed in
 // every one of runs 7, 8 and 9, so no entry covers them.
-var recreatePathFaults = []string{
+var triageRecreatePathFaults = []string{
 	"CutAfterResponse/OpenSecureChannel", "DelayAboveTimeout/ActivateSession",
 	"RequestLost/ActivateSession", "ResponseLost/ActivateSession"}
 
-// cutPublishFaults lists the faults that cut the connection on the
+// triageCutPublishFaults lists the faults that cut the connection on the
 // Publish service: the arm exchange answers one held Publish right
 // after the arm, so the cut fires there, and the sentinel exchange the
 // reconnect answers never reaches a fault.
-var cutPublishFaults = []string{
+var triageCutPublishFaults = []string{
 	"CutAfterResponse/Publish", "RequestLost/Publish", "ResponseLost/Publish"}
 
 var triageCases = []struct {
@@ -41,14 +40,14 @@ var triageCases = []struct {
 	{"issue-879", "SendsNoPublishBeforeNotAvailable", "SessionSurvives", nil, nil},
 	{"issue-879", "KeepsSubscriptionID", "SessionSurvives", nil, nil},
 	{"issue-879", "SendsNoTransferForOwnSubscription", "SessionSurvives", nil, nil},
-	{"issue-879", "DeliverEachValueOnce", "SessionSurvives", nil, recreatePathFaults},
-	{"issue-879", "ResumePublishing", "SessionSurvives", nil, recreatePathFaults},
+	{"issue-879", "DeliverEachValueOnce", "SessionSurvives", nil, triageRecreatePathFaults},
+	{"issue-879", "ResumePublishing", "SessionSurvives", nil, triageRecreatePathFaults},
 	{"issue-879", "RecreatesAfterRefusal", "SubscriptionsLost", nil, nil},
 	{"issue-879", "RepublishesRecreatedFromOne", "SubscriptionsLost", nil, nil},
-	{"issue-895", "ResumePublishing", "SubscriptionsLost", nil, recreatePathFaults},
+	{"issue-895", "ResumePublishing", "SubscriptionsLost", nil, triageRecreatePathFaults},
 	{"issue-895", "KeepsPublishingAfterCancelThenSubscribe", "CancelThenSubscribe", nil, nil},
 	{"issue-895", "ResumePublishing", "CancelThenSubscribe", nil, nil},
-	{"issue-895", "KeepOneSubscriptionPerClientSubscription", "SubscriptionsLost", nil, recreatePathFaults},
+	{"issue-895", "KeepOneSubscriptionPerClientSubscription", "SubscriptionsLost", nil, triageRecreatePathFaults},
 	{"issue-879", "HaveFired", "SessionSurvives", []string{
 		"CutAfterResponse/Publish", "CutAfterResponse/Republish",
 		"DelayAboveTimeout/Publish", "DelayAboveTimeout/Republish",
@@ -56,7 +55,7 @@ var triageCases = []struct {
 		"Overload/Publish/Bad_ResourceUnavailable", "Overload/Publish/Bad_TooManyOperations",
 		"Overload/Publish/Bad_TooManyPublishRequests", "Overload/Republish/Bad_ResourceUnavailable",
 		"Overload/Republish/Bad_TooManyOperations", "RequestLost/Publish", "RequestLost/Republish",
-		"ResponseLost/Publish", "ResponseLost/Republish"}, cutPublishFaults},
+		"ResponseLost/Publish", "ResponseLost/Republish"}, triageCutPublishFaults},
 	{"issue-879", "HaveFired", "SubscriptionsLost", []string{
 		"CutAfterResponse/CreateMonitoredItems", "CutAfterResponse/CreateSubscription", "CutAfterResponse/Publish", "CutAfterResponse/Republish",
 		"DelayAboveTimeout/CreateMonitoredItems", "DelayAboveTimeout/CreateSubscription", "DelayAboveTimeout/Publish", "DelayAboveTimeout/Republish",
@@ -66,12 +65,12 @@ var triageCases = []struct {
 		"Overload/Publish/Bad_ResourceUnavailable", "Overload/Publish/Bad_TooManyOperations", "Overload/Publish/Bad_TooManyPublishRequests",
 		"Overload/Republish/Bad_ResourceUnavailable", "Overload/Republish/Bad_TooManyOperations",
 		"RequestLost/CreateMonitoredItems", "RequestLost/CreateSubscription", "RequestLost/Publish", "RequestLost/Republish",
-		"ResponseLost/CreateMonitoredItems", "ResponseLost/CreateSubscription", "ResponseLost/Publish", "ResponseLost/Republish"}, cutPublishFaults},
+		"ResponseLost/CreateMonitoredItems", "ResponseLost/CreateSubscription", "ResponseLost/Publish", "ResponseLost/Republish"}, triageCutPublishFaults},
 	{"issue-879", "ResumePublishing", "SessionLost", []string{
 		"CutAfterResponse/Publish", "DelayAboveTimeout/Read",
 		"Overload/Publish/Bad_ResourceUnavailable", "Overload/Publish/Bad_TooManyOperations",
 		"Overload/Publish/Bad_TooManyPublishRequests", "RequestLost/Publish", "RequestLost/Read",
-		"ResponseLost/Publish", "ResponseLost/Read"}, cutPublishFaults},
+		"ResponseLost/Publish", "ResponseLost/Read"}, triageCutPublishFaults},
 	{"issue-879", "DeliverEachValueOnce", "SessionLost", []string{"ResponseLost/Publish"}, []string{"ResponseLost/Publish"}},
 	{"issue-879", "KeepOneSubscriptionPerClientSubscription", "SessionLost", []string{
 		"DelayAboveTimeout/Read", "RequestLost/Read", "ResponseLost/Read"}, nil},
@@ -190,9 +189,13 @@ func TestKnownDefectsMatchExactlyTheTriageCases(t *testing.T) {
 		t.Fatalf("the triage's case lists produced no expected labelling, so the test matched nothing")
 	}
 
-	cases, err := matrix.Plan([]matrix.Suite{suites.P4_06_07(), suites.P4_05_14()}, fault.AllFaults, matrix.KnownDefects())
-	if err != nil {
-		t.Fatalf("Plan over the §6.7 suite returned an error: %v", err)
+	var cases []matrix.Case
+	for _, scenario := range []matrix.Scenario{sessionSurvives, sessionLost, subscriptionsLost, steadyPublishing, cancelThenSubscribe} {
+		planned, err := scenario.Cases(fault.AllFaults)
+		if err != nil {
+			t.Fatalf("Plan over the §6.7 suite returned an error: %v", err)
+		}
+		cases = append(cases, planned...)
 	}
 	seen := 0
 	for _, c := range cases {

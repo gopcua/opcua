@@ -11,7 +11,7 @@ import (
 	"github.com/gopcua/opcua/tests/spec/internal/fault"
 	"github.com/gopcua/opcua/tests/spec/internal/harness"
 	"github.com/gopcua/opcua/tests/spec/internal/message"
-	"github.com/gopcua/opcua/tests/spec/internal/rules"
+	"github.com/onsi/ginkgo/v2"
 )
 
 const (
@@ -21,47 +21,32 @@ const (
 	failFirstSentinel int32 = 399
 )
 
-// failFirstSuite is the self-spec of the case runner's failure
+// failFirst is the self-spec of the case runner's failure
 // continuation: one case whose first check fails while every later
 // check passes, because the fault arms on a message the workload's
 // client never sends.
-type failFirstSuite struct{}
-
-func (failFirstSuite) Clause() string { return "P4-COF" }
-
-func (failFirstSuite) Scenarios() []SuiteScenario {
-	return []SuiteScenario{failFirstScenario{}}
-}
-
-func (failFirstSuite) Rules(Category) []rules.Rule { return nil }
-
-type failFirstScenario struct{}
-
-func (failFirstScenario) Name() string { return "Idle" }
-
-func (failFirstScenario) Sends() []message.Message {
-	return []message.Message{message.Read}
-}
-
-func (failFirstScenario) Options(fault.Fault) []harness.Option { return nil }
-
-func (failFirstScenario) Category(fault.Fault) Category { return Unspecified }
-
-func (failFirstScenario) Run(env *harness.Environment, f fault.Fault) Outcome {
-	sub := env.Subscription()
-	env.Server.WaitHeldPublish().Answer(sub, failFirstValue1)
-	env.Server.WaitHeldPublish().Answer(sub, failFirstValue2)
-	injected := f.Inject(env)
-	env.Server.WaitHeldPublish().Answer(sub, failFirstValue3)
-	faultEnd := time.Now()
-	answeredAt := time.Now()
-	env.Server.WaitHeldPublish().Answer(sub, failFirstSentinel)
-	return Outcome{
-		Injected:   injected,
-		FaultEnd:   faultEnd,
-		Sentinel:   failFirstSentinel,
-		AnsweredAt: answeredAt,
-	}
+var failFirst = Scenario{
+	Clause:  "P4-COF",
+	Name:    "Idle",
+	Ordinal: 2,
+	Sends:   []message.Message{message.Read},
+	Workload: func(env *harness.Environment, f fault.Fault, _ int32) Outcome {
+		sub := env.Subscription()
+		env.Server.WaitHeldPublish().Answer(sub, failFirstValue1)
+		env.Server.WaitHeldPublish().Answer(sub, failFirstValue2)
+		injected := f.Inject(env)
+		env.Server.WaitHeldPublish().Answer(sub, failFirstValue3)
+		faultEnd := time.Now()
+		answeredAt := time.Now()
+		env.Server.WaitHeldPublish().Answer(sub, failFirstSentinel)
+		return Outcome{
+			Injected:   injected,
+			FaultEnd:   faultEnd,
+			Sentinel:   failFirstSentinel,
+			AnsweredAt: answeredAt,
+		}
+	},
+	Invariants: SubscriptionInvariants,
 }
 
 // The failure-continuation suite registers only in the nested run, so
@@ -69,7 +54,11 @@ func (failFirstScenario) Run(env *harness.Environment, f fault.Fault) Outcome {
 // carries its deliberately failing case.
 func init() {
 	if os.Getenv("SPECTEST_FAILFIRST") != "" {
-		RegisterSuites([]Suite{failFirstSuite{}}, nil, faultNamed("RequestLost/Read"))
+		ginkgo.Describe(failFirst.Clause, func() {
+			ginkgo.DescribeTableSubtree(failFirst.Name, func(f fault.Fault) {
+				Run(failFirst, f)
+			}, Entries(failFirst, faultNamed("RequestLost/Read")))
+		})
 	}
 }
 

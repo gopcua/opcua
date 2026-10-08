@@ -1,7 +1,6 @@
 package matrix
 
 import (
-	"context"
 	"fmt"
 	"slices"
 	"strings"
@@ -32,8 +31,8 @@ type Scenario struct {
 	// Sends lists the messages a correct client sends after the arm
 	// point. A fault on any other message does not apply.
 	Sends []message.Message
-	// Options returns the harness options one case needs. block is
-	// the first number of the case's value block.
+	// Options returns the harness options one case needs, none when it
+	// is nil. block is the first number of the case's value block.
 	Options func(f fault.Fault, block int32) []harness.Option
 	// Workload drives the client through one case and injects the
 	// fault at its arm point.
@@ -92,28 +91,45 @@ var SubscriptionInvariants = []Invariant{
 }
 
 var (
-	ordinalsMu sync.Mutex
-	ordinals   = make(map[int]string)
+	registeredMu sync.Mutex
+	// ordinalOwner maps each ordinal to the clause and name of the
+	// scenario that holds it, and ordinalOf the reverse.
+	ordinalOwner = make(map[int]string)
+	ordinalOf    = make(map[string]int)
 )
+
+// register records the scenario's ordinal and name for this test
+// binary. It returns an error when another scenario holds the ordinal
+// or another scenario of the clause has the name.
+func register(s Scenario) error {
+	registeredMu.Lock()
+	defer registeredMu.Unlock()
+	id := s.Clause + "/" + s.Name
+	if owner, taken := ordinalOwner[s.Ordinal]; taken && owner != id {
+		return fmt.Errorf("scenario %s has ordinal %d, which %s already holds", id, s.Ordinal, owner)
+	}
+	if ordinal, named := ordinalOf[id]; named && ordinal != s.Ordinal {
+		return fmt.Errorf("two scenarios are named %s, with ordinals %d and %d", id, ordinal, s.Ordinal)
+	}
+	ordinalOwner[s.Ordinal] = id
+	ordinalOf[id] = s.Ordinal
+	return nil
+}
 
 // Entries returns one ginkgo.Entry per fault for the scenario's
 // ginkgo.DescribeTableSubtree. The entry's text is the fault's name.
 // An entry whose fault applies is Ordered and ContinueOnFailure, so
 // its checks share one run of the workload, and one failing check
 // retires only itself. It panics when the scenario's cases cannot be
-// planned or when another scenario already holds its ordinal.
+// planned, when another scenario already holds its ordinal, or when
+// another scenario of the clause has its name.
 func Entries(s Scenario, faults ...fault.Fault) []ginkgo.TableEntry {
 	if _, err := s.Cases(faults); err != nil {
 		panic(err)
 	}
-	ordinalsMu.Lock()
-	owner, taken := ordinals[s.Ordinal]
-	if taken && owner != s.Clause+"/"+s.Name {
-		ordinalsMu.Unlock()
-		panic(fmt.Sprintf("scenario %s/%s has ordinal %d, which %s already holds", s.Clause, s.Name, s.Ordinal, owner))
+	if err := register(s); err != nil {
+		panic(err)
 	}
-	ordinals[s.Ordinal] = s.Clause + "/" + s.Name
-	ordinalsMu.Unlock()
 	var entries []ginkgo.TableEntry
 	for _, f := range faults {
 		if f.Available(s.Sends) != nil {
@@ -123,89 +139,6 @@ func Entries(s Scenario, faults ...fault.Fault) []ginkgo.TableEntry {
 		entries = append(entries, ginkgo.Entry(f.Name(), f, ginkgo.Ordered, ginkgo.ContinueOnFailure))
 	}
 	return entries
-}
-
-// Run registers one case of the scenario: when the fault does not
-// apply, one It that skips with the reason; otherwise a BeforeAll that
-// runs the workload and takes a snapshot before and after the client
-// closes, and one It per check with its labels.
-func Run(s Scenario, f fault.Fault) {
-	c := s.caseOf(f)
-	if c.Skip != nil {
-		ginkgo.It("does not apply: "+c.Skip.Text, func() {
-			ginkgo.Skip(c.Skip.Text)
-		})
-		return
-	}
-	var before invariants.Observed
-	var after invariants.Observed
-	var outcome Outcome
-
-	ginkgo.BeforeAll(func() {
-		opts := append([]harness.Option{}, s.Options(f, c.Block)...)
-		opts = append(opts, f.Options()...)
-		env := harness.New(ginkgo.GinkgoT(), opts...)
-
-		outcome = s.Workload(env, f, c.Block)
-
-		// Settle: the sentinel reaches the client before the
-		// snapshot reads it, and the case ends with the client
-		// reporting Connected, so the teardown closes a live
-		// client instead of racing its reconnect Dial (#883).
-		waitForSentinel(env, outcome.Sentinel)
-		waitUntilConnected(env)
-
-		before = invariants.Observe(env, outcome.Injected)
-		before.WithFaultEnd(outcome.FaultEnd)
-		before.WithSentinel(outcome.Sentinel, outcome.AnsweredAt)
-
-		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-		defer cancel()
-		gomega.Expect(env.Client.Close(ctx)).To(gomega.Succeed(), "closing the client failed")
-
-		// A delayed request is released only after Close
-		// returns: the after-close snapshot must wait for
-		// the hold, or a fault on the held message reads
-		// as never fired.
-		if isHoldFault(f) {
-			deadline := time.Now().Add(10 * time.Second)
-			for !outcome.Injected.Fired() && time.Now().Before(deadline) {
-				time.Sleep(50 * time.Millisecond)
-			}
-		}
-
-		after = invariants.Observe(env, outcome.Injected)
-		after.WithFaultEnd(outcome.FaultEnd)
-		after.WithSentinel(outcome.Sentinel, outcome.AnsweredAt)
-	})
-
-	for _, check := range c.Checks {
-		assert := s.assertion(check.Name, f)
-		ginkgo.It(check.Name, ginkgo.Label(check.Labels...), func() {
-			assert(before, after, outcome)
-		})
-	}
-}
-
-// assertion returns what the check named name asserts: an invariant
-// reads the snapshot its phase names, a rule reads the context the
-// workload returned.
-func (s Scenario) assertion(name string, f fault.Fault) func(before, after invariants.Observed, outcome Outcome) {
-	for _, invariant := range s.Invariants {
-		if invariant.Name != name {
-			continue
-		}
-		if invariant.Phase == BeforeClose {
-			return func(before, _ invariants.Observed, _ Outcome) { invariant.Assert(before) }
-		}
-		return func(_, after invariants.Observed, _ Outcome) { invariant.Assert(after) }
-	}
-	for _, rule := range s.rulesUnder(f) {
-		if rule.Name == name {
-			return func(_, _ invariants.Observed, outcome Outcome) { rule.Check(outcome.Rules) }
-		}
-	}
-	panic("scenario " + s.Name + " has no check named " + name)
 }
 
 // Cases plans the scenario over the faults: one case per fault, each
