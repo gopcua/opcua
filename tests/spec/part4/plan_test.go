@@ -8,7 +8,6 @@ import (
 	"github.com/gopcua/opcua/tests/spec/internal/fault"
 	"github.com/gopcua/opcua/tests/spec/internal/matrix"
 	"github.com/gopcua/opcua/tests/spec/internal/matrix/suites"
-	"github.com/gopcua/opcua/tests/spec/internal/rules"
 )
 
 // TestPlanOverTheRealSuite asserts the plan over both suites and the
@@ -45,7 +44,7 @@ func TestPlanOverTheRealSuite(t *testing.T) {
 
 	t.Run("the scenario values plan the same cases", func(t *testing.T) {
 		var planned []matrix.Case
-		scenarios := append(asScenarios(suites.P4_06_07(), matrix.KnownDefects()), steadyPublishing, cancelThenSubscribe)
+		scenarios := []matrix.Scenario{sessionSurvives, sessionLost, subscriptionsLost, steadyPublishing, cancelThenSubscribe}
 		for _, scenario := range scenarios {
 			scenarioCases, err := scenario.Cases(fault.AllFaults)
 			if err != nil {
@@ -55,39 +54,6 @@ func TestPlanOverTheRealSuite(t *testing.T) {
 		}
 		samePlans(t, all, cases, planned)
 	})
-}
-
-// clauseOrdinals are the ordinals the clause files give the suites'
-// scenarios.
-var clauseOrdinals = map[string]int{
-	"SessionSurvives": 1, "SessionLost": 2, "SubscriptionsLost": 3,
-}
-
-// asScenarios restates one suite's scenarios as scenario values: the
-// rules of each fault's category, the subscription invariants, and the
-// known defects that apply to the scenario under some fault.
-func asScenarios(suite matrix.Suite, defects []matrix.SuiteDefect) []matrix.Scenario {
-	var scenarios []matrix.Scenario
-	for _, old := range suite.Scenarios() {
-		name := old.Name()
-		var own []matrix.KnownDefect
-		for _, defect := range defects {
-			if !slices.ContainsFunc(fault.AllFaults, func(f fault.Fault) bool { return defect.Applies(name, f) }) {
-				continue
-			}
-			own = append(own, matrix.KnownDefect{Issue: defect.Issue, Check: defect.Check, Applies: func(f fault.Fault) bool { return defect.Applies(name, f) }})
-		}
-		scenarios = append(scenarios, matrix.Scenario{
-			Clause:       suite.Clause(),
-			Name:         name,
-			Ordinal:      clauseOrdinals[name],
-			Sends:        old.Sends(),
-			Rules:        func(f fault.Fault) []rules.Rule { return suite.Rules(old.Category(f)) },
-			Invariants:   matrix.SubscriptionInvariants,
-			KnownDefects: own,
-		})
-	}
-	return scenarios
 }
 
 // samePlans asserts the scenario values planned exactly the suites'

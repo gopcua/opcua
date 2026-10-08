@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -298,3 +299,38 @@ func (s Scenario) block(f fault.Fault) int32 {
 
 // EveryFault says a known defect applies under every fault.
 func EveryFault(fault.Fault) bool { return true }
+
+// EveryFaultExcept says a known defect applies under every fault
+// except the named ones.
+func EveryFaultExcept(names ...string) func(fault.Fault) bool {
+	return func(f fault.Fault) bool {
+		return !slices.Contains(names, f.Name())
+	}
+}
+
+// FaultsNamed says a known defect applies under the named faults.
+func FaultsNamed(names ...string) func(fault.Fault) bool {
+	return func(f fault.Fault) bool {
+		return slices.Contains(names, f.Name())
+	}
+}
+
+// FaultsTargetingExcept says a known defect applies under every
+// message or overload fault that targets one of the named services,
+// except the named faults.
+func FaultsTargetingExcept(except []string, services ...string) func(fault.Fault) bool {
+	return func(f fault.Fault) bool {
+		if slices.Contains(except, f.Name()) {
+			return false
+		}
+		parts := strings.Split(f.Name(), "/")
+		if len(parts) < 2 {
+			return false
+		}
+		switch parts[0] {
+		case "RequestLost", "ResponseLost", "CutAfterResponse", "DelayBelowTimeout", "DelayAboveTimeout", "Overload":
+			return slices.Contains(services, parts[1])
+		}
+		return false
+	}
+}

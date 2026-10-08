@@ -1,8 +1,8 @@
 # tests/spec
 
-These specs run the gopcua client against a scripted OPC UA server. The
-directory holds one file per spec section, named by its clause number so the
-files sort in the standard's order, and each spec is labelled with every
+These specs run the gopcua client against a scripted OPC UA server. Each
+part of the standard has its own directory, and each directory holds one file
+per clause, named after the clause's title. Each spec is labelled with every
 clause it cites.
 
 The whole suite skips unless the environment variable `SPECTEST=1` is set, so
@@ -43,4 +43,4 @@ To script a server answer, call `ScriptedServer.WaitHeldPublish()`, which
 returns a `HeldPublish` to answer; use `Subscription` for retained
 notifications and Republish faults. To drop the connection at a chosen
 moment, use `Relay.Cut` or `Relay.CutAt`.
-`06_07_reestablishing_connections_test.go` shows a worked example.
+`part4/reestablishing_connections_test.go` shows a worked example.
