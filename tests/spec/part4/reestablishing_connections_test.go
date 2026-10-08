@@ -5,6 +5,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"testing"
 	"time"
 
 	"github.com/gopcua/opcua"
@@ -12,7 +13,6 @@ import (
 	"github.com/gopcua/opcua/tests/spec/internal/harness"
 	"github.com/gopcua/opcua/tests/spec/internal/matrix"
 	"github.com/gopcua/opcua/tests/spec/internal/message"
-	"github.com/gopcua/opcua/tests/spec/internal/rules"
 	"github.com/gopcua/opcua/ua"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -45,8 +45,8 @@ var _ = Describe("Part 4 §6.7 Re-establishing connections https://reference.opc
 
 		It("reactivates the existing session instead of creating one", Label("P4-6.7"), func() {
 			ctx := matrix.Context{Env: env, Mark: m}
-			rules.ReactivatesSession.Check(ctx)
-			rules.CreatesNoSession.Check(ctx)
+			reactivatesSession.Check(ctx)
+			createsNoSession.Check(ctx)
 			Expect(env.ConnectionsSince(m)).To(Equal(1), "the relay accepted %d connections after the cut, want exactly one", env.ConnectionsSince(m))
 			disconnectedReports := 0
 			for _, state := range env.StatesSince(m) {
@@ -58,27 +58,27 @@ var _ = Describe("Part 4 §6.7 Re-establishing connections https://reference.opc
 		})
 
 		It("calls Republish from the next expected sequence number, incrementing, until the server answers Bad_MessageNotAvailable", Label("P4-6.7", "issue-879", "known-defect"), func() {
-			rules.RepublishesFromNextSequence.Check(matrix.Context{Env: env, Mark: m, LastSeq: last})
+			republishesFromNextSequence.Check(matrix.Context{Env: env, Mark: m, LastSeq: last})
 			Expect(env.Server.UnusedScripts()).To(BeEmpty(), "scripts this spec armed were never used: %v", env.Server.UnusedScripts())
 		})
 
 		It("sends no Publish until Republish has answered Bad_MessageNotAvailable", Label("P4-6.7", "issue-879", "known-defect"), func() {
-			rules.SendsNoPublishBeforeNotAvailable.Check(matrix.Context{Env: env, Mark: m})
+			sendsNoPublishBeforeNotAvailable.Check(matrix.Context{Env: env, Mark: m})
 			Expect(env.Server.UnusedScripts()).To(BeEmpty(), "scripts this spec armed were never used: %v", env.Server.UnusedScripts())
 		})
 
 		It("sends no TransferSubscriptions for a subscription its own session owns", Label("P4-6.7", "P4-5.14.7.4", "known-defect"), func() {
-			rules.SendsNoTransferForOwnSubscription.Check(matrix.Context{Env: env, Mark: m})
+			sendsNoTransferForOwnSubscription.Check(matrix.Context{Env: env, Mark: m})
 			Expect(env.Server.UnusedScripts()).To(BeEmpty(), "scripts this spec armed were never used: %v", env.Server.UnusedScripts())
 		})
 
 		It("keeps the subscription id it had before the cut", Label("P4-6.7", "issue-879", "known-defect"), func() {
-			rules.KeepsSubscriptionID.Check(matrix.Context{Env: env, Mark: m, Sub: sub})
+			keepsSubscriptionID.Check(matrix.Context{Env: env, Mark: m, Sub: sub})
 			Expect(env.Server.UnusedScripts()).To(BeEmpty(), "scripts this spec armed were never used: %v", env.Server.UnusedScripts())
 		})
 
 		It("delivers the retained notification, then the following ones, each once and in order", Label("P4-6.7", "issue-879", "known-defect"), MustPassRepeatedly(10), func() {
-			rules.WaitAnsweredBadMessageNotAvailable(env, m)
+			waitAnsweredBadMessageNotAvailable(env, m)
 			requireSubscriptionAlive(env, m, sub, "after the cut")
 			env.Server.WaitHeldPublish().Answer(sub, valueAfterReconnect)
 			requireSubscriptionAlive(env, m, sub, "after the cut")
@@ -96,7 +96,7 @@ var _ = Describe("Part 4 §6.7 Re-establishing connections https://reference.opc
 		})
 
 		It("does not deliver a sequence number twice", Label("P4-6.7", "interop", "known-defect"), func() {
-			rules.WaitAnsweredBadMessageNotAvailable(env, m)
+			waitAnsweredBadMessageNotAvailable(env, m)
 			requireSubscriptionAlive(env, m, sub, "after the cut")
 			env.Server.WaitHeldPublish().AnswerWithSequenceNumber(sub, last+1, valueDuplicate)
 			requireSubscriptionAlive(env, m, sub, "after the cut")
@@ -129,12 +129,12 @@ var _ = Describe("Part 4 §6.7 Re-establishing connections https://reference.opc
 		})
 
 		It("creates a new subscription", Label("P4-6.7", "should", "known-defect"), func() {
-			rules.RecreatesAfterRefusal.Check(matrix.Context{Env: env, Mark: m, LastSeq: last})
+			recreatesAfterRefusal.Check(matrix.Context{Env: env, Mark: m, LastSeq: last})
 			Expect(env.Server.UnusedScripts()).To(BeEmpty(), "scripts this spec armed were never used: %v", env.Server.UnusedScripts())
 		})
 
 		It("resumes publishing with the new subscription", Label("P4-6.7", "issue-895", "known-defect"), MustPassRepeatedly(10), func() {
-			rules.RecreatesAfterRefusal.Check(matrix.Context{Env: env, Mark: m, LastSeq: last})
+			recreatesAfterRefusal.Check(matrix.Context{Env: env, Mark: m, LastSeq: last})
 			created := env.Server.WaitCreatedSubscription(m)
 			held := env.Server.WaitHeldPublish()
 			held.Answer(created, valueAfterReconnect)
@@ -182,10 +182,10 @@ var _ = Describe("Part 4 §6.7 Re-establishing connections https://reference.opc
 				Eventually(func(g Gomega) {
 					g.Expect(env.ReceivedSince(m)).To(Equal([]int32{valueRetained, valueSentinel}), "client did not deliver the retained notification then the sentinel after the first cut; delivered: %v; errors: %v", env.ReceivedSince(m), env.ReceivedErrorsSince(m))
 				}, 15*time.Second).Should(Succeed())
-				sessionToken := rules.PreCutSessionToken(env)
+				sessionToken := preCutSessionToken(env)
 				Expect(sessionToken).NotTo(BeNil(), "the recorder saw no ActivateSession request, so the pre-cut session token is unknown")
 				Eventually(func(g Gomega) {
-					activations := rules.RequestsOfType[*ua.ActivateSessionRequest](env.Recorder.RequestsSince(m))
+					activations := requestsOfType[*ua.ActivateSessionRequest](env.Recorder.RequestsSince(m))
 					onRecovery := false
 					for _, record := range activations {
 						if record.Connection == recovery {
@@ -195,8 +195,8 @@ var _ = Describe("Part 4 §6.7 Re-establishing connections https://reference.opc
 					g.Expect(onRecovery).To(BeTrue(), "client sent no ActivateSession request on the recovery connection")
 				}, 15*time.Second).Should(Succeed())
 				Consistently(func(g Gomega) {
-					g.Expect(rules.RequestsOfType[*ua.CreateSessionRequest](env.Recorder.RequestsSince(m))).To(BeEmpty(), "client sent a CreateSession request after the first cut")
-					for _, record := range rules.RequestsOfType[*ua.ActivateSessionRequest](env.Recorder.RequestsSince(m)) {
+					g.Expect(requestsOfType[*ua.CreateSessionRequest](env.Recorder.RequestsSince(m))).To(BeEmpty(), "client sent a CreateSession request after the first cut")
+					for _, record := range requestsOfType[*ua.ActivateSessionRequest](env.Recorder.RequestsSince(m)) {
 						message, decoded := record.Message()
 						if !decoded {
 							continue
@@ -208,8 +208,8 @@ var _ = Describe("Part 4 §6.7 Re-establishing connections https://reference.opc
 			Entry("the Republish request is lost (`BeforeRequestReachesServer`)", harness.BeforeRequestReachesServer, func(env *harness.Environment, m harness.Mark, recovery int) {
 				Eventually(func(g Gomega) {
 					requests := env.Recorder.RequestsSince(m)
-					answer, answered := rules.BadMessageNotAvailableAnswer(env, m)
-					republish, sent := rules.RepublishForSequence(rules.RecordsOnConnection(requests, recovery), last+1)
+					answer, answered := badMessageNotAvailableAnswer(env, m)
+					republish, sent := republishForSequence(recordsOnConnection(requests, recovery), last+1)
 					g.Expect(sent).To(BeTrue(), "client sent no Republish request for sequence number %d on the recovery connection", last+1)
 					g.Expect(answered).To(BeTrue(), "client sent no Republish request answered Bad_MessageNotAvailable")
 					g.Expect(answer.Connection).To(Equal(recovery), "the Republish request answered Bad_MessageNotAvailable ran on connection %d, want the recovery connection %d", answer.Connection, recovery)
@@ -219,13 +219,13 @@ var _ = Describe("Part 4 §6.7 Re-establishing connections https://reference.opc
 			Entry("the connection drops right after the Republish response is delivered (`AfterResponseReachesClient`)", harness.AfterResponseReachesClient, func(env *harness.Environment, m harness.Mark, recovery int) {
 				Eventually(func(g Gomega) {
 					requests := env.Recorder.RequestsSince(m)
-					seen := len(rules.RecordsOnConnection(rules.RequestsOfType[*ua.RepublishRequest](requests), recovery)) > 0 || len(rules.RecordsOnConnection(rules.RequestsOfType[*ua.PublishRequest](requests), recovery)) > 0
+					seen := len(recordsOnConnection(requestsOfType[*ua.RepublishRequest](requests), recovery)) > 0 || len(recordsOnConnection(requestsOfType[*ua.PublishRequest](requests), recovery)) > 0
 					g.Expect(seen).To(BeTrue(), "client sent no Republish or Publish request on the recovery connection")
 				}, 15*time.Second).Should(Succeed())
 				Consistently(func(g Gomega) {
 					requests := env.Recorder.RequestsSince(m)
 					notifications := env.Recorder.Notifications()
-					for _, record := range rules.RecordsOnConnection(rules.RequestsOfType[*ua.RepublishRequest](requests), recovery) {
+					for _, record := range recordsOnConnection(requestsOfType[*ua.RepublishRequest](requests), recovery) {
 						highestDelivered := uint32(0)
 						for _, notification := range notifications {
 							if notification.Order < record.Order && notification.SequenceNumber > highestDelivered {
@@ -259,7 +259,7 @@ var _ = Describe("Part 4 §6.7 Re-establishing connections https://reference.opc
 			m = env.Mark()
 			env.Relay.Cut()
 			env.WaitUntilReconnected()
-			rules.CreatesSessionOnlyAfterActivateFailed.Check(matrix.Context{Env: env, Mark: m})
+			createsSessionOnlyAfterActivateFailed.Check(matrix.Context{Env: env, Mark: m})
 		})
 
 		DescribeTable("transfers, and creates new subscriptions when the transfer fails",
@@ -322,7 +322,7 @@ var _ = Describe("Part 4 §6.7 Re-establishing connections https://reference.opc
 			env.WaitUntilReconnected()
 			created := second.WaitCreatedSubscription(m)
 			env.Relay.Cut()
-			rules.RepublishesRecreatedFromOne.Check(matrix.Context{Env: env, Mark: m, Recreated: created})
+			republishesRecreatedFromOne.Check(matrix.Context{Env: env, Mark: m, Recreated: created})
 			Expect(second.UnusedScripts()).To(BeEmpty(), "scripts this spec armed were never used: %v", second.UnusedScripts())
 		})
 	})
@@ -359,14 +359,14 @@ var _ = Describe("when the client is closed while it re-dials", func() {
 
 func requireRecreatedCarriesFirstSubscriptionParameters(env *harness.Environment, m harness.Mark, _, createAnswer harness.ServiceRecord[ua.Response]) {
 	var first *ua.CreateSubscriptionRequest
-	for _, record := range rules.RequestsOfType[*ua.CreateSubscriptionRequest](env.Recorder.Requests()) {
+	for _, record := range requestsOfType[*ua.CreateSubscriptionRequest](env.Recorder.Requests()) {
 		message, _ := record.Message()
 		first, _ = message.(*ua.CreateSubscriptionRequest)
 		break
 	}
 	Expect(first).NotTo(BeNil(), "the recorder saw no CreateSubscription request before the cut")
 	var recreated *ua.CreateSubscriptionRequest
-	for _, record := range rules.RequestsOfType[*ua.CreateSubscriptionRequest](env.Recorder.RequestsSince(m)) {
+	for _, record := range requestsOfType[*ua.CreateSubscriptionRequest](env.Recorder.RequestsSince(m)) {
 		if record.Connection != createAnswer.Connection || record.RequestID != createAnswer.RequestID {
 			continue
 		}
@@ -436,7 +436,7 @@ var _ = Describe("when the request timeout is short", func() {
 		subscribeCancel()
 		Expect(subscribeErr).NotTo(HaveOccurred(), "the client created no second subscription: %v", subscribeErr)
 		secondCreated := second.WaitCreatedSubscription(m2)
-		node := rules.MonitoredNode(env)
+		node := monitoredNode(env)
 		Expect(node).NotTo(BeNil(), "the recorder saw no CreateMonitoredItems request, so the node the client monitors is unknown")
 		monitorCtx, monitorCancel := context.WithTimeout(context.Background(), secondSubscribeWait)
 		_, monitorErr := secondSubscription.Monitor(monitorCtx, ua.TimestampsToReturnBoth,
@@ -473,6 +473,358 @@ var _ = Describe("when the request timeout is short", func() {
 	})
 })
 
+// reactivatesSession: after a transport loss the client re-activates
+// the session it had, carrying the authentication token the server
+// issued before the loss.
+var reactivatesSession = matrix.Rule{
+	Name:    "ReactivatesSession",
+	Clause:  "P4-6.7",
+	Keyword: "shall",
+	Check: func(c matrix.Context) {
+		reactivationAnswer(c.Env, c.Mark)
+	},
+}
+
+// createsNoSession: the client creates no new session before the
+// re-activation of the old one was answered, and none after it
+// succeeded.
+var createsNoSession = matrix.Rule{
+	Name:    "CreatesNoSession",
+	Clause:  "P4-6.7",
+	Keyword: "shall",
+	Check: func(c matrix.Context) {
+		reactivation := reactivationAnswer(c.Env, c.Mark)
+		Expect(slices.ContainsFunc(requestsOfType[*ua.CreateSessionRequest](c.Env.Recorder.RequestsSince(c.Mark)), func(request harness.ServiceRecord[ua.Request]) bool {
+			return request.Order < reactivation.Order
+		})).To(BeFalse(), "client sent a CreateSession request before the server answered ActivateSession")
+		Consistently(func(g Gomega) {
+			g.Expect(requestsOfType[*ua.CreateSessionRequest](c.Env.Recorder.RequestsSince(c.Mark))).To(BeEmpty(), "client sent a CreateSession request after the server answered ActivateSession")
+		}, 2*time.Second).Should(Succeed())
+	},
+}
+
+// republishesFromNextSequence: the client republishes from the next
+// expected sequence number, incrementing, until the server answers
+// Bad_MessageNotAvailable.
+var republishesFromNextSequence = matrix.Rule{
+	Name:    "RepublishesFromNextSequence",
+	Clause:  "P4-6.7",
+	Keyword: "shall",
+	Check: func(c matrix.Context) {
+		Eventually(func(g Gomega) {
+			requests := c.Env.Recorder.RequestsSince(c.Mark)
+			responses := c.Env.Recorder.ResponsesSince(c.Mark)
+			complete := false
+			first, firstSent := republishForSequence(requests, c.LastSeq+1)
+			if firstSent {
+				second, secondSent := republishForSequence(requests, c.LastSeq+2)
+				if secondSent && second.Order > first.Order {
+					if answer, answered := answerTo(second, responses); answered {
+						if status, decoded := statusOf(answer); decoded && status == ua.StatusBadMessageNotAvailable {
+							complete = true
+						}
+					}
+				}
+			}
+			g.Expect(complete).To(BeTrue(), "no Republish request for sequence number %d followed by one for %d answered Bad_MessageNotAvailable was recorded after the reconnect", c.LastSeq+1, c.LastSeq+2)
+		}, 15*time.Second).Should(Succeed())
+		Consistently(func(g Gomega) {
+			republishes := requestsOfType[*ua.RepublishRequest](c.Env.Recorder.RequestsSince(c.Mark))
+			g.Expect(republishes).To(HaveLen(2), "client sent more than the two expected Republish requests after the cut: %d recorded", len(republishes))
+		}, 2*time.Second).Should(Succeed())
+	},
+}
+
+// sendsNoPublishBeforeNotAvailable: the client sends no Publish
+// request on its new connection until the Republish the server
+// answered Bad_MessageNotAvailable.
+var sendsNoPublishBeforeNotAvailable = matrix.Rule{
+	Name:    "SendsNoPublishBeforeNotAvailable",
+	Clause:  "P4-6.7",
+	Keyword: "should",
+	Check: func(c matrix.Context) {
+		notAvailableAnswer := waitAnsweredBadMessageNotAvailable(c.Env, c.Mark)
+		Expect(slices.ContainsFunc(requestsOfType[*ua.PublishRequest](c.Env.Recorder.RequestsSince(c.Mark)), func(request harness.ServiceRecord[ua.Request]) bool {
+			return request.Connection == notAvailableAnswer.Connection && request.Order < notAvailableAnswer.Order
+		})).To(BeFalse(), "client sent a Publish request on the new connection before the Republish was answered Bad_MessageNotAvailable")
+	},
+}
+
+// keepsSubscriptionID: the client republishes under the subscription
+// id it had before the cut, and creates no new subscription instead.
+var keepsSubscriptionID = matrix.Rule{
+	Name:    "KeepsSubscriptionID",
+	Clause:  "P4-6.7",
+	Keyword: "shall",
+	Check: func(c matrix.Context) {
+		waitAnsweredBadMessageNotAvailable(c.Env, c.Mark)
+		wrongID := false
+		for _, republish := range requestsOfType[*ua.RepublishRequest](c.Env.Recorder.RequestsSince(c.Mark)) {
+			message, decoded := republish.Message()
+			if !decoded {
+				continue
+			}
+			if request, is := message.(*ua.RepublishRequest); is && request.SubscriptionID != c.Sub.ID() {
+				wrongID = true
+			}
+		}
+		Expect(wrongID).To(BeFalse(), "client sent a Republish request naming a subscription id other than %d", c.Sub.ID())
+		Consistently(func(g Gomega) {
+			g.Expect(requestsOfType[*ua.CreateSubscriptionRequest](c.Env.Recorder.RequestsSince(c.Mark))).To(BeEmpty(), "client created a new subscription instead of keeping subscription %d", c.Sub.ID())
+		}, 2*time.Second).Should(Succeed())
+	},
+}
+
+// createsSessionAfterActivateTimedOut: after the ActivateSession the
+// client sent was not answered within the request timeout, the client
+// creates a new session. A timeout is a failure, and Part 4 lets the
+// client create a new session once ActivateSession has failed.
+var createsSessionAfterActivateTimedOut = matrix.Rule{
+	Name:    "CreatesSessionAfterActivateTimedOut",
+	Clause:  "P4-6.7",
+	Keyword: "should",
+	Check: func(c matrix.Context) {
+		sessionToken := preCutSessionToken(c.Env)
+		Expect(sessionToken).NotTo(BeNil(), "the recorder saw no ActivateSession request before the cut")
+		Eventually(func(g Gomega) {
+			requests := c.Env.Recorder.RequestsSince(c.Mark)
+			complete := false
+			for _, record := range requestsOfType[*ua.ActivateSessionRequest](requests) {
+				message, decoded := record.Message()
+				if !decoded || !message.Header().AuthenticationToken.Equal(sessionToken) {
+					continue
+				}
+				for _, create := range requestsOfType[*ua.CreateSessionRequest](requests) {
+					if create.Order > record.Order {
+						complete = true
+					}
+				}
+			}
+			g.Expect(complete).To(BeTrue(),
+				"client sent no CreateSession after the ActivateSession that timed out; requests since the mark: %v", requestTypeNames(requests))
+		}, 15*time.Second).Should(Succeed())
+	},
+}
+
+// createsSessionOnlyAfterActivateFailed: the client creates a new
+// session only after trying to activate the old one and being refused
+// Bad_SessionIdInvalid.
+var createsSessionOnlyAfterActivateFailed = matrix.Rule{
+	Name:    "CreatesSessionOnlyAfterActivateFailed",
+	Clause:  "P4-6.7",
+	Keyword: "shall",
+	Check: func(c matrix.Context) {
+		Eventually(func(g Gomega) {
+			requests := c.Env.Recorder.RequestsSince(c.Mark)
+			responses := c.Env.Recorder.ResponsesSince(c.Mark)
+			createSessions := requestsOfType[*ua.CreateSessionRequest](requests)
+			preceded := false
+			if len(createSessions) > 0 {
+				for _, record := range requestsOfType[*ua.ActivateSessionRequest](requests) {
+					answer, answered := answerTo(record, responses)
+					if !answered {
+						continue
+					}
+					if status, decoded := statusOf(answer); decoded && status == ua.StatusBadSessionIDInvalid && answer.Order < createSessions[0].Order {
+						preceded = true
+					}
+				}
+			}
+			g.Expect(preceded).To(BeTrue(), "client created a new session without first trying to activate the old one and being refused Bad_SessionIdInvalid; requests after the first cut: %v", requestTypeNames(requests))
+		}, 15*time.Second).Should(Succeed())
+	},
+}
+
+// recreatesAfterRefusal: after the server refuses the subscription —
+// a TransferSubscriptions answered the way TransferRefusal
+// recognizes, or, when TransferRefusal is nil, a Republish answered
+// Bad_SubscriptionIdInvalid — the client creates a new subscription
+// and re-monitors its node on it.
+var recreatesAfterRefusal = matrix.Rule{
+	Name:    "RecreatesAfterRefusal",
+	Clause:  "P4-6.7",
+	Keyword: "shall",
+	Check: func(c matrix.Context) {
+		if c.TransferRefusal != nil {
+			recreateAfterTransferRefusal(c)
+			return
+		}
+		recreateAfterRepublishRefusal(c)
+	},
+}
+
+func recreateAfterTransferRefusal(c matrix.Context) {
+	var createRequest harness.ServiceRecord[ua.Request]
+	var createdID uint32
+	Eventually(func(g Gomega) {
+		transferAnswer, create, createAnswer, complete := answeredTransferThenNewSubscription(c.Env, c.Mark, c.Sub.ID(), c.TransferRefusal)
+		g.Expect(complete).To(BeTrue(),
+			"no TransferSubscriptions request for subscription %d refused per the scripted answer followed by an answered CreateSubscription request was recorded", c.Sub.ID())
+		createRequest = create
+		answerMessage, answerDecoded := createAnswer.Message()
+		if response, isCreate := answerMessage.(*ua.CreateSubscriptionResponse); answerDecoded && isCreate {
+			createdID = response.SubscriptionID
+		}
+		_, _ = transferAnswer, answerMessage
+	}, 15*time.Second).Should(Succeed())
+	monitoredItemRecreated(c, createdID, createRequest.Order)
+}
+
+func recreateAfterRepublishRefusal(c matrix.Context) {
+	var republishAnswer harness.ServiceRecord[ua.Response]
+	Eventually(func(g Gomega) {
+		requests := c.Env.Recorder.RequestsSince(c.Mark)
+		responses := c.Env.Recorder.ResponsesSince(c.Mark)
+		complete := false
+		if republish, sent := republishForSequence(requests, c.LastSeq+1); sent {
+			if answer, answered := answerTo(republish, responses); answered {
+				if status, decoded := statusOf(answer); decoded && status == ua.StatusBadSubscriptionIDInvalid {
+					republishAnswer = answer
+					complete = true
+				}
+			}
+		}
+		g.Expect(complete).To(BeTrue(), "no Republish request for sequence number %d answered Bad_SubscriptionIdInvalid was recorded after the reconnect", c.LastSeq+1)
+	}, 15*time.Second).Should(Succeed())
+	node := monitoredNode(c.Env)
+	Expect(node).NotTo(BeNil(), "the recorder saw no CreateMonitoredItems request, so the node the client monitors is unknown")
+	var createSubscription harness.ServiceRecord[ua.Request]
+	var createdID uint32
+	Eventually(func(g Gomega) {
+		requests := c.Env.Recorder.RequestsSince(c.Mark)
+		responses := c.Env.Recorder.ResponsesSince(c.Mark)
+		sent := false
+		for _, request := range requestsOfType[*ua.CreateSubscriptionRequest](requests) {
+			if request.Order > republishAnswer.Order {
+				if answer, answered := answerTo(request, responses); answered {
+					answerMessage, answerDecoded := answer.Message()
+					if response, isCreate := answerMessage.(*ua.CreateSubscriptionResponse); answerDecoded && isCreate {
+						createSubscription = request
+						createdID = response.SubscriptionID
+						sent = true
+					}
+				}
+				break
+			}
+		}
+		g.Expect(sent).To(BeTrue(), "client sent no CreateSubscription request answered with a subscription id after the Republish was answered Bad_SubscriptionIdInvalid")
+	}, 15*time.Second).Should(Succeed())
+	monitoredItemRecreated(c, createdID, createSubscription.Order)
+}
+
+func monitoredItemRecreated(c matrix.Context, id uint32, orderFloor int) {
+	node := monitoredNode(c.Env)
+	Expect(node).NotTo(BeNil(), "the recorder saw no CreateMonitoredItems request, so the node the client monitors is unknown")
+	Eventually(func(g Gomega) {
+		requests := c.Env.Recorder.RequestsSince(c.Mark)
+		sent := false
+		for _, record := range requestsOfType[*ua.CreateMonitoredItemsRequest](requests) {
+			if record.Order <= orderFloor {
+				continue
+			}
+			message, decoded := record.Message()
+			if !decoded {
+				continue
+			}
+			request, is := message.(*ua.CreateMonitoredItemsRequest)
+			if !is || request.SubscriptionID != id || len(request.ItemsToCreate) == 0 {
+				continue
+			}
+			item := request.ItemsToCreate[0]
+			if item == nil || item.ItemToMonitor == nil || !item.ItemToMonitor.NodeID.Equal(node) {
+				continue
+			}
+			sent = true
+			break
+		}
+		g.Expect(sent).To(BeTrue(), "client sent no CreateMonitoredItems request for the monitored node on subscription %d", id)
+	}, 15*time.Second).Should(Succeed())
+}
+
+// republishesRecreatedFromOne: the client republishes the recreated
+// subscription starting from sequence number one.
+var republishesRecreatedFromOne = matrix.Rule{
+	Name:    "RepublishesRecreatedFromOne",
+	Clause:  "P4-6.7",
+	Keyword: "shall",
+	Check: func(c matrix.Context) {
+		Eventually(func(g Gomega) {
+			requests := c.Env.Recorder.RequestsSince(c.Mark)
+			for _, record := range requestsOfType[*ua.RepublishRequest](requests) {
+				message, decoded := record.Message()
+				if !decoded {
+					continue
+				}
+				if republish, is := message.(*ua.RepublishRequest); is && republish.SubscriptionID == c.Recreated.ID() {
+					g.Expect(republish.RetransmitSequenceNumber).To(Equal(uint32(1)),
+						"the first Republish for the recreated subscription asks for sequence number %d, want 1", republish.RetransmitSequenceNumber)
+					return
+				}
+			}
+			g.Expect(true).To(BeFalse(), "no Republish for the recreated subscription was recorded yet; requests since the mark taken before the first cut: %v", requestTypeNames(requests))
+		}, 15*time.Second).Should(Succeed())
+	},
+}
+
+// republishesSkippedSequence: for every sequence number the server
+// skipped on a subscription — a number missing between two consecutive
+// notifications the client received on it — the client sends a Republish
+// for the missing number. No gap means the rule holds vacuously.
+var republishesSkippedSequence = matrix.Rule{
+	Name:    "RepublishesSkippedSequence",
+	Clause:  "P4-6.7",
+	Keyword: "should",
+	Check: func(c matrix.Context) {
+		requests := c.Env.Recorder.RequestsSince(c.Mark)
+		responses := c.Env.Recorder.ResponsesSince(c.Mark)
+		for _, missing := range skippedSequenceNumbers(receivedNotifications(requests, responses)) {
+			_, sent := republishForSequence(requests, missing)
+			Expect(sent).To(BeTrue(),
+				"client sent no Republish request for sequence number %d that the server skipped", missing)
+		}
+	},
+}
+
+func TestRepublishesSkippedSequence(t *testing.T) {
+	// No gap: no notification carries a sequence number missing between
+	// two the client received on one subscription, so the rule holds
+	// vacuously.
+	checkPasses(t, republishesSkippedSequence, matrix.Context{Env: harness.RecordedEnvironment(t,
+		[]harness.ServiceRecord[ua.Request]{
+			publishRequest(1, 10, ua.NewTwoByteNodeID(1)),
+		},
+		[]harness.ServiceRecord[ua.Response]{
+			answeredWithValue(2, 10, 5, 1, 101),
+			answeredWithValue(3, 11, 5, 2, 102),
+		},
+		nil)})
+
+	// A gap the client closes with a Republish for the missing number.
+	checkPasses(t, republishesSkippedSequence, matrix.Context{Env: harness.RecordedEnvironment(t,
+		[]harness.ServiceRecord[ua.Request]{
+			publishRequest(1, 10, ua.NewTwoByteNodeID(1)),
+			republishFor(4, 5, 2),
+		},
+		[]harness.ServiceRecord[ua.Response]{
+			answeredWithValue(2, 10, 5, 1, 101),
+			answeredWithValue(3, 11, 5, 3, 102),
+		},
+		nil)})
+
+	// A gap no Republish closes: the rule fails naming the skipped
+	// number.
+	checkFails(t, republishesSkippedSequence, matrix.Context{Env: harness.RecordedEnvironment(t,
+		[]harness.ServiceRecord[ua.Request]{
+			publishRequest(1, 10, ua.NewTwoByteNodeID(1)),
+			republishFor(4, 5, 8),
+		},
+		[]harness.ServiceRecord[ua.Response]{
+			answeredWithValue(2, 10, 5, 1, 101),
+			answeredWithValue(3, 11, 5, 3, 102),
+		},
+		nil)}, "sequence number 2")
+}
+
 // The §6.7 failure matrix: scenarios whose prepare step and
 // transport loss decide what the client must re-establish after the
 // relay cuts — the session, the session on a second server that
@@ -482,39 +834,39 @@ var _ = Describe("P4-6.7", func() {
 	DescribeTableSubtree(sessionSurvives.Name, func(f fault.Fault) {
 		obs := matrix.Run(sessionSurvives, f)
 		obs.BeforeCloseInvariants()
-		if obs.Applies(rules.ReactivatesSession) {
+		if obs.Applies(reactivatesSession) {
 			It("ReactivatesSession", obs.Labels("ReactivatesSession"), func() {
-				rules.ReactivatesSession.Check(obs.Context())
+				reactivatesSession.Check(obs.Context())
 			})
 		}
-		if obs.Applies(rules.CreatesNoSession) {
+		if obs.Applies(createsNoSession) {
 			It("CreatesNoSession", obs.Labels("CreatesNoSession"), func() {
-				rules.CreatesNoSession.Check(obs.Context())
+				createsNoSession.Check(obs.Context())
 			})
 		}
-		if obs.Applies(rules.RepublishesFromNextSequence) {
+		if obs.Applies(republishesFromNextSequence) {
 			It("RepublishesFromNextSequence", obs.Labels("RepublishesFromNextSequence"), func() {
-				rules.RepublishesFromNextSequence.Check(obs.Context())
+				republishesFromNextSequence.Check(obs.Context())
 			})
 		}
-		if obs.Applies(rules.SendsNoPublishBeforeNotAvailable) {
+		if obs.Applies(sendsNoPublishBeforeNotAvailable) {
 			It("SendsNoPublishBeforeNotAvailable", obs.Labels("SendsNoPublishBeforeNotAvailable"), func() {
-				rules.SendsNoPublishBeforeNotAvailable.Check(obs.Context())
+				sendsNoPublishBeforeNotAvailable.Check(obs.Context())
 			})
 		}
-		if obs.Applies(rules.KeepsSubscriptionID) {
+		if obs.Applies(keepsSubscriptionID) {
 			It("KeepsSubscriptionID", obs.Labels("KeepsSubscriptionID"), func() {
-				rules.KeepsSubscriptionID.Check(obs.Context())
+				keepsSubscriptionID.Check(obs.Context())
 			})
 		}
-		if obs.Applies(rules.SendsNoTransferForOwnSubscription) {
+		if obs.Applies(sendsNoTransferForOwnSubscription) {
 			It("SendsNoTransferForOwnSubscription", obs.Labels("SendsNoTransferForOwnSubscription"), func() {
-				rules.SendsNoTransferForOwnSubscription.Check(obs.Context())
+				sendsNoTransferForOwnSubscription.Check(obs.Context())
 			})
 		}
-		if obs.Applies(rules.CreatesSessionAfterActivateTimedOut) {
+		if obs.Applies(createsSessionAfterActivateTimedOut) {
 			It("CreatesSessionAfterActivateTimedOut", obs.Labels("CreatesSessionAfterActivateTimedOut"), func() {
-				rules.CreatesSessionAfterActivateTimedOut.Check(obs.Context())
+				createsSessionAfterActivateTimedOut.Check(obs.Context())
 			})
 		}
 		obs.AfterCloseInvariants()
@@ -523,19 +875,19 @@ var _ = Describe("P4-6.7", func() {
 	DescribeTableSubtree(sessionLost.Name, func(f fault.Fault) {
 		obs := matrix.Run(sessionLost, f)
 		obs.BeforeCloseInvariants()
-		if obs.Applies(rules.CreatesSessionOnlyAfterActivateFailed) {
+		if obs.Applies(createsSessionOnlyAfterActivateFailed) {
 			It("CreatesSessionOnlyAfterActivateFailed", obs.Labels("CreatesSessionOnlyAfterActivateFailed"), func() {
-				rules.CreatesSessionOnlyAfterActivateFailed.Check(obs.Context())
+				createsSessionOnlyAfterActivateFailed.Check(obs.Context())
 			})
 		}
-		if obs.Applies(rules.RecreatesAfterRefusal) {
+		if obs.Applies(recreatesAfterRefusal) {
 			It("RecreatesAfterRefusal", obs.Labels("RecreatesAfterRefusal"), func() {
-				rules.RecreatesAfterRefusal.Check(obs.Context())
+				recreatesAfterRefusal.Check(obs.Context())
 			})
 		}
-		if obs.Applies(rules.CreatesSessionAfterActivateTimedOut) {
+		if obs.Applies(createsSessionAfterActivateTimedOut) {
 			It("CreatesSessionAfterActivateTimedOut", obs.Labels("CreatesSessionAfterActivateTimedOut"), func() {
-				rules.CreatesSessionAfterActivateTimedOut.Check(obs.Context())
+				createsSessionAfterActivateTimedOut.Check(obs.Context())
 			})
 		}
 		obs.AfterCloseInvariants()
@@ -544,19 +896,19 @@ var _ = Describe("P4-6.7", func() {
 	DescribeTableSubtree(subscriptionsLost.Name, func(f fault.Fault) {
 		obs := matrix.Run(subscriptionsLost, f)
 		obs.BeforeCloseInvariants()
-		if obs.Applies(rules.RecreatesAfterRefusal) {
+		if obs.Applies(recreatesAfterRefusal) {
 			It("RecreatesAfterRefusal", obs.Labels("RecreatesAfterRefusal"), func() {
-				rules.RecreatesAfterRefusal.Check(obs.Context())
+				recreatesAfterRefusal.Check(obs.Context())
 			})
 		}
-		if obs.Applies(rules.RepublishesRecreatedFromOne) {
+		if obs.Applies(republishesRecreatedFromOne) {
 			It("RepublishesRecreatedFromOne", obs.Labels("RepublishesRecreatedFromOne"), func() {
-				rules.RepublishesRecreatedFromOne.Check(obs.Context())
+				republishesRecreatedFromOne.Check(obs.Context())
 			})
 		}
-		if obs.Applies(rules.CreatesSessionAfterActivateTimedOut) {
+		if obs.Applies(createsSessionAfterActivateTimedOut) {
 			It("CreatesSessionAfterActivateTimedOut", obs.Labels("CreatesSessionAfterActivateTimedOut"), func() {
-				rules.CreatesSessionAfterActivateTimedOut.Check(obs.Context())
+				createsSessionAfterActivateTimedOut.Check(obs.Context())
 			})
 		}
 		obs.AfterCloseInvariants()
@@ -618,12 +970,12 @@ var sessionSurvives = matrix.Scenario{
 	Options:  reestablishingOptions,
 	Workload: reestablishing{prepare: prepareSessionSurvives}.workload,
 	Rules: reestablishingRules(
-		rules.ReactivatesSession,
-		rules.CreatesNoSession,
-		rules.RepublishesFromNextSequence,
-		rules.SendsNoPublishBeforeNotAvailable,
-		rules.KeepsSubscriptionID,
-		rules.SendsNoTransferForOwnSubscription,
+		reactivatesSession,
+		createsNoSession,
+		republishesFromNextSequence,
+		sendsNoPublishBeforeNotAvailable,
+		keepsSubscriptionID,
+		sendsNoTransferForOwnSubscription,
 	),
 	Invariants: subscriptionInvariants,
 	KnownDefects: []matrix.KnownDefect{
@@ -664,8 +1016,8 @@ var sessionLost = matrix.Scenario{
 	Options:  reestablishingOptions,
 	Workload: reestablishing{prepare: prepareSessionLost, prepareBeforeArm: true}.workload,
 	Rules: reestablishingRules(
-		rules.CreatesSessionOnlyAfterActivateFailed,
-		rules.RecreatesAfterRefusal,
+		createsSessionOnlyAfterActivateFailed,
+		recreatesAfterRefusal,
 	),
 	Invariants: subscriptionInvariants,
 	KnownDefects: []matrix.KnownDefect{
@@ -711,8 +1063,8 @@ var subscriptionsLost = matrix.Scenario{
 	Options:  reestablishingOptions,
 	Workload: reestablishing{prepare: prepareSubscriptionsLost}.workload,
 	Rules: reestablishingRules(
-		rules.RecreatesAfterRefusal,
-		rules.RepublishesRecreatedFromOne,
+		recreatesAfterRefusal,
+		republishesRecreatedFromOne,
 	),
 	Invariants: subscriptionInvariants,
 	KnownDefects: []matrix.KnownDefect{
@@ -738,7 +1090,7 @@ func reestablishingRules(own ...matrix.Rule) func(fault.Fault) []matrix.Rule {
 	return func(f fault.Fault) []matrix.Rule {
 		switch {
 		case f.Name() == "DelayAboveTimeout/ActivateSession":
-			return []matrix.Rule{rules.CreatesSessionAfterActivateTimedOut}
+			return []matrix.Rule{createsSessionAfterActivateTimedOut}
 		case strings.HasPrefix(f.Name(), "DelayAboveTimeout/"):
 			return nil
 		case strings.HasPrefix(f.Name(), "Overload/"):

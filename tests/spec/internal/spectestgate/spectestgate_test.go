@@ -76,12 +76,12 @@ func TestSuiteSkipsByDefault(t *testing.T) {
 	}
 
 	// With SPECTEST=1, the tests run.
-	cmd := exec.Command("go", "test", "-count=1", "-json", "./tests/spec/internal/rules/")
+	cmd := exec.Command("go", "test", "-count=1", "-json", "./tests/spec/internal/matrix/")
 	cmd.Dir = root
 	cmd.Env = append(os.Environ(), "SPECTEST=1")
 	output, err := cmd.Output()
 	if err != nil {
-		t.Fatalf("go test -json ./tests/spec/internal/rules/ with SPECTEST=1 failed: %v", err)
+		t.Fatalf("go test -json ./tests/spec/internal/matrix/ with SPECTEST=1 failed: %v", err)
 	}
 	ran = 0
 	decoder := json.NewDecoder(strings.NewReader(string(output)))
@@ -98,7 +98,7 @@ func TestSuiteSkipsByDefault(t *testing.T) {
 		}
 	}
 	if ran == 0 {
-		t.Fatalf("with SPECTEST=1, no test of the rules package ran, want the suite gate open")
+		t.Fatalf("with SPECTEST=1, no test of the matrix package ran, want the suite gate open")
 	}
 }
 

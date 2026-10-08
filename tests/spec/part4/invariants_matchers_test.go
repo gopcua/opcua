@@ -32,7 +32,7 @@ func forgotten(value int32, subscription uint32, sequence uint32, server int) ma
 	return matrix.Produced{Value: value, SubscriptionID: subscription, SequenceNumber: sequence, ServerIndex: server, Reachable: true, Forgotten: true}
 }
 
-func server(index int, reachable, connected bool, sessions, subscriptions int) matrix.ServerState {
+func serverState(index int, reachable, connected bool, sessions, subscriptions int) matrix.ServerState {
 	return matrix.ServerState{Index: index, Reachable: reachable, Connected: connected, KnownSessions: sessions, LiveSubscriptions: subscriptions}
 }
 
@@ -202,13 +202,13 @@ func TestKeepOneSessionOpen(t *testing.T) {
 		wantSubstr string
 	}{
 		{"connected server holds two known sessions",
-			matrix.Observed{Servers: []matrix.ServerState{server(0, true, true, 2, 1)}}, false, "2"},
+			matrix.Observed{Servers: []matrix.ServerState{serverState(0, true, true, 2, 1)}}, false, "2"},
 		{"connected server holds one known session",
-			matrix.Observed{Servers: []matrix.ServerState{server(0, true, true, 1, 1)}}, true, ""},
+			matrix.Observed{Servers: []matrix.ServerState{serverState(0, true, true, 1, 1)}}, true, ""},
 		{"an unreachable server's session does not count",
-			matrix.Observed{Servers: []matrix.ServerState{server(1, false, false, 1, 0), server(0, true, true, 1, 1)}}, true, ""},
+			matrix.Observed{Servers: []matrix.ServerState{serverState(1, false, false, 1, 0), serverState(0, true, true, 1, 1)}}, true, ""},
 		{"no connected server",
-			matrix.Observed{Servers: []matrix.ServerState{server(0, true, false, 1, 1)}}, false, "connected"},
+			matrix.Observed{Servers: []matrix.ServerState{serverState(0, true, false, 1, 1)}}, false, "connected"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -225,9 +225,9 @@ func TestCloseEveryKnownSession(t *testing.T) {
 		wantSubstr string
 	}{
 		{"a reachable server still holds a known session",
-			matrix.Observed{Servers: []matrix.ServerState{server(0, true, false, 1, 0)}}, false, "1"},
+			matrix.Observed{Servers: []matrix.ServerState{serverState(0, true, false, 1, 0)}}, false, "1"},
 		{"only an unreachable server still holds a known session",
-			matrix.Observed{Servers: []matrix.ServerState{server(1, false, false, 1, 0), server(0, true, false, 0, 0)}}, true, ""},
+			matrix.Observed{Servers: []matrix.ServerState{serverState(1, false, false, 1, 0), serverState(0, true, false, 0, 0)}}, true, ""},
 		{"a session whose CloseSession the client sent but the network lost",
 			matrix.Observed{Servers: []matrix.ServerState{{Index: 0, Reachable: true, KnownSessions: 1, ClosingAttempted: 1}}}, true, ""},
 		{"one of two sessions closing-attempted still fails for the other",
@@ -248,9 +248,9 @@ func TestKeepOneSubscriptionPerClientSubscription(t *testing.T) {
 		wantSubstr string
 	}{
 		{"the server holds two live subscriptions for one client subscription",
-			matrix.Observed{Servers: []matrix.ServerState{server(0, true, true, 1, 2)}, ClientSubscriptions: 1}, false, "2"},
+			matrix.Observed{Servers: []matrix.ServerState{serverState(0, true, true, 1, 2)}, ClientSubscriptions: 1}, false, "2"},
 		{"live subscriptions equal the client's",
-			matrix.Observed{Servers: []matrix.ServerState{server(0, true, true, 1, 1)}, ClientSubscriptions: 1}, true, ""},
+			matrix.Observed{Servers: []matrix.ServerState{serverState(0, true, true, 1, 1)}, ClientSubscriptions: 1}, true, ""},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

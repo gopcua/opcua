@@ -1,21 +1,72 @@
 package part4
 
 import (
+	"reflect"
+	"regexp"
 	"testing"
 
 	"github.com/gopcua/opcua/tests/spec/internal/fault"
 	"github.com/gopcua/opcua/tests/spec/internal/matrix"
 )
 
+// part4Scenarios lists every scenario the clause files declare, in
+// ordinal order; the plan-level tests walk exactly these.
+var part4Scenarios = []matrix.Scenario{sessionSurvives, sessionLost, subscriptionsLost, steadyPublishing, cancelThenSubscribe}
+
+// TestRuleMetadata asserts every rule the clauses declare is
+// well-formed: a non-empty Name unique among the rules, a P4 clause
+// label, shall or should, and a Check. It iterates every rule any
+// scenario returns under any fault, deduplicated by name, so the same
+// rule under several faults is checked once; a name that repeats with
+// a different Check is a second rule, whatever its metadata says.
+func TestRuleMetadata(t *testing.T) {
+	byName := map[string]matrix.Rule{}
+	checkOf := map[string]uintptr{}
+	for _, scenario := range []matrix.Scenario{sessionSurvives, sessionLost, subscriptionsLost, steadyPublishing, cancelThenSubscribe} {
+		if scenario.Rules == nil {
+			continue
+		}
+		for _, f := range fault.AllFaults {
+			for _, rule := range scenario.Rules(f) {
+				check := reflect.ValueOf(rule.Check).Pointer()
+				if previous, seen := checkOf[rule.Name]; seen {
+					if previous != check {
+						t.Errorf("two rules share the name %s", rule.Name)
+					}
+					continue
+				}
+				checkOf[rule.Name] = check
+				byName[rule.Name] = rule
+			}
+		}
+	}
+	for _, rule := range byName {
+		if rule.Name == "" {
+			t.Errorf("a rule has an empty Name: %+v", rule)
+		}
+		if !regexp.MustCompile(`^P4-[0-9.]+$`).MatchString(rule.Clause) {
+			t.Errorf("%s carries the clause %q, want a P4 label", rule.Name, rule.Clause)
+		}
+		if rule.Keyword != "shall" && rule.Keyword != "should" {
+			t.Errorf("%s carries the keyword %q, want shall or should", rule.Name, rule.Keyword)
+		}
+		if rule.Check == nil {
+			t.Errorf("%s has no Check", rule.Name)
+		}
+	}
+	if len(byName) == 0 {
+		t.Fatalf("no scenario returned any rule, so the test matched nothing")
+	}
+}
+
 // TestPlanOverTheRealSuite asserts the plan over both clauses'
 // scenarios and the full fault catalogue builds one case per scenario
 // × fault with the predicted defects attached, and prints how many
 // apply and how many skip per scenario.
 func TestPlanOverTheRealSuite(t *testing.T) {
-	scenarios := []matrix.Scenario{sessionSurvives, sessionLost, subscriptionsLost, steadyPublishing, cancelThenSubscribe}
 	applicable := map[string]int{}
 	skipped := map[string]int{}
-	for _, scenario := range scenarios {
+	for _, scenario := range part4Scenarios {
 		cases, err := scenario.Cases(fault.AllFaults)
 		if err != nil {
 			t.Fatalf("Plan over the suites returned an error: %v", err)
@@ -31,7 +82,7 @@ func TestPlanOverTheRealSuite(t *testing.T) {
 			applicable[c.Path[1]]++
 		}
 	}
-	for _, scenario := range scenarios {
+	for _, scenario := range part4Scenarios {
 		t.Logf("%s: %d applicable, %d skipped", scenario.Name, applicable[scenario.Name], skipped[scenario.Name])
 	}
 }
@@ -42,8 +93,7 @@ func TestPlanOverTheRealSuite(t *testing.T) {
 // a check by its name, so a shared name would make them confuse the
 // rule with the invariant.
 func TestRuleNamesDifferFromInvariantNames(t *testing.T) {
-	scenarios := []matrix.Scenario{sessionSurvives, sessionLost, subscriptionsLost, steadyPublishing, cancelThenSubscribe}
-	for _, scenario := range scenarios {
+	for _, scenario := range part4Scenarios {
 		invariantNames := map[string]bool{"HaveFired": true}
 		for _, invariant := range scenario.Invariants {
 			invariantNames[invariant.Name] = true

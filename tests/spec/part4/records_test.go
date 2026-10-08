@@ -1,26 +1,24 @@
-// Package rules holds the Part 4 rules the existing specs assert and
-// the failure matrix's scenarios will assert: each rule is one
-// behaviour with its clause label and its keyword, and its Check runs
-// the assertions for it against the context the caller observed. The
-// helpers here search the recorder's records; every rule and every
-// spec that still asserts on its own uses them, so no search exists
-// twice.
-package rules
+package part4
 
 import (
 	"fmt"
 	"slices"
+	"strings"
+	"testing"
 	"time"
 
+	"github.com/gopcua/opcua/server"
 	"github.com/gopcua/opcua/tests/spec/internal/harness"
+	"github.com/gopcua/opcua/tests/spec/internal/matrix"
 	"github.com/gopcua/opcua/ua"
 
+	. "github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 )
 
-// RequestsOfType returns the recorded client requests whose decoded
+// requestsOfType returns the recorded client requests whose decoded
 // message is of the request type T.
-func RequestsOfType[T ua.Request](records []harness.ServiceRecord[ua.Request]) []harness.ServiceRecord[ua.Request] {
+func requestsOfType[T ua.Request](records []harness.ServiceRecord[ua.Request]) []harness.ServiceRecord[ua.Request] {
 	var matched []harness.ServiceRecord[ua.Request]
 	for _, record := range records {
 		message, decoded := record.Message()
@@ -34,9 +32,9 @@ func RequestsOfType[T ua.Request](records []harness.ServiceRecord[ua.Request]) [
 	return matched
 }
 
-// RecordsOnConnection returns the recorded messages that rode the
+// recordsOnConnection returns the recorded messages that rode the
 // given relay connection.
-func RecordsOnConnection[M any](records []harness.ServiceRecord[M], connection int) []harness.ServiceRecord[M] {
+func recordsOnConnection[M any](records []harness.ServiceRecord[M], connection int) []harness.ServiceRecord[M] {
 	var on []harness.ServiceRecord[M]
 	for _, record := range records {
 		if record.Connection == connection {
@@ -46,9 +44,9 @@ func RecordsOnConnection[M any](records []harness.ServiceRecord[M], connection i
 	return on
 }
 
-// AnswerTo returns the recorded response that answers the request,
+// answerTo returns the recorded response that answers the request,
 // paired by connection and request id.
-func AnswerTo(request harness.ServiceRecord[ua.Request], responses []harness.ServiceRecord[ua.Response]) (harness.ServiceRecord[ua.Response], bool) {
+func answerTo(request harness.ServiceRecord[ua.Request], responses []harness.ServiceRecord[ua.Response]) (harness.ServiceRecord[ua.Response], bool) {
 	for _, response := range responses {
 		if response.Connection == request.Connection && response.RequestID == request.RequestID {
 			return response, true
@@ -57,8 +55,8 @@ func AnswerTo(request harness.ServiceRecord[ua.Request], responses []harness.Ser
 	return harness.ServiceRecord[ua.Response]{}, false
 }
 
-// StatusOf returns the service result a recorded response carries.
-func StatusOf(response harness.ServiceRecord[ua.Response]) (ua.StatusCode, bool) {
+// statusOf returns the service result a recorded response carries.
+func statusOf(response harness.ServiceRecord[ua.Response]) (ua.StatusCode, bool) {
 	message, decoded := response.Message()
 	if !decoded {
 		return 0, false
@@ -66,10 +64,10 @@ func StatusOf(response harness.ServiceRecord[ua.Response]) (ua.StatusCode, bool)
 	return message.Header().ServiceResult, true
 }
 
-// RepublishForSequence returns the recorded Republish request that
+// republishForSequence returns the recorded Republish request that
 // names the sequence number.
-func RepublishForSequence(records []harness.ServiceRecord[ua.Request], sequenceNumber uint32) (harness.ServiceRecord[ua.Request], bool) {
-	for _, record := range RequestsOfType[*ua.RepublishRequest](records) {
+func republishForSequence(records []harness.ServiceRecord[ua.Request], sequenceNumber uint32) (harness.ServiceRecord[ua.Request], bool) {
+	for _, record := range requestsOfType[*ua.RepublishRequest](records) {
 		message, decoded := record.Message()
 		if !decoded {
 			continue
@@ -81,9 +79,9 @@ func RepublishForSequence(records []harness.ServiceRecord[ua.Request], sequenceN
 	return harness.ServiceRecord[ua.Request]{}, false
 }
 
-// RequestTypeNames returns the decoded message type of every recorded
+// requestTypeNames returns the decoded message type of every recorded
 // request, for failure messages.
-func RequestTypeNames(records []harness.ServiceRecord[ua.Request]) []string {
+func requestTypeNames(records []harness.ServiceRecord[ua.Request]) []string {
 	names := make([]string, 0, len(records))
 	for _, record := range records {
 		message, decoded := record.Message()
@@ -95,10 +93,10 @@ func RequestTypeNames(records []harness.ServiceRecord[ua.Request]) []string {
 	return names
 }
 
-// MonitoredNode returns the node the client's CreateMonitoredItems
+// monitoredNode returns the node the client's CreateMonitoredItems
 // requests monitored, the harness node the specs read.
-func MonitoredNode(env *harness.Environment) *ua.NodeID {
-	for _, record := range RequestsOfType[*ua.CreateMonitoredItemsRequest](env.Recorder.Requests()) {
+func monitoredNode(env *harness.Environment) *ua.NodeID {
+	for _, record := range requestsOfType[*ua.CreateMonitoredItemsRequest](env.Recorder.Requests()) {
 		message, decoded := record.Message()
 		if !decoded {
 			continue
@@ -110,11 +108,11 @@ func MonitoredNode(env *harness.Environment) *ua.NodeID {
 	return nil
 }
 
-// PreCutSessionToken returns the authentication token the client's
+// preCutSessionToken returns the authentication token the client's
 // first ActivateSession request carried, the token the pre-cut session
 // was activated with.
-func PreCutSessionToken(env *harness.Environment) *ua.NodeID {
-	for _, record := range RequestsOfType[*ua.ActivateSessionRequest](env.Recorder.Requests()) {
+func preCutSessionToken(env *harness.Environment) *ua.NodeID {
+	for _, record := range requestsOfType[*ua.ActivateSessionRequest](env.Recorder.Requests()) {
 		message, decoded := record.Message()
 		if decoded {
 			return message.Header().AuthenticationToken
@@ -126,23 +124,23 @@ func PreCutSessionToken(env *harness.Environment) *ua.NodeID {
 // reactivationAnswer waits for the recorded answer to the client's
 // ActivateSession carrying the pre-cut session token, and returns it.
 func reactivationAnswer(env *harness.Environment, m harness.Mark) harness.ServiceRecord[ua.Response] {
-	sessionToken := PreCutSessionToken(env)
+	sessionToken := preCutSessionToken(env)
 	gomega.Expect(sessionToken).NotTo(gomega.BeNil(), "the recorder saw no ActivateSession request before the cut")
 	var answer harness.ServiceRecord[ua.Response]
 	gomega.Eventually(func(g gomega.Gomega) {
 		requests := env.Recorder.RequestsSince(m)
 		responses := env.Recorder.ResponsesSince(m)
 		reactivated := false
-		for _, record := range RequestsOfType[*ua.ActivateSessionRequest](requests) {
+		for _, record := range requestsOfType[*ua.ActivateSessionRequest](requests) {
 			message, decoded := record.Message()
 			if !decoded || !message.Header().AuthenticationToken.Equal(sessionToken) {
 				continue
 			}
-			candidate, answered := AnswerTo(record, responses)
+			candidate, answered := answerTo(record, responses)
 			if !answered {
 				continue
 			}
-			if status, decoded := StatusOf(candidate); decoded && status == ua.StatusOK {
+			if status, decoded := statusOf(candidate); decoded && status == ua.StatusOK {
 				answer = candidate
 				reactivated = true
 				break
@@ -153,13 +151,13 @@ func reactivationAnswer(env *harness.Environment, m harness.Mark) harness.Servic
 	return answer
 }
 
-// BadMessageNotAvailableAnswer returns the recorded answer that the
+// badMessageNotAvailableAnswer returns the recorded answer that the
 // server answered Bad_MessageNotAvailable to a Republish request.
-func BadMessageNotAvailableAnswer(env *harness.Environment, m harness.Mark) (harness.ServiceRecord[ua.Response], bool) {
+func badMessageNotAvailableAnswer(env *harness.Environment, m harness.Mark) (harness.ServiceRecord[ua.Response], bool) {
 	responses := env.Recorder.ResponsesSince(m)
-	for _, republish := range RequestsOfType[*ua.RepublishRequest](env.Recorder.RequestsSince(m)) {
-		if answer, answered := AnswerTo(republish, responses); answered {
-			if status, decoded := StatusOf(answer); decoded && status == ua.StatusBadMessageNotAvailable {
+	for _, republish := range requestsOfType[*ua.RepublishRequest](env.Recorder.RequestsSince(m)) {
+		if answer, answered := answerTo(republish, responses); answered {
+			if status, decoded := statusOf(answer); decoded && status == ua.StatusBadMessageNotAvailable {
 				return answer, true
 			}
 		}
@@ -167,14 +165,14 @@ func BadMessageNotAvailableAnswer(env *harness.Environment, m harness.Mark) (har
 	return harness.ServiceRecord[ua.Response]{}, false
 }
 
-// WaitAnsweredBadMessageNotAvailable waits for the client's Republish
+// waitAnsweredBadMessageNotAvailable waits for the client's Republish
 // request the server answered Bad_MessageNotAvailable and returns the
 // recorded answer.
-func WaitAnsweredBadMessageNotAvailable(env *harness.Environment, m harness.Mark) harness.ServiceRecord[ua.Response] {
+func waitAnsweredBadMessageNotAvailable(env *harness.Environment, m harness.Mark) harness.ServiceRecord[ua.Response] {
 	var answer harness.ServiceRecord[ua.Response]
 	gomega.Eventually(func(g gomega.Gomega) {
 		var answered bool
-		answer, answered = BadMessageNotAvailableAnswer(env, m)
+		answer, answered = badMessageNotAvailableAnswer(env, m)
 		g.Expect(answered).To(gomega.BeTrue(), "client sent no Republish request that the server answered Bad_MessageNotAvailable")
 	}, 15*time.Second).Should(gomega.Succeed())
 	return answer
@@ -188,7 +186,7 @@ func WaitAnsweredBadMessageNotAvailable(env *harness.Environment, m harness.Mark
 func answeredTransferThenNewSubscription(env *harness.Environment, m harness.Mark, oldID uint32, transferRefusal func(harness.ServiceRecord[ua.Response]) bool) (transferAnswer harness.ServiceRecord[ua.Response], createRequest harness.ServiceRecord[ua.Request], createAnswer harness.ServiceRecord[ua.Response], complete bool) {
 	requests := env.Recorder.RequestsSince(m)
 	responses := env.Recorder.ResponsesSince(m)
-	for _, record := range RequestsOfType[*ua.TransferSubscriptionsRequest](requests) {
+	for _, record := range requestsOfType[*ua.TransferSubscriptionsRequest](requests) {
 		message, decoded := record.Message()
 		if !decoded {
 			continue
@@ -196,15 +194,15 @@ func answeredTransferThenNewSubscription(env *harness.Environment, m harness.Mar
 		if request, isTransfer := message.(*ua.TransferSubscriptionsRequest); !isTransfer || len(request.SubscriptionIDs) != 1 || request.SubscriptionIDs[0] != oldID {
 			continue
 		}
-		answer, answered := AnswerTo(record, responses)
+		answer, answered := answerTo(record, responses)
 		if !answered || !transferRefusal(answer) {
 			continue
 		}
-		for _, create := range RequestsOfType[*ua.CreateSubscriptionRequest](requests) {
+		for _, create := range requestsOfType[*ua.CreateSubscriptionRequest](requests) {
 			if create.Order <= answer.Order {
 				continue
 			}
-			createAnswer, created := AnswerTo(create, responses)
+			createAnswer, created := answerTo(create, responses)
 			if !created {
 				continue
 			}
@@ -220,12 +218,12 @@ func answeredTransferThenNewSubscription(env *harness.Environment, m harness.Mar
 	return harness.ServiceRecord[ua.Response]{}, harness.ServiceRecord[ua.Request]{}, harness.ServiceRecord[ua.Response]{}, false
 }
 
-// FindAnsweredTransferThenNewSubscription returns the records of a
+// findAnsweredTransferThenNewSubscription returns the records of a
 // TransferSubscriptions request for oldID answered per
 // transferRefusal and the CreateSubscription request answered after
 // it, without asserting they exist; a caller whose rule already
 // proved them uses it to pass the records on.
-func FindAnsweredTransferThenNewSubscription(env *harness.Environment, m harness.Mark, oldID uint32, transferRefusal func(harness.ServiceRecord[ua.Response]) bool) (harness.ServiceRecord[ua.Response], harness.ServiceRecord[ua.Request], harness.ServiceRecord[ua.Response]) {
+func findAnsweredTransferThenNewSubscription(env *harness.Environment, m harness.Mark, oldID uint32, transferRefusal func(harness.ServiceRecord[ua.Response]) bool) (harness.ServiceRecord[ua.Response], harness.ServiceRecord[ua.Request], harness.ServiceRecord[ua.Response]) {
 	transferAnswer, createRequest, createAnswer, _ := answeredTransferThenNewSubscription(env, m, oldID, transferRefusal)
 	return transferAnswer, createRequest, createAnswer
 }
@@ -351,14 +349,97 @@ type publishAnsweredTooMany struct {
 // server answered Bad_TooManyPublishRequests, with its answer.
 func publishesAnsweredTooMany(requests []harness.ServiceRecord[ua.Request], responses []harness.ServiceRecord[ua.Response]) []publishAnsweredTooMany {
 	var refused []publishAnsweredTooMany
-	for _, request := range RequestsOfType[*ua.PublishRequest](requests) {
-		answer, answered := AnswerTo(request, responses)
+	for _, request := range requestsOfType[*ua.PublishRequest](requests) {
+		answer, answered := answerTo(request, responses)
 		if !answered {
 			continue
 		}
-		if status, decoded := StatusOf(answer); decoded && status == ua.StatusBadTooManyPublishRequests {
+		if status, decoded := statusOf(answer); decoded && status == ua.StatusBadTooManyPublishRequests {
 			refused = append(refused, publishAnsweredTooMany{request: request, answer: answer})
 		}
 	}
 	return refused
+}
+
+// publishRequest builds a Publish request a hand-built environment
+// holds: a request on connection 0 with the given order and request
+// id, sent on the session the token names. A hand-built environment
+// is harness.RecordedEnvironment fed records these tests construct
+// directly, instead of a live harness.New environment.
+func publishRequest(order int, requestID uint32, token *ua.NodeID) harness.ServiceRecord[ua.Request] {
+	return harness.RecordedRequest(order, 0, requestID, harness.Forwarded, &ua.PublishRequest{
+		RequestHeader: &ua.RequestHeader{AuthenticationToken: token},
+	})
+}
+
+// answeredWithValue builds a Publish response a hand-built environment
+// holds: an answer on connection 0 to the given request id, carrying
+// one data change notification of v at the sequence number, for the
+// given subscription.
+func answeredWithValue(order int, requestID uint32, subscriptionID, sequenceNumber uint32, v int32) harness.ServiceRecord[ua.Response] {
+	change := &ua.DataChangeNotification{
+		MonitoredItems: []*ua.MonitoredItemNotification{{
+			Value: server.DataValueFromValue(v),
+		}},
+	}
+	return harness.RecordedResponse(order, 0, requestID, harness.Forwarded, &ua.PublishResponse{
+		ResponseHeader: &ua.ResponseHeader{ServiceResult: ua.StatusOK},
+		SubscriptionID: subscriptionID,
+		NotificationMessage: &ua.NotificationMessage{
+			SequenceNumber:   sequenceNumber,
+			NotificationData: []*ua.ExtensionObject{ua.NewExtensionObject(change)},
+		},
+	})
+}
+
+// answeredTooMany builds a Publish response a hand-built environment
+// holds: an answer on connection 0 that refuses the request with
+// Bad_TooManyPublishRequests.
+func answeredTooMany(order int, requestID uint32) harness.ServiceRecord[ua.Response] {
+	return harness.RecordedResponse(order, 0, requestID, harness.Forwarded, &ua.PublishResponse{
+		ResponseHeader: &ua.ResponseHeader{ServiceResult: ua.StatusBadTooManyPublishRequests},
+	})
+}
+
+// republishFor builds a Republish request a hand-built environment
+// holds: a request for the given subscription and sequence number.
+func republishFor(order int, subscriptionID, sequenceNumber uint32) harness.ServiceRecord[ua.Request] {
+	return harness.RecordedRequest(order, 0, 0, harness.Forwarded, &ua.RepublishRequest{
+		SubscriptionID:           subscriptionID,
+		RetransmitSequenceNumber: sequenceNumber,
+	})
+}
+
+// checkPasses asserts a rule's Check passes against the context the
+// hand-built records define.
+func checkPasses(t *testing.T, rule matrix.Rule, c matrix.Context) {
+	t.Helper()
+	var failures []string
+	gomega.RegisterFailHandler(func(message string, _ ...int) { failures = append(failures, message) })
+	// Check asserts through the package-global Gomega, so the collector
+	// above replaced the suite's fail handler; restore it, or a later
+	// test's assertion would collect silently into a dead slice.
+	defer gomega.RegisterFailHandler(Fail)
+	rule.Check(c)
+	if len(failures) != 0 {
+		t.Fatalf("%s failed against records it must accept: %s", rule.Name, strings.Join(failures, "; "))
+	}
+}
+
+// checkFails asserts a rule's Check fails against the context the
+// hand-built records define, with a message naming want.
+func checkFails(t *testing.T, rule matrix.Rule, c matrix.Context, want string) {
+	t.Helper()
+	var failures []string
+	gomega.RegisterFailHandler(func(message string, _ ...int) { failures = append(failures, message) })
+	defer gomega.RegisterFailHandler(Fail)
+	rule.Check(c)
+	if len(failures) == 0 {
+		t.Fatalf("%s passed against records it must reject", rule.Name)
+	}
+	for _, message := range failures {
+		if !strings.Contains(message, want) {
+			t.Errorf("%s failed with %q, want a message naming %q", rule.Name, message, want)
+		}
+	}
 }

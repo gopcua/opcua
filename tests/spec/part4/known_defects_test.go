@@ -192,7 +192,7 @@ func TestKnownDefectsMatchExactlyTheTriageCases(t *testing.T) {
 	}
 
 	var cases []matrix.Case
-	for _, scenario := range []matrix.Scenario{sessionSurvives, sessionLost, subscriptionsLost, steadyPublishing, cancelThenSubscribe} {
+	for _, scenario := range part4Scenarios {
 		planned, err := scenario.Cases(fault.AllFaults)
 		if err != nil {
 			t.Fatalf("Plan over the §6.7 suite returned an error: %v", err)
