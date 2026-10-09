@@ -69,7 +69,12 @@ type Dialer struct {
 func (d *Dialer) Dial(ctx context.Context, endpoint string) (*Conn, error) {
 	debug.Printf("uacp: connecting to %s", endpoint)
 
-	_, raddr, err := ResolveEndpoint(ctx, endpoint)
+	// Dial the host as written, not one address resolved up front: for a
+	// name, net.Dialer tries every address it resolves to, in order, so a
+	// name whose first address does not answer (localhost resolving to an
+	// IPv6 ::1 the server does not listen on) still reaches the server on
+	// the next one.
+	_, raddr, err := parseEndpoint(endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -77,7 +82,6 @@ func (d *Dialer) Dial(ctx context.Context, endpoint string) (*Conn, error) {
 	dl := d.Dialer
 	if dl == nil {
 		dl = &net.Dialer{}
-
 	}
 
 	c, err := dl.DialContext(ctx, "tcp", raddr.Host)
