@@ -159,8 +159,8 @@ var keepsPublishingAfterCancelThenSubscribe = matrix.Rule{
 	Check: withFacts(func(c ruleFacts) {
 		if c.CyclesWanted > 0 {
 			Expect(c.CyclesCompleted).To(Equal(c.CyclesWanted),
-				"the client parked its publish loop after cycle %d of %d: the cancel and the resume raced",
-				c.CyclesCompleted+1, c.CyclesWanted)
+				"the client completed %d of %d cancel-then-subscribe cycles",
+				c.CyclesCompleted, c.CyclesWanted)
 		}
 		Eventually(func(g Gomega) {
 			g.Expect(requestsOfType[*ua.PublishRequest](c.Env.Recorder.RequestsSince(c.Mark))).NotTo(BeEmpty(),

@@ -2,8 +2,7 @@
 
 These specs run the gopcua client against a scripted OPC UA server. Each
 part of the standard has its own directory, and each directory holds one file
-per clause, named after the clause's title. Each spec is labelled with every
-clause it cites.
+per clause, named after the clause's title.
 
 The whole suite skips unless the environment variable `SPECTEST=1` is set, so
 a plain `go test ./...` stays fast and the skip is visible in every package's
@@ -11,37 +10,37 @@ output. Run the suite with:
 
     SPECTEST=1 go test -race -timeout 30m ./tests/spec/...
 
-The default run skips every spec labelled `known-defect`, a spec measured to
-fail on `main`, so it passes on `main`. To run every spec, including the known
-defects:
+The suite fails on `main`. No spec is skipped because it is expected to fail,
+and nothing marks a failure as expected: read the failure output to decide
+what produced it. A fault that cannot apply to a scenario skips its case,
+visibly.
 
-    SPECTEST=1 go test -race -timeout 30m ./tests/spec/part4/ -ginkgo.label-filter=''
+Select specs with `ginkgo.focus`, a regular expression matched against a
+spec's path: the chain of its container texts down to its own text. A
+matrix case's path is its clause, its scenario, its fault and its check.
+A hand-written spec's path is whatever chain of containers its spec
+declares. One case, the SessionSurvives scenario under RequestLost/Publish:
 
-Under the `ginkgo` CLI an empty `--label-filter` never reaches the test
-binary, so the known defects stay skipped (measured with ginkgo v2.33.0); set
-the environment variable to a filter that matches everything:
+    SPECTEST=1 go test -race -timeout 30m ./tests/spec/part4/ -ginkgo.focus='SessionSurvives RequestLost/Publish'
 
-    SPECTEST=1 SPECTEST_LABEL_FILTER='!known-defect || known-defect' go run github.com/onsi/ginkgo/v2/ginkgo@v2.33.0 ./tests/spec/part4
+One check the matrix plans for every fault:
 
-A spec's labels name what it cites. `P4-6.7` cites Part 4 clause 6.7
-(https://reference.opcfoundation.org/Core/Part4/v105/docs/<clause>).
-`should` marks a recommendation and `interop` tolerates server behaviour the
-standard does not cover. `issue-N` and `pr-N` cite GitHub.
+    SPECTEST=1 go test -race -timeout 30m ./tests/spec/part4/ -ginkgo.focus='KeepsSubscriptionID'
+
+The part4 binary also reads `SPECTEST_FOCUS`, whose value becomes the focus
+when no `-ginkgo.focus` flag was passed.
 
 A rule is a `matrix.Rule` value in the clause file of the clause it cites.
-An invariant is a `matrix.Invariant` value in `part4/invariants_test.go`.
-Nothing under `internal/` cites a clause in code: `internal/` holds the
-harness, the faults and the matrix runner, and what a clause demands
-belongs in its clause file under `part4/`.
-
-A known-defect label is a prediction that its spec fails on `main`. A later
-PR gates CI on it: a run that makes a known-defect spec pass fails the gate,
-so a fix removes the label. A defect with no issue yet carries the label
-`matrix.Unfiled` returns, on the per-fault matrix checks it predicts
-fail; a hand-written spec for such a defect carries `known-defect` alone.
+The facts a rule's Check reads are the clause package's `ruleFacts` type,
+declared in `part4/helpers_test.go`. An invariant is a `matrix.Invariant`
+value in `part4/invariants_test.go`. The runner's self-spec, which registers
+stand-in scenarios and runs them the way a clause file does, runs in
+`internal/matrix`. No code under `internal/` asserts what a clause demands:
+`internal/` holds the harness, the faults and the matrix runner, and what a
+clause demands belongs in its clause file under `part4/`.
 
 A failure message starting with `spectest:` reports a fault in the harness
-itself. Any other failure reports client behaviour.
+itself. Any other failure is a check on client behaviour that did not hold.
 
 To script a server answer, call `ScriptedServer.WaitHeldPublish()`, which
 returns a `HeldPublish` to answer; use `Subscription` for retained

@@ -2,11 +2,14 @@
 // scenario as a value and registers it, and the matrix plans one case
 // per fault with its checks, then runs a real client through each case
 // and asserts its checks against what it observed. A rule is a Rule
-// value in the clause file of the clause it cites, and an invariant an
-// Invariant value in the clause package's invariants file,
-// part4/invariants_test.go. The matrix adds the HaveFired check to
-// every applicable case itself. Nothing under internal/ cites a clause
-// in non-test code.
+// value in the clause file of the clause it cites. The workload returns
+// the rule's facts as an untyped value, and the clause package's Check
+// asserts them to its own type. An invariant is an Invariant value in
+// the clause package's invariants file, part4/invariants_test.go. The
+// matrix adds the HaveFired check to every applicable case itself. The
+// self-spec in this package registers stand-in scenarios and exercises
+// the runner's own registration and checks. No code under internal/
+// asserts what a clause demands.
 package matrix
 
 import (
