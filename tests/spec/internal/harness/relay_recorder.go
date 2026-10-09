@@ -27,9 +27,8 @@ type T interface {
 }
 
 // harnessFault returns the failure message for a fault in the harness
-// itself, carrying the spectest: prefix. knowndefectgate classifies a
-// message starting with this prefix as a harness fault, not an
-// implementation defect.
+// itself, carrying the spectest: prefix that marks a harness fault,
+// not an implementation defect.
 func harnessFault(format string, args ...any) string {
 	return harnessfault.Prefix + fmt.Sprintf(format, args...)
 }

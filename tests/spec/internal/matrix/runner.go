@@ -2,7 +2,6 @@ package matrix
 
 import (
 	"context"
-	"fmt"
 	"slices"
 	"strings"
 	"time"
@@ -24,9 +23,6 @@ type Observation struct {
 	before   Observed
 	after    Observed
 	outcome  Outcome
-	// written lists the checks whose Its asked for their labels, in
-	// the order they registered.
-	written []string
 }
 
 // Run registers one case of the scenario: when the fault does not
@@ -106,22 +102,12 @@ var haveFiredInvariant = Invariant{
 
 // AfterCloseInvariants registers the HaveFired check, then one It per
 // invariant of the scenario that reads the snapshot taken after the
-// client closes. It is the case's last call, so it panics when the Its
-// registered so far differ from the case's planned checks, which carry
-// the known-defect labels.
+// client closes.
 func (o *Observation) AfterCloseInvariants() {
 	if o.planned.Skip == nil {
 		o.invariant(haveFiredInvariant)
 	}
 	o.invariantsIn(AfterClose)
-	var planned []string
-	for _, check := range o.planned.Checks {
-		planned = append(planned, check.Name)
-	}
-	if !slices.Equal(o.written, planned) {
-		panic(fmt.Sprintf("scenario %s under %s registers the checks %v, but plans %v",
-			strings.Join(o.planned.Path[:2], "/"), o.planned.Path[2], o.written, planned))
-	}
 }
 
 func (o *Observation) invariantsIn(phase Phase) {
@@ -138,7 +124,7 @@ func (o *Observation) invariantsIn(phase Phase) {
 // invariant registers one invariant's It, on the snapshot its phase
 // names.
 func (o *Observation) invariant(invariant Invariant) {
-	ginkgo.It(invariant.Name, o.Labels(invariant.Name), func() {
+	ginkgo.It(invariant.Name, func() {
 		o.assertInvariant(invariant)
 	})
 }
@@ -160,21 +146,6 @@ func (o *Observation) Applies(rule Rule) bool {
 		return false
 	}
 	return slices.ContainsFunc(o.scenario.rulesUnder(o.fault), func(r Rule) bool { return r.Name == rule.Name })
-}
-
-// Labels returns the labels of the case's check named name: its
-// clause, fault and message labels, and the known-defect labels the
-// scenario predicts for it. It panics when the case plans no such
-// check.
-func (o *Observation) Labels(name string) ginkgo.Labels {
-	for _, check := range o.planned.Checks {
-		if check.Name == name {
-			o.written = append(o.written, name)
-			return ginkgo.Label(check.Labels...)
-		}
-	}
-	panic(fmt.Sprintf("scenario %s under %s plans no check named %s",
-		strings.Join(o.planned.Path[:2], "/"), o.planned.Path[2], name))
 }
 
 // Context returns the rules' context the workload returned. A rule's

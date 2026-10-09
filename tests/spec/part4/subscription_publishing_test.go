@@ -24,7 +24,7 @@ const (
 )
 
 var _ = Describe("when the publishing interval is 10 ms", func() {
-	It("times out a held Publish on its first subscription", Label("P4-5.14.1.2"), func() {
+	It("times out a held Publish on its first subscription", func() {
 		env := harness.New(GinkgoT(), harness.WithPublishingInterval(timeoutPublishingInterval))
 		held := env.Server.WaitHeldPublish()
 		heldOrder, recorded := held.Order()
@@ -36,7 +36,7 @@ var _ = Describe("when the publishing interval is 10 ms", func() {
 		republishesWithinTimeoutAfterPublishTimeout.Check(matrix.Context{Env: env, Server: env.Server, HeldOrder: heldOrder})
 	})
 
-	It("times out a held Publish after recreating the subscription", Label("P4-5.14.1.2", "known-defect"), func() {
+	It("times out a held Publish after recreating the subscription", func() {
 		env := harness.New(GinkgoT(), harness.WithPublishingInterval(timeoutPublishingInterval))
 		second := env.StartServer()
 		env.Relay.RedirectTo(second.Address())
@@ -55,7 +55,7 @@ var _ = Describe("when the publishing interval is 10 ms", func() {
 })
 
 var _ = Describe("when the only subscription is cancelled and a new one created while a Publish is held", func() {
-	It("keeps publishing", Label("P4-5.14.1.2", "issue-895", "known-defect"), MustPassRepeatedly(20), func() {
+	It("keeps publishing", MustPassRepeatedly(20), func() {
 		env := harness.New(GinkgoT())
 		old := env.ClientSubscription()
 		held := env.Server.WaitHeldPublish()
@@ -108,13 +108,11 @@ func requireSubscriptionDeleted(env *harness.Environment, m harness.Mark, id uin
 		"the client deleted no subscription %d before creating the new one; requests since the mark: %v", id, requestTypeNames(env.Recorder.RequestsSince(m)))
 }
 
-// sendsNoTransferForOwnSubscription: the client sends no
-// TransferSubscriptions request for a subscription its own session
-// owns.
+// sendsNoTransferForOwnSubscription (§5.14.7.4, shall): the client
+// sends no TransferSubscriptions request for a subscription its own
+// session owns.
 var sendsNoTransferForOwnSubscription = matrix.Rule{
-	Name:    "SendsNoTransferForOwnSubscription",
-	Clause:  "P4-5.14.7.4",
-	Keyword: "shall",
+	Name: "SendsNoTransferForOwnSubscription",
 	Check: func(c matrix.Context) {
 		notAvailableAnswer := waitAnsweredBadMessageNotAvailable(c.Env, c.Mark)
 		Expect(slices.ContainsFunc(requestsOfType[*ua.TransferSubscriptionsRequest](c.Env.Recorder.RequestsSince(c.Mark)), func(request harness.ServiceRecord[ua.Request]) bool {
@@ -126,16 +124,14 @@ var sendsNoTransferForOwnSubscription = matrix.Rule{
 	},
 }
 
-// republishesWithinTimeoutAfterPublishTimeout: when the server holds
-// a Publish until the client's publishing times out, the client sends
-// the next Publish within that timeout instead of waiting forever.
-// The check reads recorded traffic: a Publish request on the held
-// one's connection after its order and before the answer the workload
-// gave it, or after it when the workload gave none.
+// republishesWithinTimeoutAfterPublishTimeout (§5.14.1.2, should): when
+// the server holds a Publish until the client's publishing times out,
+// the client sends the next Publish within that timeout instead of
+// waiting forever. The check reads recorded traffic: a Publish request
+// on the held one's connection after its order and before the answer
+// the workload gave it, or after it when the workload gave none.
 var republishesWithinTimeoutAfterPublishTimeout = matrix.Rule{
-	Name:    "RepublishesWithinTimeoutAfterPublishTimeout",
-	Clause:  "P4-5.14.1.2",
-	Keyword: "should",
+	Name: "RepublishesWithinTimeoutAfterPublishTimeout",
 	Check: func(c matrix.Context) {
 		sent := false
 		for _, record := range requestsOfType[*ua.PublishRequest](c.Env.Recorder.RequestsSince(c.Mark)) {
@@ -152,16 +148,14 @@ var republishesWithinTimeoutAfterPublishTimeout = matrix.Rule{
 	},
 }
 
-// keepsPublishingAfterCancelThenSubscribe: after the client cancels
-// its only subscription and creates a new one while a Publish is
-// held, the client answers arriving values: it completes every
-// cancel-then-subscribe cycle the workload drives, keeps sending
+// keepsPublishingAfterCancelThenSubscribe (§5.14.1.2, should): after the
+// client cancels its only subscription and creates a new one while a
+// Publish is held, the client answers arriving values: it completes
+// every cancel-then-subscribe cycle the workload drives, keeps sending
 // Publish requests and delivers the value answered on the new
 // subscription.
 var keepsPublishingAfterCancelThenSubscribe = matrix.Rule{
-	Name:    "KeepsPublishingAfterCancelThenSubscribe",
-	Clause:  "P4-5.14.1.2",
-	Keyword: "should",
+	Name: "KeepsPublishingAfterCancelThenSubscribe",
 	Check: func(c matrix.Context) {
 		if c.CyclesWanted > 0 {
 			Expect(c.CyclesCompleted).To(Equal(c.CyclesWanted),
@@ -179,14 +173,13 @@ var keepsPublishingAfterCancelThenSubscribe = matrix.Rule{
 	},
 }
 
-// publishesAgainAfterTooManyPublishRequests: for every Publish the
-// server answered Bad_TooManyPublishRequests, the client sends another
-// Publish on the same session, and a value answered after it is
-// delivered. No such answer means the rule holds vacuously.
+// publishesAgainAfterTooManyPublishRequests (§5.14.5, should): for every
+// Publish the server answered Bad_TooManyPublishRequests, the client
+// sends another Publish on the same session, and a value answered
+// after it is delivered. No such answer means the rule holds
+// vacuously.
 var publishesAgainAfterTooManyPublishRequests = matrix.Rule{
-	Name:    "PublishesAgainAfterTooManyPublishRequests",
-	Clause:  "P4-5.14.5",
-	Keyword: "should",
+	Name: "PublishesAgainAfterTooManyPublishRequests",
 	Check: func(c matrix.Context) {
 		requests := c.Env.Recorder.RequestsSince(c.Mark)
 		responses := c.Env.Recorder.ResponsesSince(c.Mark)
@@ -307,17 +300,17 @@ var _ = Describe("P4-5.14", func() {
 		obs := matrix.Run(steadyPublishing, f)
 		obs.BeforeCloseInvariants()
 		if obs.Applies(republishesWithinTimeoutAfterPublishTimeout) {
-			It("RepublishesWithinTimeoutAfterPublishTimeout", obs.Labels("RepublishesWithinTimeoutAfterPublishTimeout"), func() {
+			It("RepublishesWithinTimeoutAfterPublishTimeout", func() {
 				republishesWithinTimeoutAfterPublishTimeout.Check(obs.Context())
 			})
 		}
 		if obs.Applies(republishesSkippedSequence) {
-			It("RepublishesSkippedSequence", obs.Labels("RepublishesSkippedSequence"), func() {
+			It("RepublishesSkippedSequence", func() {
 				republishesSkippedSequence.Check(obs.Context())
 			})
 		}
 		if obs.Applies(publishesAgainAfterTooManyPublishRequests) {
-			It("PublishesAgainAfterTooManyPublishRequests", obs.Labels("PublishesAgainAfterTooManyPublishRequests"), func() {
+			It("PublishesAgainAfterTooManyPublishRequests", func() {
 				publishesAgainAfterTooManyPublishRequests.Check(obs.Context())
 			})
 		}
@@ -328,17 +321,17 @@ var _ = Describe("P4-5.14", func() {
 		obs := matrix.Run(cancelThenSubscribe, f)
 		obs.BeforeCloseInvariants()
 		if obs.Applies(keepsPublishingAfterCancelThenSubscribe) {
-			It("KeepsPublishingAfterCancelThenSubscribe", obs.Labels("KeepsPublishingAfterCancelThenSubscribe"), func() {
+			It("KeepsPublishingAfterCancelThenSubscribe", func() {
 				keepsPublishingAfterCancelThenSubscribe.Check(obs.Context())
 			})
 		}
 		if obs.Applies(republishesSkippedSequence) {
-			It("RepublishesSkippedSequence", obs.Labels("RepublishesSkippedSequence"), func() {
+			It("RepublishesSkippedSequence", func() {
 				republishesSkippedSequence.Check(obs.Context())
 			})
 		}
 		if obs.Applies(publishesAgainAfterTooManyPublishRequests) {
-			It("PublishesAgainAfterTooManyPublishRequests", obs.Labels("PublishesAgainAfterTooManyPublishRequests"), func() {
+			It("PublishesAgainAfterTooManyPublishRequests", func() {
 				publishesAgainAfterTooManyPublishRequests.Check(obs.Context())
 			})
 		}
@@ -393,12 +386,6 @@ var cancelThenSubscribe = matrix.Scenario{
 		}
 	},
 	Invariants: subscriptionInvariants,
-	// The publish loop stops under #895, so every fault
-	// fails the cycle count and the sentinel both.
-	KnownDefects: []matrix.KnownDefect{
-		{Issue: "issue-895", Check: "KeepsPublishingAfterCancelThenSubscribe", Applies: matrix.EveryFault},
-		{Issue: "issue-895", Check: "ResumePublishing", Applies: matrix.EveryFault},
-	},
 }
 
 // publishingUnspecified says Part 4 prescribes no reaction the rules

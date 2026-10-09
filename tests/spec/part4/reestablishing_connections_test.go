@@ -43,7 +43,7 @@ var _ = Describe("Part 4 §6.7 Re-establishing connections https://reference.opc
 			env.WaitUntilReconnected()
 		})
 
-		It("reactivates the existing session instead of creating one", Label("P4-6.7"), func() {
+		It("reactivates the existing session instead of creating one", func() {
 			ctx := matrix.Context{Env: env, Mark: m}
 			reactivatesSession.Check(ctx)
 			createsNoSession.Check(ctx)
@@ -57,27 +57,27 @@ var _ = Describe("Part 4 §6.7 Re-establishing connections https://reference.opc
 			Expect(disconnectedReports).To(Equal(1), "client reported the Disconnected state %d times after the cut, want exactly once", disconnectedReports)
 		})
 
-		It("calls Republish from the next expected sequence number, incrementing, until the server answers Bad_MessageNotAvailable", Label("P4-6.7", "issue-879", "known-defect"), func() {
+		It("calls Republish from the next expected sequence number, incrementing, until the server answers Bad_MessageNotAvailable", func() {
 			republishesFromNextSequence.Check(matrix.Context{Env: env, Mark: m, LastSeq: last})
 			Expect(env.Server.UnusedScripts()).To(BeEmpty(), "scripts this spec armed were never used: %v", env.Server.UnusedScripts())
 		})
 
-		It("sends no Publish until Republish has answered Bad_MessageNotAvailable", Label("P4-6.7", "issue-879", "known-defect"), func() {
+		It("sends no Publish until Republish has answered Bad_MessageNotAvailable", func() {
 			sendsNoPublishBeforeNotAvailable.Check(matrix.Context{Env: env, Mark: m})
 			Expect(env.Server.UnusedScripts()).To(BeEmpty(), "scripts this spec armed were never used: %v", env.Server.UnusedScripts())
 		})
 
-		It("sends no TransferSubscriptions for a subscription its own session owns", Label("P4-6.7", "P4-5.14.7.4", "known-defect"), func() {
+		It("sends no TransferSubscriptions for a subscription its own session owns", func() {
 			sendsNoTransferForOwnSubscription.Check(matrix.Context{Env: env, Mark: m})
 			Expect(env.Server.UnusedScripts()).To(BeEmpty(), "scripts this spec armed were never used: %v", env.Server.UnusedScripts())
 		})
 
-		It("keeps the subscription id it had before the cut", Label("P4-6.7", "issue-879", "known-defect"), func() {
+		It("keeps the subscription id it had before the cut", func() {
 			keepsSubscriptionID.Check(matrix.Context{Env: env, Mark: m, Sub: sub})
 			Expect(env.Server.UnusedScripts()).To(BeEmpty(), "scripts this spec armed were never used: %v", env.Server.UnusedScripts())
 		})
 
-		It("delivers the retained notification, then the following ones, each once and in order", Label("P4-6.7", "issue-879", "known-defect"), MustPassRepeatedly(10), func() {
+		It("delivers the retained notification, then the following ones, each once and in order", MustPassRepeatedly(10), func() {
 			waitAnsweredBadMessageNotAvailable(env, m)
 			requireSubscriptionAlive(env, m, sub, "after the cut")
 			env.Server.WaitHeldPublish().Answer(sub, valueAfterReconnect)
@@ -95,7 +95,7 @@ var _ = Describe("Part 4 §6.7 Re-establishing connections https://reference.opc
 			Expect(env.Server.UnusedScripts()).To(BeEmpty(), "scripts this spec armed were never used: %v", env.Server.UnusedScripts())
 		})
 
-		It("does not deliver a sequence number twice", Label("P4-6.7", "interop", "known-defect"), func() {
+		It("does not deliver a sequence number twice", func() {
 			waitAnsweredBadMessageNotAvailable(env, m)
 			requireSubscriptionAlive(env, m, sub, "after the cut")
 			env.Server.WaitHeldPublish().AnswerWithSequenceNumber(sub, last+1, valueDuplicate)
@@ -128,12 +128,12 @@ var _ = Describe("Part 4 §6.7 Re-establishing connections https://reference.opc
 			env.WaitUntilReconnected()
 		})
 
-		It("creates a new subscription", Label("P4-6.7", "should", "known-defect"), func() {
+		It("creates a new subscription", func() {
 			recreatesAfterRefusal.Check(matrix.Context{Env: env, Mark: m, LastSeq: last})
 			Expect(env.Server.UnusedScripts()).To(BeEmpty(), "scripts this spec armed were never used: %v", env.Server.UnusedScripts())
 		})
 
-		It("resumes publishing with the new subscription", Label("P4-6.7", "issue-895", "known-defect"), MustPassRepeatedly(10), func() {
+		It("resumes publishing with the new subscription", MustPassRepeatedly(10), func() {
 			recreatesAfterRefusal.Check(matrix.Context{Env: env, Mark: m, LastSeq: last})
 			created := env.Server.WaitCreatedSubscription(m)
 			held := env.Server.WaitHeldPublish()
@@ -215,7 +215,7 @@ var _ = Describe("Part 4 §6.7 Re-establishing connections https://reference.opc
 					g.Expect(answer.Connection).To(Equal(recovery), "the Republish request answered Bad_MessageNotAvailable ran on connection %d, want the recovery connection %d", answer.Connection, recovery)
 					g.Expect(answer.Order).To(BeNumerically(">", republish.Order), "the Republish request answered Bad_MessageNotAvailable did not follow the Republish request for sequence number %d on the recovery connection", last+1)
 				}, 15*time.Second).Should(Succeed())
-			}, Label("P4-6.7", "known-defect")),
+			}),
 			Entry("the connection drops right after the Republish response is delivered (`AfterResponseReachesClient`)", harness.AfterResponseReachesClient, func(env *harness.Environment, m harness.Mark, recovery int) {
 				Eventually(func(g Gomega) {
 					requests := env.Recorder.RequestsSince(m)
@@ -241,7 +241,7 @@ var _ = Describe("Part 4 §6.7 Re-establishing connections https://reference.opc
 						}
 					}
 				}, 2*time.Second).Should(Succeed())
-			}, Label("P4-6.7", "known-defect")),
+			}),
 		)
 	})
 
@@ -255,7 +255,7 @@ var _ = Describe("Part 4 §6.7 Re-establishing connections https://reference.opc
 			last = env.LastSequenceNumber()
 		})
 
-		It("creates a new session only after ActivateSession fails", Label("P4-6.7"), func() {
+		It("creates a new session only after ActivateSession fails", func() {
 			m = env.Mark()
 			env.Relay.Cut()
 			env.WaitUntilReconnected()
@@ -275,19 +275,19 @@ var _ = Describe("Part 4 §6.7 Re-establishing connections https://reference.opc
 				func(env *harness.Environment, second *harness.ScriptedServer, m harness.Mark, last uint32) {
 					transferFailedFlow(env, second, m, transferRefusedPerResult(ua.StatusBadSubscriptionIDInvalid), requireRecreatedCarriesFirstSubscriptionParameters)
 				},
-				Label("P4-6.7", "P4-5.14.7", "should")),
+			),
 			Entry("unsupported, with Bad_ServiceUnsupported",
 				func(second *harness.ScriptedServer) {},
 				func(env *harness.Environment, second *harness.ScriptedServer, m harness.Mark, last uint32) {
 					transferFailedFlow(env, second, m, transferAnsweredWithStatus(ua.StatusBadServiceUnsupported), requireRecreatedCarriesFirstSubscriptionParameters)
 				},
-				Label("P4-6.7", "should")),
+			),
 			Entry("refused per subscription with Bad_UserAccessDenied",
 				func(second *harness.ScriptedServer) { second.QueueTransferRefusal(ua.StatusBadUserAccessDenied) },
 				func(env *harness.Environment, second *harness.ScriptedServer, m harness.Mark, last uint32) {
 					transferFailedFlow(env, second, m, transferRefusedPerResult(ua.StatusBadUserAccessDenied), requireNoRepublishBetween)
 				},
-				Label("P4-6.7", "P4-7.38.1", "known-defect")),
+			),
 			Entry("transferred, with the last delivered notification still available",
 				func(second *harness.ScriptedServer) {
 					moved := second.QueueTransferSuccess(last, last+1)
@@ -296,10 +296,10 @@ var _ = Describe("Part 4 §6.7 Re-establishing connections https://reference.opc
 				func(env *harness.Environment, second *harness.ScriptedServer, m harness.Mark, last uint32) {
 					transferredFlow(env, second, m, last)
 				},
-				Label("P4-6.7", "P4-5.14.7")),
+			),
 		)
 
-		It("opens no new connection once closed", Label("P4-6.7"), func() {
+		It("opens no new connection once closed", func() {
 			m := env.Mark()
 			_ = env.Client.Close(context.Background())
 			Eventually(func(g Gomega) {
@@ -315,7 +315,7 @@ var _ = Describe("Part 4 §6.7 Re-establishing connections https://reference.opc
 			}, noReconnectWindow).Should(Succeed())
 		})
 
-		It("republishes a recreated subscription from sequence number 1", Label("P4-6.7", "issue-879", "known-defect"), func() {
+		It("republishes a recreated subscription from sequence number 1", func() {
 			second.QueueTransferRefusal(ua.StatusBadSubscriptionIDInvalid)
 			m = env.Mark()
 			env.Relay.Cut()
@@ -333,7 +333,7 @@ const dataRaceWindow = 3 * time.Second
 // The spec asserts nothing itself: under -race, the race detector fails
 // the test binary if Close and Dial race on the client's connection again.
 var _ = Describe("when the client is closed while it re-dials", func() {
-	It("does not race Close against the reconnect Dial", Label("P4-6.7", "issue-883"), func() {
+	It("does not race Close against the reconnect Dial", func() {
 		env := harness.New(GinkgoT())
 		ctx := context.Background()
 		deadline := time.Now().Add(dataRaceWindow)
@@ -392,7 +392,7 @@ const (
 )
 
 var _ = Describe("when the reconnect interval is long", func() {
-	It("reconnects without waiting the reconnect interval when the first redial succeeds", Label("P4-6.7"), func() {
+	It("reconnects without waiting the reconnect interval when the first redial succeeds", func() {
 		env := harness.New(GinkgoT(), harness.WithClientOptions(opcua.ReconnectInterval(reconnectIntervalLong)))
 		m := env.Mark()
 		env.Relay.Cut()
@@ -416,7 +416,7 @@ const (
 )
 
 var _ = Describe("when the request timeout is short", func() {
-	It("keeps a Publish open past the request timeout after recreating the subscription", Label("P4-6.7"), func() {
+	It("keeps a Publish open past the request timeout after recreating the subscription", func() {
 		env := harness.New(GinkgoT(), harness.WithClientOptions(opcua.RequestTimeout(publishHoldRequestTimeout)))
 		second := env.StartServer()
 		env.Relay.RedirectTo(second.Address())
@@ -473,25 +473,21 @@ var _ = Describe("when the request timeout is short", func() {
 	})
 })
 
-// reactivatesSession: after a transport loss the client re-activates
+// reactivatesSession (§6.7, shall): after a transport loss the client re-activates
 // the session it had, carrying the authentication token the server
 // issued before the loss.
 var reactivatesSession = matrix.Rule{
-	Name:    "ReactivatesSession",
-	Clause:  "P4-6.7",
-	Keyword: "shall",
+	Name: "ReactivatesSession",
 	Check: func(c matrix.Context) {
 		reactivationAnswer(c.Env, c.Mark)
 	},
 }
 
-// createsNoSession: the client creates no new session before the
+// createsNoSession (§6.7, shall): the client creates no new session before the
 // re-activation of the old one was answered, and none after it
 // succeeded.
 var createsNoSession = matrix.Rule{
-	Name:    "CreatesNoSession",
-	Clause:  "P4-6.7",
-	Keyword: "shall",
+	Name: "CreatesNoSession",
 	Check: func(c matrix.Context) {
 		reactivation := reactivationAnswer(c.Env, c.Mark)
 		Expect(slices.ContainsFunc(requestsOfType[*ua.CreateSessionRequest](c.Env.Recorder.RequestsSince(c.Mark)), func(request harness.ServiceRecord[ua.Request]) bool {
@@ -503,13 +499,11 @@ var createsNoSession = matrix.Rule{
 	},
 }
 
-// republishesFromNextSequence: the client republishes from the next
+// republishesFromNextSequence (§6.7, shall): the client republishes from the next
 // expected sequence number, incrementing, until the server answers
 // Bad_MessageNotAvailable.
 var republishesFromNextSequence = matrix.Rule{
-	Name:    "RepublishesFromNextSequence",
-	Clause:  "P4-6.7",
-	Keyword: "shall",
+	Name: "RepublishesFromNextSequence",
 	Check: func(c matrix.Context) {
 		Eventually(func(g Gomega) {
 			requests := c.Env.Recorder.RequestsSince(c.Mark)
@@ -535,13 +529,11 @@ var republishesFromNextSequence = matrix.Rule{
 	},
 }
 
-// sendsNoPublishBeforeNotAvailable: the client sends no Publish
+// sendsNoPublishBeforeNotAvailable (§6.7, should): the client sends no Publish
 // request on its new connection until the Republish the server
 // answered Bad_MessageNotAvailable.
 var sendsNoPublishBeforeNotAvailable = matrix.Rule{
-	Name:    "SendsNoPublishBeforeNotAvailable",
-	Clause:  "P4-6.7",
-	Keyword: "should",
+	Name: "SendsNoPublishBeforeNotAvailable",
 	Check: func(c matrix.Context) {
 		notAvailableAnswer := waitAnsweredBadMessageNotAvailable(c.Env, c.Mark)
 		Expect(slices.ContainsFunc(requestsOfType[*ua.PublishRequest](c.Env.Recorder.RequestsSince(c.Mark)), func(request harness.ServiceRecord[ua.Request]) bool {
@@ -550,12 +542,10 @@ var sendsNoPublishBeforeNotAvailable = matrix.Rule{
 	},
 }
 
-// keepsSubscriptionID: the client republishes under the subscription
+// keepsSubscriptionID (§6.7, shall): the client republishes under the subscription
 // id it had before the cut, and creates no new subscription instead.
 var keepsSubscriptionID = matrix.Rule{
-	Name:    "KeepsSubscriptionID",
-	Clause:  "P4-6.7",
-	Keyword: "shall",
+	Name: "KeepsSubscriptionID",
 	Check: func(c matrix.Context) {
 		waitAnsweredBadMessageNotAvailable(c.Env, c.Mark)
 		wrongID := false
@@ -575,14 +565,12 @@ var keepsSubscriptionID = matrix.Rule{
 	},
 }
 
-// createsSessionAfterActivateTimedOut: after the ActivateSession the
+// createsSessionAfterActivateTimedOut (§6.7, should): after the ActivateSession the
 // client sent was not answered within the request timeout, the client
 // creates a new session. A timeout is a failure, and Part 4 lets the
 // client create a new session once ActivateSession has failed.
 var createsSessionAfterActivateTimedOut = matrix.Rule{
-	Name:    "CreatesSessionAfterActivateTimedOut",
-	Clause:  "P4-6.7",
-	Keyword: "should",
+	Name: "CreatesSessionAfterActivateTimedOut",
 	Check: func(c matrix.Context) {
 		sessionToken := preCutSessionToken(c.Env)
 		Expect(sessionToken).NotTo(BeNil(), "the recorder saw no ActivateSession request before the cut")
@@ -606,13 +594,11 @@ var createsSessionAfterActivateTimedOut = matrix.Rule{
 	},
 }
 
-// createsSessionOnlyAfterActivateFailed: the client creates a new
+// createsSessionOnlyAfterActivateFailed (§6.7, shall): the client creates a new
 // session only after trying to activate the old one and being refused
 // Bad_SessionIdInvalid.
 var createsSessionOnlyAfterActivateFailed = matrix.Rule{
-	Name:    "CreatesSessionOnlyAfterActivateFailed",
-	Clause:  "P4-6.7",
-	Keyword: "shall",
+	Name: "CreatesSessionOnlyAfterActivateFailed",
 	Check: func(c matrix.Context) {
 		Eventually(func(g Gomega) {
 			requests := c.Env.Recorder.RequestsSince(c.Mark)
@@ -635,15 +621,13 @@ var createsSessionOnlyAfterActivateFailed = matrix.Rule{
 	},
 }
 
-// recreatesAfterRefusal: after the server refuses the subscription —
+// recreatesAfterRefusal (§6.7, shall): after the server refuses the subscription —
 // a TransferSubscriptions answered the way TransferRefusal
 // recognizes, or, when TransferRefusal is nil, a Republish answered
 // Bad_SubscriptionIdInvalid — the client creates a new subscription
 // and re-monitors its node on it.
 var recreatesAfterRefusal = matrix.Rule{
-	Name:    "RecreatesAfterRefusal",
-	Clause:  "P4-6.7",
-	Keyword: "shall",
+	Name: "RecreatesAfterRefusal",
 	Check: func(c matrix.Context) {
 		if c.TransferRefusal != nil {
 			recreateAfterTransferRefusal(c)
@@ -741,12 +725,10 @@ func monitoredItemRecreated(c matrix.Context, id uint32, orderFloor int) {
 	}, 15*time.Second).Should(Succeed())
 }
 
-// republishesRecreatedFromOne: the client republishes the recreated
+// republishesRecreatedFromOne (§6.7, shall): the client republishes the recreated
 // subscription starting from sequence number one.
 var republishesRecreatedFromOne = matrix.Rule{
-	Name:    "RepublishesRecreatedFromOne",
-	Clause:  "P4-6.7",
-	Keyword: "shall",
+	Name: "RepublishesRecreatedFromOne",
 	Check: func(c matrix.Context) {
 		Eventually(func(g Gomega) {
 			requests := c.Env.Recorder.RequestsSince(c.Mark)
@@ -766,14 +748,12 @@ var republishesRecreatedFromOne = matrix.Rule{
 	},
 }
 
-// republishesSkippedSequence: for every sequence number the server
+// republishesSkippedSequence (§6.7, should): for every sequence number the server
 // skipped on a subscription — a number missing between two consecutive
 // notifications the client received on it — the client sends a Republish
 // for the missing number. No gap means the rule holds vacuously.
 var republishesSkippedSequence = matrix.Rule{
-	Name:    "RepublishesSkippedSequence",
-	Clause:  "P4-6.7",
-	Keyword: "should",
+	Name: "RepublishesSkippedSequence",
 	Check: func(c matrix.Context) {
 		requests := c.Env.Recorder.RequestsSince(c.Mark)
 		responses := c.Env.Recorder.ResponsesSince(c.Mark)
@@ -835,37 +815,37 @@ var _ = Describe("P4-6.7", func() {
 		obs := matrix.Run(sessionSurvives, f)
 		obs.BeforeCloseInvariants()
 		if obs.Applies(reactivatesSession) {
-			It("ReactivatesSession", obs.Labels("ReactivatesSession"), func() {
+			It("ReactivatesSession", func() {
 				reactivatesSession.Check(obs.Context())
 			})
 		}
 		if obs.Applies(createsNoSession) {
-			It("CreatesNoSession", obs.Labels("CreatesNoSession"), func() {
+			It("CreatesNoSession", func() {
 				createsNoSession.Check(obs.Context())
 			})
 		}
 		if obs.Applies(republishesFromNextSequence) {
-			It("RepublishesFromNextSequence", obs.Labels("RepublishesFromNextSequence"), func() {
+			It("RepublishesFromNextSequence", func() {
 				republishesFromNextSequence.Check(obs.Context())
 			})
 		}
 		if obs.Applies(sendsNoPublishBeforeNotAvailable) {
-			It("SendsNoPublishBeforeNotAvailable", obs.Labels("SendsNoPublishBeforeNotAvailable"), func() {
+			It("SendsNoPublishBeforeNotAvailable", func() {
 				sendsNoPublishBeforeNotAvailable.Check(obs.Context())
 			})
 		}
 		if obs.Applies(keepsSubscriptionID) {
-			It("KeepsSubscriptionID", obs.Labels("KeepsSubscriptionID"), func() {
+			It("KeepsSubscriptionID", func() {
 				keepsSubscriptionID.Check(obs.Context())
 			})
 		}
 		if obs.Applies(sendsNoTransferForOwnSubscription) {
-			It("SendsNoTransferForOwnSubscription", obs.Labels("SendsNoTransferForOwnSubscription"), func() {
+			It("SendsNoTransferForOwnSubscription", func() {
 				sendsNoTransferForOwnSubscription.Check(obs.Context())
 			})
 		}
 		if obs.Applies(createsSessionAfterActivateTimedOut) {
-			It("CreatesSessionAfterActivateTimedOut", obs.Labels("CreatesSessionAfterActivateTimedOut"), func() {
+			It("CreatesSessionAfterActivateTimedOut", func() {
 				createsSessionAfterActivateTimedOut.Check(obs.Context())
 			})
 		}
@@ -876,17 +856,17 @@ var _ = Describe("P4-6.7", func() {
 		obs := matrix.Run(sessionLost, f)
 		obs.BeforeCloseInvariants()
 		if obs.Applies(createsSessionOnlyAfterActivateFailed) {
-			It("CreatesSessionOnlyAfterActivateFailed", obs.Labels("CreatesSessionOnlyAfterActivateFailed"), func() {
+			It("CreatesSessionOnlyAfterActivateFailed", func() {
 				createsSessionOnlyAfterActivateFailed.Check(obs.Context())
 			})
 		}
 		if obs.Applies(recreatesAfterRefusal) {
-			It("RecreatesAfterRefusal", obs.Labels("RecreatesAfterRefusal"), func() {
+			It("RecreatesAfterRefusal", func() {
 				recreatesAfterRefusal.Check(obs.Context())
 			})
 		}
 		if obs.Applies(createsSessionAfterActivateTimedOut) {
-			It("CreatesSessionAfterActivateTimedOut", obs.Labels("CreatesSessionAfterActivateTimedOut"), func() {
+			It("CreatesSessionAfterActivateTimedOut", func() {
 				createsSessionAfterActivateTimedOut.Check(obs.Context())
 			})
 		}
@@ -897,64 +877,23 @@ var _ = Describe("P4-6.7", func() {
 		obs := matrix.Run(subscriptionsLost, f)
 		obs.BeforeCloseInvariants()
 		if obs.Applies(recreatesAfterRefusal) {
-			It("RecreatesAfterRefusal", obs.Labels("RecreatesAfterRefusal"), func() {
+			It("RecreatesAfterRefusal", func() {
 				recreatesAfterRefusal.Check(obs.Context())
 			})
 		}
 		if obs.Applies(republishesRecreatedFromOne) {
-			It("RepublishesRecreatedFromOne", obs.Labels("RepublishesRecreatedFromOne"), func() {
+			It("RepublishesRecreatedFromOne", func() {
 				republishesRecreatedFromOne.Check(obs.Context())
 			})
 		}
 		if obs.Applies(createsSessionAfterActivateTimedOut) {
-			It("CreatesSessionAfterActivateTimedOut", obs.Labels("CreatesSessionAfterActivateTimedOut"), func() {
+			It("CreatesSessionAfterActivateTimedOut", func() {
 				createsSessionAfterActivateTimedOut.Check(obs.Context())
 			})
 		}
 		obs.AfterCloseInvariants()
 	}, matrix.Entries(subscriptionsLost, fault.AllFaults...))
 })
-
-// The unfiled issues the triage named, one label per group of cases
-// with one root cause.
-var (
-	issueFailedSubscriptionStep      = matrix.Unfiled("failed-subscription-step", "a failed subscription step during reconnect makes recreateSession drop a healthy session without closing it")
-	issueConnectionFailureOnActivate = matrix.Unfiled("connection-failure-on-activate", "a connection failure during ActivateSession makes the client forget its session without retrying or closing it")
-	issueTimedOutActivationSession   = matrix.Unfiled("timed-out-activation-session", "after an ActivateSession timeout the old session stays open on the server")
-	issueDrainedConnectionError      = matrix.Unfiled("drained-connection-error", "the reconnect loop's error drain discards a connection error, so the client reports Connected on a dead channel")
-	issueHELHandshakeHang            = matrix.Unfiled("hel-handshake-hang", "the HEL/ACK handshake ignores its context, so a reconnect hangs on an unanswered HEL; PR #919 fixes it")
-)
-
-// recreatePathFaults lists the faults under which the client does not
-// reactivate its session but creates a new one. On that path it
-// recreates its subscriptions and resumes publishing, so the delivery
-// and publishing entries below, which belong to the reactivation path,
-// do not cover them.
-var recreatePathFaults = []string{
-	"CutAfterResponse/OpenSecureChannel", "DelayAboveTimeout/ActivateSession",
-	"RequestLost/ActivateSession", "ResponseLost/ActivateSession"}
-
-// cutPublishFaults lists the faults that cut the connection on the
-// Publish service: the workload answers one held Publish right after
-// the arm on them, so their armed cut fires on that exchange and their
-// labelled HaveFired and ResumePublishing checks pass on main.
-var cutPublishFaults = []string{
-	"CutAfterResponse/Publish", "RequestLost/Publish", "ResponseLost/Publish"}
-
-// failedSubscriptionStepFaults lists the SessionLost faults that fail
-// a subscription step of the reconnect.
-var failedSubscriptionStepFaults = []string{
-	"CutAfterResponse/CreateSubscription", "CutAfterResponse/Read", "CutAfterResponse/TransferSubscriptions",
-	"DelayAboveTimeout/CreateMonitoredItems", "DelayAboveTimeout/CreateSubscription",
-	"Overload/CreateMonitoredItems/Bad_ResourceUnavailable", "Overload/CreateMonitoredItems/Bad_TooManyOperations",
-	"Overload/CreateSubscription/Bad_ResourceUnavailable", "Overload/CreateSubscription/Bad_TooManyOperations",
-	"RequestLost/CreateMonitoredItems", "RequestLost/CreateSubscription", "RequestLost/TransferSubscriptions",
-	"ResponseLost/CreateMonitoredItems", "ResponseLost/CreateSubscription", "ResponseLost/TransferSubscriptions"}
-
-// failedActivationFaults lists the faults that fail the ActivateSession
-// of a reconnect on its connection.
-var failedActivationFaults = []string{
-	"CutAfterResponse/OpenSecureChannel", "RequestLost/ActivateSession", "ResponseLost/ActivateSession"}
 
 // sessionSurvives leaves the session and its subscription on the one
 // server the client is connected to: the client must re-activate the
@@ -978,27 +917,6 @@ var sessionSurvives = matrix.Scenario{
 		sendsNoTransferForOwnSubscription,
 	),
 	Invariants: subscriptionInvariants,
-	KnownDefects: []matrix.KnownDefect{
-		{Issue: "issue-879", Check: "RepublishesFromNextSequence", Applies: matrix.EveryFault},
-		{Issue: "issue-879", Check: "SendsNoPublishBeforeNotAvailable", Applies: matrix.EveryFault},
-		{Issue: "issue-879", Check: "KeepsSubscriptionID", Applies: matrix.EveryFault},
-		{Issue: "issue-879", Check: "SendsNoTransferForOwnSubscription", Applies: matrix.EveryFault},
-		{Issue: "issue-879", Check: "DeliverEachValueOnce", Applies: matrix.EveryFaultExcept(recreatePathFaults...)},
-		{Issue: "issue-879", Check: "ResumePublishing", Applies: matrix.EveryFaultExcept(recreatePathFaults...)},
-		{Issue: "issue-879", Check: "HaveFired", Applies: matrix.FaultsTargetingExcept(cutPublishFaults, "Publish", "Republish")},
-		{Issue: issueConnectionFailureOnActivate, Check: "CloseEveryKnownSession", Applies: matrix.FaultsNamed(failedActivationFaults...)},
-		{Issue: issueConnectionFailureOnActivate, Check: "KeepOneSessionOpen", Applies: matrix.FaultsNamed(failedActivationFaults...)},
-		{Issue: issueConnectionFailureOnActivate, Check: "CreatesNoSession", Applies: matrix.FaultsNamed(failedActivationFaults...)},
-		{Issue: issueConnectionFailureOnActivate, Check: "ReactivatesSession", Applies: matrix.FaultsNamed("CutAfterResponse/OpenSecureChannel", "RequestLost/ActivateSession")},
-		{Issue: issueHELHandshakeHang, Check: "CloseEveryKnownSession", Applies: matrix.FaultsNamed("Link/HELUnanswered")},
-		{Issue: issueHELHandshakeHang, Check: "CreatesNoSession", Applies: matrix.FaultsNamed("Link/HELUnanswered")},
-		{Issue: issueHELHandshakeHang, Check: "ReactivatesSession", Applies: matrix.FaultsNamed("Link/HELUnanswered")},
-		{Issue: "issue-828", Check: "CreatesNoSession", Applies: matrix.FaultsNamed("Link/Stall")},
-		{Issue: "issue-828", Check: "ReactivatesSession", Applies: matrix.FaultsNamed("Link/Stall")},
-		{Issue: issueTimedOutActivationSession, Check: "CloseEveryKnownSession", Applies: matrix.FaultsNamed("DelayAboveTimeout/ActivateSession")},
-		{Issue: issueTimedOutActivationSession, Check: "KeepOneSessionOpen", Applies: matrix.FaultsNamed("DelayAboveTimeout/ActivateSession")},
-		{Issue: issueDrainedConnectionError, Check: "CloseEveryKnownSession", Applies: matrix.FaultsNamed("CutAfterResponse/Read")},
-	},
 }
 
 // sessionLost redirects the client to a second server that refuses
@@ -1020,33 +938,6 @@ var sessionLost = matrix.Scenario{
 		recreatesAfterRefusal,
 	),
 	Invariants: subscriptionInvariants,
-	KnownDefects: []matrix.KnownDefect{
-		{Issue: "issue-879", Check: "ResumePublishing", Applies: matrix.FaultsNamed(
-			"DelayAboveTimeout/Read",
-			"Overload/Publish/Bad_ResourceUnavailable", "Overload/Publish/Bad_TooManyOperations",
-			"Overload/Publish/Bad_TooManyPublishRequests", "RequestLost/Read", "ResponseLost/Read")},
-		{Issue: "issue-879", Check: "KeepOneSubscriptionPerClientSubscription", Applies: matrix.FaultsNamed(
-			"DelayAboveTimeout/Read", "RequestLost/Read", "ResponseLost/Read")},
-		{Issue: "issue-879", Check: "RecreatesAfterRefusal", Applies: matrix.FaultsNamed(
-			"RequestLost/Read", "ResponseLost/Read")},
-		{Issue: issueFailedSubscriptionStep, Check: "CloseEveryKnownSession", Applies: matrix.FaultsNamed(failedSubscriptionStepFaults...)},
-		{Issue: issueFailedSubscriptionStep, Check: "KeepOneSessionOpen", Applies: matrix.FaultsNamed(failedSubscriptionStepFaults...)},
-		{Issue: issueFailedSubscriptionStep, Check: "RecreatesAfterRefusal", Applies: matrix.FaultsNamed("CutAfterResponse/CreateSubscription")},
-		{Issue: issueConnectionFailureOnActivate, Check: "CloseEveryKnownSession", Applies: matrix.FaultsNamed("CutAfterResponse/CreateSession")},
-		{Issue: issueConnectionFailureOnActivate, Check: "KeepOneSessionOpen", Applies: matrix.FaultsNamed("CutAfterResponse/CreateSession")},
-		{Issue: issueConnectionFailureOnActivate, Check: "CreatesSessionOnlyAfterActivateFailed", Applies: matrix.FaultsNamed("CutAfterResponse/OpenSecureChannel", "RequestLost/ActivateSession")},
-		{Issue: issueHELHandshakeHang, Check: "CreatesSessionOnlyAfterActivateFailed", Applies: matrix.FaultsNamed("Link/HELUnanswered")},
-		{Issue: issueHELHandshakeHang, Check: "KeepOneSessionOpen", Applies: matrix.FaultsNamed("Link/HELUnanswered")},
-		{Issue: issueHELHandshakeHang, Check: "KeepOneSubscriptionPerClientSubscription", Applies: matrix.FaultsNamed("Link/HELUnanswered")},
-		{Issue: issueHELHandshakeHang, Check: "RecreatesAfterRefusal", Applies: matrix.FaultsNamed("Link/HELUnanswered")},
-		{Issue: issueHELHandshakeHang, Check: "ResumePublishing", Applies: matrix.FaultsNamed("Link/HELUnanswered")},
-		{Issue: "issue-828", Check: "CreatesSessionOnlyAfterActivateFailed", Applies: matrix.FaultsNamed("Link/Stall")},
-		{Issue: "issue-828", Check: "DeliverEachValueOnce", Applies: matrix.FaultsNamed("Link/Stall")},
-		{Issue: "issue-828", Check: "RecreatesAfterRefusal", Applies: matrix.FaultsNamed("Link/Stall")},
-		{Issue: "issue-828", Check: "ResumePublishing", Applies: matrix.FaultsNamed("Link/Stall")},
-		{Issue: issueDrainedConnectionError, Check: "CloseEveryKnownSession", Applies: matrix.FaultsNamed("CutAfterResponse/CreateMonitoredItems")},
-		{Issue: issueDrainedConnectionError, Check: "ResumePublishing", Applies: matrix.FaultsNamed("CutAfterResponse/CreateMonitoredItems")},
-	},
 }
 
 // subscriptionsLost makes the server forget every subscription while
@@ -1067,19 +958,6 @@ var subscriptionsLost = matrix.Scenario{
 		republishesRecreatedFromOne,
 	),
 	Invariants: subscriptionInvariants,
-	KnownDefects: []matrix.KnownDefect{
-		{Issue: "issue-879", Check: "RecreatesAfterRefusal", Applies: matrix.EveryFault},
-		{Issue: "issue-879", Check: "RepublishesRecreatedFromOne", Applies: matrix.EveryFault},
-		{Issue: "issue-879", Check: "HaveFired", Applies: matrix.FaultsTargetingExcept(cutPublishFaults, "CreateSubscription", "CreateMonitoredItems", "Publish", "Republish")},
-		{Issue: "issue-895", Check: "ResumePublishing", Applies: matrix.EveryFaultExcept(recreatePathFaults...)},
-		{Issue: "issue-895", Check: "KeepOneSubscriptionPerClientSubscription", Applies: matrix.EveryFaultExcept(recreatePathFaults...)},
-		{Issue: issueConnectionFailureOnActivate, Check: "CloseEveryKnownSession", Applies: matrix.FaultsNamed(failedActivationFaults...)},
-		{Issue: issueConnectionFailureOnActivate, Check: "KeepOneSessionOpen", Applies: matrix.FaultsNamed(failedActivationFaults...)},
-		{Issue: issueHELHandshakeHang, Check: "CloseEveryKnownSession", Applies: matrix.FaultsNamed("Link/HELUnanswered")},
-		{Issue: issueTimedOutActivationSession, Check: "CloseEveryKnownSession", Applies: matrix.FaultsNamed("DelayAboveTimeout/ActivateSession")},
-		{Issue: issueTimedOutActivationSession, Check: "KeepOneSessionOpen", Applies: matrix.FaultsNamed("DelayAboveTimeout/ActivateSession")},
-		{Issue: issueDrainedConnectionError, Check: "CloseEveryKnownSession", Applies: matrix.FaultsNamed("CutAfterResponse/Read")},
-	},
 }
 
 // reestablishingRules returns the rules §6.7 prescribes per fault: an

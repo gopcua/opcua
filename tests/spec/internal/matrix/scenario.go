@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"reflect"
 	"slices"
-	"strings"
 	"sync"
 
 	"github.com/gopcua/opcua/tests/spec/internal/fault"
@@ -18,8 +17,11 @@ import (
 // with ginkgo.DescribeTableSubtree, Entries and Run, and writes the
 // case's check Its with the Observation that Run returns.
 type Scenario struct {
-	// Clause is the text of the clause container and the first label
-	// of every check, "P4-6.7" for example.
+	// Clause is the text of the clause container and the first part
+	// of every spec path, "P4-6.7" for example. A spec path is the
+	// chain of ginkgo container texts that locates one spec:
+	// clause, scenario, fault, then the check's own name as the
+	// leaf.
 	Clause string
 	// Name is the text of the scenario container.
 	Name string
@@ -41,17 +43,6 @@ type Scenario struct {
 	// Invariants are the checks the workload owes under every fault,
 	// because of what kind of workload it is.
 	Invariants []Invariant
-	// KnownDefects are the checks of this scenario measured to fail.
-	KnownDefects []KnownDefect
-}
-
-// KnownDefect predicts that one check of a scenario fails: the label
-// of the issue that names the defect, the check, and the faults under
-// which it fails.
-type KnownDefect struct {
-	Issue   string
-	Check   string
-	Applies func(f fault.Fault) bool
 }
 
 // Invariant is one property a kind of workload owes under every fault:
@@ -115,9 +106,8 @@ func Entries(s Scenario, faults ...fault.Fault) []ginkgo.TableEntry {
 
 // Cases plans the scenario over the faults: one case per fault, each
 // with its value block and its checks in the order they run. It
-// returns an error when the ordinal is not positive, when a rule the
-// scenario prescribes is malformed or shares an invariant's name, or
-// when a known defect labels no check of an applicable case.
+// returns an error when the ordinal is not positive or a rule the
+// scenario prescribes is malformed or shares an invariant's name.
 func (s Scenario) Cases(faults []fault.Fault) ([]Case, error) {
 	if s.Ordinal < 1 {
 		return nil, fmt.Errorf("scenario %s/%s has ordinal %d; ordinals count from 1", s.Clause, s.Name, s.Ordinal)
@@ -129,28 +119,14 @@ func (s Scenario) Cases(faults []fault.Fault) ([]Case, error) {
 	for _, f := range faults {
 		cases = append(cases, s.caseOf(f))
 	}
-	for _, defect := range s.KnownDefects {
-		matched := false
-		for i, c := range cases {
-			if c.Skip != nil || !defect.Applies(faults[i]) {
-				continue
-			}
-			if slices.ContainsFunc(c.Checks, func(check Check) bool { return check.Name == defect.Check }) {
-				matched = true
-			}
-		}
-		if !matched {
-			return nil, fmt.Errorf("known defect %s (check %s) matches no applicable check", defect.Issue, defect.Check)
-		}
-	}
 	return cases, nil
 }
 
 // validateRules rejects the rules the scenario prescribes under the
-// faults. A rule needs a name of its own and a Check, because the plan
-// and the known-defect table find a check by its name: a rule that
-// shares an invariant's name plans two checks under one name, and a
-// name two rules share leaves the table unable to pick either. The
+// faults. A rule needs a name of its own and a Check, because a
+// case's checks are asserted by name: a rule that shares an
+// invariant's name plans two checks under one name, and a name two
+// rules share leaves the case unable to pick either. The
 // shared-name rejection compares the rules' Check functions by code
 // pointer, so two closures built from one function literal count as
 // one rule.
@@ -190,34 +166,19 @@ func (s Scenario) caseOf(f fault.Fault) Case {
 		c.Skip = reason
 		return c
 	}
-	base := []string{s.Clause, "fault-" + faultGroup(f)}
-	if target, named := faultTarget(f); named {
-		base = append(base, "message-"+target)
-	}
 	invariantsIn := func(phase Phase) {
 		for _, invariant := range s.Invariants {
 			if invariant.Phase == phase {
-				c.Checks = append(c.Checks, Check{Name: invariant.Name, Labels: withLabels(base, "invariant"), Phase: phase})
+				c.Checks = append(c.Checks, Check{Name: invariant.Name, Phase: phase})
 			}
 		}
 	}
 	invariantsIn(BeforeClose)
 	for _, rule := range s.rulesUnder(f) {
-		labels := append(withLabels(base, rule.Clause), rule.Name)
-		if rule.Keyword == "should" {
-			labels = append(labels, "should")
-		}
-		c.Checks = append(c.Checks, Check{Name: rule.Name, Labels: labels, Phase: BeforeClose})
+		c.Checks = append(c.Checks, Check{Name: rule.Name, Phase: BeforeClose})
 	}
-	c.Checks = append(c.Checks, Check{Name: haveFiredInvariant.Name, Labels: withLabels(base, "invariant"), Phase: haveFiredInvariant.Phase})
+	c.Checks = append(c.Checks, Check{Name: haveFiredInvariant.Name, Phase: haveFiredInvariant.Phase})
 	invariantsIn(AfterClose)
-	for i := range c.Checks {
-		for _, defect := range s.KnownDefects {
-			if defect.Check == c.Checks[i].Name && defect.Applies(f) {
-				c.Checks[i].Labels = append(c.Checks[i].Labels, "known-defect", defect.Issue)
-			}
-		}
-	}
 	return c
 }
 
@@ -239,42 +200,4 @@ func (s Scenario) block(f fault.Fault) int32 {
 		return candidate.Name() == f.Name()
 	})
 	return int32(1000 * ((s.Ordinal-1)*len(fault.AllFaults) + faultOrdinal + 1))
-}
-
-// EveryFault says a known defect applies under every fault.
-func EveryFault(fault.Fault) bool { return true }
-
-// EveryFaultExcept says a known defect applies under every fault
-// except the named ones.
-func EveryFaultExcept(names ...string) func(fault.Fault) bool {
-	return func(f fault.Fault) bool {
-		return !slices.Contains(names, f.Name())
-	}
-}
-
-// FaultsNamed says a known defect applies under the named faults.
-func FaultsNamed(names ...string) func(fault.Fault) bool {
-	return func(f fault.Fault) bool {
-		return slices.Contains(names, f.Name())
-	}
-}
-
-// FaultsTargetingExcept says a known defect applies under every
-// message or overload fault that targets one of the named services,
-// except the named faults.
-func FaultsTargetingExcept(except []string, services ...string) func(fault.Fault) bool {
-	return func(f fault.Fault) bool {
-		if slices.Contains(except, f.Name()) {
-			return false
-		}
-		parts := strings.Split(f.Name(), "/")
-		if len(parts) < 2 {
-			return false
-		}
-		switch parts[0] {
-		case "RequestLost", "ResponseLost", "CutAfterResponse", "DelayBelowTimeout", "DelayAboveTimeout", "Overload":
-			return slices.Contains(services, parts[1])
-		}
-		return false
-	}
 }

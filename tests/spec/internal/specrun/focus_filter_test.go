@@ -5,24 +5,7 @@ import (
 	"testing"
 )
 
-func TestLabelFilterPrecedence(t *testing.T) {
-	labelCases := []struct {
-		flagPassed bool
-		given      string
-		env        string
-		want       string
-	}{
-		{true, "x", "y", "x"},
-		{true, "", "y", ""},
-		{false, "x", "y", "y"},
-		{false, "x", "", "!known-defect"},
-	}
-	for _, c := range labelCases {
-		got := LabelFilter(c.flagPassed, c.given, c.env)
-		if got != c.want {
-			t.Errorf("LabelFilter(flagPassed=%v, given=%q, env=%q) = %q, want %q", c.flagPassed, c.given, c.env, got, c.want)
-		}
-	}
+func TestFocusFilterPrecedence(t *testing.T) {
 	focusCases := []struct {
 		flagPassed bool
 		given      []string

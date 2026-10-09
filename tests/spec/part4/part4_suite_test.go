@@ -12,40 +12,28 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func resolveFilters(visit func(func(*flag.Flag)), labelFlag string, focusFlag []string, getenv func(string) string) (labelFilter string, focus []string, labelSource string, focusSource string) {
-	var labelPassed, focusPassed bool
+func resolveFilters(visit func(func(*flag.Flag)), focusFlag []string, getenv func(string) string) (focus []string, focusSource string) {
+	var focusPassed bool
 	visit(func(passed *flag.Flag) {
-		switch passed.Name {
-		case "ginkgo.label-filter":
-			labelPassed = true
-		case "ginkgo.focus":
+		if passed.Name == "ginkgo.focus" {
 			focusPassed = true
 		}
 	})
-	labelEnv := getenv("SPECTEST_LABEL_FILTER")
 	focusEnv := getenv("SPECTEST_FOCUS")
-	labelFilter = specrun.LabelFilter(labelPassed, labelFlag, labelEnv)
 	focus = specrun.FocusFilter(focusPassed, focusFlag, focusEnv)
-	labelSource = "default"
-	if labelPassed {
-		labelSource = "flag"
-	} else if labelEnv != "" {
-		labelSource = "SPECTEST_LABEL_FILTER"
-	}
 	focusSource = "default"
 	if focusPassed {
 		focusSource = "flag"
 	} else if focusEnv != "" {
 		focusSource = "SPECTEST_FOCUS"
 	}
-	return labelFilter, focus, labelSource, focusSource
+	return focus, focusSource
 }
 
 func TestPart4(t *testing.T) {
 	suiteConfig, reporterConfig := GinkgoConfiguration()
-	labelFilter, focus, labelSource, focusSource := resolveFilters(flag.Visit, suiteConfig.LabelFilter, suiteConfig.FocusStrings, os.Getenv)
-	fmt.Printf("part4: label filter %q from %s; focus %v from %s\n", labelFilter, labelSource, focus, focusSource)
-	suiteConfig.LabelFilter = labelFilter
+	focus, focusSource := resolveFilters(flag.Visit, suiteConfig.FocusStrings, os.Getenv)
+	fmt.Printf("part4: focus %v from %s\n", focus, focusSource)
 	suiteConfig.FocusStrings = focus
 	suiteConfig.FailOnEmpty = true
 	RegisterFailHandler(Fail)

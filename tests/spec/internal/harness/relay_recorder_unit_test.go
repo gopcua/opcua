@@ -69,7 +69,7 @@ func TestMessageOfRequest(t *testing.T) {
 }
 
 func TestMessageOfNamesEveryService(t *testing.T) {
-	// Fault names, labels and spec texts contain these names, so
+	// Fault names and spec texts contain these names, so
 	// MessageOf must keep giving each one.
 	before := []struct {
 		request any

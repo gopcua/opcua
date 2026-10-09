@@ -3,6 +3,6 @@
 package harnessfault
 
 // Prefix starts every failure message the spec harness raises for its
-// own fault, so the known-defect gate classifies the message as a
-// harness failure, not an implementation defect.
+// own fault, so the message reads as a fault in the harness, not in
+// the client under test.
 const Prefix = "spectest: "

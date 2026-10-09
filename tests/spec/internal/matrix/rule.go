@@ -6,14 +6,12 @@ import (
 )
 
 // Rule is one Part 4 behaviour the specs assert: a stable Name the
-// known-defect table cites, the Clause label and Keyword of its
-// sentence in the standard, and the Check that asserts it against the
-// context the caller observed.
+// case's checks and the clause file's check Its are keyed by, and
+// the Check that asserts it against the context the caller
+// observed.
 type Rule struct {
-	Name    string
-	Clause  string
-	Keyword string
-	Check   func(c Context)
+	Name  string
+	Check func(c Context)
 }
 
 // Context is what a rule's Check needs: the environment the scenario

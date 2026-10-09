@@ -487,7 +487,7 @@ func TestTeardownRaisesEveryStoredFaultUnderOnePrefix(t *testing.T) {
 		t.Fatalf("teardown failed %d times for two stored faults, want one joined message", len(fake.fatals))
 	}
 	if !strings.HasPrefix(fake.fatals[0], "spectest: ") {
-		t.Fatalf("the joined teardown failure %q does not start with the spectest: prefix the known-defect gate reads", fake.fatals[0])
+		t.Fatalf("the joined teardown failure %q does not start with the spectest: prefix the harness marks its own faults with", fake.fatals[0])
 	}
 	if !strings.Contains(fake.fatals[0], "stored fault one") || !strings.Contains(fake.fatals[0], "stored fault two") {
 		t.Fatalf("the joined teardown failure %q does not name both stored faults", fake.fatals[0])

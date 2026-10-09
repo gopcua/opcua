@@ -1,7 +1,6 @@
 package part4
 
 import (
-	"testing"
 	"time"
 
 	"github.com/gopcua/opcua/tests/spec/internal/fault"
@@ -43,14 +42,6 @@ var idle = matrix.Scenario{
 		}
 	},
 	Invariants: subscriptionInvariants,
-	// The DuplicateSequence case's delivery check: the client delivers
-	// a notification whose sequence number it already received, which
-	// the DeliverEachValueOnce invariant fails on.
-	KnownDefects: []matrix.KnownDefect{{
-		Issue:   matrix.Unfiled("duplicate-sequence", "client delivers a notification whose sequence number it already received (S9)"),
-		Check:   "DeliverEachValueOnce",
-		Applies: matrix.FaultsNamed("Server/DuplicateSequence"),
-	}},
 }
 
 // idleFaults are the faults the self-spec crosses idle with.
@@ -72,57 +63,4 @@ func faultNamed(name string) fault.Fault {
 		}
 	}
 	panic("no fault named " + name)
-}
-
-// TestSelfSpecDefectKeepsTheCaseRunning asserts the labelled case is
-// neither skipped nor emptied: a known defect may retire one check of
-// a case, never the case itself.
-func TestSelfSpecDefectKeepsTheCaseRunning(t *testing.T) {
-	cases, err := idle.Cases(idleFaults)
-	if err != nil {
-		t.Fatalf("Plan over the self-spec returned an error: %v", err)
-	}
-	var duplicate *matrix.Case
-	for i := range cases {
-		if cases[i].Path[2] == "Server/DuplicateSequence" {
-			duplicate = &cases[i]
-		}
-	}
-	if duplicate == nil {
-		t.Fatalf("Plan built no DuplicateSequence case; paths: %v", casePaths(cases))
-	}
-	if duplicate.Skip != nil {
-		t.Fatalf("the DuplicateSequence case is skipped: %s", duplicate.Skip.Text)
-	}
-	var labelled, unlabelled int
-	for _, check := range duplicate.Checks {
-		if contains(check.Labels, "known-defect") {
-			labelled++
-			continue
-		}
-		unlabelled++
-	}
-	if labelled != 1 {
-		t.Fatalf("the DuplicateSequence case carries %d labelled checks, want exactly the delivery check", labelled)
-	}
-	if unlabelled == 0 {
-		t.Fatalf("the DuplicateSequence case carries no unlabelled check, so the default filter would run nothing of it")
-	}
-}
-
-func casePaths(cases []matrix.Case) []string {
-	var paths []string
-	for _, c := range cases {
-		paths = append(paths, c.Path[0]+"/"+c.Path[1]+"/"+c.Path[2])
-	}
-	return paths
-}
-
-func contains(labels []string, want string) bool {
-	for _, label := range labels {
-		if label == want {
-			return true
-		}
-	}
-	return false
 }
