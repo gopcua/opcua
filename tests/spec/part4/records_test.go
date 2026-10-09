@@ -180,9 +180,9 @@ func waitAnsweredBadMessageNotAvailable(env *harness.Environment, m harness.Mark
 
 // answeredTransferThenNewSubscription says whether the recorded
 // traffic already holds a TransferSubscriptions request for oldID
-// answered per transferRefusal, followed by an answered
-// CreateSubscription request whose answer the relay forwarded to the
-// client, and returns their records.
+// answered per transferRefusal, followed by a CreateSubscription
+// request the relay answered with a forwarded CreateSubscriptionResponse
+// carrying a Good service result, and returns their records.
 func answeredTransferThenNewSubscription(env *harness.Environment, m harness.Mark, oldID uint32, transferRefusal func(harness.ServiceRecord[ua.Response]) bool) (transferAnswer harness.ServiceRecord[ua.Response], createRequest harness.ServiceRecord[ua.Request], createAnswer harness.ServiceRecord[ua.Response], complete bool) {
 	requests := env.Recorder.RequestsSince(m)
 	responses := env.Recorder.ResponsesSince(m)
@@ -209,7 +209,10 @@ func answeredTransferThenNewSubscription(env *harness.Environment, m harness.Mar
 			if createAnswer.Fate != harness.Forwarded {
 				continue
 			}
-			if _, isCreate := createAnswer.Message(); isCreate {
+			message, decoded := createAnswer.Message()
+			_, isCreate := message.(*ua.CreateSubscriptionResponse)
+			status, _ := statusOf(createAnswer)
+			if decoded && isCreate && status == ua.StatusOK {
 				return answer, create, createAnswer, true
 			}
 		}
@@ -220,9 +223,11 @@ func answeredTransferThenNewSubscription(env *harness.Environment, m harness.Mar
 
 // findAnsweredTransferThenNewSubscription returns the records of a
 // TransferSubscriptions request for oldID answered per
-// transferRefusal and the CreateSubscription request answered after
-// it, without asserting they exist; a caller whose rule already
-// proved them uses it to pass the records on.
+// transferRefusal and the CreateSubscription request the relay
+// answered after it with a forwarded CreateSubscriptionResponse
+// carrying a Good service result, without asserting they exist; a
+// caller whose rule already proved them uses it to pass the records
+// on.
 func findAnsweredTransferThenNewSubscription(env *harness.Environment, m harness.Mark, oldID uint32, transferRefusal func(harness.ServiceRecord[ua.Response]) bool) (harness.ServiceRecord[ua.Response], harness.ServiceRecord[ua.Request], harness.ServiceRecord[ua.Response]) {
 	transferAnswer, createRequest, createAnswer, _ := answeredTransferThenNewSubscription(env, m, oldID, transferRefusal)
 	return transferAnswer, createRequest, createAnswer
@@ -408,6 +413,66 @@ func republishFor(order int, subscriptionID, sequenceNumber uint32) harness.Serv
 		SubscriptionID:           subscriptionID,
 		RetransmitSequenceNumber: sequenceNumber,
 	})
+}
+
+func TestAnsweredTransferThenNewSubscriptionRejectsAServiceFault(t *testing.T) {
+	transferRefusal := transferRefusedPerResult(ua.StatusBadSubscriptionIDInvalid)
+	transferRequest := func() harness.ServiceRecord[ua.Request] {
+		return harness.RecordedRequest(1, 0, 10, harness.Forwarded, &ua.TransferSubscriptionsRequest{
+			SubscriptionIDs: []uint32{1},
+		})
+	}
+	refusedTransferAnswer := harness.RecordedResponse(2, 0, 10, harness.Forwarded, &ua.TransferSubscriptionsResponse{
+		ResponseHeader: &ua.ResponseHeader{ServiceResult: ua.StatusOK},
+		Results:        []*ua.TransferResult{{StatusCode: ua.StatusBadSubscriptionIDInvalid}},
+	})
+	createRequest := harness.RecordedRequest(3, 0, 11, harness.Forwarded, &ua.CreateSubscriptionRequest{})
+	completeWith := func(createAnswer harness.ServiceRecord[ua.Response]) bool {
+		env := harness.RecordedEnvironment(t,
+			[]harness.ServiceRecord[ua.Request]{transferRequest(), createRequest},
+			[]harness.ServiceRecord[ua.Response]{refusedTransferAnswer, createAnswer},
+			nil)
+		_, _, _, complete := answeredTransferThenNewSubscription(env, harness.Mark{}, 1, transferRefusal)
+		return complete
+	}
+	if completeWith(harness.RecordedResponse(4, 0, 11, harness.Forwarded,
+		&ua.ServiceFault{ResponseHeader: &ua.ResponseHeader{ServiceResult: ua.StatusBadTooManyOperations}})) {
+		t.Errorf("a CreateSubscription answered with a ServiceFault counted as created, want rejected")
+	}
+	if completeWith(harness.RecordedResponse(4, 0, 11, harness.Dropped,
+		&ua.CreateSubscriptionResponse{
+			ResponseHeader: &ua.ResponseHeader{ServiceResult: ua.StatusOK},
+			SubscriptionID: 2,
+		})) {
+		t.Errorf("a CreateSubscription answer the relay dropped counted as created, want rejected")
+	}
+	if completeWith(harness.RecordedResponse(4, 0, 11, harness.Forwarded,
+		&ua.CreateSubscriptionResponse{
+			ResponseHeader: &ua.ResponseHeader{ServiceResult: ua.StatusBadTooManySubscriptions},
+		})) {
+		t.Errorf("a CreateSubscription answered with a refused service result counted as created, want rejected")
+	}
+	env := harness.RecordedEnvironment(t,
+		[]harness.ServiceRecord[ua.Request]{transferRequest(), createRequest},
+		[]harness.ServiceRecord[ua.Response]{refusedTransferAnswer, harness.RecordedResponse(4, 0, 11, harness.Forwarded,
+			&ua.CreateSubscriptionResponse{
+				ResponseHeader: &ua.ResponseHeader{ServiceResult: ua.StatusOK},
+				SubscriptionID: 2,
+			})},
+		nil)
+	_, create, createAnswer, complete := answeredTransferThenNewSubscription(env, harness.Mark{}, 1, transferRefusal)
+	if !complete {
+		t.Errorf("a CreateSubscription answered with a good CreateSubscriptionResponse did not count as created, want complete")
+	}
+	if create.Order != createRequest.Order || create.RequestID != createRequest.RequestID {
+		t.Errorf("the query returned the CreateSubscription request of order %d and request id %d, want the staged ones of order %d and request id %d",
+			create.Order, create.RequestID, createRequest.Order, createRequest.RequestID)
+	}
+	message, decoded := createAnswer.Message()
+	response, isCreate := message.(*ua.CreateSubscriptionResponse)
+	if !decoded || !isCreate || response.SubscriptionID != 2 {
+		t.Errorf("the query returned the create answer of type %T, want the staged CreateSubscriptionResponse of subscription 2", message)
+	}
 }
 
 // checkPasses asserts a rule's Check passes against the facts the
