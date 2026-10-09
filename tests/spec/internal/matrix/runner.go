@@ -148,9 +148,11 @@ func (o *Observation) Applies(rule Rule) bool {
 	return slices.ContainsFunc(o.scenario.rulesUnder(o.fault), func(r Rule) bool { return r.Name == rule.Name })
 }
 
-// Context returns the rules' context the workload returned. A rule's
-// It reads it, after the BeforeAll ran.
-func (o *Observation) Context() Context {
+// Facts returns the rules' facts the workload returned. Read them only
+// inside a rule's It: BeforeAll fills them, and a read made while the
+// clause file is registering Its gets nil facts, which withFacts's
+// type assertion turns into a panic.
+func (o *Observation) Facts() any {
 	return o.outcome.Rules
 }
 

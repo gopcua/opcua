@@ -128,8 +128,9 @@ func (s Scenario) Cases(faults []fault.Fault) ([]Case, error) {
 // invariant's name plans two checks under one name, and a name two
 // rules share leaves the case unable to pick either. The
 // shared-name rejection compares the rules' Check functions by code
-// pointer, so two closures built from one function literal count as
-// one rule.
+// pointer, so whether two wrappers around one rule body count as two
+// rules depends on the compiler inlining the wrapper; a Rule value
+// reused under one name is unambiguously one rule.
 func (s Scenario) validateRules(faults []fault.Fault) error {
 	if s.Rules == nil {
 		return nil

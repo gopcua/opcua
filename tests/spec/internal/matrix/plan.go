@@ -18,19 +18,19 @@ import (
 
 // Outcome is what a scenario's Workload observed: the armed fault, the
 // fault's end event, the sentinel value with the moment its answer
-// was sent, and the rules' context.
+// was sent, and the rules' facts.
 type Outcome struct {
 	Injected   *harness.Injected
 	FaultEnd   time.Time
 	Sentinel   int32
 	AnsweredAt time.Time
-	Rules      Context
+	Rules      any
 }
 
 // Phase picks the snapshot an invariant asserts on. A rule check
 // carries a phase too, but nothing reads it at run time: a rule reads
-// the recorder through the workload's rules context, after the client
-// closed (Observation.Context).
+// the recorder through the workload's facts, after the client
+// closed (Observation.Facts).
 type Phase int
 
 // The zero Phase is invalid; no check carries it.

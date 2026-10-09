@@ -6,11 +6,41 @@ import (
 
 	"github.com/gopcua/opcua/tests/spec/internal/fault"
 	"github.com/gopcua/opcua/tests/spec/internal/harness"
-	"github.com/gopcua/opcua/tests/spec/internal/matrix"
 	"github.com/gopcua/opcua/ua"
 
 	. "github.com/onsi/gomega"
 )
+
+// ruleFacts is what a rule's Check reads: the recorder traffic and
+// subscription state the scenario produced.
+type ruleFacts struct {
+	Env             *harness.Environment
+	Mark            harness.Mark
+	LastSeq         uint32
+	Sub             harness.Subscription
+	Recreated       harness.Subscription
+	Server          *harness.ScriptedServer
+	TransferRefusal func(harness.ServiceRecord[ua.Response]) bool
+	Value           int32
+	// CyclesCompleted and CyclesWanted say how many cancel-then-subscribe
+	// cycles the workload drove and how many it wanted to complete; a
+	// client that stops sending Publish requests (#895) completes fewer
+	// of them.
+	CyclesCompleted int
+	CyclesWanted    int
+	// HeldOrder is the recorded Order of the Publish request the workload
+	// held past the client's publish timeout; HeldAnswerOrder is the
+	// recorded Order of the response it then sent to it, or 0 when it
+	// never answered it.
+	HeldOrder       int
+	HeldAnswerOrder int
+}
+
+// withFacts adapts a rule body to the matrix's Check, which carries
+// the workload's facts untyped.
+func withFacts(check func(ruleFacts)) func(any) {
+	return func(facts any) { check(facts.(ruleFacts)) }
+}
 
 func deleteNamesSubscription(requests []harness.ServiceRecord[ua.Request], orderFloor int, id uint32) bool {
 	for _, record := range requests {
@@ -73,7 +103,7 @@ func requireNoRepublishBetween(env *harness.Environment, m harness.Mark, transfe
 
 func transferFailedFlow(env *harness.Environment, second *harness.ScriptedServer, m harness.Mark, transferAnswered func(harness.ServiceRecord[ua.Response]) bool, extra func(env *harness.Environment, m harness.Mark, transferAnswer, createAnswer harness.ServiceRecord[ua.Response])) {
 	oldID := env.Subscription().ID()
-	recreatesAfterRefusal.Check(matrix.Context{Env: env, Mark: m, Sub: env.Subscription(), TransferRefusal: transferAnswered})
+	recreatesAfterRefusal.Check(ruleFacts{Env: env, Mark: m, Sub: env.Subscription(), TransferRefusal: transferAnswered})
 	transferAnswer, createRequest, createAnswer := findAnsweredTransferThenNewSubscription(env, m, oldID, transferAnswered)
 	extra(env, m, transferAnswer, createAnswer)
 	created := second.WaitCreatedSubscription(m)

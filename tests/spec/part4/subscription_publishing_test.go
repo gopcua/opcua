@@ -33,7 +33,7 @@ var _ = Describe("when the publishing interval is 10 ms", func() {
 		// timeout: the request times out on the client, which must
 		// publish again while the first stays unanswered.
 		time.Sleep(env.PublishTimeout() + 2*time.Second)
-		republishesWithinTimeoutAfterPublishTimeout.Check(matrix.Context{Env: env, Server: env.Server, HeldOrder: heldOrder})
+		republishesWithinTimeoutAfterPublishTimeout.Check(ruleFacts{Env: env, Server: env.Server, HeldOrder: heldOrder})
 	})
 
 	It("times out a held Publish after recreating the subscription", func() {
@@ -49,7 +49,7 @@ var _ = Describe("when the publishing interval is 10 ms", func() {
 		heldOrder, recorded := held.Order()
 		Expect(recorded).To(BeTrue(), "the held Publish request was never recorded, so its wire order is unknown")
 		time.Sleep(env.PublishTimeout() + 2*time.Second)
-		republishesWithinTimeoutAfterPublishTimeout.Check(matrix.Context{Env: env, Server: second, HeldOrder: heldOrder})
+		republishesWithinTimeoutAfterPublishTimeout.Check(ruleFacts{Env: env, Server: second, HeldOrder: heldOrder})
 		Expect(second.UnusedScripts()).To(BeEmpty(), "scripts this spec armed were never used: %v", second.UnusedScripts())
 	})
 })
@@ -82,7 +82,7 @@ var _ = Describe("when the only subscription is cancelled and a new one created 
 		monitorCancel()
 		Expect(monitorErr).NotTo(HaveOccurred(), "the client monitored no node on the new subscription: %v", monitorErr)
 		held.Answer(created, valueAfterReconnect)
-		keepsPublishingAfterCancelThenSubscribe.Check(matrix.Context{Env: env, Mark: m, Value: valueAfterReconnect})
+		keepsPublishingAfterCancelThenSubscribe.Check(ruleFacts{Env: env, Mark: m, Value: valueAfterReconnect})
 		Expect(env.Server.UnusedScripts()).To(BeEmpty(), "scripts this spec armed were never used: %v", env.Server.UnusedScripts())
 	})
 })
@@ -113,7 +113,7 @@ func requireSubscriptionDeleted(env *harness.Environment, m harness.Mark, id uin
 // session owns.
 var sendsNoTransferForOwnSubscription = matrix.Rule{
 	Name: "SendsNoTransferForOwnSubscription",
-	Check: func(c matrix.Context) {
+	Check: withFacts(func(c ruleFacts) {
 		notAvailableAnswer := waitAnsweredBadMessageNotAvailable(c.Env, c.Mark)
 		Expect(slices.ContainsFunc(requestsOfType[*ua.TransferSubscriptionsRequest](c.Env.Recorder.RequestsSince(c.Mark)), func(request harness.ServiceRecord[ua.Request]) bool {
 			return request.Order < notAvailableAnswer.Order
@@ -121,7 +121,7 @@ var sendsNoTransferForOwnSubscription = matrix.Rule{
 		Consistently(func(g Gomega) {
 			g.Expect(requestsOfType[*ua.TransferSubscriptionsRequest](c.Env.Recorder.RequestsSince(c.Mark))).To(BeEmpty(), "client sent a TransferSubscriptions request for a subscription its own session owns")
 		}, 2*time.Second).Should(Succeed())
-	},
+	}),
 }
 
 // republishesWithinTimeoutAfterPublishTimeout (§5.14.1.2, should): when
@@ -132,7 +132,7 @@ var sendsNoTransferForOwnSubscription = matrix.Rule{
 // the workload gave it, or after it when the workload gave none.
 var republishesWithinTimeoutAfterPublishTimeout = matrix.Rule{
 	Name: "RepublishesWithinTimeoutAfterPublishTimeout",
-	Check: func(c matrix.Context) {
+	Check: withFacts(func(c ruleFacts) {
 		sent := false
 		for _, record := range requestsOfType[*ua.PublishRequest](c.Env.Recorder.RequestsSince(c.Mark)) {
 			if record.Connection != c.Env.Recorder.ConnectionOfOrder(c.HeldOrder) {
@@ -145,7 +145,7 @@ var republishesWithinTimeoutAfterPublishTimeout = matrix.Rule{
 		}
 		Expect(sent).To(BeTrue(), "the client sent no Publish request on connection %d after the held one (order %d) and before its answer (order %d), so it never timed out the held Publish",
 			c.Env.Recorder.ConnectionOfOrder(c.HeldOrder), c.HeldOrder, c.HeldAnswerOrder)
-	},
+	}),
 }
 
 // keepsPublishingAfterCancelThenSubscribe (§5.14.1.2, should): after the
@@ -156,7 +156,7 @@ var republishesWithinTimeoutAfterPublishTimeout = matrix.Rule{
 // subscription.
 var keepsPublishingAfterCancelThenSubscribe = matrix.Rule{
 	Name: "KeepsPublishingAfterCancelThenSubscribe",
-	Check: func(c matrix.Context) {
+	Check: withFacts(func(c ruleFacts) {
 		if c.CyclesWanted > 0 {
 			Expect(c.CyclesCompleted).To(Equal(c.CyclesWanted),
 				"the client parked its publish loop after cycle %d of %d: the cancel and the resume raced",
@@ -170,7 +170,7 @@ var keepsPublishingAfterCancelThenSubscribe = matrix.Rule{
 			g.Expect(c.Env.ReceivedSince(c.Mark)).To(ContainElement(c.Value),
 				"the client delivered no value answered on the new subscription; delivered since the mark: %v", c.Env.ReceivedSince(c.Mark))
 		}, 5*time.Second).Should(Succeed())
-	},
+	}),
 }
 
 // publishesAgainAfterTooManyPublishRequests (§5.14.5, should): for every
@@ -180,7 +180,7 @@ var keepsPublishingAfterCancelThenSubscribe = matrix.Rule{
 // vacuously.
 var publishesAgainAfterTooManyPublishRequests = matrix.Rule{
 	Name: "PublishesAgainAfterTooManyPublishRequests",
-	Check: func(c matrix.Context) {
+	Check: withFacts(func(c ruleFacts) {
 		requests := c.Env.Recorder.RequestsSince(c.Mark)
 		responses := c.Env.Recorder.ResponsesSince(c.Mark)
 		for _, refused := range publishesAnsweredTooMany(requests, responses) {
@@ -234,13 +234,13 @@ var publishesAgainAfterTooManyPublishRequests = matrix.Rule{
 				"no value answered after the Publish that followed the server answering its Publish (connection %d, request id %d) with Bad_TooManyPublishRequests was delivered",
 				refused.request.Connection, refused.request.RequestID)
 		}
-	},
+	}),
 }
 
 func TestPublishesAgainAfterTooManyPublishRequests(t *testing.T) {
 	// No Publish was answered Bad_TooManyPublishRequests, so the rule
 	// holds vacuously.
-	checkPasses(t, publishesAgainAfterTooManyPublishRequests, matrix.Context{Env: harness.RecordedEnvironment(t,
+	checkPasses(t, publishesAgainAfterTooManyPublishRequests, ruleFacts{Env: harness.RecordedEnvironment(t,
 		[]harness.ServiceRecord[ua.Request]{
 			publishRequest(1, 10, ua.NewTwoByteNodeID(1)),
 		},
@@ -251,7 +251,7 @@ func TestPublishesAgainAfterTooManyPublishRequests(t *testing.T) {
 
 	// One was, and the client sent another Publish on the same session,
 	// and a value answered after it was delivered.
-	checkPasses(t, publishesAgainAfterTooManyPublishRequests, matrix.Context{Env: harness.RecordedEnvironment(t,
+	checkPasses(t, publishesAgainAfterTooManyPublishRequests, ruleFacts{Env: harness.RecordedEnvironment(t,
 		[]harness.ServiceRecord[ua.Request]{
 			publishRequest(1, 10, ua.NewTwoByteNodeID(1)),
 			publishRequest(3, 11, ua.NewTwoByteNodeID(1)),
@@ -264,7 +264,7 @@ func TestPublishesAgainAfterTooManyPublishRequests(t *testing.T) {
 
 	// One was, and the client sent no Publish after it: the rule fails
 	// naming the refused request.
-	checkFails(t, publishesAgainAfterTooManyPublishRequests, matrix.Context{Env: harness.RecordedEnvironment(t,
+	checkFails(t, publishesAgainAfterTooManyPublishRequests, ruleFacts{Env: harness.RecordedEnvironment(t,
 		[]harness.ServiceRecord[ua.Request]{
 			publishRequest(1, 10, ua.NewTwoByteNodeID(1)),
 			publishRequest(3, 11, ua.NewTwoByteNodeID(2)),
@@ -278,7 +278,7 @@ func TestPublishesAgainAfterTooManyPublishRequests(t *testing.T) {
 	// One was, another Publish followed on the same session, but no
 	// value answered after it was delivered: the rule fails naming the
 	// refused request.
-	checkFails(t, publishesAgainAfterTooManyPublishRequests, matrix.Context{Env: harness.RecordedEnvironment(t,
+	checkFails(t, publishesAgainAfterTooManyPublishRequests, ruleFacts{Env: harness.RecordedEnvironment(t,
 		[]harness.ServiceRecord[ua.Request]{
 			publishRequest(1, 10, ua.NewTwoByteNodeID(1)),
 			publishRequest(3, 11, ua.NewTwoByteNodeID(1)),
@@ -301,17 +301,17 @@ var _ = Describe("P4-5.14", func() {
 		obs.BeforeCloseInvariants()
 		if obs.Applies(republishesWithinTimeoutAfterPublishTimeout) {
 			It("RepublishesWithinTimeoutAfterPublishTimeout", func() {
-				republishesWithinTimeoutAfterPublishTimeout.Check(obs.Context())
+				republishesWithinTimeoutAfterPublishTimeout.Check(obs.Facts())
 			})
 		}
 		if obs.Applies(republishesSkippedSequence) {
 			It("RepublishesSkippedSequence", func() {
-				republishesSkippedSequence.Check(obs.Context())
+				republishesSkippedSequence.Check(obs.Facts())
 			})
 		}
 		if obs.Applies(publishesAgainAfterTooManyPublishRequests) {
 			It("PublishesAgainAfterTooManyPublishRequests", func() {
-				publishesAgainAfterTooManyPublishRequests.Check(obs.Context())
+				publishesAgainAfterTooManyPublishRequests.Check(obs.Facts())
 			})
 		}
 		obs.AfterCloseInvariants()
@@ -322,17 +322,17 @@ var _ = Describe("P4-5.14", func() {
 		obs.BeforeCloseInvariants()
 		if obs.Applies(keepsPublishingAfterCancelThenSubscribe) {
 			It("KeepsPublishingAfterCancelThenSubscribe", func() {
-				keepsPublishingAfterCancelThenSubscribe.Check(obs.Context())
+				keepsPublishingAfterCancelThenSubscribe.Check(obs.Facts())
 			})
 		}
 		if obs.Applies(republishesSkippedSequence) {
 			It("RepublishesSkippedSequence", func() {
-				republishesSkippedSequence.Check(obs.Context())
+				republishesSkippedSequence.Check(obs.Facts())
 			})
 		}
 		if obs.Applies(publishesAgainAfterTooManyPublishRequests) {
 			It("PublishesAgainAfterTooManyPublishRequests", func() {
-				publishesAgainAfterTooManyPublishRequests.Check(obs.Context())
+				publishesAgainAfterTooManyPublishRequests.Check(obs.Facts())
 			})
 		}
 		obs.AfterCloseInvariants()
@@ -432,7 +432,7 @@ func publishingValuesOf(base int32) publishingValues {
 
 // driveSteadyPublishing arms the fault, answers a steady stream,
 // holds one Publish past the client's publish timeout, answers the
-// rest, and returns the rules' context. The fault is the interruption:
+// rest, and returns the rules' facts. The fault is the interruption:
 // no relay connection is cut.
 func driveSteadyPublishing(env *harness.Environment, f fault.Fault, block int32) matrix.Outcome {
 	values := publishingValuesOf(block)
@@ -487,7 +487,7 @@ func driveSteadyPublishing(env *harness.Environment, f fault.Fault, block int32)
 		FaultEnd:   faultEnd,
 		Sentinel:   sentinel,
 		AnsweredAt: answeredAt,
-		Rules: matrix.Context{
+		Rules: ruleFacts{
 			Env:             env,
 			Mark:            m,
 			Sub:             sub,
@@ -595,7 +595,7 @@ cycle:
 		FaultEnd:   faultEnd,
 		Sentinel:   sentinel,
 		AnsweredAt: answeredAt,
-		Rules: matrix.Context{
+		Rules: ruleFacts{
 			Env:             env,
 			Mark:            m,
 			Sub:             sub,

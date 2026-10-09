@@ -410,9 +410,9 @@ func republishFor(order int, subscriptionID, sequenceNumber uint32) harness.Serv
 	})
 }
 
-// checkPasses asserts a rule's Check passes against the context the
+// checkPasses asserts a rule's Check passes against the facts the
 // hand-built records define.
-func checkPasses(t *testing.T, rule matrix.Rule, c matrix.Context) {
+func checkPasses(t *testing.T, rule matrix.Rule, c ruleFacts) {
 	t.Helper()
 	var failures []string
 	gomega.RegisterFailHandler(func(message string, _ ...int) { failures = append(failures, message) })
@@ -426,9 +426,9 @@ func checkPasses(t *testing.T, rule matrix.Rule, c matrix.Context) {
 	}
 }
 
-// checkFails asserts a rule's Check fails against the context the
+// checkFails asserts a rule's Check fails against the facts the
 // hand-built records define, with a message naming want.
-func checkFails(t *testing.T, rule matrix.Rule, c matrix.Context, want string) {
+func checkFails(t *testing.T, rule matrix.Rule, c ruleFacts, want string) {
 	t.Helper()
 	var failures []string
 	gomega.RegisterFailHandler(func(message string, _ ...int) { failures = append(failures, message) })
