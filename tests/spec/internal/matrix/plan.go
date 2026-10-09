@@ -6,7 +6,7 @@
 // Invariant value in the clause package's invariants file,
 // part4/invariants_test.go. The matrix adds the HaveFired check to
 // every applicable case itself. Nothing under internal/ cites a clause
-// in code.
+// in non-test code.
 package matrix
 
 import (

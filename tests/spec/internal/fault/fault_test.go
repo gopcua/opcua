@@ -31,9 +31,8 @@ func TestAvailable(t *testing.T) {
 		{"Server/SkippedSequence", []message.Message{message.Publish}, true},
 		{"Control/None", []message.Message{}, true},
 	}
-	byName := faultsByName()
 	for _, c := range cases {
-		f, ok := byName[c.fault]
+		f, ok := Named(c.fault)
 		if !ok {
 			t.Errorf("no fault named %s", c.fault)
 			continue
@@ -49,12 +48,4 @@ func TestAvailable(t *testing.T) {
 			t.Errorf("%s.Available(%v) = nil, want a reason", c.fault, c.sends)
 		}
 	}
-}
-
-func faultsByName() map[string]Fault {
-	byName := make(map[string]Fault)
-	for _, f := range AllFaults {
-		byName[f.Name()] = f
-	}
-	return byName
 }

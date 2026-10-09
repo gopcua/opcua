@@ -14,13 +14,11 @@ import (
 
 func faultByName(t *testing.T, name string) fault.Fault {
 	t.Helper()
-	for _, f := range fault.AllFaults {
-		if f.Name() == name {
-			return f
-		}
+	f, ok := fault.Named(name)
+	if !ok {
+		t.Fatalf("no fault named %s", name)
 	}
-	t.Fatalf("no fault named %s", name)
-	return nil
+	return f
 }
 
 // TestBreaksTransport pins which faults are their own transport loss:

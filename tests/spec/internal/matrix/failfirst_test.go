@@ -103,7 +103,7 @@ func init() {
 				obs := Run(failFirst, f)
 				obs.BeforeCloseInvariants()
 				obs.AfterCloseInvariants()
-			}, Entries(failFirst, faultNamed("RequestLost/Read")))
+			}, Entries(failFirst, mustFault("RequestLost/Read")))
 		})
 	}
 }

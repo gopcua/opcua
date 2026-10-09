@@ -62,13 +62,11 @@ func casesOf(t *testing.T, faults []fault.Fault, scenarios ...Scenario) []Case {
 
 func namedFault(t *testing.T, name string) fault.Fault {
 	t.Helper()
-	for _, f := range fault.AllFaults {
-		if f.Name() == name {
-			return f
-		}
+	f, ok := fault.Named(name)
+	if !ok {
+		t.Fatalf("no fault named %s", name)
 	}
-	t.Fatalf("no fault named %s", name)
-	return nil
+	return f
 }
 
 func TestPlanBuildsOneCasePerCombination(t *testing.T) {

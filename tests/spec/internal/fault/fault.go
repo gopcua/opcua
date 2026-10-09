@@ -218,6 +218,17 @@ func (controlFault) Inject(env *harness.Environment) *harness.Injected {
 // appears nowhere literally.
 var AllFaults = buildAllFaults()
 
+// Named returns the catalogue's fault of that name, false when the
+// catalogue holds none.
+func Named(name string) (Fault, bool) {
+	for _, f := range AllFaults {
+		if f.Name() == name {
+			return f, true
+		}
+	}
+	return nil, false
+}
+
 func buildAllFaults() []Fault {
 	var faults []Fault
 	for _, k := range []messageKind{requestLost, responseLost, cutAfterResponse, delayBelowTimeout, delayAboveTimeout} {

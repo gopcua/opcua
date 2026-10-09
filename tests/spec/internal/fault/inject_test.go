@@ -17,16 +17,6 @@ const valueInjected2 int32 = 8502
 const valueInjected3 int32 = 8503
 const valueInjectedBase int32 = 8600
 
-func faultNamed(name string) Fault {
-	for _, fault := range AllFaults {
-		if fault.Name() == name {
-			return fault
-		}
-	}
-	Fail("no fault named " + name)
-	return nil
-}
-
 func readNodeOnce(env *harness.Environment) (*ua.ReadResponse, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
@@ -61,7 +51,10 @@ var heldPublish harness.HeldPublish
 
 var _ = DescribeTable("Inject arms and Fired observes",
 	func(name string, setup func(env *harness.Environment), driver func(env *harness.Environment), settle func(env *harness.Environment)) {
-		fault := faultNamed(name)
+		fault, named := Named(name)
+		if !named {
+			Fail("no fault named " + name)
+		}
 		opts := []harness.Option{
 			harness.WithClientOptions(opcua.RequestTimeout(2 * time.Second)),
 			harness.WithPublishingInterval(10 * time.Millisecond),
@@ -182,7 +175,10 @@ var _ = Describe("Inject arms on the server the client reconnects to", func() {
 		env.Relay.RedirectTo(second.Address())
 		Expect(env.UpstreamServer()).To(Equal(second),
 			"UpstreamServer did not name the server the redirect points at")
-		fault := faultNamed("Overload/CreateSubscription/Bad_TooManyOperations")
+		fault, named := Named("Overload/CreateSubscription/Bad_TooManyOperations")
+		if !named {
+			Fail("no fault named Overload/CreateSubscription/Bad_TooManyOperations")
+		}
 		injected := fault.Inject(env)
 		Expect(injected).NotTo(BeNil(), "the overload fault returned no Injected")
 		env.Relay.Cut()
