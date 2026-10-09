@@ -6,8 +6,7 @@
 // cites, and an invariant an Invariant value in the clause package's
 // invariants file, part4/invariants_test.go. The matrix adds
 // the HaveFired check to every applicable case itself. Nothing under
-// internal/ cites a clause in code; spectestgate's
-// TestInternalCitesNoClause fails the suite when it does.
+// internal/ cites a clause in code.
 package matrix
 
 import (

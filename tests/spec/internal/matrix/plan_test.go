@@ -12,10 +12,11 @@ import (
 )
 
 // standInShall and standInShould stand in for a clause's rules: the
-// plan reads only their name, clause and keyword.
+// plan reads their name, clause and keyword, and each carries a
+// Check, because a rule without one is rejected.
 var (
-	standInShall  = Rule{Name: "StandInShall", Clause: "P4-6.7", Keyword: "shall"}
-	standInShould = Rule{Name: "StandInShould", Clause: "P4-6.7", Keyword: "should"}
+	standInShall  = Rule{Name: "StandInShall", Clause: "P4-6.7", Keyword: "shall", Check: func(Context) {}}
+	standInShould = Rule{Name: "StandInShould", Clause: "P4-6.7", Keyword: "should", Check: func(Context) {}}
 )
 
 // standInBefore and standInAfter stand in for a scenario's invariants:
@@ -347,6 +348,54 @@ func TestPlanRejectsDuplicateScenarioNames(t *testing.T) {
 	if err := register(scenarioOf("A", 901, nil)); err != nil {
 		t.Fatalf("registering the same scenario twice returned %v, want none", err)
 	}
+}
+
+// TestPlanRejectsBadRules asserts the plan rejects the rule shapes a
+// clause file must never declare. Each subtest prescribes one shape
+// with a scenario that is otherwise well-formed, so one failing
+// subtest names the rejection its shape misses.
+func TestPlanRejectsBadRules(t *testing.T) {
+	stall := namedFault(t, "Link/Stall")
+	sends := []message.Message{message.Publish}
+	t.Run("rejects a rule with an empty Name", func(t *testing.T) {
+		scenario := scenarioOf("Bad", 901, sends, Rule{Name: "", Check: func(Context) {}})
+		_, err := scenario.Cases([]fault.Fault{stall})
+		if err == nil || !strings.Contains(err.Error(), "empty Name") {
+			t.Fatalf("a rule with an empty Name returned %v, want an error naming the empty Name", err)
+		}
+	})
+	t.Run("rejects a rule with no Check", func(t *testing.T) {
+		scenario := scenarioOf("Bad", 902, sends, Rule{Name: "StandInUnchecked"})
+		_, err := scenario.Cases([]fault.Fault{stall})
+		if err == nil || !strings.Contains(err.Error(), "no Check") {
+			t.Fatalf("a rule with no Check returned %v, want an error naming the missing Check", err)
+		}
+	})
+	t.Run("rejects a rule that shares a scenario invariant's name", func(t *testing.T) {
+		scenario := scenarioOf("Bad", 903, sends,
+			Rule{Name: standInBefore.Name, Check: func(Context) {}})
+		_, err := scenario.Cases([]fault.Fault{stall})
+		if err == nil || !strings.Contains(err.Error(), "invariant's name") {
+			t.Fatalf("a rule named as an invariant returned %v, want an error naming the shared name", err)
+		}
+	})
+	t.Run("rejects a rule named HaveFired", func(t *testing.T) {
+		scenario := scenarioOf("Bad", 904, sends,
+			Rule{Name: haveFiredInvariant.Name, Check: func(Context) {}})
+		_, err := scenario.Cases([]fault.Fault{stall})
+		if err == nil || !strings.Contains(err.Error(), "invariant's name") {
+			t.Fatalf("a rule named HaveFired returned %v, want an error naming the shared name", err)
+		}
+	})
+	t.Run("rejects two rules that share a name", func(t *testing.T) {
+		scenario := scenarioOf("Bad", 905, sends,
+			Rule{Name: "StandInSame", Check: func(Context) {}},
+			Rule{Name: "StandInSame", Check: func(c Context) {}})
+		_, err := scenario.Cases([]fault.Fault{stall})
+		if err == nil || !strings.Contains(err.Error(), "rules StandInSame of scenario P4-1/Bad under Link/Stall share one name and differ in Check") {
+			t.Fatalf("two rules sharing a name returned %v, want an error naming the scenario and the fault", err)
+		}
+	})
 }
 
 func TestUnfiledRecords(t *testing.T) {

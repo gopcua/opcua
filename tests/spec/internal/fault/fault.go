@@ -216,9 +216,6 @@ func (controlFault) Inject(env *harness.Environment) *harness.Injected {
 // message-targeting faults, overload status × service for the
 // overloads — so a name such as DelayBelowTimeout/CreateMonitoredItems
 // appears nowhere literally.
-// TestMessageFaultsCoverEveryMember derives every kind × message name
-// from the message package's source and asserts the catalogue carries
-// each one; TestAllFaultsSize pins the catalogue's size.
 var AllFaults = buildAllFaults()
 
 func buildAllFaults() []Fault {

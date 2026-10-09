@@ -2,6 +2,7 @@ package matrix
 
 import (
 	"fmt"
+	"reflect"
 	"slices"
 	"strings"
 	"sync"
@@ -114,11 +115,15 @@ func Entries(s Scenario, faults ...fault.Fault) []ginkgo.TableEntry {
 
 // Cases plans the scenario over the faults: one case per fault, each
 // with its value block and its checks in the order they run. It
-// returns an error when the ordinal is not positive or a known defect
-// labels no check of an applicable case.
+// returns an error when the ordinal is not positive, when a rule the
+// scenario prescribes is malformed or shares an invariant's name, or
+// when a known defect labels no check of an applicable case.
 func (s Scenario) Cases(faults []fault.Fault) ([]Case, error) {
 	if s.Ordinal < 1 {
 		return nil, fmt.Errorf("scenario %s/%s has ordinal %d; ordinals count from 1", s.Clause, s.Name, s.Ordinal)
+	}
+	if err := s.validateRules(faults); err != nil {
+		return nil, err
 	}
 	var cases []Case
 	for _, f := range faults {
@@ -139,6 +144,40 @@ func (s Scenario) Cases(faults []fault.Fault) ([]Case, error) {
 		}
 	}
 	return cases, nil
+}
+
+// validateRules rejects the rules the scenario prescribes under the
+// faults. A rule needs a name of its own and a Check, because the plan
+// and the known-defect table find a check by its name: a rule that
+// shares an invariant's name plans two checks under one name, and a
+// name two rules share leaves the table unable to pick either. The
+// shared-name rejection compares the rules' Check functions by code
+// pointer, so two closures built from one function literal count as
+// one rule.
+func (s Scenario) validateRules(faults []fault.Fault) error {
+	if s.Rules == nil {
+		return nil
+	}
+	checkOf := map[string]uintptr{}
+	for _, f := range faults {
+		for _, rule := range s.rulesUnder(f) {
+			if rule.Name == "" {
+				return fmt.Errorf("scenario %s/%s prescribes a rule with an empty Name under %s", s.Clause, s.Name, f.Name())
+			}
+			if rule.Check == nil {
+				return fmt.Errorf("the rule %s of scenario %s/%s under %s has no Check", rule.Name, s.Clause, s.Name, f.Name())
+			}
+			if rule.Name == haveFiredInvariant.Name || slices.ContainsFunc(s.Invariants, func(invariant Invariant) bool { return invariant.Name == rule.Name }) {
+				return fmt.Errorf("the rule %s of scenario %s/%s under %s shares an invariant's name, so the case plans two checks under one name", rule.Name, s.Clause, s.Name, f.Name())
+			}
+			check := reflect.ValueOf(rule.Check).Pointer()
+			if previous, seen := checkOf[rule.Name]; seen && previous != check {
+				return fmt.Errorf("the rules %s of scenario %s/%s under %s share one name and differ in Check", rule.Name, s.Clause, s.Name, f.Name())
+			}
+			checkOf[rule.Name] = check
+		}
+	}
+	return nil
 }
 
 // caseOf plans one case: its path, its value block, and either the

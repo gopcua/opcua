@@ -31,9 +31,8 @@ standard does not cover. `issue-N` and `pr-N` cite GitHub.
 A rule is a `matrix.Rule` value in the clause file of the clause it cites.
 An invariant is a `matrix.Invariant` value in `part4/invariants_test.go`.
 Nothing under `internal/` cites a clause in code: `internal/` holds the
-harness, the faults and the matrix runner, and a gate test in
-`internal/spectestgate` fails the suite when its non-test code names a
-clause.
+harness, the faults and the matrix runner, and what a clause demands
+belongs in its clause file under `part4/`.
 
 A known-defect label is a prediction that its spec fails on `main`. A later
 PR gates CI on it: a run that makes a known-defect spec pass fails the gate,
