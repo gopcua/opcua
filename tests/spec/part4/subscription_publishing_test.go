@@ -524,6 +524,9 @@ func driveCancelThenSubscribe(env *harness.Environment, f fault.Fault, block int
 	}
 	completed := 0
 	current := env.ClientSubscription()
+	// live is the server subscription the sentinel goes to; liveOK is
+	// false once a cancel deleted it and no new subscription replaced it.
+	live, liveOK := sub, true
 cycle:
 	for i := 0; i < cancelCycles; i++ {
 		held, heldOK := env.Server.TryWaitHeldPublish(15 * time.Second)
@@ -536,6 +539,7 @@ cycle:
 		if cancelErr != nil {
 			break cycle
 		}
+		liveOK = false
 		subscribeCtx, subscribe := context.WithTimeout(context.Background(), 5*time.Second)
 		next, subscribeErr := env.Client.Subscribe(subscribeCtx, &opcua.SubscriptionParameters{
 			Interval:          100 * time.Millisecond,
@@ -557,6 +561,7 @@ cycle:
 		if !createdOK {
 			break cycle
 		}
+		live, liveOK = created, true
 		held.Answer(created, values.cycles[i])
 		deadline := time.Now().Add(5 * time.Second)
 		delivered := false
@@ -579,12 +584,19 @@ cycle:
 		completed++
 	}
 	faultEnd := time.Now()
+	if !liveOK {
+		// A cycle can break after its Subscribe succeeded, so the server
+		// may hold a new subscription the loop never looked up.
+		live, liveOK = env.Server.TryWaitCreatedSubscription(m, 15*time.Second)
+	}
 	sentinel := int32(0)
 	var answeredAt time.Time
-	if held, ok := env.Server.TryWaitHeldPublish(15 * time.Second); ok {
-		held.Answer(env.Subscription(), values.sentinel)
-		sentinel = values.sentinel
-		answeredAt = time.Now()
+	if liveOK {
+		if held, ok := env.Server.TryWaitHeldPublish(15 * time.Second); ok {
+			held.Answer(live, values.sentinel)
+			sentinel = values.sentinel
+			answeredAt = time.Now()
+		}
 	}
 	lastValue := int32(0)
 	if completed > 0 {
