@@ -17,6 +17,10 @@ type SubscriptionService struct {
 	// pub sub stuff
 	Mu   sync.Mutex
 	Subs map[uint32]*Subscription
+
+	// lastID is the most recently issued subscription ID, guarded by Mu. IDs are never reused:
+	// a deleted subscription's task can still call DeleteSubscription with its ID afterwards.
+	lastID uint32
 }
 
 // get rid of all references to a subscription and all monitored items that are pointed at this subscription.
@@ -55,7 +59,14 @@ func (s *SubscriptionService) CreateSubscription(sc *uasc.SecureChannel, r ua.Re
 	s.Mu.Lock()
 	defer s.Mu.Unlock()
 
-	newsubid := uint32(len(s.Subs)) + 1
+	// Not len(s.Subs)+1: after a deletion that reuses an ID, possibly one that is still live,
+	// and the old subscription's cleanup (DeleteSubscription from its task) then deletes the
+	// new one.
+	s.lastID++
+	if s.lastID == 0 {
+		s.lastID = 1
+	}
+	newsubid := s.lastID
 
 	if s.srv.cfg.logger != nil {
 		s.srv.cfg.logger.Info("New Sub %d for %v", newsubid, sc.RemoteAddr())
