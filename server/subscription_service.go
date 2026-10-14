@@ -282,6 +282,10 @@ type Subscription struct {
 	Mu       sync.Mutex
 	running  bool
 	shutdown chan struct{}
+
+	// done is closed when the background task returns. The task is the only reader of
+	// NotifyChannel, so once done is closed a send on NotifyChannel can never complete.
+	done chan struct{}
 }
 
 func NewSubscription() *Subscription {
@@ -290,6 +294,7 @@ func NewSubscription() *Subscription {
 		NotifyChannel: make(chan *ua.MonitoredItemNotification, 100),
 		ModifyChannel: make(chan *ua.ModifySubscriptionRequest, 2),
 		shutdown:      make(chan struct{}),
+		done:          make(chan struct{}),
 	}
 }
 
@@ -347,6 +352,9 @@ func (s *Subscription) run() {
 		}
 		s.srv.DeleteSubscription(s.ID)
 	}()
+	// Deferred after the cleanup above so it runs first: senders blocked on NotifyChannel must be
+	// released before DeleteSubscription waits for the monitored item service lock they hold.
+	defer close(s.done)
 
 	keepalive_counter := 0
 	lifetime_counter := 0
