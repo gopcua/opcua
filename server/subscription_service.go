@@ -17,6 +17,10 @@ type SubscriptionService struct {
 	// pub sub stuff
 	Mu   sync.Mutex
 	Subs map[uint32]*Subscription
+
+	// lastID is the most recently issued subscription ID, guarded by Mu. IDs are never reused:
+	// a deleted subscription's task can still call DeleteSubscription with its ID afterwards.
+	lastID uint32
 }
 
 // get rid of all references to a subscription and all monitored items that are pointed at this subscription.
@@ -55,7 +59,14 @@ func (s *SubscriptionService) CreateSubscription(sc *uasc.SecureChannel, r ua.Re
 	s.Mu.Lock()
 	defer s.Mu.Unlock()
 
-	newsubid := uint32(len(s.Subs)) + 1
+	// Not len(s.Subs)+1: after a deletion that reuses an ID, possibly one that is still live,
+	// and the old subscription's cleanup (DeleteSubscription from its task) then deletes the
+	// new one.
+	s.lastID++
+	if s.lastID == 0 {
+		s.lastID = 1
+	}
+	newsubid := s.lastID
 
 	if s.srv.cfg.logger != nil {
 		s.srv.cfg.logger.Info("New Sub %d for %v", newsubid, sc.RemoteAddr())
@@ -282,6 +293,10 @@ type Subscription struct {
 	Mu       sync.Mutex
 	running  bool
 	shutdown chan struct{}
+
+	// done is closed when the background task returns. The task is the only reader of
+	// NotifyChannel, so once done is closed a send on NotifyChannel can never complete.
+	done chan struct{}
 }
 
 func NewSubscription() *Subscription {
@@ -290,6 +305,7 @@ func NewSubscription() *Subscription {
 		NotifyChannel: make(chan *ua.MonitoredItemNotification, 100),
 		ModifyChannel: make(chan *ua.ModifySubscriptionRequest, 2),
 		shutdown:      make(chan struct{}),
+		done:          make(chan struct{}),
 	}
 }
 
@@ -347,6 +363,9 @@ func (s *Subscription) run() {
 		}
 		s.srv.DeleteSubscription(s.ID)
 	}()
+	// Deferred after the cleanup above so it runs first: senders blocked on NotifyChannel must be
+	// released before DeleteSubscription waits for the monitored item service lock they hold.
+	defer close(s.done)
 
 	keepalive_counter := 0
 	lifetime_counter := 0
