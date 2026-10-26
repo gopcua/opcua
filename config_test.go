@@ -392,6 +392,17 @@ func TestOptions(t *testing.T) {
 			},
 		},
 		{
+			name: `ForceNonEmptyNonce()`,
+			opt:  ForceNonEmptyNonce(),
+			cfg: &Config{
+				sechan: func() *uasc.Config {
+					c := DefaultClientConfig()
+					c.ForceNonEmptyNonce = true
+					return c
+				}(),
+			},
+		},
+		{
 			name: `Lifetime(10ms)`,
 			opt:  Lifetime(10 * time.Millisecond),
 			cfg: &Config{

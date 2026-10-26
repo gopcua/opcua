@@ -890,3 +890,24 @@ func newTestTCPConnPair(t *testing.T) (*net.TCPConn, *net.TCPConn) {
 
 	return nil, nil
 }
+
+func TestClientNonce(t *testing.T) {
+	none, err := uapolicy.Asymmetric(ua.SecurityPolicyURINone, nil, nil)
+	require.NoError(t, err)
+
+	t.Run("null by default", func(t *testing.T) {
+		nonce, err := clientNonce(&Config{}, none)
+		require.NoError(t, err)
+		require.Empty(t, nonce)
+	})
+
+	t.Run("ForceNonEmptyNonce", func(t *testing.T) {
+		cfg := &Config{ForceNonEmptyNonce: true}
+		a, err := clientNonce(cfg, none)
+		require.NoError(t, err)
+		require.Len(t, a, nonEmptyNonceLength)
+		b, err := clientNonce(cfg, none)
+		require.NoError(t, err)
+		require.NotEqual(t, a, b)
+	})
+}
