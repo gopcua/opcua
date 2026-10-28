@@ -80,6 +80,12 @@ type Config struct {
 	// RequestTimeout is timeout duration for all synchronous requests over SecureChannel.
 	// If the Server doesn't respond within RequestTimeout time, Client returns StatusBadTimeout
 	RequestTimeout time.Duration
+
+	// VerifyRemoteCertificate is called on a server channel with the DER certificate
+	// the client sent in OpenSecureChannel, before any key is derived from it.
+	// A non-nil error refuses the channel with an ERR message carrying
+	// Bad_CertificateUntrusted. Nil accepts every certificate. Client channels ignore it.
+	VerifyRemoteCertificate func(cert []byte) error
 }
 
 // SessionConfig is a set of common configurations used in Session.

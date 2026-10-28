@@ -36,6 +36,16 @@ func (s *SessionService) CreateSession(sc *uasc.SecureChannel, r ua.Request, req
 		return nil, err
 	}
 
+	// ask the application before the session exists
+	if verify := s.srv.cfg.verifyClientCertificate; verify != nil {
+		if err := verify(req.ClientCertificate); err != nil {
+			if s.srv.cfg.logger != nil {
+				s.srv.cfg.logger.Warn("client certificate refused at CreateSession: %v", err)
+			}
+			return nil, ua.StatusBadCertificateUntrusted
+		}
+	}
+
 	// New session
 	sess := s.srv.sb.NewSession()
 

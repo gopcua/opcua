@@ -2,6 +2,7 @@ package server
 
 import (
 	mrand "math/rand"
+	"slices"
 	"sync"
 	"time"
 
@@ -17,6 +18,7 @@ type session struct {
 	AuthTokenID       *ua.NodeID
 	serverNonce       []byte
 	remoteCertificate []byte
+	created           time.Time
 
 	PublishRequests chan PubReq
 }
@@ -46,6 +48,7 @@ func (sb *sessionBroker) NewSession() *session {
 		ID:              ua.NewGUIDNodeID(1, uuid.New().String()),
 		AuthTokenID:     ua.NewNumericNodeID(0, uint32(mrand.Int31())),
 		PublishRequests: make(chan PubReq, 100),
+		created:         time.Now(),
 	}
 
 	sb.mu.Lock()
@@ -53,6 +56,22 @@ func (sb *sessionBroker) NewSession() *session {
 	sb.mu.Unlock()
 
 	return s
+}
+
+// Sessions lists every session the broker holds, oldest first.
+func (sb *sessionBroker) Sessions() []SessionInfo {
+	sb.mu.Lock()
+	defer sb.mu.Unlock()
+	out := make([]SessionInfo, 0, len(sb.s))
+	for _, s := range sb.s {
+		out = append(out, SessionInfo{
+			ID:                s.ID,
+			ClientCertificate: s.remoteCertificate,
+			Created:           s.created,
+		})
+	}
+	slices.SortFunc(out, func(a, b SessionInfo) int { return a.Created.Compare(b.Created) })
+	return out
 }
 
 func (sb *sessionBroker) Close(authToken *ua.NodeID) error {

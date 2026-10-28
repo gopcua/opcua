@@ -26,6 +26,17 @@ func PrivateKey(key *rsa.PrivateKey) Option {
 	}
 }
 
+// ClientCertificateVerifier sets the function asked about every DER encoded client
+// certificate: at OpenSecureChannel for a channel under a policy other than None,
+// and at CreateSession for the ClientCertificate of the request. A non-nil error
+// refuses it with Bad_CertificateUntrusted. Without a verifier every certificate
+// is accepted.
+func ClientCertificateVerifier(fn func(cert []byte) error) Option {
+	return func(s *serverConfig) {
+		s.verifyClientCertificate = fn
+	}
+}
+
 // EndPointHostName adds an additional endpoint to the server based on the host name
 func EndPoint(host string, port int) Option {
 	return func(s *serverConfig) {
