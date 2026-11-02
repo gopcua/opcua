@@ -375,11 +375,15 @@ func (s *server) answer(epoch int, req ua.Request) ua.Response {
 			Results:         results,
 			DiagnosticInfos: []*ua.DiagnosticInfo{},
 		}
+
+	case *ua.RepublishRequest:
+		// OPC 10000-4 §6.7 names Bad_MessageNotAvailable as the status that
+		// ends the Republish loop. The server never offers a message back; a
+		// test reads whether the client asked from the request record.
+		return newServiceFault(h, ua.StatusBadMessageNotAvailable)
 	}
-	// Republish is unscripted and answers that no message is available, which
-	// ends a client's Republish loop; a test reads whether the client sent one
-	// from the request record.
-	return newServiceFault(h, ua.StatusBadMessageNotAvailable)
+	// Any other service is unscripted and faults.
+	return newServiceFault(h, ua.StatusBadServiceUnsupported)
 }
 
 func serviceName(v any) string {
