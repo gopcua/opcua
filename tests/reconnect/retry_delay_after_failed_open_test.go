@@ -13,6 +13,12 @@
 // A client with a fixed wait longer than the configured interval would pass at
 // one interval, so the scenario runs at two, and the shorter run must also
 // stay under the longer interval.
+//
+// A known-good client can fail this. Eclipse Milo's reconnect backoff is
+// hard-coded, one second doubling to sixteen, so it has no configured interval
+// to honour and the second check would redden it. The test is kept because it
+// checks gopcua's own contract rather than the clause above, which only says
+// "should".
 package reconnect
 
 import (
@@ -91,8 +97,9 @@ func retryScenario(interval time.Duration) record {
 }
 
 // smallestGap reports the smallest gap between the connection attempts the
-// client made after the drop, and how many it made. Below minAttempts there is
-// no gap to measure and smallest is zero.
+// client made after the drop, and how many it made. It reads Accepts rather
+// than request epochs because a refused attempt leaves no request. Below
+// minAttempts there is no gap to measure and smallest is zero.
 func smallestGap(run record) (smallest time.Duration, attempts int) {
 	var at []time.Time
 	for _, a := range run.Accepts {
