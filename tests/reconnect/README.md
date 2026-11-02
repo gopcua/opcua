@@ -8,17 +8,17 @@ A test drives the gopcua client through its public API against the scripted
 server in `harness.go`. That server can drop the transport on command —
 underneath a held Publish, so a notification is provably lost — and record
 both what went over the wire and what the application's callback received.
-What one run reduces to is the `record` type, documented at its declaration
-in `harness.go`.
+One run reduces to the `runRecord` type, documented at its declaration in
+`harness.go`.
 
 Only a test function calls `t.Errorf` or `t.Fatalf`. A helper reads the
-`record` and returns plain values, wherever it lives.
+`runRecord` and returns plain values, wherever it lives.
 
 The suite exists because a diff of reconnect code does not tell you what the
 client will do: that depends on how the server answers after the drop, and
 servers differ.
 
-## Tests that fail on purpose
+## Tests for behaviour that does not exist yet
 
 A test for a behaviour gopcua does not have yet carries a `knownBug`
 constant, declared inside the test function. Run `go test ./tests/reconnect/ -v`:
@@ -27,8 +27,9 @@ constant, declared inside the test function. Run `go test ./tests/reconnect/ -v`
   behaviour. The build stays green.
 - When your change fixes the behaviour, the test passes, and that pass is
   reported as a hard error telling you to delete the `knownBug` constant.
-- Delete it in the same commit as the fix, and say in the commit message
-  what the fix was.
+- Delete the constant **and the two switch arms that read it**, or the file
+  stops compiling. Do it in the same commit as the fix, and say in the commit
+  message what the fix was.
 
 Do not delete a `knownBug` constant because the test started passing for a
 reason you cannot explain.
@@ -36,10 +37,10 @@ reason you cannot explain.
 ## Reviewing a new test: six questions
 
 A test that passes while checking nothing is worse than no test, because it
-is trusted. Tooling cannot catch that here: every mutation testing tool in
-every language starts by requiring the suite to pass, and a test that fails
-on purpose breaks that premise. So a reviewer asks these six, each of which
-has caught a real defect in this package.
+is trusted. Tooling cannot catch that here: a test that logs `known bug:`
+instead of failing is green whatever the client does, so a mutation score
+cannot see it. So a reviewer asks these six, each of which has caught a real
+defect in this package.
 
 1. **Can the failing branch ever run?** Trace it. One test here had a FAIL
    condition that could never hold, so it passed every client and failed
@@ -47,8 +48,7 @@ has caught a real defect in this package.
 
 2. **Which facts come from the client, and which from our fake server?** Whether
    the test passes has to turn on a client fact; an assertion about the
-   harness's own state tests the fixture. We shipped a test that passed or
-   failed on a field only the fake server writes.
+   harness's own state tests the fixture.
 
 3. **Would a correct client reach this code?** Ask it of anything you delete,
    and answer from gopcua's source rather than from the specification. We
@@ -58,34 +58,33 @@ has caught a real defect in this package.
 4. **Does the test compile against unfixed code?** If it fails only because a
    symbol the fix introduces is missing, it tests a name, not a behaviour: it
    stays red for a wrong fix and goes green for a regression that keeps the
-   name. Ten open pull requests ship a test in that state.
+   name.
 
 5. **Did we construct the condition, or hope for it?** Construct the loss, and
    construct the chance to notice it. The Republish row's own setup check
    passed a run where the client reconnected and then sent no Publish at all:
    nothing arrived after the gap, so it was never asked what it is scored on.
 
-6. **Would a known-good client fail this?** Check the test against Eclipse
-   Milo, UA-.NETStandard, node-opcua and open62541, reading their source. If
-   one would fail it the test is the likely mistake, and there are two
+6. **Would a known-good client fail this?** Read one other stack's source and
+   check the test against it; open62541 and Eclipse Milo are the two that have
+   caught something here. Reading all of UA-.NETStandard, node-opcua and the
+   other two is a maintainer's job, not a condition of the pull request. If a
+   known-good client would fail the test the test is the likely mistake, and there are two
    different reasons. Either it checks how a client works rather than what it
    achieves, and you rewrite it to assert the outcome. Or every library leaves
    this to the application, and then it is not a test every client should
    pass: keep it only if you say so in the file, name the stacks it fails, and
    show it still fails a client that fakes the outcome instead of earning it.
-   We deleted one that a blind rebuild turned green without the client ever
-   asking the server what it had lost. The standing exception is
-   `republish_after_reconnect_test.go`: open62541 has no client-side Republish
-   at all, and we think the test is right. Put what you find in the pull
-   request.
+   An exception is declared in the header of the file that takes it, not here.
+   Put what you find in the pull request.
 
 ## Optional tools
 
-None of these is a gate. While a test is red, our authoring tools can edit a
-throwaway copy of the package and check that the test notices: hide the
-client's evidence and require the test to fail — a known technique, *checked
-coverage* (Schuler & Zeller, 2011) — or change what the evidence says and
-require the test to flip between pass and fail. They live outside this
+None of these is a gate. While the behaviour is missing, our authoring tools
+can edit a throwaway copy of the package and check that the test notices:
+hide the client's evidence and require the test to fail — *checked coverage*
+— or change what the evidence says and require the test to flip between pass
+and fail. They live outside this
 repository because hooks compiled into a test would add a second code path to
 the code that has to be trustworthy.
 
