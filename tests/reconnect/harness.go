@@ -165,6 +165,19 @@ func (o *recorder) heldNotification() uint32 {
 	return o.heldSeq
 }
 
+// availableSeqs is what the server says it can still resend. An empty list
+// claims it keeps no retransmission queue at all (OPC 10000-4 §5.14.1.1), so
+// while a notification is held back the list has to name it. Every Publish
+// answer and every TransferResult carries this, and they have to agree.
+func (o *recorder) availableSeqs() []uint32 {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	if o.heldSeq == 0 {
+		return []uint32{}
+	}
+	return []uint32{o.heldSeq}
+}
+
 func (o *recorder) heldConnection() int {
 	o.mu.Lock()
 	defer o.mu.Unlock()
@@ -418,25 +431,22 @@ func (s *server) answer(epoch int, req ua.Request) ua.Response {
 		// With nothing monitored there is no data, only keep-alives.
 		if !s.rec.isAnyMonitored() {
 			time.Sleep(publishPacing)
-			return newKeepAliveResponse(SubID, s.rec.nextSeq())
+			return newKeepAliveResponse(SubID, s.rec.nextSeq(), s.rec.availableSeqs())
 		}
 		seq, hold := s.rec.publishStep(epoch)
 		if hold {
 			return nil
 		}
 		time.Sleep(publishPacing)
-		return newPublishResponse(seq)
+		return newPublishResponse(seq, s.rec.availableSeqs())
 
 	case *ua.TransferSubscriptionsRequest:
 		results := make([]*ua.TransferResult, len(r.SubscriptionIDs))
 		for i := range r.SubscriptionIDs {
-			// An empty list claims nothing is left to republish (OPC 10000-4
-			// §5.14.1.1), so advertise the held sequence number.
-			avail := []uint32{}
-			if held := s.rec.heldNotification(); held != 0 {
-				avail = []uint32{held}
+			results[i] = &ua.TransferResult{
+				StatusCode:               ua.StatusOK,
+				AvailableSequenceNumbers: s.rec.availableSeqs(),
 			}
-			results[i] = &ua.TransferResult{StatusCode: ua.StatusOK, AvailableSequenceNumbers: avail}
 		}
 		return &ua.TransferSubscriptionsResponse{
 			ResponseHeader:  newResponseHeader(h, ua.StatusOK),
@@ -491,11 +501,11 @@ func newNotification(seq uint32) *ua.NotificationMessage {
 	}
 }
 
-func newPublishResponse(seq uint32) *ua.PublishResponse {
+func newPublishResponse(seq uint32, available []uint32) *ua.PublishResponse {
 	return &ua.PublishResponse{
 		ResponseHeader:           newResponseHeader(0, ua.StatusOK),
 		SubscriptionID:           SubID,
-		AvailableSequenceNumbers: []uint32{},
+		AvailableSequenceNumbers: available,
 		MoreNotifications:        false,
 		NotificationMessage:      newNotification(seq),
 		Results:                  []ua.StatusCode{},
@@ -505,7 +515,7 @@ func newPublishResponse(seq uint32) *ua.PublishResponse {
 
 // newKeepAliveResponse answers a Publish with no data. It carries the sequence
 // number the next notification will use.
-func newKeepAliveResponse(subID, nextSeq uint32) *ua.PublishResponse {
+func newKeepAliveResponse(subID, nextSeq uint32, available []uint32) *ua.PublishResponse {
 	return &ua.PublishResponse{
 		ResponseHeader: newResponseHeader(0, ua.StatusOK),
 		SubscriptionID: subID,
@@ -514,7 +524,7 @@ func newKeepAliveResponse(subID, nextSeq uint32) *ua.PublishResponse {
 			PublishTime:      time.Now(),
 			NotificationData: []*ua.ExtensionObject{},
 		},
-		AvailableSequenceNumbers: []uint32{},
+		AvailableSequenceNumbers: available,
 		Results:                  []ua.StatusCode{},
 		DiagnosticInfos:          []*ua.DiagnosticInfo{},
 	}
