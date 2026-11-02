@@ -8,12 +8,13 @@
 // drops the connection. See harness.go.
 //
 // The test checks only that the client asked. How often it asks, and where it
-// stops, is a separate behaviour with its own file. One Republish is the whole
-// answer, so unlike the tests that count events across the settle window this
-// one needs no minimum window length.
+// stops, is a separate behaviour with its own file.
 package reconnect
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 func TestRepublishAfterReconnect(t *testing.T) {
 	// knownBug records that gopcua does not do this yet. While it is set, this
@@ -21,6 +22,18 @@ func TestRepublishAfterReconnect(t *testing.T) {
 	// says when to delete it. It is declared here because it names this file's
 	// behaviour.
 	const knownBug = "the client reconnects and re-activates the session, but never asks for the notification it missed"
+
+	// minSettle is the window a client needs after the drop to reconnect,
+	// re-activate and ask. The whole sequence measured under a millisecond on
+	// loopback; the rest is margin for a loaded machine. Below it, a client
+	// that never asks cannot be told from one that had no time to.
+	const minSettle = 1 * time.Second
+
+	if settleDefault < minSettle {
+		t.Fatalf("could not set the test up: the settle window of %s is shorter than the %s a client "+
+			"needs to reconnect and ask, so a client that never asks cannot be told from one that was "+
+			"not given time. Lengthen settleDefault in harness.go", settleDefault, minSettle)
+	}
 
 	run := runScenario(scenarioOptions{})
 
