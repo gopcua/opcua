@@ -144,9 +144,9 @@ func (o *recorder) isAnyMonitored() bool {
 	return o.anyMonitored
 }
 
-// nextSeq is the sequence number the next notification will carry. A keep-alive
-// carries it without using it up.
-func (o *recorder) nextSeq() uint32 {
+// peekNextSeq is the sequence number the next notification will carry;
+// consecutive keep-alives therefore carry the same one.
+func (o *recorder) peekNextSeq() uint32 {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	return o.lastSeq + 1
@@ -436,7 +436,7 @@ func (s *server) answer(epoch int, req ua.Request) ua.Response {
 		// With nothing monitored there is no data, only keep-alives.
 		if !s.rec.isAnyMonitored() {
 			time.Sleep(publishPacing)
-			return newKeepAliveResponse(SubID, s.rec.nextSeq(), s.rec.availableSeqs())
+			return newKeepAliveResponse(SubID, s.rec.peekNextSeq(), s.rec.availableSeqs())
 		}
 		seq, hold := s.rec.publishStep(epoch)
 		if hold {
