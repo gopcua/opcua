@@ -18,17 +18,17 @@ package reconnect
 
 import "testing"
 
-// minFresh is how many distinct notifications after the drop show a resumed
-// stream: half of what the settle window holds at publishPacing. One that
-// arrives and then stalls is not a stream.
-const minFresh = int(settleDefault/publishPacing) / 2
-
 func TestDataResumesAfterReconnect(t *testing.T) {
 	// knownBug records that gopcua does not do this yet. While it is set, this
 	// text is logged in place of a failure and the build stays green. README.md
 	// says when to delete it. It is declared here because it names this file's
 	// behaviour.
 	const knownBug = "the client reconnects and re-activates the session, but never receives another notification"
+
+	// minFresh is how many distinct notifications after the drop show a resumed
+	// stream: half of what the settle window holds at publishPacing. One that
+	// arrives and then stalls is not a stream.
+	const minFresh = int(settleDefault/publishPacing) / 2
 
 	if minFresh < 2 {
 		t.Fatalf("could not set the test up: the settle window of %s holds only %d publish intervals "+
