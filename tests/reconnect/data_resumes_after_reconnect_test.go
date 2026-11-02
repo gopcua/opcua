@@ -72,7 +72,7 @@ func TestDataResumesAfterReconnect(t *testing.T) {
 		t.Logf("known bug: %s (%d distinct notifications after the drop, at least %d expected; %d received in all)",
 			knownBug, len(fresh), minFresh, len(run.Deliveries))
 	default:
-		t.Errorf("the session was re-activated after the drop, but only %d distinct notifications "+
+		t.Errorf("a session was activated after the drop, but only %d distinct notifications "+
 			"arrived after it, where at least %d are expected (%d received in all)", len(fresh), minFresh, len(run.Deliveries))
 	}
 }
