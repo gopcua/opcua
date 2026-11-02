@@ -12,9 +12,15 @@
 // it is outstanding on, so the held notification cannot have reached the
 // client. Nothing tells the session its transport is gone.
 //
-// The sequence counter is global and never resets. A subscription the client
-// recreates after the drop starts at 3, which looks like a gap to a client that
-// detects loss by sequence gaps.
+// Exactly one notification is lost, and the scenario checks it: a client that
+// keeps one Publish outstanding leaves one sequence number created and
+// withheld, which is the one availableSeqs offers back and the one the rows
+// name. A client that keeps more outstanding would lose more than the rows
+// describe, and the run is reported as a setup failure instead.
+//
+// The sequence counter is global and never resets, so a subscription the
+// client recreates after the drop does not start at 1: it looks like a gap to
+// a client that detects loss by sequence gaps.
 package reconnect
 
 import (
@@ -80,6 +86,7 @@ type recorder struct {
 	dropApplied bool
 
 	lastSeq   uint32 // highest notification sequence created so far
+	seqAtDrop uint32 // lastSeq when the drop was applied
 	heldSeq   uint32 // sequence of the first held Publish; 0 = none
 	heldEpoch int    // connection the held Publish is outstanding on; 0 = none
 	answered  bool   // the stream's first Publish has been answered
@@ -129,10 +136,26 @@ func (o *recorder) recordDropStarted() {
 	o.mu.Unlock()
 }
 
+// recordDropApplied freezes the sequence counter alongside the flag: the
+// dropped connection serves nothing more, so this is how many notifications
+// the server had created when the loss was made.
 func (o *recorder) recordDropApplied() {
 	o.mu.Lock()
 	o.dropApplied = true
+	o.seqAtDrop = o.lastSeq
 	o.mu.Unlock()
+}
+
+func (o *recorder) isDropApplied() bool {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	return o.dropApplied
+}
+
+func (o *recorder) seqCreatedAtDrop() uint32 {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	return o.seqAtDrop
 }
 
 func (o *recorder) isActivated(epoch int) bool {
@@ -216,13 +239,14 @@ func (o *recorder) publishStep(epoch int) (seq uint32, hold bool) {
 	return o.lastSeq, false
 }
 
-// snapshot returns copies of the request and accept logs, with the drop and held state.
-func (o *recorder) snapshot() (requests []requestRecord, accepts []time.Time, dropApplied bool, held uint32) {
+// snapshot returns copies of the request and accept logs, with the sequence
+// number the server held back.
+func (o *recorder) snapshot() (requests []requestRecord, accepts []time.Time, held uint32) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	requests = append([]requestRecord(nil), o.requests...)
 	accepts = append([]time.Time(nil), o.accepts...)
-	return requests, accepts, o.dropApplied, o.heldSeq
+	return requests, accepts, o.heldSeq
 }
 
 // record is what one scenario run reduces to: what both ends saw, frozen when
@@ -722,8 +746,7 @@ func runScenario(opts scenarioOptions) record {
 	srv.drop()
 	dropDeadline := time.After(2 * time.Second)
 	for {
-		_, _, dropApplied, _ := srv.rec.snapshot()
-		if dropApplied {
+		if srv.rec.isDropApplied() {
 			out.DropApplied = true
 			out.DropAt = dropAt
 			out.DropEpoch = srv.rec.heldPublishEpoch()
@@ -737,12 +760,19 @@ func runScenario(opts scenarioOptions) record {
 		}
 	}
 
+	// One notification is lost, not several: see the package comment.
+	if held, created := srv.rec.heldPublishSeq(), srv.rec.seqCreatedAtDrop(); held != created {
+		out.HarnessErr = fmt.Sprintf("the server held notification %d back and created %d more before the "+
+			"drop, so more than the one notification the tests describe was lost", held, created-held)
+		return out
+	}
+
 	time.Sleep(opts.Settle)
 
 	deliveriesMu.Lock()
 	out.Deliveries = append([]deliveryRecord(nil), deliveries...)
 	deliveriesMu.Unlock()
-	requests, accepts, _, held := srv.rec.snapshot()
+	requests, accepts, held := srv.rec.snapshot()
 	out.Requests = requests
 	out.Accepts = accepts
 	out.HeldSeq = held
