@@ -16,6 +16,7 @@
 package reconnect
 
 import (
+	"fmt"
 	"testing"
 	"time"
 )
@@ -33,43 +34,30 @@ const (
 )
 
 func TestRetryDelayAfterFailedOpen(t *testing.T) {
-	// The long interval is the binding one: a window that holds minAttempts at
-	// it holds more at the short one.
-	if settleRetries < minAttempts*longInterval {
-		t.Fatalf("could not set the test up: the settle window of %s holds only %d attempts at an "+
-			"interval of %s, too few to measure a gap. Lengthen settleRetries",
-			settleRetries, int(settleRetries/longInterval), longInterval)
-	}
+	var gaps []time.Duration
+	for _, interval := range []time.Duration{shortInterval, longInterval} {
+		if why := windowTooShort(interval); why != "" {
+			t.Fatalf("could not set the test up: %s", why)
+		}
+		run := retryScenario(interval)
+		if why := setupFailed(run); why != "" {
+			t.Fatalf("could not set the test up: %s", why)
+		}
 
-	shortRun := retryScenario(shortInterval)
-	if why := setupFailed(shortRun); why != "" {
-		t.Fatalf("could not set the test up: %s", why)
+		smallest, attempts := smallestGap(run)
+		if attempts < minAttempts {
+			t.Errorf("the client was configured to retry every %s and made %d connection attempt(s) "+
+				"in the %s after the drop, where %d are expected: it is not honouring the setting",
+				interval, attempts, settleRetries, minAttempts)
+			return
+		}
+		if smallest < interval {
+			t.Errorf("the client retried %s after the previous attempt, sooner than its configured "+
+				"interval of %s (%d attempts after the drop)", smallest, interval, attempts)
+		}
+		gaps = append(gaps, smallest)
 	}
-	shortest, attempts := smallestGap(shortRun)
-	if attempts < minAttempts {
-		t.Fatalf("the client was configured to retry every %s and made %d connection attempt(s) "+
-			"in the %s after the drop, where %d are expected: it is not honouring the setting",
-			shortInterval, attempts, settleRetries, minAttempts)
-	}
-	if shortest < shortInterval {
-		t.Errorf("the client retried %s after the previous attempt, sooner than its configured "+
-			"interval of %s (%d attempts after the drop)", shortest, shortInterval, attempts)
-	}
-
-	longRun := retryScenario(longInterval)
-	if why := setupFailed(longRun); why != "" {
-		t.Fatalf("could not set the test up: %s", why)
-	}
-	longest, longAttempts := smallestGap(longRun)
-	if longAttempts < minAttempts {
-		t.Fatalf("the client was configured to retry every %s and made %d connection attempt(s) "+
-			"in the %s after the drop, where %d are expected: it is not honouring the setting",
-			longInterval, longAttempts, settleRetries, minAttempts)
-	}
-	if longest < longInterval {
-		t.Errorf("the client retried %s after the previous attempt, sooner than its configured "+
-			"interval of %s (%d attempts after the drop)", longest, longInterval, longAttempts)
-	}
+	shortest, longest := gaps[0], gaps[1]
 
 	// A client with a fixed wait longer than the short interval passes both
 	// checks above, so the short run must also stay under the long interval.
@@ -79,6 +67,17 @@ func TestRetryDelayAfterFailedOpen(t *testing.T) {
 	}
 	t.Logf("smallest gap between attempts: %s at an interval of %s, %s at %s",
 		shortest, shortInterval, longest, longInterval)
+}
+
+// windowTooShort reports why settleRetries cannot hold minAttempts at this
+// interval, or "" if it can.
+func windowTooShort(interval time.Duration) string {
+	if settleRetries >= minAttempts*interval {
+		return ""
+	}
+	return fmt.Sprintf("the settle window of %s holds only %d attempts at an interval of %s, "+
+		"too few to measure a gap. Lengthen settleRetries",
+		settleRetries, int(settleRetries/interval), interval)
 }
 
 // retryScenario runs the scenario with the client configured to wait interval
@@ -95,8 +94,6 @@ func retryScenario(interval time.Duration) record {
 // client made after the drop, and how many it made. Below minAttempts there is
 // no gap to measure and smallest is zero.
 func smallestGap(run record) (smallest time.Duration, attempts int) {
-	// The client opens a connection at the start of every attempt, and Accepts
-	// counts the refused ones too.
 	var at []time.Time
 	for _, a := range run.Accepts {
 		if a.After(run.DropAt) {
