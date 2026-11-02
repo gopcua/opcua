@@ -19,10 +19,8 @@ package reconnect
 import "testing"
 
 func TestDataResumesAfterReconnect(t *testing.T) {
-	// knownBug records that gopcua does not do this yet. While it is set, this
-	// text is logged in place of a failure and the build stays green. README.md
-	// says when to delete it. It is declared here because it names this file's
-	// behaviour.
+	// knownBug records that gopcua does not do this yet; the text is logged in
+	// place of a failure. README.md says when to delete it.
 	const knownBug = "the client reconnects and re-activates the session, but never receives another notification"
 
 	// minFresh is how many distinct notifications after the drop show a resumed
