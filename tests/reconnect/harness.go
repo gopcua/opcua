@@ -255,6 +255,13 @@ type record struct {
 
 // setupFailed reports why the run never reached the point the test is about,
 // or "" if it did. Whatever caused it, no test here can speak past it.
+//
+// Every check of this kind is named …SetupFailed, takes the run, returns the
+// reason or "", and is reported as "could not set the test up: %s". A row
+// consults one up front when nothing it scores could be true without it, and
+// as the last arm of its switch when the violation it scores would show up
+// anyway; either way the reason is the row's, and the wording is the
+// package's.
 func setupFailed(run record) string {
 	switch {
 	case run.HarnessErr != "":
@@ -263,6 +270,32 @@ func setupFailed(run record) string {
 		return "the connection was never dropped"
 	}
 	return ""
+}
+
+// reconnectSetupFailed reports why the run never got the client back onto an
+// activated Session, or "" if it did. A client that never re-activated was
+// never offered the Session's subscriptions back, so nothing it did or did
+// not do with them is evidence.
+func reconnectSetupFailed(run record) string {
+	for _, r := range afterDrop(run) {
+		if r.Service == "ActivateSessionRequest" {
+			return ""
+		}
+	}
+	return "the client never activated a Session after the drop, so the Session's " +
+		"subscriptions were never offered back to it"
+}
+
+// afterDrop is every request the client sent on a connection it opened after
+// the drop.
+func afterDrop(run record) []requestRecord {
+	var out []requestRecord
+	for _, r := range run.Requests {
+		if r.Epoch > run.DropEpoch {
+			out = append(out, r)
+		}
+	}
+	return out
 }
 
 // server is the scripted fixture the client under test talks to.
