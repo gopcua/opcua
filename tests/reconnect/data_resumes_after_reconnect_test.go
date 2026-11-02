@@ -23,9 +23,9 @@ func TestDataResumesAfterReconnect(t *testing.T) {
 	// place of a failure. README.md says when to delete it.
 	const knownBug = "the client reconnects and re-activates the session, but never receives another notification"
 
-	// minFresh is how many distinct notifications after the drop show a resumed
-	// stream: half of what the settle window holds at publishPacing. One that
-	// arrives and then stalls is not a stream.
+	// minFresh is how many distinct notifications after the drop show a
+	// resumed stream: one that arrives and then stalls is not a stream. Half
+	// of what the settle window holds at publishPacing.
 	const minFresh = int(settleDefault/publishPacing) / 2
 
 	if minFresh < 2 {
