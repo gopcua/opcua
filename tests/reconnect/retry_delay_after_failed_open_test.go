@@ -24,9 +24,9 @@ const (
 	shortInterval = 300 * time.Millisecond
 	longInterval  = 1200 * time.Millisecond
 
-	// settle is how long each run goes on after the drop: about eleven
-	// attempts at the short interval and about three at the long one.
-	settle = 3500 * time.Millisecond
+	// settleRetries replaces settleDefault for these runs: long enough for
+	// about eleven attempts at the short interval and three at the long one.
+	settleRetries = 3500 * time.Millisecond
 
 	// minAttempts is the fewest attempts that give one gap to measure.
 	minAttempts = 2
@@ -35,10 +35,10 @@ const (
 func TestRetryDelayAfterFailedOpen(t *testing.T) {
 	// The long interval is the binding one: a window that holds minAttempts at
 	// it holds more at the short one.
-	if settle < minAttempts*longInterval {
-		t.Fatalf("settle is %s, too short for %d attempts at an interval of %s: "+
-			"a client honouring the interval could not make enough attempts to measure a gap. Lengthen settle",
-			settle, minAttempts, longInterval)
+	if settleRetries < minAttempts*longInterval {
+		t.Fatalf("settleRetries is %s, too short for %d attempts at an interval of %s: "+
+			"a client honouring the interval could not make enough attempts to measure a gap. Lengthen settleRetries",
+			settleRetries, minAttempts, longInterval)
 	}
 
 	shortRun := retryScenario(shortInterval)
@@ -49,7 +49,7 @@ func TestRetryDelayAfterFailedOpen(t *testing.T) {
 	if attempts < minAttempts {
 		t.Fatalf("the client was configured to retry every %s and made %d connection attempt(s) "+
 			"in the %s after the drop, where %d are expected: it is not honouring the setting",
-			shortInterval, attempts, settle, minAttempts)
+			shortInterval, attempts, settleRetries, minAttempts)
 	}
 	if shortest < shortInterval {
 		t.Errorf("the client retried %s after the previous attempt, sooner than its configured "+
@@ -64,7 +64,7 @@ func TestRetryDelayAfterFailedOpen(t *testing.T) {
 	if longAttempts < minAttempts {
 		t.Fatalf("the client was configured to retry every %s and made %d connection attempt(s) "+
 			"in the %s after the drop, where %d are expected: it is not honouring the setting",
-			longInterval, longAttempts, settle, minAttempts)
+			longInterval, longAttempts, settleRetries, minAttempts)
 	}
 	if longest < longInterval {
 		t.Errorf("the client retried %s after the previous attempt, sooner than its configured "+
@@ -87,7 +87,7 @@ func retryScenario(interval time.Duration) record {
 	return runScenario(scenarioOptions{
 		ReconnectInterval: interval,
 		RefuseAfterDrop:   true,
-		Settle:            settle,
+		Settle:            settleRetries,
 	})
 }
 
