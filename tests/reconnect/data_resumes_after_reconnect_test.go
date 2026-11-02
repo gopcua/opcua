@@ -1,9 +1,9 @@
 // After the transport drops and the session is re-activated, a client whose
 // subscription survived on the server goes on receiving notifications on it.
 // OPC 10000-4 §6.7: "The Client shall only create a new Session if
-// ActivateSession fails." A client that re-activates the session it already
-// has still owns the subscriptions that session holds, so the server keeps
-// publishing to it.
+// ActivateSession fails." Re-activation assigns the new channel to the
+// existing session, so the client keeps the subscriptions that session holds
+// and the server keeps publishing to it.
 //
 // The scripted server is that server: the subscription outlives the drop and
 // the re-activation. The server holds one notification back and drops the
