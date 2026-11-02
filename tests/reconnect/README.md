@@ -6,9 +6,8 @@ checks is in the file's opening comment.
 
 A test drives the gopcua client through its public API against the scripted
 server in `harness.go`. That server can drop the transport on command —
-underneath a held Publish, so a notification is provably lost — answer
-wrongly on demand, and record both what went over the wire and what the
-application's callback received. What one run reduces to is the `record`
+underneath a held Publish, so a notification is provably lost — and record
+both what went over the wire and what the application's callback received. What one run reduces to is the `record`
 type, documented at its declaration in `harness.go`.
 
 The suite exists because a diff of reconnect code does not tell you what the
