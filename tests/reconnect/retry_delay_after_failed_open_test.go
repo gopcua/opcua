@@ -36,9 +36,9 @@ func TestRetryDelayAfterFailedOpen(t *testing.T) {
 	// The long interval is the binding one: a window that holds minAttempts at
 	// it holds more at the short one.
 	if settleRetries < minAttempts*longInterval {
-		t.Fatalf("settleRetries is %s, too short for %d attempts at an interval of %s: "+
-			"a client honouring the interval could not make enough attempts to measure a gap. Lengthen settleRetries",
-			settleRetries, minAttempts, longInterval)
+		t.Fatalf("could not set the test up: the settle window of %s holds only %d attempts at an "+
+			"interval of %s, too few to measure a gap. Lengthen settleRetries",
+			settleRetries, int(settleRetries/longInterval), longInterval)
 	}
 
 	shortRun := retryScenario(shortInterval)

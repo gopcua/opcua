@@ -8,7 +8,9 @@
 // drops the connection. See harness.go.
 //
 // The test checks only that the client asked. How often it asks, and where it
-// stops, is a separate behaviour with its own file.
+// stops, is a separate behaviour with its own file. One Republish is the whole
+// answer, so unlike the tests that count events across the settle window this
+// one needs no minimum window length.
 package reconnect
 
 import "testing"
