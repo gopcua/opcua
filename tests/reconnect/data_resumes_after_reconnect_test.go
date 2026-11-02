@@ -42,10 +42,10 @@ func TestDataResumesAfterReconnect(t *testing.T) {
 		t.Fatalf("could not set the test up: %s", why)
 	}
 
-	reactivated := false
+	activated := false
 	for _, r := range run.Requests {
 		if r.Epoch > run.DropEpoch && r.Service == "ActivateSessionRequest" {
-			reactivated = true
+			activated = true
 		}
 	}
 
@@ -61,11 +61,9 @@ func TestDataResumesAfterReconnect(t *testing.T) {
 	}
 
 	switch {
-	case !reactivated:
-		// This arm fails even while knownBug is set, because knownBug names a
-		// client that does re-activate. One that never does has a different
-		// defect, which this file makes no claim about.
-		t.Errorf("the client never re-activated its session after the drop, " +
+	case !activated:
+		// knownBug names a client that does activate, so this arm fails either way.
+		t.Errorf("the client never activated a session after the drop, " +
 			"so the server's subscription was never offered back to it")
 	case len(fresh) >= minFresh && knownBug != "":
 		t.Errorf("this now passes (%d distinct notifications arrived after the drop) - "+
