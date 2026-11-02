@@ -1,10 +1,14 @@
 // After the transport drops, a client whose subscription the server discarded
-// still goes on receiving notifications. No clause requires this: the server
-// is not wrong to forget a subscription, and the specification says nothing
-// about a client that finds its subscription gone beyond the recovery steps it
-// gives for other cases. It is an interoperability requirement. gopcua's own
-// server discards a session's subscriptions when the session is re-activated,
-// and a client that cannot cope with that loses its data on every reconnect.
+// still goes on receiving notifications. OPC 10000-4 §6.7 covers this in two
+// sentences: "If TransferSubscriptions fails, the Client needs to create a new
+// Subscription." and "If the Republish returns Bad_SubscriptionIdInvalid, then
+// the Client needs to create a new Subscription." The clause says "needs to",
+// weaker than the "shall" behind the test where the subscription survives, and
+// the two sentences are why this is a separate test: that one checks what a
+// client does when the server kept its subscription, this one what it does
+// when the server did not. gopcua's own server discards a session's
+// subscriptions when the session is re-activated, so a client that cannot cope
+// loses its data on every reconnect.
 //
 // The scripted server behaves that way. It answers as the harness does until
 // the session is activated a second time, and from then on the subscription

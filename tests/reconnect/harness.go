@@ -376,9 +376,10 @@ func (s *server) answer(epoch int, req ua.Request) ua.Response {
 			DiagnosticInfos: []*ua.DiagnosticInfo{},
 		}
 	}
-	// Republish is unscripted and faults; a test reads whether the client sent
-	// one from the request record.
-	return newServiceFault(h, ua.StatusBadServiceUnsupported)
+	// Republish is unscripted and answers that no message is available, which
+	// ends a client's Republish loop; a test reads whether the client sent one
+	// from the request record.
+	return newServiceFault(h, ua.StatusBadMessageNotAvailable)
 }
 
 func serviceName(v any) string {
