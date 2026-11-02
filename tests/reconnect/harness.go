@@ -48,8 +48,8 @@ const SubID uint32 = 42
 var monitoredNode = ua.NewStringNodeID(1, "reconnect.value")
 
 // requestRecord is one service request the scripted server decoded off the
-// wire. Epoch is the connection generation it arrived on: 1 is the original
-// connection, 2+ are reconnects after the drop.
+// wire. Epoch is the connection generation it arrived on, counting from 1.
+// record.DropEpoch says which generation was dropped.
 type requestRecord struct {
 	Epoch   int
 	Service string
@@ -232,6 +232,10 @@ type record struct {
 	// DropApplied is whether the commanded transport drop fired, at DropAt.
 	DropApplied bool
 	DropAt      time.Time
+	// DropEpoch is the connection generation the drop was applied to. A
+	// request on a higher one arrived on a reconnect; a fixed 2 would miscount
+	// a client that dialled twice before the drop.
+	DropEpoch int
 	// Accepts is when each connection was accepted, refused ones included. It
 	// is the only count of the reconnect attempts Epoch cannot see.
 	Accepts []time.Time
@@ -683,6 +687,7 @@ func runScenario(opts scenarioOptions) record {
 		if dropApplied {
 			out.DropApplied = true
 			out.DropAt = dropAt
+			out.DropEpoch = srv.rec.heldPublishEpoch()
 			break
 		}
 		select {
