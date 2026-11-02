@@ -26,12 +26,8 @@ func TestDataResumesAfterReconnect(t *testing.T) {
 
 	run := runScenario(scenarioOptions{})
 
-	// A client cannot cause either of these.
-	switch {
-	case run.HarnessErr != "":
-		t.Fatalf("could not set the test up: %s", run.HarnessErr)
-	case !run.DropApplied:
-		t.Fatalf("could not set the test up: the connection was never dropped")
+	if why := setupFailed(run); why != "" {
+		t.Fatalf("could not set the test up: %s", why)
 	}
 
 	// A client that has resumed gets about one notification per publishPacing
