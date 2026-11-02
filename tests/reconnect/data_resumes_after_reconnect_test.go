@@ -18,26 +18,27 @@ package reconnect
 
 import "testing"
 
+// minFresh is how many distinct notifications after the drop show a resumed
+// stream: half of what the settle window holds at publishPacing. One that
+// arrives and then stalls is not a stream.
+const minFresh = int(settleDefault/publishPacing) / 2
+
 func TestDataResumesAfterReconnect(t *testing.T) {
 	// knownBug records that gopcua does not do this yet. While it is set, the
 	// failure is logged and the build stays green. README.md says when to delete
 	// it. It is local because every test file in the package has its own.
 	const knownBug = "the client reconnects and re-activates the session, but never receives another notification"
 
+	if minFresh < 2 {
+		t.Fatalf("could not set the test up: the settle window of %s holds only %d publish intervals "+
+			"of %s, too few to tell a stream from a single notification. Lengthen settleDefault "+
+			"or shorten publishPacing in harness.go", settleDefault, int(settleDefault/publishPacing), publishPacing)
+	}
+
 	run := runScenario(scenarioOptions{})
 
 	if why := setupFailed(run); why != "" {
 		t.Fatalf("could not set the test up: %s", why)
-	}
-
-	// A client that has resumed gets about one notification per publishPacing
-	// for the whole settle window. Half of that cannot be a lone notification
-	// that happened to arrive and then stalled.
-	want := int(settleDefault/publishPacing) / 2
-	if want < 2 {
-		t.Fatalf("could not set the test up: the settle window of %s holds only %d publish intervals "+
-			"of %s, too few to tell a stream from a single notification. Lengthen settleDefault "+
-			"or shorten publishPacing in harness.go", settleDefault, int(settleDefault/publishPacing), publishPacing)
 	}
 
 	reactivated := false
@@ -65,16 +66,16 @@ func TestDataResumesAfterReconnect(t *testing.T) {
 		// defect, which this file makes no claim about.
 		t.Errorf("the client never re-activated its session after the drop, " +
 			"so the server's subscription was never offered back to it")
-	case len(fresh) >= want && knownBug != "":
+	case len(fresh) >= minFresh && knownBug != "":
 		t.Errorf("this now passes (%d distinct notifications arrived after the drop) - "+
 			"delete the knownBug constant in this file, in the commit that fixed it", len(fresh))
-	case len(fresh) >= want:
+	case len(fresh) >= minFresh:
 		t.Logf("data kept flowing: %d distinct notifications arrived after the drop", len(fresh))
 	case knownBug != "":
 		t.Logf("known bug: %s (%d distinct notifications after the drop, at least %d expected; %d received in all)",
-			knownBug, len(fresh), want, len(run.Deliveries))
+			knownBug, len(fresh), minFresh, len(run.Deliveries))
 	default:
 		t.Errorf("the session was re-activated after the drop, but only %d distinct notifications "+
-			"arrived after it, where at least %d are expected (%d received in all)", len(fresh), want, len(run.Deliveries))
+			"arrived after it, where at least %d are expected (%d received in all)", len(fresh), minFresh, len(run.Deliveries))
 	}
 }
