@@ -44,7 +44,7 @@ func TestDataResumesAfterReconnect(t *testing.T) {
 
 	reactivated := false
 	for _, r := range run.Requests {
-		if r.Epoch >= 2 && r.Service == "ActivateSessionRequest" {
+		if r.Epoch > run.DropEpoch && r.Service == "ActivateSessionRequest" {
 			reactivated = true
 		}
 	}
