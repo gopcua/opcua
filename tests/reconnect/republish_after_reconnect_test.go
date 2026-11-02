@@ -53,7 +53,8 @@ func TestRepublishAfterReconnect(t *testing.T) {
 	switch {
 	case asked > 0 && knownBug != "":
 		t.Errorf("this now passes (%d Republish for notification %d, of %d requests after the reconnect) - "+
-			"delete the knownBug constant in this file, in the commit that fixed it", asked, run.HeldSeq, total)
+			"delete the knownBug constant and the two arms that read it, in the commit that fixed it",
+			asked, run.HeldSeq, total)
 	case asked > 0:
 		t.Logf("the client asked for the missed notification (%d Republish for notification %d, of %d requests)",
 			asked, run.HeldSeq, total)
