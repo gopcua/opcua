@@ -82,8 +82,11 @@ type recorder struct {
 	// dropStarted is set just before the connection is closed, so a client
 	// that redials the instant it sees the reset is already refused.
 	dropStarted bool
-	// dropApplied is set once the close has succeeded; the scenario waits for it.
+	// dropApplied is set once the close has succeeded; the scenario waits for
+	// it. dropAt is that instant: a connection accepted before it is not a
+	// reconnection attempt.
 	dropApplied bool
+	dropAt      time.Time
 
 	lastSeq   uint32 // highest notification sequence created so far
 	seqAtDrop uint32 // lastSeq when the drop was applied
@@ -95,8 +98,10 @@ type recorder struct {
 	// is per connection because a reconnect must activate the session again.
 	activatedEpochs map[int]bool
 	// anyMonitored is state of the whole fixture, unlike activatedEpochs: the
-	// scenario has one subscription. CreateSubscription clears it and
-	// CreateMonitoredItems sets it.
+	// scenario has one subscription. A client that recreates the subscription
+	// and then fails to recreate its monitored items gets keep-alives for the
+	// rest of the run, and the row that notices reports missing notifications
+	// rather than missing items.
 	anyMonitored bool
 }
 
@@ -142,8 +147,15 @@ func (o *recorder) recordDropStarted() {
 func (o *recorder) recordDropApplied() {
 	o.mu.Lock()
 	o.dropApplied = true
+	o.dropAt = time.Now()
 	o.seqAtDrop = o.lastSeq
 	o.mu.Unlock()
+}
+
+func (o *recorder) dropAppliedAt() time.Time {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	return o.dropAt
 }
 
 func (o *recorder) isDropApplied() bool {
@@ -261,7 +273,8 @@ type record struct {
 	HeldSeq uint32
 	// LastSeq is the highest sequence number the server created.
 	LastSeq uint32
-	// DropApplied is whether the commanded transport drop fired, at DropAt.
+	// DropApplied is whether the commanded transport drop fired; DropAt is
+	// when the connection was closed, not when the drop was commanded.
 	DropApplied bool
 	DropAt      time.Time
 	// DropEpoch is the connection generation the drop was applied to. A
@@ -439,6 +452,9 @@ func (s *server) serve(ctx context.Context, epoch int, c *uacp.Conn) {
 
 func (s *server) answer(epoch int, req ua.Request) ua.Response {
 	h := req.Header().RequestHandle
+	if usesSession(serviceName(req)) && !s.rec.isActivated(epoch) {
+		return newServiceFault(h, ua.StatusBadSessionNotActivated)
+	}
 	switch r := req.(type) {
 	case *ua.CreateSessionRequest:
 		return &ua.CreateSessionResponse{
@@ -500,9 +516,6 @@ func (s *server) answer(epoch int, req ua.Request) ua.Response {
 		}
 
 	case *ua.PublishRequest:
-		if !s.rec.isActivated(epoch) {
-			return newServiceFault(h, ua.StatusBadSessionNotActivated)
-		}
 		// With nothing monitored there is no data, only keep-alives.
 		if !s.rec.isAnyMonitored() {
 			time.Sleep(publishPacing)
@@ -537,6 +550,19 @@ func (s *server) answer(epoch int, req ua.Request) ua.Response {
 	}
 	// Services the scenario does not script fault.
 	return newServiceFault(h, ua.StatusBadServiceUnsupported)
+}
+
+// usesSession reports whether a service request counts as using the Session.
+// The fixture faults one that arrives before the connection's
+// ActivateSession, and session_unused_before_activation_test.go reads the
+// same rule: one statement of one domain fact.
+func usesSession(service string) bool {
+	switch service {
+	case "CreateSessionRequest", "ActivateSessionRequest", "CloseSessionRequest",
+		"GetEndpointsRequest", "FindServersRequest":
+		return false
+	}
+	return true
 }
 
 func serviceName(v any) string {
@@ -742,13 +768,12 @@ func runScenario(opts scenarioOptions) record {
 		}
 	}
 
-	dropAt := time.Now()
 	srv.drop()
 	dropDeadline := time.After(2 * time.Second)
 	for {
 		if srv.rec.isDropApplied() {
 			out.DropApplied = true
-			out.DropAt = dropAt
+			out.DropAt = srv.rec.dropAppliedAt()
 			out.DropEpoch = srv.rec.heldPublishEpoch()
 			break
 		}
