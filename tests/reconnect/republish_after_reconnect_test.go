@@ -50,7 +50,7 @@ func TestRepublishAfterReconnect(t *testing.T) {
 	// nothing must not pass.
 	whyNot := measurementFailed(run)
 
-	asked, total := republishesAfterDrop(run)
+	asked, wrongSeqs, total := republishesAfterDrop(run)
 
 	if asked == 0 && whyNot != "" && knownBug == "" {
 		t.Fatalf("could not set the test up: %s", whyNot)
@@ -58,10 +58,14 @@ func TestRepublishAfterReconnect(t *testing.T) {
 
 	switch {
 	case asked > 0 && knownBug != "":
-		t.Errorf("this now passes (%d Republish of %d requests after the reconnect) - "+
-			"delete the knownBug constant in this file, in the commit that fixed it", asked, total)
+		t.Errorf("this now passes (%d Republish for notification %d, of %d requests after the reconnect) - "+
+			"delete the knownBug constant in this file, in the commit that fixed it", asked, run.HeldSeq, total)
 	case asked > 0:
-		t.Logf("the client asked for the missed notification (%d Republish of %d requests)", asked, total)
+		t.Logf("the client asked for the missed notification (%d Republish for notification %d, of %d requests)",
+			asked, run.HeldSeq, total)
+	case len(wrongSeqs) > 0:
+		t.Errorf("the client asked the server to resend %v, and the notification it missed was %d: "+
+			"it republished without evaluating the sequence number it lost", wrongSeqs, run.HeldSeq)
 	case knownBug != "":
 		t.Logf("known bug: %s (notification %d was held back; %d requests after the reconnect, "+
 			"none a Republish)", knownBug, run.HeldSeq, total)
@@ -85,25 +89,33 @@ func lossSetupFailed(run record) string {
 			return "the held notification reached the client before the drop, so nothing was lost"
 		}
 	}
-	if _, total := republishesAfterDrop(run); total == 0 {
+	if _, _, total := republishesAfterDrop(run); total == 0 {
 		return "the client sent nothing at all after the drop"
 	}
 	return ""
 }
 
-// republishesAfterDrop counts what the client sent on a connection it opened
-// after the drop.
-func republishesAfterDrop(run record) (asked, total int) {
+// republishesAfterDrop reads what the client sent on a connection it opened
+// after the drop: how many Republish asked for the notification the server
+// held, which other sequence numbers it asked for instead, and how many
+// requests there were in all. The number asked for is the behaviour, not the
+// service name: a client that republishes a number the server never held has
+// not noticed what it lost.
+func republishesAfterDrop(run record) (asked int, wrongSeqs []uint32, total int) {
 	for _, r := range run.Requests {
 		if r.Epoch <= run.DropEpoch {
 			continue
 		}
 		total++
-		if r.Service == "RepublishRequest" {
+		switch {
+		case r.Service != "RepublishRequest":
+		case r.RepublishSeq == run.HeldSeq:
 			asked++
+		default:
+			wrongSeqs = append(wrongSeqs, r.RepublishSeq)
 		}
 	}
-	return asked, total
+	return asked, wrongSeqs, total
 }
 
 // measurementFailed reports why this run could not have told a client that
