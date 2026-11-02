@@ -10,10 +10,10 @@
 // Bad_SessionNotActivated and may recover and receive data, so a test that
 // only watched for data would pass it. See harness.go.
 //
-// Services that do not use the Session are exempt: CreateSession creates it,
-// ActivateSession is what is being waited for, GetEndpoints and FindServers
-// need no Session, and CloseSession is how a client abandons one it could not
-// activate.
+// Which services use the Session is usesSession in harness.go, the same rule
+// the scripted server faults on: CreateSession creates it, ActivateSession is
+// what is being waited for, GetEndpoints and FindServers need no Session, and
+// CloseSession is how a client abandons one it could not activate.
 package reconnect
 
 import "testing"
@@ -51,16 +51,6 @@ func firstEarlyUse(run record) (requestRecord, bool) {
 		}
 	}
 	return requestRecord{}, false
-}
-
-// usesSession reports whether a service request counts as using the Session.
-func usesSession(service string) bool {
-	switch service {
-	case "CreateSessionRequest", "ActivateSessionRequest", "CloseSessionRequest",
-		"GetEndpointsRequest", "FindServersRequest":
-		return false
-	}
-	return true
 }
 
 // sessionUseSetupFailed reports why this run could not have told a client
