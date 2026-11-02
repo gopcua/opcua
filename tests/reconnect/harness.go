@@ -8,17 +8,14 @@
 // received.
 //
 // The lost notification is constructed. The server answers the stream's first
-// Publish and holds every later one, keeping its sequence number but sending
-// nothing. Once a Publish is held, the scenario resets the connection that
-// Publish is outstanding on, so the held notification cannot have reached the
+// Publish and holds every later one: the notification gets a sequence number
+// but is never sent. Once a Publish is held, the scenario resets the connection
+// it is outstanding on, so the held notification cannot have reached the
 // client. Nothing tells the session its transport is gone.
 //
-// The notification sequence counter is global and never resets. A subscription
-// the client recreates after the drop starts at seq 3, so a client that walks
-// gaps reactively sees a gap where nothing was lost.
-//
-// A run never aborts. A harness fault goes into the record, and the test
-// reports it as a setup failure.
+// The sequence counter is global and never resets. A subscription the client
+// recreates after the drop starts at 3, which looks like a gap to a client that
+// detects loss by sequence gaps.
 package reconnect
 
 import (
@@ -73,26 +70,34 @@ type recorder struct {
 	mu       sync.Mutex
 	requests []requestRecord
 	accepts  []time.Time // when each connection was accepted, refused ones included
+
 	// dropStarted is set just before the connection is closed, so a client
 	// that redials the instant it sees the reset is already refused.
 	dropStarted bool
-	// dropApplied is set once the close has succeeded.
+	// dropApplied is set once the close has succeeded; the scenario waits for it.
 	dropApplied bool
-	lastSeq     uint32       // highest notification sequence created so far
-	heldSeq     uint32       // sequence of the first held Publish; 0 = none
-	heldEpoch   int          // connection the held Publish is outstanding on; 0 = none
-	answered    bool         // the stream's first Publish has been answered
-	activated   map[int]bool // connections on which ActivateSession has arrived
-	monitored   bool         // the subscription has at least one monitored item
+
+	lastSeq   uint32 // highest notification sequence created so far
+	heldSeq   uint32 // sequence of the first held Publish; 0 = none
+	heldEpoch int    // connection the held Publish is outstanding on; 0 = none
+	answered  bool   // the stream's first Publish has been answered
+
+	// activatedEpochs holds the connections ActivateSession has arrived on. It
+	// is per connection because a reconnect must activate the session again.
+	activatedEpochs map[int]bool
+	// anyMonitored is state of the whole fixture, unlike activatedEpochs: the
+	// scenario has one subscription. CreateSubscription clears it and
+	// CreateMonitoredItems sets it.
+	anyMonitored bool
 }
 
 func (o *recorder) recordRequest(epoch int, service string) {
 	o.mu.Lock()
 	if service == "ActivateSessionRequest" {
-		if o.activated == nil {
-			o.activated = map[int]bool{}
+		if o.activatedEpochs == nil {
+			o.activatedEpochs = map[int]bool{}
 		}
-		o.activated[epoch] = true
+		o.activatedEpochs[epoch] = true
 	}
 	o.requests = append(o.requests, requestRecord{Epoch: epoch, Service: service})
 	o.mu.Unlock()
@@ -122,36 +127,32 @@ func (o *recorder) recordDropApplied() {
 	o.mu.Unlock()
 }
 
-// isActivated reports whether the session has been activated on the connection.
 func (o *recorder) isActivated(epoch int) bool {
 	o.mu.Lock()
 	defer o.mu.Unlock()
-	return o.activated[epoch]
+	return o.activatedEpochs[epoch]
 }
 
-// setMonitored records whether the subscription has monitored items. A new
-// subscription has none.
-func (o *recorder) setMonitored(v bool) {
+func (o *recorder) setAnyMonitored(v bool) {
 	o.mu.Lock()
-	o.monitored = v
+	o.anyMonitored = v
 	o.mu.Unlock()
 }
 
-func (o *recorder) isMonitored() bool {
+func (o *recorder) isAnyMonitored() bool {
 	o.mu.Lock()
 	defer o.mu.Unlock()
-	return o.monitored
+	return o.anyMonitored
 }
 
-// nextSeq is the sequence number the next notification will carry; a
-// keep-alive carries it without using it up.
+// nextSeq is the sequence number the next notification will carry. A keep-alive
+// carries it without using it up.
 func (o *recorder) nextSeq() uint32 {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	return o.lastSeq + 1
 }
 
-// highestSeq is the highest sequence number created so far.
 func (o *recorder) highestSeq() uint32 {
 	o.mu.Lock()
 	defer o.mu.Unlock()
@@ -173,6 +174,7 @@ func (o *recorder) heldConnection() int {
 // publishStep answers the stream's first Publish and holds every later one.
 // After the drop it answers again with fresh data, so a client that notices a
 // gap only when the next notification arrives has one to notice it in.
+// Every call uses up a sequence number, held or not.
 func (o *recorder) publishStep(epoch int) (seq uint32, hold bool) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
@@ -193,7 +195,7 @@ func (o *recorder) publishStep(epoch int) (seq uint32, hold bool) {
 	return o.lastSeq, false
 }
 
-// snapshot copies everything recorded so far.
+// snapshot returns copies of the request and accept logs, with the drop and held state.
 func (o *recorder) snapshot() (requests []requestRecord, accepts []time.Time, dropApplied bool, held uint32) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
@@ -235,8 +237,8 @@ type server struct {
 	override        answerOverride
 	refuseAfterDrop bool // close every connection accepted once the drop has started
 
-	mu    sync.Mutex
-	conns map[int]*uacp.Conn
+	mu    sync.Mutex         // guards conns
+	conns map[int]*uacp.Conn // by epoch
 }
 
 // newServer starts the scripted server on an OS-chosen port.
@@ -316,6 +318,7 @@ func (s *server) serve(ctx context.Context, epoch int, c *uacp.Conn) {
 		Lifetime:          uint32(time.Hour / time.Millisecond),
 	}
 	errch := make(chan error, 8)
+	// Channel, sequence and token ids differ per connection.
 	sc, err := uasc.NewServerSecureChannel(s.endpoint, c, cfg, errch, uint32(1000+epoch), uint32(100*epoch+1), uint32(2000+epoch))
 	if err != nil {
 		return
@@ -380,7 +383,7 @@ func (s *server) answer(epoch int, req ua.Request) ua.Response {
 		}
 
 	case *ua.CreateSubscriptionRequest:
-		s.rec.setMonitored(false)
+		s.rec.setAnyMonitored(false)
 		return &ua.CreateSubscriptionResponse{
 			ResponseHeader:            newResponseHeader(h, ua.StatusOK),
 			SubscriptionID:            SubID,
@@ -391,7 +394,7 @@ func (s *server) answer(epoch int, req ua.Request) ua.Response {
 
 	case *ua.CreateMonitoredItemsRequest:
 		if r.SubscriptionID == SubID {
-			s.rec.setMonitored(true)
+			s.rec.setAnyMonitored(true)
 		}
 		results := make([]*ua.MonitoredItemCreateResult, len(r.ItemsToCreate))
 		for i := range r.ItemsToCreate {
@@ -409,13 +412,11 @@ func (s *server) answer(epoch int, req ua.Request) ua.Response {
 		}
 
 	case *ua.PublishRequest:
-		// A session that was not activated on this connection cannot publish.
 		if !s.rec.isActivated(epoch) {
 			return newServiceFault(h, ua.StatusBadSessionNotActivated)
 		}
-		// A subscription with nothing monitored has no data, so it only
-		// sends keep-alives.
-		if !s.rec.isMonitored() {
+		// With nothing monitored there is no data, only keep-alives.
+		if !s.rec.isAnyMonitored() {
 			time.Sleep(publishPacing)
 			return newKeepAliveResponse(SubID, s.rec.nextSeq())
 		}
@@ -429,8 +430,8 @@ func (s *server) answer(epoch int, req ua.Request) ua.Response {
 	case *ua.TransferSubscriptionsRequest:
 		results := make([]*ua.TransferResult, len(r.SubscriptionIDs))
 		for i := range r.SubscriptionIDs {
-			// Part 4 §5.14.1.1: an empty list claims nothing is left to
-			// republish, so advertise the held sequence number.
+			// An empty list claims nothing is left to republish (OPC 10000-4
+			// §5.14.1.1), so advertise the held sequence number.
 			avail := []uint32{}
 			if held := s.rec.heldNotification(); held != 0 {
 				avail = []uint32{held}
@@ -444,12 +445,12 @@ func (s *server) answer(epoch int, req ua.Request) ua.Response {
 		}
 
 	case *ua.RepublishRequest:
-		// OPC 10000-4 §6.7 names Bad_MessageNotAvailable as the status that
-		// ends the Republish loop. The server never offers a message back; a
-		// test reads whether the client asked from the request record.
+		// The server never has a message to give back. OPC 10000-4 §6.7 names
+		// Bad_MessageNotAvailable as the status that ends the Republish loop.
+		// Whether the client asked is read from the request record.
 		return newServiceFault(h, ua.StatusBadMessageNotAvailable)
 	}
-	// Any other service is unscripted and faults.
+	// Services the scenario does not script fault.
 	return newServiceFault(h, ua.StatusBadServiceUnsupported)
 }
 
@@ -472,9 +473,8 @@ func newServiceFault(handle uint32, status ua.StatusCode) ua.Response {
 	return &ua.ServiceFault{ResponseHeader: newResponseHeader(handle, status)}
 }
 
-// newNotification manufactures a data-bearing notification carrying its
-// sequence number in the value, which is how a delivery record knows which
-// data point it saw.
+// newNotification builds a notification whose value is its own sequence
+// number, so a delivery record shows which one the client received.
 func newNotification(seq uint32) *ua.NotificationMessage {
 	return &ua.NotificationMessage{
 		SequenceNumber: seq,
@@ -503,8 +503,8 @@ func newPublishResponse(seq uint32) *ua.PublishResponse {
 	}
 }
 
-// newKeepAliveResponse is a Publish answer that carries no data: the sequence
-// number of the next notification, and nothing in it.
+// newKeepAliveResponse answers a Publish with no data. It carries the sequence
+// number the next notification will use.
 func newKeepAliveResponse(subID, nextSeq uint32) *ua.PublishResponse {
 	return &ua.PublishResponse{
 		ResponseHeader: newResponseHeader(0, ua.StatusOK),
@@ -563,15 +563,15 @@ func runScenario(opts scenarioOptions) record {
 	if opts.ReconnectInterval == 0 {
 		opts.ReconnectInterval = 100 * time.Millisecond
 	}
-	var f record
+	var out record
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	srv, err := newServer(ctx, opts.Override, opts.RefuseAfterDrop)
 	if err != nil {
-		f.HarnessErr = fmt.Sprintf("the scripted server could not start: %v", err)
-		return f
+		out.HarnessErr = fmt.Sprintf("the scripted server could not start: %v", err)
+		return out
 	}
 	defer func() { srv.ln.Close() }()
 
@@ -583,12 +583,12 @@ func runScenario(opts scenarioOptions) record {
 		opcua.DialTimeout(3*time.Second),
 	)
 	if err != nil {
-		f.HarnessErr = fmt.Sprintf("constructing the client: %v", err)
-		return f
+		out.HarnessErr = fmt.Sprintf("constructing the client: %v", err)
+		return out
 	}
 	if err := c.Connect(ctx); err != nil {
-		f.HarnessErr = fmt.Sprintf("the initial connect failed: %v", err)
-		return f
+		out.HarnessErr = fmt.Sprintf("the initial connect failed: %v", err)
+		return out
 	}
 	defer func() {
 		closeCtx, closeCancel := context.WithTimeout(context.Background(), 3*time.Second)
@@ -597,13 +597,13 @@ func runScenario(opts scenarioOptions) record {
 	}()
 
 	// Records what the application's own notification callback receives.
-	var dmu sync.Mutex
+	var deliveriesMu sync.Mutex
 	var deliveries []deliveryRecord
 	notifs := make(chan *opcua.PublishNotificationData, 32)
 	sub, err := c.Subscribe(ctx, &opcua.SubscriptionParameters{Interval: 200 * time.Millisecond}, notifs)
 	if err != nil {
-		f.HarnessErr = fmt.Sprintf("subscribing: %v", err)
-		return f
+		out.HarnessErr = fmt.Sprintf("subscribing: %v", err)
+		return out
 	}
 	go func() {
 		for n := range notifs {
@@ -615,33 +615,33 @@ func runScenario(opts scenarioOptions) record {
 				continue
 			}
 			if seq, ok := dcn.MonitoredItems[0].Value.Value.Value().(int32); ok {
-				dmu.Lock()
+				deliveriesMu.Lock()
 				deliveries = append(deliveries, deliveryRecord{Seq: uint32(seq), At: time.Now()})
-				dmu.Unlock()
+				deliveriesMu.Unlock()
 			}
 		}
 	}()
 
 	item := opcua.NewMonitoredItemCreateRequestWithDefaults(monitoredNode, ua.AttributeIDValue, 1)
 	if _, err := sub.Monitor(ctx, ua.TimestampsToReturnBoth, item); err != nil {
-		f.HarnessErr = fmt.Sprintf("monitoring the item: %v", err)
-		return f
+		out.HarnessErr = fmt.Sprintf("monitoring the item: %v", err)
+		return out
 	}
 
 	// Wait until the stream is live: the application's callback has received
 	// a notification.
 	deadline := time.After(10 * time.Second)
 	for {
-		dmu.Lock()
+		deliveriesMu.Lock()
 		n := len(deliveries)
-		dmu.Unlock()
+		deliveriesMu.Unlock()
 		if n > 0 {
 			break
 		}
 		select {
 		case <-deadline:
-			f.HarnessErr = "no notification reached the application before the drop command"
-			return f
+			out.HarnessErr = "no notification reached the application before the drop command"
+			return out
 		case <-time.After(20 * time.Millisecond):
 		}
 	}
@@ -655,40 +655,39 @@ func runScenario(opts scenarioOptions) record {
 		}
 		select {
 		case <-heldDeadline:
-			f.HarnessErr = "the client never left a publish outstanding for the server to hold; the loss could not be constructed"
-			return f
+			out.HarnessErr = "the client never left a publish outstanding for the server to hold; the loss could not be constructed"
+			return out
 		case <-time.After(10 * time.Millisecond):
 		}
 	}
 
-	// Drop the transport underneath the held Publish.
 	dropAt := time.Now()
 	srv.drop()
 	dropDeadline := time.After(2 * time.Second)
 	for {
 		_, _, dropApplied, _ := srv.rec.snapshot()
 		if dropApplied {
-			f.DropApplied = true
-			f.DropAt = dropAt
+			out.DropApplied = true
+			out.DropAt = dropAt
 			break
 		}
 		select {
 		case <-dropDeadline:
-			f.HarnessErr = "the commanded transport drop never applied"
-			return f
+			out.HarnessErr = "the commanded transport drop never applied"
+			return out
 		case <-time.After(10 * time.Millisecond):
 		}
 	}
 
 	time.Sleep(opts.Settle)
 
-	dmu.Lock()
-	f.Deliveries = append([]deliveryRecord(nil), deliveries...)
-	dmu.Unlock()
+	deliveriesMu.Lock()
+	out.Deliveries = append([]deliveryRecord(nil), deliveries...)
+	deliveriesMu.Unlock()
 	requests, accepts, _, held := srv.rec.snapshot()
-	f.Requests = requests
-	f.Accepts = accepts
-	f.HeldSeq = held
-	f.LastSeq = srv.rec.highestSeq()
-	return f
+	out.Requests = requests
+	out.Accepts = accepts
+	out.HeldSeq = held
+	out.LastSeq = srv.rec.highestSeq()
+	return out
 }
