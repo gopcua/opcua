@@ -50,9 +50,54 @@ var monitoredNode = ua.NewStringNodeID(1, "reconnect.value")
 // requestRecord is one service request the scripted server decoded off the
 // wire. Epoch is the connection generation it arrived on, counting from 1.
 // record.DropEpoch says which generation was dropped.
+//
+// Publish and Republish carry what the request asked for. Each is nil unless
+// Service is that request, so nil means "this is another service", never
+// "the request asked for nothing": a Publish that acknowledged nothing has a
+// non-nil Publish with no Acks.
 type requestRecord struct {
-	Epoch   int
-	Service string
+	Epoch     int
+	Service   string
+	Publish   *publishRecord
+	Republish *republishRecord
+}
+
+// ack is one SubscriptionAcknowledgement the client put in a Publish.
+type ack struct {
+	SubID, Seq uint32
+}
+
+// publishRecord is what a PublishRequest acknowledged, in the order sent.
+type publishRecord struct {
+	Acks []ack
+}
+
+// republishRecord is the sequence number a RepublishRequest asked for.
+type republishRecord struct {
+	Seq uint32
+}
+
+// clone copies every slice and pointer, so a test holding a snapshot cannot
+// reach the recorder's state.
+func (r requestRecord) clone() requestRecord {
+	if r.Publish != nil {
+		p := *r.Publish
+		p.Acks = append([]ack(nil), r.Publish.Acks...)
+		r.Publish = &p
+	}
+	if r.Republish != nil {
+		p := *r.Republish
+		r.Republish = &p
+	}
+	return r
+}
+
+// surfacedError is one error the client handed the application through the
+// notification channel. Err is the text only; deciding what an error means is
+// the test's job.
+type surfacedError struct {
+	At  time.Time
+	Err string
 }
 
 // deliveryRecord is one notification the client's application callback
@@ -90,15 +135,27 @@ type recorder struct {
 	anyMonitored bool
 }
 
-func (o *recorder) recordRequest(epoch int, service string) {
+// recordRequest takes the decoded request, so the call site does not need to
+// know which services carry something worth keeping.
+func (o *recorder) recordRequest(epoch int, req ua.Request) {
+	rr := requestRecord{Epoch: epoch, Service: serviceName(req)}
+	switch r := req.(type) {
+	case *ua.PublishRequest:
+		rr.Publish = &publishRecord{Acks: []ack{}}
+		for _, a := range r.SubscriptionAcknowledgements {
+			rr.Publish.Acks = append(rr.Publish.Acks, ack{SubID: a.SubscriptionID, Seq: a.SequenceNumber})
+		}
+	case *ua.RepublishRequest:
+		rr.Republish = &republishRecord{Seq: r.RetransmitSequenceNumber}
+	}
 	o.mu.Lock()
-	if service == "ActivateSessionRequest" {
+	if rr.Service == "ActivateSessionRequest" {
 		if o.activatedEpochs == nil {
 			o.activatedEpochs = map[int]bool{}
 		}
 		o.activatedEpochs[epoch] = true
 	}
-	o.requests = append(o.requests, requestRecord{Epoch: epoch, Service: service})
+	o.requests = append(o.requests, rr)
 	o.mu.Unlock()
 }
 
@@ -211,7 +268,10 @@ func (o *recorder) publishStep(epoch int) (seq uint32, hold bool) {
 func (o *recorder) snapshot() (requests []requestRecord, accepts []time.Time, dropApplied bool, held uint32) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
-	requests = append([]requestRecord(nil), o.requests...)
+	requests = make([]requestRecord, len(o.requests))
+	for i, r := range o.requests {
+		requests[i] = r.clone()
+	}
 	accepts = append([]time.Time(nil), o.accepts...)
 	return requests, accepts, o.dropApplied, o.heldSeq
 }
@@ -242,6 +302,22 @@ type record struct {
 	// HarnessErr is a stage the scenario could not reach; the test reports it
 	// as a setup failure.
 	HarnessErr string
+
+	// surfacedErrs and surfacedSeen back Surfaced. They are unexported so that
+	// a run which never reached the consumer cannot be read as one in which
+	// the client said nothing.
+	surfacedErrs []surfacedError
+	surfacedSeen bool
+}
+
+// Surfaced is every error the client delivered on the notification channel,
+// from the subscription until the run ended. observed is false when the run
+// stopped before the consumer was reading; errs is then meaningless. An empty
+// errs with observed true shows the client said nothing, which is what a test
+// that a client should have told the application relies on. No stimulus tried
+// so far makes the client put an error here.
+func (r record) Surfaced() (errs []surfacedError, observed bool) {
+	return r.surfacedErrs, r.surfacedSeen
 }
 
 // setupFailed reports why the run never reached the point the test is about,
@@ -361,7 +437,7 @@ func (s *server) serve(ctx context.Context, epoch int, c *uacp.Conn) {
 		if req == nil {
 			continue
 		}
-		s.rec.recordRequest(epoch, serviceName(req))
+		s.rec.recordRequest(epoch, req)
 
 		resp := s.answer(epoch, req)
 		if resp == nil {
@@ -617,6 +693,7 @@ func runScenario(opts scenarioOptions) record {
 	// Records what the application's own notification callback receives.
 	var deliveriesMu sync.Mutex
 	var deliveries []deliveryRecord
+	var surfaced []surfacedError
 	notifs := make(chan *opcua.PublishNotificationData, 32)
 	sub, err := c.Subscribe(ctx, &opcua.SubscriptionParameters{Interval: 200 * time.Millisecond}, notifs)
 	if err != nil {
@@ -626,6 +703,9 @@ func runScenario(opts scenarioOptions) record {
 	go func() {
 		for n := range notifs {
 			if n.Error != nil {
+				deliveriesMu.Lock()
+				surfaced = append(surfaced, surfacedError{At: time.Now(), Err: n.Error.Error()})
+				deliveriesMu.Unlock()
 				continue
 			}
 			dcn, ok := n.Value.(*ua.DataChangeNotification)
@@ -702,6 +782,8 @@ func runScenario(opts scenarioOptions) record {
 
 	deliveriesMu.Lock()
 	out.Deliveries = append([]deliveryRecord(nil), deliveries...)
+	out.surfacedErrs = append([]surfacedError(nil), surfaced...)
+	out.surfacedSeen = true
 	deliveriesMu.Unlock()
 	requests, accepts, _, held := srv.rec.snapshot()
 	out.Requests = requests
