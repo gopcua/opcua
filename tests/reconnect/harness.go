@@ -3,9 +3,8 @@
 // fixture they all run against.
 //
 // The fixture is a scripted OPC UA server. It drops the transport on command,
-// can answer a service wrongly, can refuse every connection after the drop,
-// and records what it decoded off the wire and what the client's callback
-// received.
+// can refuse every connection after the drop, and records what it decoded off
+// the wire and what the client's callback received.
 //
 // The lost notification is constructed. The server answers the stream's first
 // Publish and holds every later one: the notification gets a sequence number
@@ -236,10 +235,6 @@ type record struct {
 	HarnessErr string
 }
 
-// answerOverride lets a test answer a service wrongly. It is consulted before
-// the honest answers; ok=true replaces the honest response.
-type answerOverride func(service string, req ua.Request) (resp ua.Response, ok bool)
-
 // server is the scripted fixture the client under test talks to.
 type server struct {
 	rec      *recorder
@@ -247,15 +242,14 @@ type server struct {
 	endpoint string
 
 	dropCh          chan struct{} // the scenario's one-shot drop command
-	override        answerOverride
-	refuseAfterDrop bool // close every connection accepted once the drop has started
+	refuseAfterDrop bool          // close every connection accepted once the drop has started
 
 	mu    sync.Mutex         // guards conns
 	conns map[int]*uacp.Conn // by epoch
 }
 
 // newServer starts the scripted server on an OS-chosen port.
-func newServer(ctx context.Context, override answerOverride, refuseAfterDrop bool) (*server, error) {
+func newServer(ctx context.Context, refuseAfterDrop bool) (*server, error) {
 	ln, err := uacp.Listen(ctx, "opc.tcp://127.0.0.1:0", nil)
 	if err != nil {
 		return nil, err
@@ -265,7 +259,6 @@ func newServer(ctx context.Context, override answerOverride, refuseAfterDrop boo
 		ln:              ln,
 		endpoint:        "opc.tcp://" + ln.Addr().String(),
 		dropCh:          make(chan struct{}, 1),
-		override:        override,
 		conns:           map[int]*uacp.Conn{},
 		refuseAfterDrop: refuseAfterDrop,
 	}
@@ -358,11 +351,6 @@ func (s *server) serve(ctx context.Context, epoch int, c *uacp.Conn) {
 }
 
 func (s *server) answer(epoch int, req ua.Request) ua.Response {
-	if s.override != nil {
-		if resp, ok := s.override(serviceName(req), req); ok {
-			return resp
-		}
-	}
 	h := req.Header().RequestHandle
 	switch r := req.(type) {
 	case *ua.CreateSessionRequest:
@@ -552,7 +540,6 @@ func anonymousAuthEndpoint(url string) *ua.EndpointDescription {
 
 // scenarioOptions configures one scenario run.
 type scenarioOptions struct {
-	Override answerOverride
 	// RefuseAfterDrop closes every connection accepted once the drop has started.
 	RefuseAfterDrop bool
 	// ReconnectInterval is the client's wait between reconnection attempts;
@@ -578,7 +565,7 @@ func runScenario(opts scenarioOptions) record {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	srv, err := newServer(ctx, opts.Override, opts.RefuseAfterDrop)
+	srv, err := newServer(ctx, opts.RefuseAfterDrop)
 	if err != nil {
 		out.HarnessErr = fmt.Sprintf("the scripted server could not start: %v", err)
 		return out
