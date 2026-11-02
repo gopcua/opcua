@@ -42,7 +42,19 @@ func TestRepublishAfterReconnect(t *testing.T) {
 		t.Fatalf("could not set the test up: %s", why)
 	}
 
+	// Why this run could not have told asking from not asking, or "" if it
+	// could. A client that never polls again is never shown the gap, so "no
+	// Republish" from such a run is not evidence. While knownBug stands the
+	// client is expected not to get that far and the shortfall is logged with
+	// it; once someone deletes knownBug to claim the fix, a run that measured
+	// nothing must not pass.
+	whyNot := measurementFailed(run)
+
 	asked, total := republishesAfterDrop(run)
+
+	if asked == 0 && whyNot != "" && knownBug == "" {
+		t.Fatalf("could not set the test up: %s", whyNot)
+	}
 
 	switch {
 	case asked > 0 && knownBug != "":
@@ -53,6 +65,9 @@ func TestRepublishAfterReconnect(t *testing.T) {
 	case knownBug != "":
 		t.Logf("known bug: %s (notification %d was held back; %d requests after the reconnect, "+
 			"none a Republish)", knownBug, run.HeldSeq, total)
+		if whyNot != "" {
+			t.Logf("this run could not have told asking from not asking anyway: %s", whyNot)
+		}
 	default:
 		t.Errorf("the client missed notification %d and never asked for it "+
 			"(%d requests after the reconnect, none a Republish)", run.HeldSeq, total)
@@ -89,4 +104,33 @@ func republishesAfterDrop(run record) (asked, total int) {
 		}
 	}
 	return asked, total
+}
+
+// measurementFailed reports why this run could not have told a client that
+// declined to ask from one that was never asked, or "" if it could. A client
+// has to poll again after the drop, and the server has to have created
+// something after the notification it held, before a missing Republish means
+// anything.
+func measurementFailed(run record) string {
+	if publishesAfterDrop(run) == 0 {
+		return "the client never polled again after the drop, so it was never in a " +
+			"position to notice the loss"
+	}
+	if run.LastSeq <= run.HeldSeq {
+		return "the server created nothing after the notification it held, so there " +
+			"was no gap for the client to notice"
+	}
+	return ""
+}
+
+// publishesAfterDrop counts the Publish requests the client sent on a
+// connection it opened after the drop.
+func publishesAfterDrop(run record) int {
+	n := 0
+	for _, r := range run.Requests {
+		if r.Epoch > run.DropEpoch && r.Service == "PublishRequest" {
+			n++
+		}
+	}
+	return n
 }
