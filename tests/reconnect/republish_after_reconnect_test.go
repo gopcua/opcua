@@ -40,7 +40,7 @@ func TestRepublishAfterReconnect(t *testing.T) {
 	if why := setupFailed(run); why != "" {
 		t.Fatalf("could not set the test up: %s", why)
 	}
-	if why := lossNotConstructed(run); why != "" {
+	if why := lossSetupFailed(run); why != "" {
 		t.Fatalf("could not set the test up: %s", why)
 	}
 
@@ -61,9 +61,9 @@ func TestRepublishAfterReconnect(t *testing.T) {
 	}
 }
 
-// lossNotConstructed reports why nothing was lost after all, or "" if the
-// loss was constructed. Until it is, the test has nothing to ask about.
-func lossNotConstructed(run record) string {
+// lossSetupFailed reports why the loss this test is about was not
+// constructed, or "" if it was. Until it is, the test has nothing to ask.
+func lossSetupFailed(run record) string {
 	if run.HeldSeq == 0 {
 		return "the server never held a notification back, so nothing was lost"
 	}
