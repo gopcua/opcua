@@ -12,16 +12,11 @@
 //
 // The test checks only that data arrives after the drop. Whether the client
 // republishes, transfers the subscription or recreates it is not the test's
-// business. The server answers Republish with Bad_MessageNotAvailable, the
-// answer of a server with nothing to retransmit, so a client that does ask
-// is not faulted for it.
+// business. The server answers Republish with Bad_MessageNotAvailable, which
+// ends a Republish loop, so a client that does ask is not faulted for it.
 package reconnect
 
-import (
-	"testing"
-
-	"github.com/gopcua/opcua/ua"
-)
+import "testing"
 
 func TestDataResumesAfterReconnect(t *testing.T) {
 	// knownBug records that gopcua does not do this yet. While it is set, the
@@ -29,7 +24,7 @@ func TestDataResumesAfterReconnect(t *testing.T) {
 	// it. It is local because every test file in the package has its own.
 	const knownBug = "the client reconnects and re-activates the session, but never receives another notification"
 
-	run := runScenario(scenarioOptions{Override: republishNothingToSend})
+	run := runScenario(scenarioOptions{})
 
 	// A client cannot cause either of these.
 	switch {
@@ -60,13 +55,4 @@ func TestDataResumesAfterReconnect(t *testing.T) {
 		t.Errorf("the connection dropped under a held notification and the session was re-activated, "+
 			"but no notification arrived after the drop (%d received in all)", len(run.Deliveries))
 	}
-}
-
-// republishNothingToSend answers Republish the way a server with nothing to
-// retransmit does, and leaves every other service to the honest answers.
-func republishNothingToSend(service string, req ua.Request) (ua.Response, bool) {
-	if service != "RepublishRequest" {
-		return nil, false
-	}
-	return newServiceFault(req.Header().RequestHandle, ua.StatusBadMessageNotAvailable), true
 }
