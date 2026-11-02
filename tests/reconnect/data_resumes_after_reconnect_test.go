@@ -56,8 +56,8 @@ func TestDataResumesAfterReconnect(t *testing.T) {
 
 	switch {
 	case len(fresh) >= minFresh && knownBug != "":
-		t.Errorf("this now passes (%d distinct notifications arrived after the drop) - "+
-			"delete the knownBug constant in this file, in the commit that fixed it", len(fresh))
+		t.Errorf("this now passes (%d distinct notifications arrived after the drop) - delete the "+
+			"knownBug constant and the two arms that read it, in the commit that fixed it", len(fresh))
 	case len(fresh) >= minFresh:
 		t.Logf("data kept flowing: %d distinct notifications arrived after the drop", len(fresh))
 	case knownBug != "":
