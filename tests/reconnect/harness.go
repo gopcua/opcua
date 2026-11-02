@@ -240,6 +240,18 @@ type record struct {
 	HarnessErr string
 }
 
+// setupFailed reports why the run never reached the point the test is about,
+// or "" if it did. A client cannot cause either of these.
+func setupFailed(run record) string {
+	switch {
+	case run.HarnessErr != "":
+		return run.HarnessErr
+	case !run.DropApplied:
+		return "the connection was never dropped"
+	}
+	return ""
+}
+
 // server is the scripted fixture the client under test talks to.
 type server struct {
 	rec      *recorder

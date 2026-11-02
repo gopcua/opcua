@@ -25,6 +25,9 @@ func TestRepublishAfterReconnect(t *testing.T) {
 	if why := setupFailed(run); why != "" {
 		t.Fatalf("could not set the test up: %s", why)
 	}
+	if why := lossNotConstructed(run); why != "" {
+		t.Fatalf("could not set the test up: %s", why)
+	}
 	t.Logf("the server held notification %d back and never sent it, then dropped the connection",
 		run.HeldSeq)
 
@@ -44,15 +47,10 @@ func TestRepublishAfterReconnect(t *testing.T) {
 	}
 }
 
-// setupFailed reports why the test could not reach the point it is about,
-// or "" if it did. A client cannot cause any of these.
-func setupFailed(run record) string {
-	switch {
-	case run.HarnessErr != "":
-		return run.HarnessErr
-	case !run.DropApplied:
-		return "the connection was never dropped"
-	case run.HeldSeq == 0:
+// lossNotConstructed reports why nothing was lost after all, or "" if the
+// loss was constructed. Until it is, the test has nothing to ask about.
+func lossNotConstructed(run record) string {
+	if run.HeldSeq == 0 {
 		return "the server never held a notification back, so nothing was lost"
 	}
 	for _, d := range run.Deliveries {

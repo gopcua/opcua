@@ -78,12 +78,8 @@ func smallestGap(t *testing.T, interval time.Duration) (smallest time.Duration, 
 		Settle:            settle,
 	})
 
-	// A client cannot cause either of these.
-	switch {
-	case run.HarnessErr != "":
-		t.Fatalf("could not set the test up: %s", run.HarnessErr)
-	case !run.DropApplied:
-		t.Fatalf("could not set the test up: the connection was never dropped")
+	if why := setupFailed(run); why != "" {
+		t.Fatalf("could not set the test up: %s", why)
 	}
 
 	// The client opens a connection at the start of every attempt. The server
