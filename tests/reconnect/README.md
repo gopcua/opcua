@@ -10,6 +10,9 @@ underneath a held Publish, so a notification is provably lost — and record
 both what went over the wire and what the application's callback received. What one run reduces to is the `record`
 type, documented at its declaration in `harness.go`.
 
+A helper in a test file reads that `record` and returns plain values; only
+the test function itself calls `t.Errorf` or `t.Fatalf`.
+
 The suite exists because a diff of reconnect code does not tell you what the
 client will do: that depends on how the server answers after the drop, and
 servers differ.
