@@ -67,8 +67,8 @@ func setupFailed(run record) string {
 }
 
 // republishesAfterDrop counts what the client sent on a connection it opened
-// after the drop. Each connection is numbered as it is accepted, so anything
-// numbered 2 or higher is a reconnect.
+// after the drop. The server numbers each connection it serves, so anything
+// numbered 2 or higher arrived on a reconnect.
 func republishesAfterDrop(run record) (asked, total int) {
 	for _, r := range run.Requests {
 		if r.Epoch < 2 {
