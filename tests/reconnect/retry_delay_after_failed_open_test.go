@@ -35,8 +35,8 @@ const (
 	// about eleven attempts at the short interval and three at the long one.
 	settleRetries = 3500 * time.Millisecond
 
-	// minAttempts is the fewest attempts that give one gap to measure.
-	minAttempts = 2
+	// minRetryAttempts is the fewest attempts that give one gap to measure.
+	minRetryAttempts = 2
 )
 
 func TestRetryDelayAfterFailedOpen(t *testing.T) {
@@ -45,16 +45,20 @@ func TestRetryDelayAfterFailedOpen(t *testing.T) {
 		if why := retryWindowSetupFailed(interval); why != "" {
 			t.Fatalf("could not set the test up: %s", why)
 		}
-		run := retryScenario(interval)
+		run := runScenario(runOptions{
+			ReconnectInterval: interval,
+			RefuseAfterDrop:   true,
+			Settle:            settleRetries,
+		})
 		if why := setupFailed(run); why != "" {
 			t.Fatalf("could not set the test up: %s", why)
 		}
 
 		smallest, attempts := smallestGap(run)
-		if attempts < minAttempts {
+		if attempts < minRetryAttempts {
 			t.Errorf("the client was configured to retry every %s and made %d connection attempt(s) "+
 				"in the %s after the drop, where %d are expected: it is not honouring the setting",
-				interval, attempts, settleRetries, minAttempts)
+				interval, attempts, settleRetries, minRetryAttempts)
 			return
 		}
 		if smallest < interval {
@@ -65,8 +69,6 @@ func TestRetryDelayAfterFailedOpen(t *testing.T) {
 	}
 	shortest, longest := gaps[0], gaps[1]
 
-	// A client with a fixed wait longer than the short interval passes both
-	// checks above, so the short run must also stay under the long interval.
 	if shortest >= longInterval {
 		t.Errorf("configured with %s the client still left at least %s between attempts, "+
 			"as it did when configured with %s: it ignores the setting", shortInterval, shortest, longInterval)
@@ -75,10 +77,10 @@ func TestRetryDelayAfterFailedOpen(t *testing.T) {
 		shortest, shortInterval, longest, longInterval)
 }
 
-// retryWindowSetupFailed reports why settleRetries cannot hold minAttempts at
+// retryWindowSetupFailed reports why settleRetries cannot hold minRetryAttempts at
 // this interval, or "" if it can.
 func retryWindowSetupFailed(interval time.Duration) string {
-	if settleRetries >= minAttempts*interval {
+	if settleRetries >= minRetryAttempts*interval {
 		return ""
 	}
 	return fmt.Sprintf("the settle window of %s holds only %d attempts at an interval of %s, "+
@@ -86,28 +88,18 @@ func retryWindowSetupFailed(interval time.Duration) string {
 		settleRetries, int(settleRetries/interval), interval)
 }
 
-// retryScenario runs the scenario with the client configured to wait interval
-// between attempts.
-func retryScenario(interval time.Duration) record {
-	return runScenario(scenarioOptions{
-		ReconnectInterval: interval,
-		RefuseAfterDrop:   true,
-		Settle:            settleRetries,
-	})
-}
-
 // smallestGap reports the smallest gap between the connection attempts the
-// client made after the drop, and how many it made. It reads Accepts rather
-// than request epochs because a refused attempt leaves no request. Below
-// minAttempts there is no gap to measure and smallest is zero.
-func smallestGap(run record) (smallest time.Duration, attempts int) {
+// client made after the drop, and how many it made. It reads AcceptedAt rather
+// than request connections because a refused attempt leaves no request. Below
+// minRetryAttempts there is no gap to measure and smallest is zero.
+func smallestGap(run runRecord) (smallest time.Duration, attempts int) {
 	var at []time.Time
-	for _, a := range run.Accepts {
+	for _, a := range run.AcceptedAt {
 		if a.After(run.DropAt) {
 			at = append(at, a)
 		}
 	}
-	if len(at) < minAttempts {
+	if len(at) < minRetryAttempts {
 		return 0, len(at)
 	}
 

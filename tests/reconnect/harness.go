@@ -38,7 +38,7 @@ import (
 
 // publishPacing is how long the scripted server waits before answering a
 // Publish. Without it the client would re-publish as fast as it is answered
-// and flood the request record.
+// and flood the request log.
 const publishPacing = 200 * time.Millisecond
 
 // settleDefault is how long a run goes on after the drop when the test sets no
@@ -54,12 +54,12 @@ const SubID uint32 = 42
 var monitoredNode = ua.NewStringNodeID(1, "reconnect.value")
 
 // requestRecord is one service request the scripted server decoded off the
-// wire. Epoch is the connection generation it arrived on, counting from 1.
-// record.DropEpoch says which generation was dropped. RepublishSeq is the
+// wire. Conn is the connection generation it arrived on, counting from 1.
+// runRecord.DropConn says which generation was dropped. RepublishSeq is the
 // sequence number a RepublishRequest asked for and is meaningless on any
 // other service.
 type requestRecord struct {
-	Epoch        int
+	Conn         int
 	Service      string
 	RepublishSeq uint32
 }
@@ -91,13 +91,13 @@ type recorder struct {
 	lastSeq   uint32 // highest notification sequence created so far
 	seqAtDrop uint32 // lastSeq when the drop was applied
 	heldSeq   uint32 // sequence of the first held Publish; 0 = none
-	heldEpoch int    // connection the held Publish is outstanding on; 0 = none
+	heldConn  int    // connection the held Publish is outstanding on; 0 = none
 	answered  bool   // the stream's first Publish has been answered
 
-	// activatedEpochs holds the connections ActivateSession has arrived on. It
+	// activatedConns holds the connections ActivateSession has arrived on. It
 	// is per connection because a reconnect must activate the session again.
-	activatedEpochs map[int]bool
-	// anyMonitored is state of the whole fixture, unlike activatedEpochs: the
+	activatedConns map[int]bool
+	// anyMonitored is state of the whole fixture, unlike activatedConns: the
 	// scenario has one subscription. A client that recreates the subscription
 	// and then fails to recreate its monitored items gets keep-alives for the
 	// rest of the run, and the row that notices reports missing notifications
@@ -107,17 +107,17 @@ type recorder struct {
 
 // recordRequest takes the decoded request, so the call site does not need to
 // know which services carry something worth keeping.
-func (o *recorder) recordRequest(epoch int, req ua.Request) {
-	rr := requestRecord{Epoch: epoch, Service: serviceName(req)}
+func (o *recorder) recordRequest(connID int, req ua.Request) {
+	rr := requestRecord{Conn: connID, Service: serviceName(req)}
 	if r, ok := req.(*ua.RepublishRequest); ok {
 		rr.RepublishSeq = r.RetransmitSequenceNumber
 	}
 	o.mu.Lock()
 	if rr.Service == "ActivateSessionRequest" {
-		if o.activatedEpochs == nil {
-			o.activatedEpochs = map[int]bool{}
+		if o.activatedConns == nil {
+			o.activatedConns = map[int]bool{}
 		}
-		o.activatedEpochs[epoch] = true
+		o.activatedConns[connID] = true
 	}
 	o.requests = append(o.requests, rr)
 	o.mu.Unlock()
@@ -170,10 +170,10 @@ func (o *recorder) seqCreatedAtDrop() uint32 {
 	return o.seqAtDrop
 }
 
-func (o *recorder) isActivated(epoch int) bool {
+func (o *recorder) isActivated(connID int) bool {
 	o.mu.Lock()
 	defer o.mu.Unlock()
-	return o.activatedEpochs[epoch]
+	return o.activatedConns[connID]
 }
 
 func (o *recorder) setAnyMonitored(v bool) {
@@ -221,17 +221,17 @@ func (o *recorder) availableSeqs() []uint32 {
 	return []uint32{o.heldSeq}
 }
 
-func (o *recorder) heldPublishEpoch() int {
+func (o *recorder) heldPublishConn() int {
 	o.mu.Lock()
 	defer o.mu.Unlock()
-	return o.heldEpoch
+	return o.heldConn
 }
 
 // publishStep answers the stream's first Publish and holds every later one.
 // After the drop it answers again with fresh data, so a client that notices a
 // gap only when the next notification arrives has one to notice it in.
 // Every call uses up a sequence number, held or not.
-func (o *recorder) publishStep(epoch int) (seq uint32, hold bool) {
+func (o *recorder) publishStep(connID int) (seq uint32, hold bool) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	o.lastSeq++
@@ -242,8 +242,8 @@ func (o *recorder) publishStep(epoch int) (seq uint32, hold bool) {
 		if o.heldSeq == 0 {
 			o.heldSeq = o.lastSeq
 		}
-		if o.heldEpoch == 0 {
-			o.heldEpoch = epoch
+		if o.heldConn == 0 {
+			o.heldConn = connID
 		}
 		return o.lastSeq, true
 	}
@@ -261,11 +261,11 @@ func (o *recorder) snapshot() (requests []requestRecord, accepts []time.Time, he
 	return requests, accepts, o.heldSeq
 }
 
-// record is what one scenario run reduces to: what both ends saw, frozen when
-// the run ends. A test decides pass or fail from this value alone.
-type record struct {
+// runRecord is what one run reduces to: what both ends saw, frozen when the
+// run ends. A test decides pass or fail from this value alone.
+type runRecord struct {
 	// Requests is every service request the server decoded, each with the
-	// epoch of the connection it arrived on.
+	// connection generation it arrived on.
 	Requests []requestRecord
 	// Deliveries is what the application's own callback received.
 	Deliveries []deliveryRecord
@@ -277,14 +277,14 @@ type record struct {
 	// when the connection was closed, not when the drop was commanded.
 	DropApplied bool
 	DropAt      time.Time
-	// DropEpoch is the connection generation the drop was applied to. A
+	// DropConn is the connection generation the drop was applied to. A
 	// request on a higher one arrived on a reconnect; a fixed 2 would miscount
 	// a client that dialled twice before the drop.
-	DropEpoch int
-	// Accepts is when each connection was accepted, refused ones included. A
-	// refused connection is served by nobody, so it shows up here and in no
-	// request's epoch.
-	Accepts []time.Time
+	DropConn int
+	// AcceptedAt is when each connection was accepted, refused ones included.
+	// A refused connection is served by nobody, so it shows up here and under
+	// no request's Conn.
+	AcceptedAt []time.Time
 	// HarnessErr is a stage the scenario could not reach; the test reports it
 	// as a setup failure.
 	HarnessErr string
@@ -299,7 +299,7 @@ type record struct {
 // as the last arm of its switch when the violation it scores would show up
 // anyway; either way the reason is the row's, and the wording is the
 // package's.
-func setupFailed(run record) string {
+func setupFailed(run runRecord) string {
 	switch {
 	case run.HarnessErr != "":
 		return run.HarnessErr
@@ -313,7 +313,7 @@ func setupFailed(run record) string {
 // activated Session, or "" if it did. A client that never re-activated was
 // never offered the Session's subscriptions back, so nothing it did or did
 // not do with them is evidence.
-func reconnectSetupFailed(run record) string {
+func reconnectSetupFailed(run runRecord) string {
 	for _, r := range afterDrop(run) {
 		if r.Service == "ActivateSessionRequest" {
 			return ""
@@ -325,10 +325,10 @@ func reconnectSetupFailed(run record) string {
 
 // afterDrop is every request the client sent on a connection it opened after
 // the drop.
-func afterDrop(run record) []requestRecord {
+func afterDrop(run runRecord) []requestRecord {
 	var out []requestRecord
 	for _, r := range run.Requests {
-		if r.Epoch > run.DropEpoch {
+		if r.Conn > run.DropConn {
 			out = append(out, r)
 		}
 	}
@@ -345,7 +345,7 @@ type server struct {
 	refuseAfterDrop bool          // close every connection accepted once the drop has started
 
 	mu    sync.Mutex         // guards conns
-	conns map[int]*uacp.Conn // by epoch
+	conns map[int]*uacp.Conn // by connection generation
 }
 
 // newServer starts the scripted server on an OS-chosen port.
@@ -376,13 +376,13 @@ func (s *server) drop() {
 	}
 }
 
-// dropWatcher applies the commanded drop to the connection pinned by heldEpoch;
+// dropWatcher applies the commanded drop to the connection pinned by heldConn;
 // the newest connection could already be a redial.
 func (s *server) dropWatcher() {
 	<-s.dropCh
-	epoch := s.rec.heldPublishEpoch()
+	connID := s.rec.heldPublishConn()
 	s.mu.Lock()
-	conn := s.conns[epoch]
+	conn := s.conns[connID]
 	s.mu.Unlock()
 	applied := false
 	if conn != nil {
@@ -410,14 +410,14 @@ func (s *server) acceptLoop(ctx context.Context) {
 			continue
 		}
 		s.mu.Lock()
-		epoch := len(s.conns) + 1
-		s.conns[epoch] = c
+		connID := len(s.conns) + 1
+		s.conns[connID] = c
 		s.mu.Unlock()
-		go s.serve(ctx, epoch, c)
+		go s.serve(ctx, connID, c)
 	}
 }
 
-func (s *server) serve(ctx context.Context, epoch int, c *uacp.Conn) {
+func (s *server) serve(ctx context.Context, connID int, c *uacp.Conn) {
 	cfg := &uasc.Config{
 		SecurityPolicyURI: ua.SecurityPolicyURINone,
 		SecurityMode:      ua.MessageSecurityModeNone,
@@ -425,7 +425,7 @@ func (s *server) serve(ctx context.Context, epoch int, c *uacp.Conn) {
 	}
 	errch := make(chan error, 8)
 	// Channel, sequence and token ids differ per connection.
-	sc, err := uasc.NewServerSecureChannel(s.endpoint, c, cfg, errch, uint32(1000+epoch), uint32(100*epoch+1), uint32(2000+epoch))
+	sc, err := uasc.NewServerSecureChannel(s.endpoint, c, cfg, errch, uint32(1000+connID), uint32(100*connID+1), uint32(2000+connID))
 	if err != nil {
 		return
 	}
@@ -440,9 +440,9 @@ func (s *server) serve(ctx context.Context, epoch int, c *uacp.Conn) {
 		if req == nil {
 			continue
 		}
-		s.rec.recordRequest(epoch, req)
+		s.rec.recordRequest(connID, req)
 
-		resp := s.answer(epoch, req)
+		resp := s.answer(connID, req)
 		if resp == nil {
 			continue
 		}
@@ -450,9 +450,9 @@ func (s *server) serve(ctx context.Context, epoch int, c *uacp.Conn) {
 	}
 }
 
-func (s *server) answer(epoch int, req ua.Request) ua.Response {
+func (s *server) answer(connID int, req ua.Request) ua.Response {
 	h := req.Header().RequestHandle
-	if usesSession(serviceName(req)) && !s.rec.isActivated(epoch) {
+	if usesSession(serviceName(req)) && !s.rec.isActivated(connID) {
 		return newServiceFault(h, ua.StatusBadSessionNotActivated)
 	}
 	switch r := req.(type) {
@@ -521,7 +521,7 @@ func (s *server) answer(epoch int, req ua.Request) ua.Response {
 			time.Sleep(publishPacing)
 			return newKeepAliveResponse(s.rec.peekNextSeq(), s.rec.availableSeqs())
 		}
-		seq, hold := s.rec.publishStep(epoch)
+		seq, hold := s.rec.publishStep(connID)
 		if hold {
 			return nil
 		}
@@ -545,7 +545,7 @@ func (s *server) answer(epoch int, req ua.Request) ua.Response {
 	case *ua.RepublishRequest:
 		// The server never has a message to give back. OPC 10000-4 §6.7 names
 		// Bad_MessageNotAvailable as the status that ends the Republish loop.
-		// Whether the client asked is read from the request record.
+		// Whether the client asked is read from the request log.
 		return newServiceFault(h, ua.StatusBadMessageNotAvailable)
 	}
 	// Services the scenario does not script fault.
@@ -651,8 +651,8 @@ func anonymousAuthEndpoint(url string) *ua.EndpointDescription {
 	}
 }
 
-// scenarioOptions configures one scenario run.
-type scenarioOptions struct {
+// runOptions configures one scenario run.
+type runOptions struct {
 	// RefuseAfterDrop closes every connection accepted once the drop has started.
 	RefuseAfterDrop bool
 	// ReconnectInterval is the client's wait between reconnection attempts;
@@ -664,16 +664,16 @@ type scenarioOptions struct {
 }
 
 // runScenario drives one reconnect scenario against the scripted server and
-// returns the record the test reads. It never aborts: a stage it could not
+// returns the runRecord the test reads. It never aborts: a stage it could not
 // reach is recorded in HarnessErr.
-func runScenario(opts scenarioOptions) record {
+func runScenario(opts runOptions) runRecord {
 	if opts.Settle == 0 {
 		opts.Settle = settleDefault
 	}
 	if opts.ReconnectInterval == 0 {
 		opts.ReconnectInterval = 100 * time.Millisecond
 	}
-	var out record
+	var out runRecord
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -774,7 +774,7 @@ func runScenario(opts scenarioOptions) record {
 		if srv.rec.isDropApplied() {
 			out.DropApplied = true
 			out.DropAt = srv.rec.dropAppliedAt()
-			out.DropEpoch = srv.rec.heldPublishEpoch()
+			out.DropConn = srv.rec.heldPublishConn()
 			break
 		}
 		select {
@@ -799,7 +799,7 @@ func runScenario(opts scenarioOptions) record {
 	deliveriesMu.Unlock()
 	requests, accepts, held := srv.rec.snapshot()
 	out.Requests = requests
-	out.Accepts = accepts
+	out.AcceptedAt = accepts
 	out.HeldSeq = held
 	out.LastSeq = srv.rec.highestSeq()
 	return out
