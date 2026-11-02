@@ -3,8 +3,9 @@
 // fixture they all run against.
 //
 // The fixture is a scripted OPC UA server. It drops the transport on command,
-// can refuse every connection after the drop, and records what it decoded off
-// the wire and what the client's callback received.
+// can refuse every connection after the drop, can refuse to transfer the
+// subscription, and records what it decoded off the wire and what the
+// client's callback received.
 //
 // The lost notification is constructed. The server answers the stream's first
 // Publish and holds every later one: the notification gets a sequence number
@@ -343,13 +344,14 @@ type server struct {
 
 	dropCh          chan struct{} // the scenario's one-shot drop command
 	refuseAfterDrop bool          // close every connection accepted once the drop has started
+	refusesTransfer bool          // the server of runOptions.RefusesTransfer
 
 	mu    sync.Mutex         // guards conns
 	conns map[int]*uacp.Conn // by connection generation
 }
 
 // newServer starts the scripted server on an OS-chosen port.
-func newServer(ctx context.Context, refuseAfterDrop bool) (*server, error) {
+func newServer(ctx context.Context, opts runOptions) (*server, error) {
 	ln, err := uacp.Listen(ctx, "opc.tcp://127.0.0.1:0", nil)
 	if err != nil {
 		return nil, err
@@ -360,7 +362,8 @@ func newServer(ctx context.Context, refuseAfterDrop bool) (*server, error) {
 		endpoint:        "opc.tcp://" + ln.Addr().String(),
 		dropCh:          make(chan struct{}, 1),
 		conns:           map[int]*uacp.Conn{},
-		refuseAfterDrop: refuseAfterDrop,
+		refuseAfterDrop: opts.RefuseAfterDrop,
+		refusesTransfer: opts.RefusesTransfer,
 	}
 	go s.acceptLoop(ctx)
 	go s.dropWatcher()
@@ -529,6 +532,9 @@ func (s *server) answer(connID int, req ua.Request) ua.Response {
 		return newPublishResponse(seq, s.rec.availableSeqs())
 
 	case *ua.TransferSubscriptionsRequest:
+		if s.refusesTransfer {
+			return newServiceFault(h, ua.StatusBadServiceUnsupported)
+		}
 		results := make([]*ua.TransferResult, len(r.SubscriptionIDs))
 		for i := range r.SubscriptionIDs {
 			results[i] = &ua.TransferResult{
@@ -543,9 +549,14 @@ func (s *server) answer(connID int, req ua.Request) ua.Response {
 		}
 
 	case *ua.RepublishRequest:
-		// The server never has a message to give back. OPC 10000-4 §6.7 names
+		// Under RefusesTransfer the server keeps the retransmission queue OPC
+		// 10000-4 §5.14.1.1 describes, and the one notification it withheld is
+		// in it; every other sequence number is gone. Otherwise the server has
+		// no message to give back at all. Either way OPC 10000-4 §6.7 names
 		// Bad_MessageNotAvailable as the status that ends the Republish loop.
-		// Whether the client asked is read from the request log.
+		if s.refusesTransfer && r.RetransmitSequenceNumber == s.rec.heldPublishSeq() {
+			return newRepublishResponse(r.RetransmitSequenceNumber)
+		}
 		return newServiceFault(h, ua.StatusBadMessageNotAvailable)
 	}
 	// Services the scenario does not script fault.
@@ -614,6 +625,15 @@ func newPublishResponse(seq uint32, available []uint32) *ua.PublishResponse {
 	}
 }
 
+// newRepublishResponse hands back a notification the server still has, which
+// is how a client recovers one it missed.
+func newRepublishResponse(seq uint32) *ua.RepublishResponse {
+	return &ua.RepublishResponse{
+		ResponseHeader:      newResponseHeader(0, ua.StatusOK),
+		NotificationMessage: newNotification(seq),
+	}
+}
+
 // newKeepAliveResponse answers a Publish with no data. It carries the sequence
 // number the next notification will use.
 func newKeepAliveResponse(nextSeq uint32, available []uint32) *ua.PublishResponse {
@@ -655,6 +675,12 @@ func anonymousAuthEndpoint(url string) *ua.EndpointDescription {
 type runOptions struct {
 	// RefuseAfterDrop closes every connection accepted once the drop has started.
 	RefuseAfterDrop bool
+	// RefusesTransfer selects the other server this package scripts: one that
+	// answers TransferSubscriptions with Bad_ServiceUnsupported, as gopcua's
+	// own server does, and that still holds the notification it withheld, so a
+	// Republish asking for that sequence number gets it back. The default
+	// server is the opposite on both counts.
+	RefusesTransfer bool
 	// ReconnectInterval is the client's wait between reconnection attempts;
 	// zero means 100ms.
 	ReconnectInterval time.Duration
@@ -678,7 +704,7 @@ func runScenario(opts runOptions) runRecord {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	srv, err := newServer(ctx, opts.RefuseAfterDrop)
+	srv, err := newServer(ctx, opts)
 	if err != nil {
 		out.HarnessErr = fmt.Sprintf("the scripted server could not start: %v", err)
 		return out
