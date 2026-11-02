@@ -95,8 +95,8 @@ func retryScenario(interval time.Duration) record {
 // client made after the drop, and how many it made. Below minAttempts there is
 // no gap to measure and smallest is zero.
 func smallestGap(run record) (smallest time.Duration, attempts int) {
-	// The client opens a connection at the start of every attempt. The server
-	// refuses them all, and Accepts counts refused connections too.
+	// The client opens a connection at the start of every attempt, and Accepts
+	// counts the refused ones too.
 	var at []time.Time
 	for _, a := range run.Accepts {
 		if a.After(run.DropAt) {
