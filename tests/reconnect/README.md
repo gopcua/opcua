@@ -60,10 +60,10 @@ has caught a real defect in this package.
    stays red for a wrong fix and goes green for a regression that keeps the
    name. Ten open pull requests ship a test in that state.
 
-5. **Did we construct the condition, or hope for it?** An obligation that
-   binds only once something is lost needs that loss constructed. If the
-   client has to be unlucky for the test to mean anything, the result is a
-   coin flip.
+5. **Did we construct the condition, or hope for it?** Construct the loss, and
+   construct the chance to notice it. The Republish row's own setup check
+   passed a run where the client reconnected and then sent no Publish at all:
+   nothing arrived after the gap, so it was never asked what it is scored on.
 
 6. **Would a known-good client fail this?** Check the test against Eclipse
    Milo, UA-.NETStandard, node-opcua and open62541, reading their source. If
