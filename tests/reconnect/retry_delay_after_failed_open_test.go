@@ -33,22 +33,42 @@ const (
 )
 
 func TestRetryDelayAfterFailedOpen(t *testing.T) {
-	shortest, attempts, ok := smallestGap(t, shortInterval)
-	if !ok {
-		return
+	// The long interval is the binding one: a window that holds minAttempts at
+	// it holds more at the short one.
+	if settle < minAttempts*longInterval {
+		t.Fatalf("settle is %s, too short for %d attempts at an interval of %s: "+
+			"a client honouring the interval could not make enough attempts to measure a gap. Lengthen settle",
+			settle, minAttempts, longInterval)
+	}
+
+	shortRun := retryScenario(shortInterval)
+	if why := setupFailed(shortRun); why != "" {
+		t.Fatalf("could not set the test up: %s", why)
+	}
+	shortest, attempts := smallestGap(shortRun)
+	if attempts < minAttempts {
+		t.Fatalf("the client was configured to retry every %s and made %d connection attempt(s) "+
+			"in the %s after the drop, where %d are expected: it is not honouring the setting",
+			shortInterval, attempts, settle, minAttempts)
 	}
 	if shortest < shortInterval {
 		t.Errorf("the client retried %s after the previous attempt, sooner than its configured "+
 			"interval of %s (%d attempts after the drop)", shortest, shortInterval, attempts)
 	}
 
-	longest, attempts, ok := smallestGap(t, longInterval)
-	if !ok {
-		return
+	longRun := retryScenario(longInterval)
+	if why := setupFailed(longRun); why != "" {
+		t.Fatalf("could not set the test up: %s", why)
+	}
+	longest, longAttempts := smallestGap(longRun)
+	if longAttempts < minAttempts {
+		t.Fatalf("the client was configured to retry every %s and made %d connection attempt(s) "+
+			"in the %s after the drop, where %d are expected: it is not honouring the setting",
+			longInterval, longAttempts, settle, minAttempts)
 	}
 	if longest < longInterval {
 		t.Errorf("the client retried %s after the previous attempt, sooner than its configured "+
-			"interval of %s (%d attempts after the drop)", longest, longInterval, attempts)
+			"interval of %s (%d attempts after the drop)", longest, longInterval, longAttempts)
 	}
 
 	// A client with a fixed wait longer than the short interval passes both
@@ -61,27 +81,20 @@ func TestRetryDelayAfterFailedOpen(t *testing.T) {
 		shortest, shortInterval, longest, longInterval)
 }
 
-// smallestGap runs the scenario with the client configured to wait interval
-// and returns the smallest gap between its attempts after the drop. ok is false
-// if the client made too few attempts for there to be a gap, which it reports
-// as a failure.
-func smallestGap(t *testing.T, interval time.Duration) (smallest time.Duration, attempts int, ok bool) {
-	t.Helper()
-	if settle < minAttempts*interval {
-		t.Fatalf("settle is %s, too short for %d attempts at an interval of %s: "+
-			"a client honouring the interval could not make enough attempts to measure a gap. Lengthen settle",
-			settle, minAttempts, interval)
-	}
-	run := runScenario(scenarioOptions{
+// retryScenario runs the scenario with the client configured to wait interval
+// between attempts.
+func retryScenario(interval time.Duration) record {
+	return runScenario(scenarioOptions{
 		ReconnectInterval: interval,
 		RefuseAfterDrop:   true,
 		Settle:            settle,
 	})
+}
 
-	if why := setupFailed(run); why != "" {
-		t.Fatalf("could not set the test up: %s", why)
-	}
-
+// smallestGap reports the smallest gap between the connection attempts the
+// client made after the drop, and how many it made. Below minAttempts there is
+// no gap to measure and smallest is zero.
+func smallestGap(run record) (smallest time.Duration, attempts int) {
 	// The client opens a connection at the start of every attempt. The server
 	// refuses them all, and Accepts counts refused connections too.
 	var at []time.Time
@@ -90,12 +103,8 @@ func smallestGap(t *testing.T, interval time.Duration) (smallest time.Duration, 
 			at = append(at, a)
 		}
 	}
-
 	if len(at) < minAttempts {
-		t.Errorf("the client was configured to retry every %s and made %d connection attempt(s) "+
-			"in the %s after the drop, where %d are expected: it is not honouring the setting",
-			interval, len(at), settle, minAttempts)
-		return 0, len(at), false
+		return 0, len(at)
 	}
 
 	smallest = at[1].Sub(at[0])
@@ -104,5 +113,5 @@ func smallestGap(t *testing.T, interval time.Duration) (smallest time.Duration, 
 			smallest = gap
 		}
 	}
-	return smallest, len(at), true
+	return smallest, len(at)
 }
