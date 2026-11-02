@@ -25,10 +25,7 @@ func TestSessionUnusedBeforeActivation(t *testing.T) {
 		t.Fatalf("could not set the test up: %s", why)
 	}
 
-	// Why this run could not have told a client that waits from one that never
-	// used its Session again, or "" if it could. A client that sends nothing
-	// for the Session after the drop cannot be caught sending it too early.
-	whyNot := sessionUseMeasurementFailed(run)
+	why := sessionUseSetupFailed(run)
 
 	early, found := firstEarlyUse(run)
 
@@ -36,8 +33,8 @@ func TestSessionUnusedBeforeActivation(t *testing.T) {
 	case found:
 		t.Errorf("the client sent %s on connection %d before it activated the Session there",
 			early.Service, early.Epoch)
-	case whyNot != "":
-		t.Fatalf("could not set the test up: %s", whyNot)
+	case why != "":
+		t.Fatalf("could not set the test up: %s", why)
 	}
 }
 
@@ -66,13 +63,13 @@ func usesSession(service string) bool {
 	return true
 }
 
-// sessionUseMeasurementFailed reports why this run could not have told a
-// client that activates first from one that never used its Session again, or
-// "" if it could. The client has to use its Session on a connection opened
-// after the drop before an absence of early use means anything.
-func sessionUseMeasurementFailed(run record) string {
-	for _, r := range run.Requests {
-		if r.Epoch > run.DropEpoch && usesSession(r.Service) {
+// sessionUseSetupFailed reports why this run could not have told a client
+// that activates first from one that never used its Session again, or "" if
+// it could. The client has to use its Session on a connection opened after
+// the drop before an absence of early use means anything.
+func sessionUseSetupFailed(run record) string {
+	for _, r := range afterDrop(run) {
+		if usesSession(r.Service) {
 			return ""
 		}
 	}

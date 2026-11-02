@@ -42,19 +42,13 @@ func TestRepublishAfterReconnect(t *testing.T) {
 		t.Fatalf("could not set the test up: %s", why)
 	}
 
-	// Why this run could not have told asking from not asking, or "" if it
-	// could. A client that never polls again is never shown the gap, so "no
-	// Republish" from such a run is not evidence. While knownBug stands the
-	// client is expected not to get that far and the shortfall is logged with
-	// it; once someone deletes knownBug to claim the fix, a run that measured
-	// nothing must not pass.
-	whyNot := measurementFailed(run)
+	// While knownBug stands the client is expected not to get far enough to be
+	// asked, and the shortfall is logged with it; once someone deletes knownBug
+	// to claim the fix, a run that measured nothing must not pass. That is why
+	// the setup arm sits below the knownBug arm here and nowhere else.
+	why := republishSetupFailed(run)
 
 	asked, wrongSeqs, total := republishesAfterDrop(run)
-
-	if asked == 0 && whyNot != "" && knownBug == "" {
-		t.Fatalf("could not set the test up: %s", whyNot)
-	}
 
 	switch {
 	case asked > 0 && knownBug != "":
@@ -69,9 +63,11 @@ func TestRepublishAfterReconnect(t *testing.T) {
 	case knownBug != "":
 		t.Logf("known bug: %s (notification %d was held back; %d requests after the reconnect, "+
 			"none a Republish)", knownBug, run.HeldSeq, total)
-		if whyNot != "" {
-			t.Logf("this run could not have told asking from not asking anyway: %s", whyNot)
+		if why != "" {
+			t.Logf("this run could not have told asking from not asking anyway: %s", why)
 		}
+	case why != "":
+		t.Fatalf("could not set the test up: %s", why)
 	default:
 		t.Errorf("the client missed notification %d and never asked for it "+
 			"(%d requests after the reconnect, none a Republish)", run.HeldSeq, total)
@@ -83,11 +79,6 @@ func TestRepublishAfterReconnect(t *testing.T) {
 func lossSetupFailed(run record) string {
 	if run.HeldSeq == 0 {
 		return "the server never held a notification back, so nothing was lost"
-	}
-	for _, d := range run.Deliveries {
-		if d.Seq == run.HeldSeq && d.At.Before(run.DropAt) {
-			return "the held notification reached the client before the drop, so nothing was lost"
-		}
 	}
 	if _, _, total := republishesAfterDrop(run); total == 0 {
 		return "the client sent nothing at all after the drop"
@@ -118,13 +109,19 @@ func republishesAfterDrop(run record) (asked int, wrongSeqs []uint32, total int)
 	return asked, wrongSeqs, total
 }
 
-// measurementFailed reports why this run could not have told a client that
+// republishSetupFailed reports why this run could not have told a client that
 // declined to ask from one that was never asked, or "" if it could. A client
 // has to poll again after the drop, and the server has to have created
 // something after the notification it held, before a missing Republish means
 // anything.
-func measurementFailed(run record) string {
-	if publishesAfterDrop(run) == 0 {
+func republishSetupFailed(run record) string {
+	polled := false
+	for _, r := range afterDrop(run) {
+		if r.Service == "PublishRequest" {
+			polled = true
+		}
+	}
+	if !polled {
 		return "the client never polled again after the drop, so it was never in a " +
 			"position to notice the loss"
 	}
@@ -133,16 +130,4 @@ func measurementFailed(run record) string {
 			"was no gap for the client to notice"
 	}
 	return ""
-}
-
-// publishesAfterDrop counts the Publish requests the client sent on a
-// connection it opened after the drop.
-func publishesAfterDrop(run record) int {
-	n := 0
-	for _, r := range run.Requests {
-		if r.Epoch > run.DropEpoch && r.Service == "PublishRequest" {
-			n++
-		}
-	}
-	return n
 }

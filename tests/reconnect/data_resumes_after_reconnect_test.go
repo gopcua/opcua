@@ -39,12 +39,8 @@ func TestDataResumesAfterReconnect(t *testing.T) {
 	if why := setupFailed(run); why != "" {
 		t.Fatalf("could not set the test up: %s", why)
 	}
-
-	activated := false
-	for _, r := range run.Requests {
-		if r.Epoch > run.DropEpoch && r.Service == "ActivateSessionRequest" {
-			activated = true
-		}
+	if why := reconnectSetupFailed(run); why != "" {
+		t.Fatalf("could not set the test up: %s", why)
 	}
 
 	// The server numbers notifications above the held one only after the drop,
@@ -59,10 +55,6 @@ func TestDataResumesAfterReconnect(t *testing.T) {
 	}
 
 	switch {
-	case !activated:
-		// knownBug names a client that does activate, so this arm fails either way.
-		t.Errorf("the client never activated a session after the drop, " +
-			"so the server's subscription was never offered back to it")
 	case len(fresh) >= minFresh && knownBug != "":
 		t.Errorf("this now passes (%d distinct notifications arrived after the drop) - "+
 			"delete the knownBug constant in this file, in the commit that fixed it", len(fresh))

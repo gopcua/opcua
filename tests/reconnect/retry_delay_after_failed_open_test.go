@@ -42,7 +42,7 @@ const (
 func TestRetryDelayAfterFailedOpen(t *testing.T) {
 	var gaps []time.Duration
 	for _, interval := range []time.Duration{shortInterval, longInterval} {
-		if why := windowTooShort(interval); why != "" {
+		if why := retryWindowSetupFailed(interval); why != "" {
 			t.Fatalf("could not set the test up: %s", why)
 		}
 		run := retryScenario(interval)
@@ -75,9 +75,9 @@ func TestRetryDelayAfterFailedOpen(t *testing.T) {
 		shortest, shortInterval, longest, longInterval)
 }
 
-// windowTooShort reports why settleRetries cannot hold minAttempts at this
-// interval, or "" if it can.
-func windowTooShort(interval time.Duration) string {
+// retryWindowSetupFailed reports why settleRetries cannot hold minAttempts at
+// this interval, or "" if it can.
+func retryWindowSetupFailed(interval time.Duration) string {
 	if settleRetries >= minAttempts*interval {
 		return ""
 	}
