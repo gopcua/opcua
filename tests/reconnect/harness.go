@@ -245,7 +245,7 @@ type record struct {
 }
 
 // setupFailed reports why the run never reached the point the test is about,
-// or "" if it did. Neither answer is the behaviour any test here checks.
+// or "" if it did. Whatever caused it, no test here can speak past it.
 func setupFailed(run record) string {
 	switch {
 	case run.HarnessErr != "":
