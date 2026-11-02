@@ -144,8 +144,8 @@ func (o *recorder) isAnyMonitored() bool {
 	return o.anyMonitored
 }
 
-// peekNextSeq is the sequence number the next notification will carry;
-// consecutive keep-alives therefore carry the same one.
+// peekNextSeq is the sequence number the next notification will carry.
+// Reading it does not use it up, so a keep-alive can carry it.
 func (o *recorder) peekNextSeq() uint32 {
 	o.mu.Lock()
 	defer o.mu.Unlock()
