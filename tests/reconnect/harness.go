@@ -436,7 +436,7 @@ func (s *server) answer(epoch int, req ua.Request) ua.Response {
 		// With nothing monitored there is no data, only keep-alives.
 		if !s.rec.isAnyMonitored() {
 			time.Sleep(publishPacing)
-			return newKeepAliveResponse(SubID, s.rec.peekNextSeq(), s.rec.availableSeqs())
+			return newKeepAliveResponse(s.rec.peekNextSeq(), s.rec.availableSeqs())
 		}
 		seq, hold := s.rec.publishStep(epoch)
 		if hold {
@@ -520,10 +520,10 @@ func newPublishResponse(seq uint32, available []uint32) *ua.PublishResponse {
 
 // newKeepAliveResponse answers a Publish with no data. It carries the sequence
 // number the next notification will use.
-func newKeepAliveResponse(subID, nextSeq uint32, available []uint32) *ua.PublishResponse {
+func newKeepAliveResponse(nextSeq uint32, available []uint32) *ua.PublishResponse {
 	return &ua.PublishResponse{
 		ResponseHeader: newResponseHeader(0, ua.StatusOK),
-		SubscriptionID: subID,
+		SubscriptionID: SubID,
 		NotificationMessage: &ua.NotificationMessage{
 			SequenceNumber:   nextSeq,
 			PublishTime:      time.Now(),
