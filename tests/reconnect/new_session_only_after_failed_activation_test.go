@@ -12,7 +12,7 @@ package reconnect
 import "testing"
 
 func TestNewSessionOnlyAfterFailedActivation(t *testing.T) {
-	run := runScenario(scenarioOptions{})
+	run := runScenario(runOptions{})
 
 	if why := setupFailed(run); why != "" {
 		t.Fatalf("could not set the test up: %s", why)
@@ -33,7 +33,7 @@ func TestNewSessionOnlyAfterFailedActivation(t *testing.T) {
 
 // createSessionsAfterDrop counts the CreateSession requests the client sent on
 // connections it opened after the drop.
-func createSessionsAfterDrop(run record) int {
+func createSessionsAfterDrop(run runRecord) int {
 	n := 0
 	for _, r := range afterDrop(run) {
 		if r.Service == "CreateSessionRequest" {

@@ -33,7 +33,7 @@ func TestRepublishAfterReconnect(t *testing.T) {
 			"not given time. Lengthen settleDefault in harness.go", settleDefault, minSettle)
 	}
 
-	run := runScenario(scenarioOptions{})
+	run := runScenario(runOptions{})
 
 	if why := setupFailed(run); why != "" {
 		t.Fatalf("could not set the test up: %s", why)
@@ -76,7 +76,7 @@ func TestRepublishAfterReconnect(t *testing.T) {
 
 // lossSetupFailed reports why the loss this test is about was not
 // constructed, or "" if it was. Until it is, the test has nothing to ask.
-func lossSetupFailed(run record) string {
+func lossSetupFailed(run runRecord) string {
 	if run.HeldSeq == 0 {
 		return "the server never held a notification back, so nothing was lost"
 	}
@@ -92,9 +92,9 @@ func lossSetupFailed(run record) string {
 // requests there were in all. The number asked for is the behaviour, not the
 // service name: a client that republishes a number the server never held has
 // not noticed what it lost.
-func republishesAfterDrop(run record) (asked int, wrongSeqs []uint32, total int) {
+func republishesAfterDrop(run runRecord) (asked int, wrongSeqs []uint32, total int) {
 	for _, r := range run.Requests {
-		if r.Epoch <= run.DropEpoch {
+		if r.Conn <= run.DropConn {
 			continue
 		}
 		total++
@@ -114,7 +114,7 @@ func republishesAfterDrop(run record) (asked int, wrongSeqs []uint32, total int)
 // has to poll again after the drop, and the server has to have created
 // something after the notification it held, before a missing Republish means
 // anything.
-func republishSetupFailed(run record) string {
+func republishSetupFailed(run runRecord) string {
 	polled := false
 	for _, r := range afterDrop(run) {
 		if r.Service == "PublishRequest" {

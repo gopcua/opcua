@@ -34,7 +34,7 @@ func TestDataResumesAfterReconnect(t *testing.T) {
 			"or shorten publishPacing in harness.go", settleDefault, int(settleDefault/publishPacing), publishPacing)
 	}
 
-	run := runScenario(scenarioOptions{})
+	run := runScenario(runOptions{})
 
 	if why := setupFailed(run); why != "" {
 		t.Fatalf("could not set the test up: %s", why)

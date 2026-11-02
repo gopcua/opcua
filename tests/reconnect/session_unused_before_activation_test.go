@@ -19,7 +19,7 @@ package reconnect
 import "testing"
 
 func TestSessionUnusedBeforeActivation(t *testing.T) {
-	run := runScenario(scenarioOptions{})
+	run := runScenario(runOptions{})
 
 	if why := setupFailed(run); why != "" {
 		t.Fatalf("could not set the test up: %s", why)
@@ -32,7 +32,7 @@ func TestSessionUnusedBeforeActivation(t *testing.T) {
 	switch {
 	case found:
 		t.Errorf("the client sent %s on connection %d before it activated the Session there",
-			early.Service, early.Epoch)
+			early.Service, early.Conn)
 	case why != "":
 		t.Fatalf("could not set the test up: %s", why)
 	}
@@ -40,13 +40,13 @@ func TestSessionUnusedBeforeActivation(t *testing.T) {
 
 // firstEarlyUse returns the first request that used the Session on a
 // connection before that connection's ActivateSession.
-func firstEarlyUse(run record) (requestRecord, bool) {
+func firstEarlyUse(run runRecord) (requestRecord, bool) {
 	activated := map[int]bool{}
 	for _, r := range run.Requests {
 		switch {
 		case r.Service == "ActivateSessionRequest":
-			activated[r.Epoch] = true
-		case usesSession(r.Service) && !activated[r.Epoch]:
+			activated[r.Conn] = true
+		case usesSession(r.Service) && !activated[r.Conn]:
 			return r, true
 		}
 	}
@@ -57,7 +57,7 @@ func firstEarlyUse(run record) (requestRecord, bool) {
 // that activates first from one that never used its Session again, or "" if
 // it could. The client has to use its Session on a connection opened after
 // the drop before an absence of early use means anything.
-func sessionUseSetupFailed(run record) string {
+func sessionUseSetupFailed(run runRecord) string {
 	for _, r := range afterDrop(run) {
 		if usesSession(r.Service) {
 			return ""
