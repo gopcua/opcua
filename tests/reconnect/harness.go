@@ -219,9 +219,8 @@ func (o *recorder) snapshot() (requests []requestRecord, accepts []time.Time, dr
 // record is what one scenario run reduces to: what both ends saw, frozen when
 // the run ends. A test decides pass or fail from this value alone.
 type record struct {
-	// Requests is every service request the server decoded. Their Epoch
-	// numbers only connections the server served, so a connection refused
-	// under RefuseAfterDrop leaves nothing here.
+	// Requests is every service request the server decoded, each with the
+	// epoch of the connection it arrived on.
 	Requests []requestRecord
 	// Deliveries is what the application's own callback received.
 	Deliveries []deliveryRecord
@@ -236,8 +235,9 @@ type record struct {
 	// request on a higher one arrived on a reconnect; a fixed 2 would miscount
 	// a client that dialled twice before the drop.
 	DropEpoch int
-	// Accepts is when each connection was accepted, refused ones included. It
-	// is the only count of the reconnect attempts Epoch cannot see.
+	// Accepts is when each connection was accepted, refused ones included. A
+	// refused connection is served by nobody, so it shows up here and in no
+	// request's epoch.
 	Accepts []time.Time
 	// HarnessErr is a stage the scenario could not reach; the test reports it
 	// as a setup failure.
