@@ -34,6 +34,15 @@ import (
 	"github.com/gopcua/opcua/uasc"
 )
 
+// publishPacing is how long the scripted server waits before answering a
+// Publish. Without it the client would re-publish as fast as it is answered
+// and flood the request record.
+const publishPacing = 200 * time.Millisecond
+
+// settleDefault is how long a run goes on after the drop when the test sets no
+// Settle.
+const settleDefault = 5 * time.Second
+
 // SubID is the subscription id the scripted server hands out; the scenario
 // has one subscription.
 const SubID uint32 = 42
@@ -69,14 +78,22 @@ type recorder struct {
 	dropStarted bool
 	// dropApplied is set once the close has succeeded.
 	dropApplied bool
-	lastSeq     uint32 // highest notification sequence created so far
-	heldSeq     uint32 // sequence of the first held Publish; 0 = none
-	heldEpoch   int    // connection the held Publish is outstanding on; 0 = none
-	answered    bool   // the stream's first Publish has been answered
+	lastSeq     uint32       // highest notification sequence created so far
+	heldSeq     uint32       // sequence of the first held Publish; 0 = none
+	heldEpoch   int          // connection the held Publish is outstanding on; 0 = none
+	answered    bool         // the stream's first Publish has been answered
+	activated   map[int]bool // connections on which ActivateSession has arrived
+	monitored   bool         // the subscription has at least one monitored item
 }
 
 func (o *recorder) recordRequest(epoch int, service string) {
 	o.mu.Lock()
+	if service == "ActivateSessionRequest" {
+		if o.activated == nil {
+			o.activated = map[int]bool{}
+		}
+		o.activated[epoch] = true
+	}
 	o.requests = append(o.requests, requestRecord{Epoch: epoch, Service: service})
 	o.mu.Unlock()
 }
@@ -103,6 +120,42 @@ func (o *recorder) recordDropApplied() {
 	o.mu.Lock()
 	o.dropApplied = true
 	o.mu.Unlock()
+}
+
+// isActivated reports whether the session has been activated on the connection.
+func (o *recorder) isActivated(epoch int) bool {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	return o.activated[epoch]
+}
+
+// setMonitored records whether the subscription has monitored items. A new
+// subscription has none.
+func (o *recorder) setMonitored(v bool) {
+	o.mu.Lock()
+	o.monitored = v
+	o.mu.Unlock()
+}
+
+func (o *recorder) isMonitored() bool {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	return o.monitored
+}
+
+// nextSeq is the sequence number the next notification will carry; a
+// keep-alive carries it without using it up.
+func (o *recorder) nextSeq() uint32 {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	return o.lastSeq + 1
+}
+
+// highestSeq is the highest sequence number created so far.
+func (o *recorder) highestSeq() uint32 {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	return o.lastSeq
 }
 
 func (o *recorder) heldNotification() uint32 {
@@ -157,6 +210,8 @@ type record struct {
 	Deliveries []deliveryRecord
 	// HeldSeq is the sequence number of the notification the server held back.
 	HeldSeq uint32
+	// LastSeq is the highest sequence number the server created.
+	LastSeq uint32
 	// DropApplied is whether the commanded transport drop fired, at DropAt.
 	DropApplied bool
 	DropAt      time.Time
@@ -325,6 +380,7 @@ func (s *server) answer(epoch int, req ua.Request) ua.Response {
 		}
 
 	case *ua.CreateSubscriptionRequest:
+		s.rec.setMonitored(false)
 		return &ua.CreateSubscriptionResponse{
 			ResponseHeader:            newResponseHeader(h, ua.StatusOK),
 			SubscriptionID:            SubID,
@@ -334,6 +390,9 @@ func (s *server) answer(epoch int, req ua.Request) ua.Response {
 		}
 
 	case *ua.CreateMonitoredItemsRequest:
+		if r.SubscriptionID == SubID {
+			s.rec.setMonitored(true)
+		}
 		results := make([]*ua.MonitoredItemCreateResult, len(r.ItemsToCreate))
 		for i := range r.ItemsToCreate {
 			results[i] = &ua.MonitoredItemCreateResult{
@@ -350,13 +409,21 @@ func (s *server) answer(epoch int, req ua.Request) ua.Response {
 		}
 
 	case *ua.PublishRequest:
-		// Pacing: the client re-publishes as fast as it is answered, which
-		// would flood the request record.
+		// A session that was not activated on this connection cannot publish.
+		if !s.rec.isActivated(epoch) {
+			return newServiceFault(h, ua.StatusBadSessionNotActivated)
+		}
+		// A subscription with nothing monitored has no data, so it only
+		// sends keep-alives.
+		if !s.rec.isMonitored() {
+			time.Sleep(publishPacing)
+			return newKeepAliveResponse(SubID, s.rec.nextSeq())
+		}
 		seq, hold := s.rec.publishStep(epoch)
 		if hold {
 			return nil
 		}
-		time.Sleep(200 * time.Millisecond)
+		time.Sleep(publishPacing)
 		return newPublishResponse(seq)
 
 	case *ua.TransferSubscriptionsRequest:
@@ -436,6 +503,23 @@ func newPublishResponse(seq uint32) *ua.PublishResponse {
 	}
 }
 
+// newKeepAliveResponse is a Publish answer that carries no data: the sequence
+// number of the next notification, and nothing in it.
+func newKeepAliveResponse(subID, nextSeq uint32) *ua.PublishResponse {
+	return &ua.PublishResponse{
+		ResponseHeader: newResponseHeader(0, ua.StatusOK),
+		SubscriptionID: subID,
+		NotificationMessage: &ua.NotificationMessage{
+			SequenceNumber:   nextSeq,
+			PublishTime:      time.Now(),
+			NotificationData: []*ua.ExtensionObject{},
+		},
+		AvailableSequenceNumbers: []uint32{},
+		Results:                  []ua.StatusCode{},
+		DiagnosticInfos:          []*ua.DiagnosticInfo{},
+	}
+}
+
 func anonymousAuthEndpoint(url string) *ua.EndpointDescription {
 	return &ua.EndpointDescription{
 		EndpointURL: url,
@@ -464,7 +548,8 @@ type scenarioOptions struct {
 	// ReconnectInterval is the client's wait between reconnection attempts;
 	// zero means 100ms.
 	ReconnectInterval time.Duration
-	// Settle is how long to wait after the drop before snapshotting; zero means 5s.
+	// Settle is how long to wait after the drop before snapshotting; zero means
+	// settleDefault.
 	Settle time.Duration
 }
 
@@ -473,7 +558,7 @@ type scenarioOptions struct {
 // reach is recorded in HarnessErr.
 func runScenario(opts scenarioOptions) record {
 	if opts.Settle == 0 {
-		opts.Settle = 5 * time.Second
+		opts.Settle = settleDefault
 	}
 	if opts.ReconnectInterval == 0 {
 		opts.ReconnectInterval = 100 * time.Millisecond
@@ -604,5 +689,6 @@ func runScenario(opts scenarioOptions) record {
 	f.Requests = requests
 	f.Accepts = accepts
 	f.HeldSeq = held
+	f.LastSeq = srv.rec.highestSeq()
 	return f
 }
