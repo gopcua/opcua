@@ -88,11 +88,11 @@ type recorder struct {
 	dropApplied bool
 	dropAt      time.Time
 
-	lastSeq   uint32 // highest notification sequence created so far
-	seqAtDrop uint32 // lastSeq when the drop was applied
-	heldSeq   uint32 // sequence of the first held Publish; 0 = none
-	heldConn  int    // connection the held Publish is outstanding on; 0 = none
-	answered  bool   // the stream's first Publish has been answered
+	lastSeq       uint32 // highest notification sequence created so far
+	seqAtDrop     uint32 // lastSeq when the drop was applied
+	heldSeq       uint32 // sequence of the first held Publish; 0 = none
+	heldConn      int    // connection the held Publish is outstanding on; 0 = none
+	firstAnswered bool   // the stream's first Publish has been answered, ever
 
 	// activatedConns holds the connections ActivateSession has arrived on. It
 	// is per connection because a reconnect must activate the session again.
@@ -238,7 +238,7 @@ func (o *recorder) publishStep(connID int) (seq uint32, hold bool) {
 	if o.dropApplied {
 		return o.lastSeq, false
 	}
-	if o.answered {
+	if o.firstAnswered {
 		if o.heldSeq == 0 {
 			o.heldSeq = o.lastSeq
 		}
@@ -247,7 +247,7 @@ func (o *recorder) publishStep(connID int) (seq uint32, hold bool) {
 		}
 		return o.lastSeq, true
 	}
-	o.answered = true
+	o.firstAnswered = true
 	return o.lastSeq, false
 }
 
