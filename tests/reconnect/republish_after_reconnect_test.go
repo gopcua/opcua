@@ -30,8 +30,6 @@ func TestRepublishAfterReconnect(t *testing.T) {
 	if why := lossNotConstructed(run); why != "" {
 		t.Fatalf("could not set the test up: %s", why)
 	}
-	t.Logf("the server held notification %d back and never sent it, then dropped the connection",
-		run.HeldSeq)
 
 	asked, total := republishesAfterDrop(run)
 
@@ -42,7 +40,8 @@ func TestRepublishAfterReconnect(t *testing.T) {
 	case asked > 0:
 		t.Logf("the client asked for the missed notification (%d Republish of %d requests)", asked, total)
 	case knownBug != "":
-		t.Logf("known bug: %s (%d requests after the reconnect, none a Republish)", knownBug, total)
+		t.Logf("known bug: %s (notification %d was held back; %d requests after the reconnect, "+
+			"none a Republish)", knownBug, run.HeldSeq, total)
 	default:
 		t.Errorf("the client missed notification %d and never asked for it "+
 			"(%d requests after the reconnect, none a Republish)", run.HeldSeq, total)
