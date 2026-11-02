@@ -86,7 +86,8 @@ func smallestGap(t *testing.T, interval time.Duration) (smallest time.Duration, 
 		t.Fatalf("could not set the test up: the connection was never dropped")
 	}
 
-	// The client opens a connection at the start of every attempt.
+	// The client opens a connection at the start of every attempt. The server
+	// refuses them all, and Accepts counts refused connections too.
 	var at []time.Time
 	for _, a := range run.Accepts {
 		if a.After(run.DropAt) {
