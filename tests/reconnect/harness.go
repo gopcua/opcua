@@ -158,7 +158,7 @@ func (o *recorder) highestSeq() uint32 {
 	return o.lastSeq
 }
 
-func (o *recorder) heldNotification() uint32 {
+func (o *recorder) heldPublishSeq() uint32 {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	return o.heldSeq
@@ -177,7 +177,7 @@ func (o *recorder) availableSeqs() []uint32 {
 	return []uint32{o.heldSeq}
 }
 
-func (o *recorder) heldConnection() int {
+func (o *recorder) heldPublishEpoch() int {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	return o.heldEpoch
@@ -297,7 +297,7 @@ func (s *server) drop() {
 // the newest connection could already be a redial.
 func (s *server) dropWatcher() {
 	<-s.dropCh
-	epoch := s.rec.heldConnection()
+	epoch := s.rec.heldPublishEpoch()
 	s.mu.Lock()
 	conn := s.conns[epoch]
 	s.mu.Unlock()
@@ -664,7 +664,7 @@ func runScenario(opts scenarioOptions) record {
 	// cannot reach the client before the drop.
 	heldDeadline := time.After(10 * time.Second)
 	for {
-		if srv.rec.heldNotification() != 0 {
+		if srv.rec.heldPublishSeq() != 0 {
 			break
 		}
 		select {
