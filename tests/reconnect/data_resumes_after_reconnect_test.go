@@ -64,6 +64,9 @@ func TestDataResumesAfterReconnect(t *testing.T) {
 
 	switch {
 	case !reactivated:
+		// This arm fails even while knownBug is set, because knownBug names a
+		// client that does re-activate. One that never does has a different
+		// defect, which this file makes no claim about.
 		t.Errorf("the client never re-activated its session after the drop, " +
 			"so the server's subscription was never offered back to it")
 	case len(fresh) >= want && knownBug != "":
