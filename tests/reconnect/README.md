@@ -7,8 +7,9 @@ checks is in the file's opening comment.
 A test drives the gopcua client through its public API against the scripted
 server in `harness.go`. That server can drop the transport on command —
 underneath a held Publish, so a notification is provably lost — and record
-both what went over the wire and what the application's callback received. What one run reduces to is the `record`
-type, documented at its declaration in `harness.go`.
+both what went over the wire and what the application's callback received.
+What one run reduces to is the `record` type, documented at its declaration
+in `harness.go`.
 
 A helper in a test file reads that `record` and returns plain values; only
 the test function itself calls `t.Errorf` or `t.Fatalf`.
