@@ -13,12 +13,13 @@ package reconnect
 
 import "testing"
 
-// knownBug records that gopcua does not do this yet, measured 2026-10-29.
-// While it is set, the failure is logged and the build stays green. README.md
-// says when to delete it.
-const knownBug = "the client reconnects and re-activates the session, but never asks for the notification it missed"
-
 func TestRepublishAfterReconnect(t *testing.T) {
+	// knownBug records that gopcua does not do this yet, measured 2026-10-29.
+	// While it is set, the failure is logged and the build stays green.
+	// README.md says when to delete it. It is local because every test file in
+	// the package has its own.
+	const knownBug = "the client reconnects and re-activates the session, but never asks for the notification it missed"
+
 	run := runScenario(scenarioOptions{})
 
 	if why := setupFailed(run); why != "" {

@@ -18,7 +18,7 @@ servers differ.
 ## Tests that fail on purpose
 
 A test for a behaviour gopcua does not have yet carries a `knownBug`
-constant in its file. Run `go test ./tests/reconnect/ -v`:
+constant, declared inside the test function. Run `go test ./tests/reconnect/ -v`:
 
 - The test runs and its failure prints as a `known bug:` line naming the
   behaviour. The build stays green.
