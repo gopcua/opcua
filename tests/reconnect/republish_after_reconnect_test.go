@@ -7,8 +7,14 @@
 // something: the server holds one notification back and never sends it, then
 // drops the connection. See harness.go.
 //
-// The test checks only that the client asked. How often it asks, and where it
-// stops, is a separate behaviour with its own file.
+// The test checks only that the client asked, and for which sequence number.
+// How often it asks, and where it stops, is a separate behaviour with its own
+// file.
+//
+// A known-good client fails this: open62541 has no client-side Republish at
+// all, so it resumes Publish and never asks for what it lost. The test is
+// kept because Eclipse Milo, node-opcua and UA-.NETStandard all do ask, and
+// because it asserts an outcome a client cannot fake by resuming the stream.
 package reconnect
 
 import (
