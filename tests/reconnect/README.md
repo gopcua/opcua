@@ -63,11 +63,18 @@ has caught a real defect in this package.
    coin flip.
 
 6. **Would a known-good client fail this?** Check the test against Eclipse
-   Milo, UA-.NETStandard, node-opcua and open62541. If one of them would
-   fail it, treat the test as the likely mistake until you have shown
-   otherwise, and put what you found in the pull request. One test here is
-   that exception: open62541 has no client-side Republish at all, so it
-   fails `republish_after_reconnect_test.go`, and we think the test is right.
+   Milo, UA-.NETStandard, node-opcua and open62541, reading their source. If
+   one would fail it the test is the likely mistake, and there are two
+   different reasons. Either it checks how a client works rather than what it
+   achieves, and you rewrite it to assert the outcome. Or every library leaves
+   this to the application, and then it is not a test every client should
+   pass: keep it only if you say so in the file, name the stacks it fails, and
+   show it still fails a client that fakes the outcome instead of earning it.
+   We deleted one that a blind rebuild turned green without the client ever
+   asking the server what it had lost. The standing exception is
+   `republish_after_reconnect_test.go`: open62541 has no client-side Republish
+   at all, and we think the test is right. Put what you find in the pull
+   request.
 
 ## Optional tools
 
