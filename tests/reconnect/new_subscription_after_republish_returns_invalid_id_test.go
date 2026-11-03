@@ -65,8 +65,8 @@
 // This row has one decline and not two. A run where the client sent no
 // Republish after the drop on a connection it had activated is gopcua's known
 // bug — it reconnects, re-activates, and asks for nothing it missed — so it
-// goes through the knownBug arm below, with the four other rows that log the
-// same defect. The second decline
+// goes through the knownBug arm below, with the other rows that log the same
+// defect. The second decline
 // publish_resumes_when_republish_loop_ends_test.go needs, a loop that ended
 // on the client's own terms, cannot arise here: this server answers no
 // Republish with a notification, so runRecord.Answerable is empty and any

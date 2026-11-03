@@ -18,10 +18,11 @@
 // retransmission". The fixture cannot construct that: the scripted server
 // keeps the Session alive across the drop and accepts the re-activation, so a
 // conforming client never creates a new Session and never transfers anything.
-// No run of this package, under any option, has a TransferSubscriptions in
-// its request log; GATE-MEASURE-report.md records the same of node-opcua on
-// this fixture. Reaching §5.14.7.1 needs a server that refuses to re-activate
-// the surviving Session, and that is the stimulus
+// No gopcua run measured here has sent a TransferSubscriptions; the server
+// has the arm, and a mutant client reaches it, but no stack measured on this
+// fixture does. GATE-MEASURE-report.md records the same of node-opcua.
+// Reaching §5.14.7.1 needs a server that refuses to re-activate the
+// surviving Session, and that is the stimulus
 // new_session_only_after_failed_activation_test.go exists to keep out of the
 // default fixture. Named and left.
 //
