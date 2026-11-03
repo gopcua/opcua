@@ -326,7 +326,10 @@ type runRecord struct {
 	// Answerable is every sequence number the server would have answered a
 	// Republish for with the notification itself, ascending. Anything else got
 	// Bad_MessageNotAvailable. Empty on the server that keeps no
-	// retransmission queue.
+	// retransmission queue, and empty under RepublishSubInvalid, where no
+	// Republish is answered with anything: every one of them is faulted
+	// Bad_SubscriptionIdInvalid instead. runScenario refuses to combine that
+	// option with RefusesTransfer so that this stays the whole rule.
 	Answerable []uint32
 	// HarnessErr is a stage the scenario could not reach; the test reports it
 	// as a setup failure.
@@ -656,6 +659,9 @@ func (s *server) answer(connID int, req ua.Request) ua.Response {
 		}
 
 	case *ua.RepublishRequest:
+		if s.opts.RepublishSubInvalid {
+			return newServiceFault(h, ua.StatusBadSubscriptionIDInvalid)
+		}
 		if slices.Contains(s.answerableSeqs(), r.RetransmitSequenceNumber) {
 			return newRepublishResponse(r.RetransmitSequenceNumber)
 		}
@@ -671,7 +677,9 @@ func (s *server) answer(connID int, req ua.Request) ua.Response {
 // and so is anything FurtherLost queued behind it. Otherwise the server has no
 // message to give back at all. Either way OPC 10000-4 §6.7 names
 // Bad_MessageNotAvailable as the status that ends the Republish loop, and that
-// is what every other sequence number gets.
+// is what every other sequence number gets. RepublishSubInvalid is answered
+// above this and never reaches it, and runScenario refuses to combine the two,
+// so the list is empty whenever that option is set.
 //
 // runRecord.Answerable is this list, so a test reads the one rule the server
 // answers by rather than restating it.
@@ -807,6 +815,12 @@ type runOptions struct {
 	// Republish at all, so on the other one this changes nothing but the
 	// sequence numbers the stream resumes at.
 	FurtherLost int
+	// RepublishSubInvalid answers every Republish with
+	// Bad_SubscriptionIdInvalid, the status OPC 10000-4 §6.7 makes the Client
+	// answer by creating a new Subscription. It cannot be combined with
+	// RefusesTransfer: both decide what a Republish is answered with, and
+	// runRecord.Answerable could then say neither.
+	RepublishSubInvalid bool
 	// ReconnectInterval is the client's wait between reconnection attempts;
 	// zero means 100ms.
 	ReconnectInterval time.Duration
@@ -819,13 +833,18 @@ type runOptions struct {
 // returns the runRecord the test reads. It never aborts: a stage it could not
 // reach is recorded in HarnessErr.
 func runScenario(opts runOptions) runRecord {
+	var out runRecord
+	if opts.RepublishSubInvalid && opts.RefusesTransfer {
+		out.HarnessErr = "RepublishSubInvalid and RefusesTransfer both decide what a Republish is " +
+			"answered with, so runRecord.Answerable could not say what the server would have handed back"
+		return out
+	}
 	if opts.Settle == 0 {
 		opts.Settle = settleDefault
 	}
 	if opts.ReconnectInterval == 0 {
 		opts.ReconnectInterval = 100 * time.Millisecond
 	}
-	var out runRecord
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
