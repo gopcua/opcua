@@ -48,7 +48,7 @@ func (c *Client) Subscribe(ctx context.Context, params *SubscriptionParameters, 
 	stats.Subscription().Add("Count", 1)
 
 	// start the publish loop if it isn't already running
-	c.resumech <- struct{}{}
+	c.resumeSubscriptions(ctx)
 
 	sub := &Subscription{
 		SubscriptionID:            res.SubscriptionID,
@@ -389,21 +389,28 @@ func (c *Client) notifySubscription(ctx context.Context, sub *Subscription, noti
 	}
 }
 
-// pauseSubscriptions suspends the publish loop by signalling the pausech.
+// pauseSubscriptions suspends the publish loop by setting the desired state
+// to paused and nudging the loop to notice.
 // It has no effect if the publish loop is already paused.
 func (c *Client) pauseSubscriptions(ctx context.Context) {
-	select {
-	case <-ctx.Done():
-	case c.pausech <- struct{}{}:
-	}
+	c.publishPaused.Store(true)
+	c.wake()
 }
 
-// resumeSubscriptions restarts the publish loop by signalling the resumech.
+// resumeSubscriptions restarts the publish loop by setting the desired state
+// to running and nudging the loop to notice.
 // It has no effect if the publish loop is not paused.
 func (c *Client) resumeSubscriptions(ctx context.Context) {
+	c.publishPaused.Store(false)
+	c.wake()
+}
+
+// wake nudges monitorSubscriptions to re-check publishPaused. The send is
+// non-blocking and best-effort: a wake-up already queued is enough.
+func (c *Client) wake() {
 	select {
-	case <-ctx.Done():
-	case c.resumech <- struct{}{}:
+	case c.wakech <- struct{}{}:
+	default:
 	}
 }
 
@@ -413,34 +420,30 @@ func (c *Client) monitorSubscriptions(ctx context.Context) {
 	dlog := debug.NewPrefixLogger("sub: ")
 	defer dlog.Print("done")
 
-publish:
 	for {
+		if c.publishPaused.Load() {
+			dlog.Print("pause")
+			select {
+			case <-ctx.Done():
+				dlog.Print("pause: ctx.Done()")
+				return
+
+			case <-c.wakech:
+				// Re-check publishPaused rather than assuming this wake-up
+				// means "resume". Trusting the state, not the signal, is what
+				// makes the loop immune to wake-ups being coalesced or dropped.
+				continue
+			}
+		}
+
 		select {
 		case <-ctx.Done():
 			dlog.Println("ctx.Done()")
 			return
 
-		case <-c.resumech:
-			dlog.Print("resume")
-			// ignore since not paused
-
-		case <-c.pausech:
-			dlog.Print("pause")
-			for {
-				select {
-				case <-ctx.Done():
-					dlog.Print("pause: ctx.Done()")
-					return
-
-				case <-c.resumech:
-					dlog.Print("pause: resume")
-					continue publish
-
-				case <-c.pausech:
-					dlog.Print("pause: pause")
-					// ignore since already paused
-				}
-			}
+		case <-c.wakech:
+			// state may have changed (e.g. paused again); re-check publishPaused.
+			continue
 
 		default:
 			// send publish request and handle response

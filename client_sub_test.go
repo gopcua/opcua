@@ -2,10 +2,12 @@ package opcua
 
 import (
 	"context"
+	"expvar"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/gopcua/opcua/stats"
 	"github.com/gopcua/opcua/ua"
 	"github.com/stretchr/testify/require"
 )
@@ -245,4 +247,121 @@ func TestRepublishOrRecreateSubscriptions(t *testing.T) {
 		require.Equal(t, recreateSession, action)
 		require.Equal(t, []uint32{6647}, c.SubscriptionIDs())
 	})
+}
+
+// TestReconnectRecoversRegisteredSubscriptions guards against the reconnect
+// state machine (client.go) silently abandoning subscriptions.
+//
+// Both reconnect paths funnel their registered subscription ids through
+// transferSubscriptions into republishOrRecreateSubscriptions:
+//   - recreateSession builds a new session and always did so.
+//   - restoreSession reactivates the same session and now does too, because a
+//     Republish alone does not make servers resume delivery after the secure
+//     channel was rebuilt.
+//
+// If that step is handed nothing (as restoreSession used to do by jumping
+// straight to restoreSubscriptions) it returns action==none and activeSubs==0,
+// which marks the client Connected while the subscription is left registered
+// but untouched and the publish loop stays paused forever: the production hang
+// reported for short network blips.
+func TestReconnectRecoversRegisteredSubscriptions(t *testing.T) {
+	t.Run("empty input strands a registered subscription", func(t *testing.T) {
+		c, err := NewClient("opc.tcp://example.com:4840")
+		require.NoError(t, err)
+
+		stub := &stubClient{send: recreateResponder(4711, ua.StatusOK)}
+		newTestSubscription(t, c, stub, 1)
+
+		// The regression: recovering with nothing to do leaves subscription 1
+		// registered under its old id, never republished or recreated, while
+		// the caller reads this as "everything recovered".
+		action, activeSubs := c.republishOrRecreateSubscriptions(context.Background(), nil, nil, nil)
+
+		require.Equal(t, none, action)
+		require.Equal(t, 0, activeSubs)
+		require.Equal(t, []uint32{1}, c.SubscriptionIDs(), "subscription must not be silently abandoned")
+	})
+
+	t.Run("registered subscription ids are recovered", func(t *testing.T) {
+		c, err := NewClient("opc.tcp://example.com:4840")
+		require.NoError(t, err)
+
+		stub := &stubClient{send: recreateResponder(4711, ua.StatusOK)}
+		newTestSubscription(t, c, stub, 1)
+
+		// Fed the ids the way transferSubscriptions feeds them, the
+		// subscription is processed: republish fails (no session/channel) and
+		// falls back to recreate, so activeSubs > 0 and the reconnect loop
+		// resumes the publish loop.
+		action, activeSubs := c.republishOrRecreateSubscriptions(context.Background(), c.SubscriptionIDs(), nil, map[uint32][]uint32{})
+
+		require.Equal(t, none, action)
+		require.Greater(t, activeSubs, 0, "activeSubs must be > 0 so the publish loop is resumed")
+		require.Equal(t, []uint32{4711}, c.SubscriptionIDs(), "subscription must have been recreated, not abandoned")
+	})
+}
+
+// errorCount reads the current value of the named counter in the global
+// stats.Error() expvar map, treating a missing counter as zero.
+func errorCount(key string) int64 {
+	v := stats.Error().Get(key)
+	if v == nil {
+		return 0
+	}
+	iv, ok := v.(*expvar.Int)
+	if !ok {
+		return 0
+	}
+	return iv.Value()
+}
+
+// TestMonitorSubscriptionsSurvivesPauseResumeRace guards against
+// https://github.com/gopcua/opcua/issues/895: pausech/resumech used to be two
+// buffered channels read by the same select in monitorSubscriptions. When a
+// pause and a resume were both pending -- e.g. Subscription.Cancel() followed
+// by Client.Subscribe() -- Go's select picked one at random; if the resume was
+// picked first it was discarded and the loop then parked on the pause forever.
+//
+// The level-based publishPaused plus a best-effort wake-up removes the race.
+// This test hammers pauseSubscriptions/resumeSubscriptions concurrently and
+// checks that a final resume always gets the loop running again.
+func TestMonitorSubscriptionsSurvivesPauseResumeRace(t *testing.T) {
+	c, err := NewClient("opc.tcp://example.com:4840")
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		c.monitorSubscriptions(ctx)
+	}()
+	defer func() {
+		cancel()
+		<-done
+	}()
+
+	// c has no real connection, so a running loop reacts to being resumed by
+	// attempting exactly one PublishRequest, which fails immediately with
+	// StatusBadServerNotConnected (see sendWithTimeout) and re-pauses on its
+	// own. Counting this error proves the loop actually woke up and executed
+	// the publish path, rather than remaining parked forever.
+	const key = "ua.StatusBadServerNotConnected"
+	baseline := errorCount(key)
+
+	for i := 0; i < 200; i++ {
+		var wg sync.WaitGroup
+		wg.Add(2)
+		go func() { defer wg.Done(); c.pauseSubscriptions(ctx) }()
+		go func() { defer wg.Done(); c.resumeSubscriptions(ctx) }()
+		wg.Wait()
+
+		// Whatever order the two racing calls above landed in, make the
+		// desired end state explicit and unambiguous: the loop must run.
+		c.resumeSubscriptions(ctx)
+
+		require.Eventually(t, func() bool {
+			return errorCount(key) > baseline
+		}, time.Second, time.Millisecond, "iteration %d: publish loop appears stuck after a pause/resume race", i)
+		baseline = errorCount(key)
+	}
 }
