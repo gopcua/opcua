@@ -75,11 +75,9 @@ func TestRepublishAsksForEachMissedNumber(t *testing.T) {
 	const minLoopWindow = time.Duration(furtherLost+2) * time.Second
 	const settleLoop = 10 * time.Second
 
-	if settleLoop < 2*minLoopWindow {
-		t.Fatalf("could not set the test up: the settle window of %s leaves no margin over the %s "+
-			"a client that waits a second between asks needs for %d asks. Lengthen settleLoop",
-			settleLoop, minLoopWindow, furtherLost+2)
-	}
+	// A tripwire, not a check: both sides are constants, so a settleLoop
+	// shortened below twice minLoopWindow fails the build, not a run.
+	const _ = uint64(settleLoop - 2*minLoopWindow)
 
 	run := runScenario(runOptions{RefusesTransfer: true, FurtherLost: furtherLost, Settle: settleLoop})
 
