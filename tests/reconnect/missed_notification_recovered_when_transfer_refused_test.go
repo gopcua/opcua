@@ -62,7 +62,8 @@ func TestMissedNotificationRecoveredWhenTransferRefused(t *testing.T) {
 	// what it was asked. A client that sends a transfer and is faulted for
 	// some other reason — before activating, say — is therefore scored as if
 	// the refusal had been put to it. Telling those apart needs the record to
-	// keep responses as well as requests; see mutants m5b.
+	// keep responses as well as requests, which it does not. A client that
+	// sends the transfer before activating is the case that shows it.
 	asked, _, _ := republishesAfterDrop(run)
 	recovered, arrived := missedNotificationBack(run)
 
