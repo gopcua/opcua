@@ -134,12 +134,9 @@ func TestDataResumesOnRecreatedSubscription(t *testing.T) {
 	// had no time to.
 	const minSettle = 3 * time.Second
 
-	if settleDefault < minSettle {
-		t.Fatalf("could not set the test up: the settle window of %s is shorter than the %s a client "+
-			"needs to reconnect, be faulted, create the replacement, monitor an item on it and be "+
-			"answered, so a client that never gets its data back cannot be told from one that was "+
-			"not given time. Lengthen settleDefault in harness.go", settleDefault, minSettle)
-	}
+	// A tripwire, not a check: both sides are constants, so a settleDefault
+	// shortened below minSettle fails the build here rather than a run.
+	const _ = uint64(settleDefault - minSettle)
 
 	run := runScenario(runOptions{RepublishSubInvalid: true})
 
