@@ -28,11 +28,9 @@ func TestDataResumesAfterReconnect(t *testing.T) {
 	// of what the settle window holds at publishPacing.
 	const minFresh = int(settleDefault/publishPacing) / 2
 
-	if minFresh < 2 {
-		t.Fatalf("could not set the test up: the settle window of %s holds only %d publish intervals "+
-			"of %s, too few to tell a stream from a single notification. Lengthen settleDefault "+
-			"or shorten publishPacing in harness.go", settleDefault, int(settleDefault/publishPacing), publishPacing)
-	}
+	// A tripwire, not a check: both sides are constants, so a settleDefault
+	// or publishPacing leaving minFresh below 2 fails the build, not a run.
+	const _ = uint64(minFresh - 2)
 
 	run := runScenario(runOptions{})
 
