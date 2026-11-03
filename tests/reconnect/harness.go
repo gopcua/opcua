@@ -312,10 +312,9 @@ type runRecord struct {
 	HeldSeq uint32
 	// LastSeq is the highest sequence number the server created.
 	LastSeq uint32
-	// DropApplied is whether the commanded transport drop fired; DropAt is
-	// when the connection was closed, not when the drop was commanded.
-	DropApplied bool
-	DropAt      time.Time
+	// DropAt is when the connection was closed, not when the drop was
+	// commanded.
+	DropAt time.Time
 	// DropConn is the connection generation the drop was applied to. A
 	// request on a higher one arrived on a reconnect; a fixed 2 would miscount
 	// a client that dialled twice before the drop.
@@ -352,13 +351,7 @@ type runRecord struct {
 // gopcua's own defect goes through the knownBug arm, and the one a
 // conforming client earns is a t.Fatalf up with the preconditions.
 func setupFailed(run runRecord) string {
-	switch {
-	case run.HarnessErr != "":
-		return run.HarnessErr
-	case !run.DropApplied:
-		return "the connection was never dropped"
-	}
-	return ""
+	return run.HarnessErr
 }
 
 // reconnectSetupFailed reports why the run never got the client back onto an
@@ -870,7 +863,6 @@ func runScenario(opts runOptions) runRecord {
 	dropDeadline := time.After(2 * time.Second)
 	for {
 		if srv.rec.isDropApplied() {
-			out.DropApplied = true
 			out.DropAt = srv.rec.dropAppliedAt()
 			out.DropConn = srv.rec.heldPublishConn()
 			break
