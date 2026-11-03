@@ -47,7 +47,7 @@ func TestMissedNotificationRecoveredWhenTransferRefused(t *testing.T) {
 	if why := setupFailed(run); why != "" {
 		t.Fatalf("could not set the test up: %s", why)
 	}
-	if why := lossSetupFailed(run); why != "" {
+	if why := clientSilentSetupFailed(run); why != "" {
 		t.Fatalf("could not set the test up: %s", why)
 	}
 	// A client that never re-activated was never offered the subscription
