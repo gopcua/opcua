@@ -69,10 +69,28 @@ var monitoredNode = ua.NewStringNodeID(1, "reconnect.value")
 // runRecord.DropConn says which generation was dropped. RepublishSeq is the
 // sequence number a RepublishRequest asked for and is meaningless on any
 // other service.
+//
+// Acks is what a PublishRequest acknowledged, in the order the client wrote
+// them, and is meaningless on any other service. It is empty both for a
+// Publish that acknowledged nothing and for every request that is not a
+// Publish, so a reader that needs to tell those apart checks Service first.
 type requestRecord struct {
 	Conn         int
 	Service      string
 	RepublishSeq uint32
+	Acks         []ack
+}
+
+// ack is one SubscriptionAcknowledgement the client put in a Publish.
+type ack struct {
+	SubID, Seq uint32
+}
+
+// clone copies the acknowledgement slice, so a test holding a snapshot cannot
+// reach the recorder's live state.
+func (r requestRecord) clone() requestRecord {
+	r.Acks = append([]ack(nil), r.Acks...)
+	return r
 }
 
 // deliveryRecord is one notification the client's application callback
@@ -121,7 +139,12 @@ type recorder struct {
 // know which services carry something worth keeping.
 func (o *recorder) recordRequest(connID int, req ua.Request) {
 	rr := requestRecord{Conn: connID, Service: serviceName(req)}
-	if r, ok := req.(*ua.RepublishRequest); ok {
+	switch r := req.(type) {
+	case *ua.PublishRequest:
+		for _, a := range r.SubscriptionAcknowledgements {
+			rr.Acks = append(rr.Acks, ack{SubID: a.SubscriptionID, Seq: a.SequenceNumber})
+		}
+	case *ua.RepublishRequest:
 		rr.RepublishSeq = r.RetransmitSequenceNumber
 	}
 	o.mu.Lock()
@@ -295,7 +318,10 @@ func (o *recorder) publishStep(connID int) (seq uint32, hold bool) {
 func (o *recorder) snapshot() (requests []requestRecord, accepts []time.Time, held uint32) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
-	requests = append([]requestRecord(nil), o.requests...)
+	requests = make([]requestRecord, len(o.requests))
+	for i, r := range o.requests {
+		requests[i] = r.clone()
+	}
 	accepts = append([]time.Time(nil), o.accepts...)
 	return requests, accepts, o.heldSeq
 }
@@ -331,6 +357,15 @@ type runRecord struct {
 	// Bad_SubscriptionIdInvalid instead. runScenario refuses to combine that
 	// option with RefusesTransfer so that this stays the whole rule.
 	Answerable []uint32
+	// Offered is every sequence number the server told the client it still
+	// had, which is what a keep-alive and a TransferResult carried verbatim and
+	// what a data PublishResponse carried alongside its own sequence number
+	// under AdvertisesSentSequence. It is empty under NoRetransmissionQueue,
+	// which is the server saying it keeps no retransmission queue at all.
+	// Answerable is the part of it the server would really have handed back,
+	// and on the default server the two disagree on purpose; see
+	// answerableSeqs.
+	Offered []uint32
 	// HarnessErr is a stage the scenario could not reach; the test reports it
 	// as a setup failure.
 	HarnessErr string
@@ -632,14 +667,14 @@ func (s *server) answer(connID int, req ua.Request) ua.Response {
 		// With nothing monitored there is no data, only keep-alives.
 		if !s.rec.isAnyMonitored() {
 			time.Sleep(publishPacing)
-			return newKeepAliveResponse(s.rec.peekNextSeq(), s.rec.availableSeqs())
+			return newKeepAliveResponse(s.rec.peekNextSeq(), s.available())
 		}
 		seq, hold := s.rec.publishStep(connID)
 		if hold {
 			return nil
 		}
 		time.Sleep(publishPacing)
-		return newPublishResponse(seq, s.rec.availableSeqs())
+		return newPublishResponse(seq, s.availableWith(seq))
 
 	case *ua.TransferSubscriptionsRequest:
 		if s.opts.RefusesTransfer {
@@ -649,7 +684,7 @@ func (s *server) answer(connID int, req ua.Request) ua.Response {
 		for i := range r.SubscriptionIDs {
 			results[i] = &ua.TransferResult{
 				StatusCode:               ua.StatusOK,
-				AvailableSequenceNumbers: s.rec.availableSeqs(),
+				AvailableSequenceNumbers: s.available(),
 			}
 		}
 		return &ua.TransferSubscriptionsResponse{
@@ -688,6 +723,35 @@ func (s *server) answerableSeqs() []uint32 {
 		return nil
 	}
 	return s.rec.availableSeqs()
+}
+
+// available is what the server tells the client it still has: the list a
+// keep-alive and a TransferResult carry, and the one availableWith builds a
+// data PublishResponse's list from. It is the recorder's
+// availableSeqs, except under NoRetransmissionQueue, where the server keeps no
+// retransmission queue and says so with an empty list on every answer, as OPC
+// 10000-4 §5.14.5.2 requires of such a server and as gopcua's own server does.
+//
+// runRecord.Offered is this list, so a test reads what the client was told
+// rather than restating the rule the server told it by.
+func (s *server) available() []uint32 {
+	if s.opts.NoRetransmissionQueue {
+		return []uint32{}
+	}
+	return s.rec.availableSeqs()
+}
+
+// availableWith is the list a data PublishResponse carries: what the server
+// still has, and under AdvertisesSentSequence the sequence number of that
+// response as well. The server has just created that notification and has not
+// given it away yet, so it is available for retransmission by the same rule as
+// everything else in the queue, and it sorts above all of them.
+func (s *server) availableWith(seq uint32) []uint32 {
+	available := s.available()
+	if !s.opts.AdvertisesSentSequence || slices.Contains(available, seq) {
+		return available
+	}
+	return append(available, seq)
 }
 
 // usesSession reports whether a service request counts as using the Session.
@@ -821,6 +885,25 @@ type runOptions struct {
 	// RefusesTransfer: both decide what a Republish is answered with, and
 	// runRecord.Answerable could then say neither.
 	RepublishSubInvalid bool
+	// NoRetransmissionQueue makes the server say it keeps no retransmission
+	// queue: every PublishResponse and every TransferResult carries an empty
+	// availableSequenceNumbers. OPC 10000-4 §5.14.5.2 gives that list its
+	// meaning, and gopcua's own server is one of these. It cannot be combined
+	// with RefusesTransfer, which selects the server that does keep the queue
+	// and hands notifications back out of it.
+	NoRetransmissionQueue bool
+	// AdvertisesSentSequence puts the sequence number of a data PublishResponse
+	// into that response's own availableSequenceNumbers, which OPC 10000-4
+	// §5.14.5.2 requires of a server that keeps a retransmission queue: the
+	// list holds everything available for retransmission "including the
+	// sequence number of this response if it is not a keep-alive Message".
+	// Without it the fixture advertises nothing until it has withheld
+	// something, so the one notification it hands over before the drop arrives
+	// with an empty list, and a client that reads the list acknowledges
+	// nothing in the whole run. It cannot be combined with
+	// NoRetransmissionQueue, which is the server that keeps no queue to
+	// advertise.
+	AdvertisesSentSequence bool
 	// ReconnectInterval is the client's wait between reconnection attempts;
 	// zero means 100ms.
 	ReconnectInterval time.Duration
@@ -837,6 +920,18 @@ func runScenario(opts runOptions) runRecord {
 	if opts.RepublishSubInvalid && opts.RefusesTransfer {
 		out.HarnessErr = "RepublishSubInvalid and RefusesTransfer both decide what a Republish is " +
 			"answered with, so runRecord.Answerable could not say what the server would have handed back"
+		return out
+	}
+	if opts.AdvertisesSentSequence && opts.NoRetransmissionQueue {
+		out.HarnessErr = "AdvertisesSentSequence has the server advertise the notification it is " +
+			"sending and NoRetransmissionQueue has it advertise nothing at all, so the server would " +
+			"have been telling the client two different things"
+		return out
+	}
+	if opts.NoRetransmissionQueue && opts.RefusesTransfer {
+		out.HarnessErr = "NoRetransmissionQueue says the server keeps no retransmission queue and " +
+			"RefusesTransfer selects the server that keeps one and hands notifications back out of " +
+			"it, so the server would have been telling the client two different things"
 		return out
 	}
 	if opts.Settle == 0 {
@@ -973,5 +1068,6 @@ func runScenario(opts runOptions) runRecord {
 	out.HeldSeq = held
 	out.LastSeq = srv.rec.highestSeq()
 	out.Answerable = srv.answerableSeqs()
+	out.Offered = srv.available()
 	return out
 }
