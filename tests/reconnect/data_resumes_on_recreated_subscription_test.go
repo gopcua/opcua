@@ -90,6 +90,14 @@
 // callback. Silence after the replacement is therefore a change in what the
 // client does, not a client that was never able to speak.
 //
+// On the gopcua branches measured so far this row separates exactly what
+// data_resumes_after_reconnect_test.go separates, and nothing more:
+// recreateSubscription ends with recreate_monitoredItems, so a branch that
+// reaches the recreate path at all brings the items back with the
+// subscription. The client this row exists for splits those two, which no
+// branch does and the m3e patch constructs. Against the branches the row
+// guards a regression rather than telling them apart.
+//
 // The reference stacks. open62541 v1.4.22 is declined, not failed, and for
 // the reason rows 8 and 9 decline it: it has no client-side replacement path
 // at all. On a re-activation ua_client_connect.c resumes publishing and
@@ -97,12 +105,12 @@
 // __Client_Subscriptions_clean, which force-removes the client's
 // subscriptions locally; the only thing in ua_client_subscriptions.c that
 // creates a Subscription is the application's own call. So it never reaches
-// the condition this row scores. node-opcua, Eclipse Milo and
-// UA-.NETStandard are not settled. What settles each of them is whether its
-// own recreate path carries the items, and in node-opcua 2.187.19 that path
-// is in neither client_subscription_impl.ts nor opcua_client_impl.ts, which
-// is where it was looked for — not found rather than read. Named and left.
-// No stack read here fails this row, so it takes no exception.
+// the condition this row scores. node-opcua 2.187.19 passes it, measured
+// here: data created after the replacement reached the application. Eclipse
+// Milo and UA-.NETStandard are not settled, and what settles each is whether
+// its own recreate path carries the items. Named and left. No stack read
+// here fails this row and no stack run here fails it either, so it takes no
+// exception.
 package reconnect
 
 import (
@@ -231,6 +239,10 @@ func newSubscriptionAfterDrop(run runRecord) (created bool, published int) {
 // disowned subscription in place has not failed to put data on a replacement;
 // it has no replacement, and what it has instead is
 // new_subscription_after_republish_returns_invalid_id_test.go's to object to.
+// The activation rule the message names is the fixture's and no longer this
+// row's: a CreateSubscription arriving before its own connection's
+// ActivateSession is faulted Bad_SessionNotActivated and never reaches the
+// arm that sets RecreateAfter.
 func newSubscriptionSetupFailed(run runRecord) string {
 	if created, _ := newSubscriptionAfterDrop(run); !created {
 		return "the client created no new Subscription after the drop on a connection it had " +
