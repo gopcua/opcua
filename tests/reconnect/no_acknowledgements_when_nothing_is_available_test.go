@@ -68,10 +68,10 @@
 //     also why the control run has to advertise: against a fixture that
 //     advertises nothing, open62541 acknowledges nothing in either run and the
 //     row would be declining a client that earned the pass.
-//   - node-opcua 2.187.19 fails it. client_publish_engine.js reads the
-//     response's available list only in a commented-out line and then
-//     acknowledges every notification with data, whatever the server said it
-//     keeps. Source read; not measured on this fixture.
+//   - node-opcua 2.187.19 fails it, measured here: it acknowledged the same
+//     31 sequence numbers in the same order in both runs, so what the server
+//     said it keeps made no difference to it. client_publish_engine.js reads
+//     the available list only in a commented-out line.
 //   - Eclipse Milo and UA-.NETStandard cannot be run here and were not read
 //     for this row.
 //
