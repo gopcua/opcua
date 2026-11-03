@@ -32,6 +32,13 @@ constant, declared inside the test function. Run `go test ./tests/reconnect/ -v`
   stops compiling. Do it in the same commit as the fix, and say in the commit
   message what the fix was.
 
+Who that is depends on where this suite is. While it is unmerged — which is
+where it is today — the person who deletes a constant is whoever runs the
+suite by hand against a candidate fix, and the deletion lands with that fix
+as we merge it. Once the suite is merged, the contributor whose fix turns a
+row red deletes the constant in their own pull request, and that is how the
+entry is closed.
+
 Do not delete a `knownBug` constant because the test started passing for a
 reason you cannot explain.
 
