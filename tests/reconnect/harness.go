@@ -777,14 +777,14 @@ func (s *server) answer(connID int, req ua.Request) ua.Response {
 		// With nothing monitored there is no data, only keep-alives.
 		if !s.rec.isAnyMonitored() {
 			time.Sleep(publishPacing)
-			return newKeepAliveResponse(s.rec.peekNextSeq(), s.available())
+			return newKeepAliveResponse(h, s.rec.peekNextSeq(), s.available())
 		}
 		seq, hold := s.rec.publishStep(connID)
 		if hold {
 			return nil
 		}
 		time.Sleep(publishPacing)
-		return newPublishResponse(seq, s.availableWith(seq))
+		return newPublishResponse(h, seq, s.availableWith(seq))
 
 	case *ua.TransferSubscriptionsRequest:
 		if s.opts.RefusesTransfer {
@@ -808,7 +808,7 @@ func (s *server) answer(connID int, req ua.Request) ua.Response {
 			return newServiceFault(h, ua.StatusBadSubscriptionIDInvalid)
 		}
 		if slices.Contains(s.answerableSeqs(), r.RetransmitSequenceNumber) {
-			return newRepublishResponse(r.RetransmitSequenceNumber)
+			return newRepublishResponse(h, r.RetransmitSequenceNumber)
 		}
 		return newServiceFault(h, ua.StatusBadMessageNotAvailable)
 	}
@@ -914,9 +914,9 @@ func newNotification(seq uint32) *ua.NotificationMessage {
 	}
 }
 
-func newPublishResponse(seq uint32, available []uint32) *ua.PublishResponse {
+func newPublishResponse(handle, seq uint32, available []uint32) *ua.PublishResponse {
 	return &ua.PublishResponse{
-		ResponseHeader:           newResponseHeader(0, ua.StatusOK),
+		ResponseHeader:           newResponseHeader(handle, ua.StatusOK),
 		SubscriptionID:           SubID,
 		AvailableSequenceNumbers: available,
 		MoreNotifications:        false,
@@ -928,18 +928,18 @@ func newPublishResponse(seq uint32, available []uint32) *ua.PublishResponse {
 
 // newRepublishResponse hands back a notification the server still has, which
 // is how a client recovers one it missed.
-func newRepublishResponse(seq uint32) *ua.RepublishResponse {
+func newRepublishResponse(handle, seq uint32) *ua.RepublishResponse {
 	return &ua.RepublishResponse{
-		ResponseHeader:      newResponseHeader(0, ua.StatusOK),
+		ResponseHeader:      newResponseHeader(handle, ua.StatusOK),
 		NotificationMessage: newNotification(seq),
 	}
 }
 
 // newKeepAliveResponse answers a Publish with no data. It carries the sequence
 // number the next notification will use.
-func newKeepAliveResponse(nextSeq uint32, available []uint32) *ua.PublishResponse {
+func newKeepAliveResponse(handle, nextSeq uint32, available []uint32) *ua.PublishResponse {
 	return &ua.PublishResponse{
-		ResponseHeader: newResponseHeader(0, ua.StatusOK),
+		ResponseHeader: newResponseHeader(handle, ua.StatusOK),
 		SubscriptionID: SubID,
 		NotificationMessage: &ua.NotificationMessage{
 			SequenceNumber:   nextSeq,
