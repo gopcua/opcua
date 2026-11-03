@@ -13,11 +13,20 @@
 // it is outstanding on, so the held notification cannot have reached the
 // client. Nothing tells the session its transport is gone.
 //
-// Exactly one notification is lost, and the scenario checks it: a client that
-// keeps one Publish outstanding leaves one sequence number created and
-// withheld, which is the one availableSeqs offers back and the one the rows
-// name. A client that keeps more outstanding would lose more than the rows
-// describe, and the run is reported as a setup failure instead.
+// Exactly one notification is lost in the stream, and the scenario checks it:
+// a client that keeps one Publish outstanding leaves one sequence number
+// created and withheld, which is the one availableSeqs offers back and the
+// one the rows name. A client that keeps more outstanding would lose more
+// than the rows describe, and the run is reported as a setup failure instead.
+//
+// A run can ask for more than that one to be recoverable. runOptions.FurtherLost
+// notifications are created as the drop is applied and go straight into the
+// server's retransmission queue: responses that were sent and never received
+// ("When the connection is lost, Publish responses may have been sent but not
+// received by the Client", OPC 10000-4 §6.7). They are not part of the
+// stream and do not touch the one-lost check, which is frozen first. They
+// exist so that a Republish loop has a range to walk rather than a single
+// number; the default is none.
 //
 // The sequence counter is global and never resets, so a subscription the
 // client recreates after the drop does not start at 1: it looks like a gap to
@@ -27,6 +36,7 @@ package reconnect
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -89,11 +99,12 @@ type recorder struct {
 	dropApplied bool
 	dropAt      time.Time
 
-	lastSeq       uint32 // highest notification sequence created so far
-	seqAtDrop     uint32 // lastSeq when the drop was applied
-	heldSeq       uint32 // sequence of the first held Publish; 0 = none
-	heldConn      int    // connection the held Publish is outstanding on; 0 = none
-	firstAnswered bool   // the stream's first Publish has been answered, ever
+	lastSeq       uint32   // highest notification sequence created so far
+	seqAtDrop     uint32   // lastSeq when the drop was applied
+	heldSeq       uint32   // sequence of the first held Publish; 0 = none
+	queued        []uint32 // further sequence numbers kept for retransmission; see the package comment
+	heldConn      int      // connection the held Publish is outstanding on; 0 = none
+	firstAnswered bool     // the stream's first Publish has been answered, ever
 
 	// activatedConns holds the connections ActivateSession has arrived on. It
 	// is per connection because a reconnect must activate the session again.
@@ -144,12 +155,18 @@ func (o *recorder) recordDropStarted() {
 
 // recordDropApplied freezes the sequence counter alongside the flag: the
 // dropped connection serves nothing more, so this is how many notifications
-// the server had created when the loss was made.
-func (o *recorder) recordDropApplied() {
+// the server had created when the loss was made. The counter is frozen before
+// the further lost notifications are created, so they are not counted as
+// notifications the stream lost.
+func (o *recorder) recordDropApplied(furtherLost int) {
 	o.mu.Lock()
 	o.dropApplied = true
 	o.dropAt = time.Now()
 	o.seqAtDrop = o.lastSeq
+	for i := 0; i < furtherLost; i++ {
+		o.lastSeq++
+		o.queued = append(o.queued, o.lastSeq)
+	}
 	o.mu.Unlock()
 }
 
@@ -223,7 +240,7 @@ func (o *recorder) availableSeqs() []uint32 {
 	if o.heldSeq == 0 {
 		return []uint32{}
 	}
-	return []uint32{o.heldSeq}
+	return append([]uint32{o.heldSeq}, o.queued...)
 }
 
 func (o *recorder) heldPublishConn() int {
@@ -290,6 +307,11 @@ type runRecord struct {
 	// A refused connection is served by nobody, so it shows up here and under
 	// no request's Conn.
 	AcceptedAt []time.Time
+	// Answerable is every sequence number the server would have answered a
+	// Republish for with the notification itself, ascending. Anything else got
+	// Bad_MessageNotAvailable. Empty on the server that keeps no
+	// retransmission queue.
+	Answerable []uint32
 	// HarnessErr is a stage the scenario could not reach; the test reports it
 	// as a setup failure.
 	HarnessErr string
@@ -349,6 +371,7 @@ type server struct {
 	dropCh          chan struct{} // the scenario's one-shot drop command
 	refuseAfterDrop bool          // close every connection accepted once the drop has started
 	refusesTransfer bool          // the server of runOptions.RefusesTransfer
+	furtherLost     int           // runOptions.FurtherLost
 
 	mu    sync.Mutex         // guards conns
 	conns map[int]*uacp.Conn // by connection generation
@@ -368,6 +391,7 @@ func newServer(ctx context.Context, opts runOptions) (*server, error) {
 		conns:           map[int]*uacp.Conn{},
 		refuseAfterDrop: opts.RefuseAfterDrop,
 		refusesTransfer: opts.RefusesTransfer,
+		furtherLost:     opts.FurtherLost,
 	}
 	go s.acceptLoop(ctx)
 	go s.dropWatcher()
@@ -399,7 +423,7 @@ func (s *server) dropWatcher() {
 		applied = conn.Close() == nil
 	}
 	if applied {
-		s.rec.recordDropApplied()
+		s.rec.recordDropApplied(s.furtherLost)
 	}
 }
 
@@ -553,18 +577,30 @@ func (s *server) answer(connID int, req ua.Request) ua.Response {
 		}
 
 	case *ua.RepublishRequest:
-		// Under RefusesTransfer the server keeps the retransmission queue OPC
-		// 10000-4 §5.14.1.1 describes, and the one notification it withheld is
-		// in it; every other sequence number is gone. Otherwise the server has
-		// no message to give back at all. Either way OPC 10000-4 §6.7 names
-		// Bad_MessageNotAvailable as the status that ends the Republish loop.
-		if s.refusesTransfer && r.RetransmitSequenceNumber == s.rec.heldPublishSeq() {
+		if slices.Contains(s.answerableSeqs(), r.RetransmitSequenceNumber) {
 			return newRepublishResponse(r.RetransmitSequenceNumber)
 		}
 		return newServiceFault(h, ua.StatusBadMessageNotAvailable)
 	}
 	// Services the scenario does not script fault.
 	return newServiceFault(h, ua.StatusBadServiceUnsupported)
+}
+
+// answerableSeqs is every sequence number a Republish gets a notification
+// back for. Under RefusesTransfer the server keeps the retransmission queue
+// OPC 10000-4 §5.14.1.1 describes: the notification it withheld is in it,
+// and so is anything FurtherLost queued behind it. Otherwise the server has no
+// message to give back at all. Either way OPC 10000-4 §6.7 names
+// Bad_MessageNotAvailable as the status that ends the Republish loop, and that
+// is what every other sequence number gets.
+//
+// runRecord.Answerable is this list, so a test reads the one rule the server
+// answers by rather than restating it.
+func (s *server) answerableSeqs() []uint32 {
+	if !s.refusesTransfer {
+		return nil
+	}
+	return s.rec.availableSeqs()
 }
 
 // usesSession reports whether a service request counts as using the Session.
@@ -685,6 +721,13 @@ type runOptions struct {
 	// Republish asking for that sequence number gets it back. The default
 	// server is the opposite on both counts.
 	RefusesTransfer bool
+	// FurtherLost is how many notifications beyond the held one the server
+	// creates as the drop is applied and keeps in its retransmission queue,
+	// never having reached the client. They give a Republish loop a range to
+	// walk; see the package comment. Only the RefusesTransfer server answers a
+	// Republish at all, so on the other one this changes nothing but the
+	// sequence numbers the stream resumes at.
+	FurtherLost int
 	// ReconnectInterval is the client's wait between reconnection attempts;
 	// zero means 100ms.
 	ReconnectInterval time.Duration
@@ -832,5 +875,6 @@ func runScenario(opts runOptions) runRecord {
 	out.AcceptedAt = accepts
 	out.HeldSeq = held
 	out.LastSeq = srv.rec.highestSeq()
+	out.Answerable = srv.answerableSeqs()
 	return out
 }
