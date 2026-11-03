@@ -113,7 +113,7 @@ func TestPublishResumesWhenRepublishLoopEnds(t *testing.T) {
 	if why := setupFailed(run); why != "" {
 		t.Fatalf("could not set the test up: %s", why)
 	}
-	if why := lossSetupFailed(run); why != "" {
+	if why := clientSilentSetupFailed(run); why != "" {
 		t.Fatalf("could not set the test up: %s", why)
 	}
 	// A client that never re-activated was never offered the subscription
@@ -194,19 +194,6 @@ func afterLastRepublish(run runRecord) (lastAsk uint32, published, sent int, ask
 		}
 	}
 	return lastAsk, published, sent, true
-}
-
-// loopRanSetupFailed reports why there was no Republish loop at all, or ""
-// if one ran. This is the reason the knownBug arm carries, here and in
-// republish_asks_for_each_missed_number_test.go: gopcua re-activates and then
-// asks for nothing, so either row has nothing to score rather than something
-// to object to.
-func loopRanSetupFailed(run runRecord) string {
-	if _, _, _, asked := afterLastRepublish(run); !asked {
-		return "the client sent no Republish after the drop on a connection it had activated, so " +
-			"no loop ran"
-	}
-	return ""
 }
 
 // loopEndSetupFailed reports why the loop that ran ended for a reason other

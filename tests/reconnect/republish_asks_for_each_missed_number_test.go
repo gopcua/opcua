@@ -86,7 +86,7 @@ func TestRepublishAsksForEachMissedNumber(t *testing.T) {
 	if why := setupFailed(run); why != "" {
 		t.Fatalf("could not set the test up: %s", why)
 	}
-	if why := lossSetupFailed(run); why != "" {
+	if why := clientSilentSetupFailed(run); why != "" {
 		t.Fatalf("could not set the test up: %s", why)
 	}
 	// A client that never re-activated was never offered the subscription
@@ -128,29 +128,6 @@ func TestRepublishAsksForEachMissedNumber(t *testing.T) {
 	default:
 		t.Errorf("%s", wrong)
 	}
-}
-
-// republishSeqsAfterDrop is the sequence numbers the client asked the server
-// to resend, in the order they went over the wire. It counts only what the
-// client sent on a connection it opened after the drop and had already
-// activated there: a Republish that arrives before that connection's
-// ActivateSession is faulted with Bad_SessionNotActivated rather than answered
-// by the retransmission rule, so it is not part of the loop this row reads.
-// session_unused_before_activation_test.go is the row that scores it, and
-// answerableAsk in the transfer-refused row reads the same rule for the one
-// number that row cares about.
-func republishSeqsAfterDrop(run runRecord) []uint32 {
-	var out []uint32
-	activated := map[int]bool{}
-	for _, r := range run.Requests {
-		switch {
-		case r.Service == "ActivateSessionRequest":
-			activated[r.Conn] = true
-		case r.Service == "RepublishRequest" && r.Conn > run.DropConn && activated[r.Conn]:
-			out = append(out, r.RepublishSeq)
-		}
-	}
-	return out
 }
 
 // loopScorableSetupFailed reports why a loop that ran could not be scored
