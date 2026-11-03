@@ -212,7 +212,11 @@ func (o *recorder) heldPublishSeq() uint32 {
 // availableSeqs is what the server says it can still resend. An empty list
 // claims it keeps no retransmission queue at all (OPC 10000-4 §5.14.1.1), so
 // while a notification is held back the list has to name it. Every Publish
-// answer and every TransferResult carries this, and they have to agree.
+// answer and every TransferResult carries it, and the two agree with each
+// other. Only under RefusesTransfer does a Republish for that number actually
+// get it back; the default server advertises it and then answers
+// Bad_MessageNotAvailable, which is how the Republish row observes a client
+// asking without being handed the answer.
 func (o *recorder) availableSeqs() []uint32 {
 	o.mu.Lock()
 	defer o.mu.Unlock()

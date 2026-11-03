@@ -74,13 +74,14 @@ func TestMissedNotificationRecoveredWhenTransferRefused(t *testing.T) {
 	case recovered:
 		t.Logf("the client recovered notification %d although the server was set to refuse the transfer "+
 			"(%d notifications after the drop in all)", run.HeldSeq, arrived)
-	case asked > 0:
+	case asked > 0 && answerableAsk(run):
 		// The server answers that one sequence number with the notification,
-		// so a client that asked for it and did not hand it to the
-		// application dropped it on the way. That is not the client knownBug
-		// describes, so this arm fires whether or not knownBug stands.
-		t.Errorf("the client asked the server to resend notification %d and the server answered with it, "+
-			"but it never reached the application; %d notifications arrived after the drop", run.HeldSeq, arrived)
+		// so a client that asked for it on an activated connection and did
+		// not hand it to the application dropped it on the way. That is not
+		// the client knownBug describes, so this arm fires whether or not
+		// knownBug stands.
+		t.Errorf("the client asked the server to resend notification %d after activating the Session, "+
+			"and it never reached the application; %d notifications arrived after the drop", run.HeldSeq, arrived)
 	case knownBug != "":
 		t.Logf("known bug: %s (the server was set to refuse the transfer and kept notification %d; "+
 			"%d notifications arrived after the drop, none of them that one)", knownBug, run.HeldSeq, arrived)
@@ -107,4 +108,22 @@ func missedNotificationBack(run runRecord) (recovered bool, arrived int) {
 		}
 	}
 	return recovered, arrived
+}
+
+// answerableAsk reports whether a Republish for the held sequence number
+// arrived where the server could answer it: after its own connection's
+// ActivateSession. One that arrives before is faulted Bad_SessionNotActivated
+// and never reaches the retransmission queue, so a run carrying only those
+// has not asked the server anything it could answer.
+func answerableAsk(run runRecord) bool {
+	activated := map[int]bool{}
+	for _, r := range run.Requests {
+		switch {
+		case r.Service == "ActivateSessionRequest":
+			activated[r.Conn] = true
+		case r.Service == "RepublishRequest" && r.RepublishSeq == run.HeldSeq && activated[r.Conn]:
+			return true
+		}
+	}
+	return false
 }
