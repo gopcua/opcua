@@ -337,12 +337,20 @@ type runRecord struct {
 // setupFailed reports why the run never reached the point the test is about,
 // or "" if it did. Whatever caused it, no test here can speak past it.
 //
-// Every check of this kind is named …SetupFailed, takes the run, returns the
-// reason or "", and is reported as "could not set the test up: %s". A row
-// consults one up front when nothing it scores could be true without it, and
-// as the last arm of its switch when the violation it scores would show up
-// anyway; either way the reason is the row's, and the wording is the
-// package's.
+// Every check of this kind is named …SetupFailed, returns the reason or "",
+// and is reported as "could not set the test up: %s": the reason is the
+// row's, and the wording is the package's. A row consults one up front when
+// nothing it scores could be true without it, and inside its switch when the
+// violation it scores would show up anyway -- as the last arm where no
+// knownBug stands, and as the first arm where one does, so that a run which
+// measured nothing is logged with the known bug rather than passing as if it
+// had been scored. republish_after_reconnect_test.go is the one row that
+// puts it below the knownBug arm instead, and says in place why.
+//
+// A row with two kinds of decline splits them, as
+// publish_resumes_when_republish_loop_ends_test.go does: the decline that is
+// gopcua's own defect goes through the knownBug arm, and the one a
+// conforming client earns is a t.Fatalf up with the preconditions.
 func setupFailed(run runRecord) string {
 	switch {
 	case run.HarnessErr != "":
