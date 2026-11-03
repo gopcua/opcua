@@ -37,10 +37,11 @@ reason you cannot explain.
 ## Reviewing a new test: six questions
 
 A test that passes while checking nothing is worse than no test, because it
-is trusted. Tooling cannot catch that here: a test that logs `known bug:`
-instead of failing is green whatever the client does, so a mutation score
-cannot see it. So a reviewer asks these six, each of which has caught a real
-defect in this package.
+is trusted. Tooling cannot see all of it here: the behaviour a `knownBug`
+constant masks is logged rather than failed, so a mutation score counts that
+row as passing whatever the client does about that behaviour. The arms that
+fire beside the constant are ordinary failures and are visible. So a reviewer
+asks these six, each of which has caught a real defect in this package.
 
 1. **Can the failing branch ever run?** Trace it. One test here had a FAIL
    condition that could never hold, so it passed every client and failed
