@@ -55,6 +55,14 @@ func TestMissedNotificationRecoveredWhenTransferRefused(t *testing.T) {
 		t.Fatalf("could not set the test up: %s", why)
 	}
 
+	// The row cannot require that a refusal was actually put to the client:
+	// a client that recovers by republishing on the surviving session never
+	// sends a TransferSubscriptions at all, and that is the client expected
+	// to pass. So the messages say what the server was configured to do, not
+	// what it was asked. A client that sends a transfer and is faulted for
+	// some other reason — before activating, say — is therefore scored as if
+	// the refusal had been put to it. Telling those apart needs the record to
+	// keep responses as well as requests; see mutants m5b.
 	asked, _, _ := republishesAfterDrop(run)
 	recovered, arrived := missedNotificationBack(run)
 
@@ -64,7 +72,7 @@ func TestMissedNotificationRecoveredWhenTransferRefused(t *testing.T) {
 			"delete the knownBug constant and the two arms that read it, in the commit that fixed it",
 			run.HeldSeq, arrived-1)
 	case recovered:
-		t.Logf("the client recovered notification %d although the server refused to transfer the subscription "+
+		t.Logf("the client recovered notification %d although the server was set to refuse the transfer "+
 			"(%d notifications after the drop in all)", run.HeldSeq, arrived)
 	case asked > 0:
 		// The server answers that one sequence number with the notification,
@@ -74,10 +82,10 @@ func TestMissedNotificationRecoveredWhenTransferRefused(t *testing.T) {
 		t.Errorf("the client asked the server to resend notification %d and the server answered with it, "+
 			"but it never reached the application; %d notifications arrived after the drop", run.HeldSeq, arrived)
 	case knownBug != "":
-		t.Logf("known bug: %s (the server refused the transfer and kept notification %d; "+
+		t.Logf("known bug: %s (the server was set to refuse the transfer and kept notification %d; "+
 			"%d notifications arrived after the drop, none of them that one)", knownBug, run.HeldSeq, arrived)
 	default:
-		t.Errorf("the server refused to transfer the subscription and still had notification %d to give back, "+
+		t.Errorf("the server was set to refuse the transfer and still had notification %d to give back, "+
 			"and the client never got it; %d notifications arrived after the drop, none of them that one",
 			run.HeldSeq, arrived)
 	}
