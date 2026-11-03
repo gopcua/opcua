@@ -139,6 +139,13 @@ type recorder struct {
 	// the client was still being given on the old one and data it earned by
 	// recreating.
 	seqAtRecreate uint32
+	// recreateAfter is len(requests) at that same moment, so the requests
+	// from it on are everything the client sent after that CreateSubscription
+	// went over the wire. Zero while no such request has arrived, and that
+	// sentinel cannot be mistaken for a real value: the request is recorded
+	// before the arm that sets this runs, so the count is at least one
+	// whenever the arm has run.
+	recreateAfter int
 }
 
 // recordRequest takes the decoded request, so the call site does not need to
@@ -233,22 +240,24 @@ func (o *recorder) recordItemsMonitored() {
 
 // recordNewSubscription is the CreateSubscription arm's one mutation: a fresh
 // subscription has nothing monitored on it yet, and the first one created
-// after the drop fixes the sequence number everything the replacement carries
-// is above. The two are set together under the one lock because a Publish
-// answered between them would be counted on the wrong side of that line.
+// after the drop fixes both the sequence number everything the replacement
+// carries is above and the point in the request log the replacement starts
+// at. All three are set together under the one lock. A Publish answered
+// between the first two would be counted on the wrong side of that line, and
+// a reader that could find the third without the second -- or the second
+// without the third -- would have two answers to "did the client replace the
+// subscription" and no reason for them to agree.
 func (o *recorder) recordNewSubscription() {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	o.anyMonitored = false
-	if o.dropApplied && o.seqAtRecreate == 0 {
+	// recreateAfter is the flag rather than seqAtRecreate, because
+	// seqAtRecreate is a sequence number and nothing here forbids it being
+	// zero, while a recorded request count cannot be.
+	if o.dropApplied && o.recreateAfter == 0 {
 		o.seqAtRecreate = o.lastSeq
+		o.recreateAfter = len(o.requests)
 	}
-}
-
-func (o *recorder) seqCreatedAtRecreate() uint32 {
-	o.mu.Lock()
-	defer o.mu.Unlock()
-	return o.seqAtRecreate
 }
 
 func (o *recorder) isAnyMonitored() bool {
@@ -341,17 +350,24 @@ func (o *recorder) publishStep(connID int) (seq uint32, hold bool) {
 	return o.lastSeq, false
 }
 
-// snapshot returns copies of the request and accept logs, with the sequence
-// number the server held back.
-func (o *recorder) snapshot() (requests []requestRecord, accepts []time.Time, held uint32) {
+// snapshot copies into out everything the recorder holds that has to be read
+// as one value: the request and accept logs, the sequence number the server
+// held back, and the pair recordNewSubscription sets. The run is still live
+// when this is called, so reading the pair in a second lock would let a
+// CreateSubscription land between the two reads and leave out.RecreateAfter
+// indexing past the end of out.Requests.
+func (o *recorder) snapshot(out *runRecord) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
-	requests = make([]requestRecord, len(o.requests))
+	requests := make([]requestRecord, len(o.requests))
 	for i, r := range o.requests {
 		requests[i] = r.clone()
 	}
-	accepts = append([]time.Time(nil), o.accepts...)
-	return requests, accepts, o.heldSeq
+	out.Requests = requests
+	out.AcceptedAt = append([]time.Time(nil), o.accepts...)
+	out.HeldSeq = o.heldSeq
+	out.SeqAtRecreate = o.seqAtRecreate
+	out.RecreateAfter = o.recreateAfter
 }
 
 // runRecord is what one run reduces to: what both ends saw, frozen when the
@@ -405,6 +421,15 @@ type runRecord struct {
 	// never reaches the arm that sets this, which is the same rule
 	// republishSeqsAfterDrop reads for a Republish.
 	SeqAtRecreate uint32
+	// RecreateAfter is how many requests the server had recorded when that
+	// same CreateSubscription arrived, so Requests[RecreateAfter:] is
+	// everything the client sent after it went over the wire, and zero when
+	// no such request arrived. It is set in the one locked block that sets
+	// SeqAtRecreate, which is what makes "the client replaced the
+	// subscription" and "here is the line its data has to be above" one
+	// answer rather than two: a reader cannot find a replacement that the
+	// line was never fixed for, or a line with no replacement under it.
+	RecreateAfter int
 	// HarnessErr is a stage the scenario could not reach; the test reports it
 	// as a setup failure.
 	HarnessErr string
@@ -1101,13 +1126,9 @@ func runScenario(opts runOptions) runRecord {
 	deliveriesMu.Lock()
 	out.Deliveries = append([]deliveryRecord(nil), deliveries...)
 	deliveriesMu.Unlock()
-	requests, accepts, held := srv.rec.snapshot()
-	out.Requests = requests
-	out.AcceptedAt = accepts
-	out.HeldSeq = held
+	srv.rec.snapshot(&out)
 	out.LastSeq = srv.rec.highestSeq()
 	out.Answerable = srv.answerableSeqs()
 	out.Offered = srv.available()
-	out.SeqAtRecreate = srv.rec.seqCreatedAtRecreate()
 	return out
 }
