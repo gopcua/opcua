@@ -16,8 +16,10 @@
 //
 // A known-good client fails this: open62541 has no client-side Republish at
 // all, so it resumes Publish and never asks for what it lost. The test is
-// kept because Eclipse Milo, node-opcua and UA-.NETStandard all do ask, and
-// because it asserts an outcome a client cannot fake by resuming the stream.
+// kept because node-opcua asks, measured against this fixture, and Eclipse
+// Milo and UA-.NETStandard both ask too, read from source and not run here;
+// and because it asserts an outcome a client cannot fake by resuming the
+// stream.
 package reconnect
 
 import (
