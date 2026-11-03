@@ -34,11 +34,14 @@
 // number the server still had is not, and nor is going on asking once the
 // fault has come back.
 //
-// A known-good client fails this: open62541 has no client-side Republish at
-// all, so it never starts the loop, and the exception is the one
-// republish_after_reconnect_test.go takes for the same reason. The test is
-// kept because Eclipse Milo, node-opcua and UA-.NETStandard all walk the gap,
-// and because it reads the sequence numbers that went over the wire: a client
+// open62541 has no client-side Republish at all, so it never starts the loop
+// and this row declines to score it rather than failing it: the row that
+// reddens open62541 is republish_after_reconnect_test.go, which takes that
+// exception explicitly. Measured, node-opcua walks the whole gap and stops on
+// the fault, exactly as the pull request under review does. Eclipse Milo and
+// UA-.NETStandard are source reads; neither can be run here.
+//
+// The test reads the sequence numbers that went over the wire: a client
 // cannot produce them by resuming the stream, and one that stops while the
 // server still has a number for it does not produce them either.
 package reconnect
