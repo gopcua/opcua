@@ -234,13 +234,30 @@ func (o *recorder) heldPublishSeq() uint32 {
 // get it back; the default server advertises it and then answers
 // Bad_MessageNotAvailable, which is how the Republish row observes a client
 // asking without being handed the answer.
+// Everything from the first withheld notification to the last one the server
+// created is in the queue. A client with several Publishes outstanding has
+// had several withheld under it, and a server that kept the first and threw
+// away the rest would be answering a Republish loop with holes -- which looks
+// to a test exactly like a client that stopped incrementing too early. The
+// list is contiguous so that a row measures the client rather than the
+// client's publish-queue depth.
 func (o *recorder) availableSeqs() []uint32 {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	if o.heldSeq == 0 {
 		return []uint32{}
 	}
-	return append([]uint32{o.heldSeq}, o.queued...)
+	last := o.heldSeq
+	for _, q := range o.queued {
+		if q > last {
+			last = q
+		}
+	}
+	seqs := make([]uint32, 0, last-o.heldSeq+1)
+	for seq := o.heldSeq; seq <= last; seq++ {
+		seqs = append(seqs, seq)
+	}
+	return seqs
 }
 
 func (o *recorder) heldPublishConn() int {
