@@ -67,14 +67,17 @@ func TestRetryDelayAfterFailedOpen(t *testing.T) {
 		}
 		gaps = append(gaps, smallest)
 	}
-	shortest, longest := gaps[0], gaps[1]
+	// Both are smallest gaps: one from the run configured short, one from the
+	// run configured long. A client that honours the setting leaves a smaller
+	// smallest gap in the short run than the long interval itself.
+	atShort, atLong := gaps[0], gaps[1]
 
-	if shortest >= longInterval {
+	if atShort >= longInterval {
 		t.Errorf("configured with %s the client still left at least %s between attempts, "+
-			"as it did when configured with %s: it ignores the setting", shortInterval, shortest, longInterval)
+			"as it did when configured with %s: it ignores the setting", shortInterval, atShort, longInterval)
 	}
 	t.Logf("smallest gap between attempts: %s at an interval of %s, %s at %s",
-		shortest, shortInterval, longest, longInterval)
+		atShort, shortInterval, atLong, longInterval)
 }
 
 // retryWindowSetupFailed reports why settleRetries cannot hold minRetryAttempts at

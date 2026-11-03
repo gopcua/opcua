@@ -5,7 +5,10 @@
 //
 // The rule only binds once something has been lost, so the test loses
 // something: the server holds one notification back and never sends it, then
-// drops the connection. See harness.go.
+// drops the connection. See harness.go. This server transfers the
+// subscription when asked, which is what separates this row from the one
+// that withholds the transfer: here a client has every route back to the
+// notification, and the row asks only whether it takes one.
 //
 // The test checks only that the client asked, and for which sequence number.
 // How often it asks, and where it stops, is a separate behaviour with its own
