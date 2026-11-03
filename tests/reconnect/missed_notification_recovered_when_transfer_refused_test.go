@@ -4,44 +4,51 @@
 // existing Session and allows the Client to reuse the Session and
 // Subscriptions in the Server." Conformance unit 276: "Evaluate the sequence
 // number in Notifications to detect lost Notifications. Use Republish to
-// request missing Notifications."
+// request missing Notifications." §6.7 permits the other route too, "If
+// TransferSubscriptions fails, the Client needs to create a new
+// Subscription", so the row scores the notification and not the service call.
+// Whether a client asks at all, where the transfer is granted, is
+// republish_after_reconnect_test.go.
 //
-// The clause supports the outcome, not a mechanism. It does not say "do not
-// transfer a subscription the session still holds"; it says the re-activated
-// session may reuse its subscriptions, and the conformance unit says what to
-// do about a notification that went missing. The argument this test makes is
-// that a client which answers a refused transfer by recreating the
-// subscription throws away a notification the server still had.
+// The scripted server refuses TransferSubscriptions with
+// Bad_ServiceUnsupported, as gopcua's own server does, and still holds the
+// notification it withheld; its counter only moves forward, so that number
+// reaches the application only if the client asked for it. See harness.go.
 //
-// The scripted server here refuses TransferSubscriptions with
-// Bad_ServiceUnsupported, which gopcua's own server does
-// (server/subscription_service.go) and real servers do too, and it still
-// holds the notification it withheld, so a Republish asking for that sequence
-// number gets it back. The server never sends that number in a Publish
-// response — its counter only moves forward — so the application receives it
-// only if the client asked for it. A client that recreates the subscription
-// instead gets a stream of later notifications and never that one. See
-// harness.go.
+// The verdict comes off the application's own callback. It turns on the
+// option the server was set to rather than a refusal the row can prove was
+// put to the client, because the record keeps requests and not responses.
 //
-// A known-good client fails this: open62541 has no client-side Republish at
-// all (no UA_TYPES_REPUBLISHREQUEST in its client library), so it resumes
-// Publish, logs the gap and never recovers what it lost. The test is kept
-// because the other three stacks recover it — node-opcua with the §6.7
-// Republish loop on re-activation, measured against this fixture under
-// RefusesTransfer; Eclipse Milo with the same loop and UA-.NETStandard with
-// its gap-walking Republish when the next notification arrives, both read
-// from source and not run here — and because it is an outcome: a client that
-// resumes a stream, replays what the application already had, or fabricates
-// notifications the server never created does not pass it.
+// While knownBug stands the arm keys on an absence: open62541 has no
+// client-side Republish, so it is logged green here rather than failed, and
+// the row cannot tell it from gopcua. node-opcua recovers the notification,
+// measured on this fixture; Eclipse Milo and UA-.NETStandard recover it in
+// source, read and not run here. The row is kept because it scores an
+// outcome a client cannot reach by resuming the stream or by replaying what
+// the application already had.
 
 package reconnect
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 func TestMissedNotificationRecoveredWhenTransferRefused(t *testing.T) {
 	// knownBug records that gopcua does not do this yet; the text is logged in
 	// place of a failure. README.md says when to delete it.
+	// https://github.com/gopcua/opcua/issues/879
 	const knownBug = "the client reconnects and re-activates the session, and the server still has the notification it missed, but the client never gets it back"
+
+	// minSettle is the window after the drop this row needs: reconnect,
+	// re-activate, be refused the transfer, ask, and have the answer reach the
+	// application. That measured under 2ms on loopback; the rest is margin,
+	// twice republish_after_reconnect_test.go's for two more round trips.
+	const minSettle = 2 * time.Second
+
+	// A tripwire, not a check: both sides are constants, so a settleDefault
+	// shortened below minSettle fails the build here rather than a run.
+	const _ = uint64(settleDefault - minSettle)
 
 	run := runScenario(runOptions{RefusesTransfer: true})
 
@@ -57,15 +64,6 @@ func TestMissedNotificationRecoveredWhenTransferRefused(t *testing.T) {
 		t.Fatalf("could not set the test up: %s", why)
 	}
 
-	// The row cannot require that a refusal was actually put to the client:
-	// a client that recovers by republishing on the surviving session never
-	// sends a TransferSubscriptions at all, and that is the client expected
-	// to pass. So the messages say what the server was configured to do, not
-	// what it was asked. A client that sends a transfer and is faulted for
-	// some other reason — before activating, say — is therefore scored as if
-	// the refusal had been put to it. Telling those apart needs the record to
-	// keep responses as well as requests, which it does not. A client that
-	// sends the transfer before activating is the case that shows it.
 	asked, _, _ := republishesAfterDrop(run)
 	recovered, arrived := missedNotificationBack(run)
 
@@ -78,11 +76,8 @@ func TestMissedNotificationRecoveredWhenTransferRefused(t *testing.T) {
 		t.Logf("the client recovered notification %d although the server was set to refuse the transfer "+
 			"(%d notifications after the drop in all)", run.HeldSeq, arrived)
 	case asked > 0 && answerableAsk(run):
-		// The server answers that one sequence number with the notification,
-		// so a client that asked for it on an activated connection and did
-		// not hand it to the application dropped it on the way. That is not
-		// the client knownBug describes, so this arm fires whether or not
-		// knownBug stands.
+		// A client that was given the notification and lost it is not the
+		// client knownBug describes, so this arm fires whether or not it stands.
 		t.Errorf("the client asked the server to resend notification %d after activating the Session, "+
 			"and it never reached the application; %d notifications arrived after the drop", run.HeldSeq, arrived)
 	case knownBug != "":
@@ -96,10 +91,9 @@ func TestMissedNotificationRecoveredWhenTransferRefused(t *testing.T) {
 }
 
 // missedNotificationBack reports whether the notification the server held
-// back reached the application after the drop, and how many notifications
-// reached it after the drop in all. The server sends that sequence number
-// only in answer to a Republish for it, so a delivery carrying it is a
-// notification the client asked for and was given.
+// back reached the application after the drop, and how many arrived after the
+// drop in all. The server sends that sequence number only in answer to a
+// Republish for it, so a delivery carrying it is one the client asked for.
 func missedNotificationBack(run runRecord) (recovered bool, arrived int) {
 	for _, d := range run.Deliveries {
 		if !d.At.After(run.DropAt) {
@@ -116,8 +110,7 @@ func missedNotificationBack(run runRecord) (recovered bool, arrived int) {
 // answerableAsk reports whether a Republish for the held sequence number
 // arrived where the server could answer it: after its own connection's
 // ActivateSession. One that arrives before is faulted Bad_SessionNotActivated
-// and never reaches the retransmission queue, so a run carrying only those
-// has not asked the server anything it could answer.
+// and never reaches the retransmission queue.
 func answerableAsk(run runRecord) bool {
 	activated := map[int]bool{}
 	for _, r := range afterDrop(run) {
