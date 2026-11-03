@@ -133,6 +133,12 @@ type recorder struct {
 	// rest of the run, and the row that notices reports missing notifications
 	// rather than missing items.
 	anyMonitored bool
+	// seqAtRecreate is lastSeq at the moment the first CreateSubscription
+	// after the drop arrived; zero while none has. Everything above it was
+	// created for the replacement subscription, so it is the line between data
+	// the client was still being given on the old one and data it earned by
+	// recreating.
+	seqAtRecreate uint32
 }
 
 // recordRequest takes the decoded request, so the call site does not need to
@@ -217,10 +223,32 @@ func (o *recorder) isActivated(connID int) bool {
 	return o.activatedConns[connID]
 }
 
-func (o *recorder) setAnyMonitored(v bool) {
+// recordItemsMonitored is the CreateMonitoredItems arm's one mutation, and
+// the only thing that turns the fixture's keep-alives back into data.
+func (o *recorder) recordItemsMonitored() {
 	o.mu.Lock()
-	o.anyMonitored = v
+	o.anyMonitored = true
 	o.mu.Unlock()
+}
+
+// recordNewSubscription is the CreateSubscription arm's one mutation: a fresh
+// subscription has nothing monitored on it yet, and the first one created
+// after the drop fixes the sequence number everything the replacement carries
+// is above. The two are set together under the one lock because a Publish
+// answered between them would be counted on the wrong side of that line.
+func (o *recorder) recordNewSubscription() {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	o.anyMonitored = false
+	if o.dropApplied && o.seqAtRecreate == 0 {
+		o.seqAtRecreate = o.lastSeq
+	}
+}
+
+func (o *recorder) seqCreatedAtRecreate() uint32 {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	return o.seqAtRecreate
 }
 
 func (o *recorder) isAnyMonitored() bool {
@@ -366,6 +394,17 @@ type runRecord struct {
 	// and on the default server the two disagree on purpose; see
 	// answerableSeqs.
 	Offered []uint32
+	// SeqAtRecreate is the highest sequence number the server had created when
+	// the client's first CreateSubscription after the drop arrived, and zero
+	// when no such request arrived. A notification above it was created for
+	// the subscription the client put in place of the old one, and the server
+	// creates none at all until something is monitored on that subscription,
+	// so a delivery above it is the client receiving data again on a
+	// subscription it rebuilt. A CreateSubscription that arrives before its
+	// own connection's ActivateSession is faulted Bad_SessionNotActivated and
+	// never reaches the arm that sets this, which is the same rule
+	// republishSeqsAfterDrop reads for a Republish.
+	SeqAtRecreate uint32
 	// HarnessErr is a stage the scenario could not reach; the test reports it
 	// as a setup failure.
 	HarnessErr string
@@ -635,7 +674,7 @@ func (s *server) answer(connID int, req ua.Request) ua.Response {
 		}
 
 	case *ua.CreateSubscriptionRequest:
-		s.rec.setAnyMonitored(false)
+		s.rec.recordNewSubscription()
 		return &ua.CreateSubscriptionResponse{
 			ResponseHeader:            newResponseHeader(h, ua.StatusOK),
 			SubscriptionID:            SubID,
@@ -646,7 +685,7 @@ func (s *server) answer(connID int, req ua.Request) ua.Response {
 
 	case *ua.CreateMonitoredItemsRequest:
 		if r.SubscriptionID == SubID {
-			s.rec.setAnyMonitored(true)
+			s.rec.recordItemsMonitored()
 		}
 		results := make([]*ua.MonitoredItemCreateResult, len(r.ItemsToCreate))
 		for i := range r.ItemsToCreate {
@@ -1069,5 +1108,6 @@ func runScenario(opts runOptions) runRecord {
 	out.LastSeq = srv.rec.highestSeq()
 	out.Answerable = srv.answerableSeqs()
 	out.Offered = srv.available()
+	out.SeqAtRecreate = srv.rec.seqCreatedAtRecreate()
 	return out
 }
