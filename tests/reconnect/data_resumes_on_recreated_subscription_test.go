@@ -206,13 +206,9 @@ func TestDataResumesOnRecreatedSubscription(t *testing.T) {
 // passes" arm for a client that was given nothing.
 //
 // The two rules part company whenever the client has more than one connection
-// open before the drop. run.DropConn names only the connection the held
-// Publish was on, and dropWatcher closes only that one, so a second pre-drop
-// connection is both above run.DropConn before the drop and alive after it.
-// The fixture's rule is the drop having been applied, which is neither of
-// those things. No client here opens a second connection before the drop, so
-// nothing produced the disagreement; the rule it was waiting on is not one the
-// row controls.
+// open before the drop, which is why this row reads the fixture's record
+// rather than calling afterDrop; afterDrop's doc comment in harness.go says
+// how they diverge.
 //
 // What follows is counted on every connection and not only the post-drop one,
 // as in new_subscription_after_republish_returns_invalid_id_test.go: the
