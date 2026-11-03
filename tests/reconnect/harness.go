@@ -35,7 +35,9 @@ package reconnect
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net"
 	"slices"
 	"strings"
 	"sync"
@@ -486,11 +488,32 @@ func clientSilentSetupFailed(run runRecord) string {
 // requests there were in all. The number asked for is the behaviour, not the
 // service name: a client that republishes a number the server never held has
 // not noticed what it lost.
+//
+// A Republish is counted only on a connection the client had already
+// activated, which is republishSeqsAfterDrop's rule and for its reason:
+// answer() faults a Republish that arrives before its own connection's
+// ActivateSession with Bad_SessionNotActivated and never reaches the
+// retransmission arm, so the server resends nothing and the client recovers
+// nothing. Without the filter a client that pipelines Republish ahead of
+// ActivateSession is read as having asked, and republish_after_reconnect_test.go
+// reports "this now passes" for a client that got its notification back no
+// more than one that never asked at all.
+//
+// total is every post-drop request and is deliberately not filtered: it is
+// the denominator the rows print, not a reading of the client.
 func republishesAfterDrop(run runRecord) (asked int, wrongSeqs []uint32, total int) {
-	for _, r := range afterDrop(run) {
+	activated := map[int]bool{}
+	for _, r := range run.Requests {
+		if r.Service == "ActivateSessionRequest" {
+			activated[r.Conn] = true
+		}
+		if r.Conn <= run.DropConn {
+			continue
+		}
 		total++
 		switch {
 		case r.Service != "RepublishRequest":
+		case !activated[r.Conn]:
 		case r.RepublishSeq == run.HeldSeq:
 			asked++
 		default:
@@ -625,7 +648,17 @@ func (s *server) acceptLoop(ctx context.Context) {
 	for {
 		c, err := s.ln.Accept(ctx)
 		if err != nil {
-			return
+			// uacp.Listener.Accept returns an error for a failed UACP
+			// handshake as well as for a closed listener, and the two mean
+			// opposite things here: one client gave up part way through
+			// Hello, or the run is over. Returning on both would end the
+			// server for every later connection because one client aborted,
+			// and the rows with no knownBug would then fail a client for
+			// something the fixture did.
+			if errors.Is(err, net.ErrClosed) || ctx.Err() != nil {
+				return
+			}
+			continue
 		}
 		s.rec.recordConn()
 		// The Hello/Acknowledge handshake is already done, so closing here
