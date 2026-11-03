@@ -16,13 +16,13 @@
 //
 // Two known-good clients fail this, for different reasons, and neither is a
 // reason to drop it. Eclipse Milo's reconnect backoff is hard-coded, one
-// second doubling to sixteen, so it has no configured interval to honour and
-// the second check would redden it. node-opcua 2.187.19 does have a
-// configured interval and ignores it: measured against this scenario at 300ms,
-// 1.2s and 5s it reconnected about six thousand times a second in each case,
-// median gap 0.145ms, because its backoff fires once and then its endpoint
-// probe loop runs free. That is a defect in node-opcua rather than a
-// disagreement about the clause.
+// second doubling to sixteen — read from source, not run here — so it has no
+// configured interval to honour and the second check would redden it.
+// node-opcua 2.187.19 does have a configured interval and ignores it:
+// measured against this scenario at 300ms, 1.2s and 5s it reconnected about
+// six thousand times a second in each case, median gap 0.145ms, because its
+// backoff fires once and then its endpoint probe loop runs free. That is a
+// defect in node-opcua rather than a disagreement about the clause.
 //
 // The test is kept because it checks gopcua's own contract rather than the
 // clause above, which only says "should".

@@ -26,12 +26,13 @@
 // A known-good client fails this: open62541 has no client-side Republish at
 // all (no UA_TYPES_REPUBLISHREQUEST in its client library), so it resumes
 // Publish, logs the gap and never recovers what it lost. The test is kept
-// because the other three stacks recover it — Eclipse Milo and node-opcua
-// with the §6.7 Republish loop on re-activation, UA-.NETStandard with its
-// gap-walking Republish when the next notification arrives — and because it
-// is an outcome: a client that resumes a stream, replays what the
-// application already had, or fabricates notifications the server never
-// created does not pass it.
+// because the other three stacks recover it — node-opcua with the §6.7
+// Republish loop on re-activation, measured against this fixture under
+// RefusesTransfer; Eclipse Milo with the same loop and UA-.NETStandard with
+// its gap-walking Republish when the next notification arrives, both read
+// from source and not run here — and because it is an outcome: a client that
+// resumes a stream, replays what the application already had, or fabricates
+// notifications the server never created does not pass it.
 package reconnect
 
 import "testing"
