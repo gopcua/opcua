@@ -42,14 +42,28 @@ entry is closed.
 Do not delete a `knownBug` constant because the test started passing for a
 reason you cannot explain.
 
+A constant costs the row a second thing while it stands: the row cannot tell
+*this client is broken* from *this client cannot be measured at all*. Where
+the missing behaviour is an absence and the arm keys on that absence, a
+client that never reaches the stimulus lands in the same green arm as one
+that reached it and did the wrong thing. Key the arm on a presence where the
+behaviour allows one, and where it does not, say so in the file.
+
 ## Reviewing a new test: six questions
 
 A test that passes while checking nothing is worse than no test, because it
 is trusted. Tooling cannot see all of it here: the behaviour a `knownBug`
 constant masks is logged rather than failed, so a mutation score counts that
 row as passing whatever the client does about that behaviour. The arms that
-fire beside the constant are ordinary failures and are visible. So a reviewer
-asks these six, each of which has caught a real defect in this package.
+fire beside the constant are ordinary failures and are visible.
+
+One convention the questions assume: a row with two kinds of decline splits
+them, the one that is gopcua's own defect through the `knownBug` arm and the
+one a conforming client earns as a `t.Fatalf` up with the preconditions. The
+rule and its reasoning are on `setupFailed` in `harness.go`.
+
+So a reviewer asks these six, each of which has caught a real defect in this
+package.
 
 1. **Can the failing branch ever run?** Trace it. One test here had a FAIL
    condition that could never hold, so it passed every client and failed
