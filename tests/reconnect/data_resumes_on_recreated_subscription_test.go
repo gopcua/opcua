@@ -37,6 +37,12 @@
 // proof the items came back; how many followed is
 // data_resumes_after_reconnect_test.go's question and not this one's.
 //
+// Whether there is a replacement at all is read off runRecord.RecreateAfter,
+// which the fixture set in the same locked block as SeqAtRecreate. That is
+// README.md's first review question answered by construction rather than by
+// assertion: the row cannot find a replacement the line was never fixed for,
+// because the two are one record. See newSubscriptionAfterDrop.
+//
 // The row does not require the replacement to follow a Republish, and that is
 // deliberate rather than an oversight. Row 9 is the row that establishes the
 // replacement was an answer to the status; what this one measures is what the
@@ -179,39 +185,41 @@ func TestDataResumesOnRecreatedSubscription(t *testing.T) {
 }
 
 // newSubscriptionAfterDrop reads what the client did about the subscription
-// the server disowned: whether it created a replacement on a post-drop
-// connection it had already activated, and how many Publish requests it sent
-// after that request went over the wire.
+// the server disowned: whether it created a replacement, and how many Publish
+// requests it sent after that request went over the wire.
 //
-// The activation rule is republishSeqsAfterDrop's, for the same reason: a
-// CreateSubscription that arrives before its own connection's ActivateSession
-// is faulted Bad_SessionNotActivated rather than creating anything, so the
-// client has no subscription out of it. It is also the rule the fixture
-// applies when it sets runRecord.SeqAtRecreate, so the request this walk
-// finds is the request that fixed the sequence number the deliveries are read
-// against.
+// Both answers come from runRecord.RecreateAfter, which the fixture set in the
+// same locked block as runRecord.SeqAtRecreate, when the request arrived. The
+// row does not look for that request itself, and the reason it does not is the
+// whole point. It did once, by a rule of its own -- a CreateSubscription on a
+// connection above run.DropConn that had already been activated -- and a row
+// that decides "there is a replacement" by one rule and "here is the line its
+// data has to be above" by another is a row that can be told there is a
+// replacement and handed no line. SeqAtRecreate is zero when the fixture never
+// fixed one, so every delivery in the run, every pre-drop one included, reads
+// as data the replacement carried, and the switch below takes the "this now
+// passes" arm for a client that was given nothing.
 //
-// What follows is counted on every post-drop connection and not only that
-// one, as in new_subscription_after_republish_returns_invalid_id_test.go: the
+// The two rules part company whenever the client has more than one connection
+// open before the drop. run.DropConn names only the connection the held
+// Publish was on, and dropWatcher closes only that one, so a second pre-drop
+// connection is both above run.DropConn before the drop and alive after it.
+// The fixture's rule is the drop having been applied, which is neither of
+// those things. No client here opens a second connection before the drop, so
+// nothing produced the disagreement; the rule it was waiting on is not one the
+// row controls.
+//
+// What follows is counted on every connection and not only the post-drop one,
+// as in new_subscription_after_republish_returns_invalid_id_test.go: the
 // clause asks for a Subscription that carries data, not for one on any
-// particular channel.
+// particular channel. The fixture serves one subscription, so a Publish from
+// here on is a Publish the replacement could have been answered under.
 func newSubscriptionAfterDrop(run runRecord) (created bool, published int) {
-	activated := map[int]bool{}
-	first := -1
-	for i, r := range run.Requests {
-		if r.Service == "ActivateSessionRequest" {
-			activated[r.Conn] = true
-			continue
-		}
-		if first < 0 && r.Service == "CreateSubscriptionRequest" && r.Conn > run.DropConn && activated[r.Conn] {
-			first = i
-		}
-	}
-	if first < 0 {
+	if run.RecreateAfter == 0 {
 		return false, 0
 	}
-	for _, r := range run.Requests[first+1:] {
-		if r.Conn > run.DropConn && r.Service == "PublishRequest" {
+	for _, r := range run.Requests[run.RecreateAfter:] {
+		if r.Service == "PublishRequest" {
 			published++
 		}
 	}
