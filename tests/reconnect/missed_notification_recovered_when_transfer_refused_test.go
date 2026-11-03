@@ -33,6 +33,7 @@
 // from source and not run here — and because it is an outcome: a client that
 // resumes a stream, replays what the application already had, or fabricates
 // notifications the server never created does not pass it.
+
 package reconnect
 
 import "testing"
