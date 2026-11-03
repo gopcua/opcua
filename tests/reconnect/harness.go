@@ -527,6 +527,10 @@ func republishSeqsAfterDrop(run runRecord) []uint32 {
 // if one ran. This is the reason the knownBug arm carries in both rows that
 // read the loop: gopcua re-activates and then asks for nothing, so neither
 // has anything to score rather than something to object to.
+//
+// It subsumes reconnectSetupFailed, so the rows that call both call that one
+// first; that order is what makes the knownBug text's "reconnects and
+// re-activates" true of every run that reaches this reason.
 func loopRanSetupFailed(run runRecord) string {
 	if len(republishSeqsAfterDrop(run)) == 0 {
 		return "the client sent no Republish after the drop on a connection it had activated, so " +
@@ -537,6 +541,15 @@ func loopRanSetupFailed(run runRecord) string {
 
 // afterDrop is every request the client sent on a connection it opened after
 // the drop.
+//
+// Its rule parts company with the fixture's own whenever the client has more
+// than one connection open before the drop: run.DropConn names only the
+// connection the held Publish was on, and dropWatcher closes only that one,
+// so a second pre-drop connection is above run.DropConn before the drop and
+// alive after it, while the fixture's rule is the drop having been applied.
+// No client here opens a second connection, so nothing has produced the
+// disagreement; data_resumes_on_recreated_subscription_test.go, which cannot
+// tolerate it, reads runRecord.RecreateAfter instead.
 func afterDrop(run runRecord) []requestRecord {
 	var out []requestRecord
 	for _, r := range run.Requests {
