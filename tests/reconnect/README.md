@@ -12,7 +12,8 @@ One run reduces to the `runRecord` type, documented at its declaration in
 `harness.go`.
 
 Only a test function calls `t.Errorf` or `t.Fatalf`. A helper reads the
-`runRecord` and returns plain values, wherever it lives.
+`runRecord` and returns plain values. A helper two rows call lives in
+`harness.go`; a helper one row calls lives with that row.
 
 The suite exists because a diff of reconnect code does not tell you what the
 client will do: that depends on how the server answers after the drop, and

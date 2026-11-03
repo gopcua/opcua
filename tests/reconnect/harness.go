@@ -368,6 +368,71 @@ func reconnectSetupFailed(run runRecord) string {
 		"subscriptions were never offered back to it"
 }
 
+// clientSilentSetupFailed reports why there is nothing of the client's to
+// read after the drop, or "" if there is. A client that sent nothing at all
+// has not declined to do anything in particular, so no row can score it.
+func clientSilentSetupFailed(run runRecord) string {
+	if len(afterDrop(run)) == 0 {
+		return "the client sent nothing at all after the drop"
+	}
+	return ""
+}
+
+// republishesAfterDrop reads what the client sent on a connection it opened
+// after the drop: how many Republish asked for the notification the server
+// held, which other sequence numbers it asked for instead, and how many
+// requests there were in all. The number asked for is the behaviour, not the
+// service name: a client that republishes a number the server never held has
+// not noticed what it lost.
+func republishesAfterDrop(run runRecord) (asked int, wrongSeqs []uint32, total int) {
+	for _, r := range afterDrop(run) {
+		total++
+		switch {
+		case r.Service != "RepublishRequest":
+		case r.RepublishSeq == run.HeldSeq:
+			asked++
+		default:
+			wrongSeqs = append(wrongSeqs, r.RepublishSeq)
+		}
+	}
+	return asked, wrongSeqs, total
+}
+
+// republishSeqsAfterDrop is the sequence numbers the client asked the server
+// to resend, in the order they went over the wire. It counts only what the
+// client sent on a connection it opened after the drop and had already
+// activated there: a Republish that arrives before that connection's
+// ActivateSession is faulted with Bad_SessionNotActivated rather than
+// answered by the retransmission rule, so it is not part of any loop.
+// session_unused_before_activation_test.go is the row that scores it, and
+// answerableAsk in the transfer-refused row reads the same rule for the one
+// number that row cares about.
+func republishSeqsAfterDrop(run runRecord) []uint32 {
+	var out []uint32
+	activated := map[int]bool{}
+	for _, r := range run.Requests {
+		switch {
+		case r.Service == "ActivateSessionRequest":
+			activated[r.Conn] = true
+		case r.Service == "RepublishRequest" && r.Conn > run.DropConn && activated[r.Conn]:
+			out = append(out, r.RepublishSeq)
+		}
+	}
+	return out
+}
+
+// loopRanSetupFailed reports why there was no Republish loop at all, or ""
+// if one ran. This is the reason the knownBug arm carries in both rows that
+// read the loop: gopcua re-activates and then asks for nothing, so neither
+// has anything to score rather than something to object to.
+func loopRanSetupFailed(run runRecord) string {
+	if len(republishSeqsAfterDrop(run)) == 0 {
+		return "the client sent no Republish after the drop on a connection it had activated, so " +
+			"no loop ran"
+	}
+	return ""
+}
+
 // afterDrop is every request the client sent on a connection it opened after
 // the drop.
 func afterDrop(run runRecord) []requestRecord {

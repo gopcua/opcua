@@ -49,7 +49,7 @@ func TestRepublishAfterReconnect(t *testing.T) {
 	if why := setupFailed(run); why != "" {
 		t.Fatalf("could not set the test up: %s", why)
 	}
-	if why := lossSetupFailed(run); why != "" {
+	if why := clientSilentSetupFailed(run); why != "" {
 		t.Fatalf("could not set the test up: %s", why)
 	}
 
@@ -84,38 +84,6 @@ func TestRepublishAfterReconnect(t *testing.T) {
 		t.Errorf("the client missed notification %d and never asked for it "+
 			"(%d requests after the reconnect, none a Republish)", run.HeldSeq, total)
 	}
-}
-
-// lossSetupFailed reports why the loss this test is about was not
-// constructed, or "" if it was. Until it is, the test has nothing to ask.
-func lossSetupFailed(run runRecord) string {
-	if _, _, total := republishesAfterDrop(run); total == 0 {
-		return "the client sent nothing at all after the drop"
-	}
-	return ""
-}
-
-// republishesAfterDrop reads what the client sent on a connection it opened
-// after the drop: how many Republish asked for the notification the server
-// held, which other sequence numbers it asked for instead, and how many
-// requests there were in all. The number asked for is the behaviour, not the
-// service name: a client that republishes a number the server never held has
-// not noticed what it lost.
-func republishesAfterDrop(run runRecord) (asked int, wrongSeqs []uint32, total int) {
-	for _, r := range run.Requests {
-		if r.Conn <= run.DropConn {
-			continue
-		}
-		total++
-		switch {
-		case r.Service != "RepublishRequest":
-		case r.RepublishSeq == run.HeldSeq:
-			asked++
-		default:
-			wrongSeqs = append(wrongSeqs, r.RepublishSeq)
-		}
-	}
-	return asked, wrongSeqs, total
 }
 
 // republishSetupFailed reports why this run could not have told a client that
