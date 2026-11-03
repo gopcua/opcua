@@ -43,10 +43,23 @@
 // the row may claim, and a second status would be needed to tell the two
 // apart.
 //
+// A second limit, this one on the row's own instrument. open62541 is where
+// knownBug costs this row something: it has no client-side Republish, so it
+// sends none after the drop, which is the trace gopcua's defect leaves too,
+// and both land in the knownBug arm below, logged and green. While the
+// constant stands the row reports gopcua's bug over a client that has none.
+// Deleting the constant does not separate them; it moves both to the
+// t.Fatalf decline below, which is red and says plainly that nothing was
+// measured. Keying the arm on a presence, as
+// no_acknowledgements_when_nothing_is_available_test.go does, would escape
+// this and is not open here: the defect this row scores is an absence and no
+// fixture makes gopcua republish, so this is a limit to state rather than to
+// engineer away.
+//
 // DeleteSubscriptions is not scripted. It falls to the catch-all in
 // harness.go and is answered Bad_ServiceUnsupported, which is what a client
-// that sends one before creating the replacement gets. The clients measured
-// against this fixture send it and go on to CreateSubscription regardless, so
+// that sends one before creating the replacement gets. The gopcua clients
+// measured against this fixture send it and go on to CreateSubscription, so
 // the row works as written and the fixture is not missing an arm.
 //
 // This row has one decline and not two. A run where the client sent no
@@ -60,9 +73,9 @@
 // Republish that reached it was faulted with the status this row is about.
 //
 // The reference stacks, and the exception this row takes. Two of the four
-// fail it, one is declined and one is not settled, all read from source and
-// none of them run here. The row is kept deliberately and the stacks it fails
-// are named:
+// fail it, one passes it and one is declined, all read from source and none
+// of them run here; node-opcua was also measured by hand against this
+// fixture. The row is kept deliberately and the stacks it fails are named:
 //
 //   - Eclipse Milo fails it. PublishingManager treats Bad_MessageNotAvailable
 //     as the normal end of the loop and anything else, Bad_SubscriptionIdInvalid
@@ -77,11 +90,12 @@
 //     republish_after_reconnect_test.go and
 //     publish_resumes_when_republish_loop_ends_test.go: it has no client-side
 //     Republish at all, so it never gets the status put to it.
-//   - node-opcua 2.187.19 escalates a Republish failure other than
-//     Bad_MessageNotAvailable to recreating the Session, which then transfers
-//     the subscriptions. This server accepts that transfer, so whether
-//     node-opcua ever reaches CreateSubscription on this fixture is not
-//     settled by the source read and was not measured here.
+//   - node-opcua 2.187.19 passes it, measured here. Its source escalates a
+//     Republish failure other than Bad_MessageNotAvailable to recreating the
+//     Session; against this fixture it takes the shorter route instead,
+//     straight to CreateSubscription on the Session it still has, with no
+//     CreateSession, TransferSubscriptions or DeleteSubscriptions after the
+//     drop.
 //
 // So this is a behaviour most libraries leave to the application, and the row
 // says so rather than claiming every client should pass. It is kept because
@@ -90,13 +104,6 @@
 // reached by accident: the CreateSubscription this row counts has to follow a
 // Republish the server faulted, so a client that recreates its subscription
 // on every re-activation without ever asking does not pass.
-//
-// What that client does read is worth knowing, because it is the one place
-// knownBug costs this row something. It is declined, not failed, and while
-// knownBug stands a decline is logged and green, so until someone deletes the
-// constant the row cannot tell that client from gopcua's own. Delete the
-// constant and it becomes the t.Fatalf below instead, and the row is red for
-// it.
 package reconnect
 
 import (
@@ -134,7 +141,10 @@ func TestNewSubscriptionAfterRepublishReturnsInvalidID(t *testing.T) {
 		t.Fatalf("could not set the test up: %s", why)
 	}
 	// A client that never re-activated was never offered the subscription
-	// back, so it was never in a position to republish on it.
+	// back, so it was never in a position to republish on it. It runs before
+	// loopRanSetupFailed, which subsumes it: that order is what makes the
+	// knownBug text's "reconnects and re-activates" true of every run that
+	// reaches it.
 	if why := reconnectSetupFailed(run); why != "" {
 		t.Fatalf("could not set the test up: %s", why)
 	}
