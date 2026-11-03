@@ -70,7 +70,7 @@ func TestRepublishAsksForEachMissedNumber(t *testing.T) {
 	// sleeps a second between asks. minLoopWindow is what that pacing costs,
 	// and the window is twice it, the rest being margin for a loaded machine.
 	// A window that closed mid-loop would look like a client that gave up;
-	// republishLoopSetupFailed declines those runs rather than scoring them,
+	// loopScorableSetupFailed declines those runs rather than scoring them,
 	// and the margin is there to make them rare.
 	const minLoopWindow = time.Duration(furtherLost+2) * time.Second
 	const settleLoop = 10 * time.Second
@@ -95,12 +95,19 @@ func TestRepublishAsksForEachMissedNumber(t *testing.T) {
 		t.Fatalf("could not set the test up: %s", why)
 	}
 
-	why := republishLoopSetupFailed(run)
+	// A loop the row cannot score is not a defect of gopcua's, so it is a
+	// setup failure here rather than something the knownBug arm excuses.
+	if why := loopScorableSetupFailed(run); why != "" {
+		t.Fatalf("could not set the test up: %s", why)
+	}
+
+	// Having no loop at all is the known bug, so it goes through the switch.
+	why := loopRanSetupFailed(run)
 
 	asked := republishSeqsAfterDrop(run)
 
 	// republishLoopWrong reads a loop whose first ask the server answered,
-	// which is what why being empty establishes.
+	// which loopScorableSetupFailed has established.
 	var wrong string
 	if why == "" {
 		wrong = republishLoopWrong(asked, run.Answerable)
@@ -146,34 +153,38 @@ func republishSeqsAfterDrop(run runRecord) []uint32 {
 	return out
 }
 
-// republishLoopSetupFailed reports why this run could not have told a client
-// that stopped the loop early from one that was never in a position to walk
-// it, or "" if it could.
+// loopScorableSetupFailed reports why a loop that ran could not be scored
+// against §6.7, or "" if it could. None of these is gopcua's defect, so each
+// is a plain setup failure rather than something the knownBug arm excuses; a
+// run with no loop at all is loopRanSetupFailed's to report, and that one is
+// the defect.
 //
-// Three things have to hold. The server has to have had more than one
-// notification to give back, or there is no loop to ask for. The client's
-// first ask has to be the first of them, because that is the ask the server
-// answers with a notification, and until one comes back nothing has told the
-// client there might be more; a client that asks for something else is
-// faulted and stops for a reason the clause allows, and
+// The first check is a tripwire on the row's own FurtherLost rather than a
+// reading of the client: the server's queue runs contiguously from the
+// notification it held, so a run of this row always has FurtherLost+1
+// numbers to give back.
+//
+// The client's first ask has to be the first of them, because that is the ask
+// the server answers with a notification, and until one comes back nothing
+// has told the client there might be more; a client that asks for something
+// else is faulted and stops for a reason the clause allows, and
 // republish_after_reconnect_test.go is the row that scores the number it
 // asked for. And where the client has not yet asked for the last number the
 // server has, the last thing it sent has to be something other than a
 // Republish: a run whose last request is a Republish may have been cut off
 // mid-loop when the settle window closed, and the record cannot tell that
 // from a client that gave up.
-func republishLoopSetupFailed(run runRecord) string {
+func loopScorableSetupFailed(run runRecord) string {
 	if len(run.Answerable) < 2 {
 		return fmt.Sprintf("the server had %d notification(s) to give back, and a loop needs more "+
 			"than one", len(run.Answerable))
 	}
 	asked := republishSeqsAfterDrop(run)
+	if len(asked) == 0 {
+		return ""
+	}
 	first := run.Answerable[0]
-	switch {
-	case len(asked) == 0:
-		return fmt.Sprintf("the client never asked for notification %d on a connection it had "+
-			"activated, so the server never handed it one and never gave it a reason to ask again", first)
-	case asked[0] != first:
+	if asked[0] != first {
 		return fmt.Sprintf("the client's first ask was for notification %d, which the server does "+
 			"not have, so it was faulted rather than answered and the client was never given a "+
 			"reason to ask again; the first one it missed was %d", asked[0], first)

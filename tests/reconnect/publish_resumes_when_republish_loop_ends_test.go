@@ -196,14 +196,15 @@ func afterLastRepublish(run runRecord) (lastAsk uint32, published, sent int, ask
 	return lastAsk, published, sent, true
 }
 
-// loopRanSetupFailed reports why there was no Republish loop to find the end
-// of, or "" if there was one. This is the reason the knownBug arm carries:
-// gopcua re-activates and then asks for nothing, so the row has nothing to
-// score rather than something to object to.
+// loopRanSetupFailed reports why there was no Republish loop at all, or ""
+// if one ran. This is the reason the knownBug arm carries, here and in
+// republish_asks_for_each_missed_number_test.go: gopcua re-activates and then
+// asks for nothing, so either row has nothing to score rather than something
+// to object to.
 func loopRanSetupFailed(run runRecord) string {
 	if _, _, _, asked := afterLastRepublish(run); !asked {
 		return "the client sent no Republish after the drop on a connection it had activated, so " +
-			"no loop ran and none of its own can have ended"
+			"no loop ran"
 	}
 	return ""
 }
