@@ -30,11 +30,8 @@
 // A run where no Republish was sent after the drop at all is gopcua's known
 // bug: the client reconnects, re-activates, and never asks for anything it
 // missed, so there is no loop to end and nothing to resume from. That is the
-// same defect republish_after_reconnect_test.go,
-// data_resumes_after_reconnect_test.go,
-// missed_notification_recovered_when_transfer_refused_test.go and
-// republish_asks_for_each_missed_number_test.go all log, and it goes through
-// the knownBug arm below with them.
+// same defect the other rows log, and it goes through the knownBug arm below
+// with them.
 //
 // A run whose last ask was for a number the server had is not a bug. The loop
 // stopped for a reason of the client's own — the gap filled, or

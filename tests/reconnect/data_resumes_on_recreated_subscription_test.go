@@ -57,7 +57,7 @@
 // different things.
 //
 // A client that created no new Subscription after the drop is gopcua's known
-// bug, logged below with the four other rows that log the same defect: it
+// bug, logged below with the other rows that log the same defect: it
 // reconnects, re-activates, and leaves the subscription exactly as it was. It
 // is not this row's business to object to that, because
 // new_subscription_after_republish_returns_invalid_id_test.go already does,

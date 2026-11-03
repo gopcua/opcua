@@ -65,7 +65,7 @@ rule and its reasoning are on `setupFailed` in `harness.go`.
 So a reviewer asks these six, each of which has caught a real defect in this
 package.
 
-1. **Can the failing branch ever run?** Trace it. One test here had a FAIL
+1. **Can the failing or declining branch ever run?** Trace it. One test here had a FAIL
    condition that could never hold, so it passed every client and failed
    none. Every automated check we had called it sound.
 
