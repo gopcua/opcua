@@ -118,7 +118,7 @@ func missedNotificationBack(run runRecord) (recovered bool, arrived int) {
 // has not asked the server anything it could answer.
 func answerableAsk(run runRecord) bool {
 	activated := map[int]bool{}
-	for _, r := range run.Requests {
+	for _, r := range afterDrop(run) {
 		switch {
 		case r.Service == "ActivateSessionRequest":
 			activated[r.Conn] = true
