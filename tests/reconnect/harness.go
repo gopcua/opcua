@@ -15,8 +15,8 @@
 //
 // Exactly one notification is lost in the stream, and the scenario checks it:
 // a client that keeps one Publish outstanding leaves one sequence number
-// created and withheld, which is the one availableSeqs offers back and the
-// one the rows name. A client that keeps more outstanding would lose more
+// created and withheld, which is the one availableSeqsLocked offers back and
+// the one the rows name. A client that keeps more outstanding would lose more
 // than the rows describe, and the run is reported as a setup failure instead.
 //
 // A run can ask for more than that one to be recoverable. runOptions.FurtherLost
@@ -302,9 +302,10 @@ func (o *recorder) heldPublishSeq() uint32 {
 	return o.heldSeq
 }
 
-// availableSeqs is what the server says it can still resend. An empty list
-// claims it keeps no retransmission queue at all (OPC 10000-4 §5.14.1.1), so
-// while a notification is held back the list has to name it. Every Publish
+// availableSeqsLocked is what the server says it can still resend, read with
+// the recorder's lock already held. An empty list claims it keeps no
+// retransmission queue at all (OPC 10000-4 §5.14.1.1), so while a
+// notification is held back the list has to name it. Every Publish
 // answer and every TransferResult carries it, and the two agree with each
 // other. Only under RefusesTransfer does a Republish for that number actually
 // get it back; the default server advertises it and then answers
@@ -317,12 +318,6 @@ func (o *recorder) heldPublishSeq() uint32 {
 // to a test exactly like a client that stopped incrementing too early. The
 // list is contiguous so that a row measures the client rather than the
 // client's publish-queue depth.
-func (o *recorder) availableSeqs() []uint32 {
-	o.mu.Lock()
-	defer o.mu.Unlock()
-	return o.availableSeqsLocked()
-}
-
 func (o *recorder) availableSeqsLocked() []uint32 {
 	if o.heldSeq == 0 {
 		return []uint32{}
@@ -868,10 +863,10 @@ func (s *server) answerableSeqsLocked() []uint32 {
 
 // available is what the server tells the client it still has: the list a
 // keep-alive and a TransferResult carry, and the one availableWith builds a
-// data PublishResponse's list from. It is the recorder's
-// availableSeqs, except under NoRetransmissionQueue, where the server keeps no
-// retransmission queue and says so with an empty list on every answer, as OPC
-// 10000-4 §5.14.5.2 requires of such a server and as gopcua's own server does.
+// data PublishResponse's list from. It is the recorder's availableSeqsLocked,
+// except under NoRetransmissionQueue, where the server keeps no retransmission
+// queue and says so with an empty list on every answer, as OPC 10000-4
+// §5.14.5.2 requires of such a server and as gopcua's own server does.
 //
 // runRecord.Offered is this list, so a test reads what the client was told
 // rather than restating the rule the server told it by.
