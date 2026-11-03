@@ -139,9 +139,8 @@ func TestNewSubscriptionAfterRepublishReturnsInvalidID(t *testing.T) {
 	}
 	// A client that never re-activated was never offered the subscription
 	// back, so it was never in a position to republish on it. It runs before
-	// loopRanSetupFailed, which subsumes it: that order is what makes the
-	// knownBug text's "reconnects and re-activates" true of every run that
-	// reaches it.
+	// loopRanSetupFailed, which subsumes it; harness.go says why the order
+	// matters.
 	if why := reconnectSetupFailed(run); why != "" {
 		t.Fatalf("could not set the test up: %s", why)
 	}
