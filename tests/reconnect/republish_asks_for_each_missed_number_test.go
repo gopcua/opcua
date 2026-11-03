@@ -5,45 +5,24 @@
 // sequence number until the Server returns the status
 // Bad_MessageNotAvailable." Conformance unit 276: "Evaluate the sequence
 // number in Notifications to detect lost Notifications. Use Republish to
-// request missing Notifications."
+// request missing Notifications." Stopping one short of the fault is
+// accepted too: availableSequenceNumbers can tell a client nothing is left
+// above the number it just recovered, and gopcua's own loop stops there when
+// it is given the list.
 //
-// Whether the client asks at all is republish_after_reconnect_test.go. This
-// file is about the asks after the first one, because a client that asks once
-// and stops recovers one notification of however many it lost and looks the
-// same as a conforming one on a server that had one to give. What the client
-// does once the loop has ended — resume Publish with the normal handling — is
-// a separate behaviour with its own file.
+// Whether the client asks at all is republish_after_reconnect_test.go; what
+// it does once the loop has ended is
+// publish_resumes_when_republish_loop_ends_test.go. The scripted server is
+// the transfer-refusing one of
+// missed_notification_recovered_when_transfer_refused_test.go, here holding
+// furtherLost more notifications behind the one it withheld. See harness.go.
 //
-// The scripted server here is the one that keeps the retransmission queue OPC
-// 10000-4 §5.14.1.1 describes, which is the transfer-refusing one; the other
-// answers every Republish with Bad_MessageNotAvailable, and against it a loop
-// of one and a loop of five leave the same trace. Besides the notification it
-// holds back, the server queues furtherLost more as the drop is applied:
-// responses it sent that the connection took with it, which is the case §6.7
-// opens with — "When the connection is lost, Publish responses may have been
-// sent but not received by the Client". So the client's next expected
-// sequence number is the one the server held, the server answers that one and
-// the furtherLost behind it, and faults the next. See harness.go.
-//
-// A conforming client asks for every one of them, in turn. Whether it then
-// asks for the number that gets the fault is left open: the clause says to
-// increment until the Server returns Bad_MessageNotAvailable, but a client
-// that has been told by availableSequenceNumbers that nothing is left above
-// the number it just recovered may stop there, and gopcua's own loop does
-// exactly that when it is given the list. Both are accepted. Leaving behind a
-// number the server still had is not, and nor is going on asking once the
-// fault has come back.
-//
-// open62541 has no client-side Republish at all, so it never starts the loop
-// and this row declines to score it rather than failing it: the row that
-// reddens open62541 is republish_after_reconnect_test.go, which takes that
-// exception explicitly. Measured, node-opcua walks the whole gap and stops on
-// the fault, exactly as the pull request under review does. Eclipse Milo and
-// UA-.NETStandard are source reads; neither can be run here.
-//
-// The test reads the sequence numbers that went over the wire: a client
-// cannot produce them by resuming the stream, and one that stops while the
-// server still has a number for it does not produce them either.
+// open62541 has no client-side Republish at all, so this row declines to
+// score it rather than failing it; the row that fails it is
+// republish_after_reconnect_test.go, which takes that exception explicitly.
+// node-opcua walks the whole gap and stops on the fault, measured. Eclipse
+// Milo and UA-.NETStandard are source reads, not run here. A client cannot
+// produce the numbers this row reads by resuming the stream.
 
 package reconnect
 
@@ -56,23 +35,20 @@ import (
 func TestRepublishAsksForEachMissedNumber(t *testing.T) {
 	// knownBug records that gopcua does not do this yet; the text is logged in
 	// place of a failure. README.md says when to delete it.
+	// https://github.com/gopcua/opcua/issues/879
 	const knownBug = "the client reconnects and re-activates the session, but never asks for anything it missed, so there is no loop to walk"
 
 	// furtherLost is how many notifications the server keeps for
 	// retransmission behind the one it held back. Two means it can give back
 	// three, so a client that asks once and a client that asks twice both
-	// leave something behind and the row names the numbers they left. Nothing
-	// in the row depends on the length: what it reads is whether the asks
-	// cover what the server had.
+	// leave something behind and the row names the numbers they left.
 	const furtherLost = 2
 
 	// settleLoop replaces settleDefault for this run: the window has to hold
 	// the whole loop, and a client paces its Republish — gopcua's own loop
 	// sleeps a second between asks. minLoopWindow is what that pacing costs,
 	// and the window is twice it, the rest being margin for a loaded machine.
-	// A window that closed mid-loop would look like a client that gave up;
-	// loopScorableSetupFailed declines those runs rather than scoring them,
-	// and the margin is there to make them rare.
+	// A window that closed mid-loop is loopScorableSetupFailed's to decline.
 	const minLoopWindow = time.Duration(furtherLost+2) * time.Second
 	const settleLoop = 10 * time.Second
 
@@ -140,16 +116,9 @@ func TestRepublishAsksForEachMissedNumber(t *testing.T) {
 // notification it held, so a run of this row always has FurtherLost+1
 // numbers to give back.
 //
-// The client's first ask has to be the first of them, because that is the ask
-// the server answers with a notification, and until one comes back nothing
-// has told the client there might be more; a client that asks for something
-// else is faulted and stops for a reason the clause allows, and
-// republish_after_reconnect_test.go is the row that scores the number it
-// asked for. And where the client has not yet asked for the last number the
-// server has, the last thing it sent has to be something other than a
-// Republish: a run whose last request is a Republish may have been cut off
-// mid-loop when the settle window closed, and the record cannot tell that
-// from a client that gave up.
+// A client that asks for something else first is faulted and stops for a
+// reason the clause allows, and republish_after_reconnect_test.go is the row
+// that scores the number it asked for.
 func loopScorableSetupFailed(run runRecord) string {
 	if len(run.Answerable) < 2 {
 		return fmt.Sprintf("the server had %d notification(s) to give back, and a loop needs more "+
@@ -166,7 +135,7 @@ func loopScorableSetupFailed(run runRecord) string {
 			"reason to ask again; the first one it missed was %d", asked[0], first)
 	}
 	lastAnswerable := run.Answerable[len(run.Answerable)-1]
-	if asked[len(asked)-1] < lastAnswerable && lastAfterDrop(run) == "RepublishRequest" {
+	if asked[len(asked)-1] < lastAnswerable && lastServiceAfterDrop(run) == "RepublishRequest" {
 		return fmt.Sprintf("the client had asked for %v, the server still had notifications up to "+
 			"%d to give back, and the last thing it sent was another Republish, so the settle "+
 			"window may have closed while it was still walking the gap rather than after it gave "+
@@ -175,9 +144,9 @@ func loopScorableSetupFailed(run runRecord) string {
 	return ""
 }
 
-// lastAfterDrop is the service name of the last request the client sent on a
-// connection it opened after the drop, or "" if it sent none.
-func lastAfterDrop(run runRecord) string {
+// lastServiceAfterDrop is the service name of the last request the client
+// sent on a connection it opened after the drop, or "" if it sent none.
+func lastServiceAfterDrop(run runRecord) string {
 	after := afterDrop(run)
 	if len(after) == 0 {
 		return ""
@@ -192,7 +161,9 @@ func lastAfterDrop(run runRecord) string {
 // server has. Asking for the one past them, the number that gets
 // Bad_MessageNotAvailable, is allowed and so is stopping without it; asking
 // for anything beyond that is not. The caller has established that the client
-// asked for the first number and was answered.
+// asked for the first number and was answered. The string returned is the
+// failure the test prints, so the sentence a reader meets at the switch's
+// default arm is phrased here.
 func republishLoopWrong(asked, answerable []uint32) string {
 	first := answerable[0]
 	lastAnswerable := answerable[len(answerable)-1]
