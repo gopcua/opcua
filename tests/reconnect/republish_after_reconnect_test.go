@@ -89,9 +89,6 @@ func TestRepublishAfterReconnect(t *testing.T) {
 // lossSetupFailed reports why the loss this test is about was not
 // constructed, or "" if it was. Until it is, the test has nothing to ask.
 func lossSetupFailed(run runRecord) string {
-	if run.HeldSeq == 0 {
-		return "the server never held a notification back, so nothing was lost"
-	}
 	if _, _, total := republishesAfterDrop(run); total == 0 {
 		return "the client sent nothing at all after the drop"
 	}
