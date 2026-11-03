@@ -14,6 +14,7 @@
 // the scripted server faults on: CreateSession creates it, ActivateSession is
 // what is being waited for, GetEndpoints and FindServers need no Session, and
 // CloseSession is how a client abandons one it could not activate.
+
 package reconnect
 
 import "testing"

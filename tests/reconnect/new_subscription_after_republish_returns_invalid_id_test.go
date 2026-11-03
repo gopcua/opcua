@@ -104,6 +104,7 @@
 // reached by accident: the CreateSubscription this row counts has to follow a
 // Republish the server faulted, so a client that recreates its subscription
 // on every re-activation without ever asking does not pass.
+
 package reconnect
 
 import (

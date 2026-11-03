@@ -7,6 +7,7 @@
 // that creates a new Session anyway still recovers data, but it abandons the
 // subscriptions the old Session held, so a test that only watched for data
 // would pass it. See harness.go.
+
 package reconnect
 
 import "testing"

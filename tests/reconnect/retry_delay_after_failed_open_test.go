@@ -26,6 +26,7 @@
 //
 // The test is kept because it checks gopcua's own contract rather than the
 // clause above, which only says "should".
+
 package reconnect
 
 import (
