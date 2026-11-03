@@ -38,11 +38,9 @@ func TestRepublishAfterReconnect(t *testing.T) {
 	// that never asks cannot be told from one that had no time to.
 	const minSettle = 1 * time.Second
 
-	if settleDefault < minSettle {
-		t.Fatalf("could not set the test up: the settle window of %s is shorter than the %s a client "+
-			"needs to reconnect and ask, so a client that never asks cannot be told from one that was "+
-			"not given time. Lengthen settleDefault in harness.go", settleDefault, minSettle)
-	}
+	// A tripwire, not a check: both sides are constants, so a settleDefault
+	// shortened below minSettle fails the build here rather than a run.
+	const _ = uint64(settleDefault - minSettle)
 
 	run := runScenario(runOptions{})
 
