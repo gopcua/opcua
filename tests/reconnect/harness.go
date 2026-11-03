@@ -451,10 +451,8 @@ type server struct {
 	ln       *uacp.Listener
 	endpoint string
 
-	dropCh          chan struct{} // the scenario's one-shot drop command
-	refuseAfterDrop bool          // close every connection accepted once the drop has started
-	refusesTransfer bool          // the server of runOptions.RefusesTransfer
-	furtherLost     int           // runOptions.FurtherLost
+	dropCh chan struct{} // the scenario's one-shot drop command
+	opts   runOptions    // the run this server was scripted for
 
 	mu    sync.Mutex         // guards conns
 	conns map[int]*uacp.Conn // by connection generation
@@ -467,14 +465,12 @@ func newServer(ctx context.Context, opts runOptions) (*server, error) {
 		return nil, err
 	}
 	s := &server{
-		rec:             &recorder{},
-		ln:              ln,
-		endpoint:        "opc.tcp://" + ln.Addr().String(),
-		dropCh:          make(chan struct{}, 1),
-		conns:           map[int]*uacp.Conn{},
-		refuseAfterDrop: opts.RefuseAfterDrop,
-		refusesTransfer: opts.RefusesTransfer,
-		furtherLost:     opts.FurtherLost,
+		rec:      &recorder{},
+		ln:       ln,
+		endpoint: "opc.tcp://" + ln.Addr().String(),
+		dropCh:   make(chan struct{}, 1),
+		opts:     opts,
+		conns:    map[int]*uacp.Conn{},
 	}
 	go s.acceptLoop(ctx)
 	go s.dropWatcher()
@@ -506,7 +502,7 @@ func (s *server) dropWatcher() {
 		applied = conn.Close() == nil
 	}
 	if applied {
-		s.rec.recordDropApplied(s.furtherLost)
+		s.rec.recordDropApplied(s.opts.FurtherLost)
 	}
 }
 
@@ -519,7 +515,7 @@ func (s *server) acceptLoop(ctx context.Context) {
 		s.rec.recordConn()
 		// The Hello/Acknowledge handshake is already done, so closing here
 		// fails the client's OpenSecureChannel.
-		if s.refuseAfterDrop && s.rec.isDropStarted() {
+		if s.opts.RefuseAfterDrop && s.rec.isDropStarted() {
 			_ = c.Close()
 			continue
 		}
@@ -643,7 +639,7 @@ func (s *server) answer(connID int, req ua.Request) ua.Response {
 		return newPublishResponse(seq, s.rec.availableSeqs())
 
 	case *ua.TransferSubscriptionsRequest:
-		if s.refusesTransfer {
+		if s.opts.RefusesTransfer {
 			return newServiceFault(h, ua.StatusBadServiceUnsupported)
 		}
 		results := make([]*ua.TransferResult, len(r.SubscriptionIDs))
@@ -680,7 +676,7 @@ func (s *server) answer(connID int, req ua.Request) ua.Response {
 // runRecord.Answerable is this list, so a test reads the one rule the server
 // answers by rather than restating it.
 func (s *server) answerableSeqs() []uint32 {
-	if !s.refusesTransfer {
+	if !s.opts.RefusesTransfer {
 		return nil
 	}
 	return s.rec.availableSeqs()
