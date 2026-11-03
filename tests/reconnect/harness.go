@@ -148,6 +148,26 @@ type recorder struct {
 	// before the arm that sets this runs, so the count is at least one
 	// whenever the arm has run.
 	recreateAfter int
+
+	// deliveries is what the application's own notification callback
+	// received. It belongs here and not beside the callback because the
+	// record a test reads has to hold it and the request log as one value,
+	// and one lock is the only way two slices written by different goroutines
+	// can be read at one instant.
+	deliveries []deliveryRecord
+}
+
+// recordDelivery is the application callback's one mutation.
+func (o *recorder) recordDelivery(seq uint32) {
+	o.mu.Lock()
+	o.deliveries = append(o.deliveries, deliveryRecord{Seq: seq, At: time.Now()})
+	o.mu.Unlock()
+}
+
+func (o *recorder) deliveryCount() int {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	return len(o.deliveries)
 }
 
 // recordRequest takes the decoded request, so the call site does not need to
@@ -276,12 +296,6 @@ func (o *recorder) peekNextSeq() uint32 {
 	return o.lastSeq + 1
 }
 
-func (o *recorder) highestSeq() uint32 {
-	o.mu.Lock()
-	defer o.mu.Unlock()
-	return o.lastSeq
-}
-
 func (o *recorder) heldPublishSeq() uint32 {
 	o.mu.Lock()
 	defer o.mu.Unlock()
@@ -306,6 +320,10 @@ func (o *recorder) heldPublishSeq() uint32 {
 func (o *recorder) availableSeqs() []uint32 {
 	o.mu.Lock()
 	defer o.mu.Unlock()
+	return o.availableSeqsLocked()
+}
+
+func (o *recorder) availableSeqsLocked() []uint32 {
 	if o.heldSeq == 0 {
 		return []uint32{}
 	}
@@ -352,13 +370,16 @@ func (o *recorder) publishStep(connID int) (seq uint32, hold bool) {
 	return o.lastSeq, false
 }
 
-// snapshot copies into out everything the recorder holds that has to be read
-// as one value: the request and accept logs, the sequence number the server
-// held back, and the pair recordNewSubscription sets. The run is still live
-// when this is called, so reading the pair in a second lock would let a
-// CreateSubscription land between the two reads and leave out.RecreateAfter
-// indexing past the end of out.Requests.
-func (o *recorder) snapshot(out *runRecord) {
+// snapshot copies into out everything the run recorded, in one acquisition of
+// the recorder's lock. The run is still live when this is called, so a second
+// acquisition would let a request land between two reads and leave a record
+// that describes no instant the run ever passed through: a CreateSubscription
+// arriving after the deliveries were copied and before the pair
+// recordNewSubscription sets was read puts RecreateAfter's line above every
+// delivery in the record, and the row that reads the two together reports a
+// client that was given nothing when it had been given everything.
+func (s *server) snapshot(out *runRecord) {
+	o := s.rec
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	requests := make([]requestRecord, len(o.requests))
@@ -366,10 +387,14 @@ func (o *recorder) snapshot(out *runRecord) {
 		requests[i] = r.clone()
 	}
 	out.Requests = requests
+	out.Deliveries = append([]deliveryRecord(nil), o.deliveries...)
 	out.AcceptedAt = append([]time.Time(nil), o.accepts...)
 	out.HeldSeq = o.heldSeq
+	out.LastSeq = o.lastSeq
 	out.SeqAtRecreate = o.seqAtRecreate
 	out.RecreateAfter = o.recreateAfter
+	out.Answerable = s.answerableSeqsLocked()
+	out.Offered = s.availableLocked()
 }
 
 // runRecord is what one run reduces to: what both ends saw, frozen when the
@@ -829,10 +854,16 @@ func (s *server) answer(connID int, req ua.Request) ua.Response {
 // runRecord.Answerable is this list, so a test reads the one rule the server
 // answers by rather than restating it.
 func (s *server) answerableSeqs() []uint32 {
+	s.rec.mu.Lock()
+	defer s.rec.mu.Unlock()
+	return s.answerableSeqsLocked()
+}
+
+func (s *server) answerableSeqsLocked() []uint32 {
 	if !s.opts.RefusesTransfer {
 		return nil
 	}
-	return s.rec.availableSeqs()
+	return s.rec.availableSeqsLocked()
 }
 
 // available is what the server tells the client it still has: the list a
@@ -845,10 +876,16 @@ func (s *server) answerableSeqs() []uint32 {
 // runRecord.Offered is this list, so a test reads what the client was told
 // rather than restating the rule the server told it by.
 func (s *server) available() []uint32 {
+	s.rec.mu.Lock()
+	defer s.rec.mu.Unlock()
+	return s.availableLocked()
+}
+
+func (s *server) availableLocked() []uint32 {
 	if s.opts.NoRetransmissionQueue {
 		return []uint32{}
 	}
-	return s.rec.availableSeqs()
+	return s.rec.availableSeqsLocked()
 }
 
 // availableWith is the list a data PublishResponse carries: what the server
@@ -1082,9 +1119,6 @@ func runScenario(opts runOptions) runRecord {
 		closeCancel()
 	}()
 
-	// Records what the application's own notification callback receives.
-	var deliveriesMu sync.Mutex
-	var deliveries []deliveryRecord
 	notifs := make(chan *opcua.PublishNotificationData, 32)
 	sub, err := c.Subscribe(ctx, &opcua.SubscriptionParameters{Interval: 200 * time.Millisecond}, notifs)
 	if err != nil {
@@ -1098,9 +1132,7 @@ func runScenario(opts runOptions) runRecord {
 				continue
 			}
 			if seq, ok := dcn.MonitoredItems[0].Value.Value.Value().(int32); ok {
-				deliveriesMu.Lock()
-				deliveries = append(deliveries, deliveryRecord{Seq: uint32(seq), At: time.Now()})
-				deliveriesMu.Unlock()
+				srv.rec.recordDelivery(uint32(seq))
 			}
 		}
 	}()
@@ -1115,10 +1147,7 @@ func runScenario(opts runOptions) runRecord {
 	// a notification.
 	deadline := time.After(10 * time.Second)
 	for {
-		deliveriesMu.Lock()
-		n := len(deliveries)
-		deliveriesMu.Unlock()
-		if n > 0 {
+		if srv.rec.deliveryCount() > 0 {
 			break
 		}
 		select {
@@ -1169,12 +1198,6 @@ func runScenario(opts runOptions) runRecord {
 
 	time.Sleep(opts.Settle)
 
-	deliveriesMu.Lock()
-	out.Deliveries = append([]deliveryRecord(nil), deliveries...)
-	deliveriesMu.Unlock()
-	srv.rec.snapshot(&out)
-	out.LastSeq = srv.rec.highestSeq()
-	out.Answerable = srv.answerableSeqs()
-	out.Offered = srv.available()
+	srv.snapshot(&out)
 	return out
 }
