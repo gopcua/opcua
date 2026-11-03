@@ -14,6 +14,7 @@
 // republishes, transfers the subscription or recreates it is not the test's
 // business. The server answers Republish with Bad_MessageNotAvailable, which
 // ends a Republish loop, so a client that does ask is not faulted for it.
+
 package reconnect
 
 import "testing"

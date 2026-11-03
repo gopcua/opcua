@@ -44,6 +44,7 @@
 // The test reads the sequence numbers that went over the wire: a client
 // cannot produce them by resuming the stream, and one that stops while the
 // server still has a number for it does not produce them either.
+
 package reconnect
 
 import (

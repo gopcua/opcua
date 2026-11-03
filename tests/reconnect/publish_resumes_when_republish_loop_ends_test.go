@@ -69,6 +69,7 @@
 // A client cannot reach the passing branch by resuming the stream without
 // asking, because then there is no loop for the row to find the end of, and
 // the run is declined rather than passed.
+
 package reconnect
 
 import (

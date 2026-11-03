@@ -83,6 +83,7 @@
 // queue that it may drop the message, and a client that sends it blindly is
 // one configuration change away from throwing away the only copy of a
 // notification it has not processed.
+
 package reconnect
 
 import "testing"
