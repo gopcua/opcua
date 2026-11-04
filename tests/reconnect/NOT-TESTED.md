@@ -17,8 +17,9 @@ exists so a reader can tell them from a behaviour nobody thought of.
 | an application-side value cache | the Client "should make sure that it does not overwrite newer data in the Client with older values provided through Republish" |
 | a configurable monitored node plus a ServerStatus node | "A Client should subscribe for the State Variable in the ServerStatus to detect shutdown" |
 | a server-initiated connection | reverse connect |
+| a run that goes silent without closing the transport | "The preferred mechanism for a Client to monitor the connection status is through the keep-alive of the Subscription" |
 
-Three of these need more than the table says.
+Four of these need more than the table says.
 
 **The failing-activation fixture is not another `runOptions` field.** `answer`
 grants every ActivateSession unconditionally, and `recordActivationFault` marks
@@ -35,6 +36,14 @@ is exactly the clause's trigger. But `requestRecord` carries `Conn`, `Service`,
 identified as ResendData, and a read of the monitored items cannot be told from
 gopcua's own namespace-array read, which is what the `ReadRequest` arm answers.
 It is nearer to reachable than the rest.
+
+**The keep-alive item is the library's, unlike the two below.** `publishTimeout` in
+`subscription.go` already computes the interval a keep-alive is expected within, and `publish` in
+`client_sub.go` answers the timeout that produces with *ignore and continue the loop*, so the
+signal is built and discarded inside gopcua; none of it is the application's to choose. What the
+harness lacks is a run that stops answering without closing the transport. The fixture already
+withholds Publish responses, so the silence is there; what is not is a scenario that stalls instead
+of dropping, and a `runRecord` whose readings are not all anchored on `DropAt` and `DropConn`.
 
 **Two of these are mis-addressed, not merely blocked.** What to monitor is
 the application's choice, not the library's, and gopcua keeps no value cache. So
