@@ -75,7 +75,13 @@ func TestMissedNotificationRecoveredWhenTransferRefused(t *testing.T) {
 	case recovered:
 		t.Logf("the client recovered notification %d although the server was set to refuse the transfer "+
 			"(%d notifications after the drop in all)", run.HeldSeq, arrived)
-	case asked > 0 && answerableAsk(run):
+	case asked > 0:
+		// asked is already only the asks the server could answer:
+		// republishesAfterDrop counts a Republish for the held number on a
+		// post-drop connection the client had activated first, and one that
+		// arrives before that connection's ActivateSession is faulted
+		// Bad_SessionNotActivated and never reaches the retransmission queue.
+		//
 		// A client that was given the notification and lost it is not the
 		// client knownBug describes, so this arm fires whether or not it stands.
 		t.Errorf("the client asked the server to resend notification %d after activating the Session, "+
@@ -105,21 +111,4 @@ func missedNotificationBack(run runRecord) (recovered bool, arrived int) {
 		}
 	}
 	return recovered, arrived
-}
-
-// answerableAsk reports whether a Republish for the held sequence number
-// arrived where the server could answer it: after its own connection's
-// ActivateSession. One that arrives before is faulted Bad_SessionNotActivated
-// and never reaches the retransmission queue.
-func answerableAsk(run runRecord) bool {
-	activated := map[int]bool{}
-	for _, r := range afterDrop(run) {
-		switch {
-		case r.Service == "ActivateSessionRequest":
-			activated[r.Conn] = true
-		case r.Service == "RepublishRequest" && r.RepublishSeq == run.HeldSeq && activated[r.Conn]:
-			return true
-		}
-	}
-	return false
 }
