@@ -4,16 +4,27 @@
 // its ApplicationInstanceCertificate and any user identity token that it
 // provided."
 //
+// Whether the client re-activates the Session it has rather than creating a
+// new one is new_session_only_after_failed_activation_test.go: a different
+// clause, §6.7, and a different reading of the same requests, whether a
+// CreateSession is among them at all rather than the order they arrive in.
+// Whether the data comes back is data_resumes_after_reconnect_test.go, scored
+// on the application's own callback rather than on the wire; a client that
+// sends a Publish before its ActivateSession is faulted with
+// Bad_SessionNotActivated and may recover and receive data anyway, so that
+// row would pass it.
+//
+// The scripted server is the default one. It grants every ActivateSession.
+// A session service that arrives on a connection before that connection's
+// ActivateSession is faulted rather than answered. See harness.go.
+//
 // After a reconnect the client sends its first request for the Session on a
 // new connection, and that connection's ActivateSession has to come before
-// it. A client that sends a Publish first is faulted with
-// Bad_SessionNotActivated and may recover and receive data, so a test that
-// only watched for data would pass it. See harness.go.
-//
-// Which services use the Session is usesSession in harness.go, the same rule
-// the scripted server faults on: CreateSession creates it, ActivateSession is
-// what is being waited for, GetEndpoints and FindServers need no Session, and
-// CloseSession is how a client abandons one it could not activate.
+// it. Which services use the Session is usesSession in harness.go, the same
+// rule the scripted server faults on: CreateSession creates it,
+// ActivateSession is what is being waited for, GetEndpoints and FindServers
+// need no Session, and CloseSession is how a client abandons one it could
+// not activate.
 
 package reconnect
 
@@ -26,6 +37,10 @@ func TestSessionUnusedBeforeActivation(t *testing.T) {
 		t.Fatalf("could not set the test up: %s", why)
 	}
 
+	// firstEarlyUse reads every connection and the decline below reads only
+	// those opened after the drop, so a declining run can still hold a
+	// violation on the connection before it: the decline is the last arm
+	// rather than a precondition. setupFailed in harness.go has the rule.
 	why := sessionUseSetupFailed(run)
 
 	early, found := firstEarlyUse(run)
