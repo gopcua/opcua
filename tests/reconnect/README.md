@@ -20,7 +20,10 @@ it feeds `runRecord` values written by hand to the five helpers that filter on
 activation, and requires each to read a session service that arrived before
 its connection's `ActivateSession` differently from the same request arriving
 after. The five state one rule in five places, the ordering is the whole
-content of it, and that file is the only thing checking they agree. The six
+content of it, and that file is the only thing checking they agree. It also
+checks the assumption all five rest on, that the scripted server grants every
+activation it is asked for, by putting the four answers that are not a grant
+to the fixture's own check and requiring it to notice each one. The six
 questions below are for rows and do not apply to it.
 
 The suite exists because a diff of reconnect code does not tell you what the

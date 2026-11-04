@@ -31,7 +31,10 @@ package reconnect
 
 import (
 	"fmt"
+	"strings"
 	"testing"
+
+	"github.com/gopcua/opcua/ua"
 )
 
 // The scenario every case is set in: one connection before the drop, which
@@ -237,5 +240,137 @@ func TestActivationRuleIsOrdered(t *testing.T) {
 					"acts on it, the reading is %s; it has to be %s", got, c.wantLate)
 			}
 		})
+	}
+}
+
+// The rule above is sound only while the scripted server grants every
+// activation it is asked for, and recordActivationFault is what notices if it
+// ever stops. These cases are the four ways an answer stops being a grant,
+// and the three answers that are grants and must be left alone.
+//
+// The last of the three matters more than it looks: answer() returns nil for
+// a held Publish, which is how this fixture constructs the loss, on every run
+// the package makes. A guard that read nil as a refusal without first asking
+// what the request was would decline all eleven rows on every run.
+func TestFixtureNoticesAnActivationItDidNotGrant(t *testing.T) {
+	const handle = 1
+	activate := &ua.ActivateSessionRequest{RequestHeader: &ua.RequestHeader{RequestHandle: handle}}
+	publish := &ua.PublishRequest{RequestHeader: &ua.RequestHeader{RequestHandle: handle}}
+
+	// granted is the answer answer() really gives an ActivateSessionRequest.
+	// It is written out rather than called so that a change to answer() turns
+	// this case red instead of quietly redefining what a grant is.
+	granted := func() ua.Response {
+		return &ua.ActivateSessionResponse{
+			ResponseHeader: newResponseHeader(handle, ua.StatusOK),
+			ServerNonce:    nil,
+			Results:        []ua.StatusCode{},
+		}
+	}
+
+	for _, c := range []struct {
+		name string
+		req  ua.Request
+		resp ua.Response
+		// want is the reason the fixture has to record, or "" if the answer
+		// was a grant and nothing may be recorded.
+		want string
+	}{
+		{
+			name: "a ServiceFault",
+			req:  activate,
+			resp: newServiceFault(handle, ua.StatusBadIdentityTokenRejected),
+			want: "faulted it with",
+		},
+		{
+			name: "a non-OK ServiceResult",
+			req:  activate,
+			resp: &ua.ActivateSessionResponse{
+				ResponseHeader: newResponseHeader(handle, ua.StatusBadIdentityTokenRejected),
+				Results:        []ua.StatusCode{},
+			},
+			want: "answered it",
+		},
+		{
+			name: "a rejected identity token under an OK ServiceResult",
+			req:  activate,
+			resp: &ua.ActivateSessionResponse{
+				ResponseHeader: newResponseHeader(handle, ua.StatusOK),
+				Results:        []ua.StatusCode{ua.StatusBadIdentityTokenRejected},
+			},
+			want: "accepted it and rejected identity token 0 with",
+		},
+		{
+			name: "no answer at all",
+			req:  activate,
+			resp: nil,
+			want: "never answered it",
+		},
+		{
+			name: "the answer the fixture really gives",
+			req:  activate,
+			resp: granted(),
+			want: "",
+		},
+		{
+			name: "a grant whose Results entry is OK",
+			req:  activate,
+			resp: &ua.ActivateSessionResponse{
+				ResponseHeader: newResponseHeader(handle, ua.StatusOK),
+				Results:        []ua.StatusCode{ua.StatusOK},
+			},
+			want: "",
+		},
+		{
+			name: "no answer to a held Publish, which every run of this fixture produces",
+			req:  publish,
+			resp: nil,
+			want: "",
+		},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			o := &recorder{}
+			o.recordActivationFault(c.req, c.resp)
+			got := o.activationFaulted
+			switch {
+			case c.want == "" && got != "":
+				t.Errorf("the fixture declined a run over an answer that grants the activation: %s", got)
+			case c.want != "" && got == "":
+				t.Errorf("the fixture let this answer stand as a grant, so every activation filter in "+
+					"the package would go on reading an activation the server did not give; it has to "+
+					"record a reason naming %q", c.want)
+			case c.want != "" && !strings.Contains(got, c.want):
+				t.Errorf("the fixture recorded %q, which does not name %q, so the reason a row prints "+
+					"would not say which answer the server gave", got, c.want)
+			}
+		})
+	}
+}
+
+// The reason is the first one, so a run whose later connections answered
+// normally still reports the refusal that happened.
+func TestFixtureKeepsTheFirstActivationItDidNotGrant(t *testing.T) {
+	const handle = 1
+	activate := &ua.ActivateSessionRequest{RequestHeader: &ua.RequestHeader{RequestHandle: handle}}
+
+	o := &recorder{}
+	o.recordActivationFault(activate, newServiceFault(handle, ua.StatusBadIdentityTokenRejected))
+	first := o.activationFaulted
+	o.recordActivationFault(activate, &ua.ActivateSessionResponse{
+		ResponseHeader: newResponseHeader(handle, ua.StatusBadInternalError),
+		Results:        []ua.StatusCode{},
+	})
+	o.recordActivationFault(activate, &ua.ActivateSessionResponse{
+		ResponseHeader: newResponseHeader(handle, ua.StatusOK),
+		Results:        []ua.StatusCode{},
+	})
+
+	if first == "" {
+		t.Fatalf("the first refusal was not recorded at all")
+	}
+	if o.activationFaulted != first {
+		t.Errorf("the reason changed after the first refusal, to %q; it has to stay %q, or a run "+
+			"reports whichever refusal came last instead of the one that invalidated it",
+			o.activationFaulted, first)
 	}
 }
