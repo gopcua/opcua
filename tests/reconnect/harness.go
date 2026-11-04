@@ -383,12 +383,15 @@ func (o *recorder) heldPublishSeq() uint32 {
 // availableSeqsLocked is what the server says it can still resend, read with
 // the recorder's lock already held. An empty list claims it keeps no
 // retransmission queue at all (OPC 10000-4 §5.14.1.1), so while a
-// notification is held back the list has to name it. Every Publish
-// answer and every TransferResult carries it, and the two agree with each
-// other. Only under RefusesTransfer does a Republish for that number actually
-// get it back; the default server advertises it and then answers
-// Bad_MessageNotAvailable, which is how the Republish row observes a client
-// asking without being handed the answer.
+// notification is held back this list names it -- except under
+// NoRetransmissionQueue, where availableLocked throws the list away and makes
+// that claim on purpose. Every Publish answer and every TransferResult
+// carries it, and the two agree except under AdvertisesSentSequence, where a
+// data PublishResponse carries its own sequence number as well; see
+// availableWith. Only under RefusesTransfer does a Republish for that number
+// actually get it back; the default server advertises it and then answers
+// Bad_MessageNotAvailable, which is how republish_after_reconnect_test.go
+// observes a client asking without being handed the answer.
 // Everything from the first withheld notification to the last one the server
 // created is in the queue. A client with several Publishes outstanding has
 // had several withheld under it, and a server that kept the first and threw
@@ -532,9 +535,13 @@ type runRecord struct {
 	// republishSeqsAfterDrop reads for a Republish.
 	SeqAtRecreate uint32
 	// RecreateAfter is how many requests the server had recorded when that
-	// same CreateSubscription arrived, so Requests[RecreateAfter:] is
-	// everything the client sent after it went over the wire, and zero when
-	// no such request arrived. It is set in the one locked block that sets
+	// same CreateSubscription arrived, and zero when no such request
+	// arrived. Requests[RecreateAfter:] is everything recorded after that
+	// moment, which is the boundary and no more than that: another
+	// connection's goroutine can record a request between the recording of
+	// the CreateSubscription and the arm that reads the count, so a request
+	// that went over the wire after it can still land below the line; see
+	// recorder.recreateAfter. It is set in the one locked block that sets
 	// SeqAtRecreate, which is what makes "the client replaced the
 	// subscription" and "here is the line its data has to be above" one
 	// answer rather than two: a reader cannot find a replacement that the
@@ -651,7 +658,8 @@ func republishesAfterDrop(run runRecord) (asked int, wrongSeqs []uint32, total i
 // activated there: a Republish that arrives before that connection's
 // ActivateSession is faulted with Bad_SessionNotActivated rather than
 // answered by the retransmission rule, so it is not part of any loop.
-// session_unused_before_activation_test.go is the row that scores it.
+// session_unused_before_activation_test.go is the row that scores a client
+// for sending one.
 func republishSeqsAfterDrop(run runRecord) []uint32 {
 	var out []uint32
 	activated := map[int]bool{}
