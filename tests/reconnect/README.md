@@ -15,6 +15,14 @@ Only a test function calls `t.Errorf` or `t.Fatalf`. A helper reads the
 `runRecord` and returns plain values. A helper two rows call lives in
 `harness.go`; a helper one row calls lives with that row.
 
+One file is not a row. `harness_activation_rule_test.go` has no client in it:
+it feeds `runRecord` values written by hand to the five helpers that filter on
+activation, and requires each to read a session service that arrived before
+its connection's `ActivateSession` differently from the same request arriving
+after. The five state one rule in five places, the ordering is the whole
+content of it, and that file is the only thing checking they agree. The six
+questions below are for rows and do not apply to it.
+
 The suite exists because a diff of reconnect code does not tell you what the
 client will do: that depends on how the server answers after the drop, and
 servers differ.
