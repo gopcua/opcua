@@ -285,7 +285,7 @@ func TestActivationRuleIsOrdered(t *testing.T) {
 
 // The rule above is sound only while the scripted server grants every
 // activation it is asked for, and recordActivationFault is what notices if it
-// ever stops. These cases are the four ways an answer stops being a grant,
+// ever stops. These cases are the five ways an answer stops being a grant,
 // and the three answers that are grants and must be left alone.
 //
 // The last of the three matters more than it looks: answer() returns nil for
@@ -345,6 +345,16 @@ func TestFixtureNoticesAnActivationItDidNotGrant(t *testing.T) {
 			req:  activate,
 			resp: nil,
 			want: "never answered it",
+		},
+		{
+			// No arm of answer() returns this for an ActivateSessionRequest.
+			// Neither does any of the four above, and pinning them is what
+			// this file is for: the catch-all is what keeps an arm added
+			// tomorrow from reading as a grant.
+			name: "an answer of some other type",
+			req:  activate,
+			resp: &ua.PublishResponse{ResponseHeader: newResponseHeader(handle, ua.StatusOK)},
+			want: "answered it with a *ua.PublishResponse",
 		},
 		{
 			name: "the answer the fixture really gives",
