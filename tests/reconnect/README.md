@@ -22,7 +22,7 @@ before its connection's `ActivateSession` differently from the same request
 arriving after. The seven state one rule in seven places, the ordering is
 the whole content of it, and that file is the only thing checking they
 agree. It also checks the assumption all seven rest on, that the scripted
-server grants every activation it is asked for, by putting the four answers
+server grants every activation it is asked for, by putting the five answers
 that are not a grant to the fixture's own check and requiring it to notice
 each one. The six questions below are for rows and do not apply to it.
 

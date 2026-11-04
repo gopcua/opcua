@@ -10,10 +10,12 @@
 // replaces the subscription at all is
 // new_subscription_after_republish_returns_invalid_id_test.go.
 //
-// The scripted server is that row's, with every Republish answered
-// Bad_SubscriptionIdInvalid. A CreateSubscription makes the fixture forget
-// that anything is monitored, and it answers every Publish with a keep-alive
-// until a CreateMonitoredItems arrives for that subscription. See harness.go.
+// The scripted server is the one in
+// new_subscription_after_republish_returns_invalid_id_test.go, with every
+// Republish answered Bad_SubscriptionIdInvalid. A CreateSubscription makes
+// the fixture forget that anything is monitored, and it answers every Publish
+// with a keep-alive until a CreateMonitoredItems arrives for that
+// subscription. See harness.go.
 //
 // The row asserts the outcome and not the mechanism: a notification the
 // server created after the replacement existed reached the application's own

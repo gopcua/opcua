@@ -5,16 +5,19 @@
 //
 // The rule only binds once something has been lost, so the test loses
 // something: the server holds one notification back and never sends it, then
-// drops the connection. See harness.go. This server transfers the
-// subscription when asked, which is what separates this row from
-// missed_notification_recovered_when_transfer_refused_test.go: here a client
-// has every route back to the notification, and the row asks only whether it
-// takes one.
+// drops the connection. See harness.go. This is the default server: it
+// transfers the subscription when asked and advertises the number it held,
+// then answers every Republish Bad_MessageNotAvailable, so nothing here
+// brings that notification back. That is what separates this row from
+// missed_notification_recovered_when_transfer_refused_test.go, where
+// recovery is reachable: here the row can observe only the asking.
 //
 // The test checks only that the client asked, and for which sequence number.
 // How often it asks is republish_asks_for_each_missed_number_test.go, and
 // what it does once that loop has ended is
-// publish_resumes_when_republish_loop_ends_test.go.
+// publish_resumes_when_republish_loop_ends_test.go; both run the
+// transfer-refused server, where a Republish is answered and the loop they
+// measure exists.
 //
 // A known-good client fails this once knownBug is deleted: open62541 has no
 // client-side Republish at all, so it resumes Publish and never asks for
@@ -57,10 +60,13 @@ func TestRepublishAfterReconnect(t *testing.T) {
 		t.Fatalf("could not set the test up: %s", why)
 	}
 
-	// While knownBug stands the client is expected not to get far enough to be
-	// asked, and the shortfall is logged with it; once someone deletes knownBug
-	// to claim the fix, a run that measured nothing must not pass. That is why
-	// the setup arm sits below the knownBug arm here and nowhere else.
+	// This row puts its setup arm below the knownBug arm, which no other row
+	// does: while knownBug stands the client is expected not to get far enough
+	// to be asked, so the shortfall is logged beside it instead of declining
+	// the run. What keeps such a run from reading as clean is the nested
+	// co-log inside that arm. Once someone deletes knownBug to claim the fix,
+	// that arm is dead and the setup arm, still above the default one, is what
+	// stops a run that measured nothing from passing.
 	why := republishSetupFailed(run)
 
 	asked, wrongSeqs, total := republishesAfterDrop(run)
@@ -97,13 +103,13 @@ func TestRepublishAfterReconnect(t *testing.T) {
 // anything.
 //
 // The poll counts only on a connection the client had already activated
-// there, which is republishesAfterDrop's rule and for its reason: answer()
-// faults a Publish that arrives before its own connection's ActivateSession
-// with Bad_SessionNotActivated, and that fault carries neither a sequence
-// number nor availableSequenceNumbers, so it tells the client nothing about
-// the gap. A client whose every post-drop Publish was faulted is in exactly
-// the position this reason describes, and counting one would have the row
-// deny it.
+// there, which is republishesAfterDrop's rule, for a reason of its own:
+// answer() faults a Publish that arrives before its own connection's
+// ActivateSession with Bad_SessionNotActivated, and that fault carries
+// neither a sequence number nor availableSequenceNumbers, so it tells the
+// client nothing about the gap. A client whose every post-drop Publish was
+// faulted is in exactly the position this reason describes, and counting one
+// would have the row deny it.
 func republishSetupFailed(run runRecord) string {
 	polled := false
 	activated := map[int]bool{}
