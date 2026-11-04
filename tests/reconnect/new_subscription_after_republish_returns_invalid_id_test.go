@@ -86,8 +86,8 @@ func TestNewSubscriptionAfterRepublishReturnsInvalidID(t *testing.T) {
 	default:
 		t.Errorf("the client's last ask was for notification %d, which the server answers with "+
 			"Bad_SubscriptionIdInvalid, so the subscription it was republishing on is gone, and it "+
-			"created no new one (%d requests after that ask, none of them a CreateSubscription)",
-			lastAsk, sent)
+			"created no new one (%d requests after that ask, none of them a CreateSubscription the "+
+			"server acted on)", lastAsk, sent)
 	}
 }
 
@@ -95,12 +95,23 @@ func TestNewSubscriptionAfterRepublishReturnsInvalidID(t *testing.T) {
 // told it the subscription id was invalid: the sequence number of the last
 // Republish it sent on a post-drop connection it had already activated, how
 // many CreateSubscription requests followed it on an activated connection,
-// and how many requests of any kind followed it on any.
+// and how many requests of any kind followed it on a post-drop connection.
 //
-// Activation is the rule on both counts: answer() faults a session service
-// arriving before its own connection's ActivateSession with
-// Bad_SessionNotActivated, so a Republish counted without it was never put
-// the status and a CreateSubscription counted without it created nothing.
+// Activation is the rule on the first two, which are readings of the client:
+// answer() faults a session service arriving before its own connection's
+// ActivateSession with Bad_SessionNotActivated, so a Republish counted
+// without it was never put the status and a CreateSubscription counted
+// without it created nothing.
+//
+// sent is the third and is deliberately not filtered, as republishesAfterDrop
+// keeps total unfiltered and for the same reason: it is the denominator the
+// failure prints, and a human deciding whether gopcua is broken wants to be
+// told everything the client sent, not the part of it the fixture answered.
+// That is why the failure says "none of them a CreateSubscription the server
+// acted on" and not "none of them a CreateSubscription" -- a client that
+// pipelines CreateSubscription ahead of ActivateSession on a redial has one
+// inside sent and none inside created, and the shorter sentence would be
+// false about the very batch it was counting.
 //
 // A run with no such Republish returns zeros; loopRanSetupFailed is what
 // reports it, as it is for publish_resumes_when_republish_loop_ends_test.go.
