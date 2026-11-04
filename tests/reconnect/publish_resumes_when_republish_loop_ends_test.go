@@ -27,10 +27,19 @@
 // resumes, measured on this fixture. Eclipse Milo, read in source and not
 // run here, resumes after the loop drains; UA-.NETStandard, read the same
 // way, walks only to the number it just received and is declined for
-// stopping before the terminator. No stack here fails it -- open62541 is
+// stopping before the terminator; gopcua's own loop takes that route too
+// once it republishes at all, because it stops at the top of
+// availableSequenceNumbers when the server hands it a non-empty list. No stack here fails it -- open62541 is
 // logged green rather than failed while knownBug stands, and UA-.NETStandard
 // is declined rather than failed -- so the row takes no exception. A client
-// cannot reach the passing branch by resuming the stream without asking.
+// cannot reach the passing branch by resuming the stream without asking. It
+// can reach it without any post-terminator logic, though. The count is
+// positional rather than temporal: afterLastRepublish counts the Publishes
+// recorded after the last Republish's index, so a client whose publish loop
+// runs concurrently with its Republish loop passes on that overlap alone.
+// The row assumes a client that pauses publishing while it reconnects, which
+// gopcua does: its publish loop stays paused until setState(ctx, Connected),
+// after restoreSubscriptions.
 
 package reconnect
 
@@ -57,7 +66,8 @@ func TestPublishResumesWhenRepublishLoopEnds(t *testing.T) {
 	// the whole loop and leave room after it: gopcua's own loop sleeps a
 	// second between asks, and a window that closed on the last ask would
 	// look like a client that stopped polling. minLoopWindow is what the
-	// pacing costs, and the window is twice it.
+	// pacing costs, and the window is twice it, the rest being margin for a
+	// loaded machine.
 	const minLoopWindow = time.Duration(furtherLost+2) * time.Second
 	const settleLoop = 10 * time.Second
 
@@ -150,7 +160,8 @@ func afterLastRepublish(run runRecord) (lastAsk uint32, published, sent int, ask
 // than the one this row is about, or "" if it ended for that reason. A client
 // that stopped while the server still had the number it asked for stopped on
 // its own terms and was never returned Bad_MessageNotAvailable; the file's
-// opening comment names UA-.NETStandard as the stack that takes that route.
+// opening comment names UA-.NETStandard, and gopcua once it republishes at
+// all, as the stacks that take that route.
 // The sequence numbers here are the server's own, so the reason names what
 // the server had rather than what the client was handed.
 //

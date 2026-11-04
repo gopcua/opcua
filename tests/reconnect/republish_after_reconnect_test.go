@@ -42,10 +42,15 @@ func TestRepublishAfterReconnect(t *testing.T) {
 	const knownBug = "the client reconnects and re-activates the session, but never asks for the notification it missed"
 
 	// minSettle is the window a client needs after the drop to reconnect,
-	// re-activate and ask. The whole sequence measured under a millisecond on
-	// loopback; the rest is margin for a loaded machine. Below it, a client
-	// that never asks cannot be told from one that had no time to.
-	const minSettle = 1 * time.Second
+	// re-activate and ask. Below it, a client that never asks cannot be told
+	// from one that had no time to, so the floor has to exceed the longest a
+	// client that does ask spends getting to the point of asking. The ask
+	// itself is sub-millisecond on loopback; the reconnect in front of it is
+	// not. node-opcua spends about 1.2s of dead time after the drop before it
+	// is back in the stream, measured on this fixture by
+	// data_resumes_after_reconnect_test.go, and Eclipse Milo schedules its
+	// first reactivation a whole second out. Two seconds clears both.
+	const minSettle = 2 * time.Second
 
 	// A tripwire, not a check: both sides are constants, so a settleDefault
 	// shortened below minSettle fails the build here rather than a run.

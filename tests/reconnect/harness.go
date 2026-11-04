@@ -938,6 +938,18 @@ func (s *server) answer(connID int, req ua.Request) ua.Response {
 		}
 
 	case *ua.RepublishRequest:
+		// A known gap: the subscription id is neither checked here nor kept by
+		// recordRequest, which takes only RetransmitSequenceNumber. A client
+		// asking for the right numbers against a subscription that never
+		// existed therefore scores as a correct walk in
+		// republish_asks_for_each_missed_number_test.go and
+		// publish_resumes_when_republish_loop_ends_test.go, and as a correct
+		// ask in republish_after_reconnect_test.go. It is an oversight rather
+		// than a judgement that the id does not matter: a Publish's
+		// acknowledgements are recorded with their SubID, and the
+		// CreateMonitoredItems arm does check r.SubscriptionID == SubID.
+		// Closing it means faulting a mismatch here and keeping the id on
+		// requestRecord so those rows can read it.
 		if s.opts.RepublishSubInvalid {
 			return newServiceFault(h, ua.StatusBadSubscriptionIDInvalid)
 		}
