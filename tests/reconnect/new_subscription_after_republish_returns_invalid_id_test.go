@@ -22,8 +22,9 @@
 // it: PublishingManager logs any status but Bad_MessageNotAvailable and
 // returns without creating anything. UA-.NETStandard fails it in both
 // engines, neither recreating unless the application asks. open62541 v1.4.22
-// has no client-side Republish, so the status is never put to it and the row
-// declines to score it, as republish_after_reconnect_test.go does. node-opcua
+// has no client-side Republish, so the status is never put to it. While
+// knownBug stands that absence is logged green beside gopcua rather than
+// declined, here and in republish_after_reconnect_test.go. node-opcua
 // 2.187.19 passes it, measured here. The clause only asks, so the row is kept
 // for what failing it costs: silent data loss on a live subscription.
 

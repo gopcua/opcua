@@ -14,11 +14,13 @@
 // How often it asks, and where it stops, is a separate behaviour with its own
 // file.
 //
-// A known-good client fails this: open62541 has no client-side Republish at
-// all, so it resumes Publish and never asks for what it lost. The test is
-// kept because node-opcua asks, measured against this fixture, and Eclipse
-// Milo and UA-.NETStandard both ask too, read from source and not run here;
-// and because it asserts an outcome a client cannot fake by resuming the
+// A known-good client fails this once knownBug is deleted: open62541 has no
+// client-side Republish at all, so it resumes Publish and never asks for
+// what it lost. While knownBug stands that absence is logged green beside
+// gopcua, and the row cannot tell the two apart. The test is kept because
+// node-opcua asks, measured against this fixture, and Eclipse Milo and
+// UA-.NETStandard both ask too, read from source and not run here; and
+// because it asserts an outcome a client cannot fake by resuming the
 // stream.
 
 package reconnect

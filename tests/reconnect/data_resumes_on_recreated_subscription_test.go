@@ -23,10 +23,12 @@
 // keys on an absence: a client that created no replacement is logged green.
 //
 // The reference stacks. open62541 v1.4.22 has no client-side replacement
-// path, so it never reaches the condition this row scores and is declined.
-// node-opcua 2.187.19 passes it, measured here. Eclipse Milo and
-// UA-.NETStandard are unsettled; what settles each is whether its own
-// recreate path carries the items. No stack here fails it: no exception.
+// path, so it never reaches the condition this row scores; while knownBug
+// stands that is the green log above and not a decline, and the row cannot
+// tell it from gopcua. node-opcua 2.187.19 passes it, measured here.
+// Eclipse Milo and UA-.NETStandard are unsettled; what settles each is
+// whether its own recreate path carries the items. No stack here fails it:
+// no exception.
 
 package reconnect
 
