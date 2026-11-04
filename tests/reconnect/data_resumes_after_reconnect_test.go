@@ -5,6 +5,10 @@
 // existing session, so the client keeps the subscriptions that session holds
 // and the server keeps publishing to it.
 //
+// Data on one the client built to replace a subscription the server
+// disowned, rather than on one that survived, is
+// data_resumes_on_recreated_subscription_test.go.
+//
 // The scripted server is that server: the subscription outlives the drop and
 // the re-activation. The server holds one notification back and drops the
 // connection underneath it, then answers every later Publish with fresh data.
