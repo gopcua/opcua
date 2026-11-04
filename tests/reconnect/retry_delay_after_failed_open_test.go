@@ -26,6 +26,7 @@
 // six thousand times a second in each case, median gap 0.145ms, because its
 // backoff fires once and then its endpoint probe loop runs free. That is a
 // defect in node-opcua rather than a disagreement about the clause.
+// open62541 and UA-.NETStandard were not read.
 //
 // gopcua passes it, measured by this row, which is why the row carries no
 // knownBug constant.
