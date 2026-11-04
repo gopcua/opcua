@@ -39,6 +39,15 @@ server grants every activation it is asked for, by putting the five answers
 that are not a grant to the fixture's own check and requiring it to notice
 each one. The six questions below are for rows and do not apply to it.
 
+The seven is checkable, the way item 3 above is. `grep -ro 'activated :=
+map\[int\]bool{}' tests/reconnect/ | wc -l` prints one line per helper that
+filters on activation, and `grep -o 'name: "[^" ]* [^"]*ActivateSession'
+tests/reconnect/harness_activation_rule_test.go | cut -d'"' -f2 | cut -d' '
+-f1 | sort -u | wc -l` prints how many of them `TestActivationRuleIsOrdered`
+has a case for. Both print 7; the second is lower than the case count
+because one helper has two cases. An eighth helper moves the first number
+and leaves the second behind.
+
 The suite exists because a diff of reconnect code does not tell you what the
 client will do: that depends on how the server answers after the drop, and
 servers differ.

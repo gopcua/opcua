@@ -23,8 +23,9 @@
 // republish_after_reconnect_test.go is where that absence will be failed
 // once knownBug is deleted. node-opcua walks the whole gap and stops on the
 // fault, measured. Eclipse Milo and UA-.NETStandard are source reads, not
-// run here. A client cannot produce the numbers this row reads by resuming
-// the stream.
+// run here. No stack here fails it -- open62541 is logged green rather than
+// failed while knownBug stands -- so the row takes no exception. A client
+// cannot produce the numbers this row reads by resuming the stream.
 
 package reconnect
 

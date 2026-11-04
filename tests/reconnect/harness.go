@@ -394,13 +394,16 @@ func (o *recorder) heldPublishSeq() uint32 {
 // actually get it back; the default server advertises it and then answers
 // Bad_MessageNotAvailable, which is how republish_after_reconnect_test.go
 // observes a client asking without being handed the answer.
-// Everything from the first withheld notification to the last one the server
-// created is in the queue. A client with several Publishes outstanding has
-// had several withheld under it, and a server that kept the first and threw
-// away the rest would be answering a Republish loop with holes -- which looks
-// to a test exactly like a client that stopped incrementing too early. The
-// list is contiguous so that a row measures the client rather than the
-// client's publish-queue depth.
+// Everything from the first withheld notification to the last one queued as
+// the drop was applied is in the list; anything the server creates after
+// that is outside it. The list is contiguous because heldSeq and the
+// FurtherLost numbers recordDropApplied queues behind it are consecutive, so
+// a Republish loop walking it never meets a hole -- which would look to a
+// test exactly like a client that stopped incrementing too early. A client
+// with several Publishes outstanding does not put one there either:
+// runScenario's one-lost check declines such a run before a row scores it,
+// and the withheld numbers past the first are in neither heldSeq nor queued,
+// so the list would come up short rather than holey.
 func (o *recorder) availableSeqsLocked() []uint32 {
 	if o.heldSeq == 0 {
 		return []uint32{}
