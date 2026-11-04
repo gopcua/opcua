@@ -6,13 +6,15 @@
 // The rule only binds once something has been lost, so the test loses
 // something: the server holds one notification back and never sends it, then
 // drops the connection. See harness.go. This server transfers the
-// subscription when asked, which is what separates this row from the one
-// that withholds the transfer: here a client has every route back to the
-// notification, and the row asks only whether it takes one.
+// subscription when asked, which is what separates this row from
+// missed_notification_recovered_when_transfer_refused_test.go: here a client
+// has every route back to the notification, and the row asks only whether it
+// takes one.
 //
 // The test checks only that the client asked, and for which sequence number.
-// How often it asks, and where it stops, is a separate behaviour with its own
-// file.
+// How often it asks is republish_asks_for_each_missed_number_test.go, and
+// what it does once that loop has ended is
+// publish_resumes_when_republish_loop_ends_test.go.
 //
 // A known-good client fails this once knownBug is deleted: open62541 has no
 // client-side Republish at all, so it resumes Publish and never asks for
@@ -33,6 +35,7 @@ import (
 func TestRepublishAfterReconnect(t *testing.T) {
 	// knownBug records that gopcua does not do this yet; the text is logged in
 	// place of a failure. README.md says when to delete it.
+	// https://github.com/gopcua/opcua/issues/879
 	const knownBug = "the client reconnects and re-activates the session, but never asks for the notification it missed"
 
 	// minSettle is the window a client needs after the drop to reconnect,
@@ -92,16 +95,29 @@ func TestRepublishAfterReconnect(t *testing.T) {
 // has to poll again after the drop, and the server has to have created
 // something after the notification it held, before a missing Republish means
 // anything.
+//
+// The poll counts only on a connection the client had already activated
+// there, which is republishesAfterDrop's rule and for its reason: answer()
+// faults a Publish that arrives before its own connection's ActivateSession
+// with Bad_SessionNotActivated, and that fault carries neither a sequence
+// number nor availableSequenceNumbers, so it tells the client nothing about
+// the gap. A client whose every post-drop Publish was faulted is in exactly
+// the position this reason describes, and counting one would have the row
+// deny it.
 func republishSetupFailed(run runRecord) string {
 	polled := false
-	for _, r := range afterDrop(run) {
-		if r.Service == "PublishRequest" {
+	activated := map[int]bool{}
+	for _, r := range run.Requests {
+		switch {
+		case r.Service == "ActivateSessionRequest":
+			activated[r.Conn] = true
+		case r.Service == "PublishRequest" && r.Conn > run.DropConn && activated[r.Conn]:
 			polled = true
 		}
 	}
 	if !polled {
-		return "the client never polled again after the drop, so it was never in a " +
-			"position to notice the loss"
+		return "the client never polled again after the drop on a connection it had " +
+			"activated, so it was never in a position to notice the loss"
 	}
 	if run.LastSeq <= run.HeldSeq {
 		return "the server created nothing after the notification it held, so there " +

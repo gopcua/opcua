@@ -1,17 +1,17 @@
-// The package states one rule in six places, and this is the executable
+// The package states one rule in seven places, and this is the executable
 // statement of it. A session service that arrives on a connection before
 // that connection's ActivateSession is faulted Bad_SessionNotActivated by
 // answer() and the server does nothing with it, so no reading of the client
 // may count it -- even though the same connection activates a moment later
 // and is activated for the rest of the run.
 //
-// Every one of the six builds its activated map inside the loop that reads
+// Every one of the seven builds its activated map inside the loop that reads
 // it, so "activated" there means "had activated by the time this request
 // arrived" and not "activated at some point". That ordering is the whole
 // content of the rule, and nothing in the package asserted it. A reviewer
-// proposing to lift the six into one activatedConns(run) map[int]bool is
+// proposing to lift the seven into one activatedConns(run) map[int]bool is
 // proposing membership over the run, which answers a different question:
-// five of the six would start counting the faulted requests, and
+// six of the seven would start counting the faulted requests, and
 // firstEarlyUse, whose entire job is to find one, would return false for
 // every client that activates at all. The suite would stay green, because no
 // client this fixture drives has ever pipelined.
@@ -63,6 +63,16 @@ func activationRuleRun(afterDrop ...requestRecord) runRecord {
 
 func republishRecord(conn int, seq uint32) requestRecord {
 	return requestRecord{Conn: conn, Service: "RepublishRequest", RepublishSeq: seq}
+}
+
+// activationRulePolled is a run in which the server created a notification
+// above the one it held, so that republishSetupFailed's other reason -- no
+// gap for the client to notice -- is out of the way and the case reads only
+// the poll.
+func activationRulePolled(afterDrop ...requestRecord) runRecord {
+	run := activationRuleRun(afterDrop...)
+	run.LastSeq = activationRuleHeldSeq + 1
+	return run
 }
 
 // activationRuleRecreate is a run in which the client replaced the disowned
@@ -132,6 +142,23 @@ func TestActivationRuleIsOrdered(t *testing.T) {
 			},
 			wantEarly: "[]",
 			wantLate:  "[7]",
+		},
+		{
+			name: "republishSetupFailed does not take a Publish that preceded its ActivateSession as a poll",
+			early: activationRulePolled(
+				requestRecord{Conn: 2, Service: "CreateSessionRequest"},
+				requestRecord{Conn: 2, Service: "PublishRequest"},
+				requestRecord{Conn: 2, Service: "ActivateSessionRequest"},
+			),
+			late: activationRulePolled(
+				requestRecord{Conn: 2, Service: "CreateSessionRequest"},
+				requestRecord{Conn: 2, Service: "ActivateSessionRequest"},
+				requestRecord{Conn: 2, Service: "PublishRequest"},
+			),
+			read: republishSetupFailed,
+			wantEarly: "the client never polled again after the drop on a connection it had " +
+				"activated, so it was never in a position to notice the loss",
+			wantLate: "",
 		},
 		{
 			name: "subscriptionAfterInvalidID does not count a CreateSubscription that preceded its ActivateSession",
