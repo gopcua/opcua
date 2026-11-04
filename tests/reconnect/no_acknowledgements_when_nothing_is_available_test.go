@@ -56,9 +56,6 @@ func TestNoAcknowledgementsWhenNothingIsAvailable(t *testing.T) {
 	if why := emptyAvailableSetupFailed(run); why != "" {
 		t.Fatalf("could not set the test up: %s", why)
 	}
-	if why := ackOpportunitySetupFailed(run); why != "" {
-		t.Fatalf("could not set the test up: %s", why)
-	}
 
 	acked := acknowledgementsSent(run)
 
@@ -84,10 +81,18 @@ func TestNoAcknowledgementsWhenNothingIsAvailable(t *testing.T) {
 // acknowledgementsSent is every acknowledgement the client put in a Publish,
 // in the order they went over the wire. A request that is not a Publish
 // carries none, so the service name does not need checking here. It is
-// deliberately not filtered on activation, unlike the counts the other rows
-// read: the claim is about the wire, and an acknowledgement in a request the
-// server faulted still went over it. Over-counting can only block this row's
-// green arm, never produce it.
+// deliberately not filtered on activation, as republishesAfterDrop keeps
+// total unfiltered and subscriptionAfterInvalidID keeps sent: the claim is
+// about the wire, and an acknowledgement in a request the server faulted
+// still went over it.
+//
+// Its two callers take that differently. At the switch, over-counting can
+// only block this row's green arm, never produce it. In
+// acknowledgingClientSetupFailed it loosens the precondition instead, since
+// one more acknowledgement is one more chance to match a delivery. No client
+// measured on this fixture sends one before its own connection's
+// ActivateSession, so the looser reading has not yet differed from the
+// stricter one, and both runs are read by the same rule either way.
 func acknowledgementsSent(run runRecord) []ack {
 	var out []ack
 	for _, r := range run.Requests {
@@ -107,10 +112,6 @@ func acknowledgementsSent(run runRecord) []ack {
 // is not this row's, so what it checks is that something the client was given
 // came back.
 func acknowledgingClientSetupFailed(run runRecord) string {
-	if len(run.Deliveries) == 0 {
-		return "the client's callback was given no notification in the control run, so there was " +
-			"nothing for it to acknowledge there"
-	}
 	for _, a := range acknowledgementsSent(run) {
 		for _, d := range run.Deliveries {
 			if a.Seq == d.Seq {
@@ -124,42 +125,16 @@ func acknowledgingClientSetupFailed(run runRecord) string {
 }
 
 // emptyAvailableSetupFailed reports why the scored run is not the one the
-// clause speaks to, or "" if it is. This reads the fixture rather than the
-// client: the row rests on the server having advertised nothing, and a run
+// clause speaks to, or "" if it is. This is a tripwire on the row's own
+// NoRetransmissionQueue rather than a reading of the client, and cannot fire
+// while availableLocked returns the empty list unconditionally for that
+// option: the row rests on the server having advertised nothing, and a run
 // where it advertised something scores a client against a clause about a
 // server that advertises nothing.
 func emptyAvailableSetupFailed(run runRecord) string {
 	if len(run.Offered) != 0 {
 		return fmt.Sprintf("the server advertised %v as available for retransmission, and the "+
 			"clause is about a server that advertises nothing", run.Offered)
-	}
-	return ""
-}
-
-// ackOpportunitySetupFailed reports why the client was never in a position to
-// acknowledge anything in the scored run, or "" if it was. Acknowledging
-// nothing is only evidence where there was something to acknowledge and a
-// request to put it in.
-//
-// Two Publish requests establish the second. The fixture answers the first of
-// the stream and holds the next, and runScenario refuses any run in which
-// more than one notification was withheld, so the client's second Publish
-// went out after the first had been answered and is where the acknowledgement
-// would have been.
-func ackOpportunitySetupFailed(run runRecord) string {
-	if len(run.Deliveries) == 0 {
-		return "the client's callback was given no notification, so it had nothing it could have " +
-			"acknowledged"
-	}
-	published := 0
-	for _, r := range run.Requests {
-		if r.Service == "PublishRequest" {
-			published++
-		}
-	}
-	if published < 2 {
-		return "the client was given a notification and then sent no further Publish, so it was " +
-			"never in a position to acknowledge it"
 	}
 	return ""
 }

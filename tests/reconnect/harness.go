@@ -134,11 +134,11 @@ type recorder struct {
 	// ActivateSessionRequest was recorded" as "the Session is activated on
 	// that connection", which is true only because answer() returns success
 	// for every one of them. A server scripted to refuse re-activation --
-	// which no_acknowledgements_when_nothing_is_available_test.go already
-	// asks for, to reach §5.14.7.1 -- would turn all of those filters into
-	// no-ops at once, and every row would go on scoring clients against a
-	// Session the server had taken away. This holds the reason the rows
-	// decline instead.
+	// which reaching §5.14.7.1 would need, as
+	// no_acknowledgements_when_nothing_is_available_test.go notes -- would
+	// turn all of those filters into no-ops at once, and every row would go
+	// on scoring clients against a Session the server had taken away. This
+	// holds the reason the rows decline instead.
 	activationFaulted string
 	// anyMonitored is state of the whole fixture, unlike activatedConns: the
 	// scenario has one subscription. A client that recreates the subscription
@@ -474,7 +474,10 @@ type runRecord struct {
 	// Requests is every service request the server decoded, each with the
 	// connection generation it arrived on.
 	Requests []requestRecord
-	// Deliveries is what the application's own callback received.
+	// Deliveries is what the application's own callback received. It holds at
+	// least one notification whenever HarnessErr is empty, because runScenario
+	// waits for the callback before it commands the drop and every path out of
+	// it that stops short of that sets HarnessErr.
 	Deliveries []deliveryRecord
 	// HeldSeq is the sequence number of the notification the server held back.
 	HeldSeq uint32
