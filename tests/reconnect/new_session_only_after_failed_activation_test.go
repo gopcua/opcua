@@ -23,6 +23,10 @@
 // fixture did not grant one is declined by setupFailed rather than scored, so
 // the case the clause permits — a new Session after a refused activation —
 // never arises.
+//
+// The reference stacks. open62541 v1.4.22 re-activates and sends no
+// CreateSession after the drop, measured. node-opcua, Eclipse Milo and
+// UA-.NETStandard are unsettled. No stack here fails it: no exception.
 
 package reconnect
 
