@@ -9,10 +9,10 @@
 // disowned, rather than on one that survived, is
 // data_resumes_on_recreated_subscription_test.go.
 //
-// The scripted server is that server: the subscription outlives the drop and
-// the re-activation. The server holds one notification back and drops the
-// connection underneath it, then answers every later Publish with fresh data.
-// See harness.go.
+// The scripted server is the default one: the subscription outlives the drop
+// and the re-activation. The server holds one notification back and drops
+// the connection underneath it, then answers every later Publish with fresh
+// data. See harness.go.
 //
 // The test checks only that data arrives after the drop. Whether the client
 // republishes, transfers the subscription or recreates it is not the test's
