@@ -4,9 +4,9 @@ Every OPC 10000-4 §6.7 behaviour the harness can reach has a row. The rest of
 the clause's client statements are either scored by a row, or — for "shall
 re-establish the connection by creating a new SecureChannel and activating the
 Session" — enforced as a precondition by `reconnectSetupFailed` in seven rows,
-with no row taking it as its subject. Eight have no row at all, each blocked on
-a fixture capability `harness.go` does not have. This file exists so a reader
-can tell those from a behaviour nobody thought of.
+with no row taking it as its subject, or blocked on a fixture capability
+`harness.go` does not have. The table below is the blocked ones. This file
+exists so a reader can tell them from a behaviour nobody thought of.
 
 | capability the harness lacks | blocks |
 |---|---|
@@ -25,8 +25,8 @@ grants every ActivateSession unconditionally, and `recordActivationFault` marks
 a whole run unscorable if the fixture ever answers one with anything but a clean
 grant — the assumption the seven activation-filtering helpers rest on, and the
 one `harness_activation_rule_test.go` exists to hold. That capability is a
-rework of the package's own self-check, which is why it blocks two behaviours
-and is the most expensive item here.
+rework of the package's own self-check, which is what makes it the most
+expensive item here.
 
 **ResendData has a reachable stimulus and an unmeasurable response.**
 `runOptions{}` already answers every Republish `Bad_MessageNotAvailable`, which
@@ -34,9 +34,9 @@ is exactly the clause's trigger. But `requestRecord` carries `Conn`, `Service`,
 `RepublishSeq` and `Acks` and no node or method id, so a Call cannot be
 identified as ResendData, and a read of the monitored items cannot be told from
 gopcua's own namespace-array read, which is what the `ReadRequest` arm answers.
-It is nearer to reachable than the other seven.
+It is nearer to reachable than the rest.
 
-**Two of the eight are mis-addressed, not merely blocked.** What to monitor is
+**Two of these are mis-addressed, not merely blocked.** What to monitor is
 the application's choice, not the library's, and gopcua keeps no value cache. So
 the ServerStatus and overwrite-ordering items would not be client-library
 conformance rows even once the capability existed — the case question 6 of the

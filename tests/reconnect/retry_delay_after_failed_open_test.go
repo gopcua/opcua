@@ -27,6 +27,9 @@
 // backoff fires once and then its endpoint probe loop runs free. That is a
 // defect in node-opcua rather than a disagreement about the clause.
 //
+// gopcua passes it, measured by this row, which is why the row carries no
+// knownBug constant.
+//
 // The test is kept because it checks gopcua's own contract rather than the
 // clause above, which only says "should".
 

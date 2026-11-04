@@ -23,8 +23,10 @@ One run reduces to the `runRecord` type, documented at its declaration in
 
 Only a test function calls `t.Errorf` or `t.Fatalf`. A helper reads the
 `runRecord` and returns plain values. A helper two rows call lives in
-`harness.go`, as does one the fixture or `harness_activation_rule_test.go`
-also uses, whatever the row count; a helper one row calls lives with that row.
+`harness.go`, as does one `harness.go` itself calls, whatever the row count;
+a helper one row calls lives with that row. `harness_activation_rule_test.go`
+is not a placement criterion: it reads helpers wherever they already live,
+some in `harness.go` and some in row files.
 
 One file is not a row. `harness_activation_rule_test.go` has no client in it:
 it feeds `runRecord` values written by hand to the seven helpers that filter
@@ -67,6 +69,10 @@ entry is closed.
 Do not delete a `knownBug` constant because the test started passing for a
 reason you cannot explain.
 
+A row with no `knownBug` constant says in a clause that gopcua passes it, the
+way a row says which reference stacks were read, so that silence there means
+nobody checked rather than nothing to report.
+
 A constant costs the row a second thing while it stands: the row cannot tell
 *this client is broken* from *this client cannot be measured at all*. Where
 the missing behaviour is an absence and the arm keys on that absence, a
@@ -81,6 +87,10 @@ is trusted. Tooling cannot see all of it here: the behaviour a `knownBug`
 constant masks is logged rather than failed, so a mutation score counts that
 row as passing whatever the client does about that behaviour. The arms that
 fire beside the constant are ordinary failures and are visible.
+
+A decline is a `t.Fatalf`, so the test is red like any other failure. The
+word marks why it is red — the run could not be scored — and not a third
+outcome between passing and failing.
 
 One convention the questions assume: a row with two kinds of decline splits
 them, the one that is gopcua's own defect through the `knownBug` arm and the
