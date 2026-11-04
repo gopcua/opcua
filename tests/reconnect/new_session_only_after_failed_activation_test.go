@@ -26,7 +26,9 @@
 //
 // The reference stacks. open62541 v1.4.22 re-activates and sends no
 // CreateSession after the drop, measured. node-opcua, Eclipse Milo and
-// UA-.NETStandard are unsettled. No stack here fails it: no exception.
+// UA-.NETStandard were not read. No stack here fails it: no exception.
+// gopcua passes it, measured by this row, which is why the row carries no
+// knownBug constant.
 
 package reconnect
 

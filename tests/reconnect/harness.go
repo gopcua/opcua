@@ -677,9 +677,9 @@ func republishSeqsAfterDrop(run runRecord) []uint32 {
 }
 
 // loopRanSetupFailed reports why there was no Republish loop at all, or ""
-// if one ran. This is the reason the knownBug arm carries in both rows that
-// read the loop: gopcua re-activates and then asks for nothing, so neither
-// has anything to score rather than something to object to.
+// if one ran. This is the reason the knownBug arm carries in every row that
+// reads the loop: gopcua re-activates and then asks for nothing, so none of
+// them has anything to score rather than something to object to.
 //
 // It subsumes reconnectSetupFailed, so the rows that call both call that one
 // first; that order is what makes the knownBug text's "reconnects and
