@@ -480,6 +480,12 @@ type runRecord struct {
 	// it that stops short of that sets HarnessErr.
 	Deliveries []deliveryRecord
 	// HeldSeq is the sequence number of the notification the server held back.
+	// It is non-zero whenever HarnessErr is empty, because runScenario waits
+	// for the server to be holding a Publish before it commands the drop and
+	// every path out of it that stops short of that sets HarnessErr. The
+	// request it was withheld from is never the stream's first Publish:
+	// publishStep sets it only on the branch guarded by firstAnswered, which
+	// an earlier call has to have taken.
 	HeldSeq uint32
 	// LastSeq is the highest sequence number the server created.
 	LastSeq uint32
