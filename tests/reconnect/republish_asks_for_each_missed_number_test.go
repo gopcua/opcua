@@ -17,12 +17,14 @@
 // missed_notification_recovered_when_transfer_refused_test.go, here holding
 // furtherLost more notifications behind the one it withheld. See harness.go.
 //
-// open62541 has no client-side Republish at all, so this row declines to
-// score it rather than failing it; the row that fails it is
-// republish_after_reconnect_test.go, which takes that exception explicitly.
-// node-opcua walks the whole gap and stops on the fault, measured. Eclipse
-// Milo and UA-.NETStandard are source reads, not run here. A client cannot
-// produce the numbers this row reads by resuming the stream.
+// open62541 has no client-side Republish at all, so there is no loop for
+// this row to read. While knownBug stands the arm keys on an absence:
+// open62541 is logged green beside gopcua, and
+// republish_after_reconnect_test.go is where that absence will be failed
+// once knownBug is deleted. node-opcua walks the whole gap and stops on the
+// fault, measured. Eclipse Milo and UA-.NETStandard are source reads, not
+// run here. A client cannot produce the numbers this row reads by resuming
+// the stream.
 
 package reconnect
 

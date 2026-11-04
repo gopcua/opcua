@@ -18,9 +18,11 @@
 // keeps requests and not responses — the limit
 // missed_notification_recovered_when_transfer_refused_test.go also takes.
 //
-// open62541 has no client-side Republish, so no loop of its own ever ends
-// and this row declines to score it; republish_after_reconnect_test.go takes
-// that exception explicitly. node-opcua runs off the end of the queue and
+// open62541 has no client-side Republish, so no loop of its own ever ends.
+// While knownBug stands that absence is logged green here beside gopcua and
+// the row cannot tell the two apart; republish_after_reconnect_test.go is
+// the row that will fail it once knownBug is deleted, and declares that
+// exception in its own header. node-opcua runs off the end of the queue and
 // resumes, measured on this fixture. Eclipse Milo, read in source and not
 // run here, resumes after the loop drains; UA-.NETStandard, read the same
 // way, walks only to the number it just received and is declined for
