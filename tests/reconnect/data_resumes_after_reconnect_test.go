@@ -1,13 +1,21 @@
 // After the transport drops and the session is re-activated, a client whose
 // subscription survived on the server goes on receiving notifications on it.
-// OPC 10000-4 §6.7: "The Client shall only create a new Session if
-// ActivateSession fails." Re-activation assigns the new channel to the
-// existing session, so the client keeps the subscriptions that session holds
-// and the server keeps publishing to it.
+// OPC 10000-4 §6.7, conformance unit 669: "The Client shall only create a
+// new Session if ActivateSession fails." Re-activation assigns the new
+// channel to the existing session, so the client keeps the subscriptions
+// that session holds and the server keeps publishing to it.
 //
 // Data on one the client built to replace a subscription the server
 // disowned, rather than on one that survived, is
-// data_resumes_on_recreated_subscription_test.go.
+// data_resumes_on_recreated_subscription_test.go. The same clause sentence
+// read on the wire, as whether a CreateSession arrives at all, is
+// new_session_only_after_failed_activation_test.go: a client that creates
+// one anyway has abandoned the subscriptions the old Session held and still
+// recovers data, so this row passes it. Whether the client waits for its own
+// ActivateSession before using the Session on a new connection is
+// session_unused_before_activation_test.go, a different clause, §5.7.2.1;
+// a client that does not wait is faulted with Bad_SessionNotActivated and
+// may recover and receive data anyway, so this row passes that too.
 //
 // The scripted server is the default one: the subscription outlives the drop
 // and the re-activation. The server holds one notification back and drops

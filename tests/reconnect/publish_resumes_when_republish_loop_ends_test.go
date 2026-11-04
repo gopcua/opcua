@@ -27,8 +27,10 @@
 // resumes, measured on this fixture. Eclipse Milo, read in source and not
 // run here, resumes after the loop drains; UA-.NETStandard, read the same
 // way, walks only to the number it just received and is declined for
-// stopping before the terminator. A client cannot reach the passing branch
-// by resuming the stream without asking.
+// stopping before the terminator. No stack here fails it -- open62541 is
+// logged green rather than failed while knownBug stands, and UA-.NETStandard
+// is declined rather than failed -- so the row takes no exception. A client
+// cannot reach the passing branch by resuming the stream without asking.
 
 package reconnect
 

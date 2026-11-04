@@ -19,7 +19,7 @@ exists so a reader can tell them from a behaviour nobody thought of.
 | a server-initiated connection | reverse connect |
 | a run that goes silent without closing the transport | "The preferred mechanism for a Client to monitor the connection status is through the keep-alive of the Subscription" |
 
-Four of these need more than the table says.
+Some of these need more than the table says.
 
 **The failing-activation fixture is not another `runOptions` field.** `answer`
 grants every ActivateSession unconditionally, and `recordActivationFault` marks

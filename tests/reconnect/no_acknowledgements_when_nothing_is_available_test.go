@@ -9,6 +9,9 @@
 // while knownBug stands this row logs such a client green beside gopcua
 // rather than failing it.
 //
+// No other row here reads acknowledgements, and no other row is on
+// §5.14.5.2, so this one has no neighbouring row.
+//
 // The server runs twice: a control under AdvertisesSentSequence, which names
 // every notification it sends in that response's own list, and the scored
 // run under NoRetransmissionQueue, which advertises nothing. See harness.go.
