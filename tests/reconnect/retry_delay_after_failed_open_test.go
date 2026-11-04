@@ -58,6 +58,11 @@ func TestRetryDelayAfterFailedOpen(t *testing.T) {
 	// shortened, or a longInterval lengthened, until the window no longer
 	// holds minRetryAttempts fails the build rather than a run. The long
 	// interval is the binding one; the short one is well inside the window.
+	//
+	// It budgets a whole interval more than the attempts need: minRetryAttempts
+	// attempts leave minRetryAttempts-1 gaps between them, and the extra
+	// interval is slack for the time the client spends noticing the drop
+	// before the first attempt, which no gap covers.
 	const _ = uint64(settleRetries - minRetryAttempts*longInterval)
 
 	var gaps []time.Duration
