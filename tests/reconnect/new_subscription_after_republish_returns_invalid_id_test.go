@@ -15,8 +15,9 @@
 //
 // The row asserts the outcome and not the reasoning: after the last Republish
 // the client sent on a post-drop connection it had activated, at least one
-// CreateSubscription follows on any connection it had activated. Nothing is
-// said about how soon, about DeleteSubscriptions, or about monitored items.
+// CreateSubscription follows on a post-drop connection it had activated.
+// Nothing is said about how soon, about DeleteSubscriptions, or about
+// monitored items.
 //
 // The reference stacks, and the exception this row takes. Eclipse Milo fails
 // it: PublishingManager logs any status but Bad_MessageNotAvailable and
@@ -95,8 +96,9 @@ func TestNewSubscriptionAfterRepublishReturnsInvalidID(t *testing.T) {
 // subscriptionAfterInvalidID reads what the client did once the server had
 // told it the subscription id was invalid: the sequence number of the last
 // Republish it sent on a post-drop connection it had already activated, how
-// many CreateSubscription requests followed it on an activated connection,
-// and how many requests of any kind followed it on a post-drop connection.
+// many CreateSubscription requests followed it on a post-drop connection it
+// had already activated, and how many requests of any kind followed it on a
+// post-drop connection.
 //
 // Activation is the rule on the first two, which are readings of the client:
 // answer() faults a session service arriving before its own connection's

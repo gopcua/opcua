@@ -8,7 +8,8 @@
 // whether it walks the whole gap — with the loop sentence this one follows
 // quoted in full — is republish_asks_for_each_missed_number_test.go.
 //
-// The scripted server is that row's: the transfer-refusing one, holding
+// The scripted server is the transfer-refusing one of
+// missed_notification_recovered_when_transfer_refused_test.go, here holding
 // furtherLost more notifications behind the one it withheld, so a client
 // that walks the queue runs off the end of it. See harness.go.
 //
@@ -147,9 +148,9 @@ func afterLastRepublish(run runRecord) (lastAsk uint32, published, sent int, ask
 // than the one this row is about, or "" if it ended for that reason. A client
 // that stopped while the server still had the number it asked for stopped on
 // its own terms and was never returned Bad_MessageNotAvailable; the file's
-// opening comment names the stack that takes that route. The sequence
-// numbers here are the server's own, so the reason names what the server had
-// rather than what the client was handed.
+// opening comment names UA-.NETStandard as the stack that takes that route.
+// The sequence numbers here are the server's own, so the reason names what
+// the server had rather than what the client was handed.
 //
 // A run with no Republish at all is loopRanSetupFailed's to report, so this
 // one says nothing about it.
