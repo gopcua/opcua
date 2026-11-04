@@ -325,15 +325,14 @@ func TestFixtureNoticesAnActivationItDidNotGrant(t *testing.T) {
 	publish := &ua.PublishRequest{RequestHeader: &ua.RequestHeader{RequestHandle: handle}}
 
 	// granted is the answer answer() really gives an ActivateSessionRequest.
-	// It is written out rather than called so that a change to answer() turns
-	// this case red instead of quietly redefining what a grant is.
-	granted := func() ua.Response {
-		return &ua.ActivateSessionResponse{
-			ResponseHeader: newResponseHeader(handle, ua.StatusOK),
-			ServerNonce:    nil,
-			Results:        []ua.StatusCode{},
-		}
-	}
+	// It is asked of answer() rather than written out so that a change to
+	// answer()'s grant reaches this case: a refusal there would be recorded
+	// as a reason and fail the empty want below. What the case pins is
+	// recordActivationFault, which can no longer be changed to flag the
+	// answer the fixture gives. An ActivateSessionRequest does not use the
+	// Session, so answer()'s activation gate is skipped and nothing here
+	// needs a listener or a live connection.
+	granted := (&server{rec: &recorder{}}).answer(1, activate)
 
 	for _, c := range []struct {
 		name string
@@ -386,7 +385,7 @@ func TestFixtureNoticesAnActivationItDidNotGrant(t *testing.T) {
 		{
 			name: "the answer the fixture really gives",
 			req:  activate,
-			resp: granted(),
+			resp: granted,
 			want: "",
 		},
 		{
