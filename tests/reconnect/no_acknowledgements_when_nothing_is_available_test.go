@@ -42,8 +42,7 @@ func TestNoAcknowledgementsWhenNothingIsAvailable(t *testing.T) {
 	// knownBug records that gopcua does not do this yet; the text is logged in
 	// place of a failure. README.md says when to delete it. It carries no
 	// issue link because it is not the reconnect defect the other knownBug
-	// rows link, and gopcua's tracker was searched and has nothing covering
-	// this one.
+	// rows link.
 	const knownBug = "the client acknowledges every notification it is given and never reads the server's availableSequenceNumbers, so it acknowledges to a server that has just said it keeps nothing"
 
 	control := runScenario(runOptions{AdvertisesSentSequence: true})
