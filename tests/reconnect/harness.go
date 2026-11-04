@@ -129,6 +129,17 @@ type recorder struct {
 	// activatedConns holds the connections ActivateSession has arrived on. It
 	// is per connection because a reconnect must activate the session again.
 	activatedConns map[int]bool
+	// activationFaulted is the fixture checking itself, and is empty while
+	// the check holds. Every activation filter in this package reads "an
+	// ActivateSessionRequest was recorded" as "the Session is activated on
+	// that connection", which is true only because answer() returns success
+	// for every one of them. A server scripted to refuse re-activation --
+	// which no_acknowledgements_when_nothing_is_available_test.go already
+	// asks for, to reach §5.14.7.1 -- would turn all of those filters into
+	// no-ops at once, and every row would go on scoring clients against a
+	// Session the server had taken away. This holds the reason the rows
+	// decline instead.
+	activationFaulted string
 	// anyMonitored is state of the whole fixture, unlike activatedConns: the
 	// scenario has one subscription. A client that recreates the subscription
 	// and then fails to recreate its monitored items gets keep-alives for the
@@ -190,6 +201,61 @@ func (o *recorder) recordRequest(connID int, req ua.Request) {
 		o.activatedConns[connID] = true
 	}
 	o.requests = append(o.requests, rr)
+	o.mu.Unlock()
+}
+
+// recordActivationFault keeps the first answer the scripted server gave an
+// ActivateSessionRequest that was not a success, and ignores every other
+// request. serve() calls it at the one point that holds both the request and
+// the response it produced, so the usesSession gate at the top of answer(),
+// the catch-all at the bottom and any arm added between them are covered
+// without a call site of their own.
+//
+// It records rather than failing the test: this runs on the connection's own
+// goroutine, and reaching for *testing.T from there races the test goroutine.
+// setupFailed is what turns the record into a declined row.
+//
+// Three things stop an answer being a success, and the third is the one to
+// expect. A ServiceFault and a non-OK ServiceResult are both visible to
+// anyone grepping for newServiceFault. A Results entry that is not OK under
+// an OK ServiceResult is the server accepting the request and rejecting the
+// identity token in it, which refuses the activation without producing a
+// fault anywhere -- so a guard that looked only for faults would let exactly
+// the quiet route through.
+func (o *recorder) recordActivationFault(req ua.Request, resp ua.Response) {
+	if _, isActivation := req.(*ua.ActivateSessionRequest); !isActivation || resp == nil {
+		return
+	}
+	var why string
+	switch act := resp.(type) {
+	case *ua.ServiceFault:
+		why = fmt.Sprintf("faulted it with %s", responseStatus(act))
+	case *ua.ActivateSessionResponse:
+		switch {
+		case responseStatus(act) != ua.StatusOK:
+			why = fmt.Sprintf("answered it %s", responseStatus(act))
+		default:
+			for i, st := range act.Results {
+				if st != ua.StatusOK {
+					why = fmt.Sprintf("accepted it and rejected identity token %d with %s", i, st)
+					break
+				}
+			}
+		}
+	default:
+		why = fmt.Sprintf("answered it with a %T", act)
+	}
+	if why == "" {
+		return
+	}
+	o.mu.Lock()
+	if o.activationFaulted == "" {
+		o.activationFaulted = "the scripted server " + why + ", so the Session was not " +
+			"activated on that connection. Every check in this package that filters on " +
+			"activation reads the request and not the answer, and all of them are now " +
+			"reading an activation that did not happen, so nothing this run recorded can " +
+			"be scored"
+	}
 	o.mu.Unlock()
 }
 
@@ -388,6 +454,7 @@ func (s *server) snapshot(out *runRecord) {
 	out.LastSeq = o.lastSeq
 	out.SeqAtRecreate = o.seqAtRecreate
 	out.RecreateAfter = o.recreateAfter
+	out.ActivationFaulted = o.activationFaulted
 	out.Answerable = s.answerableSeqsLocked()
 	out.Offered = s.availableLocked()
 }
@@ -455,10 +522,18 @@ type runRecord struct {
 	// HarnessErr is a stage the scenario could not reach; the test reports it
 	// as a setup failure.
 	HarnessErr string
+	// ActivationFaulted is the fixture's own check on itself, and is empty
+	// when it holds; see recorder.activationFaulted for what it guards.
+	ActivationFaulted string
 }
 
 // setupFailed reports why the run never reached the point the test is about,
 // or "" if it did. Whatever caused it, no test here can speak past it.
+//
+// It also carries the fixture's check on itself, and carries it first. Every
+// row in the package calls this one and no row has to remember to call
+// anything else, which is the point: a guard each row opts into is a guard a
+// twelfth row forgets.
 //
 // Every check of this kind is named …SetupFailed, returns the reason or "",
 // and is reported as "could not set the test up: %s": the reason is the
@@ -475,6 +550,12 @@ type runRecord struct {
 // gopcua's own defect goes through the knownBug arm, and the one a
 // conforming client earns is a t.Fatalf up with the preconditions.
 func setupFailed(run runRecord) string {
+	// Ahead of HarnessErr because it is worse: a stage the scenario could not
+	// reach leaves the rows nothing to read, while an activation the server
+	// did not grant leaves them something that reads as evidence and is not.
+	if run.ActivationFaulted != "" {
+		return run.ActivationFaulted
+	}
 	return run.HarnessErr
 }
 
@@ -549,9 +630,7 @@ func republishesAfterDrop(run runRecord) (asked int, wrongSeqs []uint32, total i
 // activated there: a Republish that arrives before that connection's
 // ActivateSession is faulted with Bad_SessionNotActivated rather than
 // answered by the retransmission rule, so it is not part of any loop.
-// session_unused_before_activation_test.go is the row that scores it, and
-// answerableAsk in the transfer-refused row reads the same rule for the one
-// number that row cares about.
+// session_unused_before_activation_test.go is the row that scores it.
 func republishSeqsAfterDrop(run runRecord) []uint32 {
 	var out []uint32
 	activated := map[int]bool{}
@@ -721,6 +800,7 @@ func (s *server) serve(ctx context.Context, connID int, c *uacp.Conn) {
 		s.rec.recordRequest(connID, req)
 
 		resp := s.answer(connID, req)
+		s.rec.recordActivationFault(req, resp)
 		if resp == nil {
 			continue
 		}
@@ -922,6 +1002,17 @@ func newResponseHeader(handle uint32, status ua.StatusCode) *ua.ResponseHeader {
 		StringTable:        []string{},
 		AdditionalHeader:   ua.NewExtensionObject(nil),
 	}
+}
+
+// responseStatus is the ServiceResult a response carried. A response with no
+// header at all reads as StatusBadInternalError rather than as success: it is
+// not an answer the client can act on, and recordActivationFault is the only
+// caller, where reading it as success would be the one wrong answer.
+func responseStatus(resp ua.Response) ua.StatusCode {
+	if h := resp.Header(); h != nil {
+		return h.ServiceResult
+	}
+	return ua.StatusBadInternalError
 }
 
 func newServiceFault(handle uint32, status ua.StatusCode) ua.Response {
