@@ -16,12 +16,12 @@ Only a test function calls `t.Errorf` or `t.Fatalf`. A helper reads the
 `harness.go`; a helper one row calls lives with that row.
 
 One file is not a row. `harness_activation_rule_test.go` has no client in it:
-it feeds `runRecord` values written by hand to the five helpers that filter on
+it feeds `runRecord` values written by hand to the six helpers that filter on
 activation, and requires each to read a session service that arrived before
 its connection's `ActivateSession` differently from the same request arriving
-after. The five state one rule in five places, the ordering is the whole
+after. The six state one rule in six places, the ordering is the whole
 content of it, and that file is the only thing checking they agree. It also
-checks the assumption all five rest on, that the scripted server grants every
+checks the assumption all six rest on, that the scripted server grants every
 activation it is asked for, by putting the four answers that are not a grant
 to the fixture's own check and requiring it to notice each one. The six
 questions below are for rows and do not apply to it.
