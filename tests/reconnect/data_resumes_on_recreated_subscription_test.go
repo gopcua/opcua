@@ -23,12 +23,15 @@
 // would decline the client it exists for — one whose reconnect path recreates
 // subscriptions and never asks for anything. While knownBug stands the arm
 // keys on an absence: a client that created no replacement is logged green.
+// A client that created one and then sent fewer than two Publish the server
+// acted on is declined instead: it was never in a position to be handed data
+// on the replacement, so finding none there says nothing about it.
 //
 // The reference stacks. open62541 v1.4.22 has no client-side replacement
 // path, so it never reaches the condition this row scores; while knownBug
 // stands that is the green log above and not a decline, and the row cannot
 // tell it from gopcua. node-opcua 2.187.19 passes it, measured here.
-// Eclipse Milo and UA-.NETStandard are unsettled; what settles each is
+// Eclipse Milo and UA-.NETStandard were not read; what would settle each is
 // whether its own recreate path carries the items. No stack here fails it:
 // no exception.
 
