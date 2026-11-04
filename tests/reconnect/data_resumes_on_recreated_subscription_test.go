@@ -5,9 +5,10 @@
 // MonitoredItems do not overflow." Conformance unit 276 names Republish and
 // not this outcome, so the sentence is the clause's alone.
 //
-// Whether the client replaces the subscription at all is
-// new_subscription_after_republish_returns_invalid_id_test.go; how much data
-// follows is data_resumes_after_reconnect_test.go.
+// Data on the subscription that survived the drop, rather than on one built
+// to replace it, is data_resumes_after_reconnect_test.go. Whether the client
+// replaces the subscription at all is
+// new_subscription_after_republish_returns_invalid_id_test.go.
 //
 // The scripted server is that row's, with every Republish answered
 // Bad_SubscriptionIdInvalid. A CreateSubscription makes the fixture forget
