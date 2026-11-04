@@ -88,9 +88,9 @@ func TestDataResumesOnRecreatedSubscription(t *testing.T) {
 			"all created after the replacement, reached the application", fresh)
 	default:
 		t.Errorf("the client replaced the subscription the server had disowned and sent %d Publish "+
-			"on it, and no notification created after the replacement ever reached the application "+
-			"(%d reached it in all, none above sequence %d), so the replacement carries nothing the "+
-			"application subscribed to", published, len(run.Deliveries), run.SeqAtRecreate)
+			"the server acted on, and no notification created after the replacement ever reached "+
+			"the application (%d reached it in all, none above sequence %d), so the replacement "+
+			"carries nothing the application subscribed to", published, len(run.Deliveries), run.SeqAtRecreate)
 	}
 }
 

@@ -157,7 +157,10 @@ type recorder struct {
 	// went over the wire. Zero while no such request has arrived, and that
 	// sentinel cannot be mistaken for a real value: the request is recorded
 	// before the arm that sets this runs, so the count is at least one
-	// whenever the arm has run.
+	// whenever the arm has run. The boundary is all it is: serve() records a
+	// request before answer() reaches that arm, and another connection's
+	// goroutine can append in between, so requests[recreateAfter-1] is not
+	// reliably the CreateSubscription itself.
 	recreateAfter int
 
 	// deliveries is what the application's own notification callback
