@@ -218,15 +218,17 @@ func (o *recorder) recordRequest(connID int, req ua.Request) {
 // goroutine, and reaching for *testing.T from there races the test goroutine.
 // setupFailed is what turns the record into a declined row.
 //
-// Four things stop an answer being a success. A ServiceFault and a non-OK
+// Five things stop an answer being a success. A ServiceFault and a non-OK
 // ServiceResult are both visible to anyone grepping for newServiceFault. A
 // Results entry that is not OK under an OK ServiceResult is the server
 // accepting the request and rejecting the identity token in it, which
 // refuses the activation without producing a fault anywhere, so a guard that
-// looked only for faults would let that one through. And no answer at all
+// looked only for faults would let that one through. No answer at all
 // leaves the request recorded and the Session unactivated, which is the
 // failure this whole check is about, reached by the one route that writes no
-// status down anywhere.
+// status down anywhere. And an answer of any other type is the catch-all:
+// nothing in answer() produces one today, and an arm that did would read as
+// a grant without it.
 //
 // The nil it sees is the nil serve() sees, and it is only ever read for an
 // ActivateSessionRequest: answer() returns nil for a held Publish on every
