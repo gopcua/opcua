@@ -5,7 +5,9 @@
 // not acknowledge sequence numbers." Conformance unit 744/2284, Subscription
 // Client Basic, stops at the rule this clause is the exception to —
 // "Acknowledge received Notifications with subsequent Publish requests" — so
-// a client that implements the unit and nothing else fails this row.
+// a client that implements the unit and nothing else violates this clause;
+// while knownBug stands this row logs such a client green beside gopcua
+// rather than failing it.
 //
 // The server runs twice: a control under AdvertisesSentSequence, which names
 // every notification it sends in that response's own list, and the scored
@@ -20,12 +22,14 @@
 // clause needs a server that refuses to re-activate the surviving Session.
 //
 // The clause is a "should" and one of the two stacks read here ignores it,
-// so the row names the stack it fails. open62541 v1.4.22 passes it the
-// clause's own way: ua_client_subscriptions.c queues an acknowledgement only
-// for a sequence number in that response's own availableSequenceNumbers.
-// node-opcua 2.187.19 fails it, measured here: client_publish_engine.js
-// reads the available list only in a commented-out line. Eclipse Milo and
-// UA-.NETStandard were not read.
+// so the row names it. open62541 v1.4.22 passes it the clause's own way:
+// ua_client_subscriptions.c queues an acknowledgement only for a sequence
+// number in that response's own availableSequenceNumbers. node-opcua
+// 2.187.19 acknowledges anyway, measured here: client_publish_engine.js
+// reads the available list only in a commented-out line. While knownBug
+// stands that is the same green log gopcua earns, so the row cannot tell
+// them apart; it becomes the row's declared exception once knownBug is
+// deleted. Eclipse Milo and UA-.NETStandard were not read.
 
 package reconnect
 
