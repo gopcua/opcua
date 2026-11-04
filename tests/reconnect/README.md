@@ -41,6 +41,9 @@ The suite exists because a diff of reconnect code does not tell you what the
 client will do: that depends on how the server answers after the drop, and
 servers differ.
 
+What the package deliberately does not test, and the fixture capability each
+gap waits on, is in `NOT-TESTED.md`.
+
 ## Tests for behaviour that does not exist yet
 
 A test for a behaviour gopcua does not have yet carries a `knownBug`
