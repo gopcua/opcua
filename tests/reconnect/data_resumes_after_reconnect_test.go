@@ -31,10 +31,30 @@
 // re-activated too late in the window for minFresh is logged green beside
 // gopcua. Keying on a presence would mean requiring the Publishes whose
 // absence is the defect.
+//
+// The reference stacks. The three read here re-issue a Publish as soon as one
+// is answered rather than on a timer, so each draws at this fixture's ceiling
+// of five answers a second and what separates them is the dead time after the
+// drop. open62541 v1.4.22 schedules no wait - ua_client_connect.c calls
+// __Client_Subscriptions_backgroundPublish from the ActivateSession response
+// handler - and spends about 0.2s of the window on the reconnect, measured
+// here with its publish pipeline lowered to two, which this fixture's
+// serialised answers made necessary: at its default of ten it pushes its own
+// CreateMonitoredItems past its request timeout. node-opcua 2.187.19 asks
+// once, is faulted and refills a five-deep pipeline, about 1.2s, measured
+// here. Eclipse Milo, read and not run, leaves Active for ReactivatingWait on
+// a lost connection, which schedules its first reactivation a whole second
+// out and doubles that on each failure: a second of this window gone by
+// design, and the reason minFresh is three rather than a number that measures
+// throughput. UA-.NETStandard was not read. No stack here fails it: no
+// exception.
 
 package reconnect
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 func TestDataResumesAfterReconnect(t *testing.T) {
 	// knownBug records that gopcua does not do this yet; the text is logged in
@@ -43,13 +63,20 @@ func TestDataResumesAfterReconnect(t *testing.T) {
 	const knownBug = "the client reconnects and re-activates the session, but never receives another notification"
 
 	// minFresh is how many distinct notifications after the drop show a
-	// resumed stream: one that arrives and then stalls is not a stream. Half
-	// of what the settle window holds at publishPacing.
-	const minFresh = int(settleDefault/publishPacing) / 2
+	// resumed stream: one that arrives and then stalls is not a stream, and a
+	// third rules out a pair that happened to land together. It is not a rate:
+	// the fixture sleeps publishPacing before answering each Publish, so a
+	// larger number would spend the settle window on the server's own sleeps
+	// and charge the client for them.
+	const minFresh = 3
+
+	// minSettle is the window a client needs to notice the reset, redial and
+	// re-activate before minFresh answers can arrive at publishPacing.
+	const minSettle = 2 * time.Second
 
 	// A tripwire, not a check: both sides are constants, so a settleDefault
-	// or publishPacing leaving minFresh below 2 fails the build, not a run.
-	const _ = uint64(minFresh - 2)
+	// shortened below minSettle fails the build here rather than a run.
+	const _ = uint64(settleDefault - minSettle)
 
 	run := runScenario(runOptions{})
 
