@@ -25,6 +25,12 @@
 // ActivateSession is what is being waited for, GetEndpoints and FindServers
 // need no Session, and CloseSession is how a client abandons one it could
 // not activate.
+//
+// The reference stacks. node-opcua 2.187.19 opens the connection after the
+// drop with ActivateSession, measured. open62541 v1.4.22 was measured by
+// request counts per connection, which do not settle an ordering; Eclipse
+// Milo and UA-.NETStandard are unsettled. No stack here fails it: no
+// exception.
 
 package reconnect
 

@@ -1,8 +1,18 @@
 # Reconnect tests
 
 Each file here is one Go test for one client behaviour in the OPC UA
-reconnect space, named after that behaviour. The specification clause it
-checks is in the file's opening comment.
+reconnect space, named after that behaviour. Its opening comment covers
+these, in this order:
+
+1. the behaviour and the clause quoted, with the conformance unit if any;
+2. the neighbouring rows by filename and what separates them;
+3. the scripted server, the default one or the row that owns it, closing
+   with `See harness.go.`;
+4. what the row asserts and what it deliberately does not;
+5. the reference stacks and any exception, where stacks were read.
+
+Item 3 is checkable: `grep -c "See harness.go" tests/reconnect/*_test.go`
+prints 1 for every row and 0 for `harness_activation_rule_test.go`.
 
 A test drives the gopcua client through its public API against the scripted
 server in `harness.go`. That server can drop the transport on command —
@@ -13,7 +23,8 @@ One run reduces to the `runRecord` type, documented at its declaration in
 
 Only a test function calls `t.Errorf` or `t.Fatalf`. A helper reads the
 `runRecord` and returns plain values. A helper two rows call lives in
-`harness.go`; a helper one row calls lives with that row.
+`harness.go`, as does one the fixture or `harness_activation_rule_test.go`
+also uses, whatever the row count; a helper one row calls lives with that row.
 
 One file is not a row. `harness_activation_rule_test.go` has no client in it:
 it feeds `runRecord` values written by hand to the seven helpers that filter
@@ -109,8 +120,9 @@ package.
    this to the application, and then it is not a test every client should
    pass: keep it only if you say so in the file, name the stacks it fails, and
    show it still fails a client that fakes the outcome instead of earning it.
-   An exception is declared in the header of the file that takes it, not here.
-   Put what you find in the pull request.
+   An exception is declared in the header of the file that takes it, not
+   here; a row checked with no failing stack says so in a clause, so that
+   silence means nobody checked. Put what you find in the pull request.
 
 ## Optional tools
 
