@@ -215,19 +215,28 @@ func (o *recorder) recordRequest(connID int, req ua.Request) {
 // goroutine, and reaching for *testing.T from there races the test goroutine.
 // setupFailed is what turns the record into a declined row.
 //
-// Three things stop an answer being a success, and the third is the one to
-// expect. A ServiceFault and a non-OK ServiceResult are both visible to
-// anyone grepping for newServiceFault. A Results entry that is not OK under
-// an OK ServiceResult is the server accepting the request and rejecting the
-// identity token in it, which refuses the activation without producing a
-// fault anywhere -- so a guard that looked only for faults would let exactly
-// the quiet route through.
+// Four things stop an answer being a success. A ServiceFault and a non-OK
+// ServiceResult are both visible to anyone grepping for newServiceFault. A
+// Results entry that is not OK under an OK ServiceResult is the server
+// accepting the request and rejecting the identity token in it, which
+// refuses the activation without producing a fault anywhere, so a guard that
+// looked only for faults would let that one through. And no answer at all
+// leaves the request recorded and the Session unactivated, which is the
+// failure this whole check is about, reached by the one route that writes no
+// status down anywhere.
+//
+// The nil it sees is the nil serve() sees, and it is only ever read for an
+// ActivateSessionRequest: answer() returns nil for a held Publish on every
+// run this package makes, which is the fixture's own mechanism and not a
+// fault.
 func (o *recorder) recordActivationFault(req ua.Request, resp ua.Response) {
-	if _, isActivation := req.(*ua.ActivateSessionRequest); !isActivation || resp == nil {
+	if _, isActivation := req.(*ua.ActivateSessionRequest); !isActivation {
 		return
 	}
 	var why string
 	switch act := resp.(type) {
+	case nil:
+		why = "never answered it"
 	case *ua.ServiceFault:
 		why = fmt.Sprintf("faulted it with %s", responseStatus(act))
 	case *ua.ActivateSessionResponse:
