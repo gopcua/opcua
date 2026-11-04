@@ -1,17 +1,17 @@
-// The package states one rule in five places, and this is the executable
+// The package states one rule in six places, and this is the executable
 // statement of it. A session service that arrives on a connection before
 // that connection's ActivateSession is faulted Bad_SessionNotActivated by
 // answer() and the server does nothing with it, so no reading of the client
 // may count it -- even though the same connection activates a moment later
 // and is activated for the rest of the run.
 //
-// Every one of the five builds its activated map inside the loop that reads
+// Every one of the six builds its activated map inside the loop that reads
 // it, so "activated" there means "had activated by the time this request
 // arrived" and not "activated at some point". That ordering is the whole
 // content of the rule, and nothing in the package asserted it. A reviewer
-// proposing to lift the five into one activatedConns(run) map[int]bool is
+// proposing to lift the six into one activatedConns(run) map[int]bool is
 // proposing membership over the run, which answers a different question:
-// four of the five would start counting the faulted requests, and
+// five of the six would start counting the faulted requests, and
 // firstEarlyUse, whose entire job is to find one, would return false for
 // every client that activates at all. The suite would stay green, because no
 // client this fixture drives has ever pipelined.
@@ -63,6 +63,22 @@ func activationRuleRun(afterDrop ...requestRecord) runRecord {
 
 func republishRecord(conn int, seq uint32) requestRecord {
 	return requestRecord{Conn: conn, Service: "RepublishRequest", RepublishSeq: seq}
+}
+
+// activationRuleRecreate is a run in which the client replaced the disowned
+// subscription on an activated connection 2 and then did afterRecreate.
+// runRecord.RecreateAfter is set to the boundary the fixture would have set:
+// the number of requests recorded when that CreateSubscription arrived.
+func activationRuleRecreate(afterRecreate ...requestRecord) runRecord {
+	replaced := []requestRecord{
+		{Conn: 2, Service: "CreateSessionRequest"},
+		{Conn: 2, Service: "ActivateSessionRequest"},
+		republishRecord(2, activationRuleHeldSeq),
+		{Conn: 2, Service: "CreateSubscriptionRequest"},
+	}
+	run := activationRuleRun(append(replaced, afterRecreate...)...)
+	run.RecreateAfter = len(run.Requests) - len(afterRecreate)
+	return run
 }
 
 func TestActivationRuleIsOrdered(t *testing.T) {
@@ -199,6 +215,30 @@ func TestActivationRuleIsOrdered(t *testing.T) {
 			},
 			wantEarly: "lastAsk=7 published=1 sent=1 asked=true",
 			wantLate:  "lastAsk=9 published=1 sent=1 asked=true",
+		},
+		{
+			name: "newSubscriptionAfterDrop does not count a Publish that preceded its ActivateSession",
+			early: activationRuleRecreate(
+				requestRecord{Conn: 3, Service: "CreateSessionRequest"},
+				requestRecord{Conn: 3, Service: "PublishRequest"},
+				requestRecord{Conn: 3, Service: "PublishRequest"},
+				requestRecord{Conn: 3, Service: "ActivateSessionRequest"},
+			),
+			late: activationRuleRecreate(
+				requestRecord{Conn: 3, Service: "CreateSessionRequest"},
+				requestRecord{Conn: 3, Service: "ActivateSessionRequest"},
+				requestRecord{Conn: 3, Service: "PublishRequest"},
+				requestRecord{Conn: 3, Service: "PublishRequest"},
+			),
+			read: func(run runRecord) string {
+				created, published := newSubscriptionAfterDrop(run)
+				return fmt.Sprintf("created=%v published=%d", created, published)
+			},
+			// created is true in both: the replacement itself is behind its
+			// own connection's ActivateSession either way, and what varies is
+			// only whether the server could answer the Publish that followed.
+			wantEarly: "created=true published=0",
+			wantLate:  "created=true published=2",
 		},
 		{
 			name: "firstEarlyUse finds the request that preceded its ActivateSession",
