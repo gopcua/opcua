@@ -6,6 +6,9 @@
 // client configured with ReconnectInterval(d) leaves at least d between
 // successive attempts.
 //
+// No other row here measures when the client acts, only what it sends, so
+// this one has no neighbouring row.
+//
 // After the drop the server accepts every connection and closes it at once, so
 // each attempt fails at OpenSecureChannel. The server timestamps each accept,
 // and the client's attempts are read from those. See harness.go.
@@ -17,7 +20,7 @@
 // Two known-good clients fail this, for different reasons, and neither is a
 // reason to drop it. Eclipse Milo's reconnect backoff is hard-coded, one
 // second doubling to sixteen — read from source, not run here — so it has no
-// configured interval to honour and the second check would redden it.
+// configured interval to honour.
 // node-opcua 2.187.19 does have a configured interval and ignores it:
 // measured against this scenario at 300ms, 1.2s and 5s it reconnected about
 // six thousand times a second in each case, median gap 0.145ms, because its
@@ -30,7 +33,6 @@
 package reconnect
 
 import (
-	"fmt"
 	"testing"
 	"time"
 )
@@ -48,11 +50,14 @@ const (
 )
 
 func TestRetryDelayAfterFailedOpen(t *testing.T) {
+	// A tripwire, not a check: all of it is constants, so a settleRetries
+	// shortened, or a longInterval lengthened, until the window no longer
+	// holds minRetryAttempts fails the build rather than a run. The long
+	// interval is the binding one; the short one is well inside the window.
+	const _ = uint64(settleRetries - minRetryAttempts*longInterval)
+
 	var gaps []time.Duration
 	for _, interval := range []time.Duration{shortInterval, longInterval} {
-		if why := retryWindowSetupFailed(interval); why != "" {
-			t.Fatalf("could not set the test up: %s", why)
-		}
 		run := runScenario(runOptions{
 			ReconnectInterval: interval,
 			RefuseAfterDrop:   true,
@@ -86,17 +91,6 @@ func TestRetryDelayAfterFailedOpen(t *testing.T) {
 	}
 	t.Logf("smallest gap between attempts: %s at an interval of %s, %s at %s",
 		atShort, shortInterval, atLong, longInterval)
-}
-
-// retryWindowSetupFailed reports why settleRetries cannot hold minRetryAttempts at
-// this interval, or "" if it can.
-func retryWindowSetupFailed(interval time.Duration) string {
-	if settleRetries >= minRetryAttempts*interval {
-		return ""
-	}
-	return fmt.Sprintf("the settle window of %s holds only %d attempts at an interval of %s, "+
-		"too few to measure a gap. Lengthen settleRetries",
-		settleRetries, int(settleRetries/interval), interval)
 }
 
 // smallestGap reports the smallest gap between the connection attempts the
