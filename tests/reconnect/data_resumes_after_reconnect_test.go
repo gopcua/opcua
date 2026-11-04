@@ -38,9 +38,9 @@
 // drop. open62541 v1.4.22 schedules no wait - ua_client_connect.c calls
 // __Client_Subscriptions_backgroundPublish from the ActivateSession response
 // handler - and spends about 0.2s of the window on the reconnect, measured
-// here with its publish pipeline lowered to two, which this fixture's
-// serialised answers made necessary: at its default of ten it pushes its own
-// CreateMonitoredItems past its request timeout. node-opcua 2.187.19 asks
+// here with its publish depth lowered by hand to two: at its default of ten,
+// this fixture's serialised answers push its CreateMonitoredItems past the
+// client's request timeout and void the run. node-opcua 2.187.19 asks
 // once, is faulted and refills a five-deep pipeline, about 1.2s, measured
 // here. Eclipse Milo, read and not run, leaves Active for ReactivatingWait on
 // a lost connection, which schedules its first reactivation a whole second
