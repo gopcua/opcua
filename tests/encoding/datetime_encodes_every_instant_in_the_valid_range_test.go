@@ -13,6 +13,13 @@
 // datetime_out_of_range_saturates_test.go, the clause's rules for tick
 // counts outside the range this row sweeps.
 //
+// The row runs against the shared helpers, with no scripted server in
+// this package: validRangeInstants supplies the instants swept, ticksFor
+// computes each one's expected tick count, wireBytes renders the count
+// as the eight expected bytes, and each instant is encoded inside a
+// wireDateTime so ua.Encode takes the same reflection path a service
+// response does. See harness.go.
+//
 // The expected tick count for an instant is computed here in math/big, from
 // the clause's definition, with no int64 anywhere. That matters: the defect
 // this file was written for is an int64 overflow in gopcua's own conversion,
@@ -22,15 +29,8 @@
 // The sweep crosses the range at a step of one instant a year, plus four
 // probes. Three boundary points would pass a fix that was right at the
 // boundaries and wrong in between; the overflow being fixed has a cliff
-// one tick wide, so a sweep that crosses the range is what finds a second
-// one.
-//
-// The row runs against the shared helpers, with no scripted server in
-// this package: validRangeInstants supplies the instants swept, ticksFor
-// computes each one's expected tick count, wireBytes renders the count
-// as the eight expected bytes, and each instant is encoded inside a
-// wireDateTime so ua.Encode takes the same reflection path a service
-// response does. See harness.go.
+// one tick wide, so a sweep that crosses the range is what can find a
+// second one.
 //
 // The known bug has a signature, and the arms key on it: the instants inside
 // roughly 1678-2262 encode rightly today, only those outside come back
@@ -50,8 +50,9 @@
 // library's own convention and not something the clause requires.
 //
 // No reference stack was read for this row; the math/big oracle above,
-// which shares none of gopcua's conversion arithmetic, is the whole of
-// the evidence.
+// which runs the clause's algebra in a type that cannot overflow and so
+// shares none of gopcua's int64 arithmetic, is the whole of the
+// evidence.
 
 package encoding
 

@@ -33,8 +33,8 @@
 // The sweep crosses the range at a step of one instant a year, plus four
 // probes. Three boundary points would pass a fix that was right at the
 // boundaries and wrong in between; the overflow being fixed has a cliff
-// one tick wide, so a sweep that crosses the range is what finds a second
-// one.
+// one tick wide, so a sweep that crosses the range is what can find a
+// second one.
 
 //
 // The known bug has a signature, and the arms key on it: the instants inside
@@ -54,8 +54,9 @@
 // library's own convention and not something the clause requires.
 //
 // No reference stack was read for this row; the math/big oracle above,
-// which shares none of gopcua's conversion arithmetic, is the whole of
-// the evidence.
+// which runs the clause's algebra in a type that cannot overflow and so
+// shares none of gopcua's int64 arithmetic, is the whole of the
+// evidence.
 
 package encoding
 
