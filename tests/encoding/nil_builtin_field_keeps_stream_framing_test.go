@@ -195,7 +195,7 @@ func TestNilBuiltinFieldKeepsStreamFraming(t *testing.T) {
 		t.Errorf("this now passes (a struct with a nil field of each of the %d nullable "+
 			"built-in types this row checks, followed by a uint32, survives encode and "+
 			"decode with the uint32 intact) - "+
-			"delete the knownBug constant and every arm that reads it, in the commit that fixed it",
+			"delete the knownBug constant, every arm that reads it, and anything only those arms used, in the commit that fixed it",
 			len(cases))
 	case survives:
 		t.Logf("a struct with a nil field of each of the %d nullable built-in types this "+
