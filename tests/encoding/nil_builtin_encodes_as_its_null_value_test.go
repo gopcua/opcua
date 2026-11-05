@@ -164,7 +164,8 @@ func TestNilBuiltinEncodesAsItsNullValue(t *testing.T) {
 	case encodes && knownBug != "":
 		t.Errorf("this now passes (a nil pointer to each of the %d nullable built-in types "+
 			"this row checks encodes as that type's null value) - "+
-			"delete the knownBug constant, every arm that reads it, and anything only those arms used, in the commit that fixed it",
+			"delete the knownBug constant, every arm that reads it, and "+
+			"anything only those arms used, in the commit that fixed it",
 			len(cases))
 	case encodes:
 		t.Logf("a nil pointer to each of the %d nullable built-in types this row checks "+

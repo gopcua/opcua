@@ -41,18 +41,17 @@
 // with different values, and an arm keyed on "something was wrong" cannot
 // see the difference.
 //
-// What the row deliberately does not assert: the sweep is one instant a
-// year plus four probes, and not every tick the clause permits,
-// so a one-tick cliff away from a sampled point is invisible to it. And
+// What the row deliberately does not assert: the sweep above is a
+// sample, not every tick the clause permits, so a one-tick cliff away
+// from a sampled point is invisible to it. And
 // the instant tick 0 names, 1601-01-01T00:00:00Z itself, is not swept: the
 // sweep is shared with the decodes row, and it leaves that instant out
 // because gopcua reserves tick 0 for the zero time, which is the
 // library's own convention and not something the clause requires.
 //
-// No reference stack was read for this row; the expected tick counts are
-// computed here from the clause's own definition in math/big, sharing
-// none of gopcua's conversion arithmetic, and that oracle is the whole
-// of the evidence.
+// No reference stack was read for this row; the math/big oracle above,
+// which shares none of gopcua's conversion arithmetic, is the whole of
+// the evidence.
 
 package encoding
 
@@ -152,7 +151,8 @@ func TestDateTimeEncodesEveryInstantInTheValidRange(t *testing.T) {
 	case encodes && knownBug != "":
 		t.Errorf("this now passes (every one of the %d instants in the sweep encoded as the "+
 			"tick count §5.2.2.5 defines for it) - "+
-			"delete the knownBug constant, every arm that reads it, and anything only those arms used, in the commit that fixed it",
+			"delete the knownBug constant, every arm that reads it, and "+
+			"anything only those arms used, in the commit that fixed it",
 			len(instants))
 	case encodes:
 		t.Logf("every one of the %d instants in the sweep encoded as the tick count "+
