@@ -87,6 +87,24 @@ func wireBytes(ticks *big.Int) []byte {
 	return b
 }
 
+// decodeVariantRecovering calls ua.Decode on a Variant packet and turns a
+// panic into a value, the way encodeRecovering does for encoding.
+// Variant.Decode reaches reflect.MakeSlice with a length taken straight off
+// the wire, and a panic there stops every case after it in the test binary.
+// The Variant it returns is the one the packet was decoded into, so the
+// caller can read its state; only a test function turns any of this into
+// a failure.
+func decodeVariantRecovering(b []byte) (v *ua.Variant, err error, panicked string) {
+	defer func() {
+		if r := recover(); r != nil {
+			panicked = fmt.Sprint(r)
+		}
+	}()
+	v = new(ua.Variant)
+	_, err = ua.Decode(b, v)
+	return v, err, panicked
+}
+
 // encodeRecovering calls ua.Encode and turns a nil dereference into a value.
 // A missing nil guard panics, and a panic in a test binary stops every case
 // after it; the point of this suite is to say which types are affected, not
