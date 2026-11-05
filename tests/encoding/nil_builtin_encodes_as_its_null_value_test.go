@@ -16,6 +16,11 @@
 // it is held here so a later change to the others cannot quietly take this
 // one with it.
 //
+// The row runs against the shared helpers, with no scripted server in
+// this package: each nil pointer is encoded by encodeRecovering, which
+// turns the panic a missing guard raises into a value the case then
+// reports. See harness.go.
+//
 // The byte sequences asserted here were checked against two reference stacks
 // during the 2026-09-15 review of PR #901 and found identical in both:
 // open62541's ua_types_encoding_binary.c (NodeId_encodeBinaryWithEncodingMask

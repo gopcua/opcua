@@ -23,6 +23,12 @@
 // application's service responses take, rather than through Buffer.ReadTime
 // directly. The reported defect is only interesting if it reaches a caller.
 //
+// The row runs against the shared helpers, with no scripted server in
+// this package: validRangeInstants supplies the instants swept, ticksFor
+// computes each one's expected tick count, and wireBytes renders the
+// count as the eight bytes ua.Decode reads back into a wireDateTime.
+// See harness.go.
+//
 // The known bug has a signature, and the arms key on it: the instants inside
 // roughly 1678-2262 decode rightly today, only those outside come back
 // wrong, and each wrong one carries exactly the instant the known
