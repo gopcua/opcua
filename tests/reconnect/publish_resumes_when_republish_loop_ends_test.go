@@ -19,21 +19,20 @@
 // keeps requests and not responses — the limit
 // missed_notification_recovered_when_transfer_refused_test.go also takes.
 //
-// open62541 has no client-side Republish, so no loop of its own ever ends.
-// While knownBug stands that absence is logged green here beside gopcua and
-// the row cannot tell the two apart; republish_after_reconnect_test.go is
-// the row that will fail it once knownBug is deleted, and declares that
-// exception in its own header. node-opcua runs off the end of the queue and
-// resumes, measured on this fixture. Eclipse Milo, read in source and not
-// run here, resumes after the loop drains; UA-.NETStandard, read the same
-// way, walks only to the number it just received and is declined for
-// stopping before the terminator; gopcua's own loop takes that route too
-// once it republishes at all, because it stops at the top of
-// availableSequenceNumbers when the server hands it a non-empty list. No stack here fails it -- open62541 is
-// logged green rather than failed while knownBug stands, and UA-.NETStandard
-// is declined rather than failed -- so the row takes no exception. A client
-// cannot reach the passing branch by resuming the stream without asking. It
-// can reach it without any post-terminator logic, though. The count is
+// open62541 has no client-side Republish, so no loop of its own ever ends
+// and this row declines the run rather than reading it;
+// republish_after_reconnect_test.go is the row that fails that absence, and
+// declares that exception in its own header. node-opcua runs off the end of
+// the queue and resumes, measured on this fixture. Eclipse Milo, read in
+// source and not run here, resumes after the loop drains; UA-.NETStandard,
+// read the same way, walks only to the number it just received and is
+// declined for stopping before the terminator; gopcua's own loop takes that
+// route too once it republishes at all, because it stops at the top of
+// availableSequenceNumbers when the server hands it a non-empty list. No
+// stack here fails it -- open62541 and UA-.NETStandard are both declined
+// rather than failed -- so the row takes no exception. A client cannot
+// reach the passing branch by resuming the stream without asking. It can
+// reach it without any post-terminator logic, though. The count is
 // positional rather than temporal: afterLastRepublish counts the Publishes
 // recorded after the last Republish's index, so a client whose publish loop
 // runs concurrently with its Republish loop passes on that overlap alone.
@@ -50,10 +49,9 @@ import (
 )
 
 func TestPublishResumesWhenRepublishLoopEnds(t *testing.T) {
-	// knownBug records that gopcua does not do this yet; the text is logged in
-	// place of a failure. README.md says when to delete it.
-	// https://github.com/gopcua/opcua/issues/879
-	const knownBug = "the client reconnects and re-activates the session, but never asks for anything it missed, so there is no loop of its own to end and nothing to resume from"
+	// gopcua did not do this until the fix for
+	// https://github.com/gopcua/opcua/issues/879; README.md says which pull
+	// request closed it.
 
 	// furtherLost is how many notifications the server keeps for
 	// retransmission behind the one it held back. Any positive length ends the
@@ -90,26 +88,21 @@ func TestPublishResumesWhenRepublishLoopEnds(t *testing.T) {
 	}
 	// A client whose loop ended on its own terms was never told to stop, and
 	// that is a route a conforming client takes rather than a defect, so it is
-	// a setup failure here and not something the knownBug arm excuses.
+	// a setup failure here.
 	if why := loopEndSetupFailed(run); why != "" {
 		t.Fatalf("could not set the test up: %s", why)
 	}
 
-	// Having no loop at all is the known bug, so it goes through the switch.
+	// A run where the client never asked at all measured nothing, so it is
+	// declined. It is the first arm of the switch, so the two arms below it
+	// only ever read a run that had a last Republish to report on.
 	why := loopRanSetupFailed(run)
 
 	lastAsk, published, sent, _ := afterLastRepublish(run)
 
 	switch {
-	case why != "" && knownBug != "":
-		t.Logf("known bug: %s (%s; the server had %v to give back)", knownBug, why, run.Answerable)
 	case why != "":
 		t.Fatalf("could not set the test up: %s", why)
-	case published > 0 && knownBug != "":
-		t.Errorf("this now passes (the client's last ask was for notification %d, which the server "+
-			"answers with Bad_MessageNotAvailable, and %d Publish followed it on the same "+
-			"connection) - delete the knownBug constant and the two arms that read it, in the "+
-			"commit that fixed it", lastAsk, published)
 	case published > 0:
 		t.Logf("the client's last ask was for notification %d, which the server answers with "+
 			"Bad_MessageNotAvailable, and %d Publish followed it on the same connection "+

@@ -23,11 +23,10 @@
 // it: PublishingManager logs any status but Bad_MessageNotAvailable and
 // returns without creating anything. UA-.NETStandard fails it in both
 // engines, neither recreating unless the application asks. open62541 v1.4.22
-// has no client-side Republish, so the status is never put to it. While
-// knownBug stands that absence is logged green beside gopcua rather than
-// declined, here and in republish_after_reconnect_test.go. node-opcua
-// 2.187.19 passes it, measured here. The clause only asks, so the row is kept
-// for what failing it costs: silent data loss on a live subscription.
+// has no client-side Republish, so the status is never put to it and the row
+// declines the run rather than scoring it. node-opcua 2.187.19 passes it,
+// measured here. The clause only asks, so the row is kept for what failing
+// it costs: silent data loss on a live subscription.
 
 package reconnect
 
@@ -37,10 +36,9 @@ import (
 )
 
 func TestNewSubscriptionAfterRepublishReturnsInvalidID(t *testing.T) {
-	// knownBug records that gopcua does not do this yet; the text is logged in
-	// place of a failure. README.md says when to delete it.
-	// https://github.com/gopcua/opcua/issues/879
-	const knownBug = "the client reconnects and re-activates the session, but never asks for anything it missed, so it is never told the subscription id is invalid and never replaces the subscription"
+	// gopcua did not do this until the fix for
+	// https://github.com/gopcua/opcua/issues/879; README.md says which pull
+	// request closed it.
 
 	// minSettle is the window a client needs after the drop to reconnect,
 	// re-activate, ask once, be faulted and create the replacement.
@@ -67,21 +65,15 @@ func TestNewSubscriptionAfterRepublishReturnsInvalidID(t *testing.T) {
 		t.Fatalf("could not set the test up: %s", why)
 	}
 
-	// Having asked for nothing is the known bug, so it goes through the switch.
+	// A run where no Republish loop ran measured nothing, and the first arm of
+	// the switch declines it before anything is read from it.
 	why := loopRanSetupFailed(run)
 
 	lastAsk, created, sent := subscriptionAfterInvalidID(run)
 
 	switch {
-	case why != "" && knownBug != "":
-		t.Logf("known bug: %s (%s)", knownBug, why)
 	case why != "":
 		t.Fatalf("could not set the test up: %s", why)
-	case created > 0 && knownBug != "":
-		t.Errorf("this now passes (the client's last ask was for notification %d, which the server "+
-			"answers with Bad_SubscriptionIdInvalid, and %d CreateSubscription followed it) - delete "+
-			"the knownBug constant and the two arms that read it, in the commit that fixed it",
-			lastAsk, created)
 	case created > 0:
 		t.Logf("the client's last ask was for notification %d, which the server answers with "+
 			"Bad_SubscriptionIdInvalid, and %d CreateSubscription followed it", lastAsk, created)
