@@ -101,7 +101,7 @@ func TestReferenceDescriptionWithNilFieldsEncodes(t *testing.T) {
 	case encodes && framed && knownBug != "":
 		t.Errorf("this now passes (a ReferenceDescription with all fields nil encodes, and one "+
 			"with only its ExpandedNodeIDs set is %d bytes, the same as a fully populated one) - "+
-			"delete the knownBug constant and every arm that reads it, in the commit that fixed it",
+			"delete the knownBug constant, every arm that reads it, and anything only those arms used, in the commit that fixed it",
 			len(partial))
 	case encodes && framed:
 		t.Logf("a ReferenceDescription with nil fields encodes to the same %d bytes as a fully "+
