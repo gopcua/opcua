@@ -9,9 +9,9 @@
 //
 // Each case recovers from a panic and reports it as that case's failure. A
 // missing guard is a nil dereference, which takes the whole test binary with
-// it, and then one missing guard hides the state of the other five - the
-// difference between "one type is unguarded" and "six are" is not visible in
-// the resulting output otherwise.
+// it, and then one missing guard hides the state of the other six - the
+// difference between "one type is unguarded" and "six of the seven are" is
+// not visible in the resulting output otherwise.
 
 package encoding
 
@@ -84,52 +84,71 @@ func TestNilBuiltinFieldKeepsStreamFraming(t *testing.T) {
 
 	cases := []struct {
 		name string
-		run  func() (uint32, string)
+		run  func() (uint32, string, string)
 	}{
-		{"NodeId", func() (uint32, string) {
+		{"NodeId", func() (uint32, string, string) {
 			var in nodeIDFramed
-			why := roundTrip(&nodeIDFramed{Marker: marker}, &in)
-			return in.Marker, why
+			event, why := roundTrip(&nodeIDFramed{Marker: marker}, &in)
+			return in.Marker, event, why
 		}},
-		{"Guid", func() (uint32, string) {
+		{"Guid", func() (uint32, string, string) {
 			var in guidFramed
-			why := roundTrip(&guidFramed{Marker: marker}, &in)
-			return in.Marker, why
+			event, why := roundTrip(&guidFramed{Marker: marker}, &in)
+			return in.Marker, event, why
 		}},
-		{"LocalizedText", func() (uint32, string) {
+		{"LocalizedText", func() (uint32, string, string) {
 			var in localizedTextFramed
-			why := roundTrip(&localizedTextFramed{Marker: marker}, &in)
-			return in.Marker, why
+			event, why := roundTrip(&localizedTextFramed{Marker: marker}, &in)
+			return in.Marker, event, why
 		}},
-		{"DataValue", func() (uint32, string) {
+		{"DataValue", func() (uint32, string, string) {
 			var in dataValueFramed
-			why := roundTrip(&dataValueFramed{Marker: marker}, &in)
-			return in.Marker, why
+			event, why := roundTrip(&dataValueFramed{Marker: marker}, &in)
+			return in.Marker, event, why
 		}},
-		{"Variant", func() (uint32, string) {
+		{"Variant", func() (uint32, string, string) {
 			var in variantFramed
-			why := roundTrip(&variantFramed{Marker: marker}, &in)
-			return in.Marker, why
+			event, why := roundTrip(&variantFramed{Marker: marker}, &in)
+			return in.Marker, event, why
 		}},
-		{"DiagnosticInfo", func() (uint32, string) {
+		{"DiagnosticInfo", func() (uint32, string, string) {
 			var in diagnosticInfoFramed
-			why := roundTrip(&diagnosticInfoFramed{Marker: marker}, &in)
-			return in.Marker, why
+			event, why := roundTrip(&diagnosticInfoFramed{Marker: marker}, &in)
+			return in.Marker, event, why
 		}},
-		{"ExtensionObject", func() (uint32, string) {
+		{"ExtensionObject", func() (uint32, string, string) {
 			var in extensionObjectFramed
-			why := roundTrip(&extensionObjectFramed{Marker: marker}, &in)
-			return in.Marker, why
+			event, why := roundTrip(&extensionObjectFramed{Marker: marker}, &in)
+			return in.Marker, event, why
 		}},
 	}
+	if len(cases) == 0 {
+		t.Fatal("the case table is empty - this row would report a pass " +
+			"having checked nothing")
+	}
 
+	// The named defect is an event - encoding panics, or encoding fails on
+	// the nil receiver - and an event is a presence, so the arms key on it
+	// rather than on the absence of a surviving round trip: while any case
+	// still panics or fails on encode, the behaviour is still missing and
+	// the row stays green with the known bug logged; once no case does, a
+	// fix has landed, and the row then demands the message survive - a
+	// landed fix whose bytes still shift the marker, or whose bytes its
+	// own decoder rejects, is red, not green. events is a count, not a
+	// boolean, because a fix can guard five of the six unguarded types
+	// and the row must still say how many remain.
+	events := 0
 	var detail string
 	survives := true
 	for _, c := range cases {
-		got, why := c.run()
+		got, event, why := c.run()
 		ok := true
 		var outcome string
 		switch {
+		case event != "":
+			ok = false
+			events++
+			outcome = fmt.Sprintf("did not survive encode and decode: %s", event)
 		case why != "":
 			ok = false
 			outcome = fmt.Sprintf("did not survive encode and decode: %s", why)
@@ -147,41 +166,54 @@ func TestNilBuiltinFieldKeepsStreamFraming(t *testing.T) {
 		detail += fmt.Sprintf("\n    %-16s %s", c.name, outcome)
 	}
 
+	// Arm order: the two survives arms come first, because a case that
+	// panics or fails on encode never survives, so they cannot take a
+	// state the events arm needs to see; the events arm comes before the
+	// wrong-fix arm, because a fix that guards five of the six types
+	// leaves one event and must stay green, not red; and the wrong-fix
+	// arm reads the constant, so with the constant empty a missing
+	// behaviour lands in the default arm below it.
 	switch {
 	case survives && knownBug != "":
 		t.Errorf("this now passes (a struct with a nil field of each of the %d nullable "+
-			"built-in types, followed by a uint32, survives encode and decode with the "+
-			"uint32 intact) - "+
+			"built-in types this row checks, followed by a uint32, survives encode and "+
+			"decode with the uint32 intact) - "+
 			"delete the knownBug constant and the two arms that read it, in the commit that fixed it",
 			len(cases))
 	case survives:
-		t.Logf("a struct with a nil field of each of the %d nullable built-in types, "+
-			"followed by a uint32, survives encode and decode with the uint32 intact",
+		t.Logf("a struct with a nil field of each of the %d nullable built-in types this "+
+			"row checks, followed by a uint32, survives encode and decode with the uint32 intact",
 			len(cases))
+	case events > 0 && knownBug != "":
+		t.Logf("known bug: %s; %d of the %d cases still panic or fail on encode; "+
+			"§5.1.2 Table 1 lists every type below as nullable, so a nil field has a value "+
+			"to encode and the uint32 behind it must come back as it went:%s",
+			knownBug, events, len(cases), detail)
 	case knownBug != "":
-		t.Logf("known bug: %s; §5.1.2 Table 1 lists every type below as nullable, so a nil "+
-			"field has a value to encode and the uint32 behind it must come back as it went:%s",
-			knownBug, detail)
+		t.Errorf("encoding no longer panics or fails, but the message still does not "+
+			"survive encode and decode - a fix for this landed and is wrong:%s", detail)
 	default:
 		t.Errorf("§5.1.2 Table 1 lists every type below as nullable, so a nil field has a "+
 			"value to encode and the uint32 behind it must come back as it went:%s", detail)
 	}
 }
 
-// roundTrip encodes out and decodes the bytes into into. It returns the
-// reason it could not, empty when nothing went wrong; the caller then reads
-// its own marker field, which it alone has the concrete type for. Only the
-// test function above turns either into a failure.
-func roundTrip(out, into interface{}) string {
+// roundTrip encodes out and decodes the bytes into into. event carries the
+// named defect's event - encoding panicked, or encoding failed - and is empty
+// when neither happened. why carries the reason the trip did not survive
+// once encoding succeeded, and is empty when nothing went wrong; the caller
+// then reads its own marker field, which it alone has the concrete type for.
+// Only the test function above turns any of the three into a failure.
+func roundTrip(out, into interface{}) (event, why string) {
 	b, err, panicked := encodeRecovering(out)
 	if panicked != "" {
-		return fmt.Sprintf("encoding panicked (%s)", panicked)
+		return fmt.Sprintf("encoding panicked (%s)", panicked), ""
 	}
 	if err != nil {
-		return fmt.Sprintf("encoding failed: %v", err)
+		return fmt.Sprintf("encoding failed: %v", err), ""
 	}
 	if _, err := ua.Decode(b, into); err != nil {
-		return fmt.Sprintf("decoding the % x it produced failed: %v", b, err)
+		return "", fmt.Sprintf("decoding the % x it produced failed: %v", b, err)
 	}
-	return ""
+	return "", ""
 }
