@@ -127,7 +127,8 @@ func TestVariantRejectsDimensionsInconsistentWithTheArrayLength(t *testing.T) {
 	case stops && knownBug != "":
 		t.Errorf("this now passes (dimensions whose product is not the array length " +
 			"are rejected, and consistent dimensions still decode) - " +
-			"delete the knownBug constant, every arm that reads it, and anything only those arms used, in the commit that fixed it")
+			"delete the knownBug constant, every arm that reads it, and " +
+			"anything only those arms used, in the commit that fixed it")
 	case stops:
 		t.Logf("dimensions whose product is not the array length are rejected, and " +
 			"consistent dimensions still decode")

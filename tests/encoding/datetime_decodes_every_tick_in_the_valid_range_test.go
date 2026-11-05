@@ -19,8 +19,10 @@
 // The row runs against the shared helpers, with no scripted server in
 // this package: validRangeInstants supplies the instants swept, ticksFor
 // computes each one's expected tick count, and wireBytes renders the
-// count as the eight bytes ua.Decode reads back into a wireDateTime.
-// See harness.go.
+// count as the eight bytes ua.Decode reads back into a wireDateTime, so
+// the decode takes the same reflection path a service response does,
+// rather than Buffer.ReadTime directly; the reported defect is only
+// interesting if it reaches a caller. See harness.go.
 //
 // The expected tick count for an instant is computed here in math/big, from
 // the clause's definition, with no int64 anywhere. That matters: the defect
@@ -33,10 +35,7 @@
 // boundaries and wrong in between; the overflow being fixed has a cliff
 // one tick wide, so a sweep that crosses the range is what finds a second
 // one.
-//
-// Everything here goes through ua.Decode, the path an application's
-// service responses take, rather than through Buffer.ReadTime directly.
-// The reported defect is only interesting if it reaches a caller.
+
 //
 // The known bug has a signature, and the arms key on it: the instants inside
 // roughly 1678-2262 decode rightly today, only those outside come back
@@ -47,17 +46,16 @@
 // with different values, and an arm keyed on "something was wrong" cannot
 // see the difference.
 //
-// What the row deliberately does not assert: the sweep is one instant a
-// year plus four probes, and not every tick the clause permits,
-// so a one-tick cliff away from a sampled point is invisible to it. And
+// What the row deliberately does not assert: the sweep above is a
+// sample, not every tick the clause permits, so a one-tick cliff away
+// from a sampled point is invisible to it. And
 // tick 0, the clause's own low endpoint, 1601-01-01T00:00:00Z itself, is
 // not swept: gopcua reserves tick 0 for the zero time, which is the
 // library's own convention and not something the clause requires.
 //
-// No reference stack was read for this row; the expected tick counts are
-// computed here from the clause's own definition in math/big, sharing
-// none of gopcua's conversion arithmetic, and that oracle is the whole
-// of the evidence.
+// No reference stack was read for this row; the math/big oracle above,
+// which shares none of gopcua's conversion arithmetic, is the whole of
+// the evidence.
 
 package encoding
 
@@ -157,7 +155,8 @@ func TestDateTimeDecodesEveryTickInTheValidRange(t *testing.T) {
 	case decodes && knownBug != "":
 		t.Errorf("this now passes (every one of the %d instants in the sweep decoded to "+
 			"the instant its tick count names) - "+
-			"delete the knownBug constant, every arm that reads it, and anything only those arms used, in the commit that fixed it",
+			"delete the knownBug constant, every arm that reads it, and "+
+			"anything only those arms used, in the commit that fixed it",
 			len(instants))
 	case decodes:
 		t.Logf("every one of the %d instants in the sweep decoded to the instant its "+

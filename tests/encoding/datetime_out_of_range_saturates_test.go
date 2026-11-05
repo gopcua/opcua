@@ -122,7 +122,8 @@ func TestDateTimeOutOfRangeSaturates(t *testing.T) {
 	switch {
 	case saturated && knownBug != "":
 		t.Errorf("this now passes (every out-of-range tick count decodes to %s) - "+
-			"delete the knownBug constant, every arm that reads it, and anything only those arms used, in the commit that fixed it",
+			"delete the knownBug constant, every arm that reads it, and "+
+			"anything only those arms used, in the commit that fixed it",
 			got[0].Format(time.RFC3339Nano))
 	case saturated:
 		t.Logf("every out-of-range tick count decodes to %s", got[0].Format(time.RFC3339Nano))
