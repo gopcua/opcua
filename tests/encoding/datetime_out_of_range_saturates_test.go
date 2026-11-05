@@ -23,6 +23,17 @@
 // fixes. The test is here so the gap is measured on every run rather than
 // remembered in a document, and so that whoever closes it finds out
 // immediately.
+//
+// What the row deliberately does not assert: which instant the probes
+// saturate to. Go's latest representable time has no named constant, so
+// the row checks only that the clause's saturating tick counts all decode
+// to one instant, not that the instant is the platform's latest, and a
+// fix that saturates them to one wrong instant passes as though the
+// behaviour were fixed.
+//
+// No reference stack was read for this row; the clause's rules for values
+// outside the range and the measured behaviour are the whole of the
+// evidence.
 
 package encoding
 
@@ -111,7 +122,7 @@ func TestDateTimeOutOfRangeSaturates(t *testing.T) {
 	switch {
 	case saturated && knownBug != "":
 		t.Errorf("this now passes (every out-of-range tick count decodes to %s) - "+
-			"delete the knownBug constant and every arm that reads it, in the commit that fixed it",
+			"delete the knownBug constant, every arm that reads it, and anything only those arms used, in the commit that fixed it",
 			got[0].Format(time.RFC3339Nano))
 	case saturated:
 		t.Logf("every out-of-range tick count decodes to %s", got[0].Format(time.RFC3339Nano))

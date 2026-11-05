@@ -9,25 +9,34 @@
 // definition, not a range check: for any tick count in the range the clause
 // permits, the decoded instant is determined.
 //
-// The expected tick count for an instant is computed here in math/big, from
-// the clause's definition, with no int64 anywhere. That matters: the defect
-// this file was written for is an int64 overflow in gopcua's own conversion,
-// so an oracle that did the same arithmetic in int64 would overflow in the
-// same place and agree with the bug. A big.Int oracle cannot.
-//
-// The range is swept, not sampled. Three boundary points would pass a fix
-// that was right at the boundaries and wrong in between; the overflow being
-// fixed has a cliff one tick wide, so a sweep is what finds a second one.
-//
-// Everything here goes through ua.Encode and ua.Decode, the path an
-// application's service responses take, rather than through Buffer.ReadTime
-// directly. The reported defect is only interesting if it reaches a caller.
+// The neighbouring rows are
+// datetime_encodes_every_instant_in_the_valid_range_test.go, the same
+// clause read in the other direction - an instant going onto the wire as
+// the tick count that names it - and
+// datetime_out_of_range_saturates_test.go, the clause's rules for tick
+// counts outside the range this row sweeps.
 //
 // The row runs against the shared helpers, with no scripted server in
 // this package: validRangeInstants supplies the instants swept, ticksFor
 // computes each one's expected tick count, and wireBytes renders the
 // count as the eight bytes ua.Decode reads back into a wireDateTime.
 // See harness.go.
+//
+// The expected tick count for an instant is computed here in math/big, from
+// the clause's definition, with no int64 anywhere. That matters: the defect
+// this file was written for is an int64 overflow in gopcua's own conversion,
+// so an oracle that did the same arithmetic in int64 would overflow in the
+// same place and agree with the bug. A big.Int oracle cannot.
+//
+// The sweep crosses the range at a step of one instant a year, plus four
+// probes. Three boundary points would pass a fix that was right at the
+// boundaries and wrong in between; the overflow being fixed has a cliff
+// one tick wide, so a sweep that crosses the range is what finds a second
+// one.
+//
+// Everything here goes through ua.Decode, the path an application's
+// service responses take, rather than through Buffer.ReadTime directly.
+// The reported defect is only interesting if it reaches a caller.
 //
 // The known bug has a signature, and the arms key on it: the instants inside
 // roughly 1678-2262 decode rightly today, only those outside come back
@@ -37,6 +46,18 @@
 // that landed and is wrong: a clamping fix leaves the same instants wrong,
 // with different values, and an arm keyed on "something was wrong" cannot
 // see the difference.
+//
+// What the row deliberately does not assert: the sweep is one instant a
+// year plus four probes, and not every tick the clause permits,
+// so a one-tick cliff away from a sampled point is invisible to it. And
+// tick 0, the clause's own low endpoint, 1601-01-01T00:00:00Z itself, is
+// not swept: gopcua reserves tick 0 for the zero time, which is the
+// library's own convention and not something the clause requires.
+//
+// No reference stack was read for this row; the expected tick counts are
+// computed here from the clause's own definition in math/big, sharing
+// none of gopcua's conversion arithmetic, and that oracle is the whole
+// of the evidence.
 
 package encoding
 
@@ -136,7 +157,7 @@ func TestDateTimeDecodesEveryTickInTheValidRange(t *testing.T) {
 	case decodes && knownBug != "":
 		t.Errorf("this now passes (every one of the %d instants in the sweep decoded to "+
 			"the instant its tick count names) - "+
-			"delete the knownBug constant and every arm that reads it, in the commit that fixed it",
+			"delete the knownBug constant, every arm that reads it, and anything only those arms used, in the commit that fixed it",
 			len(instants))
 	case decodes:
 		t.Logf("every one of the %d instants in the sweep decoded to the instant its "+

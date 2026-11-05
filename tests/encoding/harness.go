@@ -54,8 +54,9 @@ func validRangeInstants() []time.Time {
 	// The first representable tick, where the subtraction of the 1601 epoch
 	// underflows an unsigned conversion.
 	out = append(out, time.Date(1601, time.January, 1, 0, 0, 0, 100, time.UTC))
-	// 1601-01-01T00:00:00Z itself is tick 0, which gopcua reserves for the
-	// zero time, so the sweep starts one tick above it.
+	// 1601-01-01T00:00:00Z itself is tick 0, which the sweep leaves out;
+	// the rows that sweep this range declare that exclusion, and its
+	// reason, in their headers.
 	//
 	// Either side of the last instant an int64 nanosecond count can hold.
 	out = append(out,
