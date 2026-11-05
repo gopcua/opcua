@@ -50,3 +50,22 @@ the application's choice, not the library's, and gopcua keeps no value cache. So
 the ServerStatus and overwrite-ordering items would not be client-library
 conformance rows even once the capability existed — the case question 6 of the
 README describes, where every library leaves the behaviour to the application.
+
+## A gap that is not a missing capability
+
+The table is read as "capability the harness lacks → what it blocks", and this
+one has no capability to name, so it is written out here instead of as a row.
+
+In the gopcua client, pause and resume are two signals read by the same
+`select`, so Go picks between them at random: a resume picked first is
+discarded as redundant, and the pause behind it parks the publish loop with
+nothing left to wake it. This suite cannot test that, and no fixture
+capability would change it. The defect is a scheduling race between goroutines
+inside the client, and this suite is a black-box harness that drives the client
+through its public API against a scripted server. Putting it in the table would
+promise a row that will never be written.
+
+The defect is tracked as https://github.com/gopcua/opcua/issues/895, and
+nothing in this tree covers it. A test that can see it has to race pause
+against resume many times inside one run: a different instrument from this
+one, not a larger fixture for it.
