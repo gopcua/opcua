@@ -59,7 +59,7 @@ import (
 
 func TestVariantRejectsDimensionsInconsistentWithTheArrayLength(t *testing.T) {
 	// knownBug records that gopcua does not do this yet; the text is logged
-	// in place of a failure. README.md says when to delete it. No open pull
+	// in place of a failure. ../README.md says when to delete it. No open pull
 	// request closes this behaviour: neither
 	// https://github.com/gopcua/opcua/pull/892 nor
 	// https://github.com/gopcua/opcua/pull/893 nor
@@ -86,16 +86,16 @@ func TestVariantRejectsDimensionsInconsistentWithTheArrayLength(t *testing.T) {
 	_, err := ua.Decode(packet, v)
 
 	stops := err != nil
-	// The presence the knownBug arm keys on is the decode succeeding with
-	// the packet's own inconsistent dimensions still reported, per the rule
-	// in tests/reconnect/README.md: a decode that comes back with
-	// ArrayDimensions() [4 1073741825] is what says the decoder reached this
-	// stimulus and did the wrong thing, so the arm below logs green only
-	// while that still happens. Keying it on the absence of the stopping
-	// instead would log any decoder that does not stop - including one a
-	// change has bent into accepting the packet some other way - green
-	// beside the unfixed decoder, and the arm that asks for the constant to
-	// be deleted could never fire on a wrong fix.
+	// The presence the knownBug arm keys on is the decode succeeding with the
+	// packet's own inconsistent dimensions still reported, per the rule in
+	// tests/README.md: a decode that comes back with ArrayDimensions() [4
+	// 1073741825] is what says the decoder reached this stimulus and did the
+	// wrong thing, so the arm below logs green only while that still happens.
+	// Keying it on the absence of the stopping instead would log any decoder
+	// that does not stop - including one a change has bent into accepting the
+	// packet some other way - green beside the unfixed decoder, and the arm
+	// that asks for the constant to be deleted could never fire on a wrong
+	// fix.
 	dims := v.ArrayDimensions()
 	dimsReported := len(dims) == 2 && dims[0] == 4 && dims[1] == 1073741825
 	decoded := err == nil && dimsReported

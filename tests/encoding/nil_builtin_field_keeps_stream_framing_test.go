@@ -100,7 +100,7 @@ type (
 
 func TestNilBuiltinFieldKeepsStreamFraming(t *testing.T) {
 	// knownBug records that gopcua does not do this yet; the text is logged
-	// in place of a failure. README.md says when to delete it. The
+	// in place of a failure. ../README.md says when to delete it. The
 	// behaviour is closed by https://github.com/gopcua/opcua/pull/901.
 	const knownBug = "a message whose field is a nil pointer to a nullable built-in does not survive encode and decode, because encoding it panics"
 

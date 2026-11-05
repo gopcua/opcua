@@ -4,8 +4,8 @@ The shared contract for these suites is in `../README.md`; this file holds
 only what is specific to encoding.
 
 There is no scripted server here: a row drives `ua.Encode` and `ua.Decode`
-directly, so item 3 names the shared helpers in `harness.go` rather than a
-server.
+directly, so what the row runs against - item 3 in `../README.md` - names
+the shared helpers in `harness.go` rather than a server.
 
 Panic recovery is this package's analogue of reconnect's decline
 machinery. `encodeRecovering` calls `ua.Encode` and turns a nil
@@ -23,7 +23,7 @@ UA-.NETStandard's `BinaryEncoder.cs`; the functions read, and the line
 numbers, are named in the header of
 `nil_builtin_encodes_as_its_null_value_test.go`.
 
-## The knownBug ledger
+## The knownBug ledger, 2026-11-05
 
 One constant stands per row below, each declared inside its test
 function.
