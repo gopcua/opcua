@@ -134,7 +134,7 @@ func TestVariantRejectsAnArrayLengthThatIsNotACount(t *testing.T) {
 	case rejected && knownBug != "":
 		t.Errorf("this now passes (a flattened array length other than -1 is rejected, " +
 			"and the null array still decodes) - " +
-			"delete the knownBug constant and the two arms that read it, in the commit that fixed it")
+			"delete the knownBug constant and every arm that reads it, in the commit that fixed it")
 	case rejected:
 		t.Logf("a flattened array length other than -1 is rejected, and the null array still decodes")
 	default:

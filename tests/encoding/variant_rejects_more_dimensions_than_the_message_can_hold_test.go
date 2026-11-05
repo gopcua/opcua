@@ -141,7 +141,7 @@ func TestVariantRejectsMoreDimensionsThanTheMessageCanHold(t *testing.T) {
 	case rejected && withinBound && knownBug != "":
 		t.Errorf("this now passes (a dimension count larger than the remaining bytes "+
 			"can hold is rejected before the allocation, %d bytes against a bound of %d) - "+
-			"delete the knownBug constant and the two arms that read it, in the commit that fixed it",
+			"delete the knownBug constant and every arm that reads it, in the commit that fixed it",
 			alloc, dimsAllocationBound)
 	case rejected && withinBound:
 		t.Logf("a dimension count larger than the remaining bytes can hold is rejected "+
