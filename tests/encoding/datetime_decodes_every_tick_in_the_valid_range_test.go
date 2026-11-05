@@ -65,7 +65,7 @@ func defectDecode(ts uint64) time.Time {
 
 func TestDateTimeDecodesEveryTickInTheValidRange(t *testing.T) {
 	// knownBug records that gopcua does not do this yet; the text is logged
-	// in place of a failure. README.md says when to delete it. The
+	// in place of a failure. ../README.md says when to delete it. The
 	// behaviour is closed by https://github.com/gopcua/opcua/pull/906.
 	const knownBug = "a tick count inside the range §5.2.2.5 defines does not decode to the instant that clause names, outside roughly 1678-2262: ua/buffer.go's ReadTime does time.Unix(0, int64((ts-116444736000000000)*100)), so the unsigned subtraction underflows below 1970 and the int64 nanosecond multiply overflows above 2262"
 

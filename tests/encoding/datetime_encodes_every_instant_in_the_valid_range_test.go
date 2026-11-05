@@ -63,7 +63,7 @@ func defectEncode(v time.Time) []byte {
 
 func TestDateTimeEncodesEveryInstantInTheValidRange(t *testing.T) {
 	// knownBug records that gopcua does not do this yet; the text is logged
-	// in place of a failure. README.md says when to delete it. The
+	// in place of a failure. ../README.md says when to delete it. The
 	// behaviour is closed by https://github.com/gopcua/opcua/pull/906.
 	const knownBug = "an instant inside the range §5.2.2.5 defines does not encode to the tick count that clause names, outside roughly 1678-2262: ua/buffer.go's WriteTime does v.UTC().UnixNano()/100, and UnixNano is undefined outside that window, so the wire does not carry the number of 100 nanosecond intervals since 1601-01-01T00:00:00Z"
 

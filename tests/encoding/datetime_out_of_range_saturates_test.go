@@ -37,7 +37,7 @@ import (
 
 func TestDateTimeOutOfRangeSaturates(t *testing.T) {
 	// knownBug records that gopcua does not do this yet; the text is logged
-	// in place of a failure. README.md says when to delete it.
+	// in place of a failure. ../README.md says when to delete it.
 	const knownBug = "a tick count outside the range §5.2.2.5 defines decodes to whatever date the conversion arithmetic yields instead of saturating to the platform's earliest or latest time, so the Int64 maximum - the clause's own sentinel for \"at or after 9999-12-31\" - comes back as a wrapped-overflow date in 2185 rather than as the latest time the platform can represent"
 
 	// §5.2.2.5 rule 10/11: "A date/time is decoded as the latest time that

@@ -61,7 +61,7 @@ type nullEncoding struct {
 
 func TestNilBuiltinEncodesAsItsNullValue(t *testing.T) {
 	// knownBug records that gopcua does not do this yet; the text is logged
-	// in place of a failure. README.md says when to delete it. The
+	// in place of a failure. ../README.md says when to delete it. The
 	// behaviour is closed by https://github.com/gopcua/opcua/pull/901.
 	const knownBug = "a nil pointer to a type §5.1.2 Table 1 lists as nullable panics instead of encoding that type's null value, because its Encode method dereferences the nil receiver"
 
