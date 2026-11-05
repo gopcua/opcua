@@ -29,6 +29,30 @@ A decline is a `t.Fatalf`, so the test is red like any other failure. The
 word marks why it is red - the run could not be scored - and not a third
 outcome between passing and failing.
 
+## Where a row's evidence comes from
+
+A row that encodes a value and decodes it back has asked gopcua whether
+gopcua agrees with itself. It has not asked whether the bytes in between
+are the bytes the specification calls for, and the two questions come
+apart. Change `ua/variant.go` so a UInt32 inside a Variant goes on the
+wire under type id 26 - reserved, and rejected by every stack we have
+read - then change the decode half to match, which is the shape a
+regenerated type table has, and a row that only round-trips stays green.
+It was never looking at the bytes.
+
+So a row's verdict rests on bytes from outside gopcua: literal bytes
+written out in the row, or another stack's output.
+`nil_builtin_encodes_as_its_null_value_test.go` is the worked example -
+its expected bytes are in the file and the functions they were read from
+in open62541 and UA-.NETStandard are named in its header.
+
+A row may rest on a round trip instead when another row holds the literal
+bytes for the same behaviour and it names that row. The round trip then
+checks what the bytes cannot - that a field behind the encoded value
+still arrives where it should - and the row it names is what keeps the
+pair honest about the wire. A round trip with no such row behind it has
+nothing to name, and that is the case above.
+
 ## Tests for behaviour that does not exist yet
 
 A test for a behaviour gopcua does not have yet carries a `knownBug`
@@ -47,9 +71,8 @@ constant, declared inside the test function. Run
 Who that is depends on where these suites are. While they are unmerged,
 the person who deletes a constant is whoever runs the suite by hand
 against a candidate fix, and the deletion lands with that fix as we
-merge it. Where a fix reaches main ahead of a
-suite, the deletion lands instead in the change that rebases the suite
-onto it. Once the suites are merged, the contributor whose fix turns a
+merge it. Where a fix reaches main ahead of a suite, the deletion lands
+instead in the change that rebases the suite onto it. Once the suites are merged, the contributor whose fix turns a
 row red deletes the constant in their own pull request, and that is how
 the entry is closed.
 
@@ -66,7 +89,10 @@ all*. Where the missing behaviour is an absence and the arm keys on that
 absence, an implementation that never reaches the stimulus lands in the
 same green arm as one that reached it and did the wrong thing. Key the arm
 on a presence where the behaviour allows one, and where it does not, say
-so in the file.
+so in the file. The presence has to be one a fixed library does
+not show. Keyed on a presence that survives the fix, the row logs the
+known bug for as long as it exists and the arm that demands the
+constant's deletion can never fire.
 
 ## Reviewing a new test: six questions
 
@@ -96,7 +122,7 @@ one of these packages.
    behaviour: it stays red for a wrong fix and goes green for a regression
    that keeps the name.
 5. **Did we construct the condition, or hope for it?** Construct the
-   loss, and construct the chance to notice it. The setup check
+   loss, and construct the chance to notice it. The setup check that
    `republish_after_reconnect_test.go` owns passed a run where the client
    reconnected and then sent no Publish at all: nothing arrived after the
    gap, so it was never asked what it is scored on.
