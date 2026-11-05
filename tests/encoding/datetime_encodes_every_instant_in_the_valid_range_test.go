@@ -123,7 +123,7 @@ func TestDateTimeEncodesEveryInstantInTheValidRange(t *testing.T) {
 	case encodes && knownBug != "":
 		t.Errorf("this now passes (every one of the %d instants in the sweep encoded as the "+
 			"tick count §5.2.2.5 defines for it) - "+
-			"delete the knownBug constant and the two arms that read it, in the commit that fixed it",
+			"delete the knownBug constant and every arm that reads it, in the commit that fixed it",
 			len(instants))
 	case encodes:
 		t.Logf("every one of the %d instants in the sweep encoded as the tick count "+

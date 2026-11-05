@@ -58,7 +58,7 @@ func TestNilBuiltinEncodesAsItsNullValue(t *testing.T) {
 	// knownBug records that gopcua does not do this yet; the text is logged
 	// in place of a failure. README.md says when to delete it. The
 	// behaviour is closed by https://github.com/gopcua/opcua/pull/901.
-	const knownBug = "a nil pointer to a type §5.1.2 Table 1 lists as nullable panics instead of encoding that type's null value: six of the seven types this row checks - NodeId, Guid, LocalizedText, DataValue, Variant and DiagnosticInfo - panic on the nil receiver, and only ExtensionObject is guarded"
+	const knownBug = "a nil pointer to a type §5.1.2 Table 1 lists as nullable panics instead of encoding that type's null value, because its Encode method dereferences the nil receiver"
 
 	cases := []nullEncoding{
 		{
@@ -159,7 +159,7 @@ func TestNilBuiltinEncodesAsItsNullValue(t *testing.T) {
 	case encodes && knownBug != "":
 		t.Errorf("this now passes (a nil pointer to each of the %d nullable built-in types "+
 			"this row checks encodes as that type's null value) - "+
-			"delete the knownBug constant and the two arms that read it, in the commit that fixed it",
+			"delete the knownBug constant and every arm that reads it, in the commit that fixed it",
 			len(cases))
 	case encodes:
 		t.Logf("a nil pointer to each of the %d nullable built-in types this row checks "+
