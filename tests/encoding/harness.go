@@ -70,9 +70,9 @@ func validRangeInstants() []time.Time {
 
 // ticksFor returns the tick count §5.2.2.5 defines for an instant: the number
 // of 100 nanosecond intervals since 1601-01-01T00:00:00Z. The arithmetic is
-// in math/big, which is the same algebra the conversion under test runs
-// but in a type that cannot overflow, so the oracle cannot fail the way
-// the conversion does.
+// in math/big, which is the clause's own algebra in a type that cannot
+// overflow - the conversions under test run it forwards in one row and
+// backwards in the other - so the oracle cannot fail the way they do.
 func ticksFor(t time.Time) *big.Int {
 	u := t.UTC()
 	secs := new(big.Int).SetInt64(u.Unix())

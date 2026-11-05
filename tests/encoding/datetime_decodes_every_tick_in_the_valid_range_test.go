@@ -21,7 +21,7 @@
 // computes each one's expected tick count, and wireBytes renders the
 // count as the eight bytes ua.Decode reads back into a wireDateTime, so
 // the decode takes the same reflection path a service response does,
-// rather than Buffer.ReadTime directly; the reported defect is only
+// rather than Buffer.ReadTime directly; a defect here is only
 // interesting if it reaches a caller. See harness.go.
 //
 // The expected tick count for an instant is computed here in math/big, from
@@ -35,7 +35,6 @@
 // boundaries and wrong in between; the overflow being fixed has a cliff
 // one tick wide, so a sweep that crosses the range is what can find a
 // second one.
-
 //
 // The known bug has a signature, and the arms key on it: the instants inside
 // roughly 1678-2262 decode rightly today, only those outside come back
