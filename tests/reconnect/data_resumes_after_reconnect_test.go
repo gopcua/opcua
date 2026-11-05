@@ -27,11 +27,6 @@
 // business. The server answers Republish with Bad_MessageNotAvailable, which
 // ends a Republish loop, so a client that does ask is not faulted for it.
 //
-// While knownBug stands the arm keys on an absence, so a client that
-// re-activated too late in the window for minFresh is logged green beside
-// gopcua. Keying on a presence would mean requiring the Publishes whose
-// absence is the defect.
-//
 // The reference stacks. The three read here re-issue a Publish as soon as one
 // is answered rather than on a timer, so each draws at this fixture's ceiling
 // of five answers a second and what separates them is the dead time after the
@@ -57,10 +52,9 @@ import (
 )
 
 func TestDataResumesAfterReconnect(t *testing.T) {
-	// knownBug records that gopcua does not do this yet; the text is logged in
-	// place of a failure. README.md says when to delete it.
-	// https://github.com/gopcua/opcua/issues/879
-	const knownBug = "the client reconnects and re-activates the session, but never receives another notification"
+	// gopcua did not do this until the fix for
+	// https://github.com/gopcua/opcua/issues/879; README.md says which pull
+	// request closed it.
 
 	// minFresh is how many distinct notifications after the drop show a
 	// resumed stream: one that arrives and then stalls is not a stream, and a
@@ -100,14 +94,8 @@ func TestDataResumesAfterReconnect(t *testing.T) {
 	}
 
 	switch {
-	case len(fresh) >= minFresh && knownBug != "":
-		t.Errorf("this now passes (%d distinct notifications arrived after the drop) - delete the "+
-			"knownBug constant and the two arms that read it, in the commit that fixed it", len(fresh))
 	case len(fresh) >= minFresh:
 		t.Logf("data kept flowing: %d distinct notifications arrived after the drop", len(fresh))
-	case knownBug != "":
-		t.Logf("known bug: %s (%d distinct notifications after the drop, at least %d expected; %d received in all)",
-			knownBug, len(fresh), minFresh, len(run.Deliveries))
 	default:
 		t.Errorf("a session was activated after the drop, but only %d distinct notifications "+
 			"arrived after it, where at least %d are expected (%d received in all)", len(fresh), minFresh, len(run.Deliveries))

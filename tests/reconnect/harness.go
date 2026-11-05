@@ -572,16 +572,29 @@ type runRecord struct {
 // and is reported as "could not set the test up: %s": the reason is the
 // row's, and the wording is the package's. A row consults one up front when
 // nothing it scores could be true without it, and inside its switch when the
-// violation it scores would show up anyway -- as the last arm where no
-// knownBug stands, and as the first arm where one does, so that a run which
-// measured nothing is logged with the known bug rather than passing as if it
-// had been scored. republish_after_reconnect_test.go is the one row that
-// puts it below the knownBug arm instead, and says in place why.
+// violation it scores would show up anyway. Where it stands in that switch
+// follows from what the other arms can read. It goes below them where a
+// declining run can still carry the violation they score -- last in
+// session_unused_before_activation_test.go and in
+// new_session_only_after_failed_activation_test.go, and above the failing
+// default arm in republish_after_reconnect_test.go -- so that a client which
+// did the wrong thing is reported on that whatever the reason says, and a
+// run which measured nothing is declined rather than passing. It goes first
+// where a declining run leaves those arms nothing to read, or something that
+// reads as evidence and is not: the three rows that call loopRanSetupFailed
+// have no Republish loop to report on, and
+// data_resumes_on_recreated_subscription_test.go has a run.SeqAtRecreate of
+// zero, under which every delivery reads as data on a replacement. Each of
+// those rows says in place which of the two it is doing.
 //
-// A row with two kinds of decline splits them, as
-// publish_resumes_when_republish_loop_ends_test.go does: the decline that is
-// gopcua's own defect goes through the knownBug arm, and the one a
-// conforming client earns is a t.Fatalf up with the preconditions.
+// A row that carries a knownBug constant and has two kinds of decline splits
+// them: the decline that is gopcua's own defect goes through the knownBug
+// arm, and the one a conforming client earns is a t.Fatalf up with the
+// preconditions. No row shows both halves today, because pull request 907
+// fixed the defects the split was about;
+// publish_resumes_when_republish_loop_ends_test.go keeps the conforming half
+// in loopEndSetupFailed, and the half that was gopcua's defect there is an
+// ordinary decline again.
 func setupFailed(run runRecord) string {
 	// Ahead of HarnessErr because it is worse: a stage the scenario could not
 	// reach leaves the rows nothing to read, while an activation the server
@@ -680,13 +693,18 @@ func republishSeqsAfterDrop(run runRecord) []uint32 {
 }
 
 // loopRanSetupFailed reports why there was no Republish loop at all, or ""
-// if one ran. This is the reason the knownBug arm carries in every row that
-// reads the loop: gopcua re-activates and then asks for nothing, so none of
-// them has anything to score rather than something to object to.
+// if one ran. All three rows that read the loop make it the first arm of
+// their switch: the helpers below it read what the client asked for -- the
+// last Republish in publish_resumes_when_republish_loop_ends_test.go and in
+// new_subscription_after_republish_returns_invalid_id_test.go, the whole list
+// of asks in republish_asks_for_each_missed_number_test.go -- and a run with
+// no loop gives them nothing, so the reason has to decline it before anything
+// is read from it.
 //
 // It subsumes reconnectSetupFailed, so the rows that call both call that one
-// first; that order is what makes the knownBug text's "reconnects and
-// re-activates" true of every run that reaches this reason.
+// first: a client that never re-activated sent no Republish this reason would
+// count, and without that order the narrower fact -- it was never offered the
+// Session's subscriptions back -- would be reported as the broader one.
 func loopRanSetupFailed(run runRecord) string {
 	if len(republishSeqsAfterDrop(run)) == 0 {
 		return "the client sent no Republish after the drop on a connection it had activated, so " +
@@ -786,8 +804,8 @@ func (s *server) acceptLoop(ctx context.Context) {
 			// opposite things here: one client gave up part way through
 			// Hello, or the run is over. Returning on both would end the
 			// server for every later connection because one client aborted,
-			// and the rows with no knownBug would then fail a client for
-			// something the fixture did.
+			// and the rows would then fail a client for something the
+			// fixture did.
 			if errors.Is(err, net.ErrClosed) || ctx.Err() != nil {
 				return
 			}

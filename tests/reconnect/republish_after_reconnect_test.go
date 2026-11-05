@@ -19,13 +19,11 @@
 // transfer-refused server, where a Republish is answered and the loop they
 // measure exists.
 //
-// A known-good client fails this once knownBug is deleted: open62541 has no
-// client-side Republish at all, so it resumes Publish and never asks for
-// what it lost. While knownBug stands that absence is logged green beside
-// gopcua, and the row cannot tell the two apart. The test is kept because
-// node-opcua asks, measured against this fixture, and Eclipse Milo and
-// UA-.NETStandard both ask too, read from source and not run here; and
-// because it asserts an outcome a client cannot fake by resuming the
+// A known-good client fails this: open62541 has no client-side Republish at
+// all, so it resumes Publish and never asks for what it lost. The test is
+// kept because node-opcua asks, measured against this fixture, and Eclipse
+// Milo and UA-.NETStandard both ask too, read from source and not run here;
+// and because it asserts an outcome a client cannot fake by resuming the
 // stream.
 
 package reconnect
@@ -36,10 +34,9 @@ import (
 )
 
 func TestRepublishAfterReconnect(t *testing.T) {
-	// knownBug records that gopcua does not do this yet; the text is logged in
-	// place of a failure. README.md says when to delete it.
-	// https://github.com/gopcua/opcua/issues/879
-	const knownBug = "the client reconnects and re-activates the session, but never asks for the notification it missed"
+	// gopcua did not do this until the fix for
+	// https://github.com/gopcua/opcua/issues/879; README.md says which pull
+	// request closed it.
 
 	// minSettle is the window a client needs after the drop to reconnect,
 	// re-activate and ask. Below it, a client that never asks cannot be told
@@ -65,34 +62,22 @@ func TestRepublishAfterReconnect(t *testing.T) {
 		t.Fatalf("could not set the test up: %s", why)
 	}
 
-	// This row puts its setup arm below the knownBug arm, which no other row
-	// does: while knownBug stands the client is expected not to get far enough
-	// to be asked, so the shortfall is logged beside it instead of declining
-	// the run. What keeps such a run from reading as clean is the nested
-	// co-log inside that arm. Once someone deletes knownBug to claim the fix,
-	// that arm is dead and the setup arm, still above the default one, is what
-	// stops a run that measured nothing from passing.
+	// The setup check is an arm of the switch, not a Fatalf above it, so the
+	// two arms that read the Republish traffic run first: a client that asked
+	// is reported on what it did, whatever this reason says. Only a run with
+	// no Republish to report reaches the setup arm, and sitting above the
+	// default one it is what stops a run that measured nothing from passing.
 	why := republishSetupFailed(run)
 
 	asked, wrongSeqs, total := republishesAfterDrop(run)
 
 	switch {
-	case asked > 0 && knownBug != "":
-		t.Errorf("this now passes (%d Republish for notification %d, of %d requests after the reconnect) - "+
-			"delete the knownBug constant and the two arms that read it, in the commit that fixed it",
-			asked, run.HeldSeq, total)
 	case asked > 0:
 		t.Logf("the client asked for the missed notification (%d Republish for notification %d, of %d requests)",
 			asked, run.HeldSeq, total)
 	case len(wrongSeqs) > 0:
 		t.Errorf("the client asked the server to resend %v, and the notification it missed was %d: "+
 			"it republished without evaluating the sequence number it lost", wrongSeqs, run.HeldSeq)
-	case knownBug != "":
-		t.Logf("known bug: %s (notification %d was held back; %d requests after the reconnect, "+
-			"none a Republish)", knownBug, run.HeldSeq, total)
-		if why != "" {
-			t.Logf("this run could not have told asking from not asking anyway: %s", why)
-		}
 	case why != "":
 		t.Fatalf("could not set the test up: %s", why)
 	default:

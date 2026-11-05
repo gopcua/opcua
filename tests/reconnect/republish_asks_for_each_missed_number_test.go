@@ -18,14 +18,13 @@
 // furtherLost more notifications behind the one it withheld. See harness.go.
 //
 // open62541 has no client-side Republish at all, so there is no loop for
-// this row to read. While knownBug stands the arm keys on an absence:
-// open62541 is logged green beside gopcua, and
-// republish_after_reconnect_test.go is where that absence will be failed
-// once knownBug is deleted. node-opcua walks the whole gap and stops on the
-// fault, measured. Eclipse Milo and UA-.NETStandard are source reads, not
-// run here. No stack here fails it -- open62541 is logged green rather than
-// failed while knownBug stands -- so the row takes no exception. A client
-// cannot produce the numbers this row reads by resuming the stream.
+// this row to read and the run is declined;
+// republish_after_reconnect_test.go is where that absence is failed.
+// node-opcua walks the whole gap and stops on the fault, measured. Eclipse
+// Milo and UA-.NETStandard are source reads, not run here. No stack here
+// fails it -- open62541 is declined rather than failed -- so the row takes
+// no exception. A client cannot produce the numbers this row reads by
+// resuming the stream.
 
 package reconnect
 
@@ -36,10 +35,9 @@ import (
 )
 
 func TestRepublishAsksForEachMissedNumber(t *testing.T) {
-	// knownBug records that gopcua does not do this yet; the text is logged in
-	// place of a failure. README.md says when to delete it.
-	// https://github.com/gopcua/opcua/issues/879
-	const knownBug = "the client reconnects and re-activates the session, but never asks for anything it missed, so there is no loop to walk"
+	// gopcua did not do this until the fix for
+	// https://github.com/gopcua/opcua/issues/879; README.md says which pull
+	// request closed it.
 
 	// furtherLost is how many notifications the server keeps for
 	// retransmission behind the one it held back. Two means it can give back
@@ -74,12 +72,14 @@ func TestRepublishAsksForEachMissedNumber(t *testing.T) {
 	}
 
 	// A loop the row cannot score is not a defect of gopcua's, so it is a
-	// setup failure here rather than something the knownBug arm excuses.
+	// setup failure here.
 	if why := loopScorableSetupFailed(run); why != "" {
 		t.Fatalf("could not set the test up: %s", why)
 	}
 
-	// Having no loop at all is the known bug, so it goes through the switch.
+	// A run where the client never asked at all measured nothing, so it is
+	// declined. It is the first arm of the switch, so the two arms below it
+	// only ever read a loop that ran.
 	why := loopRanSetupFailed(run)
 
 	asked := republishSeqsAfterDrop(run)
@@ -92,14 +92,8 @@ func TestRepublishAsksForEachMissedNumber(t *testing.T) {
 	}
 
 	switch {
-	case why != "" && knownBug != "":
-		t.Logf("known bug: %s (%s; the server had %v to give back)", knownBug, why, run.Answerable)
 	case why != "":
 		t.Fatalf("could not set the test up: %s", why)
-	case wrong == "" && knownBug != "":
-		t.Errorf("this now passes (the client asked for %v, %d Republish in all, and the server had "+
-			"%v to give back) - delete the knownBug constant and the two arms that read it, in the "+
-			"commit that fixed it", asked, len(asked), run.Answerable)
 	case wrong == "":
 		t.Logf("the client walked the gap: it asked for %v, %d Republish in all, and the server had "+
 			"%v to give back", asked, len(asked), run.Answerable)
@@ -110,9 +104,8 @@ func TestRepublishAsksForEachMissedNumber(t *testing.T) {
 
 // loopScorableSetupFailed reports why a loop that ran could not be scored
 // against §6.7, or "" if it could. None of these is gopcua's defect, so each
-// is a plain setup failure rather than something the knownBug arm excuses; a
-// run with no loop at all is loopRanSetupFailed's to report, and that one is
-// the defect.
+// is a plain setup failure; a run with no loop at all is
+// loopRanSetupFailed's to report.
 //
 // The first check is a tripwire on the row's own FurtherLost rather than a
 // reading of the client: the server's queue runs contiguously from the

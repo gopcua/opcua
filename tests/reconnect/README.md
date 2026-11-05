@@ -71,9 +71,10 @@ constant, declared inside the test function. Run `go test ./tests/reconnect/ -v`
 Who that is depends on where this suite is. While it is unmerged — which is
 where it is today — the person who deletes a constant is whoever runs the
 suite by hand against a candidate fix, and the deletion lands with that fix
-as we merge it. Once the suite is merged, the contributor whose fix turns a
-row red deletes the constant in their own pull request, and that is how the
-entry is closed.
+as we merge it. Where a fix reaches main ahead of this suite, the deletion
+lands instead in the change that rebases the suite onto it. Once the
+suite is merged, the contributor whose fix turns a row red deletes the
+constant in their own pull request, and that is how the entry is closed.
 
 Do not delete a `knownBug` constant because the test started passing for a
 reason you cannot explain.
@@ -88,6 +89,26 @@ the missing behaviour is an absence and the arm keys on that absence, a
 client that never reaches the stimulus lands in the same green arm as one
 that reached it and did the wrong thing. Key the arm on a presence where the
 behaviour allows one, and where it does not, say so in the file.
+
+### Constants closed by pull request 907, 2026-11-05
+
+https://github.com/gopcua/opcua/pull/907 merged into main and fixed seven of
+the eight behaviours that carried a constant. Each row below was logging its
+`knownBug` line; each now passes, and its constant and the two arms that read
+it went out in the change that rebased this suite onto that main.
+
+| row | behaviour that was missing |
+|---|---|
+| `data_resumes_after_reconnect_test.go` | the client reconnected and re-activated the session but never received another notification |
+| `data_resumes_on_recreated_subscription_test.go` | the client left the subscription as it was, so it never created the replacement or monitored anything on it |
+| `missed_notification_recovered_when_transfer_refused_test.go` | the server still had the notification the client missed, and the client never got it back |
+| `new_subscription_after_republish_returns_invalid_id_test.go` | the client never asked for what it missed, so it was never told the subscription id was invalid and never replaced the subscription |
+| `publish_resumes_when_republish_loop_ends_test.go` | the client never asked for what it missed, so it had no loop of its own to end and nothing to resume from |
+| `republish_after_reconnect_test.go` | the client never asked for the notification it missed |
+| `republish_asks_for_each_missed_number_test.go` | the client never asked for what it missed, so there was no loop to walk |
+
+One constant survives: `no_acknowledgements_when_nothing_is_available_test.go`,
+whose behaviour 907 did not fix.
 
 ## Reviewing a new test: six questions
 
