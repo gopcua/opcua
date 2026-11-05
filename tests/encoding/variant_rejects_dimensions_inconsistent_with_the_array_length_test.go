@@ -28,6 +28,10 @@
 // rows read §5.2.2.5 and §5.1.2 Table 1, clauses about a different field of
 // a different type, and none of them touches a Variant array field.
 //
+// The row runs against ua.Decode alone, with no scripted server in this
+// package: it needs no helper, and the decodeVariantRecovering its two
+// siblings share lives in harness.go. See harness.go.
+//
 // The row asserts that decoding the packet stops with an error, and that a
 // consistent control - the same four elements with dimensions [2, 2], whose
 // product is the length - keeps decoding, so a fix that rejected every

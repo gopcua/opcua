@@ -47,6 +47,11 @@
 // about a different field of a different type, and none of them touches a
 // Variant array field.
 //
+// The row runs against the shared helpers, with no scripted server in
+// this package: the packet is decoded by decodeVariantRecovering, the
+// same helper the array-length row decodes through; the ReadMemStats
+// measurements around it are this row's own, not shared. See harness.go.
+//
 // The row asserts that decoding the packet is rejected and that the
 // rejection cost at most dimsAllocationBound of allocation. It deliberately
 // does not require a particular error, and it does not check the dimension

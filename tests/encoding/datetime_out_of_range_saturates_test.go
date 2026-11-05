@@ -3,6 +3,11 @@
 // datetime_decodes_every_tick_in_the_valid_range_test.go and
 // datetime_encodes_every_instant_in_the_valid_range_test.go.
 //
+// The row runs against the shared helpers, with no scripted server in
+// this package: each probe's tick count is rendered to its eight wire
+// bytes by wireBytes and decoded into a wireDateTime, so ua.Decode takes
+// the same reflection path a service response does. See harness.go.
+//
 // TestDateTimeOutOfRangeSaturates checks the four rules §5.2.2.5 states for
 // values outside the range the definition covers. gopcua implements none of
 // them: it feeds whatever tick count arrives to its conversion arithmetic

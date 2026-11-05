@@ -6,6 +6,12 @@
 // indicates whether a 'null' value exists for the DataType in all
 // DataEncodings. A 'null' value is a value that is equivalent 'no value
 // specified'."
+//
+// The row runs against the shared helpers, with no scripted server in
+// this package: the fully populated, all-nil and partially populated
+// ReferenceDescriptions below are each encoded by encodeRecovering,
+// which turns the panic an unguarded field raises into a value the case
+// then reports. See harness.go.
 
 package encoding
 
