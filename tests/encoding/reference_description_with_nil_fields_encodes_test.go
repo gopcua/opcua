@@ -70,9 +70,27 @@ func TestReferenceDescriptionWithNilFieldsEncodes(t *testing.T) {
 		TypeDefinition: ua.NewTwoByteExpandedNodeID(0),
 	})
 
+	// The named defect is an event - the error the two *ExpandedNodeID
+	// fields return for a nil receiver, or a panic from one of the fields
+	// #901 does not guard - and an event is a presence, so the arms key on
+	// it rather than on the absence of a right outcome: while the all-nil
+	// message still fails on the nil receiver, the behaviour is still
+	// missing and the row stays green with the known bug logged; once it
+	// encodes, a fix has landed, and the row then demands the framing be
+	// right - a landed fix that still leaves the message short is red,
+	// not green.
+	event := allNilErr != nil || allNilPanic != ""
+
 	encodes := allNilErr == nil && allNilPanic == ""
 	framed := partialErr == nil && partialPanic == "" && len(partial) == len(full)
 
+	// Arm order: the two passes arms come first, because an all-nil message
+	// that fails on the nil receiver never encodes, so they cannot take a
+	// state the event arm needs to see; the event arm comes before the
+	// wrong-fix arm, because a fix that guards only some of the fields
+	// leaves the event and must stay green, not red; and the wrong-fix arm
+	// reads the constant, so with the constant empty a missing behaviour
+	// lands in the default arm below it.
 	switch {
 	case encodes && framed && knownBug != "":
 		t.Errorf("this now passes (a ReferenceDescription with all fields nil encodes, and one "+
@@ -82,10 +100,16 @@ func TestReferenceDescriptionWithNilFieldsEncodes(t *testing.T) {
 	case encodes && framed:
 		t.Logf("a ReferenceDescription with nil fields encodes to the same %d bytes as a fully "+
 			"populated one", len(full))
-	case knownBug != "":
+	case event && knownBug != "":
 		t.Logf("known bug: %s (all fields nil: err %v, panic %q; only the ExpandedNodeIDs set: "+
 			"%d bytes where a fully populated one is %d)",
 			knownBug, allNilErr, allNilPanic, len(partial), len(full))
+	case knownBug != "":
+		t.Errorf("the nil-receiver failure is gone, but the outcome is still wrong - a fix "+
+			"for this landed and is wrong: with all fields nil the message now encodes, and "+
+			"with only the ExpandedNodeIDs set it gave err %v and panic %q and %d bytes, "+
+			"where a fully populated one is %d",
+			partialErr, partialPanic, len(partial), len(full))
 	default:
 		t.Errorf("§5.1.2 Table 1 lists every pointer field of ReferenceDescription as nullable, so "+
 			"one with nil fields has a value to encode; all fields nil gave err %v and panic %q, "+
