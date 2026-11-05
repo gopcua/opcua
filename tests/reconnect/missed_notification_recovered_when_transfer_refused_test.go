@@ -19,9 +19,8 @@
 // option the server was set to rather than a refusal the row can prove was
 // put to the client, because the record keeps requests and not responses.
 //
-// While knownBug stands the arm keys on an absence: open62541 has no
-// client-side Republish, so it is logged green here rather than failed, and
-// the row cannot tell it from gopcua. node-opcua recovers the notification,
+// A known-good client fails this: open62541 has no client-side Republish, so
+// it never gets the notification back. node-opcua recovers the notification,
 // measured on this fixture; Eclipse Milo and UA-.NETStandard recover it in
 // source, read and not run here. The row is kept because it scores an
 // outcome a client cannot reach by resuming the stream or by replaying what
@@ -35,10 +34,9 @@ import (
 )
 
 func TestMissedNotificationRecoveredWhenTransferRefused(t *testing.T) {
-	// knownBug records that gopcua does not do this yet; the text is logged in
-	// place of a failure. README.md says when to delete it.
-	// https://github.com/gopcua/opcua/issues/879
-	const knownBug = "the client reconnects and re-activates the session, and the server still has the notification it missed, but the client never gets it back"
+	// gopcua did not do this until the fix for
+	// https://github.com/gopcua/opcua/issues/879; README.md says which pull
+	// request closed it.
 
 	// minSettle is the window after the drop this row needs: reconnect,
 	// re-activate, be refused the transfer, ask, and have the answer reach the
@@ -68,10 +66,6 @@ func TestMissedNotificationRecoveredWhenTransferRefused(t *testing.T) {
 	recovered, arrived := missedNotificationBack(run)
 
 	switch {
-	case recovered && knownBug != "":
-		t.Errorf("this now passes (notification %d came back after the drop, with %d other notification(s)) - "+
-			"delete the knownBug constant and the two arms that read it, in the commit that fixed it",
-			run.HeldSeq, arrived-1)
 	case recovered:
 		t.Logf("the client recovered notification %d although the server was set to refuse the transfer "+
 			"(%d notifications after the drop in all)", run.HeldSeq, arrived)
@@ -81,14 +75,8 @@ func TestMissedNotificationRecoveredWhenTransferRefused(t *testing.T) {
 		// post-drop connection the client had activated first, and one that
 		// arrives before that connection's ActivateSession is faulted
 		// Bad_SessionNotActivated and never reaches the retransmission queue.
-		//
-		// A client that was given the notification and lost it is not the
-		// client knownBug describes, so this arm fires whether or not it stands.
 		t.Errorf("the client asked the server to resend notification %d after activating the Session, "+
 			"and it never reached the application; %d notifications arrived after the drop", run.HeldSeq, arrived)
-	case knownBug != "":
-		t.Logf("known bug: %s (the server was set to refuse the transfer and kept notification %d; "+
-			"%d notifications arrived after the drop, none of them that one)", knownBug, run.HeldSeq, arrived)
 	default:
 		t.Errorf("the server was set to refuse the transfer and still had notification %d to give back, "+
 			"and the client never got it; %d notifications arrived after the drop, none of them that one",

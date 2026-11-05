@@ -21,16 +21,15 @@
 // server created after the replacement existed reached the application's own
 // callback. It does not ask that the replacement followed a Republish, which
 // would decline the client it exists for — one whose reconnect path recreates
-// subscriptions and never asks for anything. While knownBug stands the arm
-// keys on an absence: a client that created no replacement is logged green.
-// A client that created one and then sent fewer than two Publish the server
-// acted on is declined instead: it was never in a position to be handed data
-// on the replacement, so finding none there says nothing about it.
+// subscriptions and never asks for anything. A client that created no
+// replacement is declined rather than scored, and so is one that created a
+// replacement and then sent fewer than two Publish the server acted on: it
+// was never in a position to be handed data on the replacement, so finding
+// none there says nothing about it.
 //
 // The reference stacks. open62541 v1.4.22 has no client-side replacement
-// path, so it never reaches the condition this row scores; while knownBug
-// stands that is the green log above and not a decline, and the row cannot
-// tell it from gopcua. node-opcua 2.187.19 passes it, measured here.
+// path, so it never reaches the condition this row scores and its run is
+// declined. node-opcua 2.187.19 passes it, measured here.
 // Eclipse Milo and UA-.NETStandard were not read; what would settle each is
 // whether its own recreate path carries the items. No stack here fails it:
 // no exception.
@@ -44,10 +43,9 @@ import (
 )
 
 func TestDataResumesOnRecreatedSubscription(t *testing.T) {
-	// knownBug records that gopcua does not do this yet; the text is logged in
-	// place of a failure. README.md says when to delete it.
-	// https://github.com/gopcua/opcua/issues/879
-	const knownBug = "the client reconnects and re-activates the session and leaves the subscription exactly as it was, so it never creates the replacement this row reads, let alone monitors anything on it"
+	// gopcua did not do this until the fix for
+	// https://github.com/gopcua/opcua/issues/879; README.md says which pull
+	// request closed it.
 
 	// minSettle is the window a client needs after the drop to reconnect,
 	// re-activate, be faulted, create the replacement, monitor the item on it
@@ -76,21 +74,18 @@ func TestDataResumesOnRecreatedSubscription(t *testing.T) {
 		t.Fatalf("could not set the test up: %s", why)
 	}
 
-	// Having no replacement is the known bug, so it goes through the switch.
+	// Without a replacement there is nothing to read data off, and
+	// SeqAtRecreate is zero, so every delivery would read as data on one:
+	// this reason is the switch's first arm, and declines such a run before
+	// the arms below can score it.
 	why := newSubscriptionSetupFailed(run)
 
 	fresh := dataAfterNewSubscription(run)
 	_, published := newSubscriptionAfterDrop(run)
 
 	switch {
-	case why != "" && knownBug != "":
-		t.Logf("known bug: %s (%s)", knownBug, why)
 	case why != "":
 		t.Fatalf("could not set the test up: %s", why)
-	case len(fresh) > 0 && knownBug != "":
-		t.Errorf("this now passes (the client replaced the subscription the server had disowned and "+
-			"notifications %v, all created after the replacement, reached the application) - delete "+
-			"the knownBug constant and the two arms that read it, in the commit that fixed it", fresh)
 	case len(fresh) > 0:
 		t.Logf("the client replaced the subscription the server had disowned and notifications %v, "+
 			"all created after the replacement, reached the application", fresh)
