@@ -16,6 +16,13 @@
 // that was right at the boundaries and wrong in between; the overflow being
 // fixed has a cliff one tick wide, so a sweep is what finds a second one.
 //
+// The row runs against the shared helpers, with no scripted server in
+// this package: validRangeInstants supplies the instants swept, ticksFor
+// computes each one's expected tick count, wireBytes renders the count
+// as the eight expected bytes, and each instant is encoded inside a
+// wireDateTime so ua.Encode takes the same reflection path a service
+// response does. See harness.go.
+//
 // The known bug has a signature, and the arms key on it: the instants inside
 // roughly 1678-2262 encode rightly today, only those outside come back
 // wrong, and each wrong one carries exactly the tick count the known

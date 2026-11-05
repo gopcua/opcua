@@ -16,6 +16,9 @@
 // The row runs against a struct whose first field is a nil pointer to a
 // nullable built-in and whose second is a known marker: it encodes the
 // struct, decodes the bytes back, and reads the marker out of the result.
+// There is no scripted server in this package; the encoding goes through
+// the shared encodeRecovering, which turns the panic a missing guard
+// raises into a value the case then reports. See harness.go.
 //
 // What it asserts about the null bytes is that the marker survives behind
 // them, and that gopcua's own decoder accepts them - of the two rows, only

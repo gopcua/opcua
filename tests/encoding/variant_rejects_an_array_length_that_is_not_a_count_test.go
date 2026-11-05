@@ -20,6 +20,12 @@
 // §5.1.2 Table 1, clauses about a different field of a different type, and
 // none of them touches a Variant array field.
 //
+// The row runs against the shared helpers, with no scripted server in
+// this package: every packet, including the null-array control, is
+// decoded by decodeVariantRecovering, which turns the panic a bad length
+// can raise into a value the case then reports instead of taking the
+// binary down. See harness.go.
+//
 // The row decodes two packets, length -2 and the Int32 minimum, and
 // requires each to come back rejected: an error, not a panic. It also
 // decodes the null array, length -1, and requires that to keep working,
