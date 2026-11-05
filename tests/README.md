@@ -35,13 +35,13 @@ A row that encodes a value and decodes it back has asked gopcua whether
 gopcua agrees with itself. It has not asked whether the bytes in between
 are the bytes the specification calls for, and the two questions come
 apart. Change `ua/variant.go` so a UInt32 inside a Variant goes on the
-wire under type id 26 - reserved, and rejected by every stack we have
-read - then change the decode half to match, which is the shape a
+wire under type id 26 - reserved, and rejected by every reference stack
+we have read - then change the decode half to match, which is the shape a
 regenerated type table has, and a row that only round-trips stays green.
 It was never looking at the bytes.
 
 So a row's verdict rests on bytes from outside gopcua: literal bytes
-written out in the row, or another stack's output.
+written out in the row, or a reference stack's output.
 `nil_builtin_encodes_as_its_null_value_test.go` is the worked example -
 its expected bytes are in the file and the functions they were read from
 in open62541 and UA-.NETStandard are named in its header.
