@@ -47,7 +47,7 @@ import (
 // worth keeping after #901 merges rather than before.
 func TestReferenceDescriptionWithNilFieldsEncodes(t *testing.T) {
 	// knownBug records that gopcua does not do this yet; the text is logged
-	// in place of a failure. README.md says when to delete it.
+	// in place of a failure. ../README.md says when to delete it.
 	const knownBug = "a ReferenceDescription with nil fields does not encode: its two *ExpandedNodeID fields return an error on a nil receiver, and with those set its nil *QualifiedName BrowseName silently contributes no bytes, so the message is six bytes short"
 
 	// Every pointer field given the explicit null value its type has by

@@ -1,8 +1,8 @@
 # Test suites
 
 Each file in a package here is one Go test for one behaviour in the OPC UA
-space, named after that behaviour, holding one `func Test`. Its opening
-comment covers these, in this order:
+space, named after that behaviour, holding one `func Test`. Each such
+file is called a row. Its opening comment covers these, in this order:
 
 1. the behaviour and the clause quoted, with the conformance unit if any;
 2. the neighbouring rows by filename and what separates them;
@@ -39,14 +39,15 @@ constant, declared inside the test function. Run
   behaviour. The build stays green.
 - When your change fixes the behaviour, the test passes, and that pass is
   reported as a hard error telling you to delete the `knownBug` constant.
-- Delete the constant **and every arm that reads it**, or the file stops
-  compiling. Do it in the same commit as the fix, and say in the commit
-  message what the fix was.
+  The branches of the verdict switch are called arms.
+- Delete the constant, **every arm that reads it, and anything only those
+  arms used**, or the file stops compiling. Do it in the same commit as
+  the fix, and say in the commit message what the fix was.
 
-Who that is depends on where these suites are. While they are unmerged -
-which is where they are today - the person who deletes a constant is
-whoever runs the suite by hand against a candidate fix, and the deletion
-lands with that fix as we merge it. Where a fix reaches main ahead of a
+Who that is depends on where these suites are. While they are unmerged,
+the person who deletes a constant is whoever runs the suite by hand
+against a candidate fix, and the deletion lands with that fix as we
+merge it. Where a fix reaches main ahead of a
 suite, the deletion lands instead in the change that rebases the suite
 onto it. Once the suites are merged, the contributor whose fix turns a
 row red deletes the constant in their own pull request, and that is how
@@ -88,33 +89,34 @@ one of these packages.
    tests the fixture, and scores nothing the library does.
 3. **Would a correct implementation reach this code?** Ask it of
    anything you delete, and answer from gopcua's source rather than from
-   the specification. We deleted two server arms as dead; a correct client
-   reaches both, and one was the test's only route to passing.
+   the specification. Two server arms were deleted as dead; a correct
+   client reaches both, and one was the test's only route to passing.
 4. **Does the test compile against unfixed code?** If it fails only
    because a symbol the fix introduces is missing, it tests a name, not a
    behaviour: it stays red for a wrong fix and goes green for a regression
    that keeps the name.
 5. **Did we construct the condition, or hope for it?** Construct the
-   loss, and construct the chance to notice it. The Republish row's own
-   setup check passed a run where the client reconnected and then sent no
-   Publish at all: nothing arrived after the gap, so it was never asked
-   what it is scored on.
+   loss, and construct the chance to notice it. The setup check
+   `republish_after_reconnect_test.go` owns passed a run where the client
+   reconnected and then sent no Publish at all: nothing arrived after the
+   gap, so it was never asked what it is scored on.
 6. **Would a known-good implementation fail this?** Read one other
    implementation's source and check the test against it - another
    client's source for a row that drives the client, another stack's codec
    for a row that drives an encoder or decoder. Reading all of
-   UA-.NETStandard, node-opcua and the other two is a maintainer's job,
-   not a condition of the pull request. If a known-good implementation
-   would fail the test, the test is the likely mistake, and there are two
-   different reasons. Either it checks how the implementation works rather
-   than what it achieves, and you rewrite it to assert the outcome. Or
-   every library leaves this to the application, and then it is not a test
-   every implementation should pass: keep it only if you say so in the
-   file, name the stacks it fails, and show it still fails an
-   implementation that fakes the outcome instead of earning it. An
-   exception is declared in the header of the file that takes it, not
-   here; a row checked with no failing stack says so in a clause, so that
-   silence means nobody checked. Put what you find in the pull request.
+   UA-.NETStandard, node-opcua, open62541 and Eclipse Milo is a
+   maintainer's job, not a condition of the pull request. If a known-good
+   implementation would fail the test, the test is the likely mistake,
+   and there are two different reasons. Either it checks how the
+   implementation works rather than what it achieves, and you rewrite it
+   to assert the outcome. Or every library leaves this to the
+   application, and then it is not a test every implementation should
+   pass: keep it only if you say so in the file, name the stacks it
+   fails, and show it still fails an implementation that fakes the
+   outcome instead of earning it. An exception is declared in the header
+   of the file that takes it, not here; a row checked with no failing
+   stack says so in a clause, so that silence means nobody checked. Put
+   what you find in the pull request.
 
 ## Optional tools
 

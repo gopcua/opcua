@@ -49,7 +49,7 @@ import (
 
 func TestVariantRejectsAnArrayLengthThatIsNotACount(t *testing.T) {
 	// knownBug records that gopcua does not do this yet; the text is logged
-	// in place of a failure. README.md says when to delete it. The
+	// in place of a failure. ../README.md says when to delete it. The
 	// behaviour is closed by https://github.com/gopcua/opcua/pull/892 and
 	// https://github.com/gopcua/opcua/pull/936.
 	const knownBug = "a negative flattened array length other than -1 is not rejected but passed to reflect.MakeSlice, which panics with \"reflect.MakeSlice: negative len\" and, since Decode has no recover, takes the process with it"
@@ -84,13 +84,13 @@ func TestVariantRejectsAnArrayLengthThatIsNotACount(t *testing.T) {
 	}
 
 	// The presence the knownBug arm keys on is the panic itself, "reflect.MakeSlice:
-	// negative len", per the rule in tests/reconnect/README.md: the panic is
-	// what says the decoder reached this stimulus and did the wrong thing, so
-	// the arm below logs green only while that panic still occurs. Keying it
-	// on the absence of the rejection instead would log a decoder that no
-	// longer panics but still does not reject - a fix that landed wrong -
-	// green beside the unfixed decoder, and the arm that asks for the constant
-	// to be deleted could never fire on a wrong fix.
+	// negative len", per the rule in tests/README.md: the panic is what says
+	// the decoder reached this stimulus and did the wrong thing, so the arm
+	// below logs green only while that panic still occurs. Keying it on the
+	// absence of the rejection instead would log a decoder that no longer
+	// panics but still does not reject - a fix that landed wrong - green
+	// beside the unfixed decoder, and the arm that asks for the constant to
+	// be deleted could never fire on a wrong fix.
 	const makeSlicePanic = "reflect.MakeSlice: negative len"
 
 	var detail string
@@ -118,14 +118,14 @@ func TestVariantRejectsAnArrayLengthThatIsNotACount(t *testing.T) {
 		detail += fmt.Sprintf("\n    %-16s %s", p.name, outcome)
 	}
 
-	// The arms, in the order the rule in tests/reconnect/README.md asks for:
-	// the presence with the constant standing is the green known bug; the
-	// presence gone but the outcome still wrong is a fix that landed wrong,
-	// and red; the outcome right with the constant standing asks for the
-	// constant to be deleted, and is red; the outcome right with the constant
-	// gone is the row's ordinary pass. What fits none of those - the panic
-	// with the constant deleted - falls to default, so deleting the constant
-	// without the fix is red rather than silent.
+	// The arms, in the order the rule in tests/README.md asks for: the presence
+	// with the constant standing is the green known bug; the presence gone but
+	// the outcome still wrong is a fix that landed wrong, and red; the outcome
+	// right with the constant standing asks for the constant to be deleted,
+	// and is red; the outcome right with the constant gone is the row's
+	// ordinary pass. What fits none of those - the panic with the constant
+	// deleted - falls to default, so deleting the constant without the fix
+	// is red rather than silent.
 	switch {
 	case thePanic && knownBug != "":
 		t.Logf("known bug: %s; §5.2.5 gives -1 the meaning null and gives no negative "+
