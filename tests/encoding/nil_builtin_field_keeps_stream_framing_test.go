@@ -34,15 +34,10 @@
 // byte lengths it rides on were checked against open62541 and
 // UA-.NETStandard in nil_builtin_encodes_as_its_null_value_test.go.
 //
-// Each case recovers from a panic and reports it; while the knownBug
-// constant stands, that report is logged as a green "known bug" line that
-// still names the case, and it becomes that case's failure once the
-// constant is deleted. A missing guard is a nil dereference, which takes
-// the whole test binary with it, and then one missing guard hides the state
-// of the other six - NodeId, Guid, LocalizedText, DataValue, Variant and
-// DiagnosticInfo, with ExtensionObject, the seventh, the one case already
-// guarded before PR #901 - so the difference between "one type is unguarded"
-// and "six of them are" is not visible in the resulting output otherwise.
+// The seven cases split six to one: NodeId, Guid, LocalizedText,
+// DataValue, Variant and DiagnosticInfo have no nil guard, and
+// ExtensionObject, the seventh, is the one case already guarded. PR #901
+// closes the six; until it lands, that is still the split.
 
 package encoding
 
@@ -65,8 +60,8 @@ const marker = uint32(0xDEADBEEF)
 // conversion: interface is nil, not ua.BinaryDecoder"), and a field whose
 // interface type has no Decode method is rejected as an unsupported type.
 // The encode side is not the constraint - a field of interface type holding
-// a typed nil encodes just as the concrete value does - so the shape
-// repeating seven times is a choice, not a necessity.
+// a typed nil goes through the same Encode call as a concrete nil pointer
+// does - so the shape repeating seven times is a choice, not a necessity.
 type (
 	nodeIDFramed struct {
 		Field  *ua.NodeID
@@ -224,12 +219,12 @@ func TestNilBuiltinFieldKeepsStreamFraming(t *testing.T) {
 // named defect's event - encoding panicked, or encoding failed - and is empty
 // when neither happened. why carries the reason the trip did not survive
 // once encoding succeeded, and is empty when nothing went wrong; the caller
-// then reads its own marker field, which roundTrip cannot read for it,
-// because it holds the decoded value as an interface{}. The count ua.Decode
-// returns is checked against the length of the bytes the encode produced,
-// because ua.Decode does not report trailing bytes itself, and a null
-// encoding of the wrong length would otherwise leave them unseen. Only the
-// test function above turns any of the three into a failure.
+// then reads its own marker field, which roundTrip has no static type
+// for. The count ua.Decode returns is checked against the length of the
+// bytes the encode produced, because ua.Decode does not report trailing
+// bytes itself, and a null encoding of the wrong length would otherwise
+// leave them unseen. Only the test function above turns any of the three
+// into a failure.
 func roundTrip(out, into interface{}) (event, why string) {
 	b, err, panicked := encodeRecovering(out)
 	if panicked != "" {
@@ -240,10 +235,10 @@ func roundTrip(out, into interface{}) (event, why string) {
 	}
 	n, err := ua.Decode(b, into)
 	if err != nil {
-		return "", fmt.Sprintf("decoding the % x it produced failed: %v", b, err)
+		return "", fmt.Sprintf("decoding the % x the encoder produced failed: %v", b, err)
 	}
 	if n != len(b) {
-		return "", fmt.Sprintf("decode consumed %d of the %d bytes it produced, "+
+		return "", fmt.Sprintf("decode consumed %d of the %d bytes the encoder produced, "+
 			"so the null encoding is the wrong length", n, len(b))
 	}
 	return "", ""
