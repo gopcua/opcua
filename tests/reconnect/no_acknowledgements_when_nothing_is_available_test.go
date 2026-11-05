@@ -75,7 +75,8 @@ func TestNoAcknowledgementsWhenNothingIsAvailable(t *testing.T) {
 	case len(acked) == 0 && knownBug != "":
 		t.Errorf("this now passes (the client acknowledged nothing to a server that advertised "+
 			"nothing, having acknowledged %v to one that advertised what it sent) - delete the "+
-			"knownBug constant and every arm that reads it, in the commit that fixed it",
+			"knownBug constant, every arm that reads it, and anything only those "+
+			"arms used, in the commit that fixed it",
 			acknowledgementsSent(control))
 	case len(acked) == 0:
 		t.Logf("the client acknowledged nothing to a server that advertised nothing, having "+
