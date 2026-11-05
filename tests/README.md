@@ -72,9 +72,9 @@ Who that is depends on where these suites are. While they are unmerged,
 the person who deletes a constant is whoever runs the suite by hand
 against a candidate fix, and the deletion lands with that fix as we
 merge it. Where a fix reaches main ahead of a suite, the deletion lands
-instead in the change that rebases the suite onto it. Once the suites are merged, the contributor whose fix turns a
-row red deletes the constant in their own pull request, and that is how
-the entry is closed.
+instead in the change that rebases the suite onto it. Once the suites
+are merged, the contributor whose fix turns a row red deletes the
+constant in their own pull request, and that is how the entry is closed.
 
 Do not delete a `knownBug` constant because the test started passing for a
 reason you cannot explain.
