@@ -1,17 +1,45 @@
 // A nil pointer to a nullable built-in type encodes as that type's null
 // value, and a message carrying one still parses.
 //
-// OPC 10000-6 §5.1.2 Table 1 gives every built-in type a Nullable column and
-// a Default Value column, and defines the first: "The Nullable column
-// indicates whether a 'null' value exists for the DataType in all
-// DataEncodings. A 'null' value is a value that is equivalent 'no value
-// specified'."
+// OPC 10000-6 §5.1.2 Table 1 gives every built-in type a Nullable column,
+// and defines it: "The Nullable column indicates whether a 'null' value
+// exists for the DataType in all DataEncodings. A 'null' value is a value
+// that is equivalent 'no value specified'."
 //
-// Each case recovers from a panic and reports it as that case's failure. A
-// missing guard is a nil dereference, which takes the whole test binary with
-// it, and then one missing guard hides the state of the other six - the
-// difference between "one type is unguarded" and "six of the seven are" is
-// not visible in the resulting output otherwise.
+// This is the failure the byte assertions in
+// nil_builtin_encodes_as_its_null_value_test.go cannot see. They check one
+// value in isolation; a null encoding of the wrong length is only harmful
+// because everything after it in the same message shifts. A guard that wrote
+// one byte too few for NodeId would still look like a plausible null value on
+// its own, and would desynchronise every field behind it.
+//
+// The row runs against a struct whose first field is a nil pointer to a
+// nullable built-in and whose second is a known marker: it encodes the
+// struct, decodes the bytes back, and reads the marker out of the result.
+//
+// What it asserts about the null bytes is that the marker survives behind
+// them, and that gopcua's own decoder accepts them - of the two rows, only
+// this one checks that, because encoding a null value no decoder reads is
+// not an improvement on panicking. What it deliberately does not assert is
+// the content of the null bytes: a *ua.NodeID guard writing {0x00, 0x01} -
+// the right length, a valid but wrong TwoByte NodeId - would leave this
+// row's check green, and the byte assertions in
+// nil_builtin_encodes_as_its_null_value_test.go are the backstop for it.
+//
+// No reference stack was read for this row: it measures gopcua's encoder
+// against gopcua's own decoder, so no other stack is exercised. The null
+// byte lengths it rides on were checked against open62541 and
+// UA-.NETStandard in nil_builtin_encodes_as_its_null_value_test.go.
+//
+// Each case recovers from a panic and reports it; while the knownBug
+// constant stands, that report is logged as a green "known bug" line that
+// still names the case, and it becomes that case's failure once the
+// constant is deleted. A missing guard is a nil dereference, which takes
+// the whole test binary with it, and then one missing guard hides the state
+// of the other six - NodeId, Guid, LocalizedText, DataValue, Variant and
+// DiagnosticInfo, with ExtensionObject, the seventh, the one case already
+// guarded before PR #901 - so the difference between "one type is unguarded"
+// and "six of them are" is not visible in the resulting output otherwise.
 
 package encoding
 
@@ -28,9 +56,14 @@ import (
 const marker = uint32(0xDEADBEEF)
 
 // The framing structs. Each has a nullable built-in first and the same uint32
-// marker behind it. They are named types at package scope because the encoder
-// dispatches on each field's static type, so the field cannot be an interface
-// and the shape cannot be shared.
+// marker behind it. The field's static type has to be the concrete pointer
+// type because the decode half cannot work through an interface: ua.Decode
+// into a struct with a ua.BinaryDecoder-typed field panics ("interface
+// conversion: interface is nil, not ua.BinaryDecoder"), and a field whose
+// interface type has no Decode method is rejected as an unsupported type.
+// The encode side is not the constraint - a field of interface type holding
+// a typed nil encodes just as the concrete value does - so the shape
+// repeating seven times is a choice, not a necessity.
 type (
 	nodeIDFramed struct {
 		Field  *ua.NodeID
@@ -62,20 +95,6 @@ type (
 	}
 )
 
-// TestNilBuiltinFieldKeepsStreamFraming encodes a struct whose first field is
-// a nil pointer to a nullable built-in and whose second is a known marker,
-// then decodes the result and reads the marker back.
-//
-// This is the failure the byte assertions in
-// nil_builtin_encodes_as_its_null_value_test.go cannot see. They check one
-// value in isolation; a null encoding of the wrong length is only harmful
-// because everything after it in the same message shifts. A guard that wrote
-// one byte too few for NodeId would still look like a plausible null value on
-// its own, and would desynchronise every field behind it.
-//
-// It is also the only check here that the bytes a guard writes are bytes
-// gopcua's own decoder accepts. Encoding a null value no decoder reads is not
-// an improvement on panicking.
 func TestNilBuiltinFieldKeepsStreamFraming(t *testing.T) {
 	// knownBug records that gopcua does not do this yet; the text is logged
 	// in place of a failure. README.md says when to delete it. The
@@ -178,7 +197,7 @@ func TestNilBuiltinFieldKeepsStreamFraming(t *testing.T) {
 		t.Errorf("this now passes (a struct with a nil field of each of the %d nullable "+
 			"built-in types this row checks, followed by a uint32, survives encode and "+
 			"decode with the uint32 intact) - "+
-			"delete the knownBug constant and the two arms that read it, in the commit that fixed it",
+			"delete the knownBug constant and every arm that reads it, in the commit that fixed it",
 			len(cases))
 	case survives:
 		t.Logf("a struct with a nil field of each of the %d nullable built-in types this "+
@@ -202,8 +221,12 @@ func TestNilBuiltinFieldKeepsStreamFraming(t *testing.T) {
 // named defect's event - encoding panicked, or encoding failed - and is empty
 // when neither happened. why carries the reason the trip did not survive
 // once encoding succeeded, and is empty when nothing went wrong; the caller
-// then reads its own marker field, which it alone has the concrete type for.
-// Only the test function above turns any of the three into a failure.
+// then reads its own marker field, which roundTrip cannot read for it,
+// because it holds the decoded value as an interface{}. The count ua.Decode
+// returns is checked against the length of the bytes the encode produced,
+// because ua.Decode does not report trailing bytes itself, and a null
+// encoding of the wrong length would otherwise leave them unseen. Only the
+// test function above turns any of the three into a failure.
 func roundTrip(out, into interface{}) (event, why string) {
 	b, err, panicked := encodeRecovering(out)
 	if panicked != "" {
@@ -212,8 +235,13 @@ func roundTrip(out, into interface{}) (event, why string) {
 	if err != nil {
 		return fmt.Sprintf("encoding failed: %v", err), ""
 	}
-	if _, err := ua.Decode(b, into); err != nil {
+	n, err := ua.Decode(b, into)
+	if err != nil {
 		return "", fmt.Sprintf("decoding the % x it produced failed: %v", b, err)
+	}
+	if n != len(b) {
+		return "", fmt.Sprintf("decode consumed %d of the %d bytes it produced, "+
+			"so the null encoding is the wrong length", n, len(b))
 	}
 	return "", ""
 }

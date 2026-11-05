@@ -130,7 +130,7 @@ func TestDateTimeDecodesEveryTickInTheValidRange(t *testing.T) {
 	case decodes && knownBug != "":
 		t.Errorf("this now passes (every one of the %d instants in the sweep decoded to "+
 			"the instant its tick count names) - "+
-			"delete the knownBug constant and the two arms that read it, in the commit that fixed it",
+			"delete the knownBug constant and every arm that reads it, in the commit that fixed it",
 			len(instants))
 	case decodes:
 		t.Logf("every one of the %d instants in the sweep decoded to the instant its "+
