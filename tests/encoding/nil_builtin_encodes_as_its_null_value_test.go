@@ -37,11 +37,12 @@
 // against ua.Encode(&T{}) would keep agreeing with gopcua after its two
 // sides drifted away from the two reference stacks together.
 //
-// Each case recovers from a panic and reports it as that case's failure. A
-// missing guard is a nil dereference, which takes the whole test binary with
-// it, and then one missing guard hides the state of the other six - the
-// difference between "one type is unguarded" and "six of the seven are" is
-// not visible in the resulting output otherwise.
+// Each case recovers from a panic and records it as that case's outcome -
+// logged as the known bug while the constant stands, a failure once it is
+// gone. A missing guard is a nil dereference, which takes the whole test
+// binary with it, and then one missing guard hides the state of the other
+// six - the difference between "one type is unguarded" and "six of the
+// seven are" is not visible in the resulting output otherwise.
 
 package encoding
 
