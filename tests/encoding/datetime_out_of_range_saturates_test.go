@@ -1,3 +1,12 @@
+// A tick count outside the range §5.2.2.5's definition covers decodes to
+// the latest or earliest time that can be represented, not to whatever
+// date the conversion arithmetic yields.
+//
+// OPC 10000-6 §5.2.2.5: "A date/time is decoded as the latest time that
+// can be represented on the platform if either: the encoded value is the
+// maximum value for an Int64 [or] the encoded value represents a time
+// later than the latest time that can be represented".
+//
 // The clause's remaining rules cover what happens outside that range and
 // are a separate behaviour from the definition, tested in
 // datetime_decodes_every_tick_in_the_valid_range_test.go and
@@ -8,9 +17,13 @@
 // bytes by wireBytes and decoded into a wireDateTime, so ua.Decode takes
 // the same reflection path a service response does. See harness.go.
 //
-// TestDateTimeOutOfRangeSaturates checks the four rules §5.2.2.5 states for
-// values outside the range the definition covers. gopcua implements none of
-// them: it feeds whatever tick count arrives to its conversion arithmetic
+// TestDateTimeOutOfRangeSaturates checks the decode-side rules §5.2.2.5
+// states for values outside the range the definition covers. It does not
+// probe the clause's "the encoded value is 0" condition, and no row in
+// this package probes the two encode-side saturation rules at all.
+//
+// gopcua implements none of the rules it does probe: it feeds whatever
+// tick count arrives to its conversion arithmetic
 // and returns the date that falls out, so the Int64 maximum - the clause's
 // own "at or after 9999" sentinel - comes back today as a wrapped-overflow
 // date in 2185, and once PR #906's in-range fix lands, as the literal date
@@ -60,8 +73,10 @@ func TestDateTimeOutOfRangeSaturates(t *testing.T) {
 	// is the weaker one the clause still forces: all three tick counts below
 	// are "the maximum value for an Int64" or "later than the latest time
 	// that can be represented", so the clause maps all three to one instant.
-	// gopcua maps them to three different dates, which no implementation of
-	// the rule can do. The check needs no name for Go's upper bound.
+	// gopcua maps them to two different dates today - the Int64 maximum and
+	// MaxUint64 coincide, because (100 * 2**63) mod 2**64 is 0 - and to
+	// three once PR #906's conversion lands. No implementation of the rule
+	// can do either. The check needs no name for Go's upper bound.
 	probes := []struct {
 		name  string
 		ticks *big.Int
