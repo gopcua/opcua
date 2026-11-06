@@ -38,8 +38,8 @@
 //
 // The known bug has a signature, and the arms key on it: the instants inside
 // the window an int64 nanosecond count can hold decode rightly today,
-// only those outside come back
-// wrong, and each wrong one carries exactly the instant the known
+// only those outside come back wrong, and each wrong one carries
+// exactly the instant the known
 // conversion's arithmetic predicts - defectDecode below restates that
 // arithmetic. Keying on the signature is what tells the known bug from a fix
 // that landed and is wrong: a clamping fix leaves the same instants wrong,
@@ -86,7 +86,7 @@ func TestDateTimeDecodesEveryTickInTheValidRange(t *testing.T) {
 	// knownBug records that gopcua does not do this yet; the text is logged
 	// in place of a failure. ../README.md says when to delete it. The
 	// behaviour is closed by https://github.com/gopcua/opcua/pull/906.
-	const knownBug = "a tick count inside the range §5.2.2.5 defines does not decode to the instant that clause names, outside the window an int64 nanosecond count can hold, which starts inside 1677 and ends inside 2262: ua/buffer.go's ReadTime does time.Unix(0, int64((ts-116444736000000000)*100)), so the unsigned subtraction underflows below 1970 and the int64 nanosecond multiply overflows above 2262"
+	const knownBug = "a tick count inside the range §5.2.2.5 defines does not decode to the instant that clause names, outside the window an int64 nanosecond count can hold, which starts inside 1677 and ends inside 2262: ua/buffer.go's ReadTime does time.Unix(0, int64((ts-116444736000000000)*100)), and the nanosecond multiply overflows on both sides of that window - the subtraction underflowing below 1970 is harmless, because the wrap recovers the true negative count"
 
 	instants := validRangeInstants()
 	if len(instants) == 0 {
