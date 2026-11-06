@@ -61,10 +61,7 @@
 // does not require a particular error, and it does not check the dimension
 // values themselves: with zero bytes behind the count there are none to
 // check, and the "greater than zero" clause is what the unpatched decoder
-// fails on, one missing dimension too late. While the knownBug constant
-// stands, every run of this row performs the very allocation it protests -
-// the make succeeds, one element is written, and the decode stops - and
-// the knownBug line carries the measured size.
+// fails on, one missing dimension too late.
 //
 // All three reference stacks were read, and all three would pass this row:
 // each bounds the dimension count before allocating for it, though not all
@@ -112,11 +109,8 @@ import (
 const dimsAllocationBound = 1 << 20 // bytes
 
 func TestVariantRejectsMoreDimensionsThanTheMessageCanHold(t *testing.T) {
-	// knownBug records that gopcua does not do this yet; the text is logged
-	// in place of a failure. ../README.md says when to delete it. The
-	// behaviour is closed by https://github.com/gopcua/opcua/pull/893 and
-	// https://github.com/gopcua/opcua/pull/936.
-	const knownBug = "a dimension count larger than the remaining bytes can hold is rejected only after the allocation it protests: make([]int32, arrayDimensionsLength) with the count taken straight off the wire, so a nine-byte message allocates roughly 38 MiB and only then fails on the first missing dimension"
+	// gopcua did not do this until https://github.com/gopcua/opcua/pull/936
+	// merged; it passes since.
 
 	// mask 0xc1 is Boolean | array values | array dimensions; the array
 	// length is 0, so no element bytes; the dimension count is 10000000,
@@ -135,46 +129,13 @@ func TestVariantRejectsMoreDimensionsThanTheMessageCanHold(t *testing.T) {
 		"allocating %d bytes where the bound is %d",
 		packet, err, panicked, alloc, dimsAllocationBound)
 
-	// mustRejectBeforeAllocation is the inference the three arms below share:
-	// it is the reason each outcome is a failure, and it is one sentence in
-	// one place so a change to the reading cannot land in two of the three.
+	// mustRejectBeforeAllocation is the reason the default arm below gives
+	// for its failure.
 	const mustRejectBeforeAllocation = "§5.2.2.16 encodes each dimension as an Int32, so a count " +
 		"of 10000000 with no bytes behind it names dimensions the message cannot " +
 		"hold, and they must be rejected before the allocation"
 
-	// The presence the knownBug arm keys on is the over-bound allocation itself,
-	// per the rule in tests/README.md: allocating beyond dimsAllocationBound
-	// is what says the decoder reached this stimulus and did the wrong thing,
-	// so the arm below logs green only while the decode still makes that
-	// allocation. Keying it on the absence of the rejection instead would
-	// log a decoder that stopped allocating but stopped rejecting too - a
-	// fix that landed wrong - green beside the unfixed decoder, and the arm
-	// that asks for the constant to be deleted could never fire on a wrong
-	// fix.
-	//
-	// The arms, keyed as the rule in tests/README.md asks: the presence with
-	// the constant standing is the green known bug; the presence gone but the
-	// outcome still wrong is a fix that landed wrong, and red; the outcome
-	// right with the constant standing asks for the constant to be deleted,
-	// and is red; the outcome right with the constant gone is the row's
-	// ordinary pass. What fits none of those - the over-bound allocation with
-	// the constant deleted - falls to default, so deleting the constant
-	// without the fix is red rather than silent.
 	switch {
-	case !withinBound && knownBug != "":
-		t.Logf("known bug: %s; %s:%s", knownBug, mustRejectBeforeAllocation, detail)
-	case withinBound && !rejected:
-		t.Errorf("the over-bound allocation is gone - %d bytes against a bound of %d - "+
-			"so a change has landed on this decode, but the outcome is still wrong: "+
-			"%s; the change that bounded the allocation did not make the decoder "+
-			"reject:%s",
-			alloc, dimsAllocationBound, mustRejectBeforeAllocation, detail)
-	case rejected && withinBound && knownBug != "":
-		t.Errorf("this now passes (a dimension count larger than the remaining bytes "+
-			"can hold is rejected before the allocation, %d bytes against a bound of %d) - "+
-			"delete the knownBug constant, every arm that reads it, and "+
-			"anything only those arms used, in the commit that fixed it",
-			alloc, dimsAllocationBound)
 	case rejected && withinBound:
 		t.Logf("a dimension count larger than the remaining bytes can hold is rejected "+
 			"before the allocation (%d bytes against a bound of %d)",
