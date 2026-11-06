@@ -25,10 +25,12 @@
 // encoders: open62541's ua_types_encoding_binary.c
 // (NodeId_encodeBinaryWithEncodingMask:638, Guid:602, LocalizedText:858,
 // Variant:1119, DataValue:1424, DiagnosticInfo:1509) and UA-.NETStandard's
-// BinaryEncoder.cs (WriteGuid:615, WriteNodeId:722,
-// WriteDiagnosticInfo:816, WriteLocalizedText:836, WriteDataValue:911,
-// WriteVariantValue:1665). Asserting the literal
-// bytes here is what turns that one-off cross-check into something the suite
+// BinaryEncoder.cs, at the line each writes the null byte rather than at
+// its public entry point (WriteGuid:618, WriteNodeId:727,
+// WriteLocalizedText:841, WriteDataValue:916, the Variant path reached
+// through WriteVariant:1710, DiagnosticInfo's inner overload:2394).
+// Asserting the literal bytes here is what turns that cross-check into
+// something the suite
 // re-runs; a test that compared ua.Encode(nil) against ua.Encode(&T{}) would
 // keep agreeing with gopcua after its two sides - ua.Encode(nil) and
 // ua.Encode(&T{}) - drifted away from the two reference stacks together.
