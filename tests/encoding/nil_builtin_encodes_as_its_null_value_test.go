@@ -21,13 +21,13 @@
 // turns the panic a missing guard raises into a value the case then
 // reports. See harness.go.
 //
-// The byte sequences asserted here were checked against two reference stacks
-// during the 2026-09-15 review of PR #901 and found identical in both:
-// open62541's ua_types_encoding_binary.c (NodeId_encodeBinaryWithEncodingMask
-// :625, Guid_encodeBinary:565, LocalizedText:801, DataValue:1300,
-// Variant:1039, DiagnosticInfo:1381) and UA-.NETStandard's BinaryEncoder.cs
-// (WriteNodeId:696, WriteGuid:580, WriteLocalizedText:823, WriteDataValue:880,
-// WriteVariantValue:2386, WriteDiagnosticInfo:2122). Asserting the literal
+// The byte sequences asserted here were read out of two reference stacks'
+// encoders: open62541's ua_types_encoding_binary.c
+// (NodeId_encodeBinaryWithEncodingMask:638, Guid:602, LocalizedText:858,
+// Variant:1119, DataValue:1424, DiagnosticInfo:1509) and UA-.NETStandard's
+// BinaryEncoder.cs (WriteGuid:615, WriteNodeId:722,
+// WriteDiagnosticInfo:816, WriteLocalizedText:836, WriteDataValue:911,
+// WriteVariantValue:1665). Asserting the literal
 // bytes here is what turns that one-off cross-check into something the suite
 // re-runs; a test that compared ua.Encode(nil) against ua.Encode(&T{}) would
 // keep agreeing with gopcua after its two sides - ua.Encode(nil) and
