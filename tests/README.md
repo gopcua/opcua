@@ -21,13 +21,26 @@ that width: a row that names no fixture at all, and a row that runs
 against something other than the package default and does not say which.
 
 Only a test function calls `t.Errorf` or `t.Fatalf`; a helper returns plain
-values. A helper two rows call lives in `harness.go`, as does one
+values. A setup check is one of these helpers: it returns the reason the run
+cannot be scored, or "", the row holds the reason in `why` and prints
+`could not set the test up: %s` for a fixture- or environment-caused
+reason, or `gopcua's own behaviour made this run unscoreable: %s`
+(`Errorf`, then `return`) when gopcua did; see the decline paragraph. The
+check's name is each package's own.
+A helper two rows call lives in `harness.go`, as does one
 `harness.go` itself calls, whatever the row count; a helper one row calls
 lives with that row.
 
 A decline is a `t.Fatalf`, so the test is red like any other failure. The
 word marks why it is red - the run could not be scored - and not a third
-outcome between passing and failing.
+outcome between passing and failing. When the library's own behaviour makes
+a run unscoreable - an encode/decode error, a wedged server - the row scores
+it as a failure with `t.Errorf`, because the library is under test; when the
+fixture or environment does - no `-race`, a port, a lost child process, the
+scripted server failing - it is a decline. A setup check whose reason can
+come from either side - a window that closes on a loaded machine, a client
+that took a route the specification allows - is a decline too: a red the
+row cannot pin on the library is not a score.
 
 ## Where a row's evidence comes from
 
@@ -92,7 +105,11 @@ on a presence where the behaviour allows one, and where it does not, say
 so in the file. The presence has to be one a fixed library does
 not show. Keyed on a presence that survives the fix, the row logs the
 known bug for as long as it exists and the arm that demands the
-constant's deletion can never fire.
+constant's deletion can never fire. Where the presence stands in for the
+misbehaviour - a panic for a silent acceptance - the row carries one more
+arm, red when the proxy is gone and the outcome is still wrong. Where the
+keyed presence is itself the misbehaviour, that arm has nothing to add and
+the row does not carry it.
 
 ## Reviewing a new test: six questions
 
