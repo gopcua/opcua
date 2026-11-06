@@ -24,9 +24,12 @@
 // is the dimension-count field. This row is the relation between the two
 // fields: the length and the dimensions are each individually well-formed,
 // and it is their product that is wrong. The three are neighbours of each
-// other and of nothing else in this directory: the datetime and nil-builtin
-// rows read §5.2.2.5 and §5.1.2 Table 1, clauses about a different field of
-// a different type, and none of them touches a Variant array field.
+// other and of nothing else in this directory: the datetime rows read
+// §5.2.2.5 and the three nil-value rows,
+// reference_description_with_nil_fields_encodes_test.go among them, read
+// §5.1.2 Table 1 - clauses about a different field of a different type.
+// None of the six touches a Variant array field; where a nil row names a
+// Variant at all it is a null scalar, not an array.
 //
 // The row runs against ua.Decode alone, with no scripted server in this
 // package: it needs no helper, and the decodeVariantRecovering its two
