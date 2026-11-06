@@ -35,9 +35,9 @@
 // UA-.NETStandard in nil_builtin_encodes_as_its_null_value_test.go.
 //
 // The seven cases split six to one: NodeId, Guid, LocalizedText,
-// DataValue, Variant and DiagnosticInfo have no nil guard, and
-// ExtensionObject, the seventh, is the one case already guarded. PR #901
-// closes the six; until it lands, that is still the split.
+// DataValue, Variant and DiagnosticInfo had no nil guard, and
+// ExtensionObject, the seventh, was the one case already guarded before
+// PR #901, which closed the six.
 
 package encoding
 
@@ -94,10 +94,8 @@ type (
 )
 
 func TestNilBuiltinFieldKeepsStreamFraming(t *testing.T) {
-	// knownBug records that gopcua does not do this yet; the text is logged
-	// in place of a failure. ../README.md says when to delete it. The
-	// behaviour is closed by https://github.com/gopcua/opcua/pull/901.
-	const knownBug = "a message whose field is a nil pointer to a nullable built-in does not survive encode and decode, because encoding it panics"
+	// gopcua did not do this until https://github.com/gopcua/opcua/pull/901
+	// merged; it passes since.
 
 	cases := []struct {
 		name string
@@ -144,17 +142,6 @@ func TestNilBuiltinFieldKeepsStreamFraming(t *testing.T) {
 			"having checked nothing")
 	}
 
-	// The named defect is an event - encoding panics, or encoding fails on
-	// the nil receiver - and an event is a presence, so the arms key on it
-	// rather than on the absence of a surviving round trip: while any case
-	// still panics or fails on encode, the behaviour is still missing and
-	// the row stays green with the known bug logged; once no case does, a
-	// fix has landed, and the row then demands the message survive - a
-	// landed fix whose bytes still shift the marker, or whose bytes its
-	// own decoder rejects, is red, not green. events is a count, not a
-	// boolean, because a fix can guard five of the six unguarded types
-	// and the row must still say how many remain.
-	events := 0
 	var detail string
 	survives := true
 	for _, c := range cases {
@@ -164,7 +151,6 @@ func TestNilBuiltinFieldKeepsStreamFraming(t *testing.T) {
 		switch {
 		case event != "":
 			ok = false
-			events++
 			outcome = fmt.Sprintf("did not survive encode and decode: %s", event)
 		case why != "":
 			ok = false
@@ -183,41 +169,19 @@ func TestNilBuiltinFieldKeepsStreamFraming(t *testing.T) {
 		detail += fmt.Sprintf("\n    %-16s %s", c.name, outcome)
 	}
 
-	// Arm order: the two survives arms come first, because a case that
-	// panics or fails on encode never survives, so they cannot take a
-	// state the events arm needs to see; the events arm comes before the
-	// wrong-fix arm, because a fix that guards five of the six types
-	// leaves one event and must stay green, not red; and the wrong-fix
-	// arm reads the constant, so with the constant empty a missing
-	// behaviour lands in the default arm below it.
 	switch {
-	case survives && knownBug != "":
-		t.Errorf("this now passes (a struct with a nil field of each of the %d nullable "+
-			"built-in types this row checks, followed by a uint32, survives encode and "+
-			"decode with the uint32 intact) - "+
-			"delete the knownBug constant, every arm that reads it, and "+
-			"anything only those arms used, in the commit that fixed it",
-			len(cases))
 	case survives:
 		t.Logf("a struct with a nil field of each of the %d nullable built-in types this "+
 			"row checks, followed by a uint32, survives encode and decode with the uint32 intact",
 			len(cases))
-	case events > 0 && knownBug != "":
-		t.Logf("known bug: %s; %d of the %d cases still panic or fail on encode; "+
-			"§5.1.2 Table 1 lists every type below as nullable, so a nil field has a value "+
-			"to encode and the uint32 behind it must come back as it went:%s",
-			knownBug, events, len(cases), detail)
-	case knownBug != "":
-		t.Errorf("encoding no longer panics or fails, but the message still does not "+
-			"survive encode and decode - a fix for this landed and is wrong:%s", detail)
 	default:
 		t.Errorf("§5.1.2 Table 1 lists every type below as nullable, so a nil field has a "+
 			"value to encode and the uint32 behind it must come back as it went:%s", detail)
 	}
 }
 
-// roundTrip encodes out and decodes the bytes into into. event carries the
-// named defect's event - encoding panicked, or encoding failed - and is empty
+// roundTrip encodes out and decodes the bytes into into. event carries a
+// failure on the encode side - encoding panicked, or encoding failed - and is empty
 // when neither happened. why carries the reason the trip did not survive
 // once encoding succeeded, and is empty when nothing went wrong; the caller
 // then reads its own marker field, which roundTrip has no static type

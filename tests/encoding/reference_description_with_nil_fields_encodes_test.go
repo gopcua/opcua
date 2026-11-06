@@ -79,7 +79,7 @@ import (
 func TestReferenceDescriptionWithNilFieldsEncodes(t *testing.T) {
 	// knownBug records that gopcua does not do this yet; the text is logged
 	// in place of a failure. ../README.md says when to delete it.
-	const knownBug = "a ReferenceDescription with nil fields does not encode: with every field nil it panics on the nil *NodeID ReferenceTypeID before any *ExpandedNodeID is reached; with that set, its *ExpandedNodeID fields return an error on a nil receiver; and a nil *QualifiedName BrowseName silently contributes no bytes, leaving the message six bytes short"
+	const knownBug = "a ReferenceDescription with nil fields does not encode: its *ExpandedNodeID fields return an error on a nil receiver; and a nil *QualifiedName BrowseName silently contributes no bytes, leaving the message six bytes short"
 
 	// Every pointer field given the explicit null value its type has by
 	// Table 1. This encodes to the 18 bytes in want below - the bytes the
