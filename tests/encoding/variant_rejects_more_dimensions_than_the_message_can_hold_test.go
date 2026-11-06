@@ -13,11 +13,12 @@
 // reason is the suite, not the clause. The property this row scores is
 // that the decoder allocates in proportion to a wire value it has not
 // checked against the bytes present, and that property needs a count the
-// message plainly cannot hold - which 10000000 is, by more than four
-// orders of magnitude - not the largest value the field can carry. The
-// Int32 maximum would make every run perform make([]int32, 2147483647),
-// roughly 8 GiB, and .github/workflows/go.yml runs this suite on a matrix
-// whose Windows half enforces commit charge instead of overcommitting
+// message plainly cannot hold - which 10000000 is, asking for 40000000
+// bytes of dimensions from a packet that holds none - not the largest
+// value the field can carry. The Int32 maximum would make every run
+// perform make([]int32, 2147483647), roughly 8 GiB, and
+// .github/workflows/go.yml runs this suite on windows-latest, where
+// Windows charges commit for an allocation instead of overcommitting
 // lazily: the 8 GiB is charged for real, a charge failure is a
 // "runtime: out of memory" fatal error that recover cannot catch, and it
 // kills the test binary and fails the whole package, not just this row.
@@ -26,16 +27,6 @@
 // keeps the allocation near 38 MiB: still far outside anything a
 // conforming decoder does with a nine-byte packet, and safe on any
 // runner of the matrix.
-//
-// This row asserts a resource property, not just an error. gopcua
-// already returns StatusBadEncodingLimitsExceeded for the packet below -
-// after allocating for the dimensions it is about to find missing - so a
-// row that only asserted "decoding returns an error" would pass today
-// and establish nothing: the error is real, the evidence is real, and
-// the property it is offered as evidence of is not the one held. The
-// allocation is the only thing here that distinguishes a conforming
-// decoder from this one, so the allocation is what the row measures,
-// with the runtime.ReadMemStats TotalAlloc delta around the call.
 //
 // The neighbouring rows are
 // variant_rejects_an_array_length_that_is_not_a_count_test.go, which is the
@@ -53,6 +44,16 @@
 // decodeVariantRecovering, the same helper the array-length row decodes
 // through; the ReadMemStats measurements around it are this row's own, not
 // shared. See harness.go.
+//
+// This row asserts a resource property, not just an error. gopcua
+// already returns StatusBadEncodingLimitsExceeded for the packet this row decodes -
+// after allocating for the dimensions it is about to find missing - so a
+// row that only asserted "decoding returns an error" would pass today
+// and establish nothing: the error is real, the evidence is real, and
+// the property it is offered as evidence of is not the one held. The
+// allocation is the only thing here that distinguishes a conforming
+// decoder from this one, so the allocation is what the row measures,
+// with the runtime.ReadMemStats TotalAlloc delta around the call.
 //
 // The row asserts that decoding the packet is rejected and that the
 // rejection cost at most dimsAllocationBound of allocation. It deliberately
@@ -92,8 +93,10 @@ import (
 
 // dimsAllocationBound is the allocation a conforming decoder may make while
 // rejecting this packet. The two measured outcomes sit well on either side
-// of it: unpatched, decoding the packet below allocates 40019568 bytes
-// (~38 MiB) before it fails; with pull request 936's dimension guard
+// of it: unpatched, decoding the packet below allocates about 40020000
+// bytes (~38 MiB) before it fails - the exact figure moves a little from
+// run to run, because TotalAlloc counts the runtime's own allocations
+// too; with pull request 936's dimension guard
 // applied it allocates 384 bytes. A bound of 1 MiB therefore holds ~38x of
 // slack against the bug and ~2700x against the fixed decoder, and
 // TotalAlloc - cumulative, monotonic under garbage collection, counted
