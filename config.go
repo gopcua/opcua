@@ -413,11 +413,28 @@ func SecurityFromEndpoint(ep *ua.EndpointDescription, authType ua.UserTokenType)
 		cfg.sechan.RemoteCertificate = ep.ServerCertificate
 		cfg.sechan.Thumbprint = uapolicy.Thumbprint(ep.ServerCertificate)
 
+		// Prefer a user token whose security policy matches the channel's
+		// policy: the credentials are encrypted with this policy, so it must
+		// be compatible with the server certificate's key size. Fall back to
+		// the first matching token for backward compatibility.
+		// On a None channel, skip the exact-match preference: it would
+		// select an unencrypted token and send the password in clear.
+		var token *ua.UserTokenPolicy
 		for _, t := range ep.UserIdentityTokens {
 			if t.TokenType != authType {
 				continue
 			}
+			if token == nil {
+				token = t
+			}
+			if ep.SecurityPolicyURI != ua.SecurityPolicyURINone &&
+				(t.SecurityPolicyURI == ep.SecurityPolicyURI || t.SecurityPolicyURI == "") {
+				token = t
+				break
+			}
+		}
 
+		if token != nil {
 			if cfg.session.UserIdentityToken == nil {
 				switch authType {
 				case ua.UserTokenTypeAnonymous:
@@ -431,9 +448,9 @@ func SecurityFromEndpoint(ep *ua.EndpointDescription, authType ua.UserTokenType)
 				}
 			}
 
-			setPolicyID(cfg.session.UserIdentityToken, t.PolicyID)
-			if t.SecurityPolicyURI != "" {
-				cfg.session.AuthPolicyURI = t.SecurityPolicyURI
+			setPolicyID(cfg.session.UserIdentityToken, token.PolicyID)
+			if token.SecurityPolicyURI != "" {
+				cfg.session.AuthPolicyURI = token.SecurityPolicyURI
 			} else {
 				cfg.session.AuthPolicyURI = ep.SecurityPolicyURI
 			}
