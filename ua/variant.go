@@ -141,7 +141,7 @@ func (m *Variant) Decode(b []byte) (int, error) {
 
 	// read flattened array elements
 	n := int(m.arrayLength)
-	if n > MaxVariantArrayLength {
+	if n < -1 || n > MaxVariantArrayLength {
 		return buf.Pos(), StatusBadEncodingLimitsExceeded
 	}
 
@@ -170,6 +170,15 @@ func (m *Variant) Decode(b []byte) (int, error) {
 	if m.Has(VariantArrayDimensions) {
 		m.arrayDimensionsLength = buf.ReadInt32()
 		if m.arrayDimensionsLength < 0 {
+			return buf.Pos(), StatusBadEncodingLimitsExceeded
+		}
+		// arrayDimensionsLength comes straight off the wire and sizes the
+		// allocation below. Each dimension is an Int32 on the wire, so a
+		// count larger than the remaining bytes divided by four can never
+		// be satisfied. Dividing the remaining bytes instead of multiplying
+		// the count avoids arithmetic on the untrusted value.
+		maxDimensionsInRemainingBytes := buf.Len() / 4
+		if int(m.arrayDimensionsLength) > maxDimensionsInRemainingBytes {
 			return buf.Pos(), StatusBadEncodingLimitsExceeded
 		}
 		m.arrayDimensions = make([]int32, m.arrayDimensionsLength)
