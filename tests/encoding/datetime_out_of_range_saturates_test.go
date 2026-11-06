@@ -111,15 +111,15 @@
 //
 // gopcua implements none of the rules it probes: it feeds whatever tick
 // count arrives to its conversion arithmetic and returns the date that
-// falls out, so the latest group comes back today as three wrapped-overflow
-// dates (two in 2185 and one in 1816), and the earliest group as two
-// wrapped-overflow dates in 2185 - none of them an end of the clause's
-// range. Under PR #906's in-range fix the probes decode exactly but still
-// do not collapse: the latest group spreads over 9999-12-31T23:59:59.0000001Z
+// falls out. Before PR #906 the latest group came back as three
+// wrapped-overflow dates (two in 2185 and one in 1816), and the earliest
+// group as two wrapped-overflow dates in 2185 - none of them an end of the
+// clause's range. Since #906 the probes decode exactly but still do not
+// collapse: the latest group spreads over 9999-12-31T23:59:59.0000001Z
 // and two dates in 30828, the earliest group over three dates in 60056,
 // 30828 and 45442. PR #906
-// fixes the in-range conversion and adds no saturation, so the gap stays
-// open through it, though the probes' decoded values move. The row is here
+// fixed the in-range conversion and added no saturation, so the gap stayed
+// open through it, though the probes' decoded values moved. The row is here
 // so the gap is measured on every run rather than remembered in a
 // document, and so that whoever closes it finds out immediately.
 //

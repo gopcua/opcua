@@ -41,8 +41,6 @@ function.
 
 | row | closed by |
 |---|---|
-| `datetime_decodes_every_tick_in_the_valid_range_test.go` | [pull 906](https://github.com/gopcua/opcua/pull/906) |
-| `datetime_encodes_every_instant_in_the_valid_range_test.go` | [pull 906](https://github.com/gopcua/opcua/pull/906) |
 | `datetime_out_of_range_saturates_test.go` | nothing open closes this |
 | `reference_description_with_nil_fields_encodes_test.go` | nothing open closes this |
 | `variant_rejects_an_array_length_that_is_not_a_count_test.go` | [pull 892](https://github.com/gopcua/opcua/pull/892) and [pull 936](https://github.com/gopcua/opcua/pull/936) |
