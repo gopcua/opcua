@@ -5,6 +5,8 @@
 package ua
 
 import (
+	"slices"
+
 	"github.com/gopcua/opcua/debug"
 	"github.com/gopcua/opcua/id"
 )
@@ -36,6 +38,10 @@ type ExtensionObject struct {
 	EncodingMask uint8
 	TypeID       *ExpandedNodeID
 	Value        interface{}
+
+	// body is the undecoded binary body of an extension object whose type
+	// is not registered. It is nil when the body was decoded into Value.
+	body []byte
 }
 
 func NewExtensionObject(value interface{}) *ExtensionObject {
@@ -47,8 +53,18 @@ func NewExtensionObject(value interface{}) *ExtensionObject {
 	return e
 }
 
+// Body returns the undecoded binary body of an extension object whose type
+// is not registered with RegisterExtensionObject, so that it can be decoded
+// by the caller. The bytes are the encoded structure without the type id,
+// encoding mask and length prefix. It returns nil for an extension object
+// that was decoded into Value, and for an empty one.
+func (e *ExtensionObject) Body() []byte {
+	return e.body
+}
+
 func (e *ExtensionObject) Decode(b []byte) (int, error) {
 	buf := NewBuffer(b)
+	e.body = nil
 	e.TypeID = new(ExpandedNodeID)
 	buf.ReadStruct(e.TypeID)
 
@@ -77,6 +93,9 @@ func (e *ExtensionObject) Decode(b []byte) (int, error) {
 	e.Value = eotypes.New(typeID)
 	if e.Value == nil {
 		debug.Printf("ua: unknown extension object %s", typeID)
+		// Keep the body so the caller can decode it. The buffer aliases
+		// the input, which may be reused, so clone the bytes.
+		e.body = slices.Clone(body.Bytes())
 		return buf.Pos(), buf.Error()
 	}
 
@@ -96,7 +115,12 @@ func (e *ExtensionObject) Encode() ([]byte, error) {
 	}
 
 	body := NewBuffer(nil)
-	body.WriteStruct(e.Value)
+	if e.Value == nil && e.body != nil {
+		// Write the undecoded body back unchanged.
+		body.Write(e.body)
+	} else {
+		body.WriteStruct(e.Value)
+	}
 	if body.Error() != nil {
 		return nil, body.Error()
 	}
