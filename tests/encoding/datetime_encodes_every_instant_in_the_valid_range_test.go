@@ -17,7 +17,8 @@
 // counts outside the range this row sweeps.
 //
 // The row runs against the shared helpers, with no scripted server in
-// this package: validRangeInstants supplies the instants swept, ticksFor
+// this package: validRangeInstants supplies all but one of the instants
+// swept - the exception is this row's own and is named at it - ticksFor
 // computes each one's expected tick count, wireBytes renders the count
 // as the eight expected bytes, and each instant is encoded inside a
 // wireDateTime so ua.Encode takes the same reflection path a service
@@ -29,8 +30,8 @@
 // so an oracle that did the same arithmetic in int64 would overflow in the
 // same place and agree with the bug. A big.Int oracle cannot.
 //
-// The sweep crosses the range at a step of one instant a year, plus six
-// probes. Three boundary points would pass a fix that was right at the
+// The sweep crosses the range at a step of one instant a year, plus the
+// shared sweep's six probes and one more this row adds for itself. Three boundary points would pass a fix that was right at the
 // boundaries and wrong in between; the overflow being fixed has a cliff
 // one tick wide, so a sweep that crosses the range is what can find a
 // second one.
@@ -97,8 +98,8 @@ func TestDateTimeEncodesEveryInstantInTheValidRange(t *testing.T) {
 	// the sweep to the truncation half of the defect. It cannot be added
 	// there, because ticksFor floors and the decode row would then score an
 	// instant no tick count names.
-	instants := append(validRangeInstants(),
-		time.Date(1900, time.June, 15, 13, 45, 30, 123456789, time.UTC))
+	subTick := time.Date(1900, time.June, 15, 13, 45, 30, 123456789, time.UTC)
+	instants := append(validRangeInstants(), subTick)
 	if len(instants) == 0 {
 		t.Fatal("the sweep is empty - this row would report a pass having " +
 			"checked nothing")
