@@ -55,6 +55,16 @@
 // negative length is left (OpcUaBinaryDecoder.java:414, :421, :1400). The
 // -1 control below is what keeps this row from licensing the lumping move
 // Milo avoids - rejecting every negative length, the null array with it.
+//
+// Why this row takes the stricter reading, given two stacks take the other:
+// the length is a framing field, so nulling a length the sender did not mean
+// as null leaves the read position short by however many elements it did
+// write, and every later field in the message is then read from the wrong
+// offset. Measured on a two-Variant message whose second Variant is the
+// UInt32 7, with the first carrying a length of -2 and two booleans behind
+// it: the lenient decode returns no error and the second Variant comes back
+// false. Rejecting costs one response; nulling can hand the caller a wrong
+// value for a field that was never malformed, and say nothing.
 
 package encoding
 
