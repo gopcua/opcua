@@ -37,12 +37,12 @@
 // against ua.Encode(&T{}) would keep agreeing with gopcua after its two
 // sides drifted away from the two reference stacks together.
 //
-// Each case recovers from a panic and records it as that case's outcome -
-// logged as the known bug while the constant stands, a failure once it is
-// gone. A missing guard is a nil dereference, which takes the whole test
-// binary with it, and then one missing guard hides the state of the other
-// six - the difference between "one type is unguarded" and "six of the
-// seven are" is not visible in the resulting output otherwise.
+// Each case recovers from a panic and records it as that case's outcome,
+// which fails the row. A missing guard is a nil dereference, which takes
+// the whole test binary with it, and then one missing guard hides the
+// state of the other six - the difference between "one type is
+// unguarded" and "six of the seven are" is not visible in the resulting
+// output otherwise.
 
 package encoding
 
@@ -65,10 +65,8 @@ type nullEncoding struct {
 }
 
 func TestNilBuiltinEncodesAsItsNullValue(t *testing.T) {
-	// knownBug records that gopcua does not do this yet; the text is logged
-	// in place of a failure. ../README.md says when to delete it. The
-	// behaviour is closed by https://github.com/gopcua/opcua/pull/901.
-	const knownBug = "a nil pointer to a type §5.1.2 Table 1 lists as nullable panics instead of encoding that type's null value, because its Encode method dereferences the nil receiver"
+	// gopcua did not do this until https://github.com/gopcua/opcua/pull/901
+	// merged; it passes since.
 
 	cases := []nullEncoding{
 		{
@@ -121,16 +119,6 @@ func TestNilBuiltinEncodesAsItsNullValue(t *testing.T) {
 			"having checked nothing")
 	}
 
-	// The named defect is an event - a panic on the nil receiver, or an
-	// error returned for it - and an event is a presence, so the arms key
-	// on it rather than on the absence of a correct encoding: while any
-	// case still panics or fails, the behaviour is still missing and the
-	// row stays green with the known bug logged; once no case does, a fix
-	// has landed, and the row then demands the outcome be right - a
-	// landed fix that still writes the wrong bytes is red, not green.
-	// events is a count, not a boolean, because a fix can guard five of
-	// the six unguarded types and the row must still say how many remain.
-	events := 0
 	var detail string
 	encodes := true
 	for _, c := range cases {
@@ -140,11 +128,9 @@ func TestNilBuiltinEncodesAsItsNullValue(t *testing.T) {
 		switch {
 		case panicked != "":
 			ok = false
-			events++
 			outcome = fmt.Sprintf("panicked (%s), where %s makes it % x", panicked, c.why, c.want)
 		case err != nil:
 			ok = false
-			events++
 			outcome = fmt.Sprintf("failed with %v, where %s makes it % x", err, c.why, c.want)
 		case !bytes.Equal(got, c.want):
 			ok = false
@@ -158,30 +144,10 @@ func TestNilBuiltinEncodesAsItsNullValue(t *testing.T) {
 		detail += fmt.Sprintf("\n    %-16s %s", c.name, outcome)
 	}
 
-	// Arm order: the two encodes arms come first, because a case that
-	// panics or fails never encodes, so they cannot take a state the
-	// events arm needs to see; the events arm comes before the wrong-fix
-	// arm, because a fix that guards five of the six types leaves one
-	// event and must stay green, not red; and the wrong-fix arm reads
-	// the constant, so with the constant empty a missing behaviour lands
-	// in the default arm below it.
 	switch {
-	case encodes && knownBug != "":
-		t.Errorf("this now passes (a nil pointer to each of the %d nullable built-in types "+
-			"this row checks encodes as that type's null value) - "+
-			"delete the knownBug constant, every arm that reads it, and "+
-			"anything only those arms used, in the commit that fixed it",
-			len(cases))
 	case encodes:
 		t.Logf("a nil pointer to each of the %d nullable built-in types this row checks "+
 			"encodes as that type's null value", len(cases))
-	case events > 0 && knownBug != "":
-		t.Logf("known bug: %s; %d of the %d cases still panic or fail on the nil receiver; "+
-			"§5.1.2 Table 1 lists every type below as nullable and gives it a default value "+
-			"to encode:%s", knownBug, events, len(cases), detail)
-	case knownBug != "":
-		t.Errorf("the nil receiver no longer panics or fails, but the row still measured "+
-			"wrong bytes - a fix for this landed and is wrong:%s", detail)
 	default:
 		t.Errorf("§5.1.2 Table 1 lists every type below as nullable and gives it a default "+
 			"value, so a nil pointer to one has a value to encode:%s", detail)
