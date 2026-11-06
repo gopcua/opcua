@@ -69,8 +69,7 @@ import (
 
 // defectDecode restates the conversion ua/buffer.go's ReadTime runs today,
 // the arithmetic the knownBug constant names. It is not the oracle the row
-// asserts against - that is ticksFor, which computes the clause's answer in
-// math/big, with no int64 anywhere. defectDecode is the known bug's
+// asserts against - that is ticksFor. defectDecode is the known bug's
 // fingerprint: the arms use it to tell the known bug, whose every wrong
 // decode is exactly the value this conversion predicts, from a fix that
 // landed and is wrong, whose decodes carry values this conversion produces
