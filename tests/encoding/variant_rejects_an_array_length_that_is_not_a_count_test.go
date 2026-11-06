@@ -10,8 +10,8 @@
 // make a slice for and nothing to read. What it should do instead the two
 // clauses do not say, and the reference stacks split on it. This row
 // requires the packet rejected, which is the stricter of the two readings
-// and the one gopcua's own pull requests below implement; the split is
-// declared at the end of this header.
+// and the one gopcua implements since pull 936; the split is declared at
+// the end of this header.
 //
 // The neighbouring rows are
 // variant_rejects_more_dimensions_than_the_message_can_hold_test.go, which
@@ -74,11 +74,8 @@ import (
 )
 
 func TestVariantRejectsAnArrayLengthThatIsNotACount(t *testing.T) {
-	// knownBug records that gopcua does not do this yet; the text is logged
-	// in place of a failure. ../README.md says when to delete it. The
-	// behaviour is closed by https://github.com/gopcua/opcua/pull/892 and
-	// https://github.com/gopcua/opcua/pull/936.
-	const knownBug = "a negative flattened array length other than -1 is not rejected but passed to reflect.MakeSlice, which panics and, since Decode has no recover, takes the process with it"
+	// gopcua did not do this until https://github.com/gopcua/opcua/pull/936
+	// merged; it passes since.
 
 	// mask 0x81 is Boolean | array values; the four bytes behind it are the
 	// flattened array length §5.2.2.16 defines. Both lengths below are
@@ -106,32 +103,16 @@ func TestVariantRejectsAnArrayLengthThatIsNotACount(t *testing.T) {
 		}
 	}
 
-	// The presence the knownBug arm keys on is the panic itself, "reflect.MakeSlice:
-	// negative len", per the rule in tests/README.md: the panic is what says
-	// the decoder reached this stimulus and did the wrong thing, so the arm
-	// below logs green only while that panic still occurs. Keying it on the
-	// absence of the rejection instead would log a decoder that no longer
-	// panics but still does not reject - a fix that landed wrong - green
-	// beside the unfixed decoder, and the arm that asks for the constant to
-	// be deleted could never fire on a wrong fix.
-	const makeSlicePanic = "reflect.MakeSlice: negative len"
-
 	var detail string
 	rejected := true
-	thePanic := false
 	for _, p := range probes {
 		_, err, panicked := decodeVariantRecovering(p.packet)
 		var outcome string
 		switch {
-		case panicked == makeSlicePanic:
-			thePanic = true
+		case panicked != "":
 			rejected = false
 			outcome = fmt.Sprintf("panicked (%s), where -1 being the only negative "+
 				"length means there is nothing here to allocate for", panicked)
-		case panicked != "":
-			rejected = false
-			outcome = fmt.Sprintf("panicked (%s), which is not the panic the known bug "+
-				"names, so a change has reached this decode", panicked)
 		case err == nil:
 			rejected = false
 			outcome = "decoded, where -1 being the only negative length means this is not a count of anything"
@@ -141,33 +122,11 @@ func TestVariantRejectsAnArrayLengthThatIsNotACount(t *testing.T) {
 		detail += fmt.Sprintf("\n    %-16s %s", p.name, outcome)
 	}
 
-	// notACount is the inference the three arms below share: it is the reason
-	// each outcome is a failure, and it is one sentence in one place so a
-	// change to the reading cannot land in two of the three.
+	// notACount is the reason the default arm below gives for its failure.
 	const notACount = "§5.2.5 gives -1 the meaning null and gives no negative " +
 		"length another, so none of these is a count and each must be rejected"
 
-	// The arms, keyed as the rule in tests/README.md asks: the presence
-	// with the constant standing is the green known bug; the presence gone but
-	// the outcome still wrong is a fix that landed wrong, and red; the outcome
-	// right with the constant standing asks for the constant to be deleted,
-	// and is red; the outcome right with the constant gone is the row's
-	// ordinary pass. What fits none of those - the panic with the constant
-	// deleted - falls to default, so deleting the constant without the fix
-	// is red rather than silent.
 	switch {
-	case thePanic && knownBug != "":
-		t.Logf("known bug: %s; %s, not allocated for:%s", knownBug, notACount, detail)
-	case !thePanic && !rejected:
-		t.Errorf("the %q panic is gone, so a change has landed on this decode, but the "+
-			"outcome is still wrong: %s, and the decoder still does not reject it - "+
-			"the change that removed the panic did not fix the behaviour:%s",
-			makeSlicePanic, notACount, detail)
-	case rejected && knownBug != "":
-		t.Errorf("this now passes (a flattened array length other than -1 is rejected, " +
-			"and the null array still decodes) - " +
-			"delete the knownBug constant, every arm that reads it, and " +
-			"anything only those arms used, in the commit that fixed it")
 	case rejected:
 		t.Logf("a flattened array length other than -1 is rejected, and the null array still decodes")
 	default:

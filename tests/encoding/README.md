@@ -34,7 +34,7 @@ packets it is the stack whose structure is closest to what those rows
 require, and on one of them it is the only stack that rejects. A row that
 cites it says so; a row that does not has not read it.
 
-## The knownBug ledger, 2026-11-05
+## The knownBug ledger, 2026-11-06
 
 One constant stands per row below, each declared inside its test
 function.
@@ -43,10 +43,9 @@ function.
 |---|---|
 | `datetime_out_of_range_saturates_test.go` | nothing open closes this |
 | `reference_description_with_nil_fields_encodes_test.go` | nothing open closes this |
-| `variant_rejects_an_array_length_that_is_not_a_count_test.go` | [pull 892](https://github.com/gopcua/opcua/pull/892) and [pull 936](https://github.com/gopcua/opcua/pull/936) |
 | `variant_rejects_dimensions_inconsistent_with_the_array_length_test.go` | nothing open closes this |
-| `variant_rejects_more_dimensions_than_the_message_can_hold_test.go` | [pull 893](https://github.com/gopcua/opcua/pull/893) and [pull 936](https://github.com/gopcua/opcua/pull/936) |
 
 `variant_rejects_dimensions_inconsistent_with_the_array_length_test.go`
-names pull 892, pull 893 and pull 936 as checked and fixing none of it,
-so its constant stands until one does.
+names pull 892, pull 893 and pull 936 as checked and fixing none of it.
+892 and 893 closed unmerged and 936 merged, so its constant stands until
+another change fixes it.
