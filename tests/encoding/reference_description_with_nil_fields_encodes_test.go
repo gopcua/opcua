@@ -1,18 +1,14 @@
 // A ReferenceDescription whose pointer fields are nil encodes to the same
 // bytes as one whose fields carry their null values: the 18 bytes below,
-// which both reference stacks produce. Decoding is not asserted here - no
-// message in this row is decoded; that a message carrying null fields still
-// parses is what nil_builtin_field_keeps_stream_framing_test.go checks for
-// a built-in, and nothing checks it for ReferenceDescription yet.
-//
 // OPC 10000-6 §5.1.2 Table 1 gives every built-in type a Nullable column and
 // a Default Value column, and defines the first: "The Nullable column
 // indicates whether a 'null' value exists for the DataType in all
 // DataEncodings. A 'null' value is a value that is equivalent 'no value
 // specified'."
 //
-// The two rows nearest this one are nil_builtin_encodes_as_its_null_value_
-// test.go and nil_builtin_field_keeps_stream_framing_test.go: between them
+// The two rows nearest this one are
+// nil_builtin_encodes_as_its_null_value_test.go and
+// nil_builtin_field_keeps_stream_framing_test.go: between them
 // they cover a nullable built-in in isolation and a nullable built-in as a
 // struct field. What separates this row from both is that it covers a
 // concrete structure - ReferenceDescription - whose fields are nil, so the
@@ -117,7 +113,7 @@ func TestReferenceDescriptionWithNilFieldsEncodes(t *testing.T) {
 	// byte-identical at these 18 bytes, so one literal covers all three.
 	const want = "\x00\x00" + // ReferenceTypeID, null NodeID: encoding 0x00, identifier 0x00
 		"\x00" + // IsForward, false
-		"\x00\x00" + // NodeID, null ExpandedNodeID: mask 0x00, null NodeID 0x00 0x00
+		"\x00\x00" + // NodeID, null ExpandedNodeID: encoding 0x00 (two-byte NodeId, no flags), identifier 0x00
 		"\x00\x00\xff\xff\xff\xff" + // BrowseName, null QualifiedName: namespace index 0, name length -1
 		"\x00" + // DisplayName, null LocalizedText: encoding mask 0x00, neither string present
 		"\x00\x00\x00\x00" + // NodeClass 0, Int32
