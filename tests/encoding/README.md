@@ -27,11 +27,12 @@ also read the decode side - open62541's same file, UA-.NETStandard's
 `OpcUaBinaryDecoder.java` - and each of those rows names the functions
 and lines in its own header.
 
-Milo is read only by the Variant rows, and it earns its place there: on
-all three of their packets it is the stack whose structure is closest to
-what those rows require, and on one of them it is the only stack that
-rejects. A row that cites it says so; a row that does not has not read
-it.
+Milo is read by the Variant rows, and by
+`datetime_out_of_range_saturates_test.go`, whose decode-side question its
+`decodeDateTime` answers directly. On all three of the Variant rows'
+packets it is the stack whose structure is closest to what those rows
+require, and on one of them it is the only stack that rejects. A row that
+cites it says so; a row that does not has not read it.
 
 ## The knownBug ledger, 2026-11-05
 
