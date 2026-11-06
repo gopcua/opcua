@@ -76,10 +76,24 @@ var capabilities = ServerCapabilities{
 	OperationalLimits: OperationalLimits{
 		MaxNodesPerRead: 32,
 	},
+	MaxMonitoredItemsQueueSize: defaultMaxMonitoredItemsQueueSize,
+	MaxNotificationsPerPublish: defaultMaxNotificationsPerPublish,
 }
 
 type ServerCapabilities struct {
 	OperationalLimits OperationalLimits
+
+	// MaxMonitoredItemsQueueSize is the largest queue size the server
+	// grants to a data MonitoredItem (Part 5 §6.3.2). Set it with the
+	// MaxMonitoredItemsQueueSize option.
+	MaxMonitoredItemsQueueSize uint32
+
+	// MaxNotificationsPerPublish is the largest number of notifications the
+	// server sends in one Publish response, whatever the client allows.
+	// Zero means no limit. Part 5 defines no standard capability for it, and
+	// the server does not expose it in the address space. Set it with
+	// the MaxNotificationsPerPublish option.
+	MaxNotificationsPerPublish uint32
 }
 
 type OperationalLimits struct {
