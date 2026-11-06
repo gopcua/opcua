@@ -1,10 +1,13 @@
+// An instant goes onto the wire as the tick count that names it, for every
+// instant the specification allows.
+//
 // OPC 10000-6 §5.2.2.5: "A DateTime value shall be encoded as a 64-bit signed
 // integer (see 5.2.2.2) which represents the number of 100 nanosecond
 // intervals since January 1, 1601 (UTC)."
 //
 // That sentence is the whole of the valid-range contract, and it is a
-// definition, not a range check: for any tick count in the range the clause
-// permits, the decoded instant is determined.
+// definition, not a range check: for any instant in the range the clause
+// permits, the tick count is determined.
 //
 // The neighbouring rows are
 // datetime_decodes_every_tick_in_the_valid_range_test.go, the same
