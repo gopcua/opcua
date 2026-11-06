@@ -17,11 +17,21 @@ type would hide the state of every other; the helpers turn the panic into
 one case's failure instead, and only a test function turns any of it into
 a failure.
 
-A reference stack here means another stack's codec, not its client. The
-two that have been read are open62541's `ua_types_encoding_binary.c` and
-UA-.NETStandard's `BinaryEncoder.cs`; the functions read, and the line
-numbers, are named in the header of
-`nil_builtin_encodes_as_its_null_value_test.go`.
+A reference stack here means another stack's codec, not its client. Three
+have been read. open62541's `ua_types_encoding_binary.c` and
+UA-.NETStandard's `BinaryEncoder.cs` cover the encode side; the functions
+read, and the line numbers, are named in the header of
+`nil_builtin_encodes_as_its_null_value_test.go`. The three Variant rows
+also read the decode side - open62541's same file, UA-.NETStandard's
+`BinaryDecoder.cs` and `MatrixOf.cs`, and Eclipse Milo's
+`OpcUaBinaryDecoder.java` - and each of those rows names the functions
+and lines in its own header.
+
+Milo is read only by the Variant rows, and it earns its place there: on
+all three of their packets it is the stack whose structure is closest to
+what those rows require, and on one of them it is the only stack that
+rejects. A row that cites it says so; a row that does not has not read
+it.
 
 ## The knownBug ledger, 2026-11-05
 

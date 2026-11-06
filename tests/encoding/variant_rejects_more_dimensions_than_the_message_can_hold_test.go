@@ -40,7 +40,8 @@
 // None of the six touches a Variant array field; where a nil row names a
 // Variant at all it is a null scalar, not an array.
 //
-// The row runs against the shared helpers: the packet is decoded by
+// The row runs against the shared helpers, with no scripted server in
+// this package: the packet is decoded by
 // decodeVariantRecovering, the same helper the array-length row decodes
 // through; the ReadMemStats measurements around it are this row's own, not
 // shared. See harness.go.
