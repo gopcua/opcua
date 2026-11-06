@@ -30,7 +30,7 @@
 // so an oracle that did the same arithmetic in int64 would overflow in the
 // same place and agree with the bug. A big.Int oracle cannot.
 //
-// The sweep crosses the range at a step of one instant a year, plus four
+// The sweep crosses the range at a step of one instant a year, plus six
 // probes. Three boundary points would pass a fix that was right at the
 // boundaries and wrong in between; the overflow being fixed has a cliff
 // one tick wide, so a sweep that crosses the range is what can find a

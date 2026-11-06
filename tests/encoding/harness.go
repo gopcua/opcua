@@ -58,8 +58,12 @@ func validRangeInstants() []time.Time {
 	// the rows that sweep this range declare that exclusion, and its
 	// reason, in their headers.
 	//
-	// Either side of the last instant an int64 nanosecond count can hold.
+	// Either side of each end of the window an int64 nanosecond count can
+	// hold. Both edges are one tick wide, and a sweep that brackets only
+	// one of them leaves the other to samples a year apart.
 	out = append(out,
+		time.Date(1677, time.September, 21, 0, 12, 43, 145224200, time.UTC),
+		time.Date(1677, time.September, 21, 0, 12, 43, 145224100, time.UTC),
 		time.Date(2262, time.April, 11, 23, 47, 16, 854775800, time.UTC),
 		time.Date(2262, time.April, 11, 23, 47, 16, 854775900, time.UTC),
 	)
