@@ -46,11 +46,11 @@
 // through; the ReadMemStats measurements around it are this row's own, not
 // shared. See harness.go.
 //
-// This row asserts a resource property, not just an error. gopcua
-// already returns StatusBadEncodingLimitsExceeded for the packet this row decodes -
-// after allocating for the dimensions it is about to find missing - so a
-// row that only asserted "decoding returns an error" would pass today
-// and establish nothing: the error is real, the evidence is real, and
+// This row asserts a resource property, not just an error. Before #936,
+// gopcua already returned StatusBadEncodingLimitsExceeded for the packet this
+// row decodes - after allocating for the dimensions it was about to find
+// missing - so a row that only asserted "decoding returns an error" would
+// have passed and established nothing: the error is real, the evidence is real, and
 // the property it is offered as evidence of is not the one held. The
 // allocation is the only thing here that distinguishes a conforming
 // decoder from this one, so the allocation is what the row measures,

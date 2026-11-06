@@ -95,8 +95,9 @@ func wireBytes(ticks *big.Int) []byte {
 
 // decodeVariantRecovering calls ua.Decode on a Variant packet and turns a
 // panic into a value, the way encodeRecovering does for encoding.
-// Variant.Decode reaches reflect.MakeSlice with a length taken straight off
-// the wire, and a panic there stops every case after it in the test binary.
+// Until #936, Variant.Decode reached reflect.MakeSlice with a length taken
+// straight off the wire, and a panic there stops every case after it in the
+// test binary.
 // The Variant it returns is the one the packet was decoded into, so the
 // caller can read its state; only a test function turns any of this into
 // a failure.
