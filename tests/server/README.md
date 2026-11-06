@@ -12,9 +12,13 @@ server would score the script. Item 3's reading here is therefore the
 shared fixture in `harness.go`, which brings up the server, the
 MapNamespace and the client together; it is checkable the way it is in
 the other packages: `grep -c "See harness.go" tests/server/*_test.go`
-prints 1 for every row and 0 for `harness.go`. Where a row needs the
-server to misbehave in a way the in-tree server cannot, that is a fixture
-gap and is named here or in a NOT-TESTED.md, not worked around.
+prints 1 for every row and 0 for `harness.go`. `race_on.go` and
+`race_off.go` are not rows either: they hold the build-tagged
+`raceDetector` constant the race row reads, and a build constraint
+applies to a whole file, so the constant cannot live with the row.
+Where a row needs the server to misbehave in a way the in-tree server
+cannot, that is a fixture gap and is named here or in a NOT-TESTED.md,
+not worked around.
 
 The package name is `server`, as the directory is; the production package
 `github.com/gopcua/opcua/server` is a different import path.
@@ -41,8 +45,8 @@ This package has two pieces of machinery of its own:
   RACE` exits **nonzero** - the testing framework fails the very test
   that raced - so the exit code is material only when the output holds
   no report. Keying on the exit code alone makes the row decline every
-  run. The known-bug arm keys on the detector's
-  report, which is a presence a fixed library does not show, and the
+  run. The known-bug arm keys on the detector's report naming the row's
+  Attribute frame, a presence a fixed library does not show, and the
   deletion arm keys on a clean child that completed at least ten reads
   inside a two-second window - the floor is what stops an empty run
   passing, so it needs a number and not just a name. A
