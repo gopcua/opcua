@@ -66,8 +66,10 @@
 // the knownBug line carries the measured size.
 //
 // All three reference stacks were read, and all three would pass this row:
-// each bounds the dimension count against the bytes present before
-// allocating for it. open62541 reads the dimension array through
+// each bounds the dimension count before allocating for it, though not all
+// three bound it the same way - open62541 and UA-.NETStandard against the
+// bytes actually present, Milo only against its maximum message size, which
+// a smaller count with no bytes behind it would still pass. open62541 reads the dimension array through
 // Array_decodeBinary, which checks "length / 128 <= remaining /
 // type->memSize" before its ctxCalloc (ua_types_encoding_binary.c:551).
 // UA-.NETStandard reads it through ReadInt32Array -> ReadArrayLength, which
@@ -78,7 +80,7 @@
 // and checkArrayLength throws Bad_EncodingLimitsExceeded when the count
 // exceeds the maximum message size (:1406), which 10000000 does against
 // Milo's default of two megabytes (EncodingLimits.java:23). Milo's
-// dimension-consistency check (:428, dimensionsLength != length) is never
+// dimension-consistency check (:430, dimensionsLength != length) is never
 // reached on this packet: the count fails the checkArrayLength bound before
 // any dimension is read, so the packet exits through Milo's dimension-count
 // path, not its consistency path.
