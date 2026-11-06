@@ -56,12 +56,14 @@
 // UA-.NETStandard reaches MatrixOf.IsValidMatrix, which multiplies in a
 // long and gives up once the product passes int.MaxValue (MatrixOf.cs:828
 // and :829), and the caller raises BadDecodingError
-// (BinaryDecoder.cs:1830, :1832). Milo stops earlier than the other two and
-// for a different reason: calculateMatrixLength checks each dimension on
-// its own before multiplying anything (OpcUaBinaryDecoder.java:1425), and
-// 1073741825 is past its default two-megabyte maximum message size, so
-// checkArrayLength raises Bad_EncodingLimitsExceeded (:1406) and the
-// Math.multiplyExact below it is never reached.
+// (BinaryDecoder.cs:1830, :1832). Milo stops for a different reason than
+// either: rather than checking the product, calculateMatrixLength checks
+// each dimension on its own as it goes (OpcUaBinaryDecoder.java:1425), and
+// 1073741825 is past its default two-megabyte maximum message size
+// (EncodingLimits.java:23), so checkArrayLength raises
+// Bad_EncodingLimitsExceeded (:1406) on the second dimension. The
+// Math.multiplyExact below it runs once, on the harmless first dimension,
+// and never sees the one that overflows.
 //
 // Milo naming Bad_EncodingLimitsExceeded where the clause names
 // Bad_DecodingError is the reason this row requires the decode to stop
