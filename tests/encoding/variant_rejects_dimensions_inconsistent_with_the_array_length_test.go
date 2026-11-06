@@ -45,8 +45,25 @@
 // code - it decodes - and the clause's required outcome is an error, not a
 // crash.
 //
-// No reference stack was read for this row; the clauses and the measured
-// behaviour are the whole of the evidence.
+// All three reference stacks on disk stop on this packet, so none of them
+// fails this row and no exception under ../README.md's sixth question is
+// needed. open62541 accumulates the product in a size_t, which does not
+// wrap where gopcua's int32 does, and compares it against the array length
+// (ua_types_encoding_binary.c:1407-1415, UA_STATUSCODE_BADDECODINGERROR).
+// UA-.NETStandard reaches MatrixOf.IsValidMatrix, which multiplies in a
+// long and gives up once the product passes int.MaxValue (MatrixOf.cs:828
+// and :829), and the caller raises BadDecodingError
+// (BinaryDecoder.cs:1830, :1832). Milo stops earlier than the other two and
+// for a different reason: calculateMatrixLength checks each dimension on
+// its own before multiplying anything (OpcUaBinaryDecoder.java:1425), and
+// 1073741825 is past its default two-megabyte maximum message size, so
+// checkArrayLength raises Bad_EncodingLimitsExceeded (:1406) and the
+// Math.multiplyExact below it is never reached.
+//
+// Milo naming Bad_EncodingLimitsExceeded where the clause names
+// Bad_DecodingError is the reason this row requires the decode to stop
+// rather than requiring a particular status: all three stacks stop, and
+// they do not agree on what to call it.
 
 package encoding
 
@@ -86,24 +103,30 @@ func TestVariantRejectsDimensionsInconsistentWithTheArrayLength(t *testing.T) {
 	_, err := ua.Decode(packet, v)
 
 	stops := err != nil
-	// The presence the knownBug arm keys on is the decode succeeding with the
-	// packet's own inconsistent dimensions still reported, per the rule in
-	// tests/README.md: a decode that comes back with ArrayDimensions() [4
-	// 1073741825] is what says the decoder reached this stimulus and did the
-	// wrong thing, so the arm below logs green only while that still happens.
-	// Keying it on the absence of the stopping instead would log any decoder
-	// that does not stop - including one a change has bent into accepting the
-	// packet some other way - green beside the unfixed decoder, and the arm
-	// that asks for the constant to be deleted could never fire on a wrong
-	// fix.
+	const (
+		// inconsistent names the packet's defect, in the words the detail line
+		// and the wrong-fix arm below share.
+		inconsistent = "dimensions [4, 1073741825] have the product 2^32+4 " +
+			"against an array length of 4"
+		// shallStop is the clause's requirement, in the words the known-bug
+		// line and the wrong-fix arm below share.
+		shallStop = "§5.2.2.16 says the decoder shall stop"
+		// fixed is what the row logs once the decoder stops.
+		fixed = "dimensions whose product is not the array length are " +
+			"rejected, and consistent dimensions still decode"
+	)
+	// The presence the knownBug arm keys on, per the rule in tests/README.md,
+	// is the decode succeeding with the packet's own inconsistent dimensions
+	// still reported. A fixed library stops, so it never shows this presence;
+	// a change that accepts the packet some other way shows the acceptance
+	// without the presence, which is what lets the wrong-fix arm below fire.
 	dims := v.ArrayDimensions()
 	dimsReported := len(dims) == 2 && dims[0] == 4 && dims[1] == 1073741825
 	decoded := err == nil && dimsReported
-	detail := fmt.Sprintf("\n    decoding % x, whose dimensions [4, 1073741825] have "+
-		"the product 2^32+4 against an array length of 4, returned err %v and "+
-		"ArrayDimensions() %v", packet, err, dims)
+	detail := fmt.Sprintf("\n    decoding % x, whose "+inconsistent+
+		", returned err %v and ArrayDimensions() %v", packet, err, dims)
 
-	// The arms, in the order the rule asks for: the presence with the
+	// The arms, keyed as the rule asks for: the presence with the
 	// constant standing is the green known bug; the presence gone but the
 	// outcome still wrong - the packet still accepted, but no longer with
 	// its own dimensions on it, so a change has reached this decode - is a
@@ -115,23 +138,20 @@ func TestVariantRejectsDimensionsInconsistentWithTheArrayLength(t *testing.T) {
 	// the fix is red rather than silent.
 	switch {
 	case decoded && knownBug != "":
-		t.Logf("known bug: %s; §5.2.2.16 says the decoder shall stop when the "+
-			"dimensions are inconsistent with the array length:%s", knownBug, detail)
+		t.Logf("known bug: %s; "+shallStop+" when the dimensions are "+
+			"inconsistent with the array length:%s", knownBug, detail)
 	case err == nil && !dimsReported:
 		t.Errorf("the decode no longer reports the packet's own dimensions, so a "+
 			"change has landed on this decode, but the outcome is still wrong: the "+
-			"dimensions [4, 1073741825] have the product 2^32+4 against an array "+
-			"length of 4, §5.2.2.16 says the decoder shall stop, and the decoder "+
-			"still accepts the packet - the change that altered the dimensions did "+
+			inconsistent+", "+shallStop+", and the decoder still accepts the "+
+			"packet - the change that altered the dimensions did "+
 			"not make the decoder stop:%s", detail)
 	case stops && knownBug != "":
-		t.Errorf("this now passes (dimensions whose product is not the array length " +
-			"are rejected, and consistent dimensions still decode) - " +
+		t.Errorf("this now passes (" + fixed + ") - " +
 			"delete the knownBug constant, every arm that reads it, and " +
 			"anything only those arms used, in the commit that fixed it")
 	case stops:
-		t.Logf("dimensions whose product is not the array length are rejected, and " +
-			"consistent dimensions still decode")
+		t.Logf(fixed)
 	default:
 		t.Errorf("§5.2.2.16 says \"If ArrayDimensions are inconsistent with the "+
 			"ArrayLength then the decoder shall stop and raise a Bad_DecodingError\", and "+
