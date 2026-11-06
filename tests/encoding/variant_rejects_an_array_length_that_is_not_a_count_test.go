@@ -49,7 +49,7 @@
 // every negative length as the null array: open62541's Array_decodeBinary
 // returns UA_STATUSCODE_GOOD with a NULL array for any signed_length <= 0
 // (ua_types_encoding_binary.c:530), and UA-.NETStandard's ReadArrayLength
-// maps any negative length to -1 (BinaryDecoder.cs:2358). Milo rejects, and
+// maps any negative length to -1 (BinaryDecoder.cs:2360). Milo rejects, and
 // rejects in this row's own shape: its Variant path returns the null value
 // for -1 first, then checkArrayLength throws Bad_DecodingError for whatever
 // negative length is left (OpcUaBinaryDecoder.java:414, :421, :1400). The
