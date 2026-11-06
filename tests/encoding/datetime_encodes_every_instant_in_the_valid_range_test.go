@@ -36,8 +36,9 @@
 // second one.
 //
 // The known bug has a signature, and the arms key on it: the instants inside
-// roughly 1678-2262 encode rightly today, only those outside come back
-// wrong, and each wrong one carries exactly the tick count the known
+// roughly 1678-2262 encode rightly today, those outside come back wrong,
+// as does any instant below 1970 whose sub-second part is not a whole
+// number of ticks, and each wrong one carries exactly the tick count the known
 // conversion's arithmetic predicts - defectEncode below restates that
 // arithmetic. Keying on the signature is what tells the known bug from a fix
 // that landed and is wrong: a clamping fix leaves the same instants wrong,
@@ -89,9 +90,15 @@ func TestDateTimeEncodesEveryInstantInTheValidRange(t *testing.T) {
 	// knownBug records that gopcua does not do this yet; the text is logged
 	// in place of a failure. ../README.md says when to delete it. The
 	// behaviour is closed by https://github.com/gopcua/opcua/pull/906.
-	const knownBug = "an instant inside the range §5.2.2.5 defines does not encode to the tick count that clause names, outside roughly 1678-2262: ua/buffer.go's WriteTime does v.UTC().UnixNano()/100, and UnixNano is undefined outside that window, so the wire does not carry the number of 100 nanosecond intervals since 1601-01-01T00:00:00Z"
+	const knownBug = "an instant inside the range §5.2.2.5 defines does not encode to the tick count that clause names, outside roughly 1678-2262 and, below 1970, whenever its sub-second part is not a whole number of ticks: ua/buffer.go's WriteTime does v.UTC().UnixNano()/100, UnixNano is undefined outside that window, and below 1970 that division truncates toward zero where the clause floors, so the wire does not carry the number of 100 nanosecond intervals since 1601-01-01T00:00:00Z"
 
-	instants := validRangeInstants()
+	// subTick is this row's own, not part of the shared sweep: every instant
+	// in validRangeInstants is a whole number of ticks, which is what blinds
+	// the sweep to the truncation half of the defect. It cannot be added
+	// there, because ticksFor floors and the decode row would then score an
+	// instant no tick count names.
+	instants := append(validRangeInstants(),
+		time.Date(1900, time.June, 15, 13, 45, 30, 123456789, time.UTC))
 	if len(instants) == 0 {
 		t.Fatal("the sweep is empty - this row would report a pass having " +
 			"checked nothing")
