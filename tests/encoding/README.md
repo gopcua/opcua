@@ -10,8 +10,8 @@ the shared helpers in `harness.go` rather than a server.
 Panic recovery is this package's analogue of reconnect's decline
 machinery. `encodeRecovering` calls `ua.Encode` and turns a nil
 dereference into a value; `decodeVariantRecovering` does the same for
-`ua.Decode` on a Variant packet, whose array length reaches
-`reflect.MakeSlice` straight off the wire. A missing nil guard is a nil
+`ua.Decode` on a Variant packet, whose array length reached
+`reflect.MakeSlice` straight off the wire until #936. A missing nil guard is a nil
 dereference that takes the whole test binary with it, so one unguarded
 type would hide the state of every other; the helpers turn the panic into
 one case's failure instead, and only a test function turns any of it into
