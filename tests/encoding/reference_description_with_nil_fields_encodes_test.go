@@ -1,5 +1,7 @@
 // A ReferenceDescription whose pointer fields are nil encodes to the same
 // bytes as one whose fields carry their null values: the 18 bytes below,
+// which both reference stacks produce.
+//
 // OPC 10000-6 §5.1.2 Table 1 gives every built-in type a Nullable column and
 // a Default Value column, and defines the first: "The Nullable column
 // indicates whether a 'null' value exists for the DataType in all
@@ -163,8 +165,8 @@ func TestReferenceDescriptionWithNilFieldsEncodes(t *testing.T) {
 	default:
 		t.Errorf("§5.1.2 Table 1 lists every pointer field of ReferenceDescription as nullable, so "+
 			"one with nil fields has a value to encode; all fields nil gave err %v and panic %q, "+
-			"and with only the ExpandedNodeIDs set it was %d bytes where the reference stacks "+
-			"produce %d",
-			allNilErr, allNilPanic, len(partial), len(want))
+			"and the three encodings were\n    fully populated % x\n    all nil         % x\n"+
+			"    ExpandedNodeIDs % x\nwhere the reference stacks produce\n    % x",
+			allNilErr, allNilPanic, full, allNil, partial, want)
 	}
 }
