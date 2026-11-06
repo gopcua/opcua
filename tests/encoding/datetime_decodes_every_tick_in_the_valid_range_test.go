@@ -32,19 +32,9 @@
 //
 // The sweep crosses the range at a step of one instant a year, plus six
 // probes. Three boundary points would pass a fix that was right at the
-// boundaries and wrong in between; the overflow being fixed has a cliff
+// boundaries and wrong in between; the overflow #906 fixed had a cliff
 // one tick wide, so a sweep that crosses the range is what can find a
 // second one.
-//
-// The known bug has a signature, and the arms key on it: the instants inside
-// the window an int64 nanosecond count can hold decode rightly today,
-// only those outside come back wrong, and each wrong one carries
-// exactly the instant the known
-// conversion's arithmetic predicts - defectDecode below restates that
-// arithmetic. Keying on the signature is what tells the known bug from a fix
-// that landed and is wrong: a clamping fix leaves the same instants wrong,
-// with different values, and an arm keyed on "something was wrong" cannot
-// see the difference.
 //
 // What the row deliberately does not assert: the sweep above is a
 // sample, not every tick the clause permits, so a one-tick cliff away
@@ -68,25 +58,9 @@ import (
 	"github.com/gopcua/opcua/ua"
 )
 
-// defectDecode restates the conversion ua/buffer.go's ReadTime runs today,
-// the arithmetic the knownBug constant names. It is not the oracle the row
-// asserts against - that is ticksFor. defectDecode is the known bug's
-// fingerprint: the arms use it to tell the known bug, whose every wrong
-// decode is exactly the value this conversion predicts, from a fix that
-// landed and is wrong, whose decodes carry values this conversion produces
-// for no tick count.
-func defectDecode(ts uint64) time.Time {
-	if ts == 0 {
-		return time.Time{}
-	}
-	return time.Unix(0, int64((ts-116444736000000000)*100)).UTC()
-}
-
 func TestDateTimeDecodesEveryTickInTheValidRange(t *testing.T) {
-	// knownBug records that gopcua does not do this yet; the text is logged
-	// in place of a failure. ../README.md says when to delete it. The
-	// behaviour is closed by https://github.com/gopcua/opcua/pull/906.
-	const knownBug = "a tick count inside the range §5.2.2.5 defines does not decode to the instant that clause names, outside the window an int64 nanosecond count can hold, which starts inside 1677 and ends inside 2262: ua/buffer.go's ReadTime does time.Unix(0, int64((ts-116444736000000000)*100)), and the nanosecond multiply overflows on both sides of that window - the subtraction underflowing below 1970 is harmless, because the wrap recovers the true negative count"
+	// gopcua did not do this until https://github.com/gopcua/opcua/pull/906
+	// merged; it passes since.
 
 	instants := validRangeInstants()
 	if len(instants) == 0 {
@@ -95,10 +69,7 @@ func TestDateTimeDecodesEveryTickInTheValidRange(t *testing.T) {
 	}
 
 	mismatches := 0
-	// unexplained counts the cases that match neither the clause's instant
-	// nor the known bug's predicted one.
-	unexplained := 0
-	var first, firstUnexplained string
+	var first string
 	for _, want := range instants {
 		ticks := ticksFor(want)
 		wire := wireBytes(ticks)
@@ -111,13 +82,6 @@ func TestDateTimeDecodesEveryTickInTheValidRange(t *testing.T) {
 					"failed to decode: %v",
 					ticks, wire, want.Format(time.RFC3339Nano), err)
 			}
-			unexplained++
-			if firstUnexplained == "" {
-				firstUnexplained = fmt.Sprintf("tick count %s, which §5.2.2.5 defines as %s, "+
-					"failed to decode, where the known bug's arithmetic decodes it to %s",
-					ticks, want.Format(time.RFC3339Nano),
-					defectDecode(ticks.Uint64()).Format(time.RFC3339Nano))
-			}
 			continue
 		}
 		if got.V.Equal(want) {
@@ -129,49 +93,13 @@ func TestDateTimeDecodesEveryTickInTheValidRange(t *testing.T) {
 				"and it decoded as %s",
 				ticks, want.Format(time.RFC3339Nano), got.V.UTC().Format(time.RFC3339Nano))
 		}
-		if !got.V.Equal(defectDecode(ticks.Uint64())) {
-			unexplained++
-			if firstUnexplained == "" {
-				firstUnexplained = fmt.Sprintf("tick count %s, which §5.2.2.5 defines as %s "+
-					"and the known bug's arithmetic decodes to %s, decoded as %s, "+
-					"matching neither",
-					ticks, want.Format(time.RFC3339Nano),
-					defectDecode(ticks.Uint64()).Format(time.RFC3339Nano),
-					got.V.UTC().Format(time.RFC3339Nano))
-			}
-		}
 	}
 	decodes := mismatches == 0
-	signatureHolds := unexplained == 0
 
-	// Arm order: the two decodes arms come first, because a sweep that
-	// decodes every instant rightly satisfies the signature vacuously and
-	// must reach the arm that says so; the signature arm comes before the
-	// wrong-fix arm, because the wrong-fix arm is defined by the
-	// signature's absence; and the wrong-fix arm reads the constant, so
-	// with the constant empty a missing behaviour lands in the default arm
-	// below it.
 	switch {
-	case decodes && knownBug != "":
-		t.Errorf("this now passes (every one of the %d instants in the sweep decoded to "+
-			"the instant its tick count names) - "+
-			"delete the knownBug constant, every arm that reads it, and "+
-			"anything only those arms used, in the commit that fixed it",
-			len(instants))
 	case decodes:
 		t.Logf("every one of the %d instants in the sweep decoded to the instant its "+
 			"tick count names", len(instants))
-	case signatureHolds && knownBug != "":
-		t.Logf("known bug: %s; %d of the %d instants in the sweep came back as the wrong "+
-			"instant, each exactly the one the known bug's arithmetic predicts, and the "+
-			"first is %s",
-			knownBug, mismatches, len(instants), first)
-	case knownBug != "":
-		t.Errorf("%d of the %d instants in the sweep came back as the wrong instant, and %d "+
-			"of them match neither the instant §5.2.2.5 defines nor the one the known "+
-			"bug's arithmetic predicts - a fix for this landed and is wrong; the first "+
-			"case matching neither is %s",
-			mismatches, len(instants), unexplained, firstUnexplained)
 	default:
 		t.Errorf("§5.2.2.5 defines a tick count as a number of 100 nanosecond intervals since "+
 			"1601-01-01T00:00:00Z, so each one decodes to the instant it names; %d of the %d "+

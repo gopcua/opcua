@@ -40,7 +40,7 @@ type wireDateTime struct {
 // validRangeInstants returns the instants the sweep runs over: one per year
 // across the range §5.2.2.5 gives dates for, plus the tick counts where an
 // int64 nanosecond count overflows, which is where the conversion this file
-// was written for goes wrong.
+// was written for went wrong before #906.
 //
 // The per-year instant carries a sub-second component that is a whole number
 // of ticks and not a whole number of milliseconds, so a conversion that
