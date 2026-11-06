@@ -7,8 +7,11 @@
 // number of elements." Together those two make -1 the only negative length
 // the encoding defines: it means null, it is not a count. A length of -2 is
 // therefore not a length at all, so a decoder has no number of elements to
-// make a slice for and nothing to read; the only conforming move is to
-// reject the packet.
+// make a slice for and nothing to read. What it should do instead the two
+// clauses do not say, and the reference stacks split on it. This row
+// requires the packet rejected, which is the stricter of the two readings
+// and the one gopcua's own pull requests below implement; the split is
+// declared at the end of this header.
 //
 // The neighbouring rows are
 // variant_rejects_more_dimensions_than_the_message_can_hold_test.go, which
@@ -16,15 +19,15 @@
 // variant_rejects_dimensions_inconsistent_with_the_array_length_test.go,
 // which is the relation between the dimensions and the length this row
 // decodes. The three are neighbours of each other and of nothing else in
-// this directory: the datetime and nil-builtin rows read §5.2.2.5 and
-// §5.1.2 Table 1, clauses about a different field of a different type, and
-// none of them touches a Variant array field.
+// this directory: the datetime rows read §5.2.2.5 and the three nil-value
+// rows, reference_description_with_nil_fields_encodes_test.go among them,
+// read §5.1.2 Table 1 - clauses about a different field of a different
+// type. None of the six touches a Variant array field; where a nil row
+// names a Variant at all it is a null scalar, not an array.
 //
 // The row runs against the shared helpers, with no scripted server in
-// this package: every packet, including the null-array control, is
-// decoded by decodeVariantRecovering, which turns the panic a bad length
-// can raise into a value the case then reports instead of taking the
-// binary down. See harness.go.
+// this package: every packet, including the null-array control, is decoded
+// by decodeVariantRecovering. See harness.go.
 //
 // The row decodes two packets, length -2 and the Int32 minimum, and
 // requires each to come back rejected: an error, not a panic. It also
@@ -37,8 +40,21 @@
 // no error - and it does not cover lengths above MaxVariantArrayLength,
 // which gopcua already rejects before the slice type is reached.
 //
-// No reference stack was read for this row; the two clauses and the
-// measured behaviour are the whole of the evidence.
+// The row's verdict rests on the literal packets written out below;
+// nothing here encodes anything, so gopcua is never its own yardstick.
+//
+// The reference stacks split on what this row requires, and ../README.md's
+// sixth question asks a row that a known-good implementation would fail to
+// name the stacks it fails. Two of the three fail it, both by treating
+// every negative length as the null array: open62541's Array_decodeBinary
+// returns UA_STATUSCODE_GOOD with a NULL array for any signed_length <= 0
+// (ua_types_encoding_binary.c:530), and UA-.NETStandard's ReadArrayLength
+// maps any negative length to -1 (BinaryDecoder.cs:2358). Milo rejects, and
+// rejects in this row's own shape: its Variant path returns the null value
+// for -1 first, then checkArrayLength throws Bad_DecodingError for whatever
+// negative length is left (OpcUaBinaryDecoder.java:414, :421, :1400). The
+// -1 control below is what keeps this row from licensing the lumping move
+// Milo avoids - rejecting every negative length, the null array with it.
 
 package encoding
 
@@ -52,7 +68,7 @@ func TestVariantRejectsAnArrayLengthThatIsNotACount(t *testing.T) {
 	// in place of a failure. ../README.md says when to delete it. The
 	// behaviour is closed by https://github.com/gopcua/opcua/pull/892 and
 	// https://github.com/gopcua/opcua/pull/936.
-	const knownBug = "a negative flattened array length other than -1 is not rejected but passed to reflect.MakeSlice, which panics with \"reflect.MakeSlice: negative len\" and, since Decode has no recover, takes the process with it"
+	const knownBug = "a negative flattened array length other than -1 is not rejected but passed to reflect.MakeSlice, which panics and, since Decode has no recover, takes the process with it"
 
 	// mask 0x81 is Boolean | array values; the four bytes behind it are the
 	// flattened array length §5.2.2.16 defines. Both lengths below are
@@ -73,9 +89,6 @@ func TestVariantRejectsAnArrayLengthThatIsNotACount(t *testing.T) {
 	case panicked != "" || err != nil:
 		t.Fatalf("could not set the test up: the null array, length -1, no longer "+
 			"decodes (err %v, panic %q)", err, panicked)
-	case nullV.Value() == nil:
-		t.Fatalf("could not set the test up: the null array, length -1, decoded to " +
-			"no value at all rather than to a nil slice")
 	default:
 		if s, ok := nullV.Value().([]bool); !ok || s != nil {
 			t.Fatalf("could not set the test up: the null array, length -1, decoded to "+
@@ -118,7 +131,13 @@ func TestVariantRejectsAnArrayLengthThatIsNotACount(t *testing.T) {
 		detail += fmt.Sprintf("\n    %-16s %s", p.name, outcome)
 	}
 
-	// The arms, in the order the rule in tests/README.md asks for: the presence
+	// notACount is the inference the three arms below share: it is the reason
+	// each outcome is a failure, and it is one sentence in one place so a
+	// change to the reading cannot land in two of the three.
+	const notACount = "§5.2.5 gives -1 the meaning null and gives no negative " +
+		"length another, so none of these is a count and each must be rejected"
+
+	// The arms, keyed as the rule in tests/README.md asks: the presence
 	// with the constant standing is the green known bug; the presence gone but
 	// the outcome still wrong is a fix that landed wrong, and red; the outcome
 	// right with the constant standing asks for the constant to be deleted,
@@ -128,15 +147,12 @@ func TestVariantRejectsAnArrayLengthThatIsNotACount(t *testing.T) {
 	// is red rather than silent.
 	switch {
 	case thePanic && knownBug != "":
-		t.Logf("known bug: %s; §5.2.5 gives -1 the meaning null and gives no negative "+
-			"length another, so none of these is a count and each must be rejected, "+
-			"not allocated for:%s", knownBug, detail)
+		t.Logf("known bug: %s; %s, not allocated for:%s", knownBug, notACount, detail)
 	case !thePanic && !rejected:
-		t.Errorf("the \"reflect.MakeSlice: negative len\" panic is gone, so a change has "+
-			"landed on this decode, but the outcome is still wrong: §5.2.5 gives -1 the "+
-			"meaning null and gives no negative length another, so none of these is a "+
-			"count and each must be rejected, and the decoder still does not reject "+
-			"it - the change that removed the panic did not fix the behaviour:%s", detail)
+		t.Errorf("the %q panic is gone, so a change has landed on this decode, but the "+
+			"outcome is still wrong: %s, and the decoder still does not reject it - "+
+			"the change that removed the panic did not fix the behaviour:%s",
+			makeSlicePanic, notACount, detail)
 	case rejected && knownBug != "":
 		t.Errorf("this now passes (a flattened array length other than -1 is rejected, " +
 			"and the null array still decodes) - " +
@@ -145,8 +161,6 @@ func TestVariantRejectsAnArrayLengthThatIsNotACount(t *testing.T) {
 	case rejected:
 		t.Logf("a flattened array length other than -1 is rejected, and the null array still decodes")
 	default:
-		t.Errorf("§5.2.5 gives -1 the meaning null and gives no negative length "+
-			"another, so none of these is a count and each must be rejected, "+
-			"not allocated for:%s", detail)
+		t.Errorf("%s, not allocated for:%s", notACount, detail)
 	}
 }
