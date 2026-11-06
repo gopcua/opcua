@@ -31,7 +31,8 @@
 // same place and agree with the bug. A big.Int oracle cannot.
 //
 // The sweep crosses the range at a step of one instant a year, plus the
-// shared sweep's six probes and one more this row adds for itself. Three boundary points would pass a fix that was right at the
+// shared sweep's six probes and one more this row adds for itself.
+// Three boundary points would pass a fix that was right at the
 // boundaries and wrong in between; the overflow being fixed has a cliff
 // one tick wide, so a sweep that crosses the range is what can find a
 // second one.
