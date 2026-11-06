@@ -373,6 +373,11 @@ func (n *NodeID) Decode(b []byte) (int, error) {
 }
 
 func (n *NodeID) Encode() ([]byte, error) {
+	if n == nil {
+		// A nil NodeID encodes as the null NodeId (TwoByte, i=0)
+		// instead of panicking on the nil receiver.
+		n = NewTwoByteNodeID(0)
+	}
 	buf := NewBuffer(nil)
 	buf.WriteByte(byte(n.mask))
 
