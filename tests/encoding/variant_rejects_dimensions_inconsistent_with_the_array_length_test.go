@@ -116,7 +116,8 @@ func TestVariantRejectsDimensionsInconsistentWithTheArrayLength(t *testing.T) {
 		// shallStop is the clause's requirement, in the words the known-bug
 		// line and the wrong-fix arm below share.
 		shallStop = "§5.2.2.16 says the decoder shall stop"
-		// fixed is what the row logs once the decoder stops.
+		// fixed is what the row says once the decoder stops, in the words the
+		// hard-error arm and the pass line below share.
 		fixed = "dimensions whose product is not the array length are " +
 			"rejected, and consistent dimensions still decode"
 	)
