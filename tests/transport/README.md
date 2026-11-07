@@ -13,7 +13,12 @@ and the silence is the stimulus, so a scripted peer is what the behaviours
 need. The fixture is small and lives entirely in `harness.go`; item 3's
 reading here is that fixture, and it is checkable the way it is in the
 other packages: `grep -c "See harness.go" tests/transport/*_test.go`
-prints 1 for every row and 0 for `harness.go`.
+prints 1 for every row and 0 for `harness.go`. `refused_windows.go` and
+`refused_other.go` are not rows either: they hold the build-tagged
+`refused` helper the address row's setup probe reads (a refused dial on
+Windows is Winsock's WSAECONNREFUSED, not `syscall.ECONNREFUSED`), and a
+build constraint applies to a whole file, so the helper cannot live with
+the fixture.
 
 ## Why no OPC UA clause binds these behaviours
 

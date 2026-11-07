@@ -43,7 +43,10 @@
 // there is no next address and the behaviour cannot be constructed; and
 // when the row's probe of the first address at that port - its setup
 // check, a dial bounded by unblock - does not see that address refuse:
-// the probe requires errors.Is(err, syscall.ECONNREFUSED). A probe that
+// the probe requires refused(err), the build-tagged helper in
+// refused_windows.go and refused_other.go (errors.Is against Winsock's
+// WSAECONNREFUSED on Windows, against syscall.ECONNREFUSED elsewhere).
+// A probe that
 // connects, or that fails any other way - a timeout, a drop, a network
 // unreachable - means the premise "the first address refuses" does not
 // hold, so the row cannot pin a missing HEL on the library. All are
