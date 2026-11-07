@@ -30,9 +30,10 @@
 //
 // The row runs against the silent peer from harness.go, bound by the
 // row's own setup to the last address localhost resolves to: the row
-// resolves the name with net.Resolver.LookupIPAddr - the same call
-// ResolveEndpoint makes (uacp/endpoint.go:40), so the row and the
-// library agree on the order - listens on the last address on a free
+// resolves the name with net.Resolver.LookupIPAddr on a zero-valued
+// net.Resolver, as ResolveEndpoint does - the same call, at
+// uacp/endpoint.go:40, on the zero-valued net.Resolver declared at
+// uacp/endpoint.go:38 - so the row and the library agree on the order - listens on the last address on a free
 // port, and dials opc.tcp://localhost:<the peer's own port, from the
 // peer's port helper>. See harness.go.
 // awaitHello is the wrong helper for this row: its "accepted no
@@ -55,7 +56,8 @@
 // unreachable - means the premise "the first address refuses" does not
 // hold, so the row cannot pin a missing HEL on the library. All are
 // declines, because a red the row cannot pin on the library is not a
-// score.
+// score. A failed lookup of localhost is a decline, for the same
+// reason: the row can then neither probe nor dial the name's addresses.
 //
 // The row dials through the shared dial helper with a context whose
 // deadline is 2×unblock - long enough that it never ends inside the
