@@ -25,32 +25,29 @@
 // gives up on a peer that has the connection; this row scores which
 // address Dial reaches a peer on, before any handshake is held open.
 // They share the silent peer, not the HEL check - this row reads the
-// peer's state through its own logic - and no code path in the library
+// peer's state through its own logic - and, in the library, nothing
 // beyond ResolveEndpoint.
 //
 // The row runs against the silent peer from harness.go, bound by the
-// row's own setup to the last address localhost resolves to: the row
-// resolves the name with net.Resolver.LookupIPAddr on a zero-valued
-// net.Resolver, as ResolveEndpoint does - the same call, at
-// uacp/endpoint.go:40, on the zero-valued net.Resolver declared at
-// uacp/endpoint.go:38 - so the row and the library agree on the order -
-// listens on the last address on a free port, and dials
-// opc.tcp://localhost:<the peer's own port, from the peer's port
-// helper>. See harness.go.
+// row's own setup to the last address localhost resolves to. It
+// resolves the name with net.Resolver.LookupIPAddr, the same call
+// ResolveEndpoint makes (uacp/endpoint.go:40), so the row and the
+// library agree on the order. It listens on the last address on a free
+// port and dials opc.tcp://localhost:<the peer's own port, from this
+// row's port helper>. See harness.go.
 // awaitHello is the wrong helper for this row: its "accepted no
 // connection" reason is the known-bug outcome here, not a decline, so
 // the row reads the peer's state through its own logic.
 //
 // The row declines, and does not score, when the environment takes the
 // behaviour out of reach: when localhost resolves to a single address,
-// there is no next address and the behaviour cannot be constructed; and
-// when the row's probe of the first address at the peer's port - from
-// the peer's port helper again, so probe and dial cannot disagree - its
-// setup check, a dial bounded by unblock - does not see that address
-// refuse:
+// there is no next address and the behaviour cannot be constructed; when
+// the peer cannot listen on the last address; and when the row's setup
+// check - a probe of the first address at the peer's port, from the
+// peer's port helper again so probe and dial cannot disagree, bounded by
+// unblock - does not see that address refuse:
 // the probe requires refused(err), the build-tagged helper in
-// refused_windows.go and refused_other.go (errors.Is against Winsock's
-// WSAECONNREFUSED on Windows, against syscall.ECONNREFUSED elsewhere).
+// refused_windows.go and refused_other.go.
 // A probe that
 // connects - the row closes the connection it opened before it declines
 // - or that fails any other way - a timeout, a drop, a network
@@ -67,26 +64,30 @@
 // silent peer never sends an Acknowledge, so a library that dials the
 // right address still blocks in Handshake after sending its HEL. The row
 // scores only whether a HEL arrives at the listener on the last address
-// within unblock of the dial. It deliberately asserts nothing about
-// Dial's return value, and nothing about the connection's state, which
-// would score the uasc layer above, not the transport.
+// within unblock of the dial. It deliberately asserts nothing about the
+// connection Dial returns, and nothing about the connection's state,
+// which would score the uasc layer above, not the transport.
 //
 // The knownBug constant is declared in the test function's body. The
-// known-bug outcome is a presence: Dial returned an error and no HEL
-// arrived at the listener. That error is the presence: on main,
-// ResolveEndpoint keeps addrs[0] (uacp/endpoint.go:50) and the dial to
-// it is refused, so Dial returns an error and no HEL ever reaches the
-// last-address listener.
+// known-bug outcome is a presence: Dial returned a refusal and no HEL
+// arrived at the listener. That refusal is the presence, and it is one a
+// fixed library does not show: on main, ResolveEndpoint keeps addrs[0]
+// (uacp/endpoint.go:50) and the dial to it is refused, so Dial returns a
+// refusal and no HEL ever reaches the last-address listener. A Dial
+// error that is not a refusal - a transient lookup failure inside the
+// dial is one a fixed library can show - is an ordinary failure, not
+// the known bug.
 // The arms, in words: a HEL seen at the last-address listener at any
 // point before the verdict is the fixed arm, whatever Dial returned, and
 // it demands the constant's deletion; before scoring any arm other than
 // the fixed one, the row re-checks the peer's HEL signal without
 // blocking, so a HEL that raced a Dial error is still the fixed arm;
-// Dial returning an error with no
-// HEL at the listener logs the known bug; Dial returning with a nil
-// error and no HEL arrived is an ordinary failure with t.Errorf, because
-// the silent peer never acknowledges, so such a return cannot come from
-// a dial that reached it. When no HEL arrives within unblock and Dial
+// Dial returning a refusal with no HEL at the listener logs the known
+// bug; any other Dial return with no HEL arrived - an error that is not
+// a refusal, or a nil error - is an ordinary failure with t.Errorf: a
+// non-refusal error is one a fixed library can show, and the silent
+// peer never acknowledges, so a nil return cannot come from a dial that
+// reached it. When no HEL arrives within unblock and Dial
 // has not returned, that is an ordinary failure too, scored with
 // t.Errorf, and the failure message says so.
 //
@@ -103,9 +104,8 @@ import (
 // port is the port the address row's peer listens on, split from its
 // listener's address, so the row's probe of the first address and its
 // localhost dial use the peer's own port without re-deriving it from
-// addr. It is a helper one row calls, so it lives with that row: the
-// placement rule in ../README.md moved it here from harness.go when this
-// row's body landed and called it.
+// addr. It is a helper one row calls, so it lives with that row
+// (../README.md's placement rule).
 func (p *silentPeer) port() string {
 	_, port, _ := net.SplitHostPort(p.listener.Addr().String())
 	return port
@@ -134,7 +134,11 @@ func TestDialReachesAHostNameOnItsNextAddress(t *testing.T) {
 	}
 
 	// The peer goes on the last address: a HEL there is evidence Dial
-	// tried the addresses in order and passed the first one's refusal.
+	// reached the last address after the first one refused. It is not
+	// evidence of in-order iteration: a Dialer that tried only the last
+	// address, or only the IPv4 ones, or raced them, lands in the same
+	// arm, and the row cannot tell these apart with the two addresses
+	// localhost gives it.
 	peer, teardown, why := startSilentPeer(addrs[len(addrs)-1].String())
 	t.Cleanup(teardown)
 	if why != "" {
@@ -177,14 +181,18 @@ func TestDialReachesAHostNameOnItsNextAddress(t *testing.T) {
 	case o = <-out:
 		returned = true
 	case <-time.After(unblock):
-	}
-	if !hello {
 		// One more non-blocking re-check before any arm other than the
-		// fixed one scores: a HEL that raced the Dial return or the timer
-		// is still the fixed arm, whatever Dial returned.
+		// fixed one scores: a HEL or a Dial return can land with the
+		// timer, and the helper's stamp, not this read, places the
+		// return on the wall clock.
 		select {
 		case <-peer.hello:
 			hello = true
+		default:
+		}
+		select {
+		case o = <-out:
+			returned = true
 		default:
 		}
 	}
@@ -202,7 +210,7 @@ func TestDialReachesAHostNameOnItsNextAddress(t *testing.T) {
 		t.Errorf("no HEL arrived at the listener on %s and Dial was still "+
 			"blocked %v after the dial", peer.addr(), unblock)
 	case o.err != nil:
-		if knownBug != "" {
+		if knownBug != "" && refused(o.err) {
 			t.Logf("known bug: %s (Dial returned %v and no HEL arrived at the "+
 				"listener on %s)", knownBug, o.err, peer.addr())
 		} else {
@@ -210,8 +218,8 @@ func TestDialReachesAHostNameOnItsNextAddress(t *testing.T) {
 				o.err, peer.addr())
 		}
 	default:
-		t.Errorf("Dial returned a nil error (%v) and no HEL arrived at the "+
+		t.Errorf("Dial returned a nil error and no HEL arrived at the "+
 			"listener on %s - the silent peer never acknowledges, so such a "+
-			"return cannot come from a dial that reached it", o.err, peer.addr())
+			"return cannot come from a dial that reached it", peer.addr())
 	}
 }

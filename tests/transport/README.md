@@ -64,23 +64,29 @@ address row. The Go doc line is quoted verbatim in the row's header, from
   address and dials `opc.tcp://localhost:<port>`; on main the HEL never
   arrives there, because `ResolveEndpoint` keeps only `addrs[0]`
   (uacp/endpoint.go:50) and `Dialer.Dial` dials that one address
-  (uacp/conn.go:83). The row **declines** when `localhost` resolves to a
-  single address — there is no next address, so the behaviour cannot be
-  constructed — and when anything accepts a connection on the first
-  address at that port, because a HEL at the last address would then not
-  be evidence about the first address's refusal.
+  (uacp/conn.go:83). The row **declines** when `localhost` does not
+  resolve, when it resolves to a single address — there is no next
+  address, so the behaviour cannot be constructed — when the peer cannot
+  listen on the last address, and when anything accepts a connection on
+  the first address at that port or the probe of that address fails any
+  other way, because a HEL at the last address would then not be evidence
+  about the first address's refusal.
 
 ## The knownBug ledger
 
-Two constants stand, one per row, each declared in its test function's
-body. Each constant's text names the
+Two constants stand, one per row that carries one, each declared in its
+test function's body. Each constant's text names the
 mechanism it keys on, with the file and line it comes from, the way the
 constants in the neighbouring test packages do, and carries no issue
 link. Two different fixes close them, one for
 each constant: honouring the context's cancellation in `Handshake` closes
 `handshake_gives_up_when_its_context_is_cancelled_test.go`, and iterating
 the resolved addresses in `Dialer.Dial` closes
-`dial_reaches_a_host_name_on_its_next_address_test.go`. No constant
+`dial_reaches_a_host_name_on_its_next_address_test.go` — though the
+address row scores the outcome, a HEL at a listener on the last address
+after the first refused, and with the two addresses `localhost` gives it,
+it cannot tell that from a `Dialer` that tries only the last address or
+only some of them. No constant
 stands for the deadline row: gopcua passes it as it stands, and it exists
 to guard the deadline path against a change made to the cancellation
 path — the obvious fix for the cancellation row is to select on
