@@ -1,3 +1,5 @@
+//go:build conformance
+
 // A flattened array length that is not a count of anything - any negative
 // length other than -1 - is rejected, not allocated for.
 //
@@ -115,7 +117,8 @@ func TestVariantRejectsAnArrayLengthThatIsNotACount(t *testing.T) {
 				"length means there is nothing here to allocate for", panicked)
 		case err == nil:
 			rejected = false
-			outcome = "decoded, where -1 being the only negative length means this is not a count of anything"
+			outcome = "decoded, where -1 being the only negative length means " +
+				"this is not a count of anything"
 		default:
 			outcome = fmt.Sprintf("rejected with %v", err)
 		}

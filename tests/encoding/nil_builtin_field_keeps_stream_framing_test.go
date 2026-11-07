@@ -1,3 +1,5 @@
+//go:build conformance
+
 // A nil pointer to a nullable built-in type encodes as that type's null
 // value, and a message carrying one still parses.
 //
@@ -17,7 +19,8 @@
 // nullable built-in and whose second is a known marker: it encodes the
 // struct, decodes the bytes back, and reads the marker out of the result.
 // There is no scripted server in this package; the encoding goes through
-// the shared encodeRecovering, which turns the panic a missing guard
+// the shared encodeRecovering and the decode through the shared
+// decodeRecovering, either of which turns the panic a missing guard
 // raises into a value the case then reports. See harness.go.
 //
 // What it asserts about the null bytes is that the marker survives behind
@@ -183,13 +186,13 @@ func TestNilBuiltinFieldKeepsStreamFraming(t *testing.T) {
 // roundTrip encodes out and decodes the bytes into into. event carries a
 // failure on the encode side - encoding panicked, or encoding failed - and is empty
 // when neither happened. why carries the reason the trip did not survive
-// once encoding succeeded, and is empty when nothing went wrong; the caller
-// then reads its own marker field, which roundTrip has no static type
-// for. The count ua.Decode returns is checked against the length of the
-// bytes the encode produced, because ua.Decode does not report trailing
-// bytes itself, and a null encoding of the wrong length would otherwise
-// leave them unseen. Only the test function above turns any of the three
-// into a failure.
+// once encoding succeeded - decoding panicked, decoding failed, or the
+// count ua.Decode returned not matching the length of the bytes the encode
+// produced, because ua.Decode does not report trailing bytes itself and a
+// null encoding of the wrong length would otherwise leave them unseen - and
+// is empty when nothing went wrong; the caller then reads its own marker
+// field, which roundTrip has no static type for. Only the test function
+// above turns any of the three into a failure.
 func roundTrip(out, into interface{}) (event, why string) {
 	b, err, panicked := encodeRecovering(out)
 	if panicked != "" {
@@ -198,7 +201,10 @@ func roundTrip(out, into interface{}) (event, why string) {
 	if err != nil {
 		return fmt.Sprintf("encoding failed: %v", err), ""
 	}
-	n, err := ua.Decode(b, into)
+	n, err, panicked := decodeRecovering(b, into)
+	if panicked != "" {
+		return "", fmt.Sprintf("decoding the % x the encoder produced panicked (%s)", b, panicked)
+	}
 	if err != nil {
 		return "", fmt.Sprintf("decoding the % x the encoder produced failed: %v", b, err)
 	}

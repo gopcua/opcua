@@ -11,7 +11,9 @@ Panic recovery is this package's analogue of reconnect's decline
 machinery. `encodeRecovering` calls `ua.Encode` and turns a nil
 dereference into a value; `decodeVariantRecovering` does the same for
 `ua.Decode` on a Variant packet, whose array length reached
-`reflect.MakeSlice` straight off the wire until #936. A missing nil guard is a nil
+`reflect.MakeSlice` straight off the wire until #936, and
+`decodeRecovering` is the general form it wraps, for `ua.Decode` into any
+type. A missing nil guard is a nil
 dereference that takes the whole test binary with it, so one unguarded
 type would hide the state of every other; the helpers turn the panic into
 one case's failure instead, and only a test function turns any of it into
@@ -29,9 +31,18 @@ and lines in its own header.
 
 Milo is read by the Variant rows, and by
 `datetime_out_of_range_saturates_test.go`, whose decode-side question its
-`decodeDateTime` answers directly. On all three of the Variant rows'
-packets it is the stack whose structure is closest to what those rows
-require, and on one of them it is the only stack that rejects. A row that
+`decodeDateTime` answers directly. What Milo does differs by row, as the
+rows' headers say: on
+`variant_rejects_an_array_length_that_is_not_a_count_test.go` it rejects,
+and rejects in that row's own shape - there it is the only one of the
+three that rejects; on
+`variant_rejects_more_dimensions_than_the_message_can_hold_test.go` all
+three pass, with open62541 and UA-.NETStandard bounding the dimension
+count against the bytes present where Milo bounds it only against its
+maximum message size; and on
+`variant_rejects_dimensions_inconsistent_with_the_array_length_test.go`
+all three stop, but Milo stops for a different reason than the product
+check that row requires. A row that
 cites it says so; a row that does not has not read it.
 
 ## The knownBug ledger, 2026-11-06

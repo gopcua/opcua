@@ -1,3 +1,5 @@
+//go:build conformance
+
 // A DateTime on the wire decodes to the instant its tick count names, for
 // every instant the specification allows.
 //
@@ -43,10 +45,12 @@
 // not swept: gopcua reserves tick 0 for the zero time, which is the
 // library's own convention and not something the clause requires.
 //
-// No reference stack was read for this row; the math/big oracle above,
-// which runs the clause's algebra in a type that cannot overflow and so
-// shares none of gopcua's int64 arithmetic, is the whole of the
-// evidence.
+// No reference stack was read for this row; the evidence is the math/big
+// oracle above, which runs the clause's algebra in a type that cannot
+// overflow and so shares none of gopcua's int64 arithmetic, pinned by the
+// hand-written byte anchors below: instants whose eight bytes are written
+// out from the clause's definition and checked before the sweep, so a
+// defect in ticksFor or wireBytes cannot take the sweep's verdict with it.
 
 package encoding
 
@@ -61,6 +65,39 @@ import (
 func TestDateTimeDecodesEveryTickInTheValidRange(t *testing.T) {
 	// gopcua did not do this until https://github.com/gopcua/opcua/pull/906
 	// merged; it passes since.
+
+	// The literal anchors, written out by hand from the clause's definition:
+	// a tick count is the number of 100 nanosecond intervals since
+	// 1601-01-01T00:00:00Z, so one tick past that endpoint is tick 1,
+	// 1970-01-01T00:00:00Z is 11644473600 seconds after the 1601 epoch and so
+	// tick 116444736000000000, and 9999-12-31T23:59:59Z is tick
+	// 2650467743990000000. Tick 0 itself, the endpoint instant, is not an
+	// anchor, for the reason the header gives above. Each anchor's bytes are
+	// decoded and compared against its instant before the sweep, so the
+	// anchors hold even if the sweep never runs.
+	anchors := []struct {
+		wire []byte
+		want time.Time
+	}{
+		{[]byte{0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+			time.Date(1601, time.January, 1, 0, 0, 0, 100, time.UTC)},
+		{[]byte{0x00, 0x80, 0x3e, 0xd5, 0xde, 0xb1, 0x9d, 0x01},
+			time.Date(1970, time.January, 1, 0, 0, 0, 0, time.UTC)},
+		{[]byte{0x80, 0xa9, 0x27, 0xd1, 0x5e, 0x5a, 0xc8, 0x24},
+			time.Date(9999, time.December, 31, 23, 59, 59, 0, time.UTC)},
+	}
+	for _, a := range anchors {
+		var got wireDateTime
+		if _, err := ua.Decode(a.wire, &got); err != nil {
+			t.Fatalf("could not set the test up: the literal anchor % x failed "+
+				"to decode: %v", a.wire, err)
+		}
+		if !got.V.Equal(a.want) {
+			t.Fatalf("could not set the test up: the literal anchor % x decodes as "+
+				"%s where the hand-written anchor says %s", a.wire,
+				got.V.UTC().Format(time.RFC3339Nano), a.want.Format(time.RFC3339Nano))
+		}
+	}
 
 	instants := validRangeInstants()
 	if len(instants) == 0 {

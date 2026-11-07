@@ -1,3 +1,5 @@
+//go:build conformance
+
 // A nil pointer to a nullable built-in type encodes as that type's null
 // value. That a message carrying one still parses is not asserted here -
 // this row encodes each value in isolation and decodes nothing; it is what

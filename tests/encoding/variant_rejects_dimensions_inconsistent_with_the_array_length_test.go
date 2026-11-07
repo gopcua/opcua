@@ -1,3 +1,5 @@
+//go:build conformance
+
 // Dimensions whose product is not the array length are rejected, whatever
 // the product's size.
 //
@@ -31,9 +33,9 @@
 // None of the six touches a Variant array field; where a nil row names a
 // Variant at all it is a null scalar, not an array.
 //
-// The row runs against ua.Decode alone, with no scripted server in this
-// package: it needs no helper, and the decodeVariantRecovering its two
-// siblings share lives in harness.go. See harness.go.
+// The row runs against ua.Decode, with no scripted server in this
+// package: both of its decodes go through the decodeVariantRecovering its
+// two siblings share, which lives in harness.go. See harness.go.
 //
 // The row asserts that decoding the packet stops with an error, and that a
 // consistent control - the same four elements with dimensions [2, 2], whose
@@ -42,11 +44,11 @@
 // error to be exactly Bad_DecodingError: the clause names it, but requiring
 // gopcua's error taxonomy rather than the stopping would keep a fix that
 // stops and raises some other error red for the wrong reason; the detail
-// line reports what the decoder did raise. The row drives ua.Decode
-// directly, without the recover the two sibling rows share a helper for:
-// nothing in this packet's path can take the process down in the current
-// code - it decodes - and the clause's required outcome is an error, not a
-// crash.
+// line reports what the decoder did raise. Both decodes go through the
+// shared recover, so a panic in the decode becomes this row's outcome
+// instead of ending the run; the clause's required outcome is an error,
+// not a crash, and a panic is scored as neither - it lands in the red arm
+// with its reason in the detail line.
 //
 // All three reference stacks on disk stop on this packet, so none of them
 // fails this row and no exception under ../README.md's sixth question is
@@ -75,8 +77,6 @@ package encoding
 import (
 	"fmt"
 	"testing"
-
-	"github.com/gopcua/opcua/ua"
 )
 
 func TestVariantRejectsDimensionsInconsistentWithTheArrayLength(t *testing.T) {
@@ -87,27 +87,33 @@ func TestVariantRejectsDimensionsInconsistentWithTheArrayLength(t *testing.T) {
 	// https://github.com/gopcua/opcua/pull/893 nor
 	// https://github.com/gopcua/opcua/pull/936 fixes it, so the constant
 	// stands until whichever change makes the decoder stop does.
-	const knownBug = "dimensions whose product is not the array length are accepted when the product overflows: the consistency check multiplies the dimensions in an int32, so dimensions [4, 1073741825] wrap to exactly the array length 4 and the decode succeeds"
+	const knownBug = "dimensions whose product is not the array length are accepted when the " +
+		"product overflows: the consistency check multiplies the dimensions in an int32, so " +
+		"dimensions [4, 1073741825] wrap to exactly the array length 4 and the decode succeeds"
 
 	// The control: the same four Boolean elements with dimensions [2, 2],
 	// whose product is the array length. It decodes today and the row
 	// requires it to keep decoding.
 	control := []byte{0xc1, 0x04, 0x00, 0x00, 0x00, 0x01, 0x01, 0x01, 0x01,
 		0x02, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00}
-	var cv ua.Variant
-	if _, err := ua.Decode(control, &cv); err != nil {
+	if _, err, panicked := decodeVariantRecovering(control); err != nil || panicked != "" {
 		t.Fatalf("could not set the test up: dimensions [2, 2] with an array length "+
-			"of 4 are consistent and no longer decode: %v", err)
+			"of 4 are consistent and no longer decode (err %v, panicked %s)", err, panicked)
 	}
 
 	// The probe: array length 4, four Boolean elements, dimensions
 	// [4, 1073741825]. The product is 2^32+4 and wraps to 4 in an int32.
 	packet := []byte{0xc1, 0x04, 0x00, 0x00, 0x00, 0x01, 0x01, 0x01, 0x01,
 		0x02, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x40}
-	v := new(ua.Variant)
-	_, err := ua.Decode(packet, v)
+	v, err, panicked := decodeVariantRecovering(packet)
+	if panicked != "" {
+		// A panic is neither the stop the clause requires nor a decode: it
+		// is scored as neither, and lands in the red arm with its reason in
+		// the detail line.
+		err = fmt.Errorf("panicked: %s", panicked)
+	}
 
-	stops := err != nil
+	stops := err != nil && panicked == ""
 	const (
 		// inconsistent names the packet's defect, in the words the detail line
 		// and the wrong-fix arm below share.
@@ -130,7 +136,7 @@ func TestVariantRejectsDimensionsInconsistentWithTheArrayLength(t *testing.T) {
 	dimsReported := len(dims) == 2 && dims[0] == 4 && dims[1] == 1073741825
 	decoded := err == nil && dimsReported
 	detail := fmt.Sprintf("\n    decoding % x, whose "+inconsistent+
-		", returned err %v and ArrayDimensions() %v", packet, err, dims)
+		", returned err %v, panicked (%s) and ArrayDimensions() %v", packet, err, panicked, dims)
 
 	// The arms, keyed as the rule asks for: the presence with the
 	// constant standing is the green known bug; the presence gone but the

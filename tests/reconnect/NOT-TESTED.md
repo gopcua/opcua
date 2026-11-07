@@ -48,8 +48,8 @@ of dropping, and a `runRecord` whose readings are not all anchored on `DropAt` a
 **Two of these are mis-addressed, not merely blocked.** What to monitor is
 the application's choice, not the library's, and gopcua keeps no value cache. So
 the ServerStatus and overwrite-ordering items would not be client-library
-conformance rows even once the capability existed — the case question 6 of the
-README describes, where every library leaves the behaviour to the application.
+conformance rows even once the capability existed — the case question 6 of
+`../README.md` describes, where every library leaves the behaviour to the application.
 
 ## A gap that is not a missing capability
 

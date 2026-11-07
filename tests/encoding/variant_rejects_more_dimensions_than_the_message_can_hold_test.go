@@ -1,3 +1,5 @@
+//go:build conformance
+
 // A dimension count larger than the remaining bytes can hold is rejected
 // before the allocation, not after it.
 //
@@ -67,7 +69,8 @@
 // each bounds the dimension count before allocating for it, though not all
 // three bound it the same way - open62541 and UA-.NETStandard against the
 // bytes actually present, Milo only against its maximum message size, which
-// a smaller count with no bytes behind it would still pass. open62541 reads the dimension array through
+// a smaller count with no bytes behind it would still pass. open62541 reads
+// the dimension array through
 // Array_decodeBinary, which checks "length / 128 <= remaining /
 // type->memSize" before its ctxCalloc (ua_types_encoding_binary.c:551).
 // UA-.NETStandard reads it through ReadInt32Array -> ReadArrayLength, which

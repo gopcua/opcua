@@ -1,3 +1,5 @@
+//go:build conformance
+
 // A ReferenceDescription whose pointer fields are nil encodes to the same
 // bytes as one whose fields carry their null values: the 18 bytes below,
 // which both reference stacks produce.
@@ -79,7 +81,9 @@ import (
 func TestReferenceDescriptionWithNilFieldsEncodes(t *testing.T) {
 	// knownBug records that gopcua does not do this yet; the text is logged
 	// in place of a failure. ../README.md says when to delete it.
-	const knownBug = "a ReferenceDescription with nil fields does not encode: its *ExpandedNodeID fields return an error on a nil receiver; and a nil *QualifiedName BrowseName silently contributes no bytes, leaving the message six bytes short"
+	const knownBug = "a ReferenceDescription with nil fields does not encode: its *ExpandedNodeID " +
+		"fields return an error on a nil receiver; and a nil *QualifiedName BrowseName silently " +
+		"contributes no bytes, leaving the message six bytes short"
 
 	// Every pointer field given the explicit null value its type has by
 	// Table 1. This encodes to the 18 bytes in want below - the bytes the
@@ -115,7 +119,8 @@ func TestReferenceDescriptionWithNilFieldsEncodes(t *testing.T) {
 	// byte-identical at these 18 bytes, so one literal covers all three.
 	const want = "\x00\x00" + // ReferenceTypeID, null NodeID: encoding 0x00, identifier 0x00
 		"\x00" + // IsForward, false
-		"\x00\x00" + // NodeID, null ExpandedNodeID: encoding 0x00 (two-byte NodeId, no flags), identifier 0x00
+		"\x00\x00" + // NodeID, null ExpandedNodeID: encoding 0x00 (two-byte NodeId, no
+		// flags), identifier 0x00
 		"\x00\x00\xff\xff\xff\xff" + // BrowseName, null QualifiedName: namespace index 0, name length -1
 		"\x00" + // DisplayName, null LocalizedText: encoding mask 0x00, neither string present
 		"\x00\x00\x00\x00" + // NodeClass 0, Int32
