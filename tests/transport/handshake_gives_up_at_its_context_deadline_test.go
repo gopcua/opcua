@@ -17,11 +17,10 @@
 // connection's read deadline from the context (uacp/conn.go:236-237) and
 // the blocked Receive (uacp/conn.go:244) fails when it passes, so Dial
 // returns. The row exists to guard that deadline path against a change
-// made to the cancellation path: the fix that
-// handshake_gives_up_when_its_context_is_cancelled_test.go waits for is
-// naturally a select on the context beside the read, and a change that
-// broke the deadline while fixing the cancellation would pass that row
-// and fail this one.
+// made to the cancellation path: a change that fixed the cancellation
+// while breaking the deadline would pass
+// handshake_gives_up_when_its_context_is_cancelled_test.go and fail
+// this one.
 //
 // Neighbouring rows:
 // handshake_gives_up_when_its_context_is_cancelled_test.go is the same
@@ -39,14 +38,10 @@
 // not unblock, so the HEL must arrive by the deadline itself: if it has
 // not, the run cannot construct "the deadline expires while the HEL is
 // held", and the row declines. The deadline is the row's own, so the
-// peer's silence
-// outlives it and the expiry lands while the HEL is held unanswered. The
-// setup check's decline and unscoreable split is awaitHello's: a failed
-// check either side could have caused - no connection accepted, or no
-// header read in time on a loaded machine - is a decline ("could not set
-// the test up: %s"), and a header that is not HELF is gopcua's own
-// behaviour, scored "gopcua's own behaviour made this run unscoreable:
-// %s" with t.Errorf and a return. The row registers the peer's teardown
+// peer's silence outlives it and the expiry lands while the HEL is held
+// unanswered. The setup check is the shared awaitHello, and its decline
+// and unscoreable split applies here as documented there. The row
+// registers the peer's teardown
 // with t.Cleanup, so a Dial still blocked on main is released when the
 // test ends. See harness.go.
 //
