@@ -116,38 +116,48 @@ func (p *silentPeer) serve() {
 	_, _ = io.Copy(io.Discard, c) // hold the connection open, never answer
 }
 
-// awaitHello is the setup check the handshake rows share: it waits until
-// the peer has read a HEL message header off the connection Dial opened,
-// which proves the stimulus - a Dial blocked in Receive
+// awaitHello is the setup check the handshake rows share: it waits up to
+// within for the peer to read a HEL message header off the connection
+// Dial opened, which proves the stimulus - a Dial blocked in Receive
 // (uacp/conn.go:244) - has been reached before the row cancels its
-// context or its deadline passes. It returns "" or the reason the run
-// cannot be scored: the peer accepted no connection, so Dial never
-// reached it; or the connection carried no HEL, so what the row is about
-// to score is not the handshake these rows drive. Which of those reasons
-// is the fixture's and which is the library's is each row's own
-// judgement, and its header says how it declines. For the handshake rows
-// the "accepted no connection" reason is a decline; for
-// dial_reaches_a_host_name_on_its_next_address_test.go that same reason
-// is the known-bug outcome, not a decline, and that row does not call
-// this helper - it reads the peer's state through its own logic.
-func (p *silentPeer) awaitHello() string {
+// context or its deadline passes. It returns "", false once the HEL has
+// been read. Otherwise it returns a reason and which side caused the
+// failed check, and the row prints the reason with the wording below:
+//
+//   - fromGopcua false, a decline: a failed check either side could have
+//     caused - the peer accepted no connection within within, so Dial
+//     never reached it; or it accepted the connection but read no header
+//     within within, which can close on a loaded machine. The row prints
+//     "could not set the test up: %s".
+//
+//   - fromGopcua true, unscoreable: a failed check only the library
+//     could have caused - the peer read a message header that is not
+//     HELF, which is determinately gopcua's bytes. The row prints
+//     "gopcua's own behaviour made this run unscoreable: %s" with
+//     t.Errorf, then returns.
+//
+// dial_reaches_a_host_name_on_its_next_address_test.go does not call
+// this helper: for that row "accepted no connection" is the known-bug
+// outcome, not a decline, and it reads the peer's state through its own
+// logic.
+func (p *silentPeer) awaitHello(within time.Duration) (string, bool) {
 	select {
 	case <-p.hello:
-		return ""
-	case <-time.After(unblock):
+		return "", false
+	case <-time.After(within):
 	}
 
 	select {
 	case <-p.accepted:
 	default:
 		return fmt.Sprintf("the peer accepted no connection within %v, "+
-			"so Dial never reached it", unblock)
+			"so Dial never reached it", within), false
 	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if p.header == "" {
 		return fmt.Sprintf("the peer accepted the connection but read no "+
-			"message header within %v", unblock)
+			"message header within %v", within), false
 	}
-	return fmt.Sprintf("the peer read message header %q, not HELF", p.header)
+	return fmt.Sprintf("the peer read message header %q, not HELF", p.header), true
 }

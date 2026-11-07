@@ -32,7 +32,13 @@
 // harness.go - driven through uacp.Dialer.Dial directly: the row starts
 // the peer, dials opc.tcp://<peer address> on its cancellable context on
 // a goroutine it spawns, and awaits the HEL through the shared setup
-// check before it cancels. The row registers the peer's teardown with
+// check, within unblock, before it cancels. The setup check's decline
+// and unscoreable split is awaitHello's: a failed check either side
+// could have caused - no connection accepted, or no header read within
+// unblock, which can close on a loaded machine - is a decline ("could
+// not set the test up: %s"), and a header that is not HELF is gopcua's
+// own behaviour, scored "gopcua's own behaviour made this run
+// unscoreable: %s" with t.Errorf and a return. The row registers the peer's teardown with
 // t.Cleanup, so a Dial still blocked on main is released when the test
 // ends. See harness.go.
 //
@@ -50,9 +56,13 @@
 // the setup check proves the HEL reached the peer before the cancel, so
 // a library that never reaches the stimulus - no connection, or no HEL
 // on it - declines instead of landing in the known-bug arm. The arms, in
-// words: Dial returning within unblock of the cancel is the fixed arm
-// and demands the constant's deletion; Dial still blocked at the bound
-// logs the known bug. The arms read the dial goroutine's outcome off a
+// words: a Dial that returns before the cancel is a failure with
+// t.Errorf - the library gave up without being asked - and the fixed arm
+// must not credit it; the fixed arm is a return after the cancel and
+// within unblock of it, and it demands the constant's deletion; a Dial
+// still blocked at the bound is the known bug, scored with t.Errorf
+// while the constant stands and with a plain t.Errorf once it is
+// deleted. The arms read the dial goroutine's outcome off a
 // channel, so a blocked Dial cannot wedge the test past the bound.
 //
 // No reference stack has been read for this behaviour.
