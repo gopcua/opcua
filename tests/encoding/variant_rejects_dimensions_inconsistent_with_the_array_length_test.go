@@ -97,8 +97,9 @@ func TestVariantRejectsDimensionsInconsistentWithTheArrayLength(t *testing.T) {
 	control := []byte{0xc1, 0x04, 0x00, 0x00, 0x00, 0x01, 0x01, 0x01, 0x01,
 		0x02, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00}
 	if _, err, panicked := decodeVariantRecovering(control); err != nil || panicked != "" {
-		t.Fatalf("could not set the test up: dimensions [2, 2] with an array length "+
-			"of 4 are consistent and no longer decode (err %v, panicked %s)", err, panicked)
+		t.Errorf("gopcua's own behaviour made this run unscoreable: dimensions [2, 2] with an "+
+			"array length of 4 are consistent and no longer decode (err %v, panicked %s)", err, panicked)
+		return
 	}
 
 	// The probe: array length 4, four Boolean elements, dimensions
