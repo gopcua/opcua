@@ -73,8 +73,101 @@
 // No reference stack has been read for this behaviour.
 package transport
 
-import "testing"
+import (
+	"context"
+	"testing"
+	"time"
+)
 
 func TestHandshakeGivesUpWhenItsContextIsCancelled(t *testing.T) {
-	t.Skip("body not written yet")
+	// knownBug records that gopcua does not do this yet: Handshake sets the
+	// connection's deadline only from ctx.Deadline() (uacp/conn.go:236-237)
+	// and its Receive reads the connection directly (uacp/conn.go:359), so a
+	// cancellation with no deadline does nothing to the blocked read and Dial
+	// stays blocked. The text is logged in place of a failure; ../README.md
+	// says when to delete it. It carries no issue link.
+	const knownBug = "Handshake sets the connection's deadline only from ctx.Deadline() " +
+		"(uacp/conn.go:236-237) and its Receive reads the connection directly " +
+		"(uacp/conn.go:359), so a cancellation after the HEL does nothing to the " +
+		"blocked read and Dial stays blocked"
+
+	peer, teardown, why := startSilentPeer("127.0.0.1")
+	t.Cleanup(teardown)
+	if why != "" {
+		t.Fatalf("could not set the test up: %s", why)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	out := dial(ctx, "opc.tcp://"+peer.addr())
+
+	if why, fromGopcua := peer.awaitHello(unblock); why != "" {
+		if fromGopcua {
+			t.Errorf("gopcua's own behaviour made this run unscoreable: %s", why)
+			return
+		}
+		t.Fatalf("could not set the test up: %s", why)
+	}
+
+	// The peer holds the HEL. A Dial that has already returned gave up
+	// without being asked; the fixed arm must not credit that return.
+	select {
+	case o := <-out:
+		t.Errorf("Dial returned (%v) before the context was cancelled - the "+
+			"library gave up without being asked", o.err)
+		return
+	default:
+	}
+
+	cancel()
+	cancelledAt := time.Now()
+
+	var o dialOutcome
+	returned := false
+	select {
+	case o = <-out:
+		returned = true
+	case <-time.After(unblock):
+		// One more non-blocking read before scoring "still blocked": the
+		// return and the timer can land together, and the helper's stamp,
+		// not this read, places the return on the wall clock.
+		select {
+		case o = <-out:
+			returned = true
+		default:
+		}
+	}
+
+	switch {
+	case !returned:
+		if knownBug != "" {
+			t.Logf("known bug: %s (Dial was still blocked %v after the cancel)",
+				knownBug, unblock)
+		} else {
+			t.Errorf("the context was cancelled and Dial was still blocked "+
+				"%v later", unblock)
+		}
+	case o.returned.Before(cancelledAt):
+		// A return stamped before the cancel is an early return wherever
+		// the row reads it, and the fixed arm must not credit it.
+		t.Errorf("Dial returned (%v) before the context was cancelled - the "+
+			"library gave up without being asked", o.err)
+	case o.returned.Sub(cancelledAt) <= unblock && knownBug != "":
+		t.Errorf("this now passes (Dial returned %v within %v of the cancel) - "+
+			"delete the knownBug constant, every arm that reads it, and anything "+
+			"only those arms used, in the commit that fixed it", o.err, unblock)
+	case o.returned.Sub(cancelledAt) <= unblock:
+		t.Logf("Dial returned %v within %v of the cancel", o.err, unblock)
+	default:
+		// A return stamped past the bound is a Dial that stayed blocked
+		// past it: the stamp, not the read, places the return.
+		if knownBug != "" {
+			t.Logf("known bug: %s (Dial stayed blocked %v past the cancel, "+
+				"returning only then)", knownBug, unblock)
+		} else {
+			t.Errorf("Dial stayed blocked %v past the cancel, returning only "+
+				"then (%v)", o.returned.Sub(cancelledAt), o.err)
+		}
+	}
 }
