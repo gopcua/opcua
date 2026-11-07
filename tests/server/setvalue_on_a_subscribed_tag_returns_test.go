@@ -1,3 +1,5 @@
+//go:build conformance
+
 // An application's documented write path is MapNamespace.SetValue:
 // called on a key a client is subscribed to, it returns, and the
 // subscriber is notified of the value that was written.

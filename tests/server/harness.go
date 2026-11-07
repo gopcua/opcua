@@ -1,3 +1,5 @@
+//go:build conformance
+
 // Package server holds the gopcua server tests: one behaviour per file,
 // with the clause it checks in the file's opening comment. This file holds
 // the fixture they all run against.

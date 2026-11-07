@@ -51,7 +51,7 @@ This package has two pieces of machinery of its own:
   inside a two-second window - the floor is what stops an empty run
   passing, so it needs a number and not just a name. A
   plain `go test` without `-race` cannot score the row at all, and the
-  row declines in that case; `make test` runs `-race ./...`.
+  row declines in that case; `make conformance` runs it with `-race`.
 
 ## Where a row's evidence comes from here
 
