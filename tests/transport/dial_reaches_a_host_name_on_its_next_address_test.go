@@ -41,11 +41,14 @@
 // The row declines, and does not score, when the environment takes the
 // behaviour out of reach: when localhost resolves to a single address,
 // there is no next address and the behaviour cannot be constructed; and
-// when anything accepts a connection on the first address at that port -
-// the row dials the first address itself as its setup check - a HEL at
-// the last address would not be evidence about the first address's
-// refusal. Both are declines, because a red the row cannot pin on the
-// library is not a score.
+// when the row's probe of the first address at that port - its setup
+// check, a dial bounded by unblock - does not see that address refuse:
+// the probe requires errors.Is(err, syscall.ECONNREFUSED). A probe that
+// connects, or that fails any other way - a timeout, a drop, a network
+// unreachable - means the premise "the first address refuses" does not
+// hold, so the row cannot pin a missing HEL on the library. All are
+// declines, because a red the row cannot pin on the library is not a
+// score.
 //
 // The row dials with a context the row bounds - a deadline, or a cancel
 // after the verdict - because on a fixed library Dial never returns: the
@@ -61,11 +64,15 @@
 // listener. That error is the presence: on main, ResolveEndpoint keeps
 // addrs[0] (uacp/endpoint.go:50) and the dial to it is refused, so Dial
 // returns an error and no HEL ever reaches the last-address listener.
-// The arms, in words: a HEL arriving at the last-address listener is the
-// fixed arm and demands the constant's deletion; Dial returning an error
-// with no HEL at the listener logs the known bug. When no HEL arrives
-// within unblock and Dial has not returned, that is an ordinary failure,
-// scored with t.Errorf, and the failure message says so.
+// The arms, in words: a HEL seen at the last-address listener at any
+// point before the verdict is the fixed arm, whatever Dial returned, and
+// it demands the constant's deletion; Dial returning an error with no
+// HEL at the listener logs the known bug; Dial returning with a nil
+// error and no HEL arrived is an ordinary failure with t.Errorf, because
+// the silent peer never acknowledges, so such a return cannot come from
+// a dial that reached it. When no HEL arrives within unblock and Dial
+// has not returned, that is an ordinary failure too, scored with
+// t.Errorf, and the failure message says so.
 //
 // No reference stack has been read for this behaviour.
 package transport

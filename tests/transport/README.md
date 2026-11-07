@@ -64,7 +64,10 @@ address row. The Go doc line is quoted verbatim in the row's header, from
 ## The knownBug ledger
 
 Two constants stand, one per row, declared inside their test functions;
-both are written with the bodies. Two different fixes close them, one for
+both are written with the bodies. Each constant's text names the
+mechanism it keys on, with the file and line it comes from, the way the
+constants in the neighbouring test packages do, and carries no issue
+link. Two different fixes close them, one for
 each constant: honouring the context's cancellation in `Handshake` closes
 `handshake_gives_up_when_its_context_is_cancelled_test.go`, and iterating
 the resolved addresses in `Dialer.Dial` closes
