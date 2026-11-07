@@ -35,17 +35,13 @@ import (
 
 // unblock is how long a row waits for Dial to return once its stimulus
 // has fired - the cancel or the deadline - and how long a setup check
-// waits for the HEL to reach the peer. It is not a timing assumption: a
-// library that honours the context unblocks at once - the deadline path
-// sets the connection's read deadline from the context
-// (uacp/conn.go:236-237), and the cancellation path unblocks the same
-// read by setting a deadline in the past - so the bound exists to let a
-// fixed library finish, not to wait out a broken one.
+// waits for the HEL to reach the peer. README.md's machinery bullet
+// says why the bound is not a timing assumption.
 const unblock = 5 * time.Second
 
-// The outcome is the error, and returned, the wall-clock time stamped
-// immediately after Dial returned: a return is placed on the wall clock
-// by that stamp, not by when the row reads the channel.
+// dialOutcome is what dial delivers on its channel: err is the error,
+// and returned the wall-clock time stamped immediately after Dial
+// returned.
 type dialOutcome struct {
 	err      error
 	returned time.Time

@@ -51,10 +51,12 @@
 // the absence scoreable: the setup check proves the HEL reached the peer
 // before the cancel, so a library that never reaches the stimulus - no
 // connection, or no HEL on it - declines instead of landing in the
-// known-bug arm. The arms, in words: the fixed arm is a return stamped
-// after the cancel and within unblock of it - each return is placed on
-// the wall clock by the helper's stamp, not by when the row reads the
-// channel - and it demands the constant's deletion. A Dial still blocked
+// known-bug arm. The arms, in words: a return stamped before the cancel
+// is the early-return failure wherever the row reads it, and the fixed
+// arm must not credit it; the fixed arm is a return stamped after the
+// cancel and within unblock of it - each return is placed on the wall
+// clock by the helper's stamp, not by when the row reads the channel -
+// and it demands the constant's deletion. A Dial still blocked
 // at the bound is the known bug: the row logs a `known bug:` line with
 // t.Logf while the constant stands, and the build stays green; once the
 // constant is deleted, the same outcome is scored with a plain t.Errorf.
@@ -98,6 +100,8 @@ func TestHandshakeGivesUpWhenItsContextIsCancelled(t *testing.T) {
 		t.Fatalf("could not set the test up: %s", why)
 	}
 
+	// Stamped before the cancel: a return the cancel itself causes is
+	// stamped after this moment, so the early-return arm cannot mis-score it.
 	cancelledAt := time.Now()
 	cancel()
 
