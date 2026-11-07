@@ -15,10 +15,10 @@
 // deadline passes." (go/src/context/context.go:16). gopcua passes this
 // row as it stands: with a deadline present, Handshake sets the
 // connection's read deadline from the context (uacp/conn.go:236-237) and
-// the blocked Receive (uacp/conn.go:244) fails when it passes, so Dial
-// returns. The row exists to guard that deadline path against a change
-// made to the cancellation path: a change that fixed the cancellation
-// while breaking the deadline would pass
+// the blocked Receive (uacp/conn.go:244) fails when the deadline passes,
+// so Dial returns. The row exists to guard that deadline path against a
+// change made to the cancellation path: a change that fixed the
+// cancellation while breaking the deadline would pass
 // handshake_gives_up_when_its_context_is_cancelled_test.go and fail
 // this one.
 //
@@ -35,7 +35,7 @@
 // the peer, dials opc.tcp://<peer address> with a context whose deadline
 // is one second, through the shared dial helper, and awaits the HEL
 // through the shared setup check, passing it time.Until(deadline) and
-// not unblock, so the HEL must arrive by the deadline itself: if it has
+// not unblock, so the HEL must arrive by the deadline itself. If it has
 // not, the run cannot construct "the deadline expires while the HEL is
 // held", and the row declines. The deadline is the row's own, so the
 // peer's silence outlives it and the expiry lands while the HEL is held
@@ -46,21 +46,14 @@
 //
 // The row asserts that Dial returns within unblock after its context's
 // deadline: the verdict window ends at deadline + unblock on the wall
-// clock. Outcomes come off the dial helper's buffered channel, and each
-// return is placed on the wall clock by the helper's stamp, not by when
-// the row reads the channel, so the row compares the stamp with the
-// deadline: a return stamped before the deadline, while the HEL is still
-// unanswered, is a failure with t.Errorf - the library gave up before
-// the context did - after which the row returns; so is a Dial not
-// returned by the bound; a return stamped after the deadline, within
-// unblock of it, is the fixed arm. It deliberately asserts nothing
-// about the error Dial
+// clock. The row scores each return by the helper's stamp against the
+// deadline. It deliberately asserts nothing about the error Dial
 // returns: a fixed implementation may surface context.DeadlineExceeded
 // or the read failure the expired connection deadline induces, and the
 // contract fixes that the call returns, not the wording. It also asserts
-// nothing about how long inside the context deadline the return lands -
-// the connection deadline fires at it, and the margin is net's, not
-// gopcua's.
+// nothing about how long past the context's deadline the return lands -
+// the connection's read deadline fires at the deadline, and the margin
+// past it is net's, not gopcua's.
 //
 // No reference stack has been read for this behaviour.
 package transport
@@ -88,9 +81,6 @@ func TestHandshakeGivesUpAtItsContextDeadline(t *testing.T) {
 
 	out := dial(ctx, "opc.tcp://"+peer.addr())
 
-	// The HEL must arrive by the deadline itself: if it has not, the run
-	// cannot construct "the deadline expires while the HEL is held", and
-	// the row declines.
 	if why, fromGopcua := peer.awaitHello(time.Until(deadline)); why != "" {
 		if fromGopcua {
 			t.Errorf("gopcua's own behaviour made this run unscoreable: %s", why)
@@ -125,7 +115,8 @@ func TestHandshakeGivesUpAtItsContextDeadline(t *testing.T) {
 			"%v after it", unblock)
 	case o.returned.Before(deadline):
 		// A return stamped before the deadline, while the HEL is still
-		// unanswered, is an early return wherever the row reads it.
+		// unanswered, is an early return wherever the row reads it, and
+		// the fixed arm must not credit it.
 		t.Errorf("Dial returned (%v) before the context's deadline expired - "+
 			"the library gave up before the context did", o.err)
 	case o.returned.Sub(deadline) <= unblock:
