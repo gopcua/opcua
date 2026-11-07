@@ -121,15 +121,6 @@ func (p *silentPeer) addr() string {
 	return p.listener.Addr().String()
 }
 
-// port is the port the peer listens on, split from its listener's
-// address, so a row that dials another host or address at the peer's
-// port - the address row's probe and its localhost dial - uses the
-// peer's own port without re-deriving it from addr.
-func (p *silentPeer) port() string {
-	_, port, _ := net.SplitHostPort(p.listener.Addr().String())
-	return port
-}
-
 // serve accepts one connection, records its first message header, and
 // then discards everything else and never answers, until the connection
 // or the listener is closed. A second connection is never accepted.
