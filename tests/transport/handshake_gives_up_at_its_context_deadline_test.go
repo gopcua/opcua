@@ -34,11 +34,12 @@
 // The row runs against the scripted silent peer - the shared fixture in
 // harness.go - driven through uacp.Dialer.Dial directly: the row starts
 // the peer, dials opc.tcp://<peer address> with a context whose deadline
-// is one second, on a goroutine it spawns, and awaits the HEL through
-// the shared setup check bounded by that deadline, not by unblock: if
-// the HEL has not reached the peer by the time the deadline passes, the
-// run cannot construct "the deadline expires while the HEL is held", and
-// the row declines. The deadline is the row's own, so the peer's silence
+// is one second, through the shared dial helper, and awaits the HEL
+// through the shared setup check, passing it time.Until(deadline) and
+// not unblock, so the HEL must arrive by the deadline itself: if it has
+// not, the run cannot construct "the deadline expires while the HEL is
+// held", and the row declines. The deadline is the row's own, so the
+// peer's silence
 // outlives it and the expiry lands while the HEL is held unanswered. The
 // setup check's decline and unscoreable split is awaitHello's: a failed
 // check either side could have caused - no connection accepted, or no
@@ -49,12 +50,17 @@
 // with t.Cleanup, so a Dial still blocked on main is released when the
 // test ends. See harness.go.
 //
-// The row asserts that Dial returns by its context's deadline plus
-// unblock, on the wall clock. A Dial that returns before the deadline,
-// while the HEL is still unanswered, is a failure with t.Errorf - the
-// library gave up before the context did - and so is a Dial not returned
-// by the bound; a return after the deadline, within unblock of it, is
-// the fixed arm. It deliberately asserts nothing about the error Dial
+// The row asserts that Dial returns within unblock after its context's
+// deadline: the verdict window ends at deadline + unblock on the wall
+// clock. Outcomes come off the dial helper's buffered channel, and each
+// return is placed on the wall clock by the helper's stamp, not by when
+// the row reads the channel, so the row compares the stamp with the
+// deadline: a return stamped before the deadline, while the HEL is still
+// unanswered, is a failure with t.Errorf - the library gave up before
+// the context did - after which the row returns; so is a Dial not
+// returned by the bound; a return stamped after the deadline, within
+// unblock of it, is the fixed arm. It deliberately asserts nothing
+// about the error Dial
 // returns: a fixed implementation may surface context.DeadlineExceeded
 // or the read failure the expired connection deadline induces, and the
 // contract fixes that the call returns, not the wording. It also asserts

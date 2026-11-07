@@ -30,9 +30,9 @@
 //
 // The row runs against the scripted silent peer - the shared fixture in
 // harness.go - driven through uacp.Dialer.Dial directly: the row starts
-// the peer, dials opc.tcp://<peer address> on its cancellable context on
-// a goroutine it spawns, and awaits the HEL through the shared setup
-// check, within unblock, before it cancels. The setup check's decline
+// the peer, dials opc.tcp://<peer address> on its cancellable context
+// through the shared dial helper, and awaits the HEL through the shared
+// setup check, within unblock, before it cancels. The setup check's decline
 // and unscoreable split is awaitHello's: a failed check either side
 // could have caused - no connection accepted, or no header read within
 // unblock, which can close on a loaded machine - is a decline ("could
@@ -56,14 +56,19 @@
 // the setup check proves the HEL reached the peer before the cancel, so
 // a library that never reaches the stimulus - no connection, or no HEL
 // on it - declines instead of landing in the known-bug arm. The arms, in
-// words: a Dial that returns before the cancel is a failure with
-// t.Errorf - the library gave up without being asked - and the fixed arm
-// must not credit it; the fixed arm is a return after the cancel and
-// within unblock of it, and it demands the constant's deletion; a Dial
-// still blocked at the bound is the known bug, scored with t.Errorf
-// while the constant stands and with a plain t.Errorf once it is
-// deleted. The arms read the dial goroutine's outcome off a
-// channel, so a blocked Dial cannot wedge the test past the bound.
+// words: the row checks the dial helper's channel for an outcome already
+// present immediately before it cancels; one already there is a Dial
+// that returned before the cancel - the library gave up without being
+// asked - a failure with t.Errorf, after which the row returns, and the
+// fixed arm must not credit it. The fixed arm is a return stamped after
+// the cancel and within unblock of it - each return is placed on the
+// wall clock by the helper's stamp, not by when the row reads the
+// channel - and it demands the constant's deletion. A Dial still blocked
+// at the bound is the known bug: the row logs a `known bug:` line with
+// t.Logf while the constant stands, and the build stays green; once the
+// constant is deleted, the same outcome is scored with a plain t.Errorf.
+// The arms read the dial helper's buffered channel, so a blocked Dial
+// cannot wedge the test past the bound.
 //
 // No reference stack has been read for this behaviour.
 package transport

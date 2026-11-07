@@ -33,7 +33,8 @@
 // resolves the name with net.Resolver.LookupIPAddr - the same call
 // ResolveEndpoint makes (uacp/endpoint.go:40), so the row and the
 // library agree on the order - listens on the last address on a free
-// port, and dials opc.tcp://localhost:<that port>. See harness.go.
+// port, and dials opc.tcp://localhost:<the peer's own port, from the
+// peer's port helper>. See harness.go.
 // awaitHello is the wrong helper for this row: its "accepted no
 // connection" reason is the known-bug outcome here, not a decline, so
 // the row reads the peer's state through its own logic.
@@ -41,20 +42,25 @@
 // The row declines, and does not score, when the environment takes the
 // behaviour out of reach: when localhost resolves to a single address,
 // there is no next address and the behaviour cannot be constructed; and
-// when the row's probe of the first address at that port - its setup
-// check, a dial bounded by unblock - does not see that address refuse:
+// when the row's probe of the first address at the peer's port - from
+// the peer's port helper again, so probe and dial cannot disagree - its
+// setup check, a dial bounded by unblock - does not see that address
+// refuse:
 // the probe requires refused(err), the build-tagged helper in
 // refused_windows.go and refused_other.go (errors.Is against Winsock's
 // WSAECONNREFUSED on Windows, against syscall.ECONNREFUSED elsewhere).
 // A probe that
-// connects, or that fails any other way - a timeout, a drop, a network
+// connects - the row closes the connection it opened before it declines
+// - or that fails any other way - a timeout, a drop, a network
 // unreachable - means the premise "the first address refuses" does not
 // hold, so the row cannot pin a missing HEL on the library. All are
 // declines, because a red the row cannot pin on the library is not a
 // score.
 //
-// The row dials with a context the row bounds - a deadline, or a cancel
-// after the verdict - because on a fixed library Dial never returns: the
+// The row dials through the shared dial helper with a context whose
+// deadline is 2×unblock - long enough that it never ends inside the
+// scored window, while the teardown still releases a fixed library's
+// blocked Dial - because on a fixed library Dial never returns: the
 // silent peer never sends an Acknowledge, so a library that dials the
 // right address still blocks in Handshake after sending its HEL. The row
 // scores only whether a HEL arrives at the listener on the last address
@@ -69,7 +75,10 @@
 // returns an error and no HEL ever reaches the last-address listener.
 // The arms, in words: a HEL seen at the last-address listener at any
 // point before the verdict is the fixed arm, whatever Dial returned, and
-// it demands the constant's deletion; Dial returning an error with no
+// it demands the constant's deletion; before scoring any arm other than
+// the fixed one, the row re-checks the peer's HEL signal without
+// blocking, so a HEL that raced a Dial error is still the fixed arm;
+// Dial returning an error with no
 // HEL at the listener logs the known bug; Dial returning with a nil
 // error and no HEL arrived is an ordinary failure with t.Errorf, because
 // the silent peer never acknowledges, so such a return cannot come from

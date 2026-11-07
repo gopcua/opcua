@@ -23,11 +23,14 @@
 package transport
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net"
 	"sync"
 	"time"
+
+	"github.com/gopcua/opcua/uacp"
 )
 
 // unblock is how long a row waits for Dial to return once its stimulus
@@ -39,6 +42,34 @@ import (
 // close ends the blocked read immediately; the bound exists to let a
 // fixed library finish, not to wait out a broken one.
 const unblock = 5 * time.Second
+
+// dial runs uacp.Dialer.Dial - with the zero-valued &uacp.Dialer{}, whose
+// fields are nil, so the library's defaults stand - on its own goroutine
+// and delivers the call's outcome on a one-buffered channel, so the
+// goroutine never blocks on a row that has stopped reading. The outcome
+// is the error, and returned, the wall-clock time stamped immediately
+// after Dial returned: a return is placed on the wall clock by that
+// stamp, not by when the row reads the channel. A *uacp.Conn the library
+// did return is closed in this goroutine, so it leaks nothing. Like every
+// helper here it returns plain values; the row turns the outcome it
+// reads into the failure or the decline.
+type dialOutcome struct {
+	err      error
+	returned time.Time
+}
+
+func dial(ctx context.Context, endpoint string) <-chan dialOutcome {
+	out := make(chan dialOutcome, 1)
+	go func() {
+		conn, err := (&uacp.Dialer{}).Dial(ctx, endpoint)
+		o := dialOutcome{err: err, returned: time.Now()}
+		if conn != nil {
+			_ = conn.Close()
+		}
+		out <- o
+	}()
+	return out
+}
 
 // silentPeer is the scripted silent peer. It accepts one connection,
 // reads the message header off it, and never writes anything.
@@ -86,6 +117,15 @@ func startSilentPeer(host string) (*silentPeer, func(), string) {
 // addr is the host:port the peer listens on.
 func (p *silentPeer) addr() string {
 	return p.listener.Addr().String()
+}
+
+// port is the port the peer listens on, split from its listener's
+// address, so a row that dials another host or address at the peer's
+// port - the address row's probe and its localhost dial - uses the
+// peer's own port without re-deriving it from addr.
+func (p *silentPeer) port() string {
+	_, port, _ := net.SplitHostPort(p.listener.Addr().String())
+	return port
 }
 
 // serve accepts one connection, records its first message header, and
