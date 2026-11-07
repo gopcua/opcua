@@ -88,7 +88,9 @@
 // silent peer never acknowledges, so a nil return cannot come from a
 // dial that reached it. When no HEL arrives within unblock and Dial
 // has not returned, that is an ordinary failure too, scored with
-// t.Errorf, and the failure message says so.
+// t.Errorf: the message says still blocked when the peer read no
+// header, and says what the peer did read when a connection reached the
+// listener but did not send a HEL.
 //
 // No reference stack has been read for this behaviour.
 package transport
@@ -108,6 +110,15 @@ import (
 func (p *silentPeer) port() string {
 	_, port, _ := net.SplitHostPort(p.listener.Addr().String())
 	return port
+}
+
+// readHeader returns the message header the peer read off the connection
+// it accepted, or "" if it has read none yet. It is a helper one row
+// calls, so it lives with that row (../README.md's placement rule).
+func (p *silentPeer) readHeader() string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.header
 }
 
 func TestDialReachesAHostNameOnItsNextAddress(t *testing.T) {
@@ -206,8 +217,16 @@ func TestDialReachesAHostNameOnItsNextAddress(t *testing.T) {
 			t.Logf("a HEL arrived at the listener on %s", peer.addr())
 		}
 	case !returned:
-		t.Errorf("no HEL arrived at the listener on %s and Dial was still "+
-			"blocked %v after the dial", peer.addr(), unblock)
+		// A library that reached the right listener but sent a header that
+		// is not HELF leaves its header behind; the peer read it, so the
+		// row says reached rather than still blocked.
+		if hdr := peer.readHeader(); hdr != "" {
+			t.Errorf("a connection reached the listener on %s but its first "+
+				"message header was %q, not HELF", peer.addr(), hdr)
+		} else {
+			t.Errorf("no HEL arrived at the listener on %s and Dial was still "+
+				"blocked %v after the dial", peer.addr(), unblock)
+		}
 	case o.err != nil:
 		if knownBug != "" && refused(o.err) {
 			t.Logf("known bug: %s (Dial returned %v and no HEL arrived at the "+
