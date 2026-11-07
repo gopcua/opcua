@@ -93,21 +93,10 @@ func TestHandshakeGivesUpAtItsContextDeadline(t *testing.T) {
 	// after the context's deadline, not unblock after this line.
 	bound := deadline.Add(unblock)
 
-	var o dialOutcome
-	returned := false
-	select {
-	case o = <-out:
-		returned = true
-	case <-time.After(time.Until(bound)):
-		// One more non-blocking read before scoring "still blocked": the
-		// return and the timer can land together, and the helper's stamp,
-		// not this read, places the return on the wall clock.
-		select {
-		case o = <-out:
-			returned = true
-		default:
-		}
-	}
+	// awaitOutcome bounds the wait by the verdict window and takes the
+	// one more non-blocking read documented on the helper before it
+	// reports the window as ended with nothing on the channel.
+	o, returned := awaitOutcome(out, time.Until(bound))
 
 	switch {
 	case !returned:

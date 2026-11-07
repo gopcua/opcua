@@ -106,21 +106,10 @@ func TestHandshakeGivesUpWhenItsContextIsCancelled(t *testing.T) {
 	cancelledAt := time.Now()
 	cancel()
 
-	var o dialOutcome
-	returned := false
-	select {
-	case o = <-out:
-		returned = true
-	case <-time.After(unblock):
-		// One more non-blocking read before scoring "still blocked": the
-		// return and the timer can land together, and the helper's stamp,
-		// not this read, places the return on the wall clock.
-		select {
-		case o = <-out:
-			returned = true
-		default:
-		}
-	}
+	// awaitOutcome bounds the wait by unblock and takes the one more
+	// non-blocking read documented on the helper before it reports the
+	// window as ended with nothing on the channel.
+	o, returned := awaitOutcome(out, unblock)
 
 	switch {
 	case !returned:

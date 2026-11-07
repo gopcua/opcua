@@ -13,7 +13,8 @@ and the silence is the stimulus, so a scripted peer is what the behaviours
 need. The fixture is small and lives entirely in `harness.go`; item 3's
 reading here is that fixture, and it is checkable the way it is in the
 other packages: `grep -c "See harness.go" tests/transport/*_test.go`
-prints 1 for every row and 0 for `harness.go`. `refused_windows.go` and
+prints 1 for every row; the glob does not match `harness.go`, which is
+the fixture itself and not a row. `refused_windows.go` and
 `refused_other.go` are not rows either: they hold the build-tagged
 `refused` helper the address row's setup probe reads (a refused dial on
 Windows is Winsock's WSAECONNREFUSED, not `syscall.ECONNREFUSED`), and a
@@ -70,7 +71,10 @@ address row. The Go doc line is quoted verbatim in the row's header, from
   listen on the last address, and when anything accepts a connection on
   the first address at that port or the probe of that address fails any
   other way — a HEL at the last address would then not be evidence about
-  the first address's refusal.
+  the first address's refusal. One concrete case of the listen-failure
+  decline: a host without IPv6 loopback whose `localhost` still resolves
+  to `::1` cannot listen on the last address, so the row declines with
+  that reason — the red is the environment, not the library.
 
 ## The knownBug ledger
 

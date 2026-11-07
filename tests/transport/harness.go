@@ -54,12 +54,12 @@ type dialOutcome struct {
 // a return by the helper's stamp wherever it reads it, so a return
 // stamped before the cancel or the deadline is the early-return failure
 // even when the row reads it later. When a row's window ends with
-// nothing on the channel, the row takes one more non-blocking read
-// before it scores "still blocked", and scores what it finds by the
-// stamp. A *uacp.Conn the library did return is closed in this
-// goroutine, so it leaks nothing. Like every helper here it returns
-// plain values; the row turns the outcome it reads into the failure or
-// the decline.
+// nothing on the channel, the shared awaitOutcome helper takes one more
+// non-blocking read before the row scores "still blocked", and the row
+// scores what it finds by the stamp. A *uacp.Conn the library did
+// return is closed in this goroutine, so it leaks nothing. Like every
+// helper here it returns plain values; the row turns the outcome it
+// reads into the failure or the decline.
 func dial(ctx context.Context, endpoint string) <-chan dialOutcome {
 	out := make(chan dialOutcome, 1)
 	go func() {
@@ -80,6 +80,7 @@ type silentPeer struct {
 
 	mu     sync.Mutex
 	conn   net.Conn
+	closed bool   // set by teardown; serve then closes the connection itself
 	header string // the first four bytes read off the connection, once read
 
 	accepted chan struct{} // closed once a connection has been accepted
@@ -109,6 +110,7 @@ func startSilentPeer(host string) (*silentPeer, func(), string) {
 		_ = l.Close()
 		p.mu.Lock()
 		defer p.mu.Unlock()
+		p.closed = true
 		if p.conn != nil {
 			_ = p.conn.Close()
 		}
@@ -123,13 +125,20 @@ func (p *silentPeer) addr() string {
 
 // serve accepts one connection, records its first message header, and
 // then discards everything else and never answers, until the connection
-// or the listener is closed. A second connection is never accepted.
+// or the listener is closed. A second connection is never accepted. If
+// teardown runs between the Accept and this goroutine taking the mutex,
+// teardown never saw the connection, so serve closes it here.
 func (p *silentPeer) serve() {
 	c, err := p.listener.Accept()
 	if err != nil {
 		return // the listener was closed in teardown
 	}
 	p.mu.Lock()
+	if p.closed {
+		p.mu.Unlock()
+		_ = c.Close()
+		return
+	}
 	p.conn = c
 	p.mu.Unlock()
 	close(p.accepted)
@@ -149,12 +158,38 @@ func (p *silentPeer) serve() {
 	_, _ = io.Copy(io.Discard, c) // hold the connection open, never answer
 }
 
+// awaitOutcome is the verdict-window wait the two handshake rows share:
+// it waits up to `within` for the outcome dial delivered, and returns it
+// with true. Once the bound passes it takes one more non-blocking read -
+// the return and the timer can land together, and dial's stamp, not this
+// read, places the return on the wall clock - and returns a zero
+// dialOutcome with false when there is nothing there. It is a helper two
+// rows call, so it lives here.
+func awaitOutcome(
+	out <-chan dialOutcome, within time.Duration,
+) (dialOutcome, bool) {
+	var o dialOutcome
+	select {
+	case o = <-out:
+		return o, true
+	case <-time.After(within):
+		select {
+		case o = <-out:
+			return o, true
+		default:
+			return dialOutcome{}, false
+		}
+	}
+}
+
 // awaitHello is the setup check the handshake rows share: it waits up to
 // `within` for the peer to read a HEL message header off the connection
 // Dial opened, which proves the stimulus - a Dial blocked in Receive
 // (uacp/conn.go:244) - has been reached before the row cancels its
 // context or its deadline passes. It returns "", false once the HEL has
-// been read. Otherwise it returns a reason and which side caused the
+// been read. A HEL that lands with the timer is caught by the
+// fallback's re-read of the peer's recorded header, not blamed on
+// either side. Otherwise it returns a reason and which side caused the
 // failed check, and the row prints the reason with the wording below:
 //
 //   - fromGopcua false, a decline: a failed check either side could have
@@ -188,6 +223,11 @@ func (p *silentPeer) awaitHello(within time.Duration) (string, bool) {
 	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	if p.header == "HELF" {
+		// The header says the HEL arrived, whether or not the peer has
+		// closed p.hello yet: the check passed.
+		return "", false
+	}
 	if p.header == "" {
 		return fmt.Sprintf("the peer accepted the connection but read no "+
 			"message header within %v", within), false
