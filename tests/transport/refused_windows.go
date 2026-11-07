@@ -1,7 +1,7 @@
 //go:build conformance && windows
 
 // This file is not a row: it holds one build-tagged helper,
-// refusedWindows below, that the address row's setup probe calls. The
+// refused below, that the address row's setup probe calls. The
 // helper cannot live in harness.go, because a build constraint applies
 // to a whole file, and harness.go must build on every platform the
 // suite does. The pair is named on the race_on.go/race_off.go model in

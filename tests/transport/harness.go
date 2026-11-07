@@ -49,7 +49,12 @@ const unblock = 5 * time.Second
 // goroutine never blocks on a row that has stopped reading. The outcome
 // is the error, and returned, the wall-clock time stamped immediately
 // after Dial returned: a return is placed on the wall clock by that
-// stamp, not by when the row reads the channel. A *uacp.Conn the library
+// stamp, not by when the row reads the channel. A row scores a return
+// by the helper's stamp wherever it reads it, so a return stamped before
+// the cancel or the deadline is the early-return failure even when the
+// row reads it later. When a row's window ends with nothing on the
+// channel, the row takes one more non-blocking read before it scores
+// "still blocked", and scores what it finds by the stamp. A *uacp.Conn the library
 // did return is closed in this goroutine, so it leaks nothing. Like every
 // helper here it returns plain values; the row turns the outcome it
 // reads into the failure or the decline.
