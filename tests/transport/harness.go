@@ -53,14 +53,18 @@ type silentPeer struct {
 	hello    chan struct{} // closed once a HEL message header has been read
 }
 
-// startSilentPeer brings the silent peer up on 127.0.0.1 on a free port.
-// It returns the peer, a teardown for the listener and the accepted
+// startSilentPeer brings the silent peer up on the host it is given, on
+// a free port the kernel chooses. Rows that need the peer on the loopback
+// interface pass 127.0.0.1; the address row passes the last address
+// localhost resolves to, which may be ::1 or 127.0.0.1, so the host is
+// joined with net.JoinHostPort and an IPv6 host comes out bracketed. It
+// returns the peer, a teardown for the listener and the accepted
 // connection, and "" - or, when the peer could not be started, the reason
 // the run cannot be scored.
-func startSilentPeer() (*silentPeer, func(), string) {
-	l, err := net.Listen("tcp", "127.0.0.1:0")
+func startSilentPeer(host string) (*silentPeer, func(), string) {
+	l, err := net.Listen("tcp", net.JoinHostPort(host, "0"))
 	if err != nil {
-		return nil, func() {}, fmt.Sprintf("listen on 127.0.0.1: %v", err)
+		return nil, func() {}, fmt.Sprintf("listen on %s: %v", host, err)
 	}
 	p := &silentPeer{
 		listener: l,
@@ -121,7 +125,11 @@ func (p *silentPeer) serve() {
 // reached it; or the connection carried no HEL, so what the row is about
 // to score is not the handshake these rows drive. Which of those reasons
 // is the fixture's and which is the library's is each row's own
-// judgement, and its header says how it declines.
+// judgement, and its header says how it declines. For the handshake rows
+// the "accepted no connection" reason is a decline; for
+// dial_reaches_a_host_name_on_its_next_address_test.go that same reason
+// is the known-bug outcome, not a decline, and that row does not call
+// this helper - it reads the peer's state through its own logic.
 func (p *silentPeer) awaitHello() string {
 	select {
 	case <-p.hello:

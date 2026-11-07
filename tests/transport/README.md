@@ -34,8 +34,8 @@ address row. The Go doc line is quoted verbatim in the row's header, from
 
 - **A wall clock scores a blocked dial.** A `Dial` that never returns
   cannot be observed except by outliving a bound, so the handshake rows
-  give the call one (`unblock` in `harness.go`) and score the return, not
-  the block. The bound is not a timing assumption: a library that honours
+  and the address row give the call one (`unblock` in `harness.go`) and
+  score the return, not the block. The bound is not a timing assumption: a library that honours
   the context unblocks at once — the deadline path sets the connection's
   read deadline from the context (uacp/conn.go:236-237) and a teardown
   close ends the read with `io.EOF` — so the bound exists to let a fixed
@@ -44,12 +44,14 @@ address row. The Go doc line is quoted verbatim in the row's header, from
   `t.Cleanup`, so a `Dial` left blocked on main is released when the test
   ends.
 
-- **`localhost` gives the address row its two addresses.** On the host
-  this suite was authored on, `localhost` resolves to two addresses,
-  `::1` and `127.0.0.1` (measured with `getaddrinfo`), and the row
-  resolves the name itself with `net.Resolver.LookupIPAddr` — the same
-  call `ResolveEndpoint` makes (uacp/endpoint.go:40) — so the row and the
-  library agree on the order. The row listens only on the **last**
+- **`localhost` gives the address row its two addresses.** On the macOS
+  host this suite was authored on, a Go program calling
+  `(&net.Resolver{}).LookupIPAddr(ctx, "localhost")` printed
+  `[{::1 } {127.0.0.1 }]`: two addresses. The order and the count can
+  differ on other hosts, which is why the row resolves the name itself
+  with `net.Resolver.LookupIPAddr` — the same call `ResolveEndpoint`
+  makes (uacp/endpoint.go:40) — so the row and the library agree on the
+  order, and why it declines on a single address. The row listens only on the **last**
   address and dials `opc.tcp://localhost:<port>`; on main the HEL never
   arrives there, because `ResolveEndpoint` keeps only `addrs[0]`
   (uacp/endpoint.go:50) and `Dialer.Dial` dials that one address
@@ -62,10 +64,10 @@ address row. The Go doc line is quoted verbatim in the row's header, from
 ## The knownBug ledger
 
 Two constants stand, one per row, declared inside their test functions;
-both are written with the bodies. They are expected to be closed by the
-same fix: honouring the context's cancellation in `Handshake` closes
+both are written with the bodies. Two different fixes close them, one for
+each constant: honouring the context's cancellation in `Handshake` closes
 `handshake_gives_up_when_its_context_is_cancelled_test.go`, and iterating
-the resolved addresses closes
+the resolved addresses in `Dialer.Dial` closes
 `dial_reaches_a_host_name_on_its_next_address_test.go`. No constant
 stands for the deadline row: gopcua passes it as it stands, and it exists
 to guard the deadline path against a change made to the cancellation
