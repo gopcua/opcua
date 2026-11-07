@@ -19,12 +19,14 @@
 // dials that one address (uacp/conn.go:83), so a host name whose first
 // address refuses is never tried on its next one.
 //
-// Neighbouring rows: handshake_gives_up_when_its_context_is_cancelled_
-// test.go and handshake_gives_up_at_its_context_deadline_test.go score
-// when Dial gives up on a peer that has the connection; this row scores
-// which address Dial reaches a peer on, before any handshake is held
-// open. They share the silent peer and the HEL check, not a code path in
-// the library beyond ResolveEndpoint.
+// Neighbouring rows:
+// handshake_gives_up_when_its_context_is_cancelled_test.go and
+// handshake_gives_up_at_its_context_deadline_test.go score when Dial
+// gives up on a peer that has the connection; this row scores which
+// address Dial reaches a peer on, before any handshake is held open.
+// They share the silent peer, not the HEL check - this row reads the
+// peer's state through its own logic - and no code path in the library
+// beyond ResolveEndpoint.
 //
 // The row runs against the silent peer from harness.go, bound by the
 // row's own setup to the last address localhost resolves to: the row
@@ -32,6 +34,9 @@
 // ResolveEndpoint makes (uacp/endpoint.go:40), so the row and the
 // library agree on the order - listens on the last address on a free
 // port, and dials opc.tcp://localhost:<that port>. See harness.go.
+// awaitHello is the wrong helper for this row: its "accepted no
+// connection" reason is the known-bug outcome here, not a decline, so
+// the row reads the peer's state through its own logic.
 //
 // The row declines, and does not score, when the environment takes the
 // behaviour out of reach: when localhost resolves to a single address,
@@ -42,20 +47,25 @@
 // refusal. Both are declines, because a red the row cannot pin on the
 // library is not a score.
 //
-// The row asserts that a HEL arrives at the listener on the last address
-// within unblock of the dial. It deliberately asserts nothing about what
-// Dial returns when the behaviour is fixed - a fixed library returns a
-// live connection, and asserting more about the connection's state would
-// score the uasc layer above, not the transport.
+// The row dials with a context the row bounds - a deadline, or a cancel
+// after the verdict - because on a fixed library Dial never returns: the
+// silent peer never sends an Acknowledge, so a library that dials the
+// right address still blocks in Handshake after sending its HEL. The row
+// scores only whether a HEL arrives at the listener on the last address
+// within unblock of the dial. It deliberately asserts nothing about
+// Dial's return value, and nothing about the connection's state, which
+// would score the uasc layer above, not the transport.
 //
 // The knownBug constant is written with the body. The known-bug outcome
 // is a presence: Dial returned an error and no HEL arrived at the
-// listener. The arms, in words: a HEL arriving at the listener is the
+// listener. That error is the presence: on main, ResolveEndpoint keeps
+// addrs[0] (uacp/endpoint.go:50) and the dial to it is refused, so Dial
+// returns an error and no HEL ever reaches the last-address listener.
+// The arms, in words: a HEL arriving at the last-address listener is the
 // fixed arm and demands the constant's deletion; Dial returning an error
-// with no HEL at the listener logs the known bug. A Dial still blocked
-// at the bound is neither arm, and the row scores it as a failure - the
-// proxy the known-bug arm keys on is gone and the outcome is still
-// wrong.
+// with no HEL at the listener logs the known bug. When no HEL arrives
+// within unblock and Dial has not returned, that is an ordinary failure,
+// scored with t.Errorf, and the failure message says so.
 //
 // No reference stack has been read for this behaviour.
 package transport

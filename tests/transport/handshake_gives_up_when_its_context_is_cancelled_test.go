@@ -24,8 +24,8 @@
 // Context with a deadline is canceled after the deadline passes."
 // (go/src/context/context.go:16) - and gopcua passes that one today,
 // because the deadline path sets the connection deadline the
-// cancellation path never does. dial_reaches_a_host_name_on_its_next_
-// address_test.go scores which address of a name Dial dials; it shares
+// cancellation path never does.
+// dial_reaches_a_host_name_on_its_next_address_test.go scores which address of a name Dial dials; it shares
 // no code path with this row beyond ResolveEndpoint.
 //
 // The row runs against the scripted silent peer - the shared fixture in

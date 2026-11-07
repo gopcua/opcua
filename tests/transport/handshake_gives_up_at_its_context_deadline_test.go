@@ -23,8 +23,9 @@
 // broke the deadline while fixing the cancellation would pass that row
 // and fail this one.
 //
-// Neighbouring rows: handshake_gives_up_when_its_context_is_cancelled_
-// test.go is the same property on the cancellation half of the same
+// Neighbouring rows:
+// handshake_gives_up_when_its_context_is_cancelled_test.go is the same
+// property on the cancellation half of the same
 // contract, and it carries the knownBug constant this row does not.
 // dial_reaches_a_host_name_on_its_next_address_test.go scores which
 // address of a name Dial dials; it shares no code path with this row
