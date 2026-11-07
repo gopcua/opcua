@@ -69,8 +69,8 @@ address row. The Go doc line is quoted verbatim in the row's header, from
   address, so the behaviour cannot be constructed — when the peer cannot
   listen on the last address, and when anything accepts a connection on
   the first address at that port or the probe of that address fails any
-  other way, because a HEL at the last address would then not be evidence
-  about the first address's refusal.
+  other way — a HEL at the last address would then not be evidence about
+  the first address's refusal.
 
 ## The knownBug ledger
 
@@ -83,10 +83,10 @@ each constant: honouring the context's cancellation in `Handshake` closes
 `handshake_gives_up_when_its_context_is_cancelled_test.go`, and iterating
 the resolved addresses in `Dialer.Dial` closes
 `dial_reaches_a_host_name_on_its_next_address_test.go` — though the
-address row scores the outcome, a HEL at a listener on the last address
-after the first refused, and with the two addresses `localhost` gives it,
-it cannot tell that from a `Dialer` that tries only the last address or
-only some of them. No constant
+address row scores the outcome, which is a HEL at a listener on the last
+address after the first refused. With the two addresses `localhost`
+gives it, the row cannot tell that from a `Dialer` that tries only the
+last address or races them. No constant
 stands for the deadline row: gopcua passes it as it stands, and it exists
 to guard the deadline path against a change made to the cancellation
 path — the obvious fix for the cancellation row is to select on

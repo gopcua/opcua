@@ -47,15 +47,14 @@
 // peer's port helper again so probe and dial cannot disagree, bounded by
 // unblock - does not see that address refuse:
 // the probe requires refused(err), the build-tagged helper in
-// refused_windows.go and refused_other.go.
-// A probe that
-// connects - the row closes the connection it opened before it declines
-// - or that fails any other way - a timeout, a drop, a network
-// unreachable - means the premise "the first address refuses" does not
-// hold, so the row cannot pin a missing HEL on the library. All are
-// declines, because a red the row cannot pin on the library is not a
-// score. A failed lookup of localhost is a decline, for the same
-// reason: the row can then neither probe nor dial the name's addresses.
+// refused_windows.go and refused_other.go. A probe that connects - the
+// row closes the connection it opened before it declines - or that fails
+// any other way - a timeout, a drop, a network unreachable - means the
+// premise "the first address refuses" does not hold, so the row cannot
+// pin a missing HEL on the library. All are declines, because a red
+// the row cannot pin on the library is not a score. A failed lookup of
+// localhost is a decline, for the same reason: the row can then neither
+// probe nor dial the name's addresses.
 //
 // The row dials through the shared dial helper with a context whose
 // deadline is 2×unblock - long enough that it never ends inside the
@@ -85,9 +84,9 @@
 // Dial returning a refusal with no HEL at the listener logs the known
 // bug; any other Dial return with no HEL arrived - an error that is not
 // a refusal, or a nil error - is an ordinary failure with t.Errorf: a
-// non-refusal error is one a fixed library can show, and the silent
-// peer never acknowledges, so a nil return cannot come from a dial that
-// reached it. When no HEL arrives within unblock and Dial
+// non-refusal error is the ordinary failure described above, and the
+// silent peer never acknowledges, so a nil return cannot come from a
+// dial that reached it. When no HEL arrives within unblock and Dial
 // has not returned, that is an ordinary failure too, scored with
 // t.Errorf, and the failure message says so.
 //
@@ -136,9 +135,8 @@ func TestDialReachesAHostNameOnItsNextAddress(t *testing.T) {
 	// The peer goes on the last address: a HEL there is evidence Dial
 	// reached the last address after the first one refused. It is not
 	// evidence of in-order iteration: a Dialer that tried only the last
-	// address, or only the IPv4 ones, or raced them, lands in the same
-	// arm, and the row cannot tell these apart with the two addresses
-	// localhost gives it.
+	// address, or raced them, lands in the same arm, and the row cannot
+	// tell these apart with the two addresses localhost gives it.
 	peer, teardown, why := startSilentPeer(addrs[len(addrs)-1].String())
 	t.Cleanup(teardown)
 	if why != "" {
@@ -181,20 +179,21 @@ func TestDialReachesAHostNameOnItsNextAddress(t *testing.T) {
 	case o = <-out:
 		returned = true
 	case <-time.After(unblock):
-		// One more non-blocking re-check before any arm other than the
-		// fixed one scores: a HEL or a Dial return can land with the
-		// timer, and the helper's stamp, not this read, places the
-		// return on the wall clock.
-		select {
-		case <-peer.hello:
-			hello = true
-		default:
-		}
+		// One more non-blocking read before scoring "still blocked": a
+		// Dial return can land with the timer.
 		select {
 		case o = <-out:
 			returned = true
 		default:
 		}
+	}
+	// One more non-blocking re-check before any arm other than the fixed
+	// one scores: a HEL that raced the Dial return or the timer is still
+	// the fixed arm, whatever Dial returned.
+	select {
+	case <-peer.hello:
+		hello = true
+	default:
 	}
 
 	switch {
