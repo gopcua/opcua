@@ -36,4 +36,4 @@ jobs:
           make install-py-opcua
 
       - name: Run Tests
-        run: make test integration
+        run: make test integration conformance

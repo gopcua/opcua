@@ -1,3 +1,5 @@
+//go:build conformance
+
 // After a reconnect, a client that missed notifications asks for them one
 // after another until the server says it has no more. OPC 10000-4 §6.7:
 // "After re-establishing the connection the Client shall call Republish in a

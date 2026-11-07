@@ -1,3 +1,5 @@
+//go:build conformance
+
 // After reconnecting, a client that missed a notification must ask the
 // server to resend it. OPC 10000-4 §6.7, conformance unit 276: "Evaluate the
 // sequence number in Notifications to detect lost Notifications. Use

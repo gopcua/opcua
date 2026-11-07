@@ -1,6 +1,6 @@
 # go test -count=1 disables the test cache so that all tests are run every time.
 
-all: fmt test integration selfintegration examples
+all: fmt test integration conformance selfintegration examples
 
 test:
 	go test -count=1 -race ./...
@@ -13,6 +13,9 @@ fmt:
 
 integration:
 	go test -count=1 -race -v -tags=integration ./tests/python...
+
+conformance:
+	go test -count=1 -race -v -tags=conformance ./tests/reconnect/...
 
 selfintegration:
 	go test -count=1 -race -v -tags=integration ./tests/go...
@@ -36,4 +39,4 @@ gen:
 release:
 	GITHUB_TOKEN=$$(security find-generic-password -gs GITHUB_TOKEN -w) goreleaser --clean
 
-.PHONY: all examples gen integration test release
+.PHONY: all examples gen integration conformance test release

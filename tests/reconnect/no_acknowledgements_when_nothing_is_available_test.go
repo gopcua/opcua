@@ -1,3 +1,5 @@
+//go:build conformance
+
 // A client does not acknowledge sequence numbers to a server that keeps no
 // retransmission queue. OPC 10000-4 §5.14.5.2, on the Publish response's
 // availableSequenceNumbers: "The list shall be empty if the Server does not

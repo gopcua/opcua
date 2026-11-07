@@ -1,3 +1,5 @@
+//go:build conformance
+
 // Package reconnect holds the gopcua reconnect tests: one behaviour per file,
 // with the clause it checks in the file's opening comment. This file is the
 // fixture they all run against.
@@ -51,7 +53,9 @@ import (
 
 // publishPacing is how long the scripted server waits before answering a
 // Publish. Without it the client would re-publish as fast as it is answered
-// and flood the request log.
+// and flood the request log. The wait is off the receive path: serve()
+// schedules every Publish response on a timer of its own, so one Publish
+// waiting out the pacing delays nothing else queued on its connection.
 const publishPacing = 200 * time.Millisecond
 
 // settleDefault is how long a run goes on after the drop when the test sets no
@@ -125,6 +129,16 @@ type recorder struct {
 	queued        []uint32 // further sequence numbers kept for retransmission; see the package comment
 	heldConn      int      // connection the held Publish is outstanding on; 0 = none
 	firstAnswered bool     // the stream's first Publish has been answered, ever
+
+	// acked and republished are the sequence numbers the client has
+	// acknowledged in a Publish and the ones a Republish has handed back.
+	// Either one retires the number from the list the server advertises, so
+	// availableSequenceNumbers holds only what the server still retains
+	// (OPC 10000-4 §5.14.1.1); see offeredLocked. What a Republish is answered
+	// with, answerableSeqsLocked, keeps every queued number, so a loop that
+	// re-asks is answered rather than read as a walk that stopped short.
+	acked       map[uint32]bool
+	republished map[uint32]bool
 
 	// activatedConns holds the connections ActivateSession has arrived on. It
 	// is per connection because a reconnect must activate the session again.
@@ -202,6 +216,20 @@ func (o *recorder) recordRequest(connID int, req ua.Request) {
 			o.activatedConns = map[int]bool{}
 		}
 		o.activatedConns[connID] = true
+	}
+	// The fixture grants every acknowledgement, so one that arrives retires
+	// the number it names from the advertised list; see offeredLocked. The
+	// subscription id is checked because a Publish carries whatever the
+	// client put in it, and only this subscription's queue is being read.
+	if rr.Service == "PublishRequest" {
+		for _, a := range rr.Acks {
+			if a.SubID == SubID {
+				if o.acked == nil {
+					o.acked = map[uint32]bool{}
+				}
+				o.acked[a.Seq] = true
+			}
+		}
 	}
 	o.requests = append(o.requests, rr)
 	o.mu.Unlock()
@@ -340,6 +368,18 @@ func (o *recorder) recordItemsMonitored() {
 	o.mu.Unlock()
 }
 
+// recordRepublished is the Republish arm's one mutation: a number the server
+// has handed back comes off the list it advertises, whether or not the client
+// has acknowledged it yet; see offeredLocked.
+func (o *recorder) recordRepublished(seq uint32) {
+	o.mu.Lock()
+	if o.republished == nil {
+		o.republished = map[uint32]bool{}
+	}
+	o.republished[seq] = true
+	o.mu.Unlock()
+}
+
 // recordNewSubscription is the CreateSubscription arm's one mutation: a fresh
 // subscription has nothing monitored on it yet, and the first one created
 // after the drop fixes both the sequence number everything the replacement
@@ -404,6 +444,11 @@ func (o *recorder) heldPublishSeq() uint32 {
 // runScenario's one-lost check declines such a run before a row scores it,
 // and the withheld numbers past the first are in neither heldSeq nor queued,
 // so the list would come up short rather than holey.
+//
+// This is what the server retains. What it advertises is offeredLocked,
+// which takes off every number the client has acknowledged or been handed
+// back through Republish; the queue itself does not shrink, so a Republish
+// is answered the same however often it asks.
 func (o *recorder) availableSeqsLocked() []uint32 {
 	if o.heldSeq == 0 {
 		return []uint32{}
@@ -419,6 +464,25 @@ func (o *recorder) availableSeqsLocked() []uint32 {
 		seqs = append(seqs, seq)
 	}
 	return seqs
+}
+
+// offeredLocked is the list the server tells the client it still has: what
+// it retains, availableSeqsLocked, minus the numbers the client has
+// acknowledged in a Publish or been handed back through Republish. Either
+// event ends the server's reason for keeping a number in front of the
+// client, so the list it advertises holds only what it still retains
+// (OPC 10000-4 §5.14.1.1). A client that compares the list with what it
+// already holds never sees a number it has dealt with come round again.
+func (o *recorder) offeredLocked() []uint32 {
+	seqs := o.availableSeqsLocked()
+	out := seqs[:0]
+	for _, seq := range seqs {
+		if o.acked[seq] || o.republished[seq] {
+			continue
+		}
+		out = append(out, seq)
+	}
+	return out
 }
 
 func (o *recorder) heldPublishConn() int {
@@ -642,9 +706,9 @@ func clientSilentSetupFailed(run runRecord) string {
 // ActivateSession with Bad_SessionNotActivated and never reaches the
 // retransmission arm, so the server resends nothing and the client recovers
 // nothing. Without the filter a client that pipelines Republish ahead of
-// ActivateSession is read as having asked, and republish_after_reconnect_test.go
-// reports "this now passes" for a client that got its notification back no
-// more than one that never asked at all.
+// ActivateSession is read as having asked, and
+// republish_after_reconnect_test.go reports a pass for a client that got its
+// notification back no more than one that never asked at all.
 //
 // total is every post-drop request and is deliberately not filtered: it is
 // the denominator the rows print, not a reading of the client.
@@ -840,6 +904,16 @@ func (s *server) serve(ctx context.Context, connID int, c *uacp.Conn) {
 	}
 	defer sc.Close()
 
+	// send serialises every write to this connection: the paced Publish
+	// responses below go out from goroutines of their own, and one writer is
+	// the only thing keeping two of them from interleaving on the channel.
+	sendMu := sync.Mutex{}
+	send := func(reqID uint32, resp ua.Response) {
+		sendMu.Lock()
+		defer sendMu.Unlock()
+		_ = sc.SendResponseWithContext(ctx, reqID, resp)
+	}
+
 	for {
 		msg := sc.Receive(ctx)
 		if msg == nil || msg.Err != nil {
@@ -856,7 +930,22 @@ func (s *server) serve(ctx context.Context, connID int, c *uacp.Conn) {
 		if resp == nil {
 			continue
 		}
-		_ = sc.SendResponseWithContext(ctx, msg.RequestID, resp)
+		if _, isPublish := req.(*ua.PublishRequest); isPublish {
+			// Paced off the receive path: the response goes out from a timer
+			// of its own, so a Publish waiting out publishPacing delays no
+			// other request queued on this connection. It used to sleep here,
+			// in the serve loop, where N pipelined Publishes held everything
+			// behind them for N times the pacing.
+			go func(reqID uint32, resp ua.Response) {
+				select {
+				case <-ctx.Done():
+				case <-time.After(publishPacing):
+				}
+				send(reqID, resp)
+			}(msg.RequestID, resp)
+			continue
+		}
+		send(msg.RequestID, resp)
 	}
 }
 
@@ -926,16 +1015,15 @@ func (s *server) answer(connID int, req ua.Request) ua.Response {
 		}
 
 	case *ua.PublishRequest:
-		// With nothing monitored there is no data, only keep-alives.
+		// With nothing monitored there is no data, only keep-alives. Neither
+		// arm sleeps: the pacing is serve's, on a timer off the receive path.
 		if !s.rec.isAnyMonitored() {
-			time.Sleep(publishPacing)
 			return newKeepAliveResponse(h, s.rec.peekNextSeq(), s.available())
 		}
 		seq, hold := s.rec.publishStep(connID)
 		if hold {
 			return nil
 		}
-		time.Sleep(publishPacing)
 		return newPublishResponse(h, seq, s.availableWith(seq))
 
 	case *ua.TransferSubscriptionsRequest:
@@ -972,6 +1060,7 @@ func (s *server) answer(connID int, req ua.Request) ua.Response {
 			return newServiceFault(h, ua.StatusBadSubscriptionIDInvalid)
 		}
 		if slices.Contains(s.answerableSeqs(), r.RetransmitSequenceNumber) {
+			s.rec.recordRepublished(r.RetransmitSequenceNumber)
 			return newRepublishResponse(h, r.RetransmitSequenceNumber)
 		}
 		return newServiceFault(h, ua.StatusBadMessageNotAvailable)
@@ -1007,9 +1096,11 @@ func (s *server) answerableSeqsLocked() []uint32 {
 
 // available is what the server tells the client it still has: the list a
 // keep-alive and a TransferResult carry, and the one availableWith builds a
-// data PublishResponse's list from. It is the recorder's availableSeqsLocked,
-// except under NoRetransmissionQueue, where the server keeps no retransmission
-// queue and says so with an empty list on every answer, as OPC 10000-4
+// data PublishResponse's list from. It is the recorder's offeredLocked --
+// what it retains with everything the client has acknowledged or been handed
+// back through Republish taken off -- except under NoRetransmissionQueue,
+// where the server keeps no retransmission queue and says so with an empty
+// list on every answer, as OPC 10000-4
 // §5.14.5.2 requires of such a server and as gopcua's own server does.
 //
 // runRecord.Offered is this list, so a test reads what the client was told
@@ -1024,7 +1115,7 @@ func (s *server) availableLocked() []uint32 {
 	if s.opts.NoRetransmissionQueue {
 		return []uint32{}
 	}
-	return s.rec.availableSeqsLocked()
+	return s.rec.offeredLocked()
 }
 
 // availableWith is the list a data PublishResponse carries: what the server

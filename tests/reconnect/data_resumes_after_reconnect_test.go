@@ -1,3 +1,5 @@
+//go:build conformance
+
 // After the transport drops and the session is re-activated, a client whose
 // subscription survived on the server goes on receiving notifications on it.
 // OPC 10000-4 §6.7, conformance unit 669: "The Client shall only create a

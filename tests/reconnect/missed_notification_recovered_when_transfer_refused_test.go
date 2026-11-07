@@ -1,3 +1,5 @@
+//go:build conformance
+
 // A client whose session survived the drop recovers the notification it
 // missed even when the server refuses to transfer the subscription. OPC
 // 10000-4 §6.7: "The ActivateSession assigns the new SecureChannel to the

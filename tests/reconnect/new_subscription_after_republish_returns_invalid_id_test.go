@@ -1,3 +1,5 @@
+//go:build conformance
+
 // A client told that the subscription it is republishing on no longer exists
 // creates a new one. OPC 10000-4 §6.7 asks for the replacement: "If the
 // Republish returns Bad_SubscriptionIdInvalid, then the Client needs to
