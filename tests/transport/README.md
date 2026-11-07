@@ -18,9 +18,9 @@ prints 1 for every row and 0 for `harness.go`. `refused_windows.go` and
 `refused` helper the address row's setup probe reads (a refused dial on
 Windows is Winsock's WSAECONNREFUSED, not `syscall.ECONNREFUSED`), and a
 build constraint applies to a whole file, so the helper cannot live with
-the fixture. The shared contract's placement rule moves the fixture's `port` helper
-when the address row's body lands and calls it, so `port` stays in
-`harness.go` only until then.
+the fixture. The shared contract's placement rule moved the fixture's `port` helper when
+the address row's body landed and called it, so `port` lives with
+`dial_reaches_a_host_name_on_its_next_address_test.go`, not in `harness.go`.
 
 ## Why no OPC UA clause binds these behaviours
 

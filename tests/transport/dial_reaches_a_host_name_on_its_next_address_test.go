@@ -93,8 +93,125 @@
 // No reference stack has been read for this behaviour.
 package transport
 
-import "testing"
+import (
+	"context"
+	"net"
+	"testing"
+	"time"
+)
+
+// port is the port the address row's peer listens on, split from its
+// listener's address, so the row's probe of the first address and its
+// localhost dial use the peer's own port without re-deriving it from
+// addr. It is a helper one row calls, so it lives with that row: the
+// placement rule in ../README.md moved it here from harness.go when this
+// row's body landed and called it.
+func (p *silentPeer) port() string {
+	_, port, _ := net.SplitHostPort(p.listener.Addr().String())
+	return port
+}
 
 func TestDialReachesAHostNameOnItsNextAddress(t *testing.T) {
-	t.Skip("body not written yet")
+	// knownBug records that gopcua does not do this yet; the text is logged
+	// in place of a failure. ../README.md says when to delete it. It carries
+	// no issue link.
+	const knownBug = "ResolveEndpoint keeps only addrs[0] (uacp/endpoint.go:50) " +
+		"and Dialer.Dial dials that one address (uacp/conn.go:83), so a host " +
+		"name whose first address refuses is never tried on its next one"
+
+	// The row resolves the name itself, on a zero-valued net.Resolver, as
+	// ResolveEndpoint does (uacp/endpoint.go:40), so the row and the
+	// library agree on the order of the addresses.
+	var resolver net.Resolver
+	addrs, err := resolver.LookupIPAddr(context.Background(), "localhost")
+	if err != nil {
+		t.Fatalf("could not set the test up: resolving localhost: %v", err)
+	}
+	if len(addrs) < 2 {
+		t.Fatalf("could not set the test up: localhost resolved to %d address(es) "+
+			"(%v); there is no next address, so the behaviour cannot be constructed",
+			len(addrs), addrs)
+	}
+
+	// The peer goes on the last address: a HEL there is evidence Dial
+	// tried the addresses in order and passed the first one's refusal.
+	peer, teardown, why := startSilentPeer(addrs[len(addrs)-1].String())
+	t.Cleanup(teardown)
+	if why != "" {
+		t.Fatalf("could not set the test up: %s", why)
+	}
+
+	// The probe dials the first address at the peer's own port - from the
+	// peer's port helper, so probe and dial cannot disagree - bounded by
+	// unblock, and must see it refuse. Anything else takes the premise
+	// "the first address refuses" out of the row's reach.
+	c, err := net.DialTimeout("tcp",
+		net.JoinHostPort(addrs[0].String(), peer.port()), unblock)
+	if err == nil {
+		_ = c.Close()
+		t.Fatalf("could not set the test up: a connection to the first address "+
+			"%s at the peer's port succeeded, so a HEL at the last address would "+
+			"not be evidence about the first address's refusal", addrs[0])
+	}
+	if !refused(err) {
+		t.Fatalf("could not set the test up: the first address %s at the "+
+			"peer's port failed with %v, not a refusal", addrs[0], err)
+	}
+
+	// On a fixed library Dial never returns - the silent peer never sends
+	// an Acknowledge, so a library that dials the right address still
+	// blocks in Handshake after sending its HEL - so the context's
+	// deadline is only a bound past the scored window, for the teardown
+	// to release.
+	ctx, cancel := context.WithTimeout(context.Background(), 2*unblock)
+	defer cancel()
+
+	out := dial(ctx, "opc.tcp://localhost:"+peer.port())
+
+	var o dialOutcome
+	returned := false
+	hello := false
+	select {
+	case <-peer.hello:
+		hello = true
+	case o = <-out:
+		returned = true
+	case <-time.After(unblock):
+	}
+	if !hello {
+		// One more non-blocking re-check before any arm other than the
+		// fixed one scores: a HEL that raced the Dial return or the timer
+		// is still the fixed arm, whatever Dial returned.
+		select {
+		case <-peer.hello:
+			hello = true
+		default:
+		}
+	}
+
+	switch {
+	case hello:
+		if knownBug != "" {
+			t.Errorf("this now passes (a HEL arrived at the listener on %s) - "+
+				"delete the knownBug constant, every arm that reads it, and anything "+
+				"only those arms used, in the commit that fixed it", peer.addr())
+		} else {
+			t.Logf("a HEL arrived at the listener on %s", peer.addr())
+		}
+	case !returned:
+		t.Errorf("no HEL arrived at the listener on %s and Dial was still "+
+			"blocked %v after the dial", peer.addr(), unblock)
+	case o.err != nil:
+		if knownBug != "" {
+			t.Logf("known bug: %s (Dial returned %v and no HEL arrived at the "+
+				"listener on %s)", knownBug, o.err, peer.addr())
+		} else {
+			t.Errorf("Dial returned %v and no HEL arrived at the listener on %s",
+				o.err, peer.addr())
+		}
+	default:
+		t.Errorf("Dial returned a nil error (%v) and no HEL arrived at the "+
+			"listener on %s - the silent peer never acknowledges, so such a "+
+			"return cannot come from a dial that reached it", o.err, peer.addr())
+	}
 }
