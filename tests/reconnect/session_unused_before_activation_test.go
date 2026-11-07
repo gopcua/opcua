@@ -1,3 +1,5 @@
+//go:build conformance
+
 // A Session is not used until it is activated, on every connection. OPC
 // 10000-4 §5.7.2.1: "The Session created with this Service shall not be used
 // until the Client calls the ActivateSession Service and proves possession of

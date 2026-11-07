@@ -1,3 +1,5 @@
+//go:build conformance
+
 // After a reconnect, a client re-activates its Session and creates a new one
 // only if that fails. OPC 10000-4 §6.7, conformance unit 669: "The Client
 // shall only create a new Session if ActivateSession fails."

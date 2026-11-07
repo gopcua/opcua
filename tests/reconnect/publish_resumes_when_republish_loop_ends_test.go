@@ -1,3 +1,5 @@
+//go:build conformance
+
 // Once the server has returned Bad_MessageNotAvailable the client goes back
 // to polling. OPC 10000-4 §6.7: "After receiving this status, the Client
 // shall start sending Publish requests with the normal Publish handling."
@@ -26,9 +28,7 @@
 // the queue and resumes, measured on this fixture. Eclipse Milo, read in
 // source and not run here, resumes after the loop drains; UA-.NETStandard,
 // read the same way, walks only to the number it just received and is
-// declined for stopping before the terminator; gopcua's own loop takes that
-// route too once it republishes at all, because it stops at the top of
-// availableSequenceNumbers when the server hands it a non-empty list. No
+// declined for stopping before the terminator. No
 // stack here fails it -- open62541 and UA-.NETStandard are both declined
 // rather than failed -- so the row takes no exception. A client cannot
 // reach the passing branch by resuming the stream without asking. It can
@@ -153,8 +153,7 @@ func afterLastRepublish(run runRecord) (lastAsk uint32, published, sent int, ask
 // than the one this row is about, or "" if it ended for that reason. A client
 // that stopped while the server still had the number it asked for stopped on
 // its own terms and was never returned Bad_MessageNotAvailable; the file's
-// opening comment names UA-.NETStandard, and gopcua once it republishes at
-// all, as the stacks that take that route.
+// opening comment names UA-.NETStandard as the stack that takes that route.
 // The sequence numbers here are the server's own, so the reason names what
 // the server had rather than what the client was handed.
 //

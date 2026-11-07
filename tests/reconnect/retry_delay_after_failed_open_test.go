@@ -1,3 +1,5 @@
+//go:build conformance
+
 // After a failed OpenSecureChannel, a client must wait before it tries again.
 // OPC 10000-4 §6.7: "If the OpenSecureChannel fails, the Client should delay
 // the retry for a configurable time."

@@ -1,3 +1,5 @@
+//go:build conformance
+
 // The package states one rule in seven places, and this is the executable
 // statement of it. A session service that arrives on a connection before
 // that connection's ActivateSession is faulted Bad_SessionNotActivated by
@@ -247,6 +249,11 @@ func TestActivationRuleIsOrdered(t *testing.T) {
 			name: "newSubscriptionAfterDrop does not count a Publish that preceded its ActivateSession",
 			early: activationRuleRecreate(
 				requestRecord{Conn: 3, Service: "CreateSessionRequest"},
+				// The replacement's CreateMonitoredItems is the fixture's own
+				// next step, and newSubscriptionAfterDrop counts no Publish
+				// before it; both arms carry it ahead of the Publishes, so the
+				// only thing that varies is Publish against ActivateSession.
+				requestRecord{Conn: 3, Service: "CreateMonitoredItemsRequest"},
 				requestRecord{Conn: 3, Service: "PublishRequest"},
 				requestRecord{Conn: 3, Service: "PublishRequest"},
 				requestRecord{Conn: 3, Service: "ActivateSessionRequest"},
@@ -254,6 +261,7 @@ func TestActivationRuleIsOrdered(t *testing.T) {
 			late: activationRuleRecreate(
 				requestRecord{Conn: 3, Service: "CreateSessionRequest"},
 				requestRecord{Conn: 3, Service: "ActivateSessionRequest"},
+				requestRecord{Conn: 3, Service: "CreateMonitoredItemsRequest"},
 				requestRecord{Conn: 3, Service: "PublishRequest"},
 				requestRecord{Conn: 3, Service: "PublishRequest"},
 			),

@@ -1,3 +1,5 @@
+//go:build conformance
+
 // A client that has replaced a disowned subscription receives data on the
 // replacement. OPC 10000-4 §6.7 asks for the replacement and says what the
 // asking is for: "This will result in the Client receiving data and event
@@ -99,25 +101,33 @@ func TestDataResumesOnRecreatedSubscription(t *testing.T) {
 
 // newSubscriptionAfterDrop reads what the client did about the subscription
 // the server disowned: whether it created a replacement, and how many Publish
-// the server could have answered under it afterwards. published is a lower
-// bound on what the client sent, and is meaningless when created is false.
+// the server could have answered with data under it afterwards. published is
+// a lower bound on what the client sent, and is meaningless when created is
+// false.
 //
 // Both answers rest on runRecord.RecreateAfter, so the replacement and the
 // line its data has to clear are one record rather than two readings that can
 // disagree. The count spans every connection, because the fixture serves one
 // subscription and the clause asks for data and not for a channel, but not a
 // connection that had yet to activate: the server faults a Publish arriving
-// before its own ActivateSession and does nothing with it.
+// before its own ActivateSession and does nothing with it. It also counts
+// only the Publish that followed the replacement's CreateMonitoredItems:
+// before that the server answers every Publish with a keep-alive, so a run
+// that was never offered data on the replacement is
+// publishOpportunitySetupFailed's to decline rather than something to score.
 func newSubscriptionAfterDrop(run runRecord) (created bool, published int) {
 	if run.RecreateAfter == 0 {
 		return false, 0
 	}
 	activated := map[int]bool{}
+	monitored := false
 	for i, r := range run.Requests {
 		switch {
 		case r.Service == "ActivateSessionRequest":
 			activated[r.Conn] = true
-		case i >= run.RecreateAfter && r.Service == "PublishRequest" && activated[r.Conn]:
+		case i >= run.RecreateAfter && r.Service == "CreateMonitoredItemsRequest":
+			monitored = true
+		case monitored && i >= run.RecreateAfter && r.Service == "PublishRequest" && activated[r.Conn]:
 			published++
 		}
 	}
