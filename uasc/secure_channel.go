@@ -242,6 +242,16 @@ func (s *SecureChannel) RemoteAddr() net.Addr {
 	return s.c.TCPConn.RemoteAddr()
 }
 
+// SecurityPolicyURI returns the security policy negotiated for the channel.
+func (s *SecureChannel) SecurityPolicyURI() string {
+	return s.cfg.SecurityPolicyURI
+}
+
+// SecurityMode returns the message security mode negotiated for the channel.
+func (s *SecureChannel) SecurityMode() ua.MessageSecurityMode {
+	return s.cfg.SecurityMode
+}
+
 func (s *SecureChannel) getActiveChannelInstance() (*channelInstance, error) {
 	s.instancesMu.Lock()
 	defer s.instancesMu.Unlock()
