@@ -145,15 +145,51 @@ func Listen(ctx context.Context, endpoint string, ack *Acknowledge) (*Listener, 
 //
 // The first param ctx is to be passed to monitor(), which monitors and handles
 // incoming messages automatically in another goroutine.
+//
+// Accept runs the handshake before it returns, without a deadline, so a client
+// that connects and never sends Hello blocks it. A server that accepts in a loop
+// should use AcceptTCP and Handshake instead.
 func (l *Listener) Accept(ctx context.Context) (*Conn, error) {
 	c, err := l.l.AcceptTCP()
 	if err != nil {
 		return nil, err
 	}
+	return l.Handshake(c, 0)
+}
+
+// AcceptTCP waits for the next TCP connection and returns it without running
+// the UACP handshake. Handshake completes it.
+//
+// Splitting the two lets a server handshake each connection in its own
+// goroutine: a slow or silent client then cannot stall the accept loop, and a
+// failed handshake is an error of that one connection, not of the listener. An
+// error from AcceptTCP that wraps net.ErrClosed means the listener was closed.
+func (l *Listener) AcceptTCP() (*net.TCPConn, error) {
+	return l.l.AcceptTCP()
+}
+
+// Handshake runs the server side of the UACP handshake on c, which AcceptTCP
+// returned, and returns the established connection. A timeout greater than zero
+// bounds the handshake. c is closed when the handshake fails.
+func (l *Listener) Handshake(c *net.TCPConn, timeout time.Duration) (*Conn, error) {
+	if timeout > 0 {
+		if err := c.SetDeadline(time.Now().Add(timeout)); err != nil {
+			c.Close()
+			return nil, err
+		}
+	}
 	conn := &Conn{TCPConn: c, id: nextid(), ack: l.ack}
 	if err := conn.srvhandshake(l.endpoint); err != nil {
 		c.Close()
 		return nil, err
+	}
+	if timeout > 0 {
+		// The handshake may have replaced the connection (ReverseHello), so
+		// clear the deadline on the one it ended with.
+		if err := conn.TCPConn.SetDeadline(time.Time{}); err != nil {
+			conn.TCPConn.Close()
+			return nil, err
+		}
 	}
 	return conn, nil
 }
