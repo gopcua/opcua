@@ -52,7 +52,7 @@
 // before the cancel, so a library that never reaches the stimulus - no
 // connection, or no HEL on it - declines instead of landing in the
 // known-bug arm. The arms, in words: a return stamped before the cancel
-// is the early-return failure wherever the row reads it, and the fixed
+// is the early-return failure wherever the row reads the return, and the fixed
 // arm must not credit it; the fixed arm is a return stamped after the
 // cancel and within unblock of it - each return is placed on the wall
 // clock by the helper's stamp, not by when the row reads the channel -
@@ -100,8 +100,9 @@ func TestHandshakeGivesUpWhenItsContextIsCancelled(t *testing.T) {
 		t.Fatalf("could not set the test up: %s", why)
 	}
 
-	// Stamped before the cancel: a return the cancel itself causes is
-	// stamped after this moment, so the early-return arm cannot mis-score it.
+	// cancelledAt is stamped before the cancel: a return the cancel
+	// itself causes is stamped after this moment, so the early-return
+	// arm cannot mis-score it.
 	cancelledAt := time.Now()
 	cancel()
 

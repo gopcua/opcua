@@ -35,8 +35,8 @@ import (
 
 // unblock is how long a row waits for Dial to return once its stimulus
 // has fired - the cancel or the deadline - and how long a setup check
-// waits for the HEL to reach the peer. README.md's machinery bullet
-// says why the bound is not a timing assumption.
+// waits for the HEL to reach the peer. README.md's "A wall clock scores
+// a blocked dial" bullet says why the bound is not a timing assumption.
 const unblock = 5 * time.Second
 
 // dialOutcome is what dial delivers on its channel: err is the error,

@@ -40,10 +40,9 @@
 // held", and the row declines. The deadline is the row's own, so the
 // peer's silence outlives it and the expiry lands while the HEL is held
 // unanswered. The setup check is the shared awaitHello, and its decline
-// and unscoreable split applies here as documented there. The row
-// registers the peer's teardown
-// with t.Cleanup, so a Dial still blocked on main is released when the
-// test ends. See harness.go.
+// and unscoreable split applies here as documented there. The row registers
+// the peer's teardown with t.Cleanup, so a Dial still blocked on main is
+// released when the test ends. See harness.go.
 //
 // The row asserts that Dial returns within unblock after its context's
 // deadline: the verdict window ends at deadline + unblock on the wall
