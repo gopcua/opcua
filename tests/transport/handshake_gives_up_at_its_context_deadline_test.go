@@ -65,8 +65,75 @@
 // No reference stack has been read for this behaviour.
 package transport
 
-import "testing"
+import (
+	"context"
+	"testing"
+	"time"
+)
 
 func TestHandshakeGivesUpAtItsContextDeadline(t *testing.T) {
-	t.Skip("body not written yet")
+	// The deadline is the row's own and is set at creation: the verdict
+	// compares every return against this moment on the wall clock, so the
+	// row needs no stamp beside it the way the cancellation row needs
+	// cancelledAt beside its cancel.
+	deadline := time.Now().Add(time.Second)
+	ctx, cancel := context.WithDeadline(context.Background(), deadline)
+	defer cancel()
+
+	peer, teardown, why := startSilentPeer("127.0.0.1")
+	t.Cleanup(teardown)
+	if why != "" {
+		t.Fatalf("could not set the test up: %s", why)
+	}
+
+	out := dial(ctx, "opc.tcp://"+peer.addr())
+
+	// The HEL must arrive by the deadline itself: if it has not, the run
+	// cannot construct "the deadline expires while the HEL is held", and
+	// the row declines.
+	if why, fromGopcua := peer.awaitHello(time.Until(deadline)); why != "" {
+		if fromGopcua {
+			t.Errorf("gopcua's own behaviour made this run unscoreable: %s", why)
+			return
+		}
+		t.Fatalf("could not set the test up: %s", why)
+	}
+
+	// bound is where the verdict window ends on the wall clock: unblock
+	// after the context's deadline, not unblock after this line.
+	bound := deadline.Add(unblock)
+
+	var o dialOutcome
+	returned := false
+	select {
+	case o = <-out:
+		returned = true
+	case <-time.After(time.Until(bound)):
+		// One more non-blocking read before scoring "still blocked": the
+		// return and the timer can land together, and the helper's stamp,
+		// not this read, places the return on the wall clock.
+		select {
+		case o = <-out:
+			returned = true
+		default:
+		}
+	}
+
+	switch {
+	case !returned:
+		t.Errorf("the context's deadline expired and Dial was still blocked "+
+			"%v after it", unblock)
+	case o.returned.Before(deadline):
+		// A return stamped before the deadline, while the HEL is still
+		// unanswered, is an early return wherever the row reads it.
+		t.Errorf("Dial returned (%v) before the context's deadline expired - "+
+			"the library gave up before the context did", o.err)
+	case o.returned.Sub(deadline) <= unblock:
+		t.Logf("Dial returned %v within %v of the deadline", o.err, unblock)
+	default:
+		// A return stamped past the bound is a Dial that stayed blocked
+		// past it: the stamp, not the read, places the return.
+		t.Errorf("Dial stayed blocked %v past the deadline, returning only "+
+			"then (%v)", o.returned.Sub(deadline), o.err)
+	}
 }
