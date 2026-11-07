@@ -57,7 +57,7 @@ nothing to name, and that is the case above.
 
 A test for a behaviour gopcua does not have yet carries a `knownBug`
 constant, declared inside the test function. Run
-`go test ./tests/<package>/ -v`:
+`go test -tags=conformance ./tests/<package>/ -v`:
 
 - The test runs and its failure prints as a `known bug:` line naming the
   behaviour. The build stays green.

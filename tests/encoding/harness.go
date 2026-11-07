@@ -1,3 +1,5 @@
+//go:build conformance
+
 // Package encoding holds the gopcua encoding tests: one behaviour per file,
 // with the clause it checks in the file's opening comment. This file holds
 // the helpers they share.
@@ -102,14 +104,26 @@ func wireBytes(ticks *big.Int) []byte {
 // caller can read its state; only a test function turns any of this into
 // a failure.
 func decodeVariantRecovering(b []byte) (v *ua.Variant, err error, panicked string) {
+	v = new(ua.Variant)
+	_, err, panicked = decodeRecovering(b, v)
+	return v, err, panicked
+}
+
+// decodeRecovering calls ua.Decode into any type and turns a panic into a
+// value, the way encodeRecovering does for encoding. It is the general form
+// decodeVariantRecovering wraps: a panic anywhere in a decode path stops
+// every case after it in the test binary, and one unguarded type would hide
+// the state of every other; the helper turns the panic into one case's
+// outcome instead, and only a test function turns any of this into a
+// failure.
+func decodeRecovering(b []byte, into interface{}) (n int, err error, panicked string) {
 	defer func() {
 		if r := recover(); r != nil {
 			panicked = fmt.Sprint(r)
 		}
 	}()
-	v = new(ua.Variant)
-	_, err = ua.Decode(b, v)
-	return v, err, panicked
+	n, err = ua.Decode(b, into)
+	return n, err, panicked
 }
 
 // encodeRecovering calls ua.Encode and turns a nil dereference into a value.

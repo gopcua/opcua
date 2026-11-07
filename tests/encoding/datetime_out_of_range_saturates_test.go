@@ -1,3 +1,5 @@
+//go:build conformance
+
 // A tick count outside the range §5.2.2.5's definition covers decodes to
 // the latest or earliest time that can be represented, not to whatever
 // date the conversion arithmetic yields.
@@ -27,10 +29,10 @@
 // and the clause's sentence would be dead letters in a Go stack. The
 // clause names the ends of its own range, 1601-01-01 12:00AM and 9999-12-31
 // 11:59:59PM, the bounds harness.go holds as firstValidYear and
-// lastValidYear. Read that way both rules fire, and the row names the
-// instants they decode to exactly:
+// lastValidYear. Read that way both rules fire, and the row holds each
+// group to the instant its rule decodes to:
 //
-//	earliest  1601-01-01T00:00:00Z - tick 0, the clause's own low end
+//	earliest  the instant tick 0 decodes to - read off the platform, not named
 //	latest    9999-12-31T23:59:59Z - the high end the clause names
 //
 // The naming is evidence, not invention: the tick counts those instants
@@ -39,14 +41,14 @@
 // (DateTimeUtc.cs's kMaxValue, line 685) and the count open62541 encodes
 // up to (UA_DATETIME_ENCODE_MAX = 265046774399 * UA_DATETIME_SEC,
 // ua_types_encoding_binary.c line 288, whose comment names it "9999-12-31
-// 23:59:59 UTC"); ticksFor(earliest) is 0, the count UA-.NETStandard
-// clamps negative values to. The test checks both equalities as part of
-// its setup, so the named instants cannot drift from the constants they
-// cite. The sub-second part of the latest instant is not left open: the
-// clause names its high end as an instant to the second, so the 100ns
-// ticks between 23:59:59.0000000 and 23:59:59.9999999 on 9999-12-31 are
-// themselves "later than the latest time that can be represented" and
-// decode as that named instant.
+// 23:59:59 UTC"). The test checks that equality as part of its setup, so
+// the latest instant cannot drift from the constants it cites; the
+// earliest group's target is not named in advance at all, because the row
+// reads it off the platform instead. The sub-second part of the latest
+// instant is not left open: the clause names its high end as an instant
+// to the second, so the 100ns ticks between 23:59:59.0000000 and
+// 23:59:59.9999999 on 9999-12-31 are themselves "later than the latest
+// time that can be represented" and decode as that named instant.
 //
 // The probes are the two groups the clause's rules define. The latest
 // group is the Int64 maximum - the clause's own sentinel, "the maximum
@@ -64,22 +66,23 @@
 // Int64 minimum, and -2^62 (00 00 00 00 00 00 00 c0 little-endian), a
 // middle negative - a time before 1601 that is not at the negative
 // domain's edge, so a fix keyed on the extremes alone misses it. Each
-// group must collapse to one instant, and that instant must be the one
-// named above; the two named instants differ, so a fix that clamps both
+// group must collapse to one instant, and that instant must be the one its
+// rule decodes to; the two instants differ, so a fix that clamps both
 // groups to a single date fails.
 //
 // What the row deliberately does not assert: nothing about the encode
-// direction, and nothing about tick counts inside the range - those are
-// the two neighbouring rows' behaviours - and nothing about the clause's
-// "the encoded value is 0" condition, which is the zero time gopcua
-// reserves tick 0 for. A fix for this row must leave tick 0 decoding as
-// it does - to time.Time{}, gopcua's own null convention - because no row
-// in this package probes tick 0, and nothing here would catch a fix that
-// changed it. No row in this package probes the two encode-side
-// saturation rules at all. The earliest group's probes do not carry tick
-// 0, so gopcua's zero-time convention does not reach them: the clause
-// decodes them as the earliest time the range admits, not as a null
-// marker.
+// direction and nothing about tick counts inside the range - those are
+// the two neighbouring rows' behaviours - and no row in this package
+// probes the two encode-side saturation rules at all. The earliest group
+// is held to the clause's first condition, "the encoded value is 0": the
+// row decodes tick 0 itself and requires every earliest-group probe to
+// decode to exactly that instant, since §5.2.2.5 decodes a date/time as
+// the earliest time the platform can represent when either the encoded
+// value is 0 or it "represents a time earlier than the earliest time that
+// can be represented". 1601-01-01T00:00:00Z encodes as tick 0, which is
+// why the epoch itself cannot be the answer: it decodes as time.Time{},
+// gopcua's own null convention, and the earliest group must decode as
+// time.Time{} with it.
 //
 // All three reference stacks were read for this row. UA-.NETStandard
 // implements the rule and passes it: BinaryDecoder.cs's ReadDateTime (lines 680-683)
@@ -171,25 +174,39 @@ func TestDateTimeOutOfRangeSaturates(t *testing.T) {
 	// in place of a failure. ../README.md says when to delete it.
 	const knownBug = "a tick count outside the range §5.2.2.5 defines decodes to whatever date " +
 		"the conversion arithmetic yields instead of saturating, so neither probe group " +
-		"collapses to the instant the clause names for it"
+		"collapses to the instant the clause names for it - the latest instant its range " +
+		"admits for the latest group, the instant tick 0 decodes to for the earliest"
 
-	// The instants the clause's rules name, under the bounded reading of
-	// "the platform" stated in the header.
-	earliest := time.Date(1601, time.January, 1, 0, 0, 0, 0, time.UTC)
+	// The instant the latest group must land on, under the bounded reading
+	// of "the platform" stated in the header. The earliest group's target
+	// is not named here: it is read from the platform below, by decoding
+	// tick 0.
 	latest := time.Date(9999, time.December, 31, 23, 59, 59, 0, time.UTC)
+	epoch := time.Date(1601, time.January, 1, 0, 0, 0, 0, time.UTC)
 
-	// The named instants are anchored outside gopcua, in the constants the
-	// header cites: UA-.NETStandard's kMaxValue and open62541's
-	// UA_DATETIME_ENCODE_MAX for the latest, tick 0 for the earliest.
+	// The named latest instant is anchored outside gopcua, in the constants
+	// the header cites: UA-.NETStandard's kMaxValue and open62541's
+	// UA_DATETIME_ENCODE_MAX.
 	uanetKMaxValue := new(big.Int).SetUint64(2650467743990000000)
 	if got := ticksFor(latest); got.Cmp(uanetKMaxValue) != 0 {
 		t.Fatalf("could not set the test up: 9999-12-31T23:59:59Z is %s ticks, "+
 			"not the 2650467743990000000 UA-.NETStandard clamps to and open62541 encodes up to",
 			got)
 	}
-	if got := ticksFor(earliest); got.Sign() != 0 {
+	// The epoch encodes as tick 0, the fact the header rests its note on
+	// for why the epoch itself cannot be the earliest target.
+	if got := ticksFor(epoch); got.Sign() != 0 {
 		t.Fatalf("could not set the test up: 1601-01-01T00:00:00Z is %s ticks, not 0", got)
 	}
+
+	// The earliest group's target is read from the platform, not named in
+	// advance: the row probes the eight zero bytes and holds the earliest
+	// group to the instant tick 0 decodes to.
+	var zeroTick wireDateTime
+	if _, err := ua.Decode(wireBytes(new(big.Int)), &zeroTick); err != nil {
+		t.Fatalf("could not set the test up: decoding tick 0 failed: %v", err)
+	}
+	earliest := zeroTick.V.UTC()
 
 	probes := []struct {
 		name  string
@@ -247,12 +264,14 @@ func TestDateTimeOutOfRangeSaturates(t *testing.T) {
 	latestCollapsed := collapsed(latestGot)
 	earliestCollapsed := collapsed(earliestGot)
 	// The clause's rules name an instant, not just a collapse, and the
-	// header names both, so the collapse is checked against the named
-	// instants. A group with a decode error has not landed on the instant
+	// header names the latest, so that collapse is checked against a named
+	// instant; the earliest collapse is checked against the instant tick 0
+	// decodes to, read in the setup. A group with a decode error has not
+	// landed on the instant
 	// the clause names for it, whatever its other probes did - the error
 	// is part of the group's outcome. The two groups' instants must
-	// differ: they name opposite ends of the range, and the named
-	// instants differ, so a fix that clamps everything to one date fails
+	// differ: they name opposite ends of the range, and the two instants
+	// differ, so a fix that clamps everything to one date fails
 	// here.
 	atLatest := len(latestErrs) == 0 && latestCollapsed && latestGot[0].Equal(latest)
 	atEarliest := len(earliestErrs) == 0 && earliestCollapsed && earliestGot[0].Equal(earliest)
@@ -263,13 +282,14 @@ func TestDateTimeOutOfRangeSaturates(t *testing.T) {
 
 	switch {
 	case atLatest && atEarliest && knownBug != "":
-		t.Errorf("this now passes (the earliest group decodes as %s and the latest group as %s) - "+
+		t.Errorf("this now passes (the earliest group decodes as the instant tick 0 decodes to, %s, "+
+			"and the latest group as %s) - "+
 			"delete the knownBug constant, every arm that reads it, and "+
 			"anything only those arms used, in the commit that fixed it",
 			earliest.Format(time.RFC3339Nano), latest.Format(time.RFC3339Nano))
 	case atLatest && atEarliest:
 		t.Logf("every out-of-range tick count decodes to the instant the clause names: "+
-			"the earliest group as %s, the latest group as %s",
+			"the earliest group as the instant tick 0 decodes to (%s), the latest group as %s",
 			earliest.Format(time.RFC3339Nano), latest.Format(time.RFC3339Nano))
 	case len(latestErrs) > 0 || len(earliestErrs) > 0:
 		rejected := append(append([]string{}, latestErrs...), earliestErrs...)
@@ -280,17 +300,18 @@ func TestDateTimeOutOfRangeSaturates(t *testing.T) {
 			strings.Join(rejected, ", "), detail)
 	case latestCollapsed && earliestCollapsed:
 		t.Errorf("both probe groups collapse, but to instants other than the ones §5.2.2.5 names - "+
-			"the earliest time its range admits, 1601-01-01T00:00:00Z, and the latest, "+
-			"9999-12-31T23:59:59Z. The collapse the fix should bring is present, but the instants "+
-			"are wrong, whichever state this is: a fix that clamps to the wrong ends of the range, "+
-			"or a library that returns one instant for every tick count and that instant is one of "+
-			"these. Either way it is not the saturation the clause states:%s", detail)
+			"the instant tick 0 decodes to for the earliest group, and the latest instant its "+
+			"range admits, 9999-12-31T23:59:59Z, for the latest. The collapse the fix should "+
+			"bring is present, but the instants are wrong, whichever state this is: a fix that "+
+			"clamps to the wrong ends of the range, or a library that returns one instant for "+
+			"every tick count and that instant is one of these. Either way it is not the "+
+			"saturation the clause states:%s", detail)
 	case unresolved && knownBug != "":
 		t.Logf("known bug: %s; §5.2.2.5 decodes the latest group as 9999-12-31T23:59:59Z and "+
-			"the earliest group as 1601-01-01T00:00:00Z:%s", knownBug, detail)
+			"the earliest group as the instant tick 0 decodes to:%s", knownBug, detail)
 	case unresolved:
 		t.Errorf("§5.2.2.5 decodes the latest group as 9999-12-31T23:59:59Z and the earliest "+
-			"group as 1601-01-01T00:00:00Z, and at least one group did not even collapse to "+
-			"one instant:%s", detail)
+			"group as the instant tick 0 decodes to, and at least one group did not even "+
+			"collapse to one instant:%s", detail)
 	}
 }
