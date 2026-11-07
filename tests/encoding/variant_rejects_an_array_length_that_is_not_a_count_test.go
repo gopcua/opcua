@@ -96,12 +96,14 @@ func TestVariantRejectsAnArrayLengthThatIsNotACount(t *testing.T) {
 	nullV, err, panicked := decodeVariantRecovering([]byte{0x81, 0xff, 0xff, 0xff, 0xff})
 	switch {
 	case panicked != "" || err != nil:
-		t.Fatalf("could not set the test up: the null array, length -1, no longer "+
-			"decodes (err %v, panic %q)", err, panicked)
+		t.Errorf("gopcua's own behaviour made this run unscoreable: the null array, length -1, "+
+			"no longer decodes (err %v, panic %q)", err, panicked)
+		return
 	default:
 		if s, ok := nullV.Value().([]bool); !ok || s != nil {
-			t.Fatalf("could not set the test up: the null array, length -1, decoded to "+
-				"%#v rather than to a nil slice", nullV.Value())
+			t.Errorf("gopcua's own behaviour made this run unscoreable: the null array, length -1, "+
+				"decoded to %#v rather than to a nil slice", nullV.Value())
+			return
 		}
 	}
 
