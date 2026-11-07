@@ -143,6 +143,9 @@ type recorder struct {
 	// activatedConns holds the connections ActivateSession has arrived on. It
 	// is per connection because a reconnect must activate the session again.
 	activatedConns map[int]bool
+	// acksAnswered is how many acknowledgements the server has answered, over
+	// the whole run; see answerAcks. It is moved only under RejectsFirstAck.
+	acksAnswered int
 	// activationFaulted is the fixture checking itself, and is empty while
 	// the check holds. Every activation filter in this package reads "an
 	// ActivateSessionRequest was recorded" as "the Session is activated on
@@ -378,6 +381,28 @@ func (o *recorder) recordRepublished(seq uint32) {
 	}
 	o.republished[seq] = true
 	o.mu.Unlock()
+}
+
+// answerAcks hands out the results a Publish response carries for n
+// acknowledgements, and counts the acknowledgements the server has answered
+// across the run: the first is rejected with Bad_SequenceNumberUnknown and
+// every later one is answered Good. It runs under the recorder's lock, beside
+// the request log that records the same acknowledgements, so the two cannot
+// disagree about which one was first. This is RejectsFirstAck's counter, and
+// it is read by no other option.
+func (o *recorder) answerAcks(n int) []ua.StatusCode {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	out := make([]ua.StatusCode, n)
+	for i := range out {
+		if o.acksAnswered == 0 {
+			out[i] = ua.StatusBadSequenceNumberUnknown
+		} else {
+			out[i] = ua.StatusOK
+		}
+		o.acksAnswered++
+	}
+	return out
 }
 
 // recordNewSubscription is the CreateSubscription arm's one mutation: a fresh
@@ -1018,13 +1043,13 @@ func (s *server) answer(connID int, req ua.Request) ua.Response {
 		// With nothing monitored there is no data, only keep-alives. Neither
 		// arm sleeps: the pacing is serve's, on a timer off the receive path.
 		if !s.rec.isAnyMonitored() {
-			return newKeepAliveResponse(h, s.rec.peekNextSeq(), s.available())
+			return s.withAckResults(newKeepAliveResponse(h, s.rec.peekNextSeq(), s.available()), r)
 		}
 		seq, hold := s.rec.publishStep(connID)
 		if hold {
 			return nil
 		}
-		return newPublishResponse(h, seq, s.availableWith(seq))
+		return s.withAckResults(newPublishResponse(h, seq, s.availableWith(seq)), r)
 
 	case *ua.TransferSubscriptionsRequest:
 		if s.opts.RefusesTransfer {
@@ -1129,6 +1154,22 @@ func (s *server) availableWith(seq uint32) []uint32 {
 		return available
 	}
 	return append(available, seq)
+}
+
+// withAckResults fills in the Results list of the Publish response it is
+// handed, one result per acknowledgement in the request it answers, the way
+// OPC 10000-4 §5.14.5.2 pairs the results with the acknowledgements. It is
+// RejectsFirstAck's whole mechanism, and it does nothing on every other
+// run: without the option, and for a request that acknowledged nothing, the
+// response goes back exactly as its constructor built it, Results and all;
+// a held Publish gets no response to fill in at all.
+func (s *server) withAckResults(resp ua.Response, req *ua.PublishRequest) ua.Response {
+	if !s.opts.RejectsFirstAck || resp == nil || len(req.SubscriptionAcknowledgements) == 0 {
+		return resp
+	}
+	pub := resp.(*ua.PublishResponse)
+	pub.Results = s.rec.answerAcks(len(req.SubscriptionAcknowledgements))
+	return pub
 }
 
 // usesSession reports whether a service request counts as using the Session.
@@ -1292,6 +1333,20 @@ type runOptions struct {
 	// NoRetransmissionQueue, which is the server that keeps no queue to
 	// advertise.
 	AdvertisesSentSequence bool
+	// RejectsFirstAck makes the server answer the first acknowledgement it
+	// ever answers with Bad_SequenceNumberUnknown and every later one with
+	// StatusOK, one result per acknowledgement in the request the way
+	// OPC 10000-4 §5.14.5.2 pairs them. The option exists for the server that
+	// has dropped a notification but keeps the rest of its queue: it rejects
+	// one acknowledgement and keeps advertising, so the client's requirement
+	// to acknowledge what it receives does not end with the rejection. The
+	// count is of answered acknowledgements: a held Publish is answered with
+	// nothing at all, so an acknowledgement it carried is not rejected but
+	// withheld. It cannot be combined with NoRetransmissionQueue, whose empty
+	// list tells the client to acknowledge nothing while later Good results
+	// would tell it the opposite. Without the option every Publish response
+	// keeps the empty Results list it has always carried.
+	RejectsFirstAck bool
 	// ReconnectInterval is the client's wait between reconnection attempts;
 	// zero means 100ms.
 	ReconnectInterval time.Duration
@@ -1320,6 +1375,13 @@ func runScenario(opts runOptions) runRecord {
 		out.HarnessErr = "NoRetransmissionQueue says the server keeps no retransmission queue and " +
 			"RefusesTransfer selects the server that keeps one and hands notifications back out of " +
 			"it, so the server would have been telling the client two different things"
+		return out
+	}
+	if opts.RejectsFirstAck && opts.NoRetransmissionQueue {
+		out.HarnessErr = "NoRetransmissionQueue advertises nothing, which tells the client to " +
+			"acknowledge nothing, and RejectsFirstAck answers the acknowledgements after the first " +
+			"with Good, which tells it the opposite, so the server would have been telling the " +
+			"client two different things"
 		return out
 	}
 	if opts.Settle == 0 {

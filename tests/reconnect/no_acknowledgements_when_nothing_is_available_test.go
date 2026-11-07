@@ -11,8 +11,11 @@
 // while knownBug stands this row logs such a client green beside gopcua
 // rather than failing it.
 //
-// No other row here reads acknowledgements, and no other row is on
-// §5.14.5.2, so this one has no neighbouring row.
+// The one other row that reads acknowledgements is
+// acknowledgements_resume_after_one_is_rejected_test.go, and its clause is
+// §5.14.1.1: that row scores a server that keeps advertising and rejects an
+// acknowledgement anyway, this one a server whose empty list lifts the
+// requirement altogether.
 //
 // The server runs twice: a control under AdvertisesSentSequence, which names
 // every notification it sends in that response's own list, and the scored
