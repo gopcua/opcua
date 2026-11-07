@@ -1,3 +1,5 @@
+//go:build conformance
+
 // The server's own write path is MapNamespace.SetAttribute, where a
 // client's Write request lands (server/attribute_service.go:90): called
 // on a node a client is subscribed to, it returns, and the subscriber

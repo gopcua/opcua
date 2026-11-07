@@ -1,3 +1,5 @@
+//go:build conformance
+
 // A client read of a tag concurrent with the application's write to it
 // observes no conflicting access: while an application goroutine publishes
 // to MapNamespace, a client reading the same tag over the wire completes
@@ -72,7 +74,7 @@
 // knownBug arm keys on is gone and the outcome is still wrong, which is
 // the wrong-fix arm tests/README.md describes. The deletion arm
 // therefore fires only for a fix under which the writer still returns -
-// RLock plus notifying outside the lock. Makefile `test` runs this
+// RLock plus notifying outside the lock. `make conformance` runs this
 // package with -race.
 //
 // The wedge happens only through a subscription: SetValue notifies under
@@ -288,7 +290,7 @@ func TestReadWhileWritingIsRaceFree(t *testing.T) {
 	// the arms read.
 	if !raceDetector {
 		t.Fatalf("could not set the test up: this binary was not built with " +
-			"-race, so the detector cannot score the row; Makefile test runs it")
+			"-race, so the detector cannot score the row; make conformance runs it")
 	}
 
 	windowOut, windowErr := runChild(raceRowWindowEnv)
