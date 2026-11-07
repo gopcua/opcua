@@ -200,11 +200,16 @@ func TestDialReachesAHostNameOnItsNextAddress(t *testing.T) {
 	}
 	// One more non-blocking re-check before any arm other than the fixed
 	// one scores: a HEL that raced the Dial return or the timer is still
-	// the fixed arm, whatever Dial returned.
+	// the fixed arm, whatever Dial returned. A header the peer has already
+	// recorded as HELF counts too, whether or not it has closed p.hello
+	// yet - the shape awaitHello scores by.
 	select {
 	case <-peer.hello:
 		hello = true
 	default:
+	}
+	if peer.readHeader() == "HELF" {
+		hello = true
 	}
 
 	switch {

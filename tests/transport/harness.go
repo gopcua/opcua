@@ -53,10 +53,11 @@ type dialOutcome struct {
 // goroutine never blocks on a row that has stopped reading. A row scores
 // a return by the helper's stamp wherever it reads it, so a return
 // stamped before the cancel or the deadline is the early-return failure
-// even when the row reads it later. When a row's window ends with
-// nothing on the channel, the shared awaitOutcome helper takes one more
-// non-blocking read before the row scores "still blocked", and the row
-// scores what it finds by the stamp. A *uacp.Conn the library did
+// even when the row reads it later. When a handshake row's window ends
+// with nothing on the channel, the two handshake rows' shared
+// awaitOutcome helper takes one more non-blocking read before the row
+// scores "still blocked", and the row scores what it finds by the stamp.
+// A *uacp.Conn the library did
 // return is closed in this goroutine, so it leaks nothing. Like every
 // helper here it returns plain values; the row turns the outcome it
 // reads into the failure or the decline.
@@ -80,7 +81,7 @@ type silentPeer struct {
 
 	mu     sync.Mutex
 	conn   net.Conn
-	closed bool   // set by teardown; serve then closes the connection itself
+	closed bool   // set by teardown; serve closes the connection itself when set
 	header string // the first four bytes read off the connection, once read
 
 	accepted chan struct{} // closed once a connection has been accepted
