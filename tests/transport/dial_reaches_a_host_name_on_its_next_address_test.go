@@ -33,9 +33,10 @@
 // resolves the name with net.Resolver.LookupIPAddr on a zero-valued
 // net.Resolver, as ResolveEndpoint does - the same call, at
 // uacp/endpoint.go:40, on the zero-valued net.Resolver declared at
-// uacp/endpoint.go:38 - so the row and the library agree on the order - listens on the last address on a free
-// port, and dials opc.tcp://localhost:<the peer's own port, from the
-// peer's port helper>. See harness.go.
+// uacp/endpoint.go:38 - so the row and the library agree on the order -
+// listens on the last address on a free port, and dials
+// opc.tcp://localhost:<the peer's own port, from the peer's port
+// helper>. See harness.go.
 // awaitHello is the wrong helper for this row: its "accepted no
 // connection" reason is the known-bug outcome here, not a decline, so
 // the row reads the peer's state through its own logic.
@@ -70,11 +71,12 @@
 // Dial's return value, and nothing about the connection's state, which
 // would score the uasc layer above, not the transport.
 //
-// The knownBug constant is written with the body. The known-bug outcome
-// is a presence: Dial returned an error and no HEL arrived at the
-// listener. That error is the presence: on main, ResolveEndpoint keeps
-// addrs[0] (uacp/endpoint.go:50) and the dial to it is refused, so Dial
-// returns an error and no HEL ever reaches the last-address listener.
+// The knownBug constant is declared in the test function's body. The
+// known-bug outcome is a presence: Dial returned an error and no HEL
+// arrived at the listener. That error is the presence: on main,
+// ResolveEndpoint keeps addrs[0] (uacp/endpoint.go:50) and the dial to
+// it is refused, so Dial returns an error and no HEL ever reaches the
+// last-address listener.
 // The arms, in words: a HEL seen at the last-address listener at any
 // point before the verdict is the fixed arm, whatever Dial returned, and
 // it demands the constant's deletion; before scoring any arm other than

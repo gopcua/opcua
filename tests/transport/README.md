@@ -18,7 +18,9 @@ prints 1 for every row and 0 for `harness.go`. `refused_windows.go` and
 `refused` helper the address row's setup probe reads (a refused dial on
 Windows is Winsock's WSAECONNREFUSED, not `syscall.ECONNREFUSED`), and a
 build constraint applies to a whole file, so the helper cannot live with
-the fixture.
+the fixture. The same rule moves the fixture's `port` helper when the
+address row's body lands and calls it: a helper one row calls lives with
+that row, so `port` stays in `harness.go` only until then.
 
 ## Why no OPC UA clause binds these behaviours
 
@@ -45,7 +47,9 @@ address row. The Go doc line is quoted verbatim in the row's header, from
   read deadline from the context (uacp/conn.go:236-237) and a teardown
   close ends the read with `io.EOF` — so the bound exists to let a fixed
   library finish, not to wait out a broken one. It also bounds the setup
-  checks' waits for the HEL. Every listener and connection is closed in
+  checks' waits for the HEL, except where a row's header passes a
+  tighter bound (the deadline row passes `time.Until(deadline)`). Every
+  listener and connection is closed in
   `t.Cleanup`, so a `Dial` left blocked on main is released when the test
   ends.
 
@@ -68,8 +72,8 @@ address row. The Go doc line is quoted verbatim in the row's header, from
 
 ## The knownBug ledger
 
-Two constants stand, one per row, declared inside their test functions;
-both are written with the bodies. Each constant's text names the
+Two constants stand, one per row, each declared in its test function's
+body. Each constant's text names the
 mechanism it keys on, with the file and line it comes from, the way the
 constants in the neighbouring test packages do, and carries no issue
 link. Two different fixes close them, one for

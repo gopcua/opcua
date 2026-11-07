@@ -34,35 +34,36 @@ import (
 )
 
 // unblock is how long a row waits for Dial to return once its stimulus
-// has fired - the cancel, the deadline, or the teardown of a known-bug
-// run - and how long a setup check waits for the HEL to reach the peer.
-// It is not a timing assumption: a library that honours the context
-// unblocks at once, because Handshake sets the connection's read deadline
-// from the context's (uacp/conn.go:236-237) and a deadline or a teardown
-// close ends the blocked read immediately; the bound exists to let a
+// has fired - the cancel or the deadline - and how long a setup check
+// waits for the HEL to reach the peer. It is not a timing assumption: a
+// library that honours the context unblocks at once - the deadline path
+// sets the connection's read deadline from the context
+// (uacp/conn.go:236-237), and the cancellation path unblocks the same
+// read by setting a deadline in the past - so the bound exists to let a
 // fixed library finish, not to wait out a broken one.
 const unblock = 5 * time.Second
 
-// dial runs uacp.Dialer.Dial - with the zero-valued &uacp.Dialer{}, whose
-// fields are nil, so the library's defaults stand - on its own goroutine
-// and delivers the call's outcome on a one-buffered channel, so the
-// goroutine never blocks on a row that has stopped reading. The outcome
-// is the error, and returned, the wall-clock time stamped immediately
-// after Dial returned: a return is placed on the wall clock by that
-// stamp, not by when the row reads the channel. A row scores a return
-// by the helper's stamp wherever it reads it, so a return stamped before
-// the cancel or the deadline is the early-return failure even when the
-// row reads it later. When a row's window ends with nothing on the
-// channel, the row takes one more non-blocking read before it scores
-// "still blocked", and scores what it finds by the stamp. A *uacp.Conn the library
-// did return is closed in this goroutine, so it leaks nothing. Like every
-// helper here it returns plain values; the row turns the outcome it
-// reads into the failure or the decline.
+// The outcome is the error, and returned, the wall-clock time stamped
+// immediately after Dial returned: a return is placed on the wall clock
+// by that stamp, not by when the row reads the channel.
 type dialOutcome struct {
 	err      error
 	returned time.Time
 }
 
+// dial runs uacp.Dialer.Dial - with the zero-valued &uacp.Dialer{}, whose
+// fields are nil, so the library's defaults stand - on its own goroutine
+// and delivers the call's outcome on a one-buffered channel, so the
+// goroutine never blocks on a row that has stopped reading. A row scores
+// a return by the helper's stamp wherever it reads it, so a return
+// stamped before the cancel or the deadline is the early-return failure
+// even when the row reads it later. When a row's window ends with
+// nothing on the channel, the row takes one more non-blocking read
+// before it scores "still blocked", and scores what it finds by the
+// stamp. A *uacp.Conn the library did return is closed in this
+// goroutine, so it leaks nothing. Like every helper here it returns
+// plain values; the row turns the outcome it reads into the failure or
+// the decline.
 func dial(ctx context.Context, endpoint string) <-chan dialOutcome {
 	out := make(chan dialOutcome, 1)
 	go func() {
@@ -162,7 +163,7 @@ func (p *silentPeer) serve() {
 }
 
 // awaitHello is the setup check the handshake rows share: it waits up to
-// within for the peer to read a HEL message header off the connection
+// `within` for the peer to read a HEL message header off the connection
 // Dial opened, which proves the stimulus - a Dial blocked in Receive
 // (uacp/conn.go:244) - has been reached before the row cancels its
 // context or its deadline passes. It returns "", false once the HEL has
@@ -170,9 +171,9 @@ func (p *silentPeer) serve() {
 // failed check, and the row prints the reason with the wording below:
 //
 //   - fromGopcua false, a decline: a failed check either side could have
-//     caused - the peer accepted no connection within within, so Dial
+//     caused - the peer accepted no connection within `within`, so Dial
 //     never reached it; or it accepted the connection but read no header
-//     within within, which can close on a loaded machine. The row prints
+//     within `within`, which can close on a loaded machine. The row prints
 //     "could not set the test up: %s".
 //
 //   - fromGopcua true, unscoreable: a failed check only the library

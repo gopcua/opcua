@@ -17,7 +17,7 @@
 // connection's read deadline from the context (uacp/conn.go:236-237) and
 // the blocked Receive (uacp/conn.go:244) fails when it passes, so Dial
 // returns. The row exists to guard that deadline path against a change
-// made to the cancellation path: the fix
+// made to the cancellation path: the fix that
 // handshake_gives_up_when_its_context_is_cancelled_test.go waits for is
 // naturally a select on the context beside the read, and a change that
 // broke the deadline while fixing the cancellation would pass that row

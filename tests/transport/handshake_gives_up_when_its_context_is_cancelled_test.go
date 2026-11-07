@@ -20,25 +20,20 @@
 // to the blocked read and Dial stays blocked until the peer closes.
 //
 // Neighbouring rows: handshake_gives_up_at_its_context_deadline_test.go
-// is the same property on the deadline half of the same contract - "A
-// Context with a deadline is canceled after the deadline passes."
-// (go/src/context/context.go:16) - and gopcua passes that one today,
-// because the deadline path sets the connection deadline the
-// cancellation path never does.
-// dial_reaches_a_host_name_on_its_next_address_test.go scores which address of a name Dial dials; it shares
-// no code path with this row beyond ResolveEndpoint.
+// is the same property on the deadline half of the same contract, and
+// gopcua passes that one today, because the deadline path sets the
+// connection deadline the cancellation path never does.
+// dial_reaches_a_host_name_on_its_next_address_test.go scores which
+// address of a name Dial dials; it shares no code path with this row
+// beyond ResolveEndpoint.
 //
 // The row runs against the scripted silent peer - the shared fixture in
 // harness.go - driven through uacp.Dialer.Dial directly: the row starts
 // the peer, dials opc.tcp://<peer address> on its cancellable context
 // through the shared dial helper, and awaits the HEL through the shared
-// setup check, within unblock, before it cancels. The setup check's decline
-// and unscoreable split is awaitHello's: a failed check either side
-// could have caused - no connection accepted, or no header read within
-// unblock, which can close on a loaded machine - is a decline ("could
-// not set the test up: %s"), and a header that is not HELF is gopcua's
-// own behaviour, scored "gopcua's own behaviour made this run
-// unscoreable: %s" with t.Errorf and a return. The row registers the peer's teardown with
+// setup check, within unblock, before it cancels. The setup check is the
+// shared awaitHello, and its decline and unscoreable split applies here
+// as documented there. The row registers the peer's teardown with
 // t.Cleanup, so a Dial still blocked on main is released when the test
 // ends. See harness.go.
 //
@@ -50,19 +45,15 @@
 // asserts nothing about what the peer sees after the cancel - a fixed
 // library may close the connection or leave it to the teardown.
 //
-// The knownBug constant is written with the body. The known-bug outcome
-// is an absence - on main, Dial is still blocked at the bound, and there
-// is nothing present to key an arm on. What makes the absence scoreable:
-// the setup check proves the HEL reached the peer before the cancel, so
-// a library that never reaches the stimulus - no connection, or no HEL
-// on it - declines instead of landing in the known-bug arm. The arms, in
-// words: the row checks the dial helper's channel for an outcome already
-// present immediately before it cancels; one already there is a Dial
-// that returned before the cancel - the library gave up without being
-// asked - a failure with t.Errorf, after which the row returns, and the
-// fixed arm must not credit it. The fixed arm is a return stamped after
-// the cancel and within unblock of it - each return is placed on the
-// wall clock by the helper's stamp, not by when the row reads the
+// The knownBug constant is declared in the test function's body. The
+// known-bug outcome is an absence - on main, Dial is still blocked at
+// the bound, and there is nothing present to key an arm on. What makes
+// the absence scoreable: the setup check proves the HEL reached the peer
+// before the cancel, so a library that never reaches the stimulus - no
+// connection, or no HEL on it - declines instead of landing in the
+// known-bug arm. The arms, in words: the fixed arm is a return stamped
+// after the cancel and within unblock of it - each return is placed on
+// the wall clock by the helper's stamp, not by when the row reads the
 // channel - and it demands the constant's deletion. A Dial still blocked
 // at the bound is the known bug: the row logs a `known bug:` line with
 // t.Logf while the constant stands, and the build stays green; once the
@@ -80,16 +71,13 @@ import (
 )
 
 func TestHandshakeGivesUpWhenItsContextIsCancelled(t *testing.T) {
-	// knownBug records that gopcua does not do this yet: Handshake sets the
-	// connection's deadline only from ctx.Deadline() (uacp/conn.go:236-237)
-	// and its Receive reads the connection directly (uacp/conn.go:359), so a
-	// cancellation with no deadline does nothing to the blocked read and Dial
-	// stays blocked. The text is logged in place of a failure; ../README.md
-	// says when to delete it. It carries no issue link.
-	const knownBug = "Handshake sets the connection's deadline only from ctx.Deadline() " +
-		"(uacp/conn.go:236-237) and its Receive reads the connection directly " +
-		"(uacp/conn.go:359), so a cancellation after the HEL does nothing to the " +
-		"blocked read and Dial stays blocked"
+	// knownBug records that gopcua does not do this yet; the text is logged
+	// in place of a failure. ../README.md says when to delete it. It carries
+	// no issue link.
+	const knownBug = "Handshake sets the connection's deadline only from " +
+		"ctx.Deadline() (uacp/conn.go:236-237) and its Receive reads the " +
+		"connection directly (uacp/conn.go:359), so a cancellation after " +
+		"the HEL does nothing to the blocked read and Dial stays blocked"
 
 	peer, teardown, why := startSilentPeer("127.0.0.1")
 	t.Cleanup(teardown)
@@ -110,18 +98,8 @@ func TestHandshakeGivesUpWhenItsContextIsCancelled(t *testing.T) {
 		t.Fatalf("could not set the test up: %s", why)
 	}
 
-	// The peer holds the HEL. A Dial that has already returned gave up
-	// without being asked; the fixed arm must not credit that return.
-	select {
-	case o := <-out:
-		t.Errorf("Dial returned (%v) before the context was cancelled - the "+
-			"library gave up without being asked", o.err)
-		return
-	default:
-	}
-
-	cancel()
 	cancelledAt := time.Now()
+	cancel()
 
 	var o dialOutcome
 	returned := false
