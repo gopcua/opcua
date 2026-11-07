@@ -1,19 +1,19 @@
 //go:build conformance
 
-// The package states one rule in seven places, and this is the executable
+// The package states one rule in eight places, and this is the executable
 // statement of it. A session service that arrives on a connection before
 // that connection's ActivateSession is faulted Bad_SessionNotActivated by
 // answer() and the server does nothing with it, so no reading of the client
 // may count it -- even though the same connection activates a moment later
 // and is activated for the rest of the run.
 //
-// Every one of the seven builds its activated map inside the loop that reads
+// Every one of the eight builds its activated map inside the loop that reads
 // it, so "activated" there means "had activated by the time this request
 // arrived" and not "activated at some point". That ordering is the whole
 // content of the rule, and nothing in the package asserted it. A reviewer
-// proposing to lift the seven into one activatedConns(run) map[int]bool is
+// proposing to lift the eight into one activatedConns(run) map[int]bool is
 // proposing membership over the run, which answers a different question:
-// six of the seven would start counting the faulted requests, and
+// seven of the eight would start counting the faulted requests, and
 // firstEarlyUse, whose entire job is to find one, would return false for
 // every client that activates at all. The suite would stay green, because no
 // client this fixture drives has ever pipelined.
@@ -274,6 +274,30 @@ func TestActivationRuleIsOrdered(t *testing.T) {
 			// only whether the server could answer the Publish that followed.
 			wantEarly: "created=true published=0",
 			wantLate:  "created=true published=2",
+		},
+		{
+			name: "postDropAcks does not count a Publish that preceded its ActivateSession",
+			early: activationRuleRun(
+				requestRecord{Conn: 2, Service: "CreateSessionRequest"},
+				requestRecord{
+					Conn: 2, Service: "PublishRequest",
+					Acks: []ack{{SubID: 42, Seq: activationRuleHeldSeq}},
+				},
+				requestRecord{Conn: 2, Service: "ActivateSessionRequest"},
+			),
+			late: activationRuleRun(
+				requestRecord{Conn: 2, Service: "CreateSessionRequest"},
+				requestRecord{Conn: 2, Service: "ActivateSessionRequest"},
+				requestRecord{
+					Conn: 2, Service: "PublishRequest",
+					Acks: []ack{{SubID: 42, Seq: activationRuleHeldSeq}},
+				},
+			),
+			read: func(run runRecord) string {
+				return fmt.Sprintf("%v", postDropAcks(run))
+			},
+			wantEarly: "[]",
+			wantLate:  "[{42 7}]",
 		},
 		{
 			name: "firstEarlyUse finds the request that preceded its ActivateSession",

@@ -29,24 +29,23 @@ is not a placement criterion: it reads helpers wherever they already live,
 some in `harness.go` and some in row files.
 
 One file is not a row. `harness_activation_rule_test.go` has no client in it:
-it feeds `runRecord` values written by hand to the seven helpers that filter
+it feeds `runRecord` values written by hand to the eight helpers that filter
 on activation, and requires each to read a session service that arrived
 before its connection's `ActivateSession` differently from the same request
-arriving after. The seven state one rule in seven places, the ordering is
+arriving after. The eight state one rule in eight places, the ordering is
 the whole content of it, and that file is the only thing checking they
-agree. It also checks the assumption all seven rest on, that the scripted
+agree. It also checks the assumption all eight rest on, that the scripted
 server grants every activation it is asked for, by putting the five answers
 that are not a grant to the fixture's own check and requiring it to notice
 each one. The six questions below are for rows and do not apply to it.
 
-The seven is checkable, the way item 3 above is. `grep -ro 'activated :=
+That count is checkable, the way item 3 above is. `grep -ro 'activated :=
 map\[int\]bool{}' tests/reconnect/ | wc -l` prints one line per helper that
 filters on activation, and `grep -o 'name: "[^" ]* [^"]*ActivateSession'
 tests/reconnect/harness_activation_rule_test.go | cut -d'"' -f2 | cut -d' '
 -f1 | sort -u | wc -l` prints how many of them `TestActivationRuleIsOrdered`
-has a case for. Both print 7; the second is lower than the case count
-because one helper has two cases. An eighth helper moves the first number
-and leaves the second behind.
+has a case for. Both print 8; the second is lower than the case count
+because one helper has two cases.
 
 The suite exists because a diff of reconnect code does not tell you what the
 client will do: that depends on how the server answers after the drop, and
@@ -109,6 +108,16 @@ it went out in the change that rebased this suite onto that main.
 
 One constant survives: `no_acknowledgements_when_nothing_is_available_test.go`,
 whose behaviour 907 did not fix.
+
+## Rows that score a pull request
+
+A row can score a change that exists only as a pull request. It carries no
+`knownBug` constant, because the behaviour is on main and it is the pull
+request that breaks it, so it is listed here and not in the table above.
+
+| row | what it scores |
+|---|---|
+| `acknowledgements_resume_after_one_is_rejected_test.go` | https://github.com/gopcua/opcua/pull/899, which latches on one Bad_SequenceNumberUnknown and never acknowledges again |
 
 ## Reviewing a new test: six questions
 
