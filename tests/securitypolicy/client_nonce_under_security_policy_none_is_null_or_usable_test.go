@@ -81,8 +81,8 @@
 // the Client nonce and return Bad_NonceInvalid below 32 bytes, so a
 // conformant server may reject it, and OPC 10000-6 §6.7.4 asks for null
 // under None as the recommended shape. Issue #894 itself reports
-// gopcua's empty ClientNonce as the interop failure — some embedded
-// servers drop the connection on receiving it — and asks for an opt-in
+// gopcua's empty ClientNonce as the interop failure - some embedded
+// servers drop the connection on receiving it - and asks for an opt-in
 // option to send a non-empty one rather than a change to the default;
 // the row's verdict stands either way, and a nonce sent under such an
 // option meets the same floor. No reference stack's
@@ -200,14 +200,15 @@ func clientNonceFromOneConnection() (nonce []byte, teardown func(), why string, 
 
 // clientNonceFromOPNFrame walks the recorded OPN frame's own bytes by
 // OPC 10000-6's encoding rules alone - never through gopcua's decoder
-// - and returns the ClientNonce the OpenSecureChannelRequest it carries
-// was given, with "" - or the reason the run cannot be scored, and
+// - and returns the ClientNonce of the OpenSecureChannelRequest it
+// carries, with "" - or the reason the run cannot be scored, and
 // true, because a frame the walk cannot follow - a length prefix that
 // overruns it, a type ID that is not OpenSecureChannelRequest's, bytes
-// left over at its end - can only be the client's bytes. Every length
-// the walk reads comes from the frame itself, and the walk asserts
-// that it ends on the frame's last byte - RequestedLifetime's 4 - so
-// a wrong offset cannot score.
+// left over at its end - can only be the client's bytes. The walk's
+// field orders are OPC 10000-4's - §7.32's RequestHeader, §5.6.2.2's
+// OpenSecureChannelRequest - and every length the walk reads comes
+// from the frame itself; the walk asserts that it ends on the frame's
+// last byte - RequestedLifetime's 4 - so a wrong offset cannot score.
 func clientNonceFromOPNFrame(frame []byte) (nonce []byte, why string, fromGopcua bool) {
 	// The message header: the message type (3), the chunk type (1),
 	// the message size (4) and the secure channel id (4) - 12 bytes.
@@ -218,7 +219,7 @@ func clientNonceFromOPNFrame(frame []byte) (nonce []byte, why string, fromGopcua
 
 	// The asymmetric security header: SecurityPolicyURI,
 	// SenderCertificate and ReceiverCertificateThumbprint - three
-	// length-prefixed ByteStrings, a prefix of -1 null.
+	// length-prefixed ByteStrings, a prefix of -1 for null.
 	for i := 0; i < 3; i++ {
 		if _, o, why = skipPrefixed(frame, o); why != "" {
 			return nil, why, true
@@ -258,10 +259,7 @@ func clientNonceFromOPNFrame(frame []byte) (nonce []byte, why string, fromGopcua
 	if o, why = skip(frame, o, 8); why != "" {
 		return nil, why, true
 	}
-	if o, why = skip(frame, o, 4); why != "" {
-		return nil, why, true
-	}
-	if o, why = skip(frame, o, 4); why != "" {
+	if o, why = skip(frame, o, 8); why != "" {
 		return nil, why, true
 	}
 	if _, o, why = skipPrefixed(frame, o); why != "" {
@@ -321,8 +319,8 @@ func clientNonceFromOPNFrame(frame []byte) (nonce []byte, why string, fromGopcua
 // before the four bytes, the reason the walk cannot continue.
 func i32(frame []byte, o int) (int32, int, string) {
 	if o+4 > len(frame) {
-		return 0, o, fmt.Sprintf("the frame ends %d bytes into the "+
-			"Int32 at offset %d", o+4-len(frame), o)
+		return 0, o, fmt.Sprintf("the frame is %d bytes short of the "+
+			"Int32's four bytes at offset %d", o+4-len(frame), o)
 	}
 	return int32(binary.LittleEndian.Uint32(frame[o : o+4])), o + 4, ""
 }
@@ -332,7 +330,7 @@ func i32(frame []byte, o int) (int32, int, string) {
 // reason the walk cannot continue.
 func skip(frame []byte, o, n int) (int, string) {
 	if o+n > len(frame) {
-		return o, fmt.Sprintf("the frame ends %d bytes into the %d "+
+		return o, fmt.Sprintf("the frame is %d bytes short of the %d "+
 			"bytes at offset %d", o+n-len(frame), n, o)
 	}
 	return o + n, ""
