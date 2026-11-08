@@ -49,10 +49,18 @@
 // The row decrypts every block of the OPN's encrypted region with the
 // standard library's crypto/rsa.DecryptOAEP under SHA-256 and the peer's
 // minted key - never with gopcua code - and asserts that every block
-// decrypts and carries exactly 190 plaintext bytes. It declines, and
-// does not score, when no OPN frame arrived within the deadline, and
-// when the OPN's asymmetric security header names a policy other than
-// Aes256_Sha256_RsaPss: the row cannot score a channel it did not see.
+// decrypts and carries exactly 190 plaintext bytes. The encrypted
+// region is every byte of the OPN chunk after the asymmetric security
+// header - what uasc.MessageChunk.Decode leaves in Data: the sequence
+// header, the request, the padding and the signature, all encrypted
+// together - and every k-byte slice of it is one block. A region that
+// is empty or not a whole number of k-byte blocks is an ordinary
+// failure, and that arm is the guard against a pass on zero blocks. It
+// declines, and does not score, only when no OPN frame arrived within
+// the deadline; an OPN whose asymmetric security header names a policy
+// other than Aes256_Sha256_RsaPss can only be the client's bytes, so the
+// row prints "gopcua's own behaviour made this run unscoreable" with
+// t.Errorf, then returns.
 // It deliberately asserts nothing about the asymmetric signature
 // (RSA-PSS), the symmetric algorithms, the channel lifecycle - tokens,
 // renewal - or the HEL/ACK exchange.
@@ -60,8 +68,12 @@
 // The row fails on main, so it carries a knownBug constant, declared in
 // the test function's body together with the arms that read it. The
 // known-bug arm keys on a presence: every block decrypts and carries
-// exactly k - 2*64 - 2 = 126 bytes. That presence is itself the
-// misbehaviour, so per ../README.md the row carries no extra arm for it.
+// exactly k - 2*64 - 2 = 126 bytes. Both 190 and 126 are literals
+// computed in the row from the header's arithmetic - k - 2*32 - 2 and
+// k - 2*64 - 2 - and neither is read from uapolicy: reading the
+// constant would make the known-bug arm move with the fix. That
+// presence is itself the misbehaviour, so per ../README.md the row
+// carries no extra arm for it.
 // Any other outcome - a block that does not decrypt, mixed sizes,
 // another size - is an ordinary failure. All blocks carrying 190 passes,
 // and on main that pass is the hard error asking for the constant's
