@@ -60,8 +60,10 @@
 // together - and every k-byte slice of it is one block. A region that
 // is empty or not a whole number of k-byte blocks is an ordinary
 // failure, and that arm is the guard against a pass on zero blocks. It
-// declines, and does not score, only when no OPN frame arrived within
-// the deadline, the harness's `handshake` constant as the wait; an OPN
+// declines, and does not score, when no OPN frame arrived within
+// the deadline, the harness's `handshake` constant as the wait - that
+// is the row's own decline, and the harness's setup declines (minting,
+// starting the peer, building the client) apply as well; an OPN
 // whose asymmetric security header names a policy other than
 // Aes256_Sha256_RsaPss, or on which
 // uasc.MessageChunk.Decode fails, can only be the client's bytes, so

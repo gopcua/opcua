@@ -65,7 +65,10 @@ var peerAck = &uacp.Acknowledge{
 
 // scriptedPeer is the scripted TCP peer: it accepts one connection, reads
 // the HEL, answers the ACK, records the next frame - the OPN - and
-// closes the connection without answering it.
+// closes the connection without answering it. The recorded frame is the
+// whole secure-conversation chunk as the client wrote it, including its
+// first eight bytes, so uasc.MessageChunk.Decode takes it whole, with
+// no slicing.
 type scriptedPeer struct {
 	listener net.Listener
 
