@@ -29,7 +29,7 @@ scored here.
   uacp framing rejects - a bad header, an out-of-range size, an ERR
   frame - can only be the client's own, so the setup check reports them
   as gopcua's behaviour, not as a decline; an exchange that ends before
-  the OPN - the client closing, going away, never connecting - is a
+  the OPN - the client closing, going away - is a
   decline the check reports at once, without waiting out its bound.
 - **Keys and certificates are minted in memory at test time**: 4096-bit
   RSA for both the client and the peer, self-signed X.509, one pair for
