@@ -30,12 +30,7 @@ package securitypolicy
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/rsa"
-	"crypto/x509"
-	"crypto/x509/pkix"
 	"fmt"
-	"math/big"
 	"net"
 	"sync"
 	"time"
@@ -50,8 +45,8 @@ import (
 // its HEL and its OPN in milliseconds, so the bound exists to let a slow
 // machine finish, not to wait out a broken one; the teardown releases a
 // client that never sends, and the context's deadline releases a Connect
-// that stays blocked. README.md says this of the bound the way
-// ../transport/README.md says it of unblock.
+// that stays blocked. README.md states this bound's purpose the way
+// ../transport/README.md states `unblock`'s.
 const handshake = 10 * time.Second
 
 // peerAck is the Acknowledge the scripted peer answers the HEL with:
@@ -170,13 +165,11 @@ func (p *scriptedPeer) serve() {
 }
 
 // noteOffScript records the message type of a frame that arrived where
-// the script expected a HEL or an OPN, once.
+// the script expected a HEL or an OPN.
 func (p *scriptedPeer) noteOffScript(msgType []byte) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	if p.offScript == "" {
-		p.offScript = string(msgType)
-	}
+	p.offScript = string(msgType)
 }
 
 // awaitOpenSecureChannel is the setup check the rows share: it waits up
@@ -195,6 +188,13 @@ func (p *scriptedPeer) awaitOpenSecureChannel(within time.Duration) ([]byte, str
 		return frame, "", false
 	case <-time.After(within):
 	}
+	// An OPN that lands with the timer is caught here, not blamed on
+	// either side.
+	select {
+	case frame := <-p.opn:
+		return frame, "", false
+	default:
+	}
 	p.mu.Lock()
 	offScript := p.offScript
 	p.mu.Unlock()
@@ -211,53 +211,21 @@ func (p *scriptedPeer) awaitOpenSecureChannel(within time.Duration) ([]byte, str
 // AutoReconnect(false), so a failed connect is a returned error and not
 // a retry loop. The peer never answers the OPN and closes the connection
 // once it has recorded it, so Connect is expected to return an error;
-// the error is delivered on the returned channel and no row asserts it.
-// The channel is buffered, so the goroutine never blocks on a row that
-// has stopped reading. It returns the client, the channel, and "" - or,
-// when the client could not be built, the reason the run cannot be
-// scored. A "build the client" reason can come from either side - a
-// certificate the harness minted, or the library rejecting valid
-// options - so per ../README.md the row declines on it, printing it
-// with "could not set the test up".
-func launchClient(endpoint string, opts ...opcua.Option) (*opcua.Client, <-chan error, string) {
+// no row asserts it. It returns "" - or, when the client could not be
+// built, the reason the run cannot be scored. A "build the client" reason
+// can come from either side - a certificate the row minted, or the
+// library rejecting valid options - so per ../README.md the row declines
+// on it, printing it with "could not set the test up".
+func launchClient(endpoint string, opts ...opcua.Option) string {
 	client, err := opcua.NewClient(endpoint,
 		append([]opcua.Option{opcua.AutoReconnect(false)}, opts...)...)
 	if err != nil {
-		return nil, nil, fmt.Sprintf("build the client: %v", err)
+		return fmt.Sprintf("build the client: %v", err)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), handshake)
-	connectErr := make(chan error, 1)
 	go func() {
-		connectErr <- client.Connect(ctx)
+		_ = client.Connect(ctx)
 		cancel()
 	}()
-	return client, connectErr, ""
-}
-
-// mintCert mints a self-signed 2048-bit RSA key and X.509 certificate in
-// memory, for the common name it is given. Nothing is written to disk
-// and no key material is committed: every run mints its own pair for the
-// client and its own for the peer. It returns the key, the DER
-// certificate, and "" - or, when the minting failed, the reason the run
-// cannot be scored. A minting failure is a decline ("could not set the
-// test up"): it comes from the environment's random source, not from
-// gopcua.
-func mintCert(commonName string) (key *rsa.PrivateKey, cert []byte, why string) {
-	key, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		return nil, nil, fmt.Sprintf("generate a 2048-bit RSA key: %v", err)
-	}
-	tmpl := &x509.Certificate{
-		SerialNumber: big.NewInt(1),
-		Subject:      pkix.Name{CommonName: commonName},
-		NotBefore:    time.Now().Add(-time.Hour),
-		NotAfter:     time.Now().Add(24 * time.Hour),
-		KeyUsage: x509.KeyUsageDigitalSignature |
-			x509.KeyUsageKeyEncipherment | x509.KeyUsageDataEncipherment,
-	}
-	cert, err = x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
-	if err != nil {
-		return nil, nil, fmt.Sprintf("create the certificate: %v", err)
-	}
-	return key, cert, ""
+	return ""
 }

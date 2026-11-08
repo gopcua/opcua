@@ -24,18 +24,19 @@ scored here.
   `opcua.Client`, built by the shared `launchClient` with
   `AutoReconnect(false)` and run under a context bounded by the deadline;
   its `Connect` is expected to fail once the peer closes, and no row
-  asserts its error. A row that needs a second reading - the nonce row and
-  its two connections - runs the fixture twice.
+  asserts its error. A row that needs a second recorded OPN - the nonce
+  row and its two connections - runs the fixture twice.
 - **Keys and certificates are minted in memory at test time**: 2048-bit
-  RSA, self-signed X.509, one pair for the client and one for the peer.
-  Nothing is written to disk and no key material is committed. The None
-  row mints none: under None the client sends no certificate.
+  RSA for the client and 4096-bit for the peer, self-signed X.509, one
+  pair for each. Nothing is written to disk and no key material is
+  committed. The None row mints none: under None the client sends no
+  certificate.
 - **A wall clock frames the opening exchange.** A `Connect` that never
   returns cannot be observed except by outliving a bound, so the peer's
   setup check and the client's context share one (`handshake` in
   `harness.go`). The bound is not a timing assumption: a correct client
   sends its HEL and its OPN in well under a second - measured on this
-  tree, both rows' exchanges together ran in 0.07s - so the bound exists
+  tree, the block row's exchange ran in 0.49s - so the bound exists
   to let a slow machine finish, not to wait out a broken one. Every
   listener and connection is closed in `t.Cleanup`, so a `Connect` left
   blocked by the library under test is released when the test ends.
@@ -72,9 +73,10 @@ score.
 
 - `open_secure_channel_fills_each_rsa_oaep_block_test.go` declines when
   no OPN frame arrived within the bound. An OPN whose asymmetric
-  security header names a policy other than Aes256_Sha256_RsaPss can
-  only be the client's bytes, so the row scores it as gopcua's own
-  behaviour made this run unscoreable instead.
+  security header names a policy other than Aes256_Sha256_RsaPss, or
+  that does not decode as a message chunk, can only be the client's
+  bytes, so the row scores it as gopcua's own behaviour made this run
+  unscoreable instead.
 - `client_nonce_under_security_policy_none_is_null_or_usable_test.go`
   declines when either of its two connections' OPN did not arrive within
   the bound.
@@ -86,6 +88,7 @@ One constant stands, declared in
 `uapolicy` reserves 64 bytes for each SHA-256 hash where RFC 3447 §7.1.1
 reserves 32 (`RSAOAEPMinPaddingSHA256 = (2 * 64) + 2`,
 uapolicy/crypto_rsaoaep.go:21, subtracted at
-uapolicy/policyAes256Sha256RsaPss.go:114), so every RSA-OAEP-SHA2-256
-block carries 126 plaintext bytes where the arithmetic allows 190. The
-nonce row carries no constant: gopcua passes it as it stands.
+uapolicy/policyAes256Sha256RsaPss.go:114), so, with the 4096-bit receiver
+the harness mints, every RSA-OAEP-SHA2-256 block carries 382 plaintext
+bytes where the arithmetic allows 446. The nonce row carries no
+constant: gopcua passes it as it stands.

@@ -35,9 +35,9 @@
 // HEL/ACK exchange that precedes the OPN; this row does not score it.
 //
 // The row runs against the scripted peer from harness.go, twice: it
-// starts the peer and launches a client again for its second reading, so
-// it reads the OPN from two separate connections and can check that a
-// non-null nonce is not reused. The client under test is the real
+// starts the peer and launches a client again for its second recorded
+// OPN, so it reads the OPN from two separate connections and can check
+// that a non-null nonce is not reused. The client under test is the real
 // opcua.Client, launched by the shared launchClient with
 // opcua.SecurityPolicy(ua.SecurityPolicyURINone) and
 // opcua.SecurityMode(ua.MessageSecurityModeNone), under a context
