@@ -14,8 +14,9 @@
 // length is below 32 bytes." OPC 10000-7 v1.04 gives no
 // SecureChannelNonceLength for None - the profile's limits unit
 // SecurtyPolicy_None_Limits (sic) lists only "DerivedSignatureKeyLength: 0" -
-// so §5.6.2.2's length rule has no number to apply here, and the row rests on
-// §6.7.4 and §5.6.2.3. What counts as a null nonce is settled by the encoding
+// so §5.6.2.2's length rule has no number to apply here, and the row
+// rests on §5.6.2.3's server-side floor, with §6.7.4's null as the
+// recommended shape. What counts as a null nonce is settled by the encoding
 // rules, not by this row: OPC 10000-6 §5.2.2.7, ByteString: "If the length of
 // the byte string is -1 then the byte string is 'null'." OPC 10000-6 §5.1.11,
 // Null, Empty and Zero-Length Arrays, which covers ByteStrings ("ByteStrings
@@ -59,12 +60,13 @@
 // null, or else at least 32 bytes long; a non-null nonce must also
 // differ from the other connection's nonce, and a null nonce counts as
 // different from any non-null one. It declines, and does not score,
-// when either connection's OPN did not arrive within the deadline, the
-// harness's `handshake` constant as the wait - that is the row's own
-// decline, and the setup's declines (starting the peer, building the
-// client) apply as well. A frame that does not decode - its chunk, its
-// sequence header or its request body - or whose body is not an
-// OpenSecureChannelRequest, can only be the client's bytes, so the row
+// when either connection's OPN did not arrive, whether the harness's
+// `handshake` bound passed or the peer's exchange ended first - that is
+// the row's own decline, and the setup's declines (starting the peer,
+// building the client) apply as well. A frame that does not decode - its
+// chunk, its sequence header or its request body - or whose body is not
+// an OpenSecureChannelRequest, can only be the client's bytes, and so are
+// the harness's own flags, per harness.go, so the row
 // prints "gopcua's own behaviour made this run unscoreable" with
 // t.Errorf, then returns. It deliberately asserts nothing about the
 // rest of the OPN - the security header, the mode - and nothing about
@@ -73,9 +75,11 @@
 // renewed.") is the channel's business, not the nonce's.
 //
 // UaExpert sends a 1-byte 0x00 ClientNonce under None, per the Wireshark
-// comparison in gopcua issue #894; the row fails that shape on purpose,
-// because OPC 10000-6 §6.7.4 asks for null and OPC 10000-4 §5.6.2.3 lets a
-// checking server reject anything under 32 bytes. No reference stack's
+// comparison in gopcua issue #894; the row fails that shape on purpose:
+// OPC 10000-4 §5.6.2.3 says a Server shall check the minimum length of
+// the Client nonce and return Bad_NonceInvalid below 32 bytes, so a
+// conformant server may reject it, and OPC 10000-6 §6.7.4 asks for null
+// under None as the recommended shape. No reference stack's
 // source has been read for this behaviour.
 package securitypolicy
 
@@ -118,9 +122,12 @@ func TestClientNonceUnderSecurityPolicyNoneIsNullOrUsable(t *testing.T) {
 			continue
 		}
 		if len(nonce) < nonceFloor {
-			t.Errorf("connection %d's ClientNonce is a %d-byte nonce, not the null of "+
-				"OPC 10000-6 §6.7.4 (\"The Nonces are ignored and should be set to "+
-				"null.\"), and below the %d-byte floor of OPC 10000-4 §5.6.2.3",
+			t.Errorf("connection %d's ClientNonce is a %d-byte nonce: OPC "+
+				"10000-4 §5.6.2.3 says a Server shall check the minimum length of "+
+				"the Client nonce and return Bad_NonceInvalid below %d bytes, so a "+
+				"conformant server may reject it, and OPC 10000-6 §6.7.4 asks for "+
+				"null under None (\"The Nonces are ignored and should be set to "+
+				"null.\")",
 				i+1, len(nonce), nonceFloor)
 		}
 	}
