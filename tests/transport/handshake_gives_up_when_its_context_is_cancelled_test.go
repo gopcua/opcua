@@ -12,20 +12,18 @@
 // section says when or whether a client gives up waiting. No OPC UA
 // clause binds this behaviour. What the row scores is the Go contract:
 // "A Context may be canceled to indicate that work done on its behalf
-// should stop." (go/src/context/context.go:15). gopcua does not have the
-// behaviour: Handshake sets the connection's deadline only from
-// ctx.Deadline() (uacp/conn.go:236-237), and with no deadline its
-// Receive (uacp/conn.go:359) reads the connection directly and never
-// selects on the context, so a cancellation after the HEL does nothing
-// to the blocked read and Dial stays blocked until the peer closes.
+// should stop." (go/src/context/context.go:15). gopcua passes this row:
+// Handshake arms context.AfterFunc on the context to set a past deadline
+// on the connection when it is cancelled (uacp/conn.go:235-238), which
+// unblocks the read the HEL is waiting on, and Handshake then returns
+// ctx.Err() (uacp/conn.go:243), so Dial returns.
 //
 // Neighbouring rows: handshake_gives_up_at_its_context_deadline_test.go
 // is the same property on the deadline half of the same contract, and
-// gopcua passes that one today, because the deadline path sets the
-// connection deadline the cancellation path never does.
+// gopcua passes that one too.
 // dial_reaches_a_host_name_on_its_next_address_test.go scores which
 // address of a name Dial dials; it shares no code path with this row
-// beyond ResolveEndpoint.
+// beyond Dial.
 //
 // The row runs against the scripted silent peer - the shared fixture in
 // harness.go - driven through uacp.Dialer.Dial directly: the row starts
@@ -34,8 +32,8 @@
 // setup check, within unblock, before it cancels. The setup check is the
 // shared awaitHello, and its decline and unscoreable split applies here
 // as documented there. The row registers the peer's teardown with
-// t.Cleanup, so a Dial still blocked on main is released when the test
-// ends. See harness.go.
+// t.Cleanup, so a Dial left blocked is released when the test ends.
+// See harness.go.
 //
 // The row asserts that Dial returns within unblock of the cancel. It
 // deliberately asserts nothing about the error Dial returns: the Go
@@ -45,23 +43,17 @@
 // asserts nothing about what the peer sees after the cancel - a fixed
 // library may close the connection or leave it to the teardown.
 //
-// The knownBug constant is declared in the test function's body. The
-// known-bug outcome is an absence - on main, Dial is still blocked at
-// the bound, and there is nothing present to key an arm on. What makes
-// the absence scoreable: the setup check proves the HEL reached the peer
-// before the cancel, so a library that never reaches the stimulus - no
-// connection, or no HEL on it - declines instead of landing in the
-// known-bug arm. The arms, in words: a return stamped before the cancel
-// is the early-return failure wherever the row reads the return, and the fixed
-// arm must not credit it; the fixed arm is a return stamped after the
-// cancel and within unblock of it - each return is placed on the wall
-// clock by the helper's stamp, not by when the row reads the channel -
-// and it demands the constant's deletion. A Dial still blocked
-// at the bound is the known bug: the row logs a `known bug:` line with
-// t.Logf while the constant stands, and the build stays green; once the
-// constant is deleted, the same outcome is scored with a plain t.Errorf.
-// The arms read the dial helper's buffered channel, so a blocked Dial
-// cannot wedge the test past the bound.
+// The setup check proves the HEL reached the peer before the cancel, so
+// a library that never reaches the stimulus - no connection, or no HEL
+// on it - declines instead of being scored. The arms, in words: a
+// return stamped before the cancel is the early-return failure wherever
+// the row reads the return, and the fixed arm must not credit it; the
+// fixed arm is a return stamped after the cancel and within unblock of
+// it - each return is placed on the wall clock by the helper's stamp,
+// not by when the row reads the channel. A Dial still blocked at the
+// bound is scored with a plain t.Errorf. The arms read the dial
+// helper's buffered channel, so a blocked Dial cannot wedge the test
+// past the bound.
 //
 // No reference stack has been read for this behaviour.
 package transport
@@ -73,14 +65,6 @@ import (
 )
 
 func TestHandshakeGivesUpWhenItsContextIsCancelled(t *testing.T) {
-	// knownBug records that gopcua does not do this yet; the text is logged
-	// in place of a failure. ../README.md says when to delete it. It carries
-	// no issue link.
-	const knownBug = "Handshake sets the connection's deadline only from " +
-		"ctx.Deadline() (uacp/conn.go:236-237) and its Receive reads the " +
-		"connection directly (uacp/conn.go:359), so a cancellation after " +
-		"the HEL does nothing to the blocked read and Dial stays blocked"
-
 	peer, teardown, why := startSilentPeer("127.0.0.1")
 	t.Cleanup(teardown)
 	if why != "" {
@@ -113,33 +97,19 @@ func TestHandshakeGivesUpWhenItsContextIsCancelled(t *testing.T) {
 
 	switch {
 	case !returned:
-		if knownBug != "" {
-			t.Logf("known bug: %s (Dial was still blocked %v after the cancel)",
-				knownBug, unblock)
-		} else {
-			t.Errorf("the context was cancelled and Dial was still blocked "+
-				"%v later", unblock)
-		}
+		t.Errorf("the context was cancelled and Dial was still blocked "+
+			"%v later", unblock)
 	case o.returned.Before(cancelledAt):
 		// A return stamped before the cancel is an early return wherever
 		// the row reads it, and the fixed arm must not credit it.
 		t.Errorf("Dial returned (%v) before the context was cancelled - the "+
 			"library gave up without being asked", o.err)
-	case o.returned.Sub(cancelledAt) <= unblock && knownBug != "":
-		t.Errorf("this now passes (Dial returned %v within %v of the cancel) - "+
-			"delete the knownBug constant, every arm that reads it, and anything "+
-			"only those arms used, in the commit that fixed it", o.err, unblock)
 	case o.returned.Sub(cancelledAt) <= unblock:
 		t.Logf("Dial returned %v within %v of the cancel", o.err, unblock)
 	default:
 		// A return stamped past the bound is a Dial that stayed blocked
 		// past it: the stamp, not the read, places the return.
-		if knownBug != "" {
-			t.Logf("known bug: %s (Dial stayed blocked %v past the cancel, "+
-				"returning only then)", knownBug, unblock)
-		} else {
-			t.Errorf("Dial stayed blocked %v past the cancel, returning only "+
-				"then (%v)", o.returned.Sub(cancelledAt), o.err)
-		}
+		t.Errorf("Dial stayed blocked %v past the cancel, returning only "+
+			"then (%v)", o.returned.Sub(cancelledAt), o.err)
 	}
 }

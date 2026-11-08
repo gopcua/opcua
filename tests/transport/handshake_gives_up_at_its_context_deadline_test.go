@@ -14,8 +14,8 @@
 // deadline half: "A Context with a deadline is canceled after the
 // deadline passes." (go/src/context/context.go:16). gopcua passes this
 // row as it stands: with a deadline present, Handshake sets the
-// connection's read deadline from the context (uacp/conn.go:236-237) and
-// the blocked Receive (uacp/conn.go:244) fails when the deadline passes,
+// connection's read deadline from the context (uacp/conn.go:259-260) and
+// the blocked Receive (uacp/conn.go:267) fails when the deadline passes,
 // so Dial returns. The row exists to guard that deadline path against a
 // change made to the cancellation path: a change that fixed the
 // cancellation while breaking the deadline would pass
@@ -24,11 +24,10 @@
 //
 // Neighbouring rows:
 // handshake_gives_up_when_its_context_is_cancelled_test.go is the same
-// property on the cancellation half of the same
-// contract, and it carries the knownBug constant this row does not.
+// property on the cancellation half of the same contract.
 // dial_reaches_a_host_name_on_its_next_address_test.go scores which
 // address of a name Dial dials; it shares no code path with this row
-// beyond ResolveEndpoint.
+// beyond Dial.
 //
 // The row runs against the scripted silent peer - the shared fixture in
 // harness.go - driven through uacp.Dialer.Dial directly: the row starts
@@ -41,7 +40,7 @@
 // peer's silence outlives it and the expiry lands while the HEL is held
 // unanswered. The setup check is the shared awaitHello, and its decline
 // and unscoreable split applies here as documented there. The row registers
-// the peer's teardown with t.Cleanup, so a Dial still blocked on main is
+// the peer's teardown with t.Cleanup, so a Dial left blocked is
 // released when the test ends. See harness.go.
 //
 // The row asserts that Dial returns within unblock after its context's

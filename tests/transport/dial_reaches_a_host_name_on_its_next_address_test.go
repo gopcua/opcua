@@ -14,10 +14,9 @@
 // what the default dialer inside uacp.Dialer is: "When using TCP, and
 // the host resolves to multiple IP addresses, Dial will try each IP
 // address in order until one succeeds." (go/src/net/dial.go:438-439).
-// gopcua does not have the behaviour: ResolveEndpoint resolves the name
-// and keeps only addrs[0] (uacp/endpoint.go:40 and :50), and Dialer.Dial
-// dials that one address (uacp/conn.go:83), so a host name whose first
-// address refuses is never tried on its next one.
+// gopcua passes this row: Dialer.Dial hands the endpoint's host name to
+// net.Dialer (uacp/conn.go:87), which tries each address in order, so a
+// host name whose first address refuses is still tried on its next one.
 //
 // Neighbouring rows:
 // handshake_gives_up_when_its_context_is_cancelled_test.go and
@@ -26,17 +25,17 @@
 // address Dial reaches a peer on, before any handshake is held open.
 // They share the silent peer, not the HEL check - this row reads the
 // peer's state through its own logic - and, in the library, nothing
-// beyond ResolveEndpoint.
+// beyond Dial.
 //
 // The row runs against the silent peer from harness.go, bound by the
 // row's own setup to the last address localhost resolves to. It
-// resolves the name with net.Resolver.LookupIPAddr, the same call
-// ResolveEndpoint makes (uacp/endpoint.go:40), so the row and the
-// library agree on the order. It listens on the last address on a free
+// resolves the name with net.Resolver.LookupIPAddr, the resolution
+// net.Dialer makes inside the dial, so the row and the library agree
+// on the order. It listens on the last address on a free
 // port and dials opc.tcp://localhost:<the peer's own port, from this
 // row's port helper>. See harness.go.
 // awaitHello is the wrong helper for this row: its "accepted no
-// connection" reason is the known-bug outcome here, not a decline, so
+// connection" reason is an ordinary failure here, not a decline, so
 // the row reads the peer's state through its own logic.
 //
 // The row declines, and does not score, when the environment takes the
@@ -67,24 +66,12 @@
 // connection Dial returns, and nothing about the connection's state,
 // which would score the uasc layer above, not the transport.
 //
-// The knownBug constant is declared in the test function's body. The
-// known-bug outcome is a presence: Dial returned a refusal and no HEL
-// arrived at the listener. That refusal is the presence, and it is one a
-// fixed library does not show: on main, ResolveEndpoint keeps addrs[0]
-// (uacp/endpoint.go:50) and the dial to it is refused, so Dial returns a
-// refusal and no HEL ever reaches the last-address listener. A Dial
-// error that is not a refusal - a transient lookup failure inside the
-// dial is one a fixed library can show - is an ordinary failure, not
-// the known bug.
 // The arms, in words: a HEL seen at the last-address listener at any
-// point before the verdict is the fixed arm, whatever Dial returned, and
-// it demands the constant's deletion; before scoring any arm other than
-// the fixed one, the row re-checks the peer's HEL signal without
-// blocking, so a HEL that raced a Dial error is still the fixed arm;
-// Dial returning a refusal with no HEL at the listener logs the known
-// bug; any other Dial return with no HEL arrived - an error that is not
-// a refusal, or a nil error - is an ordinary failure with t.Errorf: a
-// non-refusal error is the ordinary failure described above, and the
+// point before the verdict is the fixed arm, whatever Dial returned;
+// before scoring any arm other than the fixed one, the row re-checks
+// the peer's HEL signal without blocking, so a HEL that raced a Dial
+// error is still the fixed arm; any Dial return with no HEL arrived -
+// an error, or a nil error - is an ordinary failure with t.Errorf: the
 // silent peer never acknowledges, so a nil return cannot come from a
 // dial that reached it. When no HEL arrives within unblock and Dial
 // has not returned, that is an ordinary failure too, scored with
@@ -122,16 +109,9 @@ func (p *silentPeer) readHeader() string {
 }
 
 func TestDialReachesAHostNameOnItsNextAddress(t *testing.T) {
-	// knownBug records that gopcua does not do this yet; the text is logged
-	// in place of a failure. ../README.md says when to delete it. It carries
-	// no issue link.
-	const knownBug = "ResolveEndpoint keeps only addrs[0] (uacp/endpoint.go:50) " +
-		"and Dialer.Dial dials that one address (uacp/conn.go:83), so a host " +
-		"name whose first address refuses is never tried on its next one"
-
 	// The row resolves the name itself, on a zero-valued net.Resolver, as
-	// ResolveEndpoint does (uacp/endpoint.go:40), so the row and the
-	// library agree on the order of the addresses.
+	// net.Dialer does inside the dial, so the row and the library agree
+	// on the order of the addresses.
 	var resolver net.Resolver
 	addrs, err := resolver.LookupIPAddr(context.Background(), "localhost")
 	if err != nil {
@@ -214,13 +194,7 @@ func TestDialReachesAHostNameOnItsNextAddress(t *testing.T) {
 
 	switch {
 	case hello:
-		if knownBug != "" {
-			t.Errorf("this now passes (a HEL arrived at the listener on %s) - "+
-				"delete the knownBug constant, every arm that reads it, and anything "+
-				"only those arms used, in the commit that fixed it", peer.addr())
-		} else {
-			t.Logf("a HEL arrived at the listener on %s", peer.addr())
-		}
+		t.Logf("a HEL arrived at the listener on %s", peer.addr())
 	case !returned:
 		// A library that reached the right listener but sent a header that
 		// is not HELF leaves its header behind; the peer read it, so the
@@ -233,13 +207,8 @@ func TestDialReachesAHostNameOnItsNextAddress(t *testing.T) {
 				"blocked %v after the dial", peer.addr(), unblock)
 		}
 	case o.err != nil:
-		if knownBug != "" && refused(o.err) {
-			t.Logf("known bug: %s (Dial returned %v and no HEL arrived at the "+
-				"listener on %s)", knownBug, o.err, peer.addr())
-		} else {
-			t.Errorf("Dial returned %v and no HEL arrived at the listener on %s",
-				o.err, peer.addr())
-		}
+		t.Errorf("Dial returned %v and no HEL arrived at the listener on %s",
+			o.err, peer.addr())
 	default:
 		t.Errorf("Dial returned a nil error and no HEL arrived at the "+
 			"listener on %s - the silent peer never acknowledges, so such a "+
