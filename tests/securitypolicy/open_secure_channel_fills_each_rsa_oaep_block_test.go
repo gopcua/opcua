@@ -92,8 +92,146 @@
 // No reference stack has been read for this behaviour.
 package securitypolicy
 
-import "testing"
+import (
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/sha256"
+	"testing"
+
+	"github.com/gopcua/opcua"
+	"github.com/gopcua/opcua/ua"
+	"github.com/gopcua/opcua/uasc"
+)
 
 func TestOpenSecureChannelFillsEachRsaOaepBlock(t *testing.T) {
-	t.Skip("body not written yet")
+	// knownBug records that gopcua does not do this yet; the text is logged
+	// in place of a failure. ../README.md says when to delete it. It carries
+	// no issue link.
+	const knownBug = "uapolicy reserves 64 bytes for each SHA-256 hash " +
+		"where RFC 3447 §7.1.1 reserves 32 (RSAOAEPMinPaddingSHA256 = " +
+		"(2 * 64) + 2, uapolicy/crypto_rsaoaep.go:21, subtracted at " +
+		"uapolicy/policyAes256Sha256RsaPss.go:114), so every " +
+		"RSA-OAEP-SHA2-256 block carries 126 plaintext bytes where the " +
+		"arithmetic allows 190"
+
+	clientKey, clientCert, why := mintCert("gopcua-conformance-client")
+	if why != "" {
+		t.Fatalf("could not set the test up: %s", why)
+	}
+	peerKey, peerCert, why := mintCert("gopcua-conformance-peer")
+	if why != "" {
+		t.Fatalf("could not set the test up: %s", why)
+	}
+
+	peer, teardown, why := startScriptedPeer()
+	t.Cleanup(teardown)
+	if why != "" {
+		t.Fatalf("could not set the test up: %s", why)
+	}
+
+	_, _, why = launchClient("opc.tcp://"+peer.addr(),
+		opcua.SecurityPolicy(ua.SecurityPolicyURIAes256Sha256RsaPss),
+		opcua.SecurityMode(ua.MessageSecurityModeSignAndEncrypt),
+		opcua.PrivateKey(clientKey),
+		opcua.Certificate(clientCert),
+		opcua.RemoteCertificate(peerCert),
+	)
+	if why != "" {
+		t.Fatalf("could not set the test up: %s", why)
+	}
+
+	frame, why, fromGopcua := peer.awaitOpenSecureChannel(handshake)
+	if why != "" {
+		if fromGopcua {
+			t.Errorf("gopcua's own behaviour made this run unscoreable: %s", why)
+			return
+		}
+		t.Fatalf("could not set the test up: %s", why)
+	}
+
+	// The row slices the frame with uasc, which only moves bytes it never
+	// scores: the verdict below rests on the standard library's
+	// DecryptOAEP and on the literal hash lengths.
+	chunk := &uasc.MessageChunk{}
+	if _, err := chunk.Decode(frame); err != nil {
+		t.Errorf("gopcua's own behaviour made this run unscoreable: the OPN "+
+			"frame does not decode as a message chunk: %v", err)
+		return
+	}
+	if uri := chunk.AsymmetricSecurityHeader.SecurityPolicyURI; uri != ua.SecurityPolicyURIAes256Sha256RsaPss {
+		t.Errorf("gopcua's own behaviour made this run unscoreable: the OPN's "+
+			"asymmetric security header names policy %q, not Aes256_Sha256_RsaPss", uri)
+		return
+	}
+
+	// k is the receiver's modulus length in octets - the peer is the
+	// receiver, and the row decrypts with the peer's minted key. The two
+	// hash lengths are literals: RFC 3447 §7.1.1's 32, and the 64 per hash
+	// uapolicy's constant reserves. Neither size is read from uapolicy,
+	// so the known-bug arm cannot move with the fix.
+	k := peerKey.Size()
+	const hLen = 32
+	const bugHLen = 64
+	want := k - 2*hLen - 2
+	knownBugSize := k - 2*bugHLen - 2
+
+	// chunk.Data is the whole encrypted region: sequence header, request,
+	// padding and signature, all encrypted together. A region that is
+	// empty or not a whole number of k-byte blocks is an ordinary
+	// failure - the guard against a pass on zero blocks.
+	data := chunk.Data
+	if len(data) == 0 || len(data)%k != 0 {
+		t.Errorf("the OPN's encrypted region is %d bytes, not a whole "+
+			"number of %d-byte blocks", len(data), k)
+		return
+	}
+	blocks := len(data) / k
+
+	sizes := make([]int, 0, blocks)
+	for i := 0; i < blocks; i++ {
+		pt, err := rsa.DecryptOAEP(sha256.New(), rand.Reader, peerKey,
+			data[i*k:(i+1)*k], nil)
+		if err != nil {
+			t.Errorf("block %d of %d does not decrypt under the peer's key: %v",
+				i+1, blocks, err)
+			return
+		}
+		sizes = append(sizes, len(pt))
+	}
+
+	atWant, atKnownBugSize := 0, 0
+	for _, n := range sizes {
+		switch n {
+		case want:
+			atWant++
+		case knownBugSize:
+			atKnownBugSize++
+		}
+	}
+
+	switch {
+	case atWant == blocks:
+		// Every block carries the most plaintext the algorithm allows.
+		// On main that pass is the hard error asking for the constant's
+		// deletion; with the constant deleted it is the row's pass and
+		// has nothing to report.
+		if knownBug != "" {
+			t.Errorf("this now passes (all %d blocks carry %d plaintext "+
+				"bytes, not %d) - delete the knownBug constant, every arm "+
+				"that reads it, and anything only those arms used, in the "+
+				"commit that fixed it", blocks, want, knownBugSize)
+		}
+	case atKnownBugSize == blocks:
+		if knownBug != "" {
+			t.Logf("known bug: %s (all %d blocks carry %d plaintext "+
+				"bytes, not %d)", knownBug, blocks, knownBugSize, want)
+		} else {
+			t.Errorf("all %d blocks carry %d plaintext bytes, not %d",
+				blocks, knownBugSize, want)
+		}
+	default:
+		// Mixed sizes, or a size that is neither the RFC's nor the bug's.
+		t.Errorf("the %d blocks carry mixed or wrong plaintext sizes "+
+			"(%d bytes each), not %d bytes each", blocks, sizes, want)
+	}
 }
