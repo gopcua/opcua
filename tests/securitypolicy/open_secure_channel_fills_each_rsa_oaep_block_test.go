@@ -28,12 +28,7 @@
 // version 1.05 moved the policy tables to the profiles website. The
 // expected 446 is computed in the row from that
 // arithmetic and the minted key's size, and never read from uapolicy:
-// uapolicy's constant is the bug this row guards against - it reserves
-// 64 bytes for each hash where RFC 3447 reserves 32
-// (RSAOAEPMinPaddingSHA256 = (2 * 64) + 2, declared in
-// uapolicy/crypto_rsaoaep.go and used twice: as the split size in
-// RSAOAEP.Encrypt and as the Aes256_Sha256_RsaPss policy's plaintext
-// block size), which leaves every block carrying 382 plaintext bytes.
+// reading the code under test would let it grade itself.
 //
 // Neighbouring rows:
 // client_nonce_under_security_policy_none_is_null_or_usable_test.go
@@ -82,23 +77,17 @@
 // renewal - or the HEL/ACK exchange; the row mints one receiver size,
 // so a fix hardcoded to the 4096-bit arithmetic would pass the row.
 //
-// gopcua does not have this behaviour yet, so the row carries a knownBug
-// constant, declared in the test function's body, where the arms that
-// read it live. The
-// known-bug arm keys on a presence: every block decrypts and carries
-// exactly k - 2*64 - 2 = 382 bytes. The literals are 32, RFC 3447's
-// SHA-256 length, and 64, what uapolicy's constant reserves for each
-// hash; k is the peer key's modulus length in octets - the peer
-// is the receiver - so the row computes both sizes from the peer key's
-// Size(), and with the 4096-bit key the row mints they come to 446
-// and 382; neither is read from uapolicy: reading the
-// constant would key the known-bug arm on uapolicy's own answer. That
-// presence is itself the misbehaviour, so per ../README.md the row
-// carries no extra arm for it.
+// gopcua passes this: RSAOAEPMinPaddingSHA256 = (2 * 32) + 2 reserves
+// 32 bytes for each SHA-256 hash, declared in
+// uapolicy/crypto_rsaoaep.go:21 and read twice: in RSAOAEP.Encrypt at
+// uapolicy/crypto_rsaoaep.go:76, where
+// maxBlock := a.PublicKey.Size() - minPadding
+// (uapolicy/crypto_rsaoaep.go:79) splits the plaintext into
+// k - 2*32 - 2 byte blocks, and as the Aes256_Sha256_RsaPss policy's
+// plaintext block size (uapolicy/policyAes256Sha256RsaPss.go:114).
 // Any other outcome - a block that does not decrypt, mixed sizes,
-// another size - is an ordinary failure. All blocks carrying 446 passes,
-// and on main that pass is the hard error asking for the constant's
-// deletion.
+// another size - is an ordinary failure. All blocks carrying 446
+// passes, logged the way the sibling rows log theirs.
 //
 // No reference stack has been read for this behaviour.
 package securitypolicy
@@ -120,17 +109,6 @@ import (
 )
 
 func TestOpenSecureChannelFillsEachRSAOAEPBlock(t *testing.T) {
-	// knownBug records that gopcua does not do this yet; the text is logged
-	// in place of a failure. ../README.md says when to delete it. It carries
-	// no issue link.
-	const knownBug = "uapolicy reserves 64 bytes for each SHA-256 hash " +
-		"where RFC 3447 §7.1.1 reserves 32 (RSAOAEPMinPaddingSHA256 = " +
-		"(2 * 64) + 2, declared in uapolicy/crypto_rsaoaep.go and used " +
-		"twice: as the split size in RSAOAEP.Encrypt and as the " +
-		"Aes256_Sha256_RsaPss policy's plaintext block size), so every " +
-		"RSA-OAEP-SHA2-256 block carries 382 plaintext bytes where the " +
-		"arithmetic allows 446"
-
 	clientKey, clientCert, why := mintCert("gopcua-conformance-client", 4096)
 	if why != "" {
 		t.Fatalf("could not set the test up: %s", why)
@@ -179,14 +157,11 @@ func TestOpenSecureChannelFillsEachRSAOAEPBlock(t *testing.T) {
 	}
 
 	// k is the receiver's modulus length in octets - the peer is the
-	// receiver, and the row decrypts with the peer's minted key. The two
-	// hash lengths are literals: RFC 3447 §7.1.1's 32, and the 64 per hash
-	// uapolicy's constant reserves.
+	// receiver, and the row decrypts with the peer's minted key. The
+	// hash length is a literal: RFC 3447 §7.1.1's 32.
 	k := peerKey.Size()
 	const hLen = 32
-	const bugHLen = 64
 	want := k - 2*hLen - 2
-	knownBugSize := k - 2*bugHLen - 2
 
 	// chunk.Data is the whole encrypted region.
 	data := chunk.Data
@@ -209,7 +184,7 @@ func TestOpenSecureChannelFillsEachRSAOAEPBlock(t *testing.T) {
 	}
 
 	sizes := make([]int, 0, blocks)
-	atWant, atKnownBugSize := 0, 0
+	atWant := 0
 	for i := 0; i < blocks; i++ {
 		pt, err := rsa.DecryptOAEP(sha256.New(), rand.Reader, peerKey,
 			data[i*k:(i+1)*k], nil)
@@ -219,37 +194,18 @@ func TestOpenSecureChannelFillsEachRSAOAEPBlock(t *testing.T) {
 			return
 		}
 		sizes = append(sizes, len(pt))
-		switch len(pt) {
-		case want:
+		if len(pt) == want {
 			atWant++
-		case knownBugSize:
-			atKnownBugSize++
 		}
 	}
 
-	switch {
-	case atWant == blocks:
-		// Every block carries the most plaintext the algorithm allows.
-		// On main that pass is the hard error asking for the constant's
-		// deletion; with the constant deleted it is the row's pass,
-		// logged the way the sibling rows log theirs.
-		if knownBug != "" {
-			t.Errorf("this now passes (each of the %d blocks carries %d "+
-				"plaintext bytes, not %d) - delete the knownBug constant, every arm "+
-				"that reads it, and anything only those arms used, in the "+
-				"commit that fixed it", blocks, want, knownBugSize)
-		} else {
-			t.Logf("each of the %d blocks carries %d plaintext bytes", blocks, want)
-		}
-	case atKnownBugSize == blocks:
-		if knownBug != "" {
-			t.Logf("known bug: %s (each of the %d blocks carries %d "+
-				"plaintext bytes, not %d)", knownBug, blocks, knownBugSize, want)
-		} else {
-			t.Errorf("each of the %d blocks carries %d plaintext bytes, not %d",
-				blocks, knownBugSize, want)
-		}
-	default:
+	// Every block carries the most plaintext the algorithm allows;
+	// logged the way the sibling rows log theirs. Anything else - a
+	// block that does not decrypt (above), mixed sizes, another size -
+	// is an ordinary failure.
+	if atWant == blocks {
+		t.Logf("each of the %d blocks carries %d plaintext bytes", blocks, want)
+	} else {
 		t.Errorf("the blocks carry mixed or wrong plaintext sizes "+
 			"(%v), not %d bytes each", sizes, want)
 	}
