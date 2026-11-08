@@ -118,7 +118,7 @@ func TestClientNonceUnderSecurityPolicyNoneIsNullOrUsable(t *testing.T) {
 			continue
 		}
 		if len(nonce) < nonceFloor {
-			t.Errorf("connection %d's ClientNonce is %d bytes: not the null of "+
+			t.Errorf("connection %d's ClientNonce is a %d-byte nonce, not the null of "+
 				"OPC 10000-6 §6.7.4 (\"The Nonces are ignored and should be set to "+
 				"null.\"), and below the %d-byte floor of OPC 10000-4 §5.6.2.3",
 				i+1, len(nonce), nonceFloor)

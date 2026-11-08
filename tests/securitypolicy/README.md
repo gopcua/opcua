@@ -49,8 +49,8 @@ match `harness.go`, which is the fixture itself and not a row.
 ## Why the verdicts rest outside gopcua
 
 The peer uses gopcua's `uacp` and `uasc` types to frame the ACK, to
-slice the recorded frame into its headers, and, in the nonce row, to
-decode the request body with `ua.DecodeService` - which is not the
+decode the recorded frame, and, in the nonce row, its request body
+with `ua.DecodeService` - which is not the
 library grading itself, because those types only move bytes the rows
 never score: the nonce verdict rests on `len` and `bytes.Equal`.
 The verdicts rest on the standard library and on the clauses: every
