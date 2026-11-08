@@ -21,7 +21,7 @@
 // bad header, an out-of-range size, an ERR frame - can only be the
 // client's own, so awaitOpenSecureChannel reports them as gopcua's
 // behaviour, not as a decline. And an exchange that ends before the
-// OPN - the client closing, going away, never connecting - is a
+// OPN - the client closing, going away - is a
 // decline the check reports at once, when serve returns, without
 // waiting out its bound.
 //
@@ -191,8 +191,8 @@ func (p *scriptedPeer) serve() {
 	_ = uc.Close()
 }
 
-// noteOffScript records the message type of a frame that arrived where
-// the script expected `expected` - a HEL at the first read, an OPN at
+// noteOffScript records the message type of a frame that arrived in
+// place of `expected` - a HEL at the first read, an OPN at
 // the second - so awaitOpenSecureChannel can report both in its reason
 // instead of naming every type the script ever reads.
 func (p *scriptedPeer) noteOffScript(msgType, expected []byte) {
@@ -204,11 +204,14 @@ func (p *scriptedPeer) noteOffScript(msgType, expected []byte) {
 
 // noteReceiveError records a read error from the peer's uacp framing,
 // unless the connection merely ended: a client that goes away
-// mid-exchange stays a decline, but any other read error - a bad header,
-// an out-of-range size, an ERR frame - can only come from the client's
-// own bytes, so awaitOpenSecureChannel reports it as gopcua's behaviour.
+// mid-exchange stays a decline, and so does a client whose frame is cut
+// short mid-flight (io.ErrUnexpectedEOF from a truncated frame) - both
+// count as the connection ending - but any other read error - a bad
+// header, an out-of-range size, an ERR frame - can only come from the
+// client's own bytes, so awaitOpenSecureChannel reports it as gopcua's
+// behaviour.
 func (p *scriptedPeer) noteReceiveError(err error) {
-	if errors.Is(err, io.EOF) {
+	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
 		return
 	}
 	p.mu.Lock()
@@ -238,7 +241,7 @@ func (p *scriptedPeer) awaitOpenSecureChannel(within time.Duration) ([]byte, str
 	}
 	// An OPN that lands with the timer or the close is caught here, not
 	// blamed on either side; serve delivers the OPN before it returns, so
-	// opn wins when both land together.
+	// the re-read below catches it when both land together.
 	select {
 	case frame := <-p.opn:
 		return frame, "", false
@@ -254,8 +257,7 @@ func (p *scriptedPeer) awaitOpenSecureChannel(within time.Duration) ([]byte, str
 			"where the script expected %q", offScript, offScriptExpected), true
 	}
 	if recvErr != "" {
-		return nil, fmt.Sprintf("the peer could not frame the client's "+
-			"next frame: %s", recvErr), true
+		return nil, fmt.Sprintf("the peer's uacp framing rejected the client's frame: %s", recvErr), true
 	}
 	select {
 	case <-p.done:
@@ -272,7 +274,7 @@ func (p *scriptedPeer) awaitOpenSecureChannel(within time.Duration) ([]byte, str
 // a retry loop. The peer never answers the OPN and closes the connection
 // once it has recorded it, so Connect is expected to return an error;
 // no row asserts it. The goroutine closes the client after Connect
-// returns, so a future peer that let Connect succeed leaves no client
+// returns, so a future peer that lets Connect succeed leaves no client
 // running past the row. It returns "" - or, when the client could not be
 // built, the reason the run cannot be scored. A "build the client" reason
 // can come from either side - a certificate the row minted, or the

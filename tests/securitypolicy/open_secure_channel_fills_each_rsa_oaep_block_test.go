@@ -73,7 +73,7 @@
 // An OPN whose asymmetric security header names a policy other than
 // Aes256_Sha256_RsaPss, or on which
 // uasc.MessageChunk.Decode fails, can only be the client's bytes, and
-// so are the harness's own flags, per harness.go, so the row prints
+// so are the frames the harness itself flags, per harness.go, so the row prints
 // "gopcua's own behaviour made this run unscoreable"
 // with t.Errorf, then returns.
 // It deliberately asserts nothing about the asymmetric signature

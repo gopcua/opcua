@@ -66,7 +66,7 @@
 // building the client) apply as well. A frame that does not decode - its
 // chunk, its sequence header or its request body - or whose body is not
 // an OpenSecureChannelRequest, can only be the client's bytes, and so are
-// the harness's own flags, per harness.go, so the row
+// the frames the harness itself flags, per harness.go, so the row
 // prints "gopcua's own behaviour made this run unscoreable" with
 // t.Errorf, then returns. It deliberately asserts nothing about the
 // rest of the OPN - the security header, the mode - and nothing about
