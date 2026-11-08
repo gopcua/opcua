@@ -38,10 +38,12 @@
 // starts the peer and launches a client again for its second reading, so
 // it reads the OPN from two separate connections and can check that a
 // non-null nonce is not reused. The client under test is the real
-// opcua.Client, launched by the shared launchClient with SecurityPolicy
-// None and SecurityMode None, under a context bounded by the harness's
-// handshake deadline; its Connect is expected to fail once the peer
-// closes, and no arm asserts its error. See harness.go.
+// opcua.Client, launched by the shared launchClient with
+// opcua.SecurityPolicy(ua.SecurityPolicyURINone) and
+// opcua.SecurityMode(ua.MessageSecurityModeNone), under a context
+// bounded by the harness's handshake deadline; its Connect is expected
+// to fail once the peer closes, and no arm asserts its error. See
+// harness.go.
 //
 // The row asserts, from the nonce bytes as they arrive on the wire -
 // read by the scripted peer, not through uapolicy.NonceLength() - that
@@ -59,7 +61,8 @@
 // connection's nonce, and a null nonce counts as different from any
 // non-null one. It declines, and does not score, when either
 // connection's OPN did not arrive within the deadline; a frame that
-// does not decode, or whose body is not an OpenSecureChannelRequest,
+// does not decode - its chunk, its sequence header or its request
+// body - or whose body is not an OpenSecureChannelRequest,
 // can only be the client's bytes, so the row prints "gopcua's own
 // behaviour made this run unscoreable" with t.Errorf, then returns. It
 // deliberately asserts nothing about the rest of the OPN - the security

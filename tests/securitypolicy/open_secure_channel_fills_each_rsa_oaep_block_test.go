@@ -39,10 +39,14 @@
 //
 // The row runs against the scripted peer from harness.go: it accepts one
 // connection, answers the ACK, records the OPN frame, and closes without
-// answering it. The client under test is the real opcua.Client, launched
-// by the shared launchClient with the policy, the mode, the minted client
-// key and certificate, and the peer's minted certificate, under a
-// context bounded by the harness's handshake deadline; its Connect is
+// answering it. The client under test is the real opcua.Client,
+// launched by the shared launchClient with
+// opcua.SecurityPolicy(ua.SecurityPolicyURIAes256Sha256RsaPss),
+// opcua.SecurityMode(ua.MessageSecurityModeSignAndEncrypt),
+// opcua.PrivateKey and opcua.Certificate carrying the minted client
+// key and certificate, and opcua.RemoteCertificate carrying the peer's
+// minted certificate, under a context bounded by the harness's
+// handshake deadline; its Connect is
 // expected to fail once the peer closes, and no arm asserts its error.
 // See harness.go.
 //
@@ -58,9 +62,10 @@
 // failure, and that arm is the guard against a pass on zero blocks. It
 // declines, and does not score, only when no OPN frame arrived within
 // the deadline; an OPN whose asymmetric security header names a policy
-// other than Aes256_Sha256_RsaPss can only be the client's bytes, so the
-// row prints "gopcua's own behaviour made this run unscoreable" with
-// t.Errorf, then returns.
+// other than Aes256_Sha256_RsaPss, or on which
+// uasc.MessageChunk.Decode fails, can only be the client's bytes, so
+// the row prints "gopcua's own behaviour made this run unscoreable"
+// with t.Errorf, then returns.
 // It deliberately asserts nothing about the asymmetric signature
 // (RSA-PSS), the symmetric algorithms, the channel lifecycle - tokens,
 // renewal - or the HEL/ACK exchange.
@@ -68,9 +73,11 @@
 // The row fails on main, so it carries a knownBug constant, declared in
 // the test function's body together with the arms that read it. The
 // known-bug arm keys on a presence: every block decrypts and carries
-// exactly k - 2*64 - 2 = 126 bytes. Both 190 and 126 are literals
-// computed in the row from the header's arithmetic - k - 2*32 - 2 and
-// k - 2*64 - 2 - and neither is read from uapolicy: reading the
+// exactly k - 2*64 - 2 = 126 bytes. The literals are 32 and 64, the two
+// hash lengths; k is the peer key's modulus length in octets - the peer
+// is the receiver - so the row computes both sizes from the peer key's
+// Size(), and with the 2048-bit key the harness mints they come to 190
+// and 126; neither is read from uapolicy: reading the
 // constant would make the known-bug arm move with the fix. That
 // presence is itself the misbehaviour, so per ../README.md the row
 // carries no extra arm for it.
