@@ -236,7 +236,9 @@ func launchClient(endpoint string, opts ...opcua.Option) (*opcua.Client, <-chan 
 // and no key material is committed: every run mints its own pair for the
 // client and its own for the peer. It returns the key, the DER
 // certificate, and "" - or, when the minting failed, the reason the run
-// cannot be scored.
+// cannot be scored. A minting failure is a decline ("could not set the
+// test up"): it comes from the environment's random source, not from
+// gopcua.
 func mintCert(commonName string) (key *rsa.PrivateKey, cert []byte, why string) {
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {

@@ -42,8 +42,8 @@
 // opcua.SecurityPolicy(ua.SecurityPolicyURINone) and
 // opcua.SecurityMode(ua.MessageSecurityModeNone), under a context
 // bounded by the harness's handshake deadline; its Connect is expected
-// to fail once the peer closes, and no arm asserts its error. See
-// harness.go.
+// to fail once the peer closes, and no arm asserts its error.
+// See harness.go.
 //
 // The row asserts, from the nonce bytes as they arrive on the wire -
 // read by the scripted peer, not through uapolicy.NonceLength() - that
@@ -60,7 +60,8 @@
 // bytes long; a non-null nonce must also differ from the other
 // connection's nonce, and a null nonce counts as different from any
 // non-null one. It declines, and does not score, when either
-// connection's OPN did not arrive within the deadline; a frame that
+// connection's OPN did not arrive within the deadline, the harness's
+// `handshake` constant as the wait; a frame that
 // does not decode - its chunk, its sequence header or its request
 // body - or whose body is not an OpenSecureChannelRequest,
 // can only be the client's bytes, so the row prints "gopcua's own
