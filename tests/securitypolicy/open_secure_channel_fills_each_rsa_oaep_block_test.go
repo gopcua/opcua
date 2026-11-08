@@ -64,7 +64,7 @@
 // failure, and the empty-region arm is the guard against a pass on
 // zero blocks. It declines, and does not score, when no OPN frame
 // arrived within the deadline, the harness's `handshake` constant as
-// the wait - that is the row's own decline, and the setup declines
+// the wait - that is the row's own decline, and the setup's declines
 // (minting, starting the peer, building the client) apply as well.
 // An OPN whose asymmetric security header names a policy other than
 // Aes256_Sha256_RsaPss, or on which
@@ -74,7 +74,7 @@
 // It deliberately asserts nothing about the asymmetric signature
 // (RSA-PSS), the symmetric algorithms, the channel lifecycle - tokens,
 // renewal - or the HEL/ACK exchange; the row mints one receiver size,
-// so a fix hardcoded to the 4096-bit arithmetic would pass it.
+// so a fix hardcoded to the 4096-bit arithmetic would pass the row.
 //
 // The row fails on main, so it carries a knownBug constant, declared in
 // the test function's body, where the arms that read it live. The
