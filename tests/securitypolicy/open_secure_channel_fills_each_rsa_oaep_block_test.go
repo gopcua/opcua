@@ -76,8 +76,9 @@
 // renewal - or the HEL/ACK exchange; the row mints one receiver size,
 // so a fix hardcoded to the 4096-bit arithmetic would pass the row.
 //
-// The row fails on main, so it carries a knownBug constant, declared in
-// the test function's body, where the arms that read it live. The
+// gopcua does not have this behaviour yet, so the row carries a knownBug
+// constant, declared in the test function's body, where the arms that
+// read it live. The
 // known-bug arm keys on a presence: every block decrypts and carries
 // exactly k - 2*64 - 2 = 382 bytes. The literals are 32, RFC 3447's
 // SHA-256 length, and 64, what uapolicy's constant reserves for each
