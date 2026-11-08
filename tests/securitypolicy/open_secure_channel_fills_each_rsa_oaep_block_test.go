@@ -4,8 +4,10 @@
 // mode SignAndEncrypt encrypts its OpenSecureChannel request in
 // RSA-OAEP-SHA2-256 blocks, each carrying the most plaintext the
 // algorithm allows: k - 2hLen - 2 bytes, where k is the receiver's
-// modulus length in octets and hLen is SHA-256's 32-byte output - 190
-// for the 2048-bit receiver key the harness mints.
+// modulus length in octets and hLen is SHA-256's 32-byte output - 446
+// for the 4096-bit receiver key the row mints - the peer is minted at
+// 4096 bits so that a fix hardcoded to one key size lands in the
+// ordinary-failure arm.
 //
 // The clauses: OPC 10000-7 v1.04 §6.6.166, Table 186 "SecurityPolicy -
 // Aes256-Sha256-RsaPss", lists the conformance unit
@@ -21,14 +23,14 @@
 // CipherTextBlockSize. These values depend on the encryption algorithm
 // and may be the same." RFC 3447 §7.1.1 step 1b: "If mLen > k - 2hLen -
 // 2, output "message too long" and stop." Part 7 v1.04 is quoted because
-// version 1.05 moved the policy tables to the profiles website; v1.04 is
-// the last text form. The expected 190 is computed in the row from that
+// version 1.05 moved the policy tables to the profiles website. The
+// expected 446 is computed in the row from that
 // arithmetic and the minted key's size, and never read from uapolicy:
 // uapolicy's constant is the bug this row guards against - it reserves
 // 64 bytes for each hash where RFC 3447 reserves 32
 // (RSAOAEPMinPaddingSHA256 = (2 * 64) + 2, uapolicy/crypto_rsaoaep.go:21,
 // subtracted at uapolicy/policyAes256Sha256RsaPss.go:114), which leaves
-// every block carrying 126 plaintext bytes.
+// every block carrying 382 plaintext bytes.
 //
 // Neighbouring rows:
 // client_nonce_under_security_policy_none_is_null_or_usable_test.go
@@ -53,7 +55,7 @@
 // The row decrypts every block of the OPN's encrypted region with the
 // standard library's crypto/rsa.DecryptOAEP under SHA-256 and the peer's
 // minted key - never with gopcua code - and asserts that every block
-// decrypts and carries exactly 190 plaintext bytes. The encrypted
+// decrypts and carries exactly 446 plaintext bytes. The encrypted
 // region is every byte of the OPN chunk after the asymmetric security
 // header - what uasc.MessageChunk.Decode leaves in Data: the sequence
 // header, the request, the padding and the signature, all encrypted
@@ -63,7 +65,7 @@
 // declines, and does not score, when no OPN frame arrived within
 // the deadline, the harness's `handshake` constant as the wait - that
 // is the row's own decline, and the harness's setup declines (minting,
-// starting the peer, building the client) apply as well; an OPN
+// starting the peer, building the client) apply as well. An OPN
 // whose asymmetric security header names a policy other than
 // Aes256_Sha256_RsaPss, or on which
 // uasc.MessageChunk.Decode fails, can only be the client's bytes, so
@@ -74,18 +76,19 @@
 // renewal - or the HEL/ACK exchange.
 //
 // The row fails on main, so it carries a knownBug constant, declared in
-// the test function's body together with the arms that read it. The
+// the test function's body, where the arms that read it live. The
 // known-bug arm keys on a presence: every block decrypts and carries
-// exactly k - 2*64 - 2 = 126 bytes. The literals are 32 and 64, the two
-// hash lengths; k is the peer key's modulus length in octets - the peer
+// exactly k - 2*64 - 2 = 382 bytes. The literals are 32, RFC 3447's
+// SHA-256 length, and 64, what uapolicy's constant reserves for each
+// hash; k is the peer key's modulus length in octets - the peer
 // is the receiver - so the row computes both sizes from the peer key's
-// Size(), and with the 2048-bit key the harness mints they come to 190
-// and 126; neither is read from uapolicy: reading the
-// constant would make the known-bug arm move with the fix. That
+// Size(), and with the 4096-bit key the row mints they come to 446
+// and 382; neither is read from uapolicy: reading the
+// constant would key the known-bug arm on uapolicy's own answer. That
 // presence is itself the misbehaviour, so per ../README.md the row
 // carries no extra arm for it.
 // Any other outcome - a block that does not decrypt, mixed sizes,
-// another size - is an ordinary failure. All blocks carrying 190 passes,
+// another size - is an ordinary failure. All blocks carrying 446 passes,
 // and on main that pass is the hard error asking for the constant's
 // deletion.
 //
@@ -96,14 +99,19 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"fmt"
+	"math/big"
 	"testing"
+	"time"
 
 	"github.com/gopcua/opcua"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uasc"
 )
 
-func TestOpenSecureChannelFillsEachRsaOaepBlock(t *testing.T) {
+func TestOpenSecureChannelFillsEachRSAOAEPBlock(t *testing.T) {
 	// knownBug records that gopcua does not do this yet; the text is logged
 	// in place of a failure. ../README.md says when to delete it. It carries
 	// no issue link.
@@ -111,14 +119,14 @@ func TestOpenSecureChannelFillsEachRsaOaepBlock(t *testing.T) {
 		"where RFC 3447 §7.1.1 reserves 32 (RSAOAEPMinPaddingSHA256 = " +
 		"(2 * 64) + 2, uapolicy/crypto_rsaoaep.go:21, subtracted at " +
 		"uapolicy/policyAes256Sha256RsaPss.go:114), so every " +
-		"RSA-OAEP-SHA2-256 block carries 126 plaintext bytes where the " +
-		"arithmetic allows 190"
+		"RSA-OAEP-SHA2-256 block carries 382 plaintext bytes where the " +
+		"arithmetic allows 446"
 
-	clientKey, clientCert, why := mintCert("gopcua-conformance-client")
+	clientKey, clientCert, why := mintCert("gopcua-conformance-client", 2048)
 	if why != "" {
 		t.Fatalf("could not set the test up: %s", why)
 	}
-	peerKey, peerCert, why := mintCert("gopcua-conformance-peer")
+	peerKey, peerCert, why := mintCert("gopcua-conformance-peer", 4096)
 	if why != "" {
 		t.Fatalf("could not set the test up: %s", why)
 	}
@@ -129,7 +137,7 @@ func TestOpenSecureChannelFillsEachRsaOaepBlock(t *testing.T) {
 		t.Fatalf("could not set the test up: %s", why)
 	}
 
-	_, _, why = launchClient("opc.tcp://"+peer.addr(),
+	why = launchClient("opc.tcp://"+peer.addr(),
 		opcua.SecurityPolicy(ua.SecurityPolicyURIAes256Sha256RsaPss),
 		opcua.SecurityMode(ua.MessageSecurityModeSignAndEncrypt),
 		opcua.PrivateKey(clientKey),
@@ -149,9 +157,6 @@ func TestOpenSecureChannelFillsEachRsaOaepBlock(t *testing.T) {
 		t.Fatalf("could not set the test up: %s", why)
 	}
 
-	// The row slices the frame with uasc, which only moves bytes it never
-	// scores: the verdict below rests on the standard library's
-	// DecryptOAEP and on the literal hash lengths.
 	chunk := &uasc.MessageChunk{}
 	if _, err := chunk.Decode(frame); err != nil {
 		t.Errorf("gopcua's own behaviour made this run unscoreable: the OPN "+
@@ -167,20 +172,20 @@ func TestOpenSecureChannelFillsEachRsaOaepBlock(t *testing.T) {
 	// k is the receiver's modulus length in octets - the peer is the
 	// receiver, and the row decrypts with the peer's minted key. The two
 	// hash lengths are literals: RFC 3447 §7.1.1's 32, and the 64 per hash
-	// uapolicy's constant reserves. Neither size is read from uapolicy,
-	// so the known-bug arm cannot move with the fix.
+	// uapolicy's constant reserves.
 	k := peerKey.Size()
 	const hLen = 32
 	const bugHLen = 64
 	want := k - 2*hLen - 2
 	knownBugSize := k - 2*bugHLen - 2
 
-	// chunk.Data is the whole encrypted region: sequence header, request,
-	// padding and signature, all encrypted together. A region that is
-	// empty or not a whole number of k-byte blocks is an ordinary
-	// failure - the guard against a pass on zero blocks.
+	// chunk.Data is the whole encrypted region.
 	data := chunk.Data
-	if len(data) == 0 || len(data)%k != 0 {
+	if len(data) == 0 {
+		t.Errorf("the OPN's encrypted region is empty")
+		return
+	}
+	if len(data)%k != 0 {
 		t.Errorf("the OPN's encrypted region is %d bytes, not a whole "+
 			"number of %d-byte blocks", len(data), k)
 		return
@@ -213,13 +218,15 @@ func TestOpenSecureChannelFillsEachRsaOaepBlock(t *testing.T) {
 	case atWant == blocks:
 		// Every block carries the most plaintext the algorithm allows.
 		// On main that pass is the hard error asking for the constant's
-		// deletion; with the constant deleted it is the row's pass and
-		// has nothing to report.
+		// deletion; with the constant deleted it is the row's pass,
+		// logged the way the sibling rows log theirs.
 		if knownBug != "" {
 			t.Errorf("this now passes (all %d blocks carry %d plaintext "+
 				"bytes, not %d) - delete the knownBug constant, every arm "+
 				"that reads it, and anything only those arms used, in the "+
 				"commit that fixed it", blocks, want, knownBugSize)
+		} else {
+			t.Logf("all %d blocks carry %d plaintext bytes", blocks, want)
 		}
 	case atKnownBugSize == blocks:
 		if knownBug != "" {
@@ -230,8 +237,35 @@ func TestOpenSecureChannelFillsEachRsaOaepBlock(t *testing.T) {
 				blocks, knownBugSize, want)
 		}
 	default:
-		// Mixed sizes, or a size that is neither the RFC's nor the bug's.
 		t.Errorf("the %d blocks carry mixed or wrong plaintext sizes "+
-			"(%d bytes each), not %d bytes each", blocks, sizes, want)
+			"(%v), not %d bytes each", blocks, sizes, want)
 	}
+}
+
+// mintCert mints a self-signed RSA key and X.509 certificate in memory,
+// of the bit size it is given, for the common name it is given. Nothing
+// is written to disk and no key material is committed: every run mints
+// its own pair for the client and its own for the peer. It returns the
+// key, the DER certificate, and "" - or, when the minting failed, the
+// reason the run cannot be scored. A minting failure is a decline
+// ("could not set the test up"): it comes from the environment's random
+// source, not from gopcua.
+func mintCert(commonName string, bits int) (key *rsa.PrivateKey, cert []byte, why string) {
+	key, err := rsa.GenerateKey(rand.Reader, bits)
+	if err != nil {
+		return nil, nil, fmt.Sprintf("generate a %d-bit RSA key: %v", bits, err)
+	}
+	tmpl := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: commonName},
+		NotBefore:    time.Now().Add(-time.Hour),
+		NotAfter:     time.Now().Add(24 * time.Hour),
+		KeyUsage: x509.KeyUsageDigitalSignature |
+			x509.KeyUsageKeyEncipherment | x509.KeyUsageDataEncipherment,
+	}
+	cert, err = x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
+	if err != nil {
+		return nil, nil, fmt.Sprintf("create the certificate: %v", err)
+	}
+	return key, cert, ""
 }
