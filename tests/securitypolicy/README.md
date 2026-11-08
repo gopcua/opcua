@@ -54,11 +54,14 @@ match `harness.go`, which is the fixture itself and not a row.
 
 ## Why the verdicts rest outside gopcua
 
-The peer uses gopcua's `uacp` types to frame the ACK; the rows use
-`uasc` to decode the recorded frame and, in the nonce row, its request
-body with `ua.DecodeService` - which is not the library grading itself,
-because those types only move bytes the rows never score: the nonce
-verdict rests on `len` and `bytes.Equal`.
+The peer uses gopcua's `uacp` types to frame the ACK; the block row uses
+`uasc` to decode the recorded frame, and the nonce row reads the nonce's
+length prefix and bytes straight out of the frame's own bytes, never
+through gopcua's decoder: the offset is computed by walking OPC
+10000-6's encoding rules, every length read from the frame itself, and
+the walk asserts it ends on the frame's last byte - which is not the
+library grading itself, because those types only move bytes the rows
+never score, and the nonce verdict rests on `len` and `bytes.Equal`.
 The verdicts rest on the standard library and on the clauses: every
 RSA-OAEP block is decrypted with `crypto/rsa.DecryptOAEP` and SHA-256
 under the peer's minted key, never with gopcua code, and the expected
