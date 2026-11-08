@@ -7,7 +7,9 @@
 // modulus length in octets and hLen is SHA-256's 32-byte output - 446
 // for the 4096-bit receiver key the row mints - the peer is minted at
 // 4096 bits so that a fix hardcoded to the 2048-bit arithmetic lands
-// in the ordinary-failure arm.
+// in the ordinary-failure arm. The client's key is minted at 4096 bits
+// too, so its 512-byte signature makes the OPN span at least two
+// blocks, and the row scores every block of a multi-block region.
 //
 // The clauses: OPC 10000-7 v1.04 §6.6.166, Table 186 "SecurityPolicy -
 // Aes256-Sha256-RsaPss", lists the conformance unit
@@ -28,9 +30,10 @@
 // arithmetic and the minted key's size, and never read from uapolicy:
 // uapolicy's constant is the bug this row guards against - it reserves
 // 64 bytes for each hash where RFC 3447 reserves 32
-// (RSAOAEPMinPaddingSHA256 = (2 * 64) + 2, uapolicy/crypto_rsaoaep.go:21,
-// subtracted at uapolicy/policyAes256Sha256RsaPss.go:114), which leaves
-// every block carrying 382 plaintext bytes.
+// (RSAOAEPMinPaddingSHA256 = (2 * 64) + 2, declared in
+// uapolicy/crypto_rsaoaep.go and used twice: as the split size in
+// RSAOAEP.Encrypt and as the Aes256_Sha256_RsaPss policy's plaintext
+// block size), which leaves every block carrying 382 plaintext bytes.
 //
 // Neighbouring rows:
 // client_nonce_under_security_policy_none_is_null_or_usable_test.go
@@ -63,13 +66,15 @@
 // is empty or not a whole number of k-byte blocks is an ordinary
 // failure, and the empty-region arm is the guard against a pass on
 // zero blocks. It declines, and does not score, when no OPN frame
-// arrived within the deadline, the harness's `handshake` constant as
-// the wait - that is the row's own decline, and the setup's declines
-// (minting, starting the peer, building the client) apply as well.
+// arrives, whether the harness's `handshake` bound passes or the
+// peer's exchange ends first - that is the row's own decline, and the
+// setup's declines (minting, starting the peer, building the client)
+// apply as well.
 // An OPN whose asymmetric security header names a policy other than
 // Aes256_Sha256_RsaPss, or on which
-// uasc.MessageChunk.Decode fails, can only be the client's bytes, so
-// the row prints "gopcua's own behaviour made this run unscoreable"
+// uasc.MessageChunk.Decode fails, can only be the client's bytes, and
+// so are the harness's own flags, per harness.go, so the row prints
+// "gopcua's own behaviour made this run unscoreable"
 // with t.Errorf, then returns.
 // It deliberately asserts nothing about the asymmetric signature
 // (RSA-PSS), the symmetric algorithms, the channel lifecycle - tokens,
@@ -119,12 +124,13 @@ func TestOpenSecureChannelFillsEachRSAOAEPBlock(t *testing.T) {
 	// no issue link.
 	const knownBug = "uapolicy reserves 64 bytes for each SHA-256 hash " +
 		"where RFC 3447 §7.1.1 reserves 32 (RSAOAEPMinPaddingSHA256 = " +
-		"(2 * 64) + 2, uapolicy/crypto_rsaoaep.go:21, subtracted at " +
-		"uapolicy/policyAes256Sha256RsaPss.go:114), so every " +
+		"(2 * 64) + 2, declared in uapolicy/crypto_rsaoaep.go and used " +
+		"twice: as the split size in RSAOAEP.Encrypt and as the " +
+		"Aes256_Sha256_RsaPss policy's plaintext block size), so every " +
 		"RSA-OAEP-SHA2-256 block carries 382 plaintext bytes where the " +
 		"arithmetic allows 446"
 
-	clientKey, clientCert, why := mintCert("gopcua-conformance-client", 2048)
+	clientKey, clientCert, why := mintCert("gopcua-conformance-client", 4096)
 	if why != "" {
 		t.Fatalf("could not set the test up: %s", why)
 	}
@@ -195,6 +201,7 @@ func TestOpenSecureChannelFillsEachRSAOAEPBlock(t *testing.T) {
 	blocks := len(data) / k
 
 	sizes := make([]int, 0, blocks)
+	atWant, atKnownBugSize := 0, 0
 	for i := 0; i < blocks; i++ {
 		pt, err := rsa.DecryptOAEP(sha256.New(), rand.Reader, peerKey,
 			data[i*k:(i+1)*k], nil)
@@ -204,11 +211,7 @@ func TestOpenSecureChannelFillsEachRSAOAEPBlock(t *testing.T) {
 			return
 		}
 		sizes = append(sizes, len(pt))
-	}
-
-	atWant, atKnownBugSize := 0, 0
-	for _, n := range sizes {
-		switch n {
+		switch len(pt) {
 		case want:
 			atWant++
 		case knownBugSize:

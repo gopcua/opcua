@@ -16,6 +16,15 @@
 // rows score are decrypted and counted by the standard library, and the
 // expected numbers come from the clauses, never from gopcua.
 //
+// Two outcomes of the exchange are worth naming here, because the
+// setup check reports both. Bytes the peer's uacp framing rejects - a
+// bad header, an out-of-range size, an ERR frame - can only be the
+// client's own, so awaitOpenSecureChannel reports them as gopcua's
+// behaviour, not as a decline. And an exchange that ends before the
+// OPN - the client closing, going away, never connecting - is a
+// decline the check reports at once, when serve returns, without
+// waiting out its bound.
+//
 // Every helper here returns plain values. A helper does not call
 // t.Errorf or t.Fatalf; a row's test function turns a non-empty reason
 // string into the failure or the decline, and it, not the fixture,
@@ -30,7 +39,9 @@ package securitypolicy
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"net"
 	"sync"
 	"time"
@@ -67,12 +78,15 @@ var peerAck = &uacp.Acknowledge{
 type scriptedPeer struct {
 	listener net.Listener
 
-	mu        sync.Mutex
-	conn      net.Conn
-	closed    bool   // set by teardown; serve closes the connection itself when set
-	offScript string // the message type of a frame that arrived where the script expected another
+	mu                sync.Mutex
+	conn              net.Conn
+	closed            bool   // set by teardown; serve closes the connection itself when set
+	offScript         string // the message type of a frame that arrived where the script expected another
+	offScriptExpected string // the message type the script expected where that frame arrived
+	recvErr           string // a read error other than a connection that merely ended: the client's bytes did not frame
 
-	opn chan []byte // the recorded OPN frame, delivered once
+	opn  chan []byte   // the recorded OPN frame, delivered once
+	done chan struct{} // closed when serve returns, so awaitOpenSecureChannel need not wait out its bound
 }
 
 // startScriptedPeer brings the peer up on the loopback interface, on a
@@ -88,8 +102,12 @@ func startScriptedPeer() (*scriptedPeer, func(), string) {
 	p := &scriptedPeer{
 		listener: l,
 		opn:      make(chan []byte, 1),
+		done:     make(chan struct{}),
 	}
-	go p.serve()
+	go func() {
+		p.serve()
+		close(p.done)
+	}()
 	teardown := func() {
 		_ = l.Close()
 		p.mu.Lock()
@@ -108,14 +126,18 @@ func (p *scriptedPeer) addr() string {
 }
 
 // serve plays the script: accept one connection, read the HEL, answer the
-// ACK, read the OPN, deliver it on the channel, and close. A frame whose
-// message type is neither HELF nor OPNF is recorded in offScript instead:
-// it is determinately the client's bytes, and awaitOpenSecureChannel
-// reports it as gopcua's own behaviour. Any other failure - no
-// connection, a client that goes away mid-exchange - leaves the channel
-// empty, and the check declines. If teardown runs between the Accept and
-// this goroutine taking the mutex, teardown never saw the connection, so
-// serve closes it here.
+// ACK, read the OPN, deliver it on the channel, and close. A frame that
+// arrives where the script expected another - the HEL at the first read,
+// the OPN at the second - is recorded in offScript together with the
+// type the script expected at that point: it is determinately the
+// client's bytes, and awaitOpenSecureChannel reports it as gopcua's own
+// behaviour. A read error other than a connection that merely ended - a
+// bad header, an out-of-range size, an ERR frame - is recorded by
+// noteReceiveError and reported the same way, for the same reason. Any
+// other failure - no connection, a client that goes away mid-exchange -
+// leaves the channel empty, and the check declines. If teardown runs
+// between the Accept and this goroutine taking the mutex, teardown
+// never saw the connection, so serve closes it here.
 func (p *scriptedPeer) serve() {
 	c, err := p.listener.Accept()
 	if err != nil {
@@ -137,10 +159,13 @@ func (p *scriptedPeer) serve() {
 
 	hel, err := uc.Receive()
 	if err != nil {
-		return // the client went away; the check declines
+		// A connection that merely ended stays a decline; anything else
+		// can only be the client's bytes, so it is recorded.
+		p.noteReceiveError(err)
+		return
 	}
 	if string(hel[:4]) != "HELF" {
-		p.noteOffScript(hel[:4])
+		p.noteOffScript(hel[:4], []byte("HELF"))
 		return
 	}
 
@@ -150,10 +175,12 @@ func (p *scriptedPeer) serve() {
 
 	frame, err := uc.Receive()
 	if err != nil {
-		return // the client went away; the check declines
+		// Same split as the HEL read above.
+		p.noteReceiveError(err)
+		return
 	}
 	if string(frame[:4]) != "OPNF" {
-		p.noteOffScript(frame[:4])
+		p.noteOffScript(frame[:4], []byte("OPNF"))
 		return
 	}
 
@@ -165,31 +192,53 @@ func (p *scriptedPeer) serve() {
 }
 
 // noteOffScript records the message type of a frame that arrived where
-// the script expected a HEL or an OPN.
-func (p *scriptedPeer) noteOffScript(msgType []byte) {
+// the script expected `expected` - a HEL at the first read, an OPN at
+// the second - so awaitOpenSecureChannel can report both in its reason
+// instead of naming every type the script ever reads.
+func (p *scriptedPeer) noteOffScript(msgType, expected []byte) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.offScript = string(msgType)
+	p.offScriptExpected = string(expected)
+}
+
+// noteReceiveError records a read error from the peer's uacp framing,
+// unless the connection merely ended: a client that goes away
+// mid-exchange stays a decline, but any other read error - a bad header,
+// an out-of-range size, an ERR frame - can only come from the client's
+// own bytes, so awaitOpenSecureChannel reports it as gopcua's behaviour.
+func (p *scriptedPeer) noteReceiveError(err error) {
+	if errors.Is(err, io.EOF) {
+		return
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.recvErr = err.Error()
 }
 
 // awaitOpenSecureChannel is the setup check the rows share: it waits up
-// to `within` for the peer to record the OPN frame the client sent, and
-// returns the frame with "". Otherwise it returns the reason the run
-// cannot be scored, and which side caused the failed check: a frame with
-// a message type that is neither HELF nor OPNF can only be the client's
-// bytes (true), and the row prints the reason with
-// "gopcua's own behaviour made this run unscoreable: %s" and t.Errorf,
-// then returns; everything else - no connection, no HEL, no OPN within
-// `within` - can close on either side, and is a decline the row prints
-// with "could not set the test up: %s".
+// to `within` for the peer to record the OPN frame the client sent - or
+// until the peer's exchange ends, whichever comes first - and returns
+// the frame with "". Otherwise it returns the reason the run cannot be
+// scored, and which side caused the failed check: a frame that arrives
+// where the script expected another, or bytes the peer's uacp framing
+// rejects, can only be the client's own (true), and the row prints the
+// reason with "gopcua's own behaviour made this run unscoreable: %s"
+// and t.Errorf, then returns; everything else - no connection, no HEL,
+// an exchange that ends before the OPN, no OPN within `within` - can
+// close on either side, and is a decline the row prints with "could not
+// set the test up: %s", reported at once when the exchange has already
+// ended rather than after the bound.
 func (p *scriptedPeer) awaitOpenSecureChannel(within time.Duration) ([]byte, string, bool) {
 	select {
 	case frame := <-p.opn:
 		return frame, "", false
+	case <-p.done:
 	case <-time.After(within):
 	}
-	// An OPN that lands with the timer is caught here, not blamed on
-	// either side.
+	// An OPN that lands with the timer or the close is caught here, not
+	// blamed on either side; serve delivers the OPN before it returns, so
+	// opn wins when both land together.
 	select {
 	case frame := <-p.opn:
 		return frame, "", false
@@ -197,10 +246,21 @@ func (p *scriptedPeer) awaitOpenSecureChannel(within time.Duration) ([]byte, str
 	}
 	p.mu.Lock()
 	offScript := p.offScript
+	offScriptExpected := p.offScriptExpected
+	recvErr := p.recvErr
 	p.mu.Unlock()
 	if offScript != "" {
 		return nil, fmt.Sprintf("a frame arrived with message type %q, "+
-			"where the script expected HELF or OPNF", offScript), true
+			"where the script expected %q", offScript, offScriptExpected), true
+	}
+	if recvErr != "" {
+		return nil, fmt.Sprintf("the peer could not frame the client's "+
+			"next frame: %s", recvErr), true
+	}
+	select {
+	case <-p.done:
+		return nil, "the peer's exchange ended without an OPN frame", false
+	default:
 	}
 	return nil, fmt.Sprintf("no OPN frame arrived within %v", within), false
 }
@@ -211,7 +271,9 @@ func (p *scriptedPeer) awaitOpenSecureChannel(within time.Duration) ([]byte, str
 // AutoReconnect(false), so a failed connect is a returned error and not
 // a retry loop. The peer never answers the OPN and closes the connection
 // once it has recorded it, so Connect is expected to return an error;
-// no row asserts it. It returns "" - or, when the client could not be
+// no row asserts it. The goroutine closes the client after Connect
+// returns, so a future peer that let Connect succeed leaves no client
+// running past the row. It returns "" - or, when the client could not be
 // built, the reason the run cannot be scored. A "build the client" reason
 // can come from either side - a certificate the row minted, or the
 // library rejecting valid options - so per ../README.md the row declines
@@ -225,6 +287,7 @@ func launchClient(endpoint string, opts ...opcua.Option) string {
 	ctx, cancel := context.WithTimeout(context.Background(), handshake)
 	go func() {
 		_ = client.Connect(ctx)
+		_ = client.Close(ctx)
 		cancel()
 	}()
 	return ""
