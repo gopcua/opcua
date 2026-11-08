@@ -11,11 +11,11 @@
 // 10000-4 §5.6.2.3, Bad_NonceInvalid: "A Server shall check the minimum
 // length of the Client nonce and return this status if the length is
 // below 32 bytes." OPC 10000-7 v1.04 gives no SecureChannelNonceLength
-// for None - the profile's limits unit SecurtyPolicy_None_Limits lists
-// only "DerivedSignatureKeyLength: 0" - so §5.6.2.2's length rule has no
-// number to apply here, and the row rests on §6.7.4 and §5.6.2.3. What
-// counts as a null nonce is settled by the encoding rules, not by this
-// row: OPC 10000-6 §5.2.2.7, ByteString: "If the length of the byte
+// for None - the profile's limits unit SecurtyPolicy_None_Limits (sic)
+// lists only "DerivedSignatureKeyLength: 0" - so §5.6.2.2's length rule
+// has no number to apply here, and the row rests on §6.7.4 and §5.6.2.3.
+// What counts as a null nonce is settled by the encoding rules, not by
+// this row: OPC 10000-6 §5.2.2.7, ByteString: "If the length of the byte
 // string is -1 then the byte string is 'null'." OPC 10000-6 §5.1.11,
 // Null, Empty and Zero-Length Arrays, which covers ByteStrings
 // ("ByteStrings are arrays of Bytes for purposes of this discussion"):
@@ -34,10 +34,10 @@
 // other end of the line from this row's. tests/transport holds the
 // HEL/ACK exchange that precedes the OPN; this row does not score it.
 //
-// The row runs against the scripted peer from harness.go, twice: it
-// starts the peer and launches a client again for its second recorded
-// OPN, so it reads the OPN from two separate connections and can check
-// that a non-null nonce is not reused. The client under test is the real
+// The row runs against the scripted peer from harness.go, twice - a
+// fresh peer and a fresh client each time - so it reads the OPN from
+// two separate connections and can check that a non-null nonce is not
+// reused. The client under test is the real
 // opcua.Client, launched by the shared launchClient with
 // opcua.SecurityPolicy(ua.SecurityPolicyURINone) and
 // opcua.SecurityMode(ua.MessageSecurityModeNone), under a context
@@ -47,32 +47,36 @@
 //
 // The row asserts, from the nonce bytes as they arrive on the wire -
 // read by the scripted peer, not through uapolicy.NonceLength() - that
-// the ClientNonce is null - a length prefix of 0 or -1, no nonce bytes
-// - or, if nonce bytes are sent anyway, at least 32 bytes long and
-// different between the two connections. The row reads the nonce by
-// slicing the recorded frame with uasc and decoding the request body
-// with ua.DecodeService into a *ua.OpenSecureChannelRequest, then
+// the ClientNonce is null - a length prefix of 0 or -1, no nonce
+// bytes. If nonce bytes are sent anyway, they must be at least 32
+// bytes long and different between the two connections. The row reads
+// the nonce by decoding the recorded frame with uasc and the request
+// body with ua.DecodeService into a *ua.OpenSecureChannelRequest, then
 // reading ClientNonce; that is acceptable because the verdict rests on
 // len and bytes.Equal of the nonce bytes, and the decoder turning a
 // length prefix of 0 and one of -1 into the same empty value is
-// §5.1.11's equality, quoted above. The two connections are read per
-// connection: each connection's nonce must be null, or else at least 32
-// bytes long; a non-null nonce must also differ from the other
-// connection's nonce, and a null nonce counts as different from any
-// non-null one. It declines, and does not score, when either
-// connection's OPN did not arrive within the deadline, the harness's
-// `handshake` constant as the wait; a frame that
-// does not decode - its chunk, its sequence header or its request
-// body - or whose body is not an OpenSecureChannelRequest,
-// can only be the client's bytes, so the row prints "gopcua's own
-// behaviour made this run unscoreable" with t.Errorf, then returns. It
-// deliberately asserts nothing about the rest of the OPN - the security
-// header, the mode -
-// and nothing about the channel lifecycle: §5.6.2.2's renewal sentence
-// ("A new clientNonce shall be generated for each time a SecureChannel
-// is renewed.") is the channel's business, not the nonce's.
+// §5.1.11's equality, quoted above. Each connection's nonce must be
+// null, or else at least 32 bytes long; a non-null nonce must also
+// differ from the other connection's nonce, and a null nonce counts as
+// different from any non-null one. It declines, and does not score,
+// when either connection's OPN did not arrive within the deadline, the
+// harness's `handshake` constant as the wait - that is the row's own
+// decline, and the setup's declines (starting the peer, building the
+// client) apply as well. A frame that does not decode - its chunk, its
+// sequence header or its request body - or whose body is not an
+// OpenSecureChannelRequest, can only be the client's bytes, so the row
+// prints "gopcua's own behaviour made this run unscoreable" with
+// t.Errorf, then returns. It deliberately asserts nothing about the
+// rest of the OPN - the security header, the mode - and nothing about
+// the channel lifecycle: §5.6.2.2's renewal sentence ("A new
+// clientNonce shall be generated for each time a SecureChannel is
+// renewed.") is the channel's business, not the nonce's.
 //
-// No reference stack has been read for this behaviour.
+// UaExpert sends a 1-byte 0x00 ClientNonce under None, per the Wireshark
+// comparison in gopcua issue #894; the row fails that shape on purpose,
+// because OPC 10000-6 §6.7.4 asks for null and OPC 10000-4 §5.6.2.3 lets a
+// checking server reject anything under 32 bytes. No reference stack's
+// source has been read for this behaviour.
 package securitypolicy
 
 import (
@@ -86,10 +90,9 @@ import (
 )
 
 func TestClientNonceUnderSecurityPolicyNoneIsNullOrUsable(t *testing.T) {
-	// nonceFloor is OPC 10000-4 §5.6.2.3's minimum: "A Server shall check
-	// the minimum length of the Client nonce and return this status if the
-	// length is below 32 bytes." The literal is in the row, never read from
-	// uapolicy, whose NonceLength() is not the clause's number for None.
+	// nonceFloor is OPC 10000-4 §5.6.2.3's 32-byte minimum, quoted in the
+	// row's header. The literal is in the row, never read from uapolicy,
+	// whose NonceLength() is 0 for None.
 	const nonceFloor = 32
 
 	var nonces [2][]byte
@@ -108,19 +111,17 @@ func TestClientNonceUnderSecurityPolicyNoneIsNullOrUsable(t *testing.T) {
 
 	// Each connection on its own: the ClientNonce is null - no nonce bytes,
 	// the length prefix 0 and -1 alike, per §5.1.11's equality, quoted in
-	// the header - or it is at least nonceFloor bytes long, the floor a
-	// server checks for. A nonce that is neither is an ordinary failure.
-	pass := true
+	// the header - or it is at least nonceFloor bytes long. A nonce that
+	// is neither is an ordinary failure.
 	for i, nonce := range nonces {
 		if len(nonce) == 0 {
 			continue
 		}
 		if len(nonce) < nonceFloor {
-			pass = false
-			t.Errorf("connection %d's ClientNonce is %d byte(s): not the null of "+
+			t.Errorf("connection %d's ClientNonce is %d bytes: not the null of "+
 				"OPC 10000-6 §6.7.4 (\"The Nonces are ignored and should be set to "+
-				"null.\"), and below the 32-byte floor of OPC 10000-4 §5.6.2.3",
-				i+1, len(nonce))
+				"null.\"), and below the %d-byte floor of OPC 10000-4 §5.6.2.3",
+				i+1, len(nonce), nonceFloor)
 		}
 	}
 
@@ -130,17 +131,16 @@ func TestClientNonceUnderSecurityPolicyNoneIsNullOrUsable(t *testing.T) {
 	// different from any non-null one, and bytes.Equal gives both that
 	// and §5.1.11's equality of null and empty for free.
 	if len(nonces[0]) > 0 && len(nonces[1]) > 0 && bytes.Equal(nonces[0], nonces[1]) {
-		pass = false
 		t.Errorf("both connections carried the same %d-byte ClientNonce, but "+
 			"the clientNonce is \"a random number that shall not be used in any "+
 			"other request\" (OPC 10000-4 §5.6.2.2)", len(nonces[0]))
 	}
 
-	if !pass {
+	if t.Failed() {
 		return
 	}
 
-	// The pass arm logs what the row saw, the way the sibling rows log
+	// The pass log states what the row saw, the way the sibling rows log
 	// theirs.
 	t.Logf("connection 1's ClientNonce is %s, connection 2's is %s",
 		nonceDesc(nonces[0]), nonceDesc(nonces[1]))
@@ -152,7 +152,7 @@ func nonceDesc(n []byte) string {
 	if len(n) == 0 {
 		return "null (no nonce bytes)"
 	}
-	return fmt.Sprintf("%d byte(s) of nonce", len(n))
+	return fmt.Sprintf("%d bytes of nonce", len(n))
 }
 
 // clientNonceFromOneConnection runs one whole connection against the
@@ -160,11 +160,8 @@ func nonceDesc(n []byte) string {
 // SecurityPolicy None and SecurityMode None, waits for the OPN within
 // the harness's handshake bound, and returns the ClientNonce the client
 // put in it, the peer's teardown for the row to register, and "" - or
-// the reason the run cannot be scored, and which side caused it, in
-// awaitOpenSecureChannel's sense. It never calls t.Errorf or t.Fatalf;
-// the row turns the reason into the failure or the decline. The nonce
-// is read from the recorded frame, as the bytes the client put on the
-// wire, never through uapolicy.NonceLength().
+// the reason the run cannot be scored, and fromGopcua, which side
+// caused it, in awaitOpenSecureChannel's sense.
 func clientNonceFromOneConnection() (nonce []byte, teardown func(), why string, fromGopcua bool) {
 	peer, teardown, why := startScriptedPeer()
 	if why != "" {
@@ -188,16 +185,13 @@ func clientNonceFromOneConnection() (nonce []byte, teardown func(), why string, 
 	return nonce, teardown, why, fromGopcua
 }
 
-// clientNonceFromOPNFrame slices the recorded OPN frame with uasc and
-// decodes its request body with ua.DecodeService, and returns the
+// clientNonceFromOPNFrame decodes the recorded OPN frame with uasc and
+// its request body with ua.DecodeService, and returns the
 // ClientNonce of the OpenSecureChannelRequest it carries, with "" - or
 // the reason the run cannot be scored, and true, because a frame that
 // does not decode - its chunk, its sequence header or its request body
 // - or whose body is not an OpenSecureChannelRequest can only be the
-// client's bytes. The verdict the row scores rests on len and
-// bytes.Equal of the returned bytes, not on the decode: the decoder
-// turning a length prefix of 0 and one of -1 into the same empty value
-// is §5.1.11's equality, quoted in the row's header.
+// client's bytes.
 func clientNonceFromOPNFrame(frame []byte) (nonce []byte, why string, fromGopcua bool) {
 	chunk := &uasc.MessageChunk{}
 	if _, err := chunk.Decode(frame); err != nil {
