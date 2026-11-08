@@ -47,9 +47,11 @@ match `harness.go`, which is the fixture itself and not a row.
 
 ## Why the verdicts rest outside gopcua
 
-The peer uses gopcua's `uacp` and `uasc` types to frame the ACK and to
-slice the recorded frame into its headers - which is not the library
-grading itself, because those types only move bytes the rows never score.
+The peer uses gopcua's `uacp` and `uasc` types to frame the ACK, to
+slice the recorded frame into its headers, and, in the nonce row, to
+decode the request body with `ua.DecodeService` - which is not the
+library grading itself, because those types only move bytes the rows
+never score: the nonce verdict rests on `len` and `bytes.Equal`.
 The verdicts rest on the standard library and on the clauses: every
 RSA-OAEP block is decrypted with `crypto/rsa.DecryptOAEP` and SHA-256
 under the peer's minted key, never with gopcua code, and the expected
@@ -69,9 +71,10 @@ score.
 ## When a row declines
 
 - `open_secure_channel_fills_each_rsa_oaep_block_test.go` declines when
-  no OPN frame arrived within the bound, and when the OPN's asymmetric
-  security header names a policy other than Aes256_Sha256_RsaPss: the row
-  cannot score a channel it did not see.
+  no OPN frame arrived within the bound. An OPN whose asymmetric
+  security header names a policy other than Aes256_Sha256_RsaPss can
+  only be the client's bytes, so the row scores it as gopcua's own
+  behaviour made this run unscoreable instead.
 - `client_nonce_under_security_policy_none_is_null_or_usable_test.go`
   declines when either of its two connections' OPN did not arrive within
   the bound.

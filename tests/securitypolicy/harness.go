@@ -212,7 +212,10 @@ func (p *scriptedPeer) awaitOpenSecureChannel(within time.Duration) ([]byte, str
 // The channel is buffered, so the goroutine never blocks on a row that
 // has stopped reading. It returns the client, the channel, and "" - or,
 // when the client could not be built, the reason the run cannot be
-// scored.
+// scored. A "build the client" reason can come from either side - a
+// certificate the harness minted, or the library rejecting valid
+// options - so per ../README.md the row declines on it, printing it
+// with "could not set the test up".
 func launchClient(endpoint string, opts ...opcua.Option) (*opcua.Client, <-chan error, string) {
 	client, err := opcua.NewClient(endpoint,
 		append([]opcua.Option{opcua.AutoReconnect(false)}, opts...)...)

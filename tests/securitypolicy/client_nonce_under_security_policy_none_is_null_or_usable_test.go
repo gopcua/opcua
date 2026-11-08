@@ -46,10 +46,24 @@
 // The row asserts, from the nonce bytes as they arrive on the wire -
 // read by the scripted peer, not through uapolicy.NonceLength() - that
 // the ClientNonce is null - a length prefix of 0 or -1, no nonce bytes
-// - or, if nonce bytes are sent anyway, at least 32 bytes long and different between the two
-// connections. It declines, and does not score, when either connection's
-// OPN did not arrive within the deadline. It deliberately asserts
-// nothing about the rest of the OPN - the security header, the mode -
+// - or, if nonce bytes are sent anyway, at least 32 bytes long and
+// different between the two connections. The row reads the nonce by
+// slicing the recorded frame with uasc and decoding the request body
+// with ua.DecodeService into a *ua.OpenSecureChannelRequest, then
+// reading ClientNonce; that is acceptable because the verdict rests on
+// len and bytes.Equal of the nonce bytes, and the decoder turning a
+// length prefix of 0 and one of -1 into the same empty value is
+// §5.1.11's equality, quoted above. The two connections are read per
+// connection: each connection's nonce must be null, or else at least 32
+// bytes long; a non-null nonce must also differ from the other
+// connection's nonce, and a null nonce counts as different from any
+// non-null one. It declines, and does not score, when either
+// connection's OPN did not arrive within the deadline; a frame that
+// does not decode, or whose body is not an OpenSecureChannelRequest,
+// can only be the client's bytes, so the row prints "gopcua's own
+// behaviour made this run unscoreable" with t.Errorf, then returns. It
+// deliberately asserts nothing about the rest of the OPN - the security
+// header, the mode -
 // and nothing about the channel lifecycle: §5.6.2.2's renewal sentence
 // ("A new clientNonce shall be generated for each time a SecureChannel
 // is renewed.") is the channel's business, not the nonce's.
