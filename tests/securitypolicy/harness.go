@@ -44,6 +44,7 @@ import (
 	"io"
 	"net"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/gopcua/opcua"
@@ -209,9 +210,17 @@ func (p *scriptedPeer) noteOffScript(msgType, expected []byte) {
 // count as the connection ending - but any other read error - a bad
 // header, an out-of-range size, an ERR frame - can only come from the
 // client's own bytes, so awaitOpenSecureChannel reports it as gopcua's
-// behaviour.
+// behaviour. A reset - a client that hit its context deadline with the
+// peer's ACK still unread closes the connection with one: ECONNRESET
+// here, WSAECONNRESET's 10054 on Windows, whose syscall.ECONNRESET is
+// an invented value that never reaches the wire, hence Errno(10054) in
+// the same platform-free check - and the fixture's own closed
+// connection (net.ErrClosed, from teardown) also count as the
+// connection ending.
 func (p *scriptedPeer) noteReceiveError(err error) {
-	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) ||
+		errors.Is(err, syscall.ECONNRESET) || errors.Is(err, syscall.Errno(10054)) ||
+		errors.Is(err, net.ErrClosed) {
 		return
 	}
 	p.mu.Lock()

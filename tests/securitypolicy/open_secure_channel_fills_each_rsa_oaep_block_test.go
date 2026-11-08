@@ -199,6 +199,13 @@ func TestOpenSecureChannelFillsEachRSAOAEPBlock(t *testing.T) {
 		return
 	}
 	blocks := len(data) / k
+	if blocks < 2 {
+		t.Errorf("the OPN's encrypted region is a single %d-byte block, but the "+
+			"client's minted 4096-bit key signs with 512 bytes, more than one block "+
+			"carries, so the row is not scoring the multi-block region its header "+
+			"promises", k)
+		return
+	}
 
 	sizes := make([]int, 0, blocks)
 	atWant, atKnownBugSize := 0, 0
