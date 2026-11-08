@@ -71,8 +71,9 @@
 // setup's declines (minting, starting the peer, building the client)
 // apply as well.
 // An OPN whose asymmetric security header names a policy other than
-// Aes256_Sha256_RsaPss, or on which
-// uasc.MessageChunk.Decode fails, can only be the client's bytes, and
+// Aes256_Sha256_RsaPss, on which
+// uasc.MessageChunk.Decode fails, or whose encrypted region is a
+// single block, can only be the client's bytes, and
 // so are the frames the harness itself flags, per harness.go, so the row prints
 // "gopcua's own behaviour made this run unscoreable"
 // with t.Errorf, then returns.
@@ -200,10 +201,10 @@ func TestOpenSecureChannelFillsEachRSAOAEPBlock(t *testing.T) {
 	}
 	blocks := len(data) / k
 	if blocks < 2 {
-		t.Errorf("the OPN's encrypted region is a single %d-byte block, but the "+
-			"client's minted 4096-bit key signs with 512 bytes, more than one block "+
-			"carries, so the row is not scoring the multi-block region its header "+
-			"promises", k)
+		t.Errorf("gopcua's own behaviour made this run unscoreable: the OPN's "+
+			"encrypted region is a single %d-byte block, but the client's minted "+
+			"4096-bit key signs with 512 bytes, more than one block can carry, so "+
+			"the row is not scoring the multi-block region its header promises", k)
 		return
 	}
 
