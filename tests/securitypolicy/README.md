@@ -67,8 +67,8 @@ The verdicts rest on the standard library and on the clauses: every
 RSA-OAEP block is decrypted with `crypto/rsa.DecryptOAEP` and SHA-256
 under the peer's minted key, never with gopcua code, and the expected
 block size is a literal computed in the row from RFC 3447's arithmetic and
-the minted key's size - never read from `uapolicy`, whose constant is the
-known bug the block row guards against. The nonce row reads the nonce
+the minted key's size - never read from `uapolicy`, whose answer would
+let the library grade itself. The nonce row reads the nonce
 bytes as they arrive on the wire, not through `uapolicy.NonceLength()`.
 
 ## Why Part 7 v1.04 is quoted
@@ -96,15 +96,13 @@ score.
 
 ## The knownBug ledger
 
-One constant stands, declared in
-`open_secure_channel_fills_each_rsa_oaep_block_test.go`'s test function:
-`uapolicy` reserves 64 bytes for each SHA-256 hash where RFC 3447 §7.1.1
-reserves 32 (`RSAOAEPMinPaddingSHA256 = (2 * 64) + 2`, declared in
-uapolicy/crypto_rsaoaep.go and used twice: as the split size in
-RSAOAEP.Encrypt and as the Aes256_Sha256_RsaPss policy's plaintext block
-size), so, with the 4096-bit receiver the row mints, every
-RSA-OAEP-SHA2-256 block carries 382 plaintext
-bytes where the arithmetic allows 446. The nonce row carries no
+No constant stands. The one that stood, declared in
+`open_secure_channel_fills_each_rsa_oaep_block_test.go`'s test function,
+recorded `uapolicy` reserving 64 bytes for each SHA-256 hash where
+RFC 3447 §7.1.1 reserves 32, so, with the 4096-bit receiver the row
+mints, every RSA-OAEP-SHA2-256 block carried 382 plaintext bytes where
+the arithmetic allows 446; it was deleted when #915 fixed `uapolicy` to
+reserve 32. The nonce row carries no
 constant: gopcua passes it as it stands. Its floor arm rests on
 OPC 10000-4 §5.6.2.3 - a conformant server may reject a sub-32-byte
 nonce - with OPC 10000-6 §6.7.4's null as the recommended shape.
