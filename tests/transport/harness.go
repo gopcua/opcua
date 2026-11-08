@@ -186,7 +186,7 @@ func awaitOutcome(
 // awaitHello is the setup check the handshake rows share: it waits up to
 // `within` for the peer to read a HEL message header off the connection
 // Dial opened, which proves the stimulus - a Dial blocked in Receive
-// (uacp/conn.go:244) - has been reached before the row cancels its
+// (uacp/conn.go:267) - has been reached before the row cancels its
 // context or its deadline passes. It returns "", false once the HEL has
 // been read. A HEL that lands with the timer is caught by the
 // fallback's re-read of the peer's recorded header, not blamed on
@@ -206,8 +206,8 @@ func awaitOutcome(
 //     t.Errorf, then returns.
 //
 // dial_reaches_a_host_name_on_its_next_address_test.go does not call
-// this helper: for that row "accepted no connection" is the known-bug
-// outcome, not a decline, and it reads the peer's state through its own
+// this helper: for that row "accepted no connection" is an ordinary
+// failure, not a decline, and it reads the peer's state through its own
 // logic.
 func (p *silentPeer) awaitHello(within time.Duration) (string, bool) {
 	select {

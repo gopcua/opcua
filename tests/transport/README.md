@@ -45,13 +45,15 @@ address row. The Go doc line is quoted verbatim in the row's header, from
   and the address row give the call one (`unblock` in `harness.go`) and
   score the return, not the block. The bound is not a timing assumption: a library that honours
   the context unblocks at once — the deadline path sets the connection's
-  read deadline from the context (uacp/conn.go:236-237) and a teardown
-  close ends the read with `io.EOF` — so the bound exists to let a fixed
+  read deadline from the context (uacp/conn.go:259-260), the cancellation
+  path sets a past one through `context.AfterFunc`
+  (uacp/conn.go:235-238), and a teardown close ends the read with
+  `io.EOF` — so the bound exists to let such a
   library finish, not to wait out a broken one. It also bounds the setup
   checks' waits for the HEL, except where a row's header passes a
   tighter bound (the deadline row passes `time.Until(deadline)`). Every
   listener and connection is closed in
-  `t.Cleanup`, so a `Dial` left blocked on main is released when the test
+  `t.Cleanup`, so a `Dial` left blocked is released when the test
   ends.
 
 - **`localhost` gives the address row its two addresses.** On the macOS
@@ -59,13 +61,13 @@ address row. The Go doc line is quoted verbatim in the row's header, from
   `(&net.Resolver{}).LookupIPAddr(ctx, "localhost")` printed
   `[{::1 } {127.0.0.1 }]`: two addresses. The order and the count can
   differ on other hosts, which is why the row resolves the name itself
-  with `net.Resolver.LookupIPAddr` — the same call `ResolveEndpoint`
-  makes (uacp/endpoint.go:40) — so the row and the library agree on the
+  with `net.Resolver.LookupIPAddr` — the resolution `net.Dialer` makes
+  inside the dial — so the row and the library agree on the
   order, and why it declines on a single address. The row listens only on the **last**
-  address and dials `opc.tcp://localhost:<port>`; on main the HEL never
-  arrives there, because `ResolveEndpoint` keeps only `addrs[0]`
-  (uacp/endpoint.go:50) and `Dialer.Dial` dials that one address
-  (uacp/conn.go:83). The row **declines** when `localhost` does not
+  address and dials `opc.tcp://localhost:<port>`; the HEL arrives there
+  because `Dialer.Dial` hands the host name to `net.Dialer`
+  (uacp/conn.go:87), which tries each address in order. The row
+  **declines** when `localhost` does not
   resolve, when it resolves to a single address — there is no next
   address, so the behaviour cannot be constructed — when the peer cannot
   listen on the last address, and when anything accepts a connection on
@@ -78,21 +80,26 @@ address row. The Go doc line is quoted verbatim in the row's header, from
 
 ## The knownBug ledger
 
-Two constants stand, one per row that carries one, each declared in its
-test function's body. Each constant's text names the
-mechanism it keys on, with the file and line it comes from, the way the
-constants in the neighbouring test packages do, and carries no issue
-link. Two different fixes close them, one for
-each constant: honouring the context's cancellation in `Handshake` closes
-`handshake_gives_up_when_its_context_is_cancelled_test.go`, and iterating
-the resolved addresses in `Dialer.Dial` closes
+No constant stands. Two did, one per row that carried one, each declared
+in its test function's body, each naming the
+mechanism it keyed on, with the file and line it came from, the way the
+constants in the neighbouring test packages do, and carrying no issue
+link; both were deleted in the change that rebased this suite onto the
+fixes that closed them, as `../README.md` prescribes: where a fix
+reaches main ahead of a suite, the deletion lands in the change that
+rebases the suite onto it.
+Honouring the context's cancellation in `Handshake` — `context.AfterFunc`
+sets a past deadline on the connection when the context ends
+(uacp/conn.go:235-238) — closed
+`handshake_gives_up_when_its_context_is_cancelled_test.go`, and handing
+the endpoint's host name to `net.Dialer` in `Dialer.Dial`
+(uacp/conn.go:87) closed
 `dial_reaches_a_host_name_on_its_next_address_test.go` — though the
 address row scores the outcome, which is a HEL at a listener on the last
 address after the first refused. With the two addresses `localhost`
 gives it, the row cannot tell that from a `Dialer` that tries only the
-last address or races them. No constant
-stands for the deadline row: gopcua passes it as it stands, and it exists
-to guard the deadline path against a change made to the cancellation
-path — the obvious fix for the cancellation row is to select on
-`ctx.Done()` beside the read, and a change that broke the deadline while
-fixing the cancellation would pass that row and fail this one.
+last address or races them. No constant stood for the deadline row
+either: gopcua passes it as it stands, and it exists to guard the
+deadline path against a change made to the cancellation path — a change
+that broke the deadline while touching the cancellation would pass the
+cancellation row and fail this one.
