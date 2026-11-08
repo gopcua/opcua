@@ -4,28 +4,28 @@
 // request is null, or, if a client sends one anyway, it is at least 32
 // bytes long and differs between two connections.
 //
-// The clauses: OPC 10000-6 §6.7.4: "The OpenSecureChannel Messages are
-// not signed or encrypted if the SecurityMode is None. The Nonces are
-// ignored and should be set to null." OPC 10000-4 §5.6.2.2, clientNonce:
-// "A random number that shall not be used in any other request." OPC
-// 10000-4 §5.6.2.3, Bad_NonceInvalid: "A Server shall check the minimum
-// length of the Client nonce and return this status if the length is
-// below 32 bytes." OPC 10000-7 v1.04 gives no SecureChannelNonceLength
-// for None - the profile's limits unit SecurtyPolicy_None_Limits (sic)
-// lists only "DerivedSignatureKeyLength: 0" - so §5.6.2.2's length rule
-// has no number to apply here, and the row rests on §6.7.4 and §5.6.2.3.
-// What counts as a null nonce is settled by the encoding rules, not by
-// this row: OPC 10000-6 §5.2.2.7, ByteString: "If the length of the byte
-// string is -1 then the byte string is 'null'." OPC 10000-6 §5.1.11,
-// Null, Empty and Zero-Length Arrays, which covers ByteStrings
-// ("ByteStrings are arrays of Bytes for purposes of this discussion"):
-// "For this reason, null, empty and zero length arrays are semantically
-// the same for all DataEncodings." "When testing for equality,
-// applications shall treat null and empty arrays as equal." That is why
-// the row counts a ClientNonce whose length prefix is 0 and one whose
-// length prefix is -1 alike: both are null. gopcua passes this row as
-// it stands: measured on this tree, its OPN under None carries a
-// zero-length ClientNonce - a length prefix of 0, no nonce bytes.
+// The clauses: OPC 10000-6 §6.7.4: "The OpenSecureChannel Messages are not
+// signed or encrypted if the SecurityMode is None. The Nonces are ignored and
+// should be set to null." OPC 10000-4 §5.6.2.2, clientNonce: "A random number
+// that shall not be used in any other request." and "This parameter shall have
+// a length equal to the SecureChannelNonceLength defined for the SecurityPolicy
+// in OPC 10000-7." OPC 10000-4 §5.6.2.3, Bad_NonceInvalid: "A Server shall
+// check the minimum length of the Client nonce and return this status if the
+// length is below 32 bytes." OPC 10000-7 v1.04 gives no
+// SecureChannelNonceLength for None - the profile's limits unit
+// SecurtyPolicy_None_Limits (sic) lists only "DerivedSignatureKeyLength: 0" -
+// so §5.6.2.2's length rule has no number to apply here, and the row rests on
+// §6.7.4 and §5.6.2.3. What counts as a null nonce is settled by the encoding
+// rules, not by this row: OPC 10000-6 §5.2.2.7, ByteString: "If the length of
+// the byte string is -1 then the byte string is 'null'." OPC 10000-6 §5.1.11,
+// Null, Empty and Zero-Length Arrays, which covers ByteStrings ("ByteStrings
+// are arrays of Bytes for purposes of this discussion"): "For this reason,
+// null, empty and zero length arrays are semantically the same for all
+// DataEncodings." "When testing for equality, applications shall treat null and
+// empty arrays as equal." That is why the row counts a ClientNonce whose length
+// prefix is 0 and one whose length prefix is -1 alike: both are null. gopcua
+// passes this row as it stands: measured on this tree, its OPN under None
+// carries a zero-length ClientNonce - a length prefix of 0, no nonce bytes.
 //
 // Neighbouring rows:
 // open_secure_channel_fills_each_rsa_oaep_block_test.go scores the
@@ -127,9 +127,9 @@ func TestClientNonceUnderSecurityPolicyNoneIsNullOrUsable(t *testing.T) {
 
 	// Across the two connections: a non-null ClientNonce is "a random
 	// number that shall not be used in any other request" (OPC 10000-4
-	// §5.6.2.2), so it must differ between them. A null nonce counts as
-	// different from any non-null one, and bytes.Equal gives both that
-	// and §5.1.11's equality of null and empty for free.
+	// §5.6.2.2), so it must differ between them. The len guards leave
+	// null nonces out of the check, so a null nonce never counts as
+	// reused.
 	if len(nonces[0]) > 0 && len(nonces[1]) > 0 && bytes.Equal(nonces[0], nonces[1]) {
 		t.Errorf("both connections carried the same %d-byte ClientNonce, but "+
 			"the clientNonce is \"a random number that shall not be used in any "+
