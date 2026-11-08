@@ -61,8 +61,9 @@
 // is empty or not a whole number of k-byte blocks is an ordinary
 // failure, and that arm is the guard against a pass on zero blocks. It
 // declines, and does not score, only when no OPN frame arrived within
-// the deadline; an OPN whose asymmetric security header names a policy
-// other than Aes256_Sha256_RsaPss, or on which
+// the deadline, the harness's `handshake` constant as the wait; an OPN
+// whose asymmetric security header names a policy other than
+// Aes256_Sha256_RsaPss, or on which
 // uasc.MessageChunk.Decode fails, can only be the client's bytes, so
 // the row prints "gopcua's own behaviour made this run unscoreable"
 // with t.Errorf, then returns.
