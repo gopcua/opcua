@@ -36,7 +36,7 @@ scored here.
   setup check and the client's context share one (`handshake` in
   `harness.go`). The bound is not a timing assumption: a correct client
   sends its HEL and its OPN in well under a second - measured on this
-  tree, the block row's exchange ran in 0.49s - so the bound exists
+  tree, the block row ran in 0.49s - so the bound exists
   to let a slow machine finish, not to wait out a broken one. Every
   listener and connection is closed in `t.Cleanup`, so a `Connect` left
   blocked by the library under test is released when the test ends.
@@ -89,6 +89,6 @@ One constant stands, declared in
 reserves 32 (`RSAOAEPMinPaddingSHA256 = (2 * 64) + 2`,
 uapolicy/crypto_rsaoaep.go:21, subtracted at
 uapolicy/policyAes256Sha256RsaPss.go:114), so, with the 4096-bit receiver
-the harness mints, every RSA-OAEP-SHA2-256 block carries 382 plaintext
+the row mints, every RSA-OAEP-SHA2-256 block carries 382 plaintext
 bytes where the arithmetic allows 446. The nonce row carries no
 constant: gopcua passes it as it stands.

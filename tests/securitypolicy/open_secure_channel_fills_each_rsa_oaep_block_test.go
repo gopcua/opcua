@@ -6,8 +6,8 @@
 // algorithm allows: k - 2hLen - 2 bytes, where k is the receiver's
 // modulus length in octets and hLen is SHA-256's 32-byte output - 446
 // for the 4096-bit receiver key the row mints - the peer is minted at
-// 4096 bits so that a fix hardcoded to one key size lands in the
-// ordinary-failure arm.
+// 4096 bits so that a fix hardcoded to the 2048-bit arithmetic lands
+// in the ordinary-failure arm.
 //
 // The clauses: OPC 10000-7 v1.04 §6.6.166, Table 186 "SecurityPolicy -
 // Aes256-Sha256-RsaPss", lists the conformance unit
@@ -61,19 +61,20 @@
 // header, the request, the padding and the signature, all encrypted
 // together - and every k-byte slice of it is one block. A region that
 // is empty or not a whole number of k-byte blocks is an ordinary
-// failure, and that arm is the guard against a pass on zero blocks. It
-// declines, and does not score, when no OPN frame arrived within
-// the deadline, the harness's `handshake` constant as the wait - that
-// is the row's own decline, and the harness's setup declines (minting,
-// starting the peer, building the client) apply as well. An OPN
-// whose asymmetric security header names a policy other than
+// failure, and the empty-region arm is the guard against a pass on
+// zero blocks. It declines, and does not score, when no OPN frame
+// arrived within the deadline, the harness's `handshake` constant as
+// the wait - that is the row's own decline, and the setup declines
+// (minting, starting the peer, building the client) apply as well.
+// An OPN whose asymmetric security header names a policy other than
 // Aes256_Sha256_RsaPss, or on which
 // uasc.MessageChunk.Decode fails, can only be the client's bytes, so
 // the row prints "gopcua's own behaviour made this run unscoreable"
 // with t.Errorf, then returns.
 // It deliberately asserts nothing about the asymmetric signature
 // (RSA-PSS), the symmetric algorithms, the channel lifecycle - tokens,
-// renewal - or the HEL/ACK exchange.
+// renewal - or the HEL/ACK exchange; the row mints one receiver size,
+// so a fix hardcoded to the 4096-bit arithmetic would pass it.
 //
 // The row fails on main, so it carries a knownBug constant, declared in
 // the test function's body, where the arms that read it live. The
@@ -221,24 +222,24 @@ func TestOpenSecureChannelFillsEachRSAOAEPBlock(t *testing.T) {
 		// deletion; with the constant deleted it is the row's pass,
 		// logged the way the sibling rows log theirs.
 		if knownBug != "" {
-			t.Errorf("this now passes (all %d blocks carry %d plaintext "+
-				"bytes, not %d) - delete the knownBug constant, every arm "+
+			t.Errorf("this now passes (each of the %d blocks carries %d "+
+				"plaintext bytes, not %d) - delete the knownBug constant, every arm "+
 				"that reads it, and anything only those arms used, in the "+
 				"commit that fixed it", blocks, want, knownBugSize)
 		} else {
-			t.Logf("all %d blocks carry %d plaintext bytes", blocks, want)
+			t.Logf("each of the %d blocks carries %d plaintext bytes", blocks, want)
 		}
 	case atKnownBugSize == blocks:
 		if knownBug != "" {
-			t.Logf("known bug: %s (all %d blocks carry %d plaintext "+
-				"bytes, not %d)", knownBug, blocks, knownBugSize, want)
+			t.Logf("known bug: %s (each of the %d blocks carries %d "+
+				"plaintext bytes, not %d)", knownBug, blocks, knownBugSize, want)
 		} else {
-			t.Errorf("all %d blocks carry %d plaintext bytes, not %d",
+			t.Errorf("each of the %d blocks carries %d plaintext bytes, not %d",
 				blocks, knownBugSize, want)
 		}
 	default:
-		t.Errorf("the %d blocks carry mixed or wrong plaintext sizes "+
-			"(%v), not %d bytes each", blocks, sizes, want)
+		t.Errorf("the blocks carry mixed or wrong plaintext sizes "+
+			"(%v), not %d bytes each", sizes, want)
 	}
 }
 
