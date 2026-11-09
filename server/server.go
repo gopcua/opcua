@@ -67,6 +67,8 @@ type serverConfig struct {
 	enabledSec  []security
 	enabledAuth []authMode
 
+	changeObservers []ChangeObserver
+
 	cap ServerCapabilities
 
 	logger Logger
@@ -189,7 +191,10 @@ func (s *Server) Namespaces() []NameSpace {
 }
 
 func (s *Server) ChangeNotification(n *ua.NodeID) {
-	s.MonitoredItemService.ChangeNotification(n)
+	if s.MonitoredItemService != nil {
+		s.MonitoredItemService.ChangeNotification(n)
+	}
+	s.notifyObservers(n)
 }
 
 // for now, the address space of the server is split up into namespaces.
