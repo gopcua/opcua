@@ -174,11 +174,21 @@ type Client struct {
 	// for all active subscriptions.
 	pendingAcks []*ua.SubscriptionAcknowledgement
 
-	// pausech pauses the subscription publish loop
-	pausech chan struct{}
+	// publishPaused is the single source of truth for whether the subscription
+	// publish loop should be running. pauseSubscriptions/resumeSubscriptions
+	// only ever store true/false here.
+	//
+	// It replaces the former pausech/resumech edge-triggered channels: both
+	// were read by the same select in monitorSubscriptions, so a resume racing
+	// a pause could be picked first and discarded, leaving the pause to park
+	// the loop forever. A level has no such race. See
+	// https://github.com/gopcua/opcua/issues/895.
+	publishPaused atomic.Bool
 
-	// resumech resumes subscription publish loop
-	resumech chan struct{}
+	// wakech nudges the publish loop to re-check publishPaused. It only carries
+	// a "something may have changed" hint, never state, so wake-ups are safe to
+	// coalesce or drop.
+	wakech chan struct{}
 
 	// mcancel stops subscription publish loop
 	mcancel func()
@@ -224,8 +234,7 @@ func NewClient(endpoint string, opts ...Option) (*Client, error) {
 		sechanErr:   make(chan error, 1),
 		subs:        make(map[uint32]*Subscription),
 		pendingAcks: make([]*ua.SubscriptionAcknowledgement, 0),
-		pausech:     make(chan struct{}, 2),
-		resumech:    make(chan struct{}, 2),
+		wakech:      make(chan struct{}, 1),
 		stateCh:     cfg.stateCh,
 		stateFunc:   cfg.stateFunc,
 	}
