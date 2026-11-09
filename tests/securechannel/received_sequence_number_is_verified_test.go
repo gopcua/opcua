@@ -39,50 +39,64 @@
 // fresh peer and a fresh client each time, under SecurityPolicy
 // None - one arm per violation, so that a client which closes the
 // channel on the first rejection, as the clause orders, never has a
-// second request to send. Each arm's client is the real
-// opcua.Client, driven through Dial and no further: Connect would
-// send CreateSession, ActivateSession and a Read of its own, each
-// of which would consume answers the script has not chosen for it,
-// and no session and no monitor - Dial starts neither - is what
-// makes the error return the whole observable. Each arm's peer
-// answers the OPN with a response whose SequenceNumber is 1 - its
-// first chunk on the channel - and the arm's one request, a raw
-// Read the row itself sends and bounds with a context of its own,
-// with a response chunk whose SequenceNumber is 1 again in the
-// reused arm, a reuse within the same TokenId, and 3 in the skipped
-// arm, skipping 2, using the harness's msgSeqs script.
+// request to send after the answer it rejected. Each arm's client
+// is the real opcua.Client, driven through Dial and no further:
+// Connect would send CreateSession, ActivateSession and a Read of
+// its own, each of which would consume answers the script has not
+// chosen for it, and no session and no monitor - Dial starts
+// neither - is what makes the arm's Reads the whole exchange the
+// row scores. Each arm's peer answers the OPN with a response whose
+// SequenceNumber is 1 - its first chunk on the channel - and the
+// arm's two requests, raw Reads the row itself sends and bounds
+// with contexts of their own, with two answer chunks: the first
+// carries the peer's correct next number, 2, and the second the
+// violated number the arm is given - 2 again in the reused arm, a
+// reuse of the first answer's number within the same TokenId, and
+// 4 in the skipped arm, skipping 3 - using the harness's msgSeqs
+// script. The first answer's body must reach the caller on both
+// arms before the violated one is scored: it grounds the arm's
+// rejection - a client that rejects every chunk, no sequence check
+// at all, would otherwise read the same as the fix - and it comes
+// first because a fixed client closes the channel on the violated
+// answer, as §6.7.7 orders, and would leave a later ground
+// undelivered.
 // See harness.go.
 //
 // The row asserts that the reused arm's client does not hand the
 // reused-number response to its caller, and that the skipped arm's
 // client does not hand the skipped-number response to its caller
 // either - per the README's definition of the phrase, the response
-// body never arrives at the caller; on these unfixed trees that shows
-// as each arm's Read returning its own timeout error, and a fixed
-// client returns the closed channel's error instead, which is why the
-// arms key on the body - and a receiver with no sequence check at all
-// accepts both, so the second arm separates a partial check from
-// none. Each arm scores its own violation alone. It deliberately
-// asserts nothing about which error the client returns, and nothing
-// about a dialling behaviour: the clause's "force a reconnect" shows
-// as the channel the client closes, not as a redial. A fixed client
-// rejects the arm's chunk and closes the channel - "If an error
-// occurs during Message verification the receiver shall close the
-// communication channel." - and the arm's pass is the response body
-// never arriving, per the README's definition of the phrase; a close
-// in the peer's close records corroborates that pass and is not
+// body never arrives at the caller; a rejection shows as the arm's
+// Read returning its own timeout error, and a fixed client returns
+// the closed channel's error instead, which is why the arms key on
+// the body - and a receiver with no sequence check at all accepts
+// both, so the first arm separates a partial check from none, and
+// the second a partial fix from the whole one. Each arm scores its
+// own violation alone. It deliberately asserts nothing about which
+// error the client returns, and nothing about a dialling behaviour:
+// the clause's "force a reconnect" shows as the channel the client
+// closes, not as a redial. A fixed client rejects the arm's chunk
+// and closes the channel - "If an error occurs during Message
+// verification the receiver shall close the communication
+// channel." - and the arm's pass is the response body never
+// arriving, per the README's definition of the phrase; a close in
+// the peer's close records corroborates that pass and is not
 // required for it, and a close is never a decline: the client owes
-// each arm the one request whose answer is scored, and a channel
-// closed on the first rejection never owes a second. It declines, and
-// does not score, when the fixture fails its half - the peer's own
-// failure, the channel never opening, the arm's request never
-// arriving - and it scores, never declines, a client whose own
-// behaviour leaves the run unscoreable: a frame the harness flags as
-// the client's own bytes is that, the setup check's report of
-// gopcua's own behaviour, a failure the row scores with t.Errorf and
-// never a decline. The knownBug constant records that gopcua does not
-// do this yet, and no pull request fixes it: the receive path decodes
-// the sequence header at uasc/secure_channel.go:520 (n, err :=
+// each arm its two requests, and a channel closed on the first
+// rejection never owes a request after the answer it rejected. It
+// declines, and does not score, when the fixture fails its half or
+// a stage the story needs never ran, whichever side caused it -
+// the peer's own failure, the channel never opening, the
+// well-formed answer never arriving at the caller - and it scores,
+// never declines, a client whose own behaviour leaves the run
+// unscoreable: a frame the harness flags as the client's own bytes
+// is that, the setup check's report of gopcua's own behaviour, and
+// so is the arm's Read never arriving at the peer - the setup check
+// holds the peer's half clean, so a Read that never arrives can
+// only be the client's own doing - a failure the row scores with
+// t.Errorf and never a decline. The knownBug constant records that
+// gopcua does not do this yet: the receive path decodes the
+// sequence header at uasc/secure_channel.go:520 (n, err :=
 // m.SequenceHeader.Decode(m.Data)) but never compares the number it
 // carries, a single-chunk message is returned without any look at it
 // (uasc/secure_channel.go:1231), and the only read of a received
@@ -100,8 +114,9 @@
 // accepting is still the known bug: a partial fix - a check that
 // catches a reused number and lets a skipped one by - stays logged
 // and visible, not mistaken for the whole fix; when both arms'
-// responses are rejected, that is a hard error telling whoever runs
-// it to delete the constant, every arm that reads it, and anything
+// responses are rejected and both arms' well-formed answers handed
+// to their callers, that is a hard error telling whoever runs it to
+// delete the constant, every arm that reads it, and anything
 // only those arms used.
 //
 // No reference stack has been read for this behaviour; the measurement
@@ -126,22 +141,22 @@ import (
 // the arm.
 const openBound = 10 * time.Second
 
-// answerBound bounds the arm's one Read, the request whose answer the
-// arm scores. A healthy answer crosses the loopback in milliseconds;
-// a chunk a tree rejects reaches no handler, and the bound is what a
-// rejection costs the arm - the arm keys on the body, never on which
-// error the Read returned along the way. It sits under the harness's
-// read bound (harness.go), so the peer's connection is never released
-// for idling before the Read returns.
+// answerBound bounds the arm's Reads, the ground Read and the scored
+// one. A healthy answer crosses the loopback in milliseconds; a
+// chunk a tree rejects reaches no handler, and the bound is what a
+// rejection costs the arm. One slower than the bound is
+// indistinguishable from a rejection on either arm. It sits under
+// the harness's read bound (harness.go), so the peer's connection
+// is never released for idling before a Read returns.
 const answerBound = 5 * time.Second
 
-// The SequenceNumbers the arms' response chunks carry in place of
-// the peer's next one: the reused arm's repeats the OPN response's
-// 1, a reuse within the same TokenId, and the skipped arm's is 3,
-// skipping 2.
+// The SequenceNumbers the arms' violated answer chunks carry in
+// place of the peer's next one: the reused arm's repeats the
+// well-formed answer's 2, a reuse within the same TokenId, and the
+// skipped arm's is 4, skipping 3.
 const (
-	reusedSeq  = 1
-	skippedSeq = 3
+	reusedSeq  = 2
+	skippedSeq = 4
 )
 
 func TestReceivedSequenceNumberIsVerified(t *testing.T) {
@@ -153,10 +168,6 @@ func TestReceivedSequenceNumberIsVerified(t *testing.T) {
 		"reuses a SequenceNumber within the same TokenId and one that " +
 		"skips a number are both handed to the caller"
 
-	// One arm per violation, a fresh peer and a fresh client each
-	// time, so a client that closes the channel on the first
-	// rejection, as the clause orders, never has a second request to
-	// send.
 	reused, teardown := runSequenceNumberArm(reusedSeq)
 	t.Cleanup(teardown)
 	if reused.setupWhy != "" {
@@ -168,9 +179,12 @@ func TestReceivedSequenceNumberIsVerified(t *testing.T) {
 		t.Fatalf("could not set the test up: %s", reused.setupWhy)
 	}
 	if !reused.readArrived {
-		t.Fatalf("could not set the test up: the reused arm's Read never " +
-			"arrived at the peer, so the response whose reuse the arm scores " +
-			"was never sent and this run cannot be scored")
+		t.Errorf("the reused arm's Read never reached the peer, so the " +
+			"arm scored nothing: the harness's setup check reports no " +
+			"failure on the peer's side, so the client's own behaviour " +
+			"stopped it, and that is scored as gopcua's failure, never " +
+			"declined")
+		return
 	}
 
 	skipped, teardown := runSequenceNumberArm(skippedSeq)
@@ -184,22 +198,23 @@ func TestReceivedSequenceNumberIsVerified(t *testing.T) {
 		t.Fatalf("could not set the test up: %s", skipped.setupWhy)
 	}
 	if !skipped.readArrived {
-		t.Fatalf("could not set the test up: the skipped arm's Read never " +
-			"arrived at the peer, so the response whose skip the arm scores " +
-			"was never sent and this run cannot be scored")
+		t.Errorf("the skipped arm's Read never reached the peer, so the " +
+			"arm scored nothing: the harness's setup check reports no " +
+			"failure on the peer's side, so the client's own behaviour " +
+			"stopped it, and that is scored as gopcua's failure, never " +
+			"declined")
+		return
 	}
 
-	// Which arm's caller was handed its response is part of the
-	// log, so exactly one arm accepting - a partial fix - stays
-	// logged and visible, not mistaken for the whole fix.
+	// Which arm's caller was handed its response is part of the log.
 	var handed []string
 	if reused.responseArrived {
 		handed = append(handed, "the reused arm's caller was handed the "+
-			"response whose SequenceNumber repeated 1 within the same TokenId")
+			"response whose SequenceNumber repeated 2 within the same TokenId")
 	}
 	if skipped.responseArrived {
 		handed = append(handed, "the skipped arm's caller was handed the "+
-			"response whose SequenceNumber skipped 2")
+			"response whose SequenceNumber skipped 3")
 	}
 
 	switch {
@@ -209,14 +224,26 @@ func TestReceivedSequenceNumberIsVerified(t *testing.T) {
 	case len(handed) > 0:
 		t.Errorf("%s, and no knownBug constant stands",
 			strings.Join(handed, "; "))
+	case !reused.groundArrived:
+		t.Fatalf("could not set the test up: the reused arm's client did " +
+			"not hand the well-formed answer to its caller, so its " +
+			"rejection of the reused-number response is not grounded in " +
+			"the number, and this run cannot be scored")
+	case !skipped.groundArrived:
+		t.Fatalf("could not set the test up: the skipped arm's client did " +
+			"not hand the well-formed answer to its caller, so its " +
+			"rejection of the skipped-number response is not grounded in " +
+			"the number, and this run cannot be scored")
 	case knownBug != "":
 		t.Errorf("this now passes (the reused arm's caller was not handed " +
-			"the response whose SequenceNumber repeated 1 within the same " +
+			"the response whose SequenceNumber repeated 2 within the same " +
 			"TokenId, and the skipped arm's caller was not handed the " +
-			"response whose SequenceNumber skipped 2, so neither body ever " +
-			"arrived at a caller) - delete the knownBug constant, every arm " +
-			"that reads it, and anything only those arms used, in the " +
-			"commit that fixed it")
+			"response whose SequenceNumber skipped 3, so neither violated " +
+			"body ever arrived at a caller, and both arms handed the " +
+			"well-formed answer to their callers, so neither channel was " +
+			"dead) - delete the knownBug constant, every arm that reads " +
+			"it, and anything only those arms used, in the commit that " +
+			"fixed it")
 	default:
 		t.Logf("both arms rejected their responses: neither caller saw " +
 			"the body")
@@ -229,6 +256,7 @@ func TestReceivedSequenceNumberIsVerified(t *testing.T) {
 // live connection for it.
 type sequenceArmOutcome struct {
 	responseArrived bool
+	groundArrived   bool
 	readArrived     bool
 	setupWhy        string
 	setupFromGopcua bool
@@ -236,21 +264,23 @@ type sequenceArmOutcome struct {
 
 // runSequenceNumberArm runs one arm of the row end to end: a fresh
 // peer under SecurityPolicy None, whose OPN response carries the
-// SequenceNumber 1 - its first chunk on the channel - and whose one
-// answer, to the arm's one request, is stamped with the responseSeq
-// the arm is given in place of the peer's next number. The arm
-// launches a fresh client - the real opcua.Client, driven through
-// Dial and no further - sends one raw Read bounded by answerBound,
-// and closes the client within openBound. It returns what the arm's
-// run left to score and the peer's teardown for the row to register
-// with t.Cleanup; a peer that could not be started, a client that
-// could not be built or a channel that never opened is a decline
-// whichever side caused it, reported through o.setupWhy and printed
-// by the row with "could not set the test up", per ../README.md. The
-// runner never aborts the test; it returns plain values.
+// SequenceNumber 1 - its first chunk on the channel. The peer's
+// answers, to the arm's two raw Reads, are stamped with the peer's
+// correct next number and then with the responseSeq the arm is
+// given in place of the peer's next one, using the harness's msgSeqs
+// script. The arm launches a fresh client - the real opcua.Client,
+// driven through Dial and no further - sends two raw Reads, each
+// bounded by answerBound, and closes the client within openBound.
+// It returns what the arm's run left to score and the peer's
+// teardown for the row to register with t.Cleanup; a peer that
+// could not be started, a client that could not be built or a
+// channel that never opened is a decline whichever side caused it,
+// reported through o.setupWhy and printed by the row with "could
+// not set the test up", per ../README.md. The runner never aborts
+// the test; it returns plain values.
 func runSequenceNumberArm(responseSeq uint32) (o sequenceArmOutcome,
 	teardown func()) {
-	// The channel id and the token id both 1, an hour of lifetime, so
+	// The same token for issue and renew, an hour of lifetime, so
 	// no renewal comes near the arm, and every chunk the peer sends
 	// carries the same TokenId.
 	token := channelToken{
@@ -268,7 +298,11 @@ func runSequenceNumberArm(responseSeq uint32) (o sequenceArmOutcome,
 			}
 			return nil
 		},
-		msgSeqs: []uint32{responseSeq},
+		// The peer's answers in order: the correct next number, 2,
+		// then the violated responseSeq - the ground before the
+		// violation, since a fixed client closes the channel on
+		// the violated answer.
+		msgSeqs: []uint32{2, responseSeq},
 	})
 	if why != "" {
 		o.setupWhy = why
@@ -296,18 +330,22 @@ func runSequenceNumberArm(responseSeq uint32) (o sequenceArmOutcome,
 		return o, teardown
 	}
 
-	readCtx, readCancel := context.WithTimeout(context.Background(),
-		answerBound)
-	res, _ := client.Read(readCtx, &ua.ReadRequest{
-		NodesToRead: []*ua.ReadValueID{{
-			NodeID:      ua.NewNumericNodeID(0, 2255),
-			AttributeID: ua.AttributeIDValue,
-		}}},
-	)
-	readCancel()
-	// The arm keys on the body, never on which error the Read
-	// returned along the way.
-	o.responseArrived = res != nil
+	bodyArrived := func() bool {
+		readCtx, readCancel := context.WithTimeout(context.Background(),
+			answerBound)
+		res, _ := client.Read(readCtx, &ua.ReadRequest{
+			NodesToRead: []*ua.ReadValueID{{
+				NodeID:      ua.NewNumericNodeID(0, 2255),
+				AttributeID: ua.AttributeIDValue,
+			}},
+		})
+		readCancel()
+		// The arm keys on the body, never on which error the Read
+		// returned along the way.
+		return res != nil
+	}
+	o.groundArrived = bodyArrived()
+	o.responseArrived = bodyArrived()
 
 	closeCtx, closeCancel := context.WithTimeout(context.Background(),
 		openBound)
