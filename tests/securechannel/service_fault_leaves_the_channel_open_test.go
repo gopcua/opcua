@@ -32,7 +32,7 @@
 //
 // The row runs against the scripted peer from harness.go, under
 // SecurityPolicy None, with the client under test built by the row as
-// the real opcua.Client with AutoReconnect(true) only: with
+// the real opcua.Client with AutoReconnect(true): with
 // AutoReconnect(false) the unfixed monitor marks the client closed
 // without touching the wire, so the wire cannot separate a fixed tree
 // from an unfixed one, and the row does not score what it cannot
@@ -72,7 +72,7 @@
 // connection, the channel closed or replaced on the original
 // connection - and only a window that closes holding none of the four
 // is a kept channel. The fourth fact catches the drop that keeps the
-// TCP connection, and a fixed tree cannot show it in the run: the
+// TCP connection open, and a fixed tree cannot show it in the run: the
 // client's only OPN after the channel opens is its renewal, 75 % of
 // the hour-long token away and asking for a Renew, and the CLO the
 // client's own close at teardown sends lands after the row has
@@ -159,12 +159,12 @@ const mark = 9876.5
 // tears down and redials on its own goroutine, so the window is
 // generous against the milliseconds that teardown takes on a loaded
 // machine. It must stay under the harness's read bound: a connection
-// that bound ends for idling leaves a close the row must not count as
-// the client's own.
+// that the bound ends for idling leaves a close the row must not
+// count as the client's own.
 const settleWindow = 8 * time.Second
 
 // retryBound is how long the row keeps sending the second
-// marked Read until the peer's records hold it. A client between
+// marked Read until the peer has decoded it. A client between
 // channels refuses the send, and an unfixed monitor's redial - a new
 // connection, the activation and the namespace read again - completes
 // in well under a second even loaded, so the bound is a safety margin
@@ -380,7 +380,7 @@ func isMarkedRead(req ua.Request) bool {
 }
 
 // firstMarkedRead returns the connection generation and the moment
-// of the first marked Read the peer decoded, the caller has
+// of the first marked Read the peer decoded; the caller has
 // verified one arrived. The fault answered that Read, so the moment
 // anchors what counts as "after the fault".
 func firstMarkedRead(rec peerRecord) (conn int, at time.Time) {
