@@ -36,10 +36,15 @@
 // AutoReconnect(false) the unfixed monitor marks the client closed
 // without touching the wire, so the wire cannot separate a fixed tree
 // from an unfixed one, and the row does not score what it cannot
-// separate. The peer answers CreateSession and ActivateSession
-// normally, faults the row's first Read with a ServiceFault carrying
-// Bad_TooManyOperations, and answers the row's second Read normally;
-// it keeps serving connections, so everything a client does to come
+// separate. Connect itself sends a Read of the namespace array,
+// NodeID i=2255, before the row sends any request of its own, so the
+// row's first Read is told apart by when it is sent: the fault is
+// armed only after Connect returns, the script answers Connect's
+// own Read normally, and the first Read the row sends after that
+// return is the one that draws a ServiceFault carrying
+// Bad_TooManyOperations, the second the one answered normally. The
+// peer answers CreateSession and ActivateSession normally, and it
+// keeps serving connections, so everything a client does to come
 // back - a new connection, a new HEL/ACK and OPN, the activation
 // again - is visible in its records.
 // See harness.go.

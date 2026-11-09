@@ -43,11 +43,14 @@ on a fixed tree too, and a None arm cannot score the behaviour.
   a row here drives its client's requests itself and holds its handle.
 - **Every number the rows score comes from the script, never from the
   library under test.** The token's ids, stamp and lifetime, the
-  response bodies, and the sequence numbers stamped on them are the
-  row's own choices; the peer's records - accepts, requests with the
-  generation each arrived on, ends of reads - are what the rows read
-  back, and the ServiceFault row's verdict rests on those records
-  alone.
+  response bodies, the sequence numbers stamped on them, and which
+  token an answer is stamped with - the current one by default, the
+  one a row's script picks otherwise - are the row's own choices; the
+  peer's records - accepts, OPNs answered with the generation each
+  arrived on and whether each asked for a new token or renewed the
+  current one, requests with the generation each arrived on, ends of
+  reads - are what the rows read back, and the ServiceFault row's
+  verdict rests on those records alone.
 - **Rows 1, 2 and 4 run under SecurityPolicy None**, so every chunk is
   in the clear and the harness's `noneCodec` encodes and decodes them.
   The expired-token row runs under Basic256Sha256 in mode Sign, and the
@@ -69,6 +72,20 @@ Item 3's reading here is that fixture, and it is checkable the way it is
 in the other packages: `grep -c "See harness.go"
 tests/securechannel/*_test.go` prints 1 for every row; the glob does not
 match `harness.go`, which is the fixture itself and not a row.
+
+## Handed to its caller
+
+Two rows - expired_security_token_is_rejected_test.go and
+received_sequence_number_is_verified_test.go - score a chunk the
+client must not hand to its caller, and the phrase means one
+observable. On these trees a rejected chunk reaches no handler, so the
+request whose answer it was is never answered: it returns its own
+timeout error, the timeout the row bound it with. Those rows read the
+rejection as exactly that - the request returning its own timeout
+error, with no response body behind it - and the acceptance, the
+knownBug arm, as the body arriving. Neither row scores which error the
+client raises along the way, only whether the scored answer is the
+one that must not arrive.
 
 ## When a row declines
 

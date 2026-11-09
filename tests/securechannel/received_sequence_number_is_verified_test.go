@@ -35,33 +35,47 @@
 // direction of §6.7.2.4 - the client's own chunks incrementing by
 // exactly one - is spec-clean on every tree measured and is not a row.
 //
-// The row runs against the scripted peer from harness.go, under
-// SecurityPolicy None, with the client under test built by the row as
-// the real opcua.Client with AutoReconnect(false), so an error return
-// is the whole observable. The peer answers the OPN with a response
-// whose SequenceNumber is 1 - its first chunk on the channel - then
-// answers the client's first request with a response chunk whose
-// SequenceNumber is 1 again, a reuse within the same TokenId, and the
-// client's second request with one whose SequenceNumber is 3, skipping
-// 2, using the harness's msgSeqs script.
+// The row runs against the scripted peer from harness.go twice - a
+// fresh peer and a fresh client each time, under SecurityPolicy None
+// - one arm per violation, so that a client which closes the channel
+// on the first rejection, as the clause orders, never has a second
+// request to send. Each arm's client is the real opcua.Client, driven
+// through Dial and no further: Connect would send CreateSession,
+// ActivateSession and a Read of its own, each of which would consume
+// answers the script has not chosen for it, and no session and no
+// monitor - Dial starts neither - is what makes the error return the
+// whole observable. Each arm's peer answers the OPN with a response
+// whose SequenceNumber is 1 - its first chunk on the channel - and
+// the arm's one request, a raw Read the row itself sends and bounds
+// with a context of its own, with a response chunk whose
+// SequenceNumber is 1 again in the reused arm, a reuse within the
+// same TokenId, and 3 in the skipped arm, skipping 2, using the
+// harness's msgSeqs script.
 // See harness.go.
 //
-// The row asserts that the client does not hand the reused-number
-// response to its caller, and that it does not hand the skipped-number
-// response to its caller either: a receiver with no sequence check at
-// all accepts both, so the second arm separates a partial check from
-// none. It deliberately asserts nothing about which error the client
-// returns, and nothing about whether it reconnects: with
-// AutoReconnect(false) and no monitor, the error return is the whole
-// observable, and the clause's "force a reconnect" is scored as the
-// transport error the client raises, not as a dialling behaviour. It
-// declines, and does not score, when the fixture fails its half - the
-// peer's own failure, a frame the harness flags as the client's own
-// bytes, the channel never opening, the client never sending the
-// request whose answer is scored - and it scores, never declines, a
-// client whose own behaviour leaves the run unscoreable. The knownBug
-// constant records that gopcua does not do this yet, and no pull
-// request fixes it: the receive path decodes the sequence header at
+// The row asserts that the reused arm's client does not hand the
+// reused-number response to its caller, and that the skipped arm's
+// client does not hand the skipped-number response to its caller
+// either - per the README's definition of the phrase, each arm's Read
+// returns its own timeout error and the response body never arrives:
+// a receiver with no sequence check at all accepts both, so the
+// second arm separates a partial check from none. Each arm scores its
+// own violation alone. It deliberately asserts nothing about which
+// error the client returns, and nothing about a dialling behaviour:
+// the clause's "force a reconnect" is scored as the channel the
+// client closes, not as a redial. A fixed client rejects the arm's
+// chunk and closes the channel - "If an error occurs during Message
+// verification the receiver shall close the communication channel."
+// - and that closed channel, read in the peer's close records, is
+// the arm's pass, never a decline: the client owes each arm the one
+// request whose answer is scored, and a channel closed on the first
+// rejection never owes a second. It declines, and does not score,
+// when the fixture fails its half - the peer's own failure, a frame
+// the harness flags as the client's own bytes, the channel never
+// opening, the arm's request never arriving - and it scores, never
+// declines, a client whose own behaviour leaves the run unscoreable.
+// The knownBug constant records that gopcua does not do this yet, and
+// no pull request fixes it: the receive path decodes the sequence header at
 // uasc/secure_channel.go:520 (n, err := m.SequenceHeader.Decode(m.Data))
 // but never compares the number it carries, a single-chunk message is
 // returned without any look at it (uasc/secure_channel.go:1231), and
@@ -69,13 +83,13 @@
 // duplicate within one chunked message instead of raising the
 // transport error (uasc/secure_channel.go:1238), so a reused number
 // and a skipped number are both accepted on every tree measured. The
-// knownBug arm is the caller being handed a response whose
+// knownBug arm is either arm's caller being handed the response whose
 // SequenceNumber was reused or skipped - a presence a fixed client does
 // not show - and what deletes the constant is a fix that verifies the
 // SequenceNumber of every received chunk and raises the transport
 // error; there is no pull request to name. When the constant stands,
-// the acceptance is logged as the known bug; when both responses are
-// rejected, that is a hard error telling whoever runs it to delete the
+// the acceptance is logged as the known bug; when both arms' responses
+// are rejected, that is a hard error telling whoever runs it to delete the
 // constant, every arm that reads it, and anything only those arms
 // used.
 //

@@ -39,21 +39,31 @@
 // The row runs against the scripted peer from harness.go, under
 // Basic256Sha256 in mode Sign - the policy's asymmetric and symmetric
 // signing lives with this row, in the codec its body supplies,
-// because no other row calls it - in two arms that differ only in the
-// ids the peer hands out: the scored arm's server assigns a channel id
-// that differs from the token id, and answers the client's first
-// request after the grace window with a response chunk whose symmetric
-// security header carries the old, expired token id and whose
-// signature is made with the old token's keys; the control arm's
-// server assigns the two the same number, and answers the same way.
-// The peer hands out a short token, answers the client's own
-// renewal, and holds its answer until the old token's lifetime plus
-// 25 % has passed on the client's clock, so the stimulus is expired
-// on any tree that measures the window correctly.
+// because no other row calls it - in two arms that differ only in
+// the ids the peer hands out, each arm on a peer of its own with a
+// client of its own. Each arm's client is the real opcua.Client,
+// driven through Dial and no further: Connect would send
+// CreateSession, ActivateSession and a Read of its own, each of
+// which would consume answers the script has not chosen for it, and
+// the row's one scored request is a raw Read it sends and bounds
+// itself. The peer hands out a short token and answers the client's
+// own renewal with new ids - numbers the issue token never carried,
+// so the channel holds two tokens to tell apart - and the row's Read
+// goes out only after the old token's lifetime plus 25 % has passed
+// on the client's clock, so the stimulus is expired on any tree that
+// measures the window correctly. The peer answers that Read with a
+// response chunk whose symmetric security header carries the old,
+// expired token id and whose signature is made with the old token's
+// keys, chosen with the harness's answerToken script: the scored
+// arm's server assigned a channel id that differs from the token
+// id, the control arm's the same number, and the ids are all that
+// separates them.
 // See harness.go.
 //
 // The row asserts that the scored arm's client does not hand the
-// old-token response to its caller, and that the control arm's client
+// old-token response to its caller - per the README's definition of
+// the phrase, the arm's Read returns its own timeout error and the
+// response body never arrives - and that the control arm's client
 // does reject it: the control arm is the instrument check - on this
 // very tree the channel id = token id arm's expiration happens to
 // remove the right instance, so it shows that the instrument can see
@@ -61,8 +71,13 @@
 // nothing about the scored arm. It declines, and does not score, when
 // the fixture fails its half - the peer's own failure, a frame the
 // harness flags as the client's own bytes, the channel never opening,
-// the renewal never arriving - and it scores, never declines, a
-// client whose own behaviour leaves the arm unscoreable. The knownBug
+// the peer's OPN records holding no renewal: the records hold one
+// entry per OpenSecureChannelRequest the peer answered, with the
+// connection generation it arrived on, whether it asked for a new
+// token or renewed the current one, and the moment it arrived, and
+// without a renewal there are no new ids for the scored answer to be
+// old against - and it scores, never declines, a client whose own
+// behaviour leaves the arm unscoreable. The knownBug
 // constant, for issue #941, records that gopcua does not do this yet:
 // scheduleExpiration empties and rebuilds the instance map under the
 // TOKEN id (uasc/secure_channel.go:888, uasc/secure_channel.go:890,
