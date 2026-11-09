@@ -11,7 +11,9 @@
 // whose channel id, token id, createdAt and lifetime the row chose -
 // and answers the client's own renewal OPN the same way - and answers
 // the client's MSG requests with the response bodies the row's script
-// picks, stamped with the sequence numbers the row picked. Rows 1, 2
+// picks, stamped with the sequence numbers the row picked and with
+// the security token the row picked - the token the connection
+// currently holds, until a row's script chooses another. Rows 1, 2
 // and 4 run under SecurityPolicy None, so every chunk is in the clear
 // and the None codec below encodes and decodes them; the expired-token
 // row runs under Basic256Sha256/Sign, and the codec for that policy -
@@ -189,6 +191,16 @@ type peerScript struct {
 	// stimulus and not a bound the harness owns.
 	answer func(req ua.Request, reqID uint32) ua.Response
 
+	// answerToken, when set, says which security token the peer stamps
+	// the answer to one request with: it returns the token to stamp the
+	// answer to req with, or nil for the token the connection currently
+	// holds - issue before any renewal, renew after one - which is what
+	// every answer is stamped with when the script sets no hook. The
+	// expired-token row returns the old token for the answer it scores,
+	// so the chunk carries the old token id and, under Sign, is signed
+	// with the old token's keys.
+	answerToken func(req ua.Request) *channelToken
+
 	// msgSeqs, when set, are the SequenceNumbers the peer stamps on its
 	// MSG responses, in the order it answers them, in place of its own
 	// counter; the sequence-number row uses them to violate OPC
@@ -200,6 +212,15 @@ type peerScript struct {
 	// codec is the security policy the peer speaks; nil means
 	// SecurityPolicy None.
 	codec chunkCodec
+}
+
+// opnRecord is one OpenSecureChannelRequest the peer answered, with
+// the connection generation it arrived on, whether it asked for a new
+// token or renewed the current one, and the moment it arrived.
+type opnRecord struct {
+	Conn int
+	Type ua.SecurityTokenRequestType
+	At   time.Time
 }
 
 // requestRecord is one service request the peer decoded off the wire,
@@ -225,12 +246,17 @@ type closeRecord struct {
 }
 
 // peerRecord is what the peer saw, frozen while its connections may
-// still be live: the connections it accepted, the requests it decoded
-// with the generation each arrived on, and the connections whose reads
-// ended. The ServiceFault row reads all three to tell a client that
-// stayed on one connection from one that came back on a second.
+// still be live: the connections it accepted, the OPNs it answered -
+// each with the generation it arrived on and whether it asked for a
+// new token or renewed the current one - the requests it decoded with
+// the generation each arrived on, and the connections whose reads
+// ended. The ServiceFault row reads the accepts, requests and closes
+// to tell a client that stayed on one connection from one that came
+// back on a second; the expired-token row reads the OPNs to tell a
+// renewal that arrived from one that never did.
 type peerRecord struct {
 	Accepts  []acceptRecord
+	OPNs     []opnRecord
 	Requests []requestRecord
 	Closed   []closeRecord
 }
@@ -245,6 +271,7 @@ type scriptedPeer struct {
 
 	mu       sync.Mutex
 	accepts  []acceptRecord
+	opns     []opnRecord
 	requests []requestRecord
 	closed   []closeRecord
 	conns    []net.Conn
@@ -303,10 +330,13 @@ func (p *scriptedPeer) serve() {
 // serveConn plays the script on one connection: the shared HEL/ACK
 // exchange, then the client's chunks until the connection's reads end.
 // An OPN is answered with the script's token - issue for a request of
-// type Issue, renew for a renewal - and a MSG is recorded and handed to
-// the script's answer, whose response is stamped with the peer's next
-// sequence number, or the next of msgSeqs when the script set them. A
-// CLO is recorded and never answered; the connection's end is still
+// type Issue, renew for a renewal - and recorded in the peer's OPN
+// records with its type; and a MSG is recorded and handed to the
+// script's answer, whose response is stamped with the peer's next
+// sequence number, or the next of msgSeqs when the script set them,
+// and with the token the connection currently holds, or the one the
+// script's answerToken picked for that request.
+// A CLO is recorded and never answered; the connection's end is still
 // read afterwards, so the row sees the connection go. Every encode
 // failure and every write the peer could not complete is the peer's
 // own, a decline that records the connection's close and nothing
@@ -362,6 +392,7 @@ func (p *scriptedPeer) serveConn(connID int, c net.Conn) {
 				p.noteClientBytes(fmt.Errorf("an OPN chunk carried %T, not an OpenSecureChannelRequest", req))
 				return
 			}
+			p.noteOPN(connID, opn.RequestType)
 			token = p.script.renew
 			if opn.RequestType == ua.SecurityTokenRequestTypeIssue {
 				token = p.script.issue
@@ -396,7 +427,13 @@ func (p *scriptedPeer) serveConn(connID int, c net.Conn) {
 				s = p.script.msgSeqs[answered]
 			}
 			answered++
-			chunk, err := codec.encodeMSG(token.channelID, token.tokenID, s, reqID, resp)
+			stamp := token
+			if p.script.answerToken != nil {
+				if t := p.script.answerToken(req); t != nil {
+					stamp = *t
+				}
+			}
+			chunk, err := codec.encodeMSG(stamp.channelID, stamp.tokenID, s, reqID, resp)
 			if err != nil {
 				p.noteFixture(fmt.Errorf("encode a MSG response: %w", err))
 				return
@@ -422,6 +459,15 @@ func (p *scriptedPeer) serveConn(connID int, c net.Conn) {
 			return
 		}
 	}
+}
+
+// noteOPN records one OpenSecureChannelRequest the peer answered,
+// with the connection generation it arrived on and whether it asked
+// for a new token or renewed the current one.
+func (p *scriptedPeer) noteOPN(connID int, requestType ua.SecurityTokenRequestType) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.opns = append(p.opns, opnRecord{Conn: connID, Type: requestType, At: time.Now()})
 }
 
 // noteRequest records one request the peer decoded, with the
@@ -488,6 +534,7 @@ func (p *scriptedPeer) record() peerRecord {
 	defer p.mu.Unlock()
 	return peerRecord{
 		Accepts:  append([]acceptRecord(nil), p.accepts...),
+		OPNs:     append([]opnRecord(nil), p.opns...),
 		Requests: append([]requestRecord(nil), p.requests...),
 		Closed:   append([]closeRecord(nil), p.closed...),
 	}
