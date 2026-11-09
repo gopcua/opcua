@@ -56,10 +56,10 @@
 // skipped arm, skipping 3 - using the harness's msgSeqs script. The
 // first answer's body must reach the caller on both arms before the
 // violated one is scored: it grounds the arm's rejection - a client
-// that rejects every chunk, no sequence check at all, would
-// otherwise read the same as the fix. It comes first because a
-// fixed client closes the channel on the violated answer, as §6.7.7
-// orders, and would leave a later ground undelivered.
+// that rejects every chunk would otherwise read the same as the
+// fix. It comes first because a fixed client closes the channel on
+// the violated answer, as §6.7.7 orders, and would leave a later
+// ground undelivered.
 // See harness.go.
 //
 // The row asserts that the reused arm's client does not hand the
