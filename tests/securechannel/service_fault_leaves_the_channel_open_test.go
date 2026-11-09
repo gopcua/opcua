@@ -38,20 +38,20 @@
 // from an unfixed one, and the row does not score what it cannot
 // separate. Connect itself sends a Read of the namespace array,
 // NodeID i=2255, before the row sends any request of its own, and an
-// unfixed client's reconnect sends that Read again on its own, so
-// when a Read is sent cannot tell the row's Reads apart: the row
-// marks its own Reads with a MaxAge no Connect or reconnect Read
-// carries, the script faults only the first marked Read - with a
-// ServiceFault carrying Bad_TooManyOperations - and answers every
-// other Read normally, the second marked one included, and the
-// records are read back by that mark. The peer answers CreateSession
-// and ActivateSession normally, and it keeps serving connections, so
-// everything a client does to come back - a new connection, a new
-// HEL/ACK and OPN, the activation again - is visible in its records.
-// The Read answers the script sends - Connect's own, and every marked
-// Read but the faulted one - are built by the harness's readResponse,
-// and the check that the faulted Read returned the injected status is
-// the harness's isServiceFault.
+// unfixed client's reconnect sends that Read again on its own, so the
+// moment a Read is sent cannot tell the row's Reads from the
+// library's: the row marks its own Reads with a MaxAge no Connect or
+// reconnect Read carries, the script faults only the first marked
+// Read - with a ServiceFault carrying Bad_TooManyOperations - and
+// answers every other Read normally, the second marked one included,
+// and the records are read back by that mark. The peer answers
+// CreateSession and ActivateSession normally, and it keeps serving
+// connections, so everything a client does to come back - a new
+// connection, a new HEL/ACK and OPN, the activation again - is
+// visible in its records. The Read answers the script sends -
+// Connect's own, and every marked Read but the faulted one - are
+// built by the harness's readResponse, and the check that the faulted
+// Read returned the injected status is the harness's isServiceFault.
 // See harness.go.
 //
 // The row asserts, from the peer's records alone, that the second
@@ -72,40 +72,40 @@
 // connection, the channel closed or replaced on the original
 // connection - and only a window that closes holding none of the four
 // is a kept channel. The fourth fact catches the drop that keeps the
-// TCP connection open, and a fixed tree cannot show it in the run: the
-// client's only OPN after the channel opens is its renewal, 75 % of
-// the hour-long token away and asking for a Renew, and the CLO the
+// TCP connection open, and a fixed tree cannot show it in the run:
+// the client's only OPN after the channel opens is its renewal, 75 %
+// of the hour-long token away and asking for a Renew, and the CLO the
 // client's own close at teardown sends lands after the row has
 // scored. The original connection's end counts as evidence only when
 // the client ended it: the harness's read bound ends a connection
 // that sat idle that long, and the close it leaves looks in the
 // records exactly like a client's own, so a window of the bound or
 // longer would score a fixed client's quiet connection as the
-// original connection ending - a false drop, which a cold author hit
-// on PR #904's tree - which is why the close records mark the bound's
-// ends and the row does not count them. A fixed client merely waits
-// the window out, and waiting only observes, so every fact the window
-// scores was put in the records by the client's own teardown or not
-// at all; the one verdict a window can get wrong now is kept - never
-// drop - when it closes before a teardown puts its facts in the
-// records, and a teardown that lands after the window looks to the
-// row exactly like the fix: the row cannot tell the two apart, which
-// is why the window's bound is generous against the milliseconds the
-// unfixed monitor's teardown takes. The second marked Read is sent
-// while a reconnect may be in flight on an unfixed tree - a client
-// between channels may refuse the send - so the row retries it within
-// a bound until the peer has decoded it, and only what the peer
-// received is scored, never the error a refused send returned. It
-// declines, and does not score, when the fixture fails its half: the
-// peer's own failure, the initial connect failing, the fault not
-// answering the first marked Read, the second marked Read neither
-// arriving nor the channel being dropped. A frame the harness flags
-// as the client's own bytes is not a decline: the setup check reports
-// it as gopcua's own behaviour, and the row scores the run as
-// gopcua's failure with t.Errorf, never declines it. The knownBug
-// constant records that gopcua does not do this yet: the receive path
-// bubbles a Bad serviceResult into the message's error at
-// uasc/secure_channel.go:426 (if status :=
+// original connection ending - a false drop, which an earlier draft
+// of this row hit on PR #904's tree - which is why the close records
+// mark the bound's ends and the row does not count them. A fixed
+// client merely waits the window out, and waiting only observes, so
+// every fact the window scores was put in the records by the client's
+// own teardown or not at all; the one verdict a window can get wrong
+// now is kept - never drop - when it closes before a teardown puts
+// its facts in the records, and a teardown that lands after the
+// window looks to the row exactly like the fix: the row cannot tell
+// the two apart, which is why the window's bound is generous against
+// the milliseconds the unfixed monitor's teardown takes. The second
+// marked Read is sent while a reconnect may be in flight on an
+// unfixed tree - a client between channels may refuse the send - so
+// the row retries it within a bound until the peer has decoded it,
+// and only what the peer received is scored, never the error a
+// refused send returned. It declines, and does not score, when the
+// fixture fails its half: the peer's own failure, the initial connect
+// failing, the fault not answering the first marked Read, the second
+// marked Read neither arriving nor the channel being dropped. A frame
+// the harness flags as the client's own bytes is not a decline: the
+// setup check reports it as gopcua's own behaviour, and the row
+// scores the run as gopcua's failure with t.Errorf, never declines
+// it. The knownBug constant records that gopcua does not do this yet:
+// the receive path bubbles a Bad serviceResult into the message's
+// error at uasc/secure_channel.go:426 (if status :=
 // resp.Header().ServiceResult; status != ua.StatusOK { msg.Err =
 // status }), the dispatcher forwards that error to the client's
 // channel-error path at uasc/secure_channel.go:274 (case s.errch <-
