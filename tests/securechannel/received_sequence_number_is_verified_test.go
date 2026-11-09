@@ -63,16 +63,18 @@
 // why the arms key on the body - and a receiver with no sequence
 // check at all accepts both, so the second arm separates a partial
 // check from none. Each arm scores its own violation alone. It
-// deliberately asserts nothing about which error the client
-// returns, and nothing about a dialling behaviour:
-// the clause's "force a reconnect" is scored as the channel the
-// client closes, not as a redial. A fixed client rejects the arm's
-// chunk and closes the channel - "If an error occurs during Message
-// verification the receiver shall close the communication channel."
-// - and that closed channel, read in the peer's close records, is
-// the arm's pass, never a decline: the client owes each arm the one
-// request whose answer is scored, and a channel closed on the first
-// rejection never owes a second. It declines, and does not score,
+// deliberately asserts nothing about which error the client returns,
+// and nothing about a dialling behaviour: the clause's "force a
+// reconnect" shows as the channel the client closes, not as a redial.
+// A fixed client rejects the arm's chunk and closes the channel - "If
+// an error occurs during Message verification the receiver shall close
+// the communication channel." - and the arm's pass is the response
+// body never arriving, per the README's definition of the phrase; a
+// close in the peer's close records corroborates that pass and is not
+// required for it, and a close is never a decline: the client owes each
+// arm the one request whose answer is scored, and a channel closed on
+// the first rejection never owes a second. It declines, and does not
+// score,
 // when the fixture fails its half - the peer's own failure, a frame
 // the harness flags as the client's own bytes, the channel never
 // opening, the arm's request never arriving - and it scores, never

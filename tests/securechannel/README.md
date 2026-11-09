@@ -94,16 +94,19 @@ request returns along the way.
 Every row declines when the fixture fails its half of the exchange: the
 peer's own failure - its encoding, a write it could not complete, the
 ACK not going out - no OPN, no session request where the row's story
-needs one. Bytes the peer's framing rejects - a bad header, an
-out-of-range size, an ERR frame - and a chunk the codec cannot decode
-can only be the client's own, so the harness's `setupCheck` reports them
-as gopcua's behaviour, not as a decline; the same split names a
-connection that merely ended - a close, a reset, a teardown - a fact the
-rows read in the close records. Two rows score what they see and never
-decline on the client's own confusion: the lifetime row's skewed arm has
-no decline of its own, because what a client does with a backdated
-token is the behaviour it scores, and the expired-token row scores a
-client whose own behaviour leaves the arm unscoreable. Each row's header
+needs one; a write the peer could not complete records its fixture
+reason beside the close record, so `setupCheck` declines it by name.
+Bytes the peer's framing rejects - a bad header, an out-of-range size,
+an ERR frame - and a chunk the codec cannot decode can only be the
+client's own, so the harness's `setupCheck` reports them as gopcua's
+behaviour, not as a decline; the same split names a connection that
+merely ended - a close, a reset, a teardown - a fact the rows read in
+the close records. Two rows score what they see rather than decline on
+the client's own confusion: the lifetime row's skewed arm has no decline
+of its own, because what a client does with a backdated token is the
+behaviour it scores; the expired-token row's scored arm scores a client
+whose own behaviour leaves the arm unscoreable, and its control arm
+declines, because the instrument check never ran. Each row's header
 says which stages its own check covers; the check the rows share is
 `setupCheck` in `harness.go`.
 

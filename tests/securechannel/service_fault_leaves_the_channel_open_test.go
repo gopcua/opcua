@@ -37,48 +37,50 @@
 // without touching the wire, so the wire cannot separate a fixed tree
 // from an unfixed one, and the row does not score what it cannot
 // separate. Connect itself sends a Read of the namespace array,
-// NodeID i=2255, before the row sends any request of its own, so the
-// row's first Read is told apart by when it is sent: the fault is
-// armed only after Connect returns, the script answers Connect's
-// own Read normally, and the first Read the row sends after that
-// return is the one that draws a ServiceFault carrying
-// Bad_TooManyOperations, the second the one answered normally. The
+// NodeID i=2255, before the row sends any request of its own, and an
+// unfixed client's reconnect sends that Read again on its own, so when
+// a Read is sent cannot tell the row's Reads apart: the row marks its
+// own Reads with a MaxAge no Connect or reconnect Read carries, the
+// script faults only the first marked Read - with a ServiceFault
+// carrying Bad_TooManyOperations - and answers every other Read
+// normally, the second marked one included, and the records are read
+// back by that mark. The
 // peer answers CreateSession and ActivateSession normally, and it
 // keeps serving connections, so everything a client does to come
 // back - a new connection, a new HEL/ACK and OPN, the activation
 // again - is visible in its records.
 // See harness.go.
 //
-// The row asserts, from the peer's records alone, that the second Read
-// was answered on the original connection - the same connection
-// generation, no new connection accepted, the original connection
-// never ended after the fault - and it deliberately asserts nothing
-// about the error the faulted Read returned beyond the setup check
-// that it was the injected one, nothing about the session, and
+// The row asserts, from the peer's records alone, that the second
+// marked Read was answered on the original connection - the same
+// connection generation, no new connection accepted, the original
+// connection never ended after the fault - and it deliberately asserts
+// nothing about the error the faulted Read returned beyond the setup
+// check that it was the injected one, nothing about the session, and
 // nothing about which error a fixed client logs. The client's monitor
 // tears down and redials on its own goroutine, so the drop is not in
 // the peer's records the moment the row's calls return: a body that
-// read them then scored the unfixed tree as kept, a false pass. The
-// row waits out a settle window before scoring the channel kept: it
-// polls the peer's records for the drop evidence - a new connection
-// accepted, the original connection ended, the second Read arriving
-// on a later connection - and only a window that closes holding none
-// of the three is a kept channel. A fixed client merely waits the
-// window out, and the window cannot produce a false pass in the
-// other direction: waiting only observes, so a drop is scored solely
-// where the client's own teardown put the facts, and the one verdict
-// a window could get wrong is kept - never drop - which is why the
-// window's bound is generous against the milliseconds the unfixed
-// monitor's teardown takes. The second Read is sent while a
-// reconnect may be in flight on an unfixed tree - a client between
-// channels may refuse the send - so the row retries it within a bound
-// until the peer's records hold it, and only the peer's records are
-// scored, never the error a refused send returned. It declines, and
-// does not score, when the fixture fails its half: the peer's own
-// failure, a frame the harness flags as the client's own bytes, the
-// initial connect failing, the fault not answering the row's first
-// Read, the second Read neither arriving nor the channel being
-// dropped. The knownBug constant records that gopcua does not do
+// read them then scored the unfixed tree as kept, a false pass. The row
+// waits out a settle window before scoring the channel kept: it polls
+// the peer's records for the drop evidence - a new connection accepted,
+// the original connection ended, the second marked Read arriving on a
+// later connection - and only a window that closes holding none of the
+// three is a kept channel. A fixed client merely waits the window out,
+// and the window cannot produce a false pass in the other direction:
+// waiting only observes, so a drop is scored solely where the client's
+// own teardown put the facts, and the one verdict a window could get
+// wrong is kept - never drop - which is why the window's bound is
+// generous against the milliseconds the unfixed monitor's teardown
+// takes. The second marked Read is sent while a reconnect may be in
+// flight on an unfixed tree - a client between channels may refuse the
+// send - so the row retries it within a bound until the peer's records
+// hold it, and only the peer's records are scored, never the error a
+// refused send returned. It declines, and does not score, when the
+// fixture fails its half: the peer's own failure, a frame the harness
+// flags as the client's own bytes, the initial connect failing, the
+// fault not answering the first marked Read, the second marked Read
+// neither arriving nor the channel being dropped. The knownBug
+// constant records that gopcua does not do
 // this yet: the receive path bubbles a Bad serviceResult into the
 // message's error at uasc/secure_channel.go:426 (if status :=
 // resp.Header().ServiceResult; status != ua.StatusOK { msg.Err =
@@ -89,8 +91,9 @@
 // recreating the secure channel (client.go:380, client.go:416), so on
 // main the faulted Read is followed by a teardown and a redial. The
 // knownBug arm is the drop: a new connection accepted, the original
-// connection ended, or the second Read arriving on a later connection
-// after the fault, each of which a fixed client does not show; what
+// connection ended, or the second marked Read arriving on a later
+// connection after the fault, each of which a fixed client does not
+// show; what
 // deletes the constant is the fix that stops a service-level fault
 // from being treated as a channel error, as PR #904 does; measured on
 // PR #911 the row still fails, because that fix touches the token's

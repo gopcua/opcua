@@ -344,8 +344,8 @@ func (p *scriptedPeer) serve() {
 // A CLO is recorded and never answered; the connection's end is still
 // read afterwards, so the row sees the connection go. Every encode
 // failure and every write the peer could not complete is the peer's
-// own, a decline that records the connection's close and nothing
-// else - a write the peer could not complete is never the client's
+// own, a decline that records its fixture reason and the connection's
+// close - a write the peer could not complete is never the client's
 // bytes; the opening exchange fails the same way on the peer's side,
 // with scriptedpeer.HelloAck's ErrPeerSide. Every chunk the codec
 // cannot decode, and every frame off script, can only be the client's
@@ -359,13 +359,14 @@ func (p *scriptedPeer) serveConn(connID int, c net.Conn) {
 	uc, err := scriptedpeer.HelloAck(c.(*net.TCPConn), peerAck)
 	if err != nil {
 		// The three outcomes of the opening exchange: the peer's own
-		// failure records the connection's close and nothing else, so
-		// the row declines; a frame that is not a HEL is the client's
+		// failure records the fixture reason and the connection's close,
+		// so the row declines; a frame that is not a HEL is the client's
 		// own bytes; a receive error keeps the ended-connection split.
 		var off *scriptedpeer.OffScriptError
 		switch {
 		case errors.Is(err, scriptedpeer.ErrPeerSide):
 			p.noteClose(connID)
+			p.noteFixture(err)
 		case errors.As(err, &off):
 			p.noteClientBytes(off)
 		default:
@@ -410,6 +411,7 @@ func (p *scriptedPeer) serveConn(connID int, c net.Conn) {
 			}
 			if _, err := uc.Write(resp); err != nil {
 				p.noteClose(connID)
+				p.noteFixture(fmt.Errorf("write the OpenSecureChannelResponse: %w", err))
 				return
 			}
 
@@ -445,6 +447,7 @@ func (p *scriptedPeer) serveConn(connID int, c net.Conn) {
 			}
 			if _, err := uc.Write(chunk); err != nil {
 				p.noteClose(connID)
+				p.noteFixture(fmt.Errorf("write a MSG response: %w", err))
 				return
 			}
 			seq = s
@@ -485,9 +488,11 @@ func (p *scriptedPeer) noteRequest(connID int, req ua.Request) {
 
 // noteClose records that connID's exchange ended - a write the peer
 // could not complete, or the opening exchange failing on the peer's
-// side - and nothing else: the row reads the close in its records, and
-// the run stays a decline, because a write the peer could not complete
-// is never the client's bytes.
+// side - and nothing else: the row reads the close in its records. A
+// close alone carries no reason, so a caller that records it for a
+// failure of the peer's own also records the fixture reason, and the
+// setup check declines the run while the close record stays; a write
+// the peer could not complete is never the client's bytes.
 func (p *scriptedPeer) noteClose(connID int) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
