@@ -42,42 +42,42 @@
 // because no other row calls it - and the codec derives each token's
 // keys from the request it is answering: under Basic256Sha256 a
 // token's symmetric keys come from the ClientNonce of the OPN that
-// drew them and the ServerNonce of the response that carried them,
-// so the harness hands the codec the decoded OPN, and the row's codec
-// mints each token's keys off that pair. The row runs in two arms that
-// differ only in the ids the peer hands out, each arm on a peer of its
-// own with a client of its own. Each arm's client is the real
-// opcua.Client, driven through Dial and no further: Connect would send
-// CreateSession, ActivateSession and a Read of its own, each of
+// drew them and the ServerNonce of the response that carried them, so
+// the harness hands the codec the decoded OPN, and the row's codec
+// mints each token's keys off that pair. The row runs in two arms
+// that differ only in the ids the peer hands out, each arm on a peer
+// of its own with a client of its own. Each arm's client is the real
+// opcua.Client, driven through Dial and no further: Connect would
+// send CreateSession, ActivateSession and a Read of its own, each of
 // which would consume answers the script has not chosen for it, and
-// the row's one scored request is a raw Read it sends and bounds
-// itself. The peer hands out a short token and answers the client's
-// own renewal with a new token id on the same channel - a number
-// the issue token never carried, so the channel holds two tokens to
-// tell apart - and the row's Read goes out only after the old token's
+// the row's scored requests are the raw Reads it sends and bounds.
+// The peer hands out a short token and answers the client's own
+// renewal with a new token id on the same channel - a number the
+// issue token never carried, so the channel holds two tokens to tell
+// apart - and the row's Read goes out only after the old token's
 // lifetime plus 25 % has passed on the client's clock, so the
 // stimulus is expired on any tree that measures the window correctly.
-// The peer answers that Read with a
-// response chunk whose symmetric security header carries the old,
-// expired token id and whose signature is made with the old token's
-// keys, chosen with the harness's answerToken script: the scored
-// arm's server assigned a channel id that differs from the token
-// id, the control arm's the same number, and the ids are all that
-// separates them. The arm then sends a second Read, which the peer
-// answers with a chunk secured with the renewed token - the first
-// Message from the server secured with the new SecurityToken, the
-// event OPC 10000-6 §6.7.4 names - and its body must reach the
-// caller on both arms: on the control arm it is the instrument
-// check's positive half, a client that accepts a chunk the live
-// token secures, so its rejection of the old-token chunk is
-// grounded in the token; on the scored arm it is the precondition
-// for the deletion demand, because a client that rejects every
-// chunk - a channel dead for every token, against the continuation
-// duty §6.7.4 asks - would otherwise read the same as the fix. A
-// client that closes the channel on the failed check, as §6.7.7
-// orders, leaves the renewed answer undelivered too, and the row
-// declines it: the demand is earned by a fix that keeps the
-// channel alive, as the candidate rekeying does.
+// The peer answers that Read with a response chunk whose symmetric
+// security header carries the old, expired token id and whose
+// signature is made with the old token's keys, chosen with the
+// harness's answerToken script: the scored arm's server assigned a
+// channel id that differs from the token id, the control arm's the
+// same number, and the ids are all that separates them. The arm then
+// sends a second Read, which the peer answers with a chunk secured
+// with the renewed token - the first Message from the server secured
+// with the new SecurityToken, the event OPC 10000-6 §6.7.4 names -
+// and its body must reach the caller on both arms: on the control arm
+// it is the instrument check's positive half, a client that accepts a
+// chunk the live token secures, so its rejection of the old-token
+// chunk is grounded in the token. On the scored arm it is the
+// precondition for the demand to delete the knownBug constant,
+// because a client that rejects every chunk - a channel dead for
+// every token, against §6.7.4's continuation duty - would otherwise
+// read the same as the fix. A client that closes the channel on the
+// failed check, as §6.7.7 orders, leaves the renewed answer
+// undelivered too, and the row declines it: the demand is earned by a
+// fix that keeps the channel alive, as the candidate rekeying - the
+// channel-id fix named further down this header - does.
 // See harness.go.
 //
 // The row asserts that the scored arm's client does not hand the
@@ -163,13 +163,13 @@ import (
 )
 
 // tokenLifetime is the short lifetime the peer's issue token carries.
-// Measured on this tree the client renews at half of it and wipes
+// Measured on this tree, the client renews at half of it and wipes
 // the expired instance at its end - the 75 % and 125 % factors
 // truncate to whole seconds in uasc - so the arm's Read goes out
-// 900 ms past the wipe, not the 400 ms graceWait sits past the
-// window the specification names, and the stimulus is expired on
-// any tree that measures the window correctly either way. Two
-// seconds keep the arm's
+// 900 ms past the wipe, not the 400 ms by which graceWait sits
+// past the window the specification names, and the stimulus is
+// expired on any tree that measures the window correctly either
+// way. Two seconds keep the arm's
 // whole wait short while leaving half a lifetime between the renewal
 // and the expiry, so a renewal that runs late on a loaded machine
 // still lands before the window the Read waits out.
@@ -188,8 +188,8 @@ const renewalLifetime = time.Minute
 // later, which the same wait covers. The wipe is a timer on a
 // goroutine, and the wait gives the goroutine time to fire and its
 // wipe to land on a loaded machine; a delay that outruns the wait
-// on the scored arm alone logs the known bug on a fixed tree, which
-// the row cannot tell apart.
+// on the scored arm alone logs the known bug on a fixed tree, and
+// the row cannot tell it from a real one.
 const graceWait = 400 * time.Millisecond
 
 // dialBound bounds each arm's Dial and the client's close at the
@@ -206,7 +206,7 @@ const dialBound = 10 * time.Second
 // the loopback in milliseconds, and one slower than the bound is
 // indistinguishable from a rejection on both arms. readBound sits
 // under the harness's read bound (harness.go), so the peer's
-// connection is never released for idling before the Read returns.
+// connection is never released for idling before a Read returns.
 const readBound = 3 * time.Second
 
 // The token ids the peer hands out: the issue token's id, and the
@@ -246,7 +246,7 @@ func TestExpiredSecurityTokenIsRejected(t *testing.T) {
 	// arm's Read never reaching the peer, the old-token response
 	// handed to the caller, the renewed-token answer not handed
 	// to it - each leaves the check unrun or its rejection
-	// ungrounded, whichever side caused them.
+	// ungrounded, whichever side caused the decline.
 	control, teardown := runRejectionArm(controlChannelID)
 	t.Cleanup(teardown)
 	if control.setupWhy != "" {
@@ -275,8 +275,8 @@ func TestExpiredSecurityTokenIsRejected(t *testing.T) {
 	}
 	if !control.renewedResponseArrived {
 		t.Fatalf("could not set the test up: the control arm's client did " +
-			"not hand the renewed-token answer to its caller, so the " +
-			"instrument check never ran")
+			"not hand the renewed-token answer to its caller, so its " +
+			"rejection of the old-token chunk is not grounded in the token")
 	}
 
 	scored, teardown := runRejectionArm(scoredChannelID)
@@ -324,10 +324,10 @@ func TestExpiredSecurityTokenIsRejected(t *testing.T) {
 	case knownBug != "":
 		t.Errorf("this now passes (both arms rejected the old-token " +
 			"response, so its body never arrived at either caller, and " +
-			"both carried the renewed-token answer, so neither channel " +
-			"was dead) - delete the knownBug constant, every arm that " +
-			"reads it, and anything only those arms used, in the commit " +
-			"that fixed it")
+			"both handed the renewed-token answer to their callers, so " +
+			"neither channel was dead) - delete the knownBug constant, " +
+			"every arm that reads it, and anything only those arms " +
+			"used, in the commit that fixed it")
 	default:
 		t.Logf("both arms rejected the old-token response: neither caller " +
 			"saw the body")
@@ -358,7 +358,7 @@ type rejectionArmOutcome struct {
 // lifetime plus its 25 % grace window, then sends two Reads, each
 // bounded by readBound: the peer answers the first with a
 // response chunk stamped with the old, expired token and signed
-// with the old token's keys and the second with a chunk secured
+// with the old token's keys, and the second with a chunk secured
 // with the renewed token, mapped by the script's answerToken
 // hook. It returns what the arm's run left to score and the
 // peer's teardown for the row to register with t.Cleanup; keys
@@ -395,7 +395,8 @@ func runRejectionArm(channelID uint32) (o rejectionArmOutcome,
 		createdAt: createdAt,
 		lifetime:  uint32(renewalLifetime / time.Millisecond),
 	}
-	// readAnswers is counted on a serve goroutine, so it must be atomic.
+	// readAnswers is counted on the peer's serve goroutines, one per
+	// connection, so the count must be atomic.
 	var readAnswers atomic.Uint32
 	peer, teardown, why := startPeer(peerScript{
 		issue: issue,
@@ -462,7 +463,7 @@ func runRejectionArm(channelID uint32) (o rejectionArmOutcome,
 		}
 	}
 	if o.renewalSeen {
-		read := func() bool {
+		bodyArrived := func() bool {
 			readCtx, cancel := context.WithTimeout(context.Background(), readBound)
 			res, _ := client.Read(readCtx, &ua.ReadRequest{
 				NodesToRead: []*ua.ReadValueID{{
@@ -475,8 +476,8 @@ func runRejectionArm(channelID uint32) (o rejectionArmOutcome,
 			// returned along the way.
 			return res != nil
 		}
-		o.responseArrived = read()
-		o.renewedResponseArrived = read()
+		o.responseArrived = bodyArrived()
+		o.renewedResponseArrived = bodyArrived()
 	}
 
 	closeCtx, cancel := context.WithTimeout(context.Background(), dialBound)
@@ -602,8 +603,8 @@ func (c *signCodec) decodeOPN(chunk *uasc.MessageChunk,
 	}
 	clientCert, err := uapolicy.ParseCertificate(ash.SenderCertificate)
 	if err != nil {
-		return nil, 0, fmt.Errorf(
-			"parse the client's certificate from the OPN: %w", err)
+		return nil, 0, fmt.Errorf("parse the client's certificate from "+
+			"the OPN: %w", err)
 	}
 	clientKey, ok := clientCert.PublicKey.(*rsa.PublicKey)
 	if !ok {
@@ -626,8 +627,8 @@ func (c *signCodec) decodeOPN(chunk *uasc.MessageChunk,
 	copy(b, frame)
 	plaintext, err := algo.Decrypt(b[headerLength:])
 	if err != nil {
-		return nil, 0, fmt.Errorf(
-			"decrypt the OPN chunk's encrypted region: %w", err)
+		return nil, 0, fmt.Errorf("decrypt the OPN chunk's "+
+			"encrypted region: %w", err)
 	}
 	b = append(b[:headerLength], plaintext...)
 	sigLength := algo.RemoteSignatureLength()
@@ -665,8 +666,8 @@ func (c *signCodec) decodeSymmetric(chunk *uasc.MessageChunk,
 	sym := c.syms[tokenID]
 	c.mu.Unlock()
 	if sym == nil {
-		return nil, 0, fmt.Errorf(
-			"no symmetric keys minted for the token id %d", tokenID)
+		return nil, 0, fmt.Errorf("no symmetric keys minted for the "+
+			"token id %d", tokenID)
 	}
 	sigLength := sym.RemoteSignatureLength()
 	headerLength := 12 + chunk.SymmetricSecurityHeader.Len()
@@ -698,8 +699,8 @@ func decodeServiceBody(data []byte) (ua.Request, uint32, error) {
 	}
 	req, ok := svc.(ua.Request)
 	if !ok {
-		return nil, 0, fmt.Errorf(
-			"the chunk's body is %T, not a service request", svc)
+		return nil, 0, fmt.Errorf("the chunk's body is %T, "+
+			"not a service request", svc)
 	}
 	return req, seq.RequestID, nil
 }
@@ -810,8 +811,8 @@ func (c *signCodec) encodeMSG(channelID, tokenID, seq, reqID uint32,
 	sym := c.syms[tokenID]
 	c.mu.Unlock()
 	if sym == nil {
-		return nil, fmt.Errorf(
-			"no symmetric keys minted for the token id %d", tokenID)
+		return nil, fmt.Errorf("no symmetric keys minted for the "+
+			"token id %d", tokenID)
 	}
 	m := &uasc.Message{
 		MessageHeader: &uasc.MessageHeader{
