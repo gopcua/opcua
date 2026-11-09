@@ -46,20 +46,20 @@
 // chosen for it, and no session and no monitor - Dial starts
 // neither - is what makes the arm's Reads the whole exchange the
 // row scores. Each arm's peer answers the OPN with a response whose
-// SequenceNumber is 1 - its first chunk on the channel - and the
-// arm's two requests, raw Reads the row itself sends and bounds
-// with contexts of their own, with two answer chunks: the first
-// carries the peer's correct next number, 2, and the second the
-// violated number the arm is given - 2 again in the reused arm, a
-// reuse of the first answer's number within the same TokenId, and
-// 4 in the skipped arm, skipping 3 - using the harness's msgSeqs
-// script. The first answer's body must reach the caller on both
-// arms before the violated one is scored: it grounds the arm's
-// rejection - a client that rejects every chunk, no sequence check
-// at all, would otherwise read the same as the fix - and it comes
-// first because a fixed client closes the channel on the violated
-// answer, as §6.7.7 orders, and would leave a later ground
-// undelivered.
+// SequenceNumber is 1 - its first chunk on the channel. The arm's
+// two requests, raw Reads the row itself sends and bounds with
+// contexts of their own, the peer answers with two answer chunks:
+// the first - the well-formed answer, the arm's ground - carries
+// the peer's correct next number, 2, and the second the violated
+// number the arm is given - 2 again in the reused arm, a reuse of
+// the first answer's number within the same TokenId, and 4 in the
+// skipped arm, skipping 3 - using the harness's msgSeqs script. The
+// first answer's body must reach the caller on both arms before the
+// violated one is scored: it grounds the arm's rejection - a client
+// that rejects every chunk, no sequence check at all, would
+// otherwise read the same as the fix. It comes first because a
+// fixed client closes the channel on the violated answer, as §6.7.7
+// orders, and would leave a later ground undelivered.
 // See harness.go.
 //
 // The row asserts that the reused arm's client does not hand the
@@ -70,33 +70,33 @@
 // Read returning its own timeout error, and a fixed client returns
 // the closed channel's error instead, which is why the arms key on
 // the body - and a receiver with no sequence check at all accepts
-// both, so the first arm separates a partial check from none, and
-// the second a partial fix from the whole one. Each arm scores its
-// own violation alone. It deliberately asserts nothing about which
-// error the client returns, and nothing about a dialling behaviour:
-// the clause's "force a reconnect" shows as the channel the client
-// closes, not as a redial. A fixed client rejects the arm's chunk
-// and closes the channel - "If an error occurs during Message
-// verification the receiver shall close the communication
-// channel." - and the arm's pass is the response body never
-// arriving, per the README's definition of the phrase; a close in
-// the peer's close records corroborates that pass and is not
-// required for it, and a close is never a decline: the client owes
-// each arm its two requests, and a channel closed on the first
-// rejection never owes a request after the answer it rejected. It
-// declines, and does not score, when the fixture fails its half or
-// a stage the story needs never ran, whichever side caused it -
-// the peer's own failure, the channel never opening, the
-// well-formed answer never arriving at the caller - and it scores,
-// never declines, a client whose own behaviour leaves the run
-// unscoreable: a frame the harness flags as the client's own bytes
-// is that, the setup check's report of gopcua's own behaviour, and
-// so is the arm's Read never arriving at the peer - the setup check
-// holds the peer's half clean, so a Read that never arrives can
-// only be the client's own doing - a failure the row scores with
-// t.Errorf and never a decline. The knownBug constant records that
-// gopcua does not do this yet: the receive path decodes the
-// sequence header at uasc/secure_channel.go:520 (n, err :=
+// both, so the first arm separates a partial check from none, and the
+// second a partial fix from the whole one. Each arm scores its own
+// violation alone. It deliberately asserts nothing about which error
+// the client returns, and nothing about a dialling behaviour: the
+// clause's "force a reconnect" shows as the channel the client
+// closes, not as a redial. A fixed client rejects the arm's chunk and
+// closes the channel - "If an error occurs during Message
+// verification the receiver shall close the communication channel." -
+// and the arm's pass is the response body never arriving, per the
+// README's definition of the phrase; a close in the peer's close
+// records corroborates that pass and is not required for it, and a
+// close is never a decline: the client owes each arm its two
+// requests, and a channel closed on the first rejection never owes a
+// request after the answer it rejected. It declines, and does not
+// score, when the fixture fails its half or a stage the story needs
+// never ran, whichever side caused it - the peer's own failure, the
+// channel never opening, the well-formed answer never arriving at the
+// caller though its Read reached the peer - and it scores, never
+// declines, a client whose own behaviour leaves the run unscoreable:
+// a frame the harness flags as the client's own bytes is that, the
+// setup check's report of gopcua's own behaviour, and so is the arm's
+// Read never arriving at the peer - the setup check holds the peer's
+// half clean, so a Read that never arrives can only be the client's
+// own doing - a failure the row scores with t.Errorf and never a
+// decline. The knownBug constant records that gopcua does not do this
+// yet: the receive path decodes the sequence header at
+// uasc/secure_channel.go:520 (n, err :=
 // m.SequenceHeader.Decode(m.Data)) but never compares the number it
 // carries, a single-chunk message is returned without any look at it
 // (uasc/secure_channel.go:1231), and the only read of a received
@@ -114,10 +114,10 @@
 // accepting is still the known bug: a partial fix - a check that
 // catches a reused number and lets a skipped one by - stays logged
 // and visible, not mistaken for the whole fix; when both arms'
-// responses are rejected and both arms' well-formed answers handed
-// to their callers, that is a hard error telling whoever runs it to
-// delete the constant, every arm that reads it, and anything
-// only those arms used.
+// responses are rejected and both arms' well-formed answers handed to
+// their callers, that is a hard error telling whoever runs it to
+// delete the constant, every arm that reads it, and anything only
+// those arms used.
 //
 // No reference stack has been read for this behaviour; the measurement
 // on the trees this suite was authored against is the row's own.
@@ -144,8 +144,8 @@ const openBound = 10 * time.Second
 // answerBound bounds the arm's Reads, the ground Read and the scored
 // one. A healthy answer crosses the loopback in milliseconds; a
 // chunk a tree rejects reaches no handler, and the bound is what a
-// rejection costs the arm. One slower than the bound is
-// indistinguishable from a rejection on either arm. It sits under
+// rejection costs the arm. An answer slower than the bound is
+// indistinguishable from a rejection on both arms. It sits under
 // the harness's read bound (harness.go), so the peer's connection
 // is never released for idling before a Read returns.
 const answerBound = 5 * time.Second
@@ -178,12 +178,12 @@ func TestReceivedSequenceNumberIsVerified(t *testing.T) {
 		}
 		t.Fatalf("could not set the test up: %s", reused.setupWhy)
 	}
-	if !reused.readArrived {
-		t.Errorf("the reused arm's Read never reached the peer, so the " +
-			"arm scored nothing: the harness's setup check reports no " +
-			"failure on the peer's side, so the client's own behaviour " +
-			"stopped it, and that is scored as gopcua's failure, never " +
-			"declined")
+	if reused.readArrived < 2 {
+		t.Errorf("the reused arm's Reads never both reached the peer, " +
+			"so the arm scored nothing: the harness's setup check " +
+			"reports no failure on the peer's side, so the client's " +
+			"own behaviour stopped it, and that is scored as " +
+			"gopcua's failure, never declined")
 		return
 	}
 
@@ -197,12 +197,12 @@ func TestReceivedSequenceNumberIsVerified(t *testing.T) {
 		}
 		t.Fatalf("could not set the test up: %s", skipped.setupWhy)
 	}
-	if !skipped.readArrived {
-		t.Errorf("the skipped arm's Read never reached the peer, so the " +
-			"arm scored nothing: the harness's setup check reports no " +
-			"failure on the peer's side, so the client's own behaviour " +
-			"stopped it, and that is scored as gopcua's failure, never " +
-			"declined")
+	if skipped.readArrived < 2 {
+		t.Errorf("the skipped arm's Reads never both reached the peer, " +
+			"so the arm scored nothing: the harness's setup check " +
+			"reports no failure on the peer's side, so the client's " +
+			"own behaviour stopped it, and that is scored as " +
+			"gopcua's failure, never declined")
 		return
 	}
 
@@ -257,7 +257,7 @@ func TestReceivedSequenceNumberIsVerified(t *testing.T) {
 type sequenceArmOutcome struct {
 	responseArrived bool
 	groundArrived   bool
-	readArrived     bool
+	readArrived     int
 	setupWhy        string
 	setupFromGopcua bool
 }
@@ -354,7 +354,7 @@ func runSequenceNumberArm(responseSeq uint32) (o sequenceArmOutcome,
 
 	for _, r := range peer.record().Requests {
 		if _, ok := r.Req.(*ua.ReadRequest); ok {
-			o.readArrived = true
+			o.readArrived++
 		}
 	}
 	o.setupWhy, o.setupFromGopcua = peer.setupCheck()
