@@ -57,8 +57,9 @@ import (
 // it waits for the client's next chunk. It only lets a slow machine
 // finish; it never waits out a broken one, because the teardown closes
 // the connection and the read ends. A read that the bound ends is a
-// fact the rows read in the peer's close records, not a failure of
-// either side on its own.
+// fact the rows read in the peer's close records - stamped as the
+// bound passing, so a row can tell it from a client ending the
+// connection - not a failure of either side on its own.
 const bound = 10 * time.Second
 
 // peerAck is the Acknowledge the scripted peer answers the HEL with:
@@ -244,10 +245,16 @@ type acceptRecord struct {
 }
 
 // closeRecord is one connection whose reads ended - a close, a reset,
-// an EOF - with the moment the peer noticed.
+// an EOF, the bound passing - with the moment the peer noticed, and
+// whether the bound ended it. The bound ending a connection is not a
+// client ending it: an idle connection the bound released looks in
+// every other respect like one the client shut, so a row that counts
+// a connection's end as evidence of a drop counts only the records
+// the bound did not make.
 type closeRecord struct {
-	Conn int
-	At   time.Time
+	Conn  int
+	At    time.Time
+	Bound bool
 }
 
 // peerRecord is what the peer saw, frozen while its connections may
@@ -255,10 +262,11 @@ type closeRecord struct {
 // each with the generation it arrived on and whether it asked for a
 // new token or renewed the current one - the requests it decoded with
 // the generation each arrived on, and the connections whose reads
-// ended. The ServiceFault row reads the accepts, requests and closes
-// to tell a client that stayed on one connection from one that came
-// back on a second; the expired-token row reads the OPNs to tell a
-// renewal that arrived from one that never did.
+// ended, each marked when it was the bound passing rather than a
+// client ending it. The ServiceFault row reads the accepts, requests
+// and closes to tell a client that stayed on one connection from one
+// that came back on a second; the expired-token row reads the OPNs
+// to tell a renewal that arrived from one that never did.
 type peerRecord struct {
 	Accepts  []acceptRecord
 	OPNs     []opnRecord
@@ -500,14 +508,18 @@ func (p *scriptedPeer) noteClose(connID int) {
 }
 
 // noteReadEnd records that connID's reads ended with err: a close
-// record for the row to read - and, unless the connection merely ended
-// or the bound passed, the client's own bytes, which the setup check
-// reports as gopcua's behaviour. The ended-connection split is the
-// shared scriptedpeer.ConnectionEnded; a read deadline is the bound
-// passing, which can close on either side and stays a fact the row
-// reads in the close records.
+// record for the row to read - stamped Bound when it was the bound
+// passing, an idle connection released, so only a client ending the
+// connection counts as evidence of a drop - and, unless the connection
+// merely ended or the bound passed, the client's own bytes, which the
+// setup check reports as gopcua's behaviour. The ended-connection
+// split is the shared scriptedpeer.ConnectionEnded; a read deadline is
+// the bound passing, which can close on either side and stays a fact
+// the row reads in the close records.
 func (p *scriptedPeer) noteReadEnd(connID int, err error) {
-	p.noteClose(connID)
+	p.mu.Lock()
+	p.closed = append(p.closed, closeRecord{Conn: connID, At: time.Now(), Bound: errors.Is(err, os.ErrDeadlineExceeded)})
+	p.mu.Unlock()
 	if scriptedpeer.ConnectionEnded(err) || errors.Is(err, os.ErrDeadlineExceeded) {
 		return
 	}
@@ -585,5 +597,42 @@ func responseHeader(handle uint32, status ua.StatusCode) *ua.ResponseHeader {
 		ServiceDiagnostics: &ua.DiagnosticInfo{},
 		StringTable:        []string{},
 		AdditionalHeader:   ua.NewExtensionObject(nil),
+	}
+}
+
+// isServiceFault reports whether err is the ServiceFault status a
+// row's script injected, which is how a fault reaches the caller on
+// every tree measured: the receive path hands the StatusCode itself
+// to the caller as the request's error, and errors.Is also finds a
+// tree that wraps it on the way. The rows use it for the check that
+// the fault their client reports is the one they injected, and score
+// nothing about the error's form.
+func isServiceFault(err error, status ua.StatusCode) bool {
+	return errors.Is(err, status)
+}
+
+// readResponse builds the well-formed ReadResponse the rows answer an
+// ordinary Read with: a response header built by responseHeader, and
+// one DataValue per NodeToRead, each carrying the same value - a
+// Variant holding the OPC UA namespace array, one string - with no
+// diagnostics and no timestamps. One Result per NodeToRead is the
+// shape a client reading the answer expects, however many nodes it
+// asked for, and the value is a string array because Connect's own
+// Read of the namespace array will not complete without one; no row
+// scores the value.
+func readResponse(req *ua.ReadRequest, reqID uint32) *ua.ReadResponse {
+	n := 0
+	if req != nil {
+		n = len(req.NodesToRead)
+	}
+	v := ua.MustVariant([]string{"http://opcfoundation.org/UA/"})
+	results := make([]*ua.DataValue, n)
+	for i := range results {
+		results[i] = &ua.DataValue{EncodingMask: ua.DataValueValue, Value: v}
+	}
+	return &ua.ReadResponse{
+		ResponseHeader:  responseHeader(reqID, ua.StatusOK),
+		Results:         results,
+		DiagnosticInfos: []*ua.DiagnosticInfo{},
 	}
 }

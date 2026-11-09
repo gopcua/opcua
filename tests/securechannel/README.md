@@ -49,8 +49,9 @@ on a fixed tree too, and a None arm cannot score the behaviour.
   peer's records - accepts, OPNs answered with the generation each
   arrived on and whether each asked for a new token or renewed the
   current one, requests with the generation each arrived on, ends of
-  reads - are what the rows read back, and the ServiceFault row's
-  verdict rests on those records alone.
+  reads, each marked when it was the read bound passing rather than a
+  client ending the connection - are what the rows read back, and the
+  ServiceFault row's verdict rests on those records alone.
 - **Rows 1, 2 and 4 run under SecurityPolicy None**, so every chunk is
   in the clear and the harness's `noneCodec` encodes and decodes them.
   The expired-token row runs under Basic256Sha256 in mode Sign, and the
@@ -101,7 +102,9 @@ an ERR frame - and a chunk the codec cannot decode can only be the
 client's own, so the harness's `setupCheck` reports them as gopcua's
 behaviour, not as a decline; the same split names a connection that
 merely ended - a close, a reset, a teardown - a fact the rows read in
-the close records. Two rows score what they see rather than decline on
+the close records, where the read bound's own ends are marked too, so
+a row can tell an idle connection the bound released from a client's
+close. Two rows score what they see rather than decline on
 the client's own confusion: the lifetime row's skewed arm has no decline
 of its own, because what a client does with a backdated token is the
 behaviour it scores; the expired-token row's scored arm scores a client
