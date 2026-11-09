@@ -50,6 +50,16 @@ func ServerCapabilitiesNodes(s *Server) []*Node {
 		nil,
 		func() *ua.DataValue { return DataValueFromValue(s.cfg.cap.OperationalLimits.MaxNodesPerRead) },
 	))
+	nodes = append(nodes, NewNode(
+		ua.NewNumericNodeID(0, id.Server_ServerCapabilities_MaxMonitoredItemsQueueSize),
+		map[ua.AttributeID]*ua.DataValue{
+			ua.AttributeIDBrowseName: DataValueFromValue(attrs.BrowseName("MaxMonitoredItemsQueueSize")),
+			ua.AttributeIDNodeClass:  DataValueFromValue(uint32(ua.NodeClassVariable)),
+			ua.AttributeIDDataType:   DataValueFromValue(ua.NewNumericNodeID(0, id.UInt32)),
+		},
+		nil,
+		func() *ua.DataValue { return DataValueFromValue(s.cfg.cap.MaxMonitoredItemsQueueSize) },
+	))
 	return nodes
 }
 
