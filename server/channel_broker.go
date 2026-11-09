@@ -18,8 +18,10 @@ type channelBroker struct {
 
 	wg sync.WaitGroup
 
-	// mu protects concurrent modification of s, secureChannelID, and secureTokenID
+	// mu protects concurrent modification of s, closed, secureChannelID, and secureTokenID
 	mu sync.RWMutex
+	// closed is set by Close; no channel is registered after it
+	closed bool
 	// s is a slice of all SecureChannels watched by the channelBroker
 	s map[uint32]*uasc.SecureChannel
 
@@ -82,12 +84,19 @@ func (c *channelBroker) RegisterConn(ctx context.Context, conn *uacp.Conn, local
 	}
 
 	c.mu.Lock()
+	if c.closed {
+		c.mu.Unlock()
+		sc.Close()
+		return io.EOF
+	}
 	c.s[secureChannelID] = sc
+	// Add under mu, before Close can set closed and start waiting, so wg.Add never runs
+	// concurrently with wg.Wait.
+	c.wg.Add(1)
 	if c.logger != nil {
 		c.logger.Info("Registered new channel (id %d) now at %d channels", secureChannelID, len(c.s))
 	}
 	c.mu.Unlock()
-	c.wg.Add(1)
 outer:
 	for {
 		select {
@@ -129,6 +138,7 @@ outer:
 func (c *channelBroker) Close() error {
 	var err error
 	c.mu.Lock()
+	c.closed = true
 	for _, s := range c.s {
 		s.Close()
 	}
