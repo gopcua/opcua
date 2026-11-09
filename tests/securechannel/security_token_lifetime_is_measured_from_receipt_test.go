@@ -65,12 +65,17 @@
 // promptly-delivered reply that needs no forged session state to be
 // well formed. It declines, and does not score, when the fixture fails
 // to deliver its half of the exchange - the peer's own failure, a
-// frame the harness flags as the client's own bytes, no CreateSession
-// arriving - per the harness's setupCheck and the row's own check; and
-// the control arm is the instrument check: a run in which it does not
-// see the reply proves nothing about the skewed arm, and fails as a
-// broken fixture, not as a score. The knownBug constant records that
-// gopcua does not do this yet: it adopts the server's clock at
+// frame the harness flags as the client's own bytes - per the
+// harness's setupCheck and the row's own check. No CreateSession
+// arriving is a decline on the control arm only, the story never
+// having reached the client whose reply the instrument check needs;
+// on the skewed arm whatever happens is scored, and a skewed run in
+// which no CreateSession arrives is scored as gopcua's failure,
+// because the arm has no decline of its own. The control arm is the
+// instrument check: a run in which it does not see the reply proves
+// nothing about the skewed arm, and fails as a broken fixture, not
+// as a score. The knownBug constant records that gopcua does not do
+// this yet: it adopts the server's clock at
 // uasc/secure_channel.go:679 (instance.createdAt =
 // resp.SecurityToken.CreatedAt) and schedules the token's expiration
 // off that stamp at uasc/secure_channel.go:872 (when :=

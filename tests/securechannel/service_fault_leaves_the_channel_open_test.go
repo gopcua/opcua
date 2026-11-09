@@ -55,14 +55,32 @@
 // never ended after the fault - and it deliberately asserts nothing
 // about the error the faulted Read returned beyond the setup check
 // that it was the injected one, nothing about the session, and
-// nothing about which error a fixed client logs. It declines, and does
-// not score, when the fixture fails its half: the peer's own failure,
-// a frame the harness flags as the client's own bytes, the initial
-// connect failing, the fault not answering the row's first Read, the
-// second Read neither arriving nor the channel being dropped. The
-// knownBug constant records that gopcua does not do this yet: the
-// receive path bubbles a Bad serviceResult into the message's error at
-// uasc/secure_channel.go:426 (if status :=
+// nothing about which error a fixed client logs. The client's monitor
+// tears down and redials on its own goroutine, so the drop is not in
+// the peer's records the moment the row's calls return: a body that
+// read them then scored the unfixed tree as kept, a false pass. The
+// row waits out a settle window before scoring the channel kept: it
+// polls the peer's records for the drop evidence - a new connection
+// accepted, the original connection ended, the second Read arriving
+// on a later connection - and only a window that closes holding none
+// of the three is a kept channel. A fixed client merely waits the
+// window out, and the window cannot produce a false pass in the
+// other direction: waiting only observes, so a drop is scored solely
+// where the client's own teardown put the facts, and the one verdict
+// a window could get wrong is kept - never drop - which is why the
+// window's bound is generous against the milliseconds the unfixed
+// monitor's teardown takes. The second Read is sent while a
+// reconnect may be in flight on an unfixed tree - a client between
+// channels may refuse the send - so the row retries it within a bound
+// until the peer's records hold it, and only the peer's records are
+// scored, never the error a refused send returned. It declines, and
+// does not score, when the fixture fails its half: the peer's own
+// failure, a frame the harness flags as the client's own bytes, the
+// initial connect failing, the fault not answering the row's first
+// Read, the second Read neither arriving nor the channel being
+// dropped. The knownBug constant records that gopcua does not do
+// this yet: the receive path bubbles a Bad serviceResult into the
+// message's error at uasc/secure_channel.go:426 (if status :=
 // resp.Header().ServiceResult; status != ua.StatusOK { msg.Err =
 // status }), the dispatcher forwards that error to the client's
 // channel-error path at uasc/secure_channel.go:274 (case s.errch <-

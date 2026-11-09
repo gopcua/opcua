@@ -56,12 +56,15 @@
 // The row asserts that the reused arm's client does not hand the
 // reused-number response to its caller, and that the skipped arm's
 // client does not hand the skipped-number response to its caller
-// either - per the README's definition of the phrase, each arm's Read
-// returns its own timeout error and the response body never arrives:
-// a receiver with no sequence check at all accepts both, so the
-// second arm separates a partial check from none. Each arm scores its
-// own violation alone. It deliberately asserts nothing about which
-// error the client returns, and nothing about a dialling behaviour:
+// either - per the README's definition of the phrase, the response
+// body never arrives at the caller; on these unfixed trees that
+// shows as each arm's Read returning its own timeout error, and a
+// fixed client returns the closed channel's error instead, which is
+// why the arms key on the body - and a receiver with no sequence
+// check at all accepts both, so the second arm separates a partial
+// check from none. Each arm scores its own violation alone. It
+// deliberately asserts nothing about which error the client
+// returns, and nothing about a dialling behaviour:
 // the clause's "force a reconnect" is scored as the channel the
 // client closes, not as a redial. A fixed client rejects the arm's
 // chunk and closes the channel - "If an error occurs during Message

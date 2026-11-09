@@ -97,10 +97,14 @@ type chunkCodec interface {
 	// header.
 	decodeRequest(frame []byte) (req ua.Request, reqID uint32, err error)
 
-	// encodeOPN encodes a final OPN chunk answering an
-	// OpenSecureChannelRequest with the given token, sequence number
-	// and request id.
-	encodeOPN(token channelToken, seq, reqID uint32) ([]byte, error)
+	// encodeOPN encodes a final OPN chunk answering the
+	// OpenSecureChannelRequest req with the given token, sequence
+	// number and request id. The decoded request is handed to the
+	// codec because a signing policy derives the token's symmetric
+	// keys from the ClientNonce it carries alongside the peer's own
+	// ServerNonce, which the ids and the stamp alone cannot give; a
+	// codec under a policy that needs no nonce ignores it.
+	encodeOPN(token channelToken, req *ua.OpenSecureChannelRequest, seq, reqID uint32) ([]byte, error)
 
 	// encodeMSG encodes a final MSG chunk carrying resp under the given
 	// channel id and token id, with the given sequence number and
@@ -130,9 +134,10 @@ func (noneCodec) decodeRequest(frame []byte) (ua.Request, uint32, error) {
 
 // encodeOPN encodes an OpenSecureChannelResponse handing out token: a
 // null policy URI, no certificates, and the response header built by
-// responseHeader. The sequence number and the request id are exactly
-// the caller's, whatever they are.
-func (noneCodec) encodeOPN(token channelToken, seq, reqID uint32) ([]byte, error) {
+// responseHeader. Under None the request is not read - every chunk is
+// in the clear, so no nonce feeds anything - and the sequence number
+// and the request id are exactly the caller's, whatever they are.
+func (noneCodec) encodeOPN(token channelToken, req *ua.OpenSecureChannelRequest, seq, reqID uint32) ([]byte, error) {
 	resp := &ua.OpenSecureChannelResponse{
 		ResponseHeader:        responseHeader(reqID, ua.StatusOK),
 		ServerProtocolVersion: 0,
@@ -398,7 +403,7 @@ func (p *scriptedPeer) serveConn(connID int, c net.Conn) {
 				token = p.script.issue
 			}
 			seq++
-			resp, err := codec.encodeOPN(token, seq, reqID)
+			resp, err := codec.encodeOPN(token, opn, seq, reqID)
 			if err != nil {
 				p.noteFixture(fmt.Errorf("encode the OpenSecureChannelResponse: %w", err))
 				return
