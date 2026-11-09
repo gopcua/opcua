@@ -52,11 +52,12 @@
 // which would consume answers the script has not chosen for it, and
 // the row's one scored request is a raw Read it sends and bounds
 // itself. The peer hands out a short token and answers the client's
-// own renewal with new ids - numbers the issue token never carried,
-// so the channel holds two tokens to tell apart - and the row's Read
-// goes out only after the old token's lifetime plus 25 % has passed
-// on the client's clock, so the stimulus is expired on any tree that
-// measures the window correctly. The peer answers that Read with a
+// own renewal with a new token id on the same channel - a number
+// the issue token never carried, so the channel holds two tokens to
+// tell apart - and the row's Read goes out only after the old token's
+// lifetime plus 25 % has passed on the client's clock, so the
+// stimulus is expired on any tree that measures the window correctly.
+// The peer answers that Read with a
 // response chunk whose symmetric security header carries the old,
 // expired token id and whose signature is made with the old token's
 // keys, chosen with the harness's answerToken script: the scored
@@ -83,14 +84,18 @@
 // entry per OpenSecureChannelRequest the peer answered, with the
 // connection generation it arrived on, whether it asked for a new
 // token or renewed the current one, and the moment it arrived, and
-// without a renewal there are no new ids for the scored answer to be
-// old against - and it scores, never declines, a client whose own
-// behaviour leaves the arm unscoreable. The row's Read never
-// reaching the peer is that case, not a decline: unhandled it would
-// read as a rejection - the body never arrives, a false pass - and
-// the harness's setupCheck already holds the peer's half clean, so a
-// Read that never arrives can only be the client's own doing, which
-// the row scores as gopcua's failure. The knownBug
+// without a renewal there is no new token id on the same channel
+// for the scored answer to be old against - and it scores, never
+// declines, a client whose own behaviour leaves the scored arm
+// unscoreable. The row's Read never reaching the peer is scored by
+// arm: on the scored arm it is scored as gopcua's failure - unhandled
+// it would read as a rejection, the body never arriving, a false
+// pass, and the harness's setupCheck already holds the peer's half
+// clean, so a Read that never arrives can only be the client's own
+// doing - and on the control arm it is a decline, because the
+// instrument check never ran: a control run whose Read never reached
+// the peer has no rejection to see, and proves nothing about the
+// scored arm. The knownBug
 // constant, for issue #941, records that gopcua does not do this yet:
 // scheduleExpiration empties and rebuilds the instance map under the
 // TOKEN id (uasc/secure_channel.go:888, uasc/secure_channel.go:890,
