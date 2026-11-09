@@ -28,9 +28,11 @@
 // Every helper here returns plain values. A helper does not call
 // t.Errorf or t.Fatalf; a row's test function turns a non-empty reason
 // string into the failure or the decline, and it, not the fixture,
-// registers the teardown with t.Cleanup. The teardown closes the
-// listener and the accepted connection, so a Connect left blocked by
-// the library under test is released when the test ends.
+// registers the teardown with t.Cleanup. The peer's listen on a free
+// port, its one accepted connection, its teardown, and its address are
+// the core it shares with the transport package's peer, and live in
+// tests/internal/scriptedpeer; the script the peer plays once a
+// connection is accepted is this package's own, below.
 //
 // The package name is securitypolicy, as the directory is; the
 // production code it drives lives in github.com/gopcua/opcua and its
@@ -48,6 +50,7 @@ import (
 	"time"
 
 	"github.com/gopcua/opcua"
+	"github.com/gopcua/opcua/tests/internal/scriptedpeer"
 	"github.com/gopcua/opcua/uacp"
 )
 
@@ -77,11 +80,9 @@ var peerAck = &uacp.Acknowledge{
 // first eight bytes, so uasc.MessageChunk.Decode takes it whole, with
 // no slicing.
 type scriptedPeer struct {
-	listener net.Listener
+	core *scriptedpeer.Core
 
 	mu                sync.Mutex
-	conn              net.Conn
-	closed            bool   // set by teardown; serve closes the connection itself when set
 	offScript         string // the message type of a frame that arrived where the script expected another
 	offScriptExpected string // the message type the script expected where that frame arrived
 	recvErr           string // a read error other than a connection that merely ended: the client's bytes did not frame
@@ -90,44 +91,37 @@ type scriptedPeer struct {
 	done chan struct{} // closed when serve returns, so awaitOpenSecureChannel need not wait out its bound
 }
 
-// startScriptedPeer brings the peer up on the loopback interface, on a
-// free port the kernel chooses - never port 4840, which other suites
-// bind. It returns the peer, a teardown for the listener and the
-// accepted connection, and "" - or, when the peer could not be started,
-// the reason the run cannot be scored.
+// startScriptedPeer brings the peer up on the loopback interface, on
+// the shared core's listener (tests/internal/scriptedpeer). It returns
+// the peer, a teardown for the listener and the accepted connection,
+// and "" - or, when the peer could not be started, the reason the run
+// cannot be scored.
 func startScriptedPeer() (*scriptedPeer, func(), string) {
-	l, err := net.Listen("tcp", "127.0.0.1:0")
+	l, err := scriptedpeer.Listen("127.0.0.1")
 	if err != nil {
 		return nil, func() {}, fmt.Sprintf("listen on the loopback interface: %v", err)
 	}
 	p := &scriptedPeer{
-		listener: l,
-		opn:      make(chan []byte, 1),
-		done:     make(chan struct{}),
+		core: scriptedpeer.New(l),
+		opn:  make(chan []byte, 1),
+		done: make(chan struct{}),
 	}
 	go func() {
 		p.serve()
 		close(p.done)
 	}()
-	teardown := func() {
-		_ = l.Close()
-		p.mu.Lock()
-		defer p.mu.Unlock()
-		p.closed = true
-		if p.conn != nil {
-			_ = p.conn.Close()
-		}
-	}
-	return p, teardown, ""
+	return p, p.core.Teardown, ""
 }
 
-// addr is the host:port the peer listens on.
+// addr is the host:port the peer listens on; the shared core holds it.
 func (p *scriptedPeer) addr() string {
-	return p.listener.Addr().String()
+	return p.core.Addr()
 }
 
-// serve plays the script: accept one connection, read the HEL, answer the
-// ACK, read the OPN, deliver it on the channel, and close. A frame that
+// serve plays the script: accept the peer's one connection - through
+// the shared core's Accept, which owns the accept and the teardown
+// race - read the HEL, answer the ACK, read the OPN, deliver it on the
+// channel, and close. A frame that
 // arrives where the script expected another - the HEL at the first read,
 // the OPN at the second - is recorded in offScript together with the
 // type the script expected at that point: it is determinately the
@@ -136,22 +130,12 @@ func (p *scriptedPeer) addr() string {
 // bad header, an out-of-range size, an ERR frame - is recorded by
 // noteReceiveError and reported the same way, for the same reason. Any
 // other failure - no connection, a client that goes away mid-exchange -
-// leaves the channel empty, and the check declines. If teardown runs
-// between the Accept and this goroutine taking the mutex, teardown
-// never saw the connection, so serve closes it here.
+// leaves the channel empty, and the check declines.
 func (p *scriptedPeer) serve() {
-	c, err := p.listener.Accept()
-	if err != nil {
-		return // the listener was closed in teardown
+	c := p.core.Accept()
+	if c == nil {
+		return // the listener was closed in teardown, or teardown won the race
 	}
-	p.mu.Lock()
-	if p.closed {
-		p.mu.Unlock()
-		_ = c.Close()
-		return
-	}
-	p.conn = c
-	p.mu.Unlock()
 
 	uc, err := uacp.NewConn(c.(*net.TCPConn), peerAck)
 	if err != nil {

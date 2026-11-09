@@ -29,7 +29,8 @@ reason, or `gopcua's own behaviour made this run unscoreable: %s`
 check's name is each package's own.
 A helper two rows call lives in `harness.go`, as does one
 `harness.go` itself calls, whatever the row count; a helper one row calls
-lives with that row.
+lives with that row. A helper two packages call lives in
+`tests/internal/<name>`, under the same plain-values rule.
 
 A decline is a `t.Fatalf`, so the test is red like any other failure. The
 word marks why it is red - the run could not be scored - and not a third
