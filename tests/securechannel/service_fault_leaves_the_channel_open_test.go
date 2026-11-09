@@ -48,16 +48,21 @@
 // peer answers CreateSession and ActivateSession normally, and it
 // keeps serving connections, so everything a client does to come
 // back - a new connection, a new HEL/ACK and OPN, the activation
-// again - is visible in its records.
+// again - is visible in its records. The Read answers the script
+// sends - Connect's own, and every marked Read but the faulted one
+// - are built by the harness's readResponse, and the check that the
+// faulted Read returned the injected status is the harness's
+// isServiceFault.
 // See harness.go.
 //
 // The row asserts, from the peer's records alone, that the second
 // marked Read was answered on the original connection - the same
 // connection generation, no new connection accepted, the original
-// connection never ended after the fault - and it deliberately asserts
-// nothing about the error the faulted Read returned beyond the setup
-// check that it was the injected one, nothing about the session, and
-// nothing about which error a fixed client logs. The client's monitor
+// connection never ended after the fault by a close the client made
+// - and it deliberately asserts nothing about the error the faulted
+// Read returned beyond the setup check that it was the injected one,
+// nothing about the session, and nothing about which error a fixed
+// client logs. The client's monitor
 // tears down and redials on its own goroutine, so the drop is not in
 // the peer's records the moment the row's calls return: a body that
 // read them then scored the unfixed tree as kept, a false pass. The row
@@ -65,22 +70,32 @@
 // the peer's records for the drop evidence - a new connection accepted,
 // the original connection ended, the second marked Read arriving on a
 // later connection - and only a window that closes holding none of the
-// three is a kept channel. A fixed client merely waits the window out,
-// and the window cannot produce a false pass in the other direction:
-// waiting only observes, so a drop is scored solely where the client's
-// own teardown put the facts, and the one verdict a window could get
-// wrong is kept - never drop - which is why the window's bound is
+// three is a kept channel. The original connection's end counts as
+// evidence only when the client ended it: the harness's read bound
+// ends a connection that sat idle that long, and the close it leaves
+// looks in the records exactly like a client's own, so a window of
+// the bound or longer would score a fixed client's quiet connection
+// as the original connection ending - a false drop, which a cold
+// author hit on PR #904's tree - which is why the close records mark
+// the bound's ends and the row does not count them. A fixed client
+// merely waits the window out, and waiting only observes, so every
+// fact the window scores was put in the records by the client's own
+// teardown or not at all; the one verdict a window can get wrong now
+// is kept - never drop - when it closes before a slow teardown puts
+// its facts in the records, which is why the window's bound is
 // generous against the milliseconds the unfixed monitor's teardown
 // takes. The second marked Read is sent while a reconnect may be in
 // flight on an unfixed tree - a client between channels may refuse the
 // send - so the row retries it within a bound until the peer's records
 // hold it, and only the peer's records are scored, never the error a
 // refused send returned. It declines, and does not score, when the
-// fixture fails its half: the peer's own failure, a frame the harness
-// flags as the client's own bytes, the initial connect failing, the
-// fault not answering the first marked Read, the second marked Read
-// neither arriving nor the channel being dropped. The knownBug
-// constant records that gopcua does not do
+// fixture fails its half: the peer's own failure, the initial connect
+// failing, the fault not answering the first marked Read, the second
+// marked Read neither arriving nor the channel being dropped. A
+// frame the harness flags as the client's own bytes is not a decline:
+// the setup check reports it as gopcua's own behaviour, and the row
+// scores the run as gopcua's failure with t.Errorf, never declines
+// it. The knownBug constant records that gopcua does not do
 // this yet: the receive path bubbles a Bad serviceResult into the
 // message's error at uasc/secure_channel.go:426 (if status :=
 // resp.Header().ServiceResult; status != ua.StatusOK { msg.Err =

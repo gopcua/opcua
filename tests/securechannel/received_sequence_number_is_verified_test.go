@@ -73,13 +73,15 @@
 // close in the peer's close records corroborates that pass and is not
 // required for it, and a close is never a decline: the client owes each
 // arm the one request whose answer is scored, and a channel closed on
-// the first rejection never owes a second. It declines, and does not
-// score,
-// when the fixture fails its half - the peer's own failure, a frame
-// the harness flags as the client's own bytes, the channel never
-// opening, the arm's request never arriving - and it scores, never
-// declines, a client whose own behaviour leaves the run unscoreable.
-// The knownBug constant records that gopcua does not do this yet, and
+// the first rejection never owes a second. It declines, and does
+// not score, when the fixture fails its half - the peer's own
+// failure, the channel never opening, the arm's request never
+// arriving - and it scores, never declines, a client whose own
+// behaviour leaves the run unscoreable: a frame the harness flags
+// as the client's own bytes is that, the setup check's report of
+// gopcua's own behaviour, a failure the row scores with t.Errorf
+// and never a decline. The knownBug constant records that gopcua
+// does not do this yet, and
 // no pull request fixes it: the receive path decodes the sequence header at
 // uasc/secure_channel.go:520 (n, err := m.SequenceHeader.Decode(m.Data))
 // but never compares the number it carries, a single-chunk message is
@@ -93,10 +95,13 @@
 // not show - and what deletes the constant is a fix that verifies the
 // SequenceNumber of every received chunk and raises the transport
 // error; there is no pull request to name. When the constant stands,
-// the acceptance is logged as the known bug; when both arms' responses
-// are rejected, that is a hard error telling whoever runs it to delete the
-// constant, every arm that reads it, and anything only those arms
-// used.
+// the acceptance is logged as the known bug, with which arm's caller
+// was handed its response, so exactly one arm accepting is still the
+// known bug: a partial fix - a check that catches a reused number and
+// lets a skipped one by - stays logged and visible, not mistaken for
+// the whole fix; when both arms' responses are rejected, that is a
+// hard error telling whoever runs it to delete the constant, every
+// arm that reads it, and anything only those arms used.
 //
 // No reference stack has been read for this behaviour; the measurement
 // on the trees this suite was authored against is the row's own.

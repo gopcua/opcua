@@ -39,7 +39,10 @@
 // neither arm is near a genuine expiry - carrying the channel id and
 // the token id 15, and answers the client's CreateSession with a
 // ServiceFault after a delay applied to both arms alike, so the delay
-// cannot be what separates them. The channel id and the token id being
+// cannot be what separates them, and answers any Read that arrives
+// with the harness's readResponse, Connect's own Read of the
+// namespace array included, so no request goes unanswered on the way
+// to the fault. The channel id and the token id being
 // the same number is load-bearing: gopcua's expiration wipes the
 // channel instance under the token id (uasc/secure_channel.go:888)
 // while every arriving response is looked up under the channel id
@@ -55,7 +58,9 @@
 // row scores, so a run the skewed arm cannot score is scored as
 // gopcua's failure, never declined. The client under test is the real
 // opcua.Client, launched by the row with a request timeout of its own;
-// its Connect is expected to return the injected fault.
+// its Connect is expected to return the injected fault, and the fault
+// it returns is compared with the injected status through the
+// harness's isServiceFault.
 // See harness.go.
 //
 // The row asserts that the skewed arm's client reports the injected
@@ -63,14 +68,17 @@
 // else: what the client does with the fault is not scored, and neither
 // is the fault's meaning - it was chosen as a distinctive,
 // promptly-delivered reply that needs no forged session state to be
-// well formed. It declines, and does not score, when the fixture fails
-// to deliver its half of the exchange - the peer's own failure, a
-// frame the harness flags as the client's own bytes - per the
-// harness's setupCheck and the row's own check. No CreateSession
-// arriving is a decline on the control arm only, the story never
-// having reached the client whose reply the instrument check needs;
-// on the skewed arm whatever happens is scored, and a skewed run in
-// which no CreateSession arrives is scored as gopcua's failure,
+// well formed. It declines, and does not score, when the fixture
+// fails to deliver its half of the exchange - the peer's own failure
+// - per the harness's setupCheck and the row's own check. A frame
+// the harness flags as the client's own bytes is not a decline: the
+// setup check reports it as gopcua's own behaviour, and the row
+// scores the run as gopcua's failure with t.Errorf, never declines
+// it. No CreateSession arriving is a decline on the control arm
+// only, the story never having reached the client whose reply the
+// instrument check needs; on the skewed arm whatever happens is
+// scored, and a skewed run in which no CreateSession arrives is
+// scored as gopcua's failure,
 // because the arm has no decline of its own. The control arm is the
 // instrument check: a run in which it does not see the reply proves
 // nothing about the skewed arm, and fails as a broken fixture, not

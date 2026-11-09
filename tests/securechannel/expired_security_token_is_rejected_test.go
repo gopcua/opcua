@@ -77,18 +77,21 @@
 // arm's expiration happens to remove the right instance, so it shows
 // that the instrument can see a rejection at all, and a run in which
 // it does not see one proves nothing about the scored arm. It
-// declines, and does not score, when the fixture fails its half - the
-// peer's own failure, a frame the harness flags as the client's own
-// bytes, the channel never opening, the peer's OPN records holding no
-// renewal: the records hold one
+// declines, and does not score, when the fixture fails its half -
+// the peer's own failure, the channel never opening, the peer's OPN
+// records holding no renewal - and it scores, never declines, a
+// client whose own behaviour leaves the scored arm unscoreable: a
+// frame the harness flags as the client's own bytes is that case's
+// clearest shape, the setup check's report of gopcua's own
+// behaviour, a failure the row scores with t.Errorf and never a
+// decline. The records hold one
 // entry per OpenSecureChannelRequest the peer answered, with the
 // connection generation it arrived on, whether it asked for a new
 // token or renewed the current one, and the moment it arrived, and
 // without a renewal there is no new token id on the same channel
-// for the scored answer to be old against - and it scores, never
-// declines, a client whose own behaviour leaves the scored arm
-// unscoreable. The row's Read never reaching the peer is scored by
-// arm: on the scored arm it is scored as gopcua's failure - unhandled
+// for the scored answer to be old against. The row's Read never
+// reaching the peer is scored by arm: on the scored arm it is scored
+// as gopcua's failure - unhandled
 // it would read as a rejection, the body never arriving, a false
 // pass, and the harness's setupCheck already holds the peer's half
 // clean, so a Read that never arrives can only be the client's own
