@@ -14,9 +14,11 @@
 // Every helper here returns plain values. A helper does not call t.Errorf
 // or t.Fatalf; a row's test function turns a non-empty reason string into
 // the failure or the decline, and it, not the fixture, registers the
-// teardown with t.Cleanup. The teardown closes the listener and the
-// accepted connection, so a Dial left blocked by the library under test
-// is released when the test ends.
+// teardown with t.Cleanup. The peer's listen on a free port, its one
+// accepted connection, its teardown, and its address are the core it
+// shares with the securitypolicy package's peer; they live in
+// tests/internal/scriptedpeer, and the script the peer plays once a
+// connection is accepted is this package's own, below.
 //
 // The package name is transport, as the directory is; the production code
 // it drives lives in github.com/gopcua/opcua/uacp.
@@ -30,6 +32,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gopcua/opcua/tests/internal/scriptedpeer"
 	"github.com/gopcua/opcua/uacp"
 )
 
@@ -77,11 +80,10 @@ func dial(ctx context.Context, endpoint string) <-chan dialOutcome {
 // silentPeer is the scripted silent peer. It accepts one connection,
 // reads the message header off it, and never writes anything.
 type silentPeer struct {
-	listener net.Listener
+	core     *scriptedpeer.Core
+	listener net.Listener // the core's listener, named here for the address row's port helper, which lives with its row
 
 	mu     sync.Mutex
-	conn   net.Conn
-	closed bool   // set by teardown; serve closes the connection itself when set
 	header string // the first four bytes read off the connection, once read
 
 	accepted chan struct{} // closed once a connection has been accepted
@@ -89,59 +91,43 @@ type silentPeer struct {
 }
 
 // startSilentPeer brings the silent peer up on the host it is given, on
-// a free port the kernel chooses. Rows that need the peer on the loopback
-// interface pass 127.0.0.1; the address row passes the last address
-// localhost resolves to, which may be ::1 or 127.0.0.1, so the host is
-// joined with net.JoinHostPort and an IPv6 host comes out bracketed. It
-// returns the peer, a teardown for the listener and the accepted
-// connection, and "" - or, when the peer could not be started, the reason
-// the run cannot be scored.
+// the shared core's listener (tests/internal/scriptedpeer). Rows that
+// need the peer on the loopback interface pass 127.0.0.1; the address
+// row passes the last address localhost resolves to, which may be ::1
+// or 127.0.0.1, so an IPv6 host must come out bracketed - the shared
+// core's Listen joins the host with the port. It returns the peer, a
+// teardown for the listener and the accepted connection, and "" - or,
+// when the peer could not be started, the reason the run cannot be
+// scored.
 func startSilentPeer(host string) (*silentPeer, func(), string) {
-	l, err := net.Listen("tcp", net.JoinHostPort(host, "0"))
+	l, err := scriptedpeer.Listen(host)
 	if err != nil {
 		return nil, func() {}, fmt.Sprintf("listen on %s: %v", host, err)
 	}
 	p := &silentPeer{
+		core:     scriptedpeer.New(l),
 		listener: l,
 		accepted: make(chan struct{}),
 		hello:    make(chan struct{}),
 	}
 	go p.serve()
-	teardown := func() {
-		_ = l.Close()
-		p.mu.Lock()
-		defer p.mu.Unlock()
-		p.closed = true
-		if p.conn != nil {
-			_ = p.conn.Close()
-		}
-	}
-	return p, teardown, ""
+	return p, p.core.Teardown, ""
 }
 
-// addr is the host:port the peer listens on.
+// addr is the host:port the peer listens on; the shared core holds it.
 func (p *silentPeer) addr() string {
-	return p.listener.Addr().String()
+	return p.core.Addr()
 }
 
-// serve accepts one connection, records its first message header, and
-// then discards everything else and never answers, until the connection
-// or the listener is closed. A second connection is never accepted. If
-// teardown runs between the Accept and this goroutine taking the mutex,
-// teardown never saw the connection, so serve closes it here.
+// serve accepts the peer's one connection - through the shared core's
+// Accept, which owns the accept and the teardown race - records its
+// first message header, and then discards everything else and never
+// answers, until the connection or the listener is closed.
 func (p *silentPeer) serve() {
-	c, err := p.listener.Accept()
-	if err != nil {
-		return // the listener was closed in teardown
+	c := p.core.Accept()
+	if c == nil {
+		return // the listener was closed in teardown, or teardown won the race
 	}
-	p.mu.Lock()
-	if p.closed {
-		p.mu.Unlock()
-		_ = c.Close()
-		return
-	}
-	p.conn = c
-	p.mu.Unlock()
 	close(p.accepted)
 
 	var hdr [4]byte
