@@ -106,8 +106,221 @@
 // on main and on the two candidate fixes is the row's own.
 package securechannel
 
-import "testing"
+import (
+	"context"
+	"fmt"
+	"testing"
+	"time"
+
+	"github.com/gopcua/opcua"
+	"github.com/gopcua/opcua/ua"
+)
+
+// faultStatus is the ServiceFault status the row's script answers the
+// client's CreateSession with. It is Bad, so it travels as a
+// ServiceFault per OPC 10000-4 §7.34, and no path in the client
+// generates it on its own - the skewed arm's lost reply shows up as
+// Bad_Timeout - so a returned fault is unambiguously the injected one.
+var faultStatus = ua.StatusBadTooManyOperations
+
+// createSessionDelay is how long the peer holds the ServiceFault back
+// before sending it, on both arms alike so it cannot be what separates
+// them. The skewed arm's premature wipe is scheduled the moment the
+// OPN answer is handled and fires microseconds later; the delay holds
+// the answer past that wipe on any machine, so the reply always meets
+// the wiped instance map on an unfixed tree and the outcome never
+// rests on the race between the two.
+const createSessionDelay = 500 * time.Millisecond
+
+// requestTimeout is the request timeout the row launches its client
+// with. It sits well above createSessionDelay, so the control arm's
+// delayed fault is never mistaken for a lost reply, and low enough
+// that the skewed arm's lost reply comes back as its own Bad_Timeout
+// in seconds rather than the ten-second default.
+const requestTimeout = 2 * time.Second
+
+// armBound is the context deadline the row bounds each arm's Connect
+// with: above the skewed arm's own latest legitimate return - the
+// request timeout plus uasc's 250ms leniency - with room for a loaded
+// machine, so it never cuts a scoring run short, and short enough
+// that a client wedged past its own timers cannot hold the row.
+const armBound = 5 * time.Second
 
 func TestSecurityTokenLifetimeIsMeasuredFromReceipt(t *testing.T) {
-	t.Skip("body not written yet")
+	// knownBug records that gopcua does not do this yet; the text is
+	// logged in place of a failure. tests/README.md says when to delete
+	// it, and the header names the production lines that decide the
+	// outcome: the stamp adopted at uasc/secure_channel.go:679 and the
+	// expiration scheduled off it at uasc/secure_channel.go:872.
+	const knownBug = "the client adopts the server's createdAt and " +
+		"schedules the security token's expiration off that stamp, so a " +
+		"token stamped on a clock six years behind the client's own is " +
+		"wiped at once and the well-formed answer that follows it is lost"
+
+	// The control arm is the instrument check, and a run in which it
+	// never saw the reply proves nothing about the skewed arm: both of
+	// its failures below are declines, whichever side caused them.
+	control, teardown, why := runArm(time.Now())
+	t.Cleanup(teardown)
+	if why != "" {
+		t.Fatalf("could not set the test up: %s", why)
+	}
+	if control.setupWhy != "" {
+		if control.setupFromGopcua {
+			t.Errorf("gopcua's own behaviour made this run unscoreable: %s",
+				control.setupWhy)
+			return
+		}
+		t.Fatalf("could not set the test up: %s", control.setupWhy)
+	}
+	if !control.createSession {
+		t.Fatalf("could not set the test up: no CreateSession arrived on " +
+			"the control arm, so the story never reached the client whose " +
+			"reply the instrument check needs")
+	}
+	if !isServiceFault(control.connectErr, faultStatus) {
+		t.Fatalf("could not set the test up: the control arm's client "+
+			"returned %v, not the injected ServiceFault %s, so the instrument "+
+			"check never ran and the skewed arm's run proves nothing",
+			control.connectErr, faultStatus)
+	}
+
+	// The skewed arm has no decline of its own: whatever a client does
+	// with a backdated token is the behaviour the row scores.
+	skewed, teardown, why := runArm(time.Now().Add(-6 * 365 * 24 * time.Hour))
+	t.Cleanup(teardown)
+	if why != "" {
+		t.Fatalf("could not set the test up: %s", why)
+	}
+	if skewed.setupWhy != "" {
+		if skewed.setupFromGopcua {
+			t.Errorf("gopcua's own behaviour made this run unscoreable: %s",
+				skewed.setupWhy)
+			return
+		}
+		t.Fatalf("could not set the test up: %s", skewed.setupWhy)
+	}
+
+	skewFault := isServiceFault(skewed.connectErr, faultStatus)
+
+	// The arms, in words: the skewed arm disagreeing with the control
+	// arm is the known bug while the constant stands and an ordinary
+	// failure once it is gone; a skewed run that never sent a
+	// CreateSession is gopcua's failure in either state, because the
+	// arm has no decline of its own; the arms agreeing is a hard error
+	// while the constant stands - the pass it reports is the fix's, not
+	// the row's to keep - and the pass log only once the constant is
+	// deleted with the fix.
+	switch {
+	case !skewFault && skewed.createSession && knownBug != "":
+		t.Logf("known bug: %s (the control arm's client returned the "+
+			"injected ServiceFault %s; the skewed arm's client, handed a "+
+			"token stamped six years back, returned %v instead)",
+			knownBug, faultStatus, skewed.connectErr)
+	case skewFault && knownBug != "":
+		t.Errorf("this now passes (the skewed arm's client returned the "+
+			"injected ServiceFault %s exactly as the control arm's client "+
+			"did) - delete the knownBug constant, every arm that reads it, "+
+			"and anything only those arms used, in the commit that fixed it",
+			faultStatus)
+	case !skewed.createSession:
+		t.Errorf("the skewed arm's client returned %v without ever "+
+			"sending a CreateSession, and the skewed arm has no decline of "+
+			"its own, so whatever a client does with a backdated token that "+
+			"stops it short of the story's one request is scored as gopcua's "+
+			"failure", skewed.connectErr)
+	case skewFault:
+		t.Logf("the skewed arm's client returned the injected ServiceFault "+
+			"%s exactly as the control arm's client did", faultStatus)
+	default:
+		t.Errorf("the skewed arm's client returned %v where the control "+
+			"arm's client returned the injected ServiceFault %s",
+			skewed.connectErr, faultStatus)
+	}
+}
+
+// armOutcome is what one arm's run left within the row's reach: the
+// error the arm's client's Connect returned, whether a
+// CreateSessionRequest reached the peer, and the harness setup
+// check's verdict on the run. It holds no handle on the peer: runArm
+// reads the peer's records once, after Connect has returned, so the
+// outcome is one instant of the run and the row never races a live
+// connection for it.
+type armOutcome struct {
+	connectErr      error
+	createSession   bool
+	setupWhy        string
+	setupFromGopcua bool
+}
+
+// runArm runs one arm of the row end to end: a fresh peer handing every
+// connection the token stamped createdAt - the channel id and the
+// token id both 15, the ten-minute lifetime the header names - and a
+// fresh client launched under SecurityPolicy None with the row's
+// request timeout, whose Connect runArm drives to its return within
+// armBound. The script answers the client's CreateSession with a
+// ServiceFault carrying faultStatus after createSessionDelay, answers
+// any Read that arrives - Connect's own included - with the harness's
+// readResponse, and answers nothing else. It returns what the arm's
+// run left to score, the peer's teardown for the row to register with
+// t.Cleanup, and "" - or, when the peer could not be started or the
+// client could not be built, the reason the run cannot be scored, a
+// decline whichever side caused the building, the way the
+// securitypolicy harness's launchClient declines its build reason.
+func runArm(createdAt time.Time) (o armOutcome, teardown func(), why string) {
+	peer, teardown, why := startPeer(peerScript{
+		issue: channelToken{
+			channelID: 15,
+			tokenID:   15,
+			createdAt: createdAt,
+			lifetime:  600000, // ten minutes, in milliseconds
+		},
+		renew: channelToken{
+			channelID: 15,
+			tokenID:   15,
+			createdAt: createdAt,
+			lifetime:  600000,
+		},
+		answer: func(req ua.Request, reqID uint32) ua.Response {
+			switch r := req.(type) {
+			case *ua.CreateSessionRequest:
+				// The delay is part of the stimulus, applied to both
+				// arms alike: it holds the scored answer back past the
+				// skewed arm's premature wipe, so the reply always
+				// meets the wiped instance map on an unfixed tree.
+				time.Sleep(createSessionDelay)
+				return &ua.ServiceFault{
+					ResponseHeader: responseHeader(reqID, faultStatus),
+				}
+			case *ua.ReadRequest:
+				return readResponse(r, reqID)
+			}
+			return nil
+		},
+	})
+	if why != "" {
+		return o, teardown, why
+	}
+
+	client, err := opcua.NewClient("opc.tcp://"+peer.addr(),
+		opcua.SecurityPolicy(ua.SecurityPolicyURINone),
+		opcua.SecurityMode(ua.MessageSecurityModeNone),
+		opcua.RequestTimeout(requestTimeout),
+	)
+	if err != nil {
+		return o, teardown, fmt.Sprintf("build the client: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), armBound)
+	defer cancel()
+	o.connectErr = client.Connect(ctx)
+	_ = client.Close(ctx)
+
+	for _, r := range peer.record().Requests {
+		if _, ok := r.Req.(*ua.CreateSessionRequest); ok {
+			o.createSession = true
+		}
+	}
+	o.setupWhy, o.setupFromGopcua = peer.setupCheck()
+	return o, teardown, ""
 }
