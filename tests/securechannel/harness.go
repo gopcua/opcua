@@ -263,10 +263,12 @@ type closeRecord struct {
 // new token or renewed the current one - the requests it decoded with
 // the generation each arrived on, and the connections whose reads
 // ended, each marked when it was the bound passing rather than a
-// client ending it. The ServiceFault row reads the accepts, requests
-// and closes to tell a client that stayed on one connection from one
-// that came back on a second; the expired-token row reads the OPNs
-// to tell a renewal that arrived from one that never did.
+// client ending it. The ServiceFault row reads the accepts, requests,
+// closes and OPNs to tell a client that stayed on one connection
+// from one that came back on a second, and a channel that survived
+// the fault from one closed or replaced on the same connection; the
+// expired-token row reads the OPNs to tell a renewal that arrived
+// from one that never did.
 type peerRecord struct {
 	Accepts  []acceptRecord
 	OPNs     []opnRecord
