@@ -63,7 +63,21 @@
 // keys, chosen with the harness's answerToken script: the scored
 // arm's server assigned a channel id that differs from the token
 // id, the control arm's the same number, and the ids are all that
-// separates them.
+// separates them. The arm then sends a second Read, which the peer
+// answers with a chunk secured with the renewed token - the first
+// Message from the server secured with the new SecurityToken, the
+// event OPC 10000-6 §6.7.4 names - and its body must reach the
+// caller on both arms: on the control arm it is the instrument
+// check's positive half, a client that accepts a chunk the live
+// token secures, so its rejection of the old-token chunk is
+// grounded in the token; on the scored arm it is the precondition
+// for the deletion demand, because a client that rejects every
+// chunk - a channel dead for every token, against the continuation
+// duty §6.7.4 asks - would otherwise read the same as the fix. A
+// client that closes the channel on the failed check, as §6.7.7
+// orders, leaves the renewed answer undelivered too, and the row
+// declines it: the demand is earned by a fix that keeps the
+// channel alive, as the candidate rekeying does.
 // See harness.go.
 //
 // The row asserts that the scored arm's client does not hand the
@@ -77,9 +91,11 @@
 // arm's expiration happens to remove the right instance, so it shows
 // that the instrument can see a rejection at all, and a run in which
 // it does not see one proves nothing about the scored arm. It
-// declines, and does not score, when the fixture fails its half -
+// declines, and does not score, when the fixture fails its half or
+// a stage the story needs never ran, whichever side caused it -
 // the peer's own failure, the channel never opening, the peer's OPN
-// records holding no renewal - and it scores, never declines, a
+// records holding no renewal, the renewed-token answer never
+// arriving at the caller - and it scores, never declines, a
 // client whose own behaviour leaves the scored arm unscoreable: a
 // frame the harness flags as the client's own bytes is that case's
 // clearest shape, the setup check's report of gopcua's own
@@ -111,7 +127,10 @@
 // not show - the control arm passing shows the row is not scoring an
 // instrument that rejects nothing - and what deletes the constant is
 // keying scheduleExpiration by the channel id instead of the token
-// id, after which both arms reject and pass; measured on main and on
+// id, after which both arms reject the old-token response and hand
+// the renewed-token answer to their callers, and only such a run
+// carries the demand - a client that rejects both answers is a
+// decline, never a fix; measured on main and on
 // the candidate fixes #911 and #904 the scored arm still logs the
 // known bug, because neither touches the expiration's keying. When
 // the constant stands, the scored arm's acceptance is logged as the
@@ -133,6 +152,7 @@ import (
 	"fmt"
 	"math/big"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -142,11 +162,14 @@ import (
 	"github.com/gopcua/opcua/uasc"
 )
 
-// tokenLifetime is the short lifetime the peer's issue token carries:
-// the client renews at 75 % of it and the token's life is over at
-// lifetime plus its 25 % grace window, both on the client's own
-// clock, which is what makes the row's stimulus expired on any tree
-// that measures the window correctly. Two seconds keep the arm's
+// tokenLifetime is the short lifetime the peer's issue token carries.
+// Measured on this tree the client renews at half of it and wipes
+// the expired instance at its end - the 75 % and 125 % factors
+// truncate to whole seconds in uasc - so the arm's Read goes out
+// 900 ms past the wipe, not the 400 ms graceWait sits past the
+// window the specification names, and the stimulus is expired on
+// any tree that measures the window correctly either way. Two
+// seconds keep the arm's
 // whole wait short while leaving half a lifetime between the renewal
 // and the expiry, so a renewal that runs late on a loaded machine
 // still lands before the window the Read waits out.
@@ -158,11 +181,15 @@ const tokenLifetime = 2 * time.Second
 const renewalLifetime = time.Minute
 
 // graceWait is how far past the issue token's lifetime plus its 25 %
-// grace window the arm waits before it sends the scored Read. The
-// client's expiration is a timer on a goroutine, and the wait gives
-// the goroutine time to fire and its wipe to land on a loaded
-// machine, so the Read goes out only after the stimulus has expired,
-// whatever the machine's load.
+// grace window the arm waits before it sends the scored Read, and
+// the window is waited out from the stamp the peer put on the
+// token: the unfixed tree schedules the expiration from that stamp,
+// and a tree that measures from receipt ends its window a handshake
+// later, which the same wait covers. The wipe is a timer on a
+// goroutine, and the wait gives the goroutine time to fire and its
+// wipe to land on a loaded machine; a delay that outruns the wait
+// on the scored arm alone logs the known bug on a fixed tree, which
+// the row cannot tell apart.
 const graceWait = 400 * time.Millisecond
 
 // dialBound bounds each arm's Dial and the client's close at the
@@ -172,21 +199,22 @@ const graceWait = 400 * time.Millisecond
 // arm.
 const dialBound = 10 * time.Second
 
-// readBound is the bound on the arm's one scored Read. On these
-// unfixed trees a rejection shows as the Read returning this bound's
-// own timeout error - a rejected chunk reaches no handler - so the
-// bound is what a rejected answer costs the arm; a healthy answer
-// crosses the loopback in milliseconds, and the bound sits under the
-// harness's ten-second read bound, so the peer's connection is never
-// released for idling before the Read returns.
+// readBound is the bound on the arm's Reads. On these unfixed trees
+// a rejection shows as the Read returning this bound's own timeout
+// error - a rejected chunk reaches no handler - so the bound is
+// what a rejected answer costs the arm; a healthy answer crosses
+// the loopback in milliseconds, and one slower than the bound is
+// indistinguishable from a rejection on both arms. readBound sits
+// under the harness's read bound (harness.go), so the peer's
+// connection is never released for idling before the Read returns.
 const readBound = 3 * time.Second
 
 // The token ids the peer hands out: the issue token's id, and the
 // new id the renewal carries - a number the issue token never had,
 // so the channel holds two tokens to tell apart.
 const (
-	issueTokenID = uint32(15)
-	renewTokenID = uint32(16)
+	issueTokenID = 15
+	renewTokenID = 16
 )
 
 // The channel ids the arms differ in: the control arm's server
@@ -195,15 +223,14 @@ const (
 // instance, and the scored arm's assigns the two different numbers.
 // The ids are all that separates the arms.
 const (
-	controlChannelID = uint32(15)
-	scoredChannelID  = uint32(20)
+	controlChannelID = 15
+	scoredChannelID  = 20
 )
 
 func TestExpiredSecurityTokenIsRejected(t *testing.T) {
-	// knownBug records, for issue #941, that gopcua does not do this
-	// yet; the text is logged in place of a failure. ../README.md says
-	// when to delete it, and the header names the production lines
-	// that decide the outcome and the fix that deletes the constant.
+	// knownBug records that gopcua does not do this yet; the text is
+	// logged in place of a failure. ../README.md says when to delete
+	// it.
 	const knownBug = "scheduleExpiration empties and rebuilds the " +
 		"instance map under the token id while every arriving chunk is " +
 		"looked up under the channel id, so a server that assigns the " +
@@ -212,11 +239,15 @@ func TestExpiredSecurityTokenIsRejected(t *testing.T) {
 
 	// The control arm first: the server assigns the channel id and
 	// the token id the same number, and on this very tree the
-	// expiration happens to remove the right instance, so the arm is
-	// the instrument check - it shows that the run can see a rejection
-	// at all, and a run in which it does not see one proves nothing
-	// about the scored arm.
-	control, teardown := runExpiredTokenArm(controlChannelID)
+	// expiration happens to remove the right instance, so the arm
+	// is the instrument check - a run in which it sees no
+	// rejection proves nothing about the scored arm. Its four
+	// declines below - no renewal in the peer's records, the
+	// arm's Read never reaching the peer, the old-token response
+	// handed to the caller, the renewed-token answer not handed
+	// to it - each leaves the check unrun or its rejection
+	// ungrounded, whichever side caused them.
+	control, teardown := runRejectionArm(controlChannelID)
 	t.Cleanup(teardown)
 	if control.setupWhy != "" {
 		if control.setupFromGopcua {
@@ -228,8 +259,8 @@ func TestExpiredSecurityTokenIsRejected(t *testing.T) {
 	}
 	if !control.renewalSeen {
 		t.Fatalf("could not set the test up: the control arm's peer holds " +
-			"no renewal, so there is no new token id on the same channel " +
-			"for the scored answer to be old against")
+			"no renewal, so the answer's token would be the channel's only " +
+			"one, not an old one, and this run cannot be scored")
 	}
 	if !control.readArrived {
 		t.Fatalf("could not set the test up: the control arm's Read never " +
@@ -242,10 +273,13 @@ func TestExpiredSecurityTokenIsRejected(t *testing.T) {
 			"see a rejection at all and this run proves nothing about the " +
 			"scored arm")
 	}
+	if !control.renewedResponseArrived {
+		t.Fatalf("could not set the test up: the control arm's client did " +
+			"not hand the renewed-token answer to its caller, so the " +
+			"instrument check never ran")
+	}
 
-	// The scored arm: the same exchange against a server that assigns
-	// the channel id and the token id different numbers.
-	scored, teardown := runExpiredTokenArm(scoredChannelID)
+	scored, teardown := runRejectionArm(scoredChannelID)
 	t.Cleanup(teardown)
 	if scored.setupWhy != "" {
 		if scored.setupFromGopcua {
@@ -257,87 +291,86 @@ func TestExpiredSecurityTokenIsRejected(t *testing.T) {
 	}
 	if !scored.renewalSeen {
 		t.Fatalf("could not set the test up: the scored arm's peer holds " +
-			"no renewal, so there is no new token id on the same channel " +
-			"for the scored answer to be old against")
+			"no renewal, so the answer's token would be the channel's only " +
+			"one, not an old one, and this run cannot be scored")
 	}
 	if !scored.readArrived {
-		// Unhandled it would read as a rejection - the body never
-		// arriving, a false pass - and the harness's setup check
-		// already holds the peer's half clean, so a Read that never
-		// arrives can only be the client's own doing.
 		t.Errorf("the scored arm's Read never reached the peer, so the arm " +
-			"scored nothing: with the peer's half clean this is gopcua's " +
-			"own doing, and it is scored as gopcua's failure, never " +
+			"scored nothing: the harness's setup check reports no " +
+			"failure on the peer's side, so the client's own behaviour " +
+			"stopped it, and that is scored as gopcua's failure, never " +
 			"declined")
 		return
 	}
 
-	// The arm keys on the body, per the README: acceptance is the
-	// old-token response body arriving at the caller, rejection its
-	// never arriving; which error the Read returned along the way is
-	// never scored.
 	switch {
 	case scored.responseArrived && knownBug != "":
 		t.Logf("known bug: %s (the scored arm's client, whose server "+
-			"assigned the channel id %d and the token id %d, handed the "+
-			"response chunk stamped with the old, expired token id %d and "+
-			"signed with its keys to its caller, while the control arm's "+
-			"client, whose server assigned both the same number, rejected "+
-			"its own)",
+			"assigned the channel id %d and the token id %d, handed its "+
+			"caller the response chunk stamped with the old, expired "+
+			"token id %d and signed with its keys, while the control "+
+			"arm's client, whose server assigned both the same number, "+
+			"rejected its own)",
 			knownBug, scoredChannelID, issueTokenID, issueTokenID)
-	case knownBug != "":
-		t.Errorf("this now passes (both arms rejected the old-token " +
-			"response, so the body never arrived at either caller) - " +
-			"delete the knownBug constant, every arm that reads it, and " +
-			"anything only those arms used, in the commit that fixed it")
 	case scored.responseArrived:
 		t.Errorf("the scored arm's client handed the old-token response to " +
 			"its caller, where the control arm's client rejected its own, " +
 			"and no knownBug constant stands")
+	case !scored.renewedResponseArrived:
+		t.Fatalf("could not set the test up: the scored arm's client did " +
+			"not hand the renewed-token answer to its caller, so its " +
+			"rejection of the old-token response cannot be told from a " +
+			"channel dead for every token, and this run cannot be scored")
+	case knownBug != "":
+		t.Errorf("this now passes (both arms rejected the old-token " +
+			"response, so its body never arrived at either caller, and " +
+			"both carried the renewed-token answer, so neither channel " +
+			"was dead) - delete the knownBug constant, every arm that " +
+			"reads it, and anything only those arms used, in the commit " +
+			"that fixed it")
 	default:
 		t.Logf("both arms rejected the old-token response: neither caller " +
 			"saw the body")
 	}
 }
 
-// expiredArmOutcome is what one arm's run left within the row's reach:
-// whether the old-token response body arrived at the arm's caller,
-// whether the client's own renewal and the arm's scored Read arrived
-// at the peer, and the reason the run cannot be scored when there is
-// one, with setupFromGopcua telling which side caused it, in the
-// harness setupCheck's sense. It holds no handle on the peer: the
-// runner reads the peer's records after each stage of the arm's story
-// has played, so the outcome is one instant of the run and the row
-// never races a live connection for it.
-type expiredArmOutcome struct {
-	responseArrived bool
-	renewalSeen     bool
-	readArrived     bool
-	setupWhy        string
-	setupFromGopcua bool
+// rejectionArmOutcome is what one arm's run left within the row's
+// reach. It holds no handle on the peer: the runner reads the
+// peer's records after each stage of the arm's story has played,
+// so the row never races a live connection for it.
+type rejectionArmOutcome struct {
+	responseArrived        bool
+	renewedResponseArrived bool
+	renewalSeen            bool
+	readArrived            bool
+	setupWhy               string
+	setupFromGopcua        bool
 }
 
-// runExpiredTokenArm runs one arm of the row end to end: it mints the
+// runRejectionArm runs one arm of the row end to end: it mints the
 // client's and the peer's keys in memory, starts a fresh peer
-// speaking Basic256Sha256 in mode Sign through the signCodec below,
-// which hands out an issue token carrying the channel id it is given
-// and the token id issueTokenID and answers the client's own renewal
-// with the token id renewTokenID on the same channel, and launches a
-// fresh client - the real opcua.Client, driven through Dial and no
-// further. The arm waits out the issue token's lifetime plus its
-// 25 % grace window, then sends its one scored Read, bounded by
-// readBound, which the peer answers with a response chunk stamped
-// with the old, expired token and signed with the old token's keys,
-// chosen with the script's answerToken hook. It returns what the
-// arm's run left to score and the peer's teardown for the row to
-// register with t.Cleanup; keys that could not be minted, a peer that
-// could not be started or a client that could not be built is a
-// decline whichever side caused it, reported through o.setupWhy and
-// printed by the row with "could not set the test up", per
-// ../README.md. The runner never aborts the test; it returns plain
-// values.
-func runExpiredTokenArm(channelID uint32) (o expiredArmOutcome, teardown func()) {
-	clientKey, clientCert, why := mintSigningCert("gopcua-securechannel-client")
+// speaking Basic256Sha256 in mode Sign through the signCodec below.
+// The peer hands out an issue token carrying the channel id it is
+// given and the token id issueTokenID and answers the client's own
+// renewal with the token id renewTokenID on the same channel; the
+// arm launches a fresh client - the real opcua.Client, driven
+// through Dial and no further. The arm waits out the issue token's
+// lifetime plus its 25 % grace window, then sends two Reads, each
+// bounded by readBound: the peer answers the first with a
+// response chunk stamped with the old, expired token and signed
+// with the old token's keys and the second with a chunk secured
+// with the renewed token, mapped by the script's answerToken
+// hook. It returns what the arm's run left to score and the
+// peer's teardown for the row to register with t.Cleanup; keys
+// that could not be minted, a peer that could not be started or
+// a client that could not be built is a decline whichever side
+// caused it, reported through o.setupWhy and printed by the row
+// with "could not set the test up", per ../README.md. The runner
+// never aborts the test; it returns plain values.
+func runRejectionArm(channelID uint32) (o rejectionArmOutcome,
+	teardown func()) {
+	clientKey, clientCert, why := mintSigningCert(
+		"gopcua-securechannel-client")
 	if why != "" {
 		o.setupWhy = why
 		return o, func() {}
@@ -348,10 +381,7 @@ func runExpiredTokenArm(channelID uint32) (o expiredArmOutcome, teardown func())
 		return o, func() {}
 	}
 
-	// The issue token is the short one; the renewal token's long
-	// lifetime keeps its own renewal and expiry out of the arm. The
-	// stamp is the peer's own clock, the clock the client measures
-	// the token's life on.
+	// The peer stamps both tokens with its own clock.
 	createdAt := time.Now()
 	issue := channelToken{
 		channelID: channelID,
@@ -365,6 +395,8 @@ func runExpiredTokenArm(channelID uint32) (o expiredArmOutcome, teardown func())
 		createdAt: createdAt,
 		lifetime:  uint32(renewalLifetime / time.Millisecond),
 	}
+	// readAnswers is counted on a serve goroutine, so it must be atomic.
+	var readAnswers atomic.Uint32
 	peer, teardown, why := startPeer(peerScript{
 		issue: issue,
 		renew: renew,
@@ -374,11 +406,18 @@ func runExpiredTokenArm(channelID uint32) (o expiredArmOutcome, teardown func())
 			}
 			return nil
 		},
-		// The scored answer is stamped with the old, expired token:
-		// the chunk carries its token id and, under Sign, its signature
-		// is made with its keys.
-		answerToken: func(ua.Request) *channelToken { return &issue },
-		codec:       newSignCodec(peerKey, peerCert),
+		// The hook maps the arm's Reads to their tokens: the scored
+		// answer is stamped with the old, expired token - the chunk
+		// carries its token id and, under Sign, its signature is made
+		// with its keys - and the second Read's answer with the
+		// renewed one.
+		answerToken: func(ua.Request) *channelToken {
+			if readAnswers.Add(1) == 1 {
+				return &issue
+			}
+			return &renew
+		},
+		codec: newSignCodec(peerKey, peerCert),
 	})
 	if why != "" {
 		o.setupWhy = why
@@ -409,36 +448,35 @@ func runExpiredTokenArm(channelID uint32) (o expiredArmOutcome, teardown func())
 		return o, teardown
 	}
 
-	// Wait out the issue token's lifetime plus its 25 % grace window
-	// on the client's clock - the stamp the peer put on the token is
-	// the clock the client schedules its expiration from - plus
-	// graceWait for the timer's goroutine to have fired.
 	windowEnd := issue.createdAt.Add(tokenLifetime).
 		Add(tokenLifetime / 4).Add(graceWait)
 	if d := time.Until(windowEnd); d > 0 {
 		time.Sleep(d)
 	}
 
-	// The client's own renewal, due at 75 % of the lifetime, has had
-	// the whole window to arrive; without it there is no new token id
-	// on the same channel for the scored answer to be old against.
+	// The client's own renewal has had the whole window to arrive.
 	for _, opn := range peer.record().OPNs {
 		if opn.Type == ua.SecurityTokenRequestTypeRenew {
 			o.renewalSeen = true
+			break
 		}
 	}
 	if o.renewalSeen {
-		readCtx, cancel := context.WithTimeout(context.Background(), readBound)
-		res, _ := client.Read(readCtx, &ua.ReadRequest{
-			NodesToRead: []*ua.ReadValueID{{
-				NodeID:      ua.NewNumericNodeID(0, 2255),
-				AttributeID: ua.AttributeIDValue,
-			}},
-		})
-		cancel()
-		// The arm keys on the body, never on which error the Read
-		// returned along the way.
-		o.responseArrived = res != nil
+		read := func() bool {
+			readCtx, cancel := context.WithTimeout(context.Background(), readBound)
+			res, _ := client.Read(readCtx, &ua.ReadRequest{
+				NodesToRead: []*ua.ReadValueID{{
+					NodeID:      ua.NewNumericNodeID(0, 2255),
+					AttributeID: ua.AttributeIDValue,
+				}},
+			})
+			cancel()
+			// The arm keys on the body, never on which error the Read
+			// returned along the way.
+			return res != nil
+		}
+		o.responseArrived = read()
+		o.renewedResponseArrived = read()
 	}
 
 	closeCtx, cancel := context.WithTimeout(context.Background(), dialBound)
@@ -464,7 +502,8 @@ func runExpiredTokenArm(channelID uint32) (o expiredArmOutcome, teardown func())
 // minting failed, the reason the run cannot be scored. A minting
 // failure is a decline ("could not set the test up"): it comes from
 // the environment's random source, not from gopcua.
-func mintSigningCert(commonName string) (key *rsa.PrivateKey, cert []byte, why string) {
+func mintSigningCert(commonName string) (key *rsa.PrivateKey,
+	cert []byte, why string) {
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		return nil, nil, fmt.Sprintf("generate a 2048-bit RSA key: %v", err)
@@ -474,9 +513,11 @@ func mintSigningCert(commonName string) (key *rsa.PrivateKey, cert []byte, why s
 		Subject:      pkix.Name{CommonName: commonName},
 		NotBefore:    time.Now().Add(-time.Hour),
 		NotAfter:     time.Now().Add(24 * time.Hour),
-		KeyUsage:     x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment | x509.KeyUsageDataEncipherment,
+		KeyUsage: x509.KeyUsageDigitalSignature |
+			x509.KeyUsageKeyEncipherment | x509.KeyUsageDataEncipherment,
 	}
-	cert, err = x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
+	cert, err = x509.CreateCertificate(rand.Reader, tmpl, tmpl,
+		&key.PublicKey, key)
 	if err != nil {
 		return nil, nil, fmt.Sprintf("create the certificate: %v", err)
 	}
@@ -484,18 +525,15 @@ func mintSigningCert(commonName string) (key *rsa.PrivateKey, cert []byte, why s
 }
 
 // signCodec is the chunkCodec of SecurityPolicy Basic256Sha256 in
-// mode Sign, and it lives in this file because no second row calls
-// it. It is the peer's half of the policy's algorithms - the
+// mode Sign. It is the peer's half of the policy's algorithms - the
 // asymmetric signing and encryption of the OPN exchange, the
 // symmetric signing of every other chunk - with keys minted in
 // memory at test time. It mirrors the byte layout the client's own
 // signAndEncrypt and verifyAndDecrypt produce
-// (uasc/secure_channel_instance.go): a chunk's signature covers the
-// whole chunk with its size field already fixed and sits at its end,
-// and an OPN chunk's plaintext is padded to a block boundary before
-// it is encrypted to the receiver's public key. It is not the library
-// grading itself: the row scores what the client does with the
-// chunks, and no arm scores the signature bytes.
+// (uasc/secure_channel_instance.go): a chunk's signature covers
+// the whole chunk and sits at its end, and an OPN chunk's plaintext
+// is padded to a block boundary before it is encrypted to the
+// receiver's public key. No arm scores the signature bytes.
 type signCodec struct {
 	// peerKey is the peer's own key: it signs the OPN responses and
 	// decrypts the client's OPN requests. peerCert is the DER
@@ -511,12 +549,11 @@ type signCodec struct {
 	clientKey   *rsa.PublicKey
 	clientThumb []byte
 
-	// mu guards everything below it; the harness calls the codec from
-	// its serve goroutines, one per connection, so a client that drops
-	// the channel and dials again reaches the codec on a second one.
-	// syms holds each token's symmetric keys, keyed by token id and
-	// derived off the ClientNonce of the OPN that drew the token and
-	// the ServerNonce of the response that carried it.
+	// mu guards clientKey, clientThumb and syms; the harness calls
+	// the codec from its serve goroutines, one per connection, so a
+	// client that drops the channel and dials again reaches the
+	// codec on a second one. syms holds each token's symmetric keys,
+	// keyed by token id.
 	mu   sync.Mutex
 	syms map[uint32]*uapolicy.EncryptionAlgorithm
 }
@@ -537,7 +574,8 @@ func newSignCodec(peerKey *rsa.PrivateKey, peerCert []byte) *signCodec {
 // a MSG or CLO chunk is verified with the symmetric keys of the token
 // its security header names. It returns the service request the
 // chunk carries and the request id from its sequence header.
-func (c *signCodec) decodeRequest(frame []byte) (ua.Request, uint32, error) {
+func (c *signCodec) decodeRequest(frame []byte) (
+	ua.Request, uint32, error) {
 	chunk := &uasc.MessageChunk{}
 	if _, err := chunk.Decode(frame); err != nil {
 		return nil, 0, err
@@ -551,31 +589,34 @@ func (c *signCodec) decodeRequest(frame []byte) (ua.Request, uint32, error) {
 // decodeOPN decodes one OpenSecureChannelRequest, the mirror of what
 // the client's own receive path does to the peer's OPN response: the
 // encrypted region is decrypted with the peer's private key, the
-// signature is verified over the header plus the plaintext - over
-// the plaintext alone the signed bytes are wrong - and the policy's
+// signature is verified over the header plus the plaintext - the
+// signature does not cover the plaintext alone - and the policy's
 // padding is stripped before the sequence header and the service
 // body are decoded.
-func (c *signCodec) decodeOPN(chunk *uasc.MessageChunk, frame []byte) (ua.Request, uint32, error) {
+func (c *signCodec) decodeOPN(chunk *uasc.MessageChunk,
+	frame []byte) (ua.Request, uint32, error) {
 	ash := chunk.AsymmetricSecurityHeader
 	if ash.SecurityPolicyURI != ua.SecurityPolicyURIBasic256Sha256 {
-		return nil, 0, fmt.Errorf("the OPN chunk's security header names %q, not Basic256Sha256",
-			ash.SecurityPolicyURI)
+		return nil, 0, fmt.Errorf("the OPN chunk's security header names %q, "+
+			"not Basic256Sha256", ash.SecurityPolicyURI)
 	}
 	clientCert, err := uapolicy.ParseCertificate(ash.SenderCertificate)
 	if err != nil {
-		return nil, 0, fmt.Errorf("parse the client's certificate from the OPN: %w", err)
+		return nil, 0, fmt.Errorf(
+			"parse the client's certificate from the OPN: %w", err)
 	}
 	clientKey, ok := clientCert.PublicKey.(*rsa.PublicKey)
 	if !ok {
-		return nil, 0, fmt.Errorf("the client's certificate carries a %T key, not RSA",
-			clientCert.PublicKey)
+		return nil, 0, fmt.Errorf("the client's certificate carries a %T "+
+			"key, not RSA", clientCert.PublicKey)
 	}
 	c.mu.Lock()
 	c.clientKey = clientKey
 	c.clientThumb = uapolicy.Thumbprint(ash.SenderCertificate)
 	c.mu.Unlock()
 
-	algo, err := uapolicy.Asymmetric(ua.SecurityPolicyURIBasic256Sha256, c.peerKey, clientKey)
+	algo, err := uapolicy.Asymmetric(ua.SecurityPolicyURIBasic256Sha256,
+		c.peerKey, clientKey)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -585,12 +626,14 @@ func (c *signCodec) decodeOPN(chunk *uasc.MessageChunk, frame []byte) (ua.Reques
 	copy(b, frame)
 	plaintext, err := algo.Decrypt(b[headerLength:])
 	if err != nil {
-		return nil, 0, fmt.Errorf("decrypt the OPN chunk's encrypted region: %w", err)
+		return nil, 0, fmt.Errorf(
+			"decrypt the OPN chunk's encrypted region: %w", err)
 	}
 	b = append(b[:headerLength], plaintext...)
 	sigLength := algo.RemoteSignatureLength()
 	if len(b) < headerLength+sigLength {
-		return nil, 0, fmt.Errorf("the OPN chunk is %d bytes, shorter than its headers and signature", len(b))
+		return nil, 0, fmt.Errorf("the OPN chunk is %d bytes, shorter than "+
+			"its headers and signature", len(b))
 	}
 	messageToVerify := b[:len(b)-sigLength]
 	signature := b[len(b)-sigLength:]
@@ -598,21 +641,16 @@ func (c *signCodec) decodeOPN(chunk *uasc.MessageChunk, frame []byte) (ua.Reques
 		return nil, 0, fmt.Errorf("verify the OPN chunk's signature: %w", err)
 	}
 
-	// Strip the policy's padding, the sender's own arithmetic: one
-	// PaddingSize byte under the 2048-bit keys the row mints, whose
-	// signatures run to exactly 256 bytes; the two-byte scheme
-	// belongs to longer keys.
-	paddingLength := int(messageToVerify[len(messageToVerify)-1])
-	if algo.SignatureLength() > 256 {
-		paddingLength <<= 8
-		paddingLength += int(messageToVerify[len(messageToVerify)-2])
-		paddingLength++
-	}
-	paddingLength++
+	// Strip the policy's padding: one PaddingSize byte under the
+	// 2048-bit keys the row mints, whose signatures run to exactly
+	// 256 bytes.
+	paddingLength := int(messageToVerify[len(messageToVerify)-1]) + 1
 	if paddingLength > len(messageToVerify)-headerLength {
-		return nil, 0, fmt.Errorf("the OPN chunk's padding (%d bytes) overruns its plaintext", paddingLength)
+		return nil, 0, fmt.Errorf("the OPN chunk's padding (%d bytes) "+
+			"overruns its plaintext", paddingLength)
 	}
-	return decodeServiceBody(messageToVerify[headerLength : len(messageToVerify)-paddingLength])
+	return decodeServiceBody(
+		messageToVerify[headerLength : len(messageToVerify)-paddingLength])
 }
 
 // decodeSymmetric decodes one symmetric chunk - a MSG or a CLO -
@@ -620,23 +658,27 @@ func (c *signCodec) decodeOPN(chunk *uasc.MessageChunk, frame []byte) (ua.Reques
 // signature is the policy's HMAC at its end, over everything before
 // it. The keys are those of the token the chunk's security header
 // names.
-func (c *signCodec) decodeSymmetric(chunk *uasc.MessageChunk, frame []byte) (ua.Request, uint32, error) {
+func (c *signCodec) decodeSymmetric(chunk *uasc.MessageChunk,
+	frame []byte) (ua.Request, uint32, error) {
 	tokenID := chunk.SymmetricSecurityHeader.TokenID
 	c.mu.Lock()
 	sym := c.syms[tokenID]
 	c.mu.Unlock()
 	if sym == nil {
-		return nil, 0, fmt.Errorf("no symmetric keys minted for the token id %d", tokenID)
+		return nil, 0, fmt.Errorf(
+			"no symmetric keys minted for the token id %d", tokenID)
 	}
 	sigLength := sym.RemoteSignatureLength()
 	headerLength := 12 + chunk.SymmetricSecurityHeader.Len()
 	if len(frame) < headerLength+sigLength {
-		return nil, 0, fmt.Errorf("the chunk is %d bytes, shorter than its headers and signature", len(frame))
+		return nil, 0, fmt.Errorf("the chunk is %d bytes, shorter than "+
+			"its headers and signature", len(frame))
 	}
 	signature := frame[len(frame)-sigLength:]
-	if err := sym.VerifySignature(frame[:len(frame)-sigLength], signature); err != nil {
-		return nil, 0, fmt.Errorf("verify the chunk's signature under the token id %d: %w",
-			tokenID, err)
+	if err := sym.VerifySignature(frame[:len(frame)-sigLength],
+		signature); err != nil {
+		return nil, 0, fmt.Errorf("verify the chunk's signature under "+
+			"the token id %d: %w", tokenID, err)
 	}
 	return decodeServiceBody(frame[headerLength : len(frame)-sigLength])
 }
@@ -656,7 +698,8 @@ func decodeServiceBody(data []byte) (ua.Request, uint32, error) {
 	}
 	req, ok := svc.(ua.Request)
 	if !ok {
-		return nil, 0, fmt.Errorf("the chunk's body is %T, not a service request", svc)
+		return nil, 0, fmt.Errorf(
+			"the chunk's body is %T, not a service request", svc)
 	}
 	return req, seq.RequestID, nil
 }
@@ -671,14 +714,17 @@ func decodeServiceBody(data []byte) (ua.Request, uint32, error) {
 // field fixed, signed with the peer's key and encrypted to the
 // client's public key: the mirror of what the client's own send path
 // does to its OPN request.
-func (c *signCodec) encodeOPN(token channelToken, req *ua.OpenSecureChannelRequest, seq, reqID uint32) ([]byte, error) {
+func (c *signCodec) encodeOPN(token channelToken,
+	req *ua.OpenSecureChannelRequest, seq, reqID uint32) ([]byte, error) {
 	c.mu.Lock()
 	clientKey, clientThumb := c.clientKey, c.clientThumb
 	c.mu.Unlock()
 	if clientKey == nil {
-		return nil, fmt.Errorf("the OPN to answer arrived before the client's certificate was learned")
+		return nil, fmt.Errorf("the OPN to answer arrived before the " +
+			"client's certificate was learned")
 	}
-	algo, err := uapolicy.Asymmetric(ua.SecurityPolicyURIBasic256Sha256, c.peerKey, clientKey)
+	algo, err := uapolicy.Asymmetric(ua.SecurityPolicyURIBasic256Sha256,
+		c.peerKey, clientKey)
 	if err != nil {
 		return nil, err
 	}
@@ -686,7 +732,8 @@ func (c *signCodec) encodeOPN(token channelToken, req *ua.OpenSecureChannelReque
 	if err != nil {
 		return nil, fmt.Errorf("mint the ServerNonce: %w", err)
 	}
-	sym, err := uapolicy.Symmetric(ua.SecurityPolicyURIBasic256Sha256, serverNonce, req.ClientNonce)
+	sym, err := uapolicy.Symmetric(ua.SecurityPolicyURIBasic256Sha256,
+		serverNonce, req.ClientNonce)
 	if err != nil {
 		return nil, fmt.Errorf("derive the token's symmetric keys: %w", err)
 	}
@@ -727,11 +774,8 @@ func (c *signCodec) encodeOPN(token channelToken, req *ua.OpenSecureChannelReque
 	// one-byte padding scheme.
 	headerLength := 12 + m.AsymmetricSecurityHeader.Len()
 	plaintextBlockSize := algo.PlaintextBlockSize()
-	paddingBytes := 1
-	if algo.RemoteSignatureLength() > 256 {
-		paddingBytes = 2
-	}
-	remainder := (len(b[headerLength:]) + algo.SignatureLength() + paddingBytes) % plaintextBlockSize
+	remainder := (len(b[headerLength:]) + algo.SignatureLength() + 1) %
+		plaintextBlockSize
 	paddingLength := 0
 	if remainder != 0 {
 		paddingLength = plaintextBlockSize - remainder
@@ -739,12 +783,10 @@ func (c *signCodec) encodeOPN(token channelToken, req *ua.OpenSecureChannelReque
 	for i := 0; i <= paddingLength; i++ {
 		b = append(b, byte(paddingLength))
 	}
-	if paddingBytes == 2 {
-		b = append(b, byte(paddingLength>>8))
-	}
 	// The size field is fixed before the chunk is signed, so the
 	// signature covers exactly the bytes the receiver verifies.
-	encryptedLength := ((len(b[headerLength:]) + algo.SignatureLength()) / plaintextBlockSize) * algo.BlockSize()
+	encryptedLength := ((len(b[headerLength:]) + algo.SignatureLength()) /
+		plaintextBlockSize) * algo.BlockSize()
 	binary.LittleEndian.PutUint32(b[4:], uint32(headerLength+encryptedLength))
 	signature, err := algo.Signature(b)
 	if err != nil {
@@ -761,19 +803,20 @@ func (c *signCodec) encodeOPN(token channelToken, req *ua.OpenSecureChannelReque
 // encodeMSG encodes a final MSG chunk carrying resp under the given
 // channel id and token id, with the given sequence number and
 // request id, signed with the symmetric keys of the token the id
-// names - so a chunk the script stamps with the old token id is
-// signed with the old token's keys, which is the stimulus the row
-// scores. Under Sign the chunk is neither padded nor encrypted.
-func (c *signCodec) encodeMSG(channelID, tokenID, seq, reqID uint32, resp ua.Response) ([]byte, error) {
+// names. Under Sign the chunk is neither padded nor encrypted.
+func (c *signCodec) encodeMSG(channelID, tokenID, seq, reqID uint32,
+	resp ua.Response) ([]byte, error) {
 	c.mu.Lock()
 	sym := c.syms[tokenID]
 	c.mu.Unlock()
 	if sym == nil {
-		return nil, fmt.Errorf("no symmetric keys minted for the token id %d", tokenID)
+		return nil, fmt.Errorf(
+			"no symmetric keys minted for the token id %d", tokenID)
 	}
 	m := &uasc.Message{
 		MessageHeader: &uasc.MessageHeader{
-			Header:                  uasc.NewHeader(uasc.MessageTypeMessage, uasc.ChunkTypeFinal, channelID),
+			Header: uasc.NewHeader(uasc.MessageTypeMessage,
+				uasc.ChunkTypeFinal, channelID),
 			SymmetricSecurityHeader: uasc.NewSymmetricSecurityHeader(tokenID),
 			SequenceHeader:          uasc.NewSequenceHeader(seq, reqID),
 		},
