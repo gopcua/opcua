@@ -46,7 +46,7 @@
 // case stands guard for a client that reads earlier. The channel id
 // and the token id being the same number is load-bearing: gopcua's
 // expiration wipes the channel instance under the token id
-// (uasc/secure_channel.go:888) while every arriving response is
+// (uasc/secure_channel.go:888-890) while every arriving response is
 // looked up under the channel id (uasc/secure_channel.go:536,
 // uasc/secure_channel.go:556), so the premature wipe only lands on
 // the instance a response needs when a server assigns both the same
