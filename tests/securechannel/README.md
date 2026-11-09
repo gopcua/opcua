@@ -78,14 +78,16 @@ match `harness.go`, which is the fixture itself and not a row.
 Two rows - expired_security_token_is_rejected_test.go and
 received_sequence_number_is_verified_test.go - score a chunk the
 client must not hand to its caller, and the phrase means one
-observable. On these trees a rejected chunk reaches no handler, so the
-request whose answer it was is never answered: it returns its own
-timeout error, the timeout the row bound it with. Those rows read the
-rejection as exactly that - the request returning its own timeout
-error, with no response body behind it - and the acceptance, the
-knownBug arm, as the body arriving. Neither row scores which error the
-client raises along the way, only whether the scored answer is the
-one that must not arrive.
+observable: the response body arrives at the caller, or it does not.
+The rejection is the body never arriving; the acceptance, the knownBug
+arm, is the body arriving. On these unfixed trees the rejection shows
+as the request returning its own timeout error, the timeout the row
+bound it with, because a rejected chunk reaches no handler and so the
+request is never answered - but that is how the rejection shows here,
+not what it is: a fixed client that closes the channel on a failed
+check (§6.7.7) returns the closed channel's error, an EOF, not a
+timeout. So the rows key on the body and never on which error the
+request returns along the way.
 
 ## When a row declines
 
