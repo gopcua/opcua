@@ -117,10 +117,10 @@
 // scored arm. The knownBug
 // constant, for issue #941, records that gopcua does not do this yet:
 // scheduleExpiration empties and rebuilds the instance map under the
-// TOKEN id (uasc/secure_channel.go:888, uasc/secure_channel.go:890,
-// uasc/secure_channel.go:900) while every arriving chunk is looked up
-// under the CHANNEL id (uasc/secure_channel.go:536,
-// uasc/secure_channel.go:556), so when the server assigns the two
+// TOKEN id (uasc/secure_channel.go:952, uasc/secure_channel.go:954,
+// uasc/secure_channel.go:964) while every arriving chunk is looked up
+// under the CHANNEL id (uasc/secure_channel.go:579,
+// uasc/secure_channel.go:603), so when the server assigns the two
 // different numbers the expired instance is never removed and the
 // old-token signature still verifies. The knownBug arm is the scored
 // arm accepting the old-token response, a presence a fixed client does
@@ -130,16 +130,16 @@
 // id, after which both arms reject the old-token response and hand
 // the renewed-token answer to their callers, and only such a run
 // carries the demand - a client that rejects both answers is a
-// decline, never a fix; measured on main and on
-// the candidate fixes #911 and #904 the scored arm still logs the
-// known bug, because neither touches the expiration's keying. When
+// decline, never a fix; measured on main before and after #911 and
+// #904 merged, the scored arm still logs the known bug, because
+// neither touches the expiration's keying. When
 // the constant stands, the scored arm's acceptance is logged as the
 // known bug; when both arms reject, that is a hard error telling
 // whoever runs it to delete the constant, every arm that reads it,
 // and anything only those arms used.
 //
 // No reference stack has been read for this behaviour; the measurement
-// on main and on the two candidate fixes is the row's own.
+// on main before and after PRs #911 and #904 merged is the row's own.
 package securechannel
 
 import (
