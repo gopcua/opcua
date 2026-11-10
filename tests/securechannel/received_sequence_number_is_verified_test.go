@@ -87,37 +87,35 @@
 // score, when the fixture fails its half or a stage the story needs
 // never ran, whichever side caused it - the peer's own failure, the
 // channel never opening, the well-formed answer never arriving at the
-// caller though its Read reached the peer - and it scores, never
-// declines, a client whose own behaviour leaves the run unscoreable:
-// a frame the harness flags as the client's own bytes is that, the
-// setup check's report of gopcua's own behaviour, and so is the arm's
-// Read never arriving at the peer - the setup check holds the peer's
-// half clean, so a Read that never arrives can only be the client's
-// own doing - a failure the row scores with t.Errorf and never a
-// decline. The knownBug constant records that gopcua does not do this
+// caller though both the arm's Reads reached the peer - and it scores,
+// never declines, a client whose own behaviour leaves the run
+// unscoreable: a frame the harness flags as the client's own bytes is
+// that, the setup check's report of gopcua's own behaviour, and so is
+// the arm's Read never arriving at the peer - the setup check holds the
+// peer's half clean, so a Read that never arrives can only be the
+// client's own doing - a failure the row scores with t.Errorf and never
+// a decline. The knownBug constant records that gopcua does not do this
 // yet: the receive path decodes the sequence header at
 // uasc/secure_channel.go:520 (n, err :=
 // m.SequenceHeader.Decode(m.Data)) but never compares the number it
 // carries, a single-chunk message is returned without any look at it
 // (uasc/secure_channel.go:1231), and the only read of a received
-// SequenceNumber silently skips a duplicate within one chunked
-// message instead of raising the transport error
-// (uasc/secure_channel.go:1238), so a reused number and a skipped
-// number are both accepted on every tree measured. The knownBug arm
-// is either arm's caller being handed the response whose
-// SequenceNumber was reused or skipped - a presence a fixed client
-// does not show - and what deletes the constant is a fix that
-// verifies the SequenceNumber of every received chunk and raises the
-// transport error; there is no pull request to name. When the
+// SequenceNumber silently skips a duplicate within one chunked message
+// instead of raising the transport error (uasc/secure_channel.go:1238),
+// so a reused number and a skipped number are both accepted on every
+// tree measured. The knownBug arm is either arm's caller being handed
+// the response whose SequenceNumber was reused or skipped - a presence
+// a fixed client does not show - and what deletes the constant is a fix
+// that verifies the SequenceNumber of every received chunk and raises
+// the transport error; there is no pull request to name. When the
 // constant stands, the acceptance is logged as the known bug, with
 // which arm's caller was handed its response, so exactly one arm
 // accepting is still the known bug: a partial fix - a check that
-// catches a reused number and lets a skipped one by - stays logged
-// and visible, not mistaken for the whole fix; when both arms'
-// responses are rejected and both arms' well-formed answers handed to
-// their callers, that is a hard error telling whoever runs it to
-// delete the constant, every arm that reads it, and anything only
-// those arms used.
+// catches a reused number and lets a skipped one by - stays logged and
+// visible, not mistaken for the whole fix; when both arms' responses
+// are rejected and both arms' well-formed answers handed to their
+// callers, that is a hard error telling whoever runs it to delete the
+// constant, every arm that reads it, and anything only those arms used.
 //
 // No reference stack has been read for this behaviour; the measurement
 // on the trees this suite was authored against is the row's own.
