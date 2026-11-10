@@ -437,15 +437,8 @@ func runRejectionArm(channelID uint32) (o rejectionArmOutcome,
 		return o, teardown
 	}
 
-	dialCtx, cancel := context.WithTimeout(context.Background(), dialBound)
-	dialErr := client.Dial(dialCtx)
-	cancel()
-	if dialErr != nil {
-		if w, g := peer.setupCheck(); w != "" {
-			o.setupWhy, o.setupFromGopcua = w, g
-			return o, teardown
-		}
-		o.setupWhy = fmt.Sprintf("the channel never opened: %v", dialErr)
+	if why, fromGopcua := openChannel(client, peer, dialBound); why != "" {
+		o.setupWhy, o.setupFromGopcua = why, fromGopcua
 		return o, teardown
 	}
 
@@ -463,21 +456,8 @@ func runRejectionArm(channelID uint32) (o rejectionArmOutcome,
 		}
 	}
 	if o.renewalSeen {
-		bodyArrived := func() bool {
-			readCtx, cancel := context.WithTimeout(context.Background(), readBound)
-			res, _ := client.Read(readCtx, &ua.ReadRequest{
-				NodesToRead: []*ua.ReadValueID{{
-					NodeID:      ua.NewNumericNodeID(0, 2255),
-					AttributeID: ua.AttributeIDValue,
-				}},
-			})
-			cancel()
-			// The arm keys on the body, never on which error the Read
-			// returned along the way.
-			return res != nil
-		}
-		o.responseArrived = bodyArrived()
-		o.renewedResponseArrived = bodyArrived()
+		o.responseArrived = readBodyArrived(client, readBound)
+		o.renewedResponseArrived = readBodyArrived(client, readBound)
 	}
 
 	closeCtx, cancel := context.WithTimeout(context.Background(), dialBound)
