@@ -599,6 +599,34 @@ func TestArray(t *testing.T) {
 		_, err := Decode(b, MustVariant([][]uint32{{}, {}}))
 		require.ErrorIs(t, err, StatusBadEncodingLimitsExceeded)
 	})
+	t.Run("length negative", func(t *testing.T) {
+		b := []byte{
+			// variant encoding mask
+			0x87,
+			// array length
+			0xfe, 0xff, 0xff, 0xff, // -2
+		}
+
+		_, err := Decode(b, MustVariant([]uint32{0}))
+		require.ErrorIs(t, err, StatusBadEncodingLimitsExceeded)
+	})
+	t.Run("dimensions length exceeds remaining bytes", func(t *testing.T) {
+		b := []byte{
+			// variant encoding mask
+			0xc7,
+			// array length
+			0x00, 0x00, 0x00, 0x00,
+			// array values
+			// array dimensions length
+			0x00, 0x00, 0x10, 0x00, // 1048576, but no dimensions follow
+		}
+		v := MustVariant([]uint32{0})
+
+		_, err := Decode(b, v)
+
+		require.ErrorIs(t, err, StatusBadEncodingLimitsExceeded)
+		require.Empty(t, v.ArrayDimensions())
+	})
 }
 
 func TestSet(t *testing.T) {

@@ -2,10 +2,12 @@ package opcua
 
 import (
 	"context"
+	"expvar"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/gopcua/opcua/stats"
 	"github.com/gopcua/opcua/ua"
 	"github.com/stretchr/testify/require"
 )
@@ -245,4 +247,69 @@ func TestRepublishOrRecreateSubscriptions(t *testing.T) {
 		require.Equal(t, recreateSession, action)
 		require.Equal(t, []uint32{6647}, c.SubscriptionIDs())
 	})
+}
+
+// errorCount reads the current value of the named counter in the global
+// stats.Error() expvar map, treating a missing counter as zero.
+func errorCount(key string) int64 {
+	v := stats.Error().Get(key)
+	if v == nil {
+		return 0
+	}
+	iv, ok := v.(*expvar.Int)
+	if !ok {
+		return 0
+	}
+	return iv.Value()
+}
+
+// TestMonitorSubscriptionsSurvivesPauseResumeRace guards against
+// https://github.com/gopcua/opcua/issues/895: pausech/resumech used to be two
+// buffered channels read by the same select in monitorSubscriptions. When a
+// pause and a resume were both pending -- e.g. Subscription.Cancel() followed
+// by Client.Subscribe() -- Go's select picked one at random; if the resume was
+// picked first it was discarded and the loop then parked on the pause forever.
+//
+// The level-based publishPaused plus a best-effort wake-up removes the race.
+// This test hammers pauseSubscriptions/resumeSubscriptions concurrently and
+// checks that a final resume always gets the loop running again.
+func TestMonitorSubscriptionsSurvivesPauseResumeRace(t *testing.T) {
+	c, err := NewClient("opc.tcp://example.com:4840")
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		c.monitorSubscriptions(ctx)
+	}()
+	defer func() {
+		cancel()
+		<-done
+	}()
+
+	// c has no real connection, so a running loop reacts to being resumed by
+	// attempting exactly one PublishRequest, which fails immediately with
+	// StatusBadServerNotConnected (see sendWithTimeout) and re-pauses on its
+	// own. Counting this error proves the loop actually woke up and executed
+	// the publish path, rather than remaining parked forever.
+	const key = "ua.StatusBadServerNotConnected"
+	baseline := errorCount(key)
+
+	for i := 0; i < 200; i++ {
+		var wg sync.WaitGroup
+		wg.Add(2)
+		go func() { defer wg.Done(); c.pauseSubscriptions(ctx) }()
+		go func() { defer wg.Done(); c.resumeSubscriptions(ctx) }()
+		wg.Wait()
+
+		// Whatever order the two racing calls above landed in, make the
+		// desired end state explicit and unambiguous: the loop must run.
+		c.resumeSubscriptions(ctx)
+
+		require.Eventually(t, func() bool {
+			return errorCount(key) > baseline
+		}, time.Second, time.Millisecond, "iteration %d: publish loop appears stuck after a pause/resume race", i)
+		baseline = errorCount(key)
+	}
 }

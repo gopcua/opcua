@@ -917,3 +917,24 @@ func TestScheduleExpiration_ClockSkew(t *testing.T) {
 	require.Len(t, instances, 1, "instance should not expire immediately when server createdAt is in the past")
 	close(sc.closing)
 }
+
+func TestClientNonce(t *testing.T) {
+	none, err := uapolicy.Asymmetric(ua.SecurityPolicyURINone, nil, nil)
+	require.NoError(t, err)
+
+	t.Run("null by default", func(t *testing.T) {
+		nonce, err := clientNonce(&Config{}, none)
+		require.NoError(t, err)
+		require.Empty(t, nonce)
+	})
+
+	t.Run("ForceNonEmptyNonce", func(t *testing.T) {
+		cfg := &Config{ForceNonEmptyNonce: true}
+		a, err := clientNonce(cfg, none)
+		require.NoError(t, err)
+		require.Len(t, a, nonEmptyNonceLength)
+		b, err := clientNonce(cfg, none)
+		require.NoError(t, err)
+		require.NotEqual(t, a, b)
+	})
+}

@@ -648,7 +648,7 @@ func (s *SecureChannel) open(ctx context.Context, instance *channelInstance, req
 	s.openingInstance.algo = algo
 	s.openingInstance.SetMaximumBodySize(int(s.c.SendBufSize()))
 
-	localNonce, err := algo.MakeNonce()
+	localNonce, err := clientNonce(s.cfg, algo)
 	if err != nil {
 		return err
 	}
@@ -669,6 +669,27 @@ func (s *SecureChannel) open(ctx context.Context, instance *channelInstance, req
 		}
 		return s.handleOpenSecureChannelResponse(resp, localNonce, s.openingInstance)
 	})
+}
+
+// nonEmptyNonceLength is the length of the ClientNonce that
+// Config.ForceNonEmptyNonce sends. It is the minimum length below which a
+// Server shall return Bad_NonceInvalid (OPC 10000-4 §5.6.2.3).
+const nonEmptyNonceLength = 32
+
+// clientNonce returns the ClientNonce for an OpenSecureChannel request.
+func clientNonce(cfg *Config, algo *uapolicy.EncryptionAlgorithm) ([]byte, error) {
+	nonce, err := algo.MakeNonce()
+	if err != nil {
+		return nil, err
+	}
+	if len(nonce) > 0 || !cfg.ForceNonEmptyNonce {
+		return nonce, nil
+	}
+	nonce = make([]byte, nonEmptyNonceLength)
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		return nil, err
+	}
+	return nonce, nil
 }
 
 func (s *SecureChannel) handleOpenSecureChannelResponse(resp *ua.OpenSecureChannelResponse, localNonce []byte, instance *channelInstance) (err error) {
