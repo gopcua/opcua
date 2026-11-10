@@ -62,12 +62,12 @@
 // deliberately asserts nothing about the error the faulted Read
 // returned beyond the setup check that it was the injected one,
 // nothing about the session, and nothing about which error a fixed
-// client logs. The client's monitor tears down and redials on its own
-// goroutine, so the drop is not in the peer's records the moment the
-// row's calls return: a body that read them then scored the unfixed
-// tree as kept, a false pass. The row waits out a settle window
-// before scoring the channel kept: it polls the peer's records for
-// the drop evidence - a new connection accepted, the original
+// client logs. An unfixed client's monitor tears down and redials on
+// its own goroutine, so the drop is not in the peer's records the
+// moment the row's calls return: a body that read them then scored
+// the unfixed tree as kept, a false pass. The row waits out a settle
+// window before scoring the channel kept: it polls the peer's records
+// for the drop evidence - a new connection accepted, the original
 // connection ended, the second marked Read arriving on a later
 // connection, the channel closed or replaced on the original
 // connection - and only a window that closes holding none of the four
@@ -103,31 +103,23 @@
 // the harness flags as the client's own bytes is not a decline: the
 // setup check reports it as gopcua's own behaviour, and the row
 // scores the run as gopcua's failure with t.Errorf, never declines
-// it. The knownBug constant records that gopcua does not do this yet:
-// the receive path bubbles a Bad serviceResult into the message's
-// error at uasc/secure_channel.go:426 (if status :=
+// it. The row passes on main since PR #904: a Bad ServiceResult on a
+// response no longer travels as a channel error. The receive path
+// stamps the message as a service fault and keeps the status as the
+// request's answer (uasc/secure_channel.go:468-470, if status :=
 // resp.Header().ServiceResult; status != ua.StatusOK { msg.Err =
-// status }), the dispatcher forwards that error to the client's
-// channel-error path at uasc/secure_channel.go:274 (case s.errch <-
-// msg.Err), and the monitor answers any error there by marking the
-// connection disconnected (client.go:325, client.go:341) and
-// recreating the secure channel (client.go:380, client.go:416), so on
-// main the faulted Read is followed by a teardown and a redial. The
-// knownBug arm is the drop: a new connection accepted, the original
-// connection ended, the second marked Read arriving on a later
-// connection, or the channel closed or replaced on the original
-// connection, each after the fault and none of which a fixed client
-// shows; what deletes the constant is the fix that stops a
-// service-level fault from being treated as a channel error, as PR
-// #904 does; measured on PR #911 the row still logs the known bug,
-// because that fix touches the token's clock and not the fault path.
-// When the constant stands, the drop is logged as the known bug; when
-// the channel is kept, that is a hard error telling whoever runs it
-// to delete the constant, every arm that reads it, and anything only
-// those arms used.
+// status; msg.serviceFault = true }), and the dispatcher forwards an
+// error to the client's channel-error path only when
+// msg.isChannelError() is true (uasc/secure_channel.go:308, if
+// msg.Err != nil && msg.isChannelError() { ... case s.errch <-
+// msg.Err:), which for a service fault means channelLost(code)
+// (uasc/secure_channel.go:91, return !ok || channelLost(code)) -
+// and Bad_TooManyOperations is not a code that loses the channel.
+// The faulted Read is answered, the channel stays up, and the second
+// marked Read travels on the original connection.
 //
 // No reference stack has been read for this behaviour; the measurement
-// on main and on the two candidate fixes is the row's own.
+// on main before and after PRs #911 and #904 merged is the row's own.
 package securechannel
 
 import (
@@ -155,12 +147,12 @@ var serviceFaultStatus = ua.StatusBadTooManyOperations
 const mark = 9876.5
 
 // settleWindow is how long the row polls the peer's records for the
-// drop evidence before scoring the channel kept. The client's monitor
-// tears down and redials on its own goroutine, so the window is
-// generous against the milliseconds that teardown takes on a loaded
-// machine. It must stay under the harness's read bound: a connection
-// that the bound ends for idling leaves a close the row must not
-// count as the client's own.
+// drop evidence before scoring the channel kept. An unfixed client's
+// monitor tears down and redials on its own goroutine, so the window
+// is generous against the milliseconds that teardown takes on a
+// loaded machine. It must stay under the harness's read bound: a
+// connection that the bound ends for idling leaves a close the row must
+// not count as the client's own.
 const settleWindow = 8 * time.Second
 
 // retryBound is how long the row keeps sending the second
@@ -184,14 +176,6 @@ const callBound = 6 * time.Second
 const poll = 25 * time.Millisecond
 
 func TestServiceFaultLeavesTheChannelOpen(t *testing.T) {
-	// knownBug records that gopcua does not do this yet; the text is
-	// logged in place of a failure. ../README.md says when to delete
-	// it.
-	const knownBug = "a Bad serviceResult is bubbled into the " +
-		"channel-error path and the monitor recreates the secure " +
-		"channel, so a ServiceFault that answered one request costs " +
-		"the whole channel and the client comes back on a new connection"
-
 	// The script answers the client's own exchanges normally - a
 	// CreateSession with a session worth activating, the activation,
 	// every Read the library sends for the namespace array, a
@@ -305,8 +289,8 @@ func TestServiceFaultLeavesTheChannelOpen(t *testing.T) {
 	}
 
 	// The settle window: the drop is not in the records the moment the
-	// row's calls return - the monitor tears down and redials on its
-	// own goroutine - so the row polls the records for the drop
+	// row's calls return - an unfixed monitor tears down and redials on
+	// its own goroutine - so the row polls the records for the drop
 	// evidence before it scores the channel kept.
 	var facts []string
 	settleDeadline := time.Now().Add(settleWindow)
@@ -334,17 +318,6 @@ func TestServiceFaultLeavesTheChannelOpen(t *testing.T) {
 	}
 
 	switch {
-	case len(facts) > 0 && knownBug != "":
-		t.Logf("known bug: %s (the drop evidence was: %s)", knownBug,
-			strings.Join(facts, "; "))
-	case len(facts) == 0 && knownBug != "":
-		t.Errorf("this now passes (the second marked Read was answered " +
-			"on the original connection, no new connection was " +
-			"accepted, the original connection never ended after the " +
-			"fault and the channel was never closed or replaced on " +
-			"it) - delete the knownBug constant, every arm that " +
-			"reads it, and anything only those arms used, in the " +
-			"commit that fixed it")
 	case len(facts) == 0:
 		t.Logf("the faulted Read left the channel open: the second " +
 			"marked Read was answered on the original connection, no " +
@@ -352,8 +325,7 @@ func TestServiceFaultLeavesTheChannelOpen(t *testing.T) {
 			"never ended after the fault and the channel was never " +
 			"closed or replaced on it")
 	default:
-		t.Errorf("the faulted Read was followed by a drop (%s), and "+
-			"no knownBug constant stands",
+		t.Errorf("the faulted Read was followed by a drop (%s)",
 			strings.Join(facts, "; "))
 	}
 }

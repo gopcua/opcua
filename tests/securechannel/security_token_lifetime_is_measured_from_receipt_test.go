@@ -46,9 +46,9 @@
 // case stands guard for a client that reads earlier. The channel id
 // and the token id being the same number is load-bearing: gopcua's
 // expiration wipes the channel instance under the token id
-// (uasc/secure_channel.go:888-890) while every arriving response is
-// looked up under the channel id (uasc/secure_channel.go:536,
-// uasc/secure_channel.go:556), so the premature wipe only lands on
+// (uasc/secure_channel.go:952-954) while every arriving response is
+// looked up under the channel id (uasc/secure_channel.go:579,
+// uasc/secure_channel.go:603), so the premature wipe only lands on
 // the instance a response needs when a server assigns both the same
 // number - which is what the open62541 server in issue #816 did,
 // which is why its response was dropped.
@@ -81,32 +81,19 @@
 // because the arm has no decline of its own. The control arm is the
 // instrument check: a run in which it does not see the reply proves
 // nothing about the skewed arm, and fails as a broken fixture, not
-// as a score. The knownBug constant records that gopcua does not do
-// this yet: it adopts the server's clock at
-// uasc/secure_channel.go:679 (instance.createdAt =
-// resp.SecurityToken.CreatedAt) and schedules the token's expiration
-// off that stamp at uasc/secure_channel.go:872 (when :=
-// instance.createdAt.Add(time.Second * time.Duration(
-// instance.revisedLifetime.Seconds()*expireAfter)) in
-// scheduleExpiration), so a token stamped six years back is wiped at
-// once and the skewed arm's reply is lost - on main the control arm
-// reports the injected fault and the skewed arm reports a timeout,
-// which is issue #816's symptom. The knownBug arm is the skewed arm
-// disagreeing with the control arm, and what deletes the constant is
-// any fix that stops a backdated stamp from costing the skewed arm
-// its answer within the run - PR #911's, measuring from receipt, is
-// one - and the row scores that observable only: a deferral that
-// holds the wipe back longer than createSessionDelay turns the arm
-// the same way, and the row cannot tell the two apart. Measured on
-// PR #904 the row still logs the known bug, because that fix touches
-// the ServiceFault path and not the clock. When the constant stands,
-// the skewed arm's disagreement is logged as the known bug; when both
-// arms agree, that is a hard error telling whoever runs it to delete
-// the constant, every arm that reads it, and anything only those arms
-// used.
+// as a score. The row passes on main since PR #911: scheduleExpiration
+// no longer takes the token's timer from the server's createdAt.
+// It measures the token's remaining life on the client's own clock,
+// scheduling the wipe for revisedLifetime x 1.25 counted from receipt
+// (uasc/secure_channel.go:936, when := time.Second * time.Duration(
+// instance.revisedLifetime.Seconds()*expireAfter)) and running that
+// duration on a plain timer (uasc/secure_channel.go:940, t :=
+// time.NewTimer(when)), so a stamp six years back costs the skewed
+// arm nothing within the run: both arms' clients return the injected
+// fault, and that agreement is the outcome the row scores.
 //
 // No reference stack has been read for this behaviour; the measurement
-// on main and on the two candidate fixes is the row's own.
+// on main before and after PRs #911 and #904 merged is the row's own.
 package securechannel
 
 import (
@@ -150,14 +137,6 @@ const requestTimeout = 2 * time.Second
 const armBound = 5 * time.Second
 
 func TestSecurityTokenLifetimeIsMeasuredFromReceipt(t *testing.T) {
-	// knownBug records that gopcua does not do this yet; the text is
-	// logged in place of a failure. ../README.md says when to delete
-	// it.
-	const knownBug = "the client adopts the server's createdAt and " +
-		"schedules the security token's expiration off that stamp, so a " +
-		"token stamped on a clock six years behind the client's own is " +
-		"wiped at once and the well-formed answer that follows it is lost"
-
 	// The control arm is the instrument check, and a run in which it
 	// never saw the reply proves nothing about the skewed arm: its two
 	// not-seeing-the-reply failures below - no CreateSession arriving,
@@ -201,17 +180,6 @@ func TestSecurityTokenLifetimeIsMeasuredFromReceipt(t *testing.T) {
 	skewFault := isServiceFault(skewed.connectErr, faultStatus)
 
 	switch {
-	case !skewFault && skewed.createSession && knownBug != "":
-		t.Logf("known bug: %s (the control arm's client returned the "+
-			"injected ServiceFault %s; the skewed arm's client, handed a "+
-			"token stamped six years back, returned %v instead)",
-			knownBug, faultStatus, skewed.connectErr)
-	case skewFault && knownBug != "":
-		t.Errorf("this now passes (the skewed arm's client returned the "+
-			"injected ServiceFault %s exactly as the control arm's client "+
-			"did) - delete the knownBug constant, every arm that reads it, "+
-			"and anything only those arms used, in the commit that fixed it",
-			faultStatus)
 	case !skewed.createSession:
 		t.Errorf("the skewed arm's client returned %v without ever "+
 			"sending a CreateSession. The skewed arm has no decline of its "+

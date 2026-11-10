@@ -115,20 +115,19 @@ says which stages its own check covers; the check the rows share is
 
 ## The knownBug ledger
 
-Four constants stand, one per row, each declared in its row's test
-function, each naming the production lines that decide the outcome and
-what deletes it:
+Two constants stand, in the two rows that still need one, each
+declared in its row's test function, each naming the production lines
+that decide the outcome and what deletes it:
 
-- `security_token_lifetime_is_measured_from_receipt_test.go`: the
-  client adopts the server's createdAt and schedules expiration off it;
-  PR #911's fix - measuring from receipt - deletes it.
-- `service_fault_leaves_the_channel_open_test.go`: a Bad serviceResult
-  is bubbled into the channel-error path and the monitor recreates the
-  channel; PR #904's fix - keeping the channel open on a service fault
-  - deletes it.
 - `expired_security_token_is_rejected_test.go`: issue #941; the
   expiration is keyed by the token id where every lookup is by the
   channel id; keying it by the channel id deletes it.
 - `received_sequence_number_is_verified_test.go`: no pull request; the
   receive path decodes the sequence header but never compares the
   number; a fix that verifies it deletes it.
+
+Two rows pass on main and carry no constant:
+`security_token_lifetime_is_measured_from_receipt_test.go`, which PR
+#911 closed by measuring the token's lifetime from receipt, and
+`service_fault_leaves_the_channel_open_test.go`, which PR #904 closed
+by keeping a service fault off the channel-error path.

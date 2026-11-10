@@ -96,12 +96,12 @@
 // client's own doing - a failure the row scores with t.Errorf and never
 // a decline. The knownBug constant records that gopcua does not do this
 // yet: the receive path decodes the sequence header at
-// uasc/secure_channel.go:520 (n, err :=
+// uasc/secure_channel.go:563 (n, err :=
 // m.SequenceHeader.Decode(m.Data)) but never compares the number it
 // carries, a single-chunk message is returned without any look at it
-// (uasc/secure_channel.go:1231), and the only read of a received
+// (uasc/secure_channel.go:1295-1296), and the only read of a received
 // SequenceNumber silently skips a duplicate within one chunked message
-// instead of raising the transport error (uasc/secure_channel.go:1238),
+// instead of raising the transport error (uasc/secure_channel.go:1302),
 // so a reused number and a skipped number are both accepted on every
 // tree measured. The knownBug arm is either arm's caller being handed
 // the response whose SequenceNumber was reused or skipped - a presence
