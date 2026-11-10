@@ -40,6 +40,7 @@
 package securechannel
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -47,6 +48,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gopcua/opcua"
 	"github.com/gopcua/opcua/tests/internal/scriptedpeer"
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uacp"
@@ -293,6 +295,9 @@ type scriptedPeer struct {
 	nextConn int
 	fixture  string // the peer's own failure, a decline
 	client   string // the client's own bytes, gopcua's behaviour
+	// shut is set by teardown; serve closes a connection Accept
+	// dequeued after it set.
+	shut bool
 }
 
 // startPeer brings the peer up on the loopback interface, on the shared
@@ -312,6 +317,7 @@ func startPeer(script peerScript) (*scriptedPeer, func(), string) {
 		_ = l.Close()
 		p.mu.Lock()
 		defer p.mu.Unlock()
+		p.shut = true
 		for _, c := range p.conns {
 			_ = c.Close()
 		}
@@ -325,7 +331,11 @@ func (p *scriptedPeer) addr() string { return p.lis.Addr().String() }
 // serve accepts connections until the listener closes in teardown and
 // serves each on its own goroutine, so a client that drops one
 // connection and dials again is served on a second generation while the
-// first is still draining.
+// first is still draining. The guard after each Accept is the one
+// scriptedpeer.Core.Accept documents: a connection the loop dequeued
+// after teardown set shut was never in the snapshot of conns teardown
+// closed, so it is closed here - else its serveConn goroutine
+// outlives the test.
 func (p *scriptedPeer) serve() {
 	for {
 		c, err := p.lis.Accept()
@@ -333,6 +343,11 @@ func (p *scriptedPeer) serve() {
 			return // the listener was closed in teardown
 		}
 		p.mu.Lock()
+		if p.shut {
+			p.mu.Unlock()
+			_ = c.Close()
+			return
+		}
 		p.nextConn++
 		connID := p.nextConn
 		p.conns = append(p.conns, c)
@@ -583,6 +598,49 @@ func (p *scriptedPeer) setupCheck() (why string, fromGopcua bool) {
 		return p.client, true
 	}
 	return "", false
+}
+
+// openChannel dials the client's endpoint within the bound the calling
+// row gives, and returns "" when the channel opened - or the reason
+// the run cannot be scored and which side caused it: the peer's setup
+// check first, because a half that failed there explains a dial that
+// never completed, and the dial error itself when the peer's half ran
+// clean, which is the channel never opening. It is a helper two rows
+// call, so per ../README.md it lives here; it returns plain values,
+// and the row turns a non-empty reason into the failure or the decline.
+func openChannel(c *opcua.Client, p *scriptedPeer,
+	bound time.Duration) (why string, fromGopcua bool) {
+	dialCtx, cancel := context.WithTimeout(context.Background(), bound)
+	dialErr := c.Dial(dialCtx)
+	cancel()
+	if dialErr != nil {
+		if w, g := p.setupCheck(); w != "" {
+			return w, g
+		}
+		return fmt.Sprintf("the channel never opened: %v", dialErr), false
+	}
+	return "", false
+}
+
+// readBodyArrived sends one Read of the namespace-array node,
+// bounded by the bound the calling row gives, and reports whether the
+// response's body reached the caller: the rows key on the body, never
+// on which error the Read returned along the way - on an unfixed tree
+// a rejection shows as the Read returning the bound's own timeout
+// error, and a fixed client returns the closed channel's error instead,
+// so the error cannot tell the two outcomes apart. It is a helper two
+// rows call, so per ../README.md it lives here; it returns a plain
+// value, and the row turns it into its score.
+func readBodyArrived(c *opcua.Client, bound time.Duration) bool {
+	readCtx, cancel := context.WithTimeout(context.Background(), bound)
+	res, _ := c.Read(readCtx, &ua.ReadRequest{
+		NodesToRead: []*ua.ReadValueID{{
+			NodeID:      ua.NewNumericNodeID(0, 2255),
+			AttributeID: ua.AttributeIDValue,
+		}},
+	})
+	cancel()
+	return res != nil
 }
 
 // responseHeader builds the ResponseHeader every scripted service

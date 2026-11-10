@@ -316,34 +316,13 @@ func runSequenceNumberArm(responseSeq uint32) (o sequenceArmOutcome,
 		return o, teardown
 	}
 
-	dialCtx, cancel := context.WithTimeout(context.Background(), openBound)
-	dialErr := client.Dial(dialCtx)
-	cancel()
-	if dialErr != nil {
-		if w, g := peer.setupCheck(); w != "" {
-			o.setupWhy, o.setupFromGopcua = w, g
-			return o, teardown
-		}
-		o.setupWhy = fmt.Sprintf("the channel never opened: %v", dialErr)
+	if why, fromGopcua := openChannel(client, peer, openBound); why != "" {
+		o.setupWhy, o.setupFromGopcua = why, fromGopcua
 		return o, teardown
 	}
 
-	bodyArrived := func() bool {
-		readCtx, readCancel := context.WithTimeout(context.Background(),
-			answerBound)
-		res, _ := client.Read(readCtx, &ua.ReadRequest{
-			NodesToRead: []*ua.ReadValueID{{
-				NodeID:      ua.NewNumericNodeID(0, 2255),
-				AttributeID: ua.AttributeIDValue,
-			}},
-		})
-		readCancel()
-		// The arm keys on the body, never on which error the Read
-		// returned along the way.
-		return res != nil
-	}
-	o.groundArrived = bodyArrived()
-	o.responseArrived = bodyArrived()
+	o.groundArrived = readBodyArrived(client, answerBound)
+	o.responseArrived = readBodyArrived(client, answerBound)
 
 	closeCtx, closeCancel := context.WithTimeout(context.Background(),
 		openBound)
