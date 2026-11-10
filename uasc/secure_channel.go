@@ -48,7 +48,47 @@ type MessageBody struct {
 	SecureChannelID uint32
 	Err             error
 
+	// serviceFault is set when Err is the ServiceResult of a response the
+	// server answered on an open channel, as opposed to a transport or
+	// decoding error. Such a fault names one request; it is handed to
+	// that request's handler and is a channel error only when the status
+	// says the channel or the session is gone (see channelLost).
+	serviceFault bool
+
 	body any
+}
+
+// channelLost reports whether a service result means the secure channel
+// or the session it carried can no longer be used, so that the client's
+// monitor has to reconnect. Every other service-level status is the
+// answer to the request that drew it: Bad_TooManyOperations,
+// Bad_ServiceUnsupported, Bad_UserAccessDenied and their like leave the
+// channel exactly as it was.
+func channelLost(code ua.StatusCode) bool {
+	switch code {
+	case ua.StatusBadSecureChannelIDInvalid,
+		ua.StatusBadSecureChannelClosed,
+		ua.StatusBadSecureChannelTokenUnknown,
+		ua.StatusBadSessionIDInvalid,
+		ua.StatusBadSessionClosed,
+		ua.StatusBadSessionNotActivated,
+		ua.StatusBadSubscriptionIDInvalid,
+		ua.StatusBadCertificateInvalid,
+		ua.StatusBadConnectionClosed:
+		return true
+	}
+	return false
+}
+
+// isChannelError reports whether Err should reach the client's monitor:
+// every transport and decoding error does, and a service fault only when
+// its status names the channel or the session as gone.
+func (b MessageBody) isChannelError() bool {
+	if !b.serviceFault {
+		return true
+	}
+	code, ok := b.Err.(ua.StatusCode)
+	return !ok || channelLost(code)
 }
 
 func (b MessageBody) Request() ua.Request {
@@ -265,7 +305,7 @@ func (s *SecureChannel) dispatcher() {
 			return
 		default:
 			msg := s.Receive(ctx)
-			if msg.Err != nil {
+			if msg.Err != nil && msg.isChannelError() {
 				select {
 				case <-s.closing:
 					return
@@ -421,10 +461,13 @@ func (s *SecureChannel) Receive(ctx context.Context) *MessageBody {
 			}
 
 			// If the service status is not OK then bubble
-			// that error up to the caller.
+			// that error up to the caller. It is the caller's answer,
+			// and the monitor's only when the status says the channel
+			// or the session is gone.
 			if resp := msg.Response(); resp != nil {
 				if status := resp.Header().ServiceResult; status != ua.StatusOK {
 					msg.Err = status
+					msg.serviceFault = true
 					return msg
 				}
 			}
