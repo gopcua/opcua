@@ -15,11 +15,15 @@
 // it is outstanding on, so the held notification cannot have reached the
 // client. Nothing tells the session its transport is gone.
 //
-// Exactly one notification is lost in the stream, and the scenario checks it:
-// a client that keeps one Publish outstanding leaves one sequence number
-// created and withheld, which is the one availableSeqsLocked offers back and
-// the one the rows name. A client that keeps more outstanding would lose more
-// than the rows describe, and the run is reported as a setup failure instead.
+// Exactly one notification is lost in the stream, and the scenario checks
+// it: after the first answer, publishStep holds every further Publish with no
+// response and creates no notification for it, so however many Publishes a
+// client keeps outstanding, exactly one sequence number is created and
+// withheld -- the one availableSeqsLocked offers back and the one the rows
+// name. The one-lost check in runScenario guards the fixture itself: a
+// held notification that is not the last one created means the fixture
+// created more than the one notification the tests describe, and the run is
+// reported as a setup failure instead.
 //
 // A run can ask for more than that one to be recoverable. runOptions.FurtherLost
 // notifications are created as the drop is applied and go straight into the
@@ -123,12 +127,13 @@ type recorder struct {
 	dropApplied bool
 	dropAt      time.Time
 
-	lastSeq       uint32   // highest notification sequence created so far
-	seqAtDrop     uint32   // lastSeq when the drop was applied
-	heldSeq       uint32   // sequence of the first held Publish; 0 = none
-	queued        []uint32 // further sequence numbers kept for retransmission; see the package comment
-	heldConn      int      // connection the held Publish is outstanding on; 0 = none
-	firstAnswered bool     // the stream's first Publish has been answered, ever
+	lastSeq        uint32   // highest notification sequence created so far
+	seqAtDrop      uint32   // lastSeq when the drop was applied
+	requestsAtDrop int      // len(requests) when the drop was applied; see requestTimelineAtDrop
+	heldSeq        uint32   // sequence of the first held Publish; 0 = none
+	queued         []uint32 // further sequence numbers kept for retransmission; see the package comment
+	heldConn       int      // connection the held Publish is outstanding on; 0 = none
+	firstAnswered  bool     // the stream's first Publish has been answered, ever
 
 	// acked and republished are the sequence numbers the client has
 	// acknowledged in a Publish and the ones a Republish has handed back.
@@ -326,17 +331,38 @@ func (o *recorder) recordDropStarted() {
 // dropped connection serves nothing more, so this is how many notifications
 // the server had created when the loss was made. The counter is frozen before
 // the further lost notifications are created, so they are not counted as
-// notifications the stream lost.
+// notifications the stream lost. It also freezes the length of the request
+// log, so requestTimelineAtDrop names the requests that arrived before the
+// loss and none that a redial recorded after it.
 func (o *recorder) recordDropApplied(furtherLost int) {
 	o.mu.Lock()
 	o.dropApplied = true
 	o.dropAt = time.Now()
 	o.seqAtDrop = o.lastSeq
+	o.requestsAtDrop = len(o.requests)
 	for i := 0; i < furtherLost; i++ {
 		o.lastSeq++
 		o.queued = append(o.queued, o.lastSeq)
 	}
 	o.mu.Unlock()
+}
+
+// requestTimelineAtDrop names every request recorded up to the drop, service
+// and connection, in order, as a runScenario one-lost failure's timeline. It
+// reads only the frozen prefix of the log, so a client that redialed while
+// the check was running cannot slip a request into it.
+func (o *recorder) requestTimelineAtDrop() string {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	n := o.requestsAtDrop
+	if n > len(o.requests) {
+		n = len(o.requests)
+	}
+	parts := make([]string, 0, n)
+	for _, r := range o.requests[:n] {
+		parts = append(parts, fmt.Sprintf("conn %d %s", r.Conn, r.Service))
+	}
+	return strings.Join(parts, ", ")
 }
 
 func (o *recorder) dropAppliedAt() time.Time {
@@ -466,9 +492,9 @@ func (o *recorder) heldPublishSeq() uint32 {
 // a Republish loop walking it never meets a hole -- which would look to a
 // test exactly like a client that stopped incrementing too early. A client
 // with several Publishes outstanding does not put one there either:
-// runScenario's one-lost check declines such a run before a row scores it,
-// and the withheld numbers past the first are in neither heldSeq nor queued,
-// so the list would come up short rather than holey.
+// publishStep holds every Publish after the first held one without creating
+// a notification, and runScenario's one-lost check fails the run as a setup
+// failure if a held notification is ever not the last one created.
 //
 // This is what the server retains. What it advertises is offeredLocked,
 // which takes off every number the client has acknowledged or been handed
@@ -519,23 +545,30 @@ func (o *recorder) heldPublishConn() int {
 // publishStep answers the stream's first Publish and holds every later one.
 // After the drop it answers again with fresh data, so a client that notices a
 // gap only when the next notification arrives has one to notice it in.
-// Every call uses up a sequence number, held or not.
+// The first Publish after the first answer is held and carries the withheld
+// notification; every further Publish that arrives before the drop is held
+// with no response and consumes no sequence number, so exactly one
+// notification is withheld however many Publishes the client keeps
+// outstanding.
 func (o *recorder) publishStep(connID int) (seq uint32, hold bool) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
-	o.lastSeq++
 	if o.dropApplied {
+		o.lastSeq++
 		return o.lastSeq, false
 	}
 	if o.firstAnswered {
 		if o.heldSeq == 0 {
+			o.lastSeq++
 			o.heldSeq = o.lastSeq
+			if o.heldConn == 0 {
+				o.heldConn = connID
+			}
+			return o.heldSeq, true
 		}
-		if o.heldConn == 0 {
-			o.heldConn = connID
-		}
-		return o.lastSeq, true
+		return 0, true
 	}
+	o.lastSeq++
 	o.firstAnswered = true
 	return o.lastSeq, false
 }
@@ -1492,10 +1525,16 @@ func runScenario(opts runOptions) runRecord {
 		}
 	}
 
-	// One notification is lost, not several: see the package comment.
+	// One notification is lost, not several: see the package comment. The
+	// check guards the fixture itself, so the requests recorded up to the
+	// drop go with the failure: a held notification that is not the last one
+	// created is a fixture bug, and the timeline shows which requests
+	// produced it.
 	if held, created := srv.rec.heldPublishSeq(), srv.rec.seqCreatedAtDrop(); held != created {
 		out.HarnessErr = fmt.Sprintf("the server held notification %d back and created %d more before the "+
-			"drop, so more than the one notification the tests describe was lost", held, created-held)
+			"drop, so more than the one notification the tests describe was lost (requests up to "+
+			"the drop: %s)",
+			held, created-held, srv.rec.requestTimelineAtDrop())
 		return out
 	}
 
