@@ -10,11 +10,13 @@ reads and records that a HEL message header arrived, and never answers.
 The rows score what `Dial` does while the peer withholds its Acknowledge,
 and which address of a name it dials; gopcua's uacp server would answer,
 and the silence is the stimulus, so a scripted peer is what the behaviours
-need. The fixture is small and lives entirely in `harness.go`; item 3's
-reading here is that fixture, and it is checkable the way it is in the
-other packages: `grep -c "See harness.go" tests/transport/*_test.go`
-prints 1 for every row; the glob does not match `harness.go`, which is
-the fixture itself and not a row. `refused_windows.go` and
+need. The fixture is small and lives in `harness.go` and in
+`../internal/scriptedpeer`, the peer core it shares with the
+securitypolicy package; item 3's reading here is that fixture, and it is
+checkable the way it is in the other packages:
+`grep -c "See harness.go" tests/transport/*_test.go` prints 1 for every
+row; the glob does not match `harness.go`, which is the fixture itself
+and not a row. `refused_windows.go` and
 `refused_other.go` are not rows either: they hold the build-tagged
 `refused` helper the address row's setup probe reads (a refused dial on
 Windows is Winsock's WSAECONNREFUSED, not `syscall.ECONNREFUSED`), and a
