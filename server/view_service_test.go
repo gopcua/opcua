@@ -204,3 +204,24 @@ func TestBrowseNextRejectsZeroMaxRefs(t *testing.T) {
 	require.Equal(t, ua.StatusBadContinuationPointInvalid, res.StatusCode)
 	require.Empty(t, res.ContinuationPoint, "must not return a continuation point that would re-loop")
 }
+
+// TestSuitableRefTypeWithoutSubtypes checks that filtering HasSubtype out of
+// the candidate reference types with IncludeSubtypes=false terminates. The
+// index-based delete loop this replaced kept deleting the same slot until the
+// slice ran out of bounds and panicked, which Browse hit for the standard
+// References hierarchy.
+func TestSuitableRefTypeWithoutSubtypes(t *testing.T) {
+	s := New()
+
+	references := ua.NewNumericNodeID(0, id.References)
+	hasSubtype := ua.NewNumericNodeID(0, id.HasSubtype)
+
+	require.NotPanics(t, func() {
+		require.False(t, suitableRefType(s, references, hasSubtype, false),
+			"HasSubtype must not match when subtypes are excluded")
+	})
+	require.True(t, suitableRefType(s, references, hasSubtype, true),
+		"HasSubtype must match when subtypes are included")
+	require.True(t, suitableRefType(s, references, references, false),
+		"exact reference type must always match")
+}
