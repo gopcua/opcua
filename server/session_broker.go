@@ -18,7 +18,37 @@ type session struct {
 	serverNonce       []byte
 	remoteCertificate []byte
 
+	// activateMu serializes ActivateSession calls for this session, which run
+	// concurrently to the message loop. It guards serverNonce after creation.
+	activateMu sync.Mutex
+
+	// mu guards activated and identity
+	mu        sync.Mutex
+	activated bool
+	identity  *Identity
+
 	PublishRequests chan PubReq
+}
+
+// Activated reports whether the session was successfully activated.
+func (s *session) Activated() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.activated
+}
+
+// Identity returns the user identity the session was activated with, or nil.
+func (s *session) Identity() *Identity {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.identity
+}
+
+func (s *session) activate(id *Identity) {
+	s.mu.Lock()
+	s.activated = true
+	s.identity = id
+	s.mu.Unlock()
 }
 
 type sessionConfig struct {

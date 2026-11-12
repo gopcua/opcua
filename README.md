@@ -207,9 +207,66 @@ The current focus is on the OPC UA Binary protocol over TCP. No other protocols 
 |                | Basic256                         | Untested  |             |
 |                | Basic256Sha256                   | Untested  |             |
 | Authentication | Anonymous                        | Yes       |             |
-|                | User Name Password               | Untested  |             |
-|                | X509 Certificate                 | Untested  |             |
+|                | User Name Password               | Yes       | `server.UserNameAuth()`, RSA policies only |
+|                | X509 Certificate                 | Yes       | `server.X509Auth()`, RSA policies only |
 
+
+### Server Authentication
+
+User authentication is configured with `server.UserNameAuth` and `server.X509Auth`.
+Both modes are only advertised on endpoints whose security policy is not `None`,
+so passwords are always sent encrypted and certificate tokens are always signed.
+
+```go
+pool := x509.NewCertPool()
+pool.AddCert(trustedUserCert) // or the CA that issued user certificates
+
+s := server.New(
+	server.EndPoint("0.0.0.0", 4840),
+	server.Certificate(serverCert),
+	server.PrivateKey(serverKey),
+	server.EnableSecurity("Basic256Sha256", ua.MessageSecurityModeSignAndEncrypt),
+	server.UserNameAuth(server.StaticUsers(map[string]string{"alice": "s3cret"})),
+	server.X509Auth(server.TrustedUserCerts(pool)),
+	// server.EnableAuthMode(ua.UserTokenTypeAnonymous), // optional
+)
+```
+
+`UserNameAuthenticator` and `X509Authenticator` are plain functions, so custom
+user stores (LDAP, database, hashed passwords) can be plugged in. Enabling a
+mode with `EnableAuthMode` but without an authenticator rejects all logins of
+that type. Services other than discovery and session management require an
+activated session. Logins are handled off the server's message loop, so a slow
+authenticator does not block other clients.
+
+#### Users file (`contrib/userstore`)
+
+`StaticUsers` keeps plain-text passwords in memory and needs a restart to
+change them. For real deployments use
+[`contrib/userstore`](contrib/userstore), a separate module (so the core stays
+dependency-free) that stores users in `users.yaml` with **bcrypt** hashes,
+reloads the file automatically, caches successful logins and throttles password
+guessing:
+
+```bash
+go install github.com/gopcua/opcua/contrib/userstore/cmd/opcua-users@latest
+opcua-users -f users.yaml add alice -role operator   # prompts for the password
+opcua-users -f users.yaml cert add user-cert.pem -role operator
+```
+
+```go
+store, err := userstore.Open("users.yaml")
+if err != nil {
+	log.Fatal(err)
+}
+defer store.Close()
+
+s := server.New(
+	// ...
+	server.UserNameAuth(store.UserNameAuthenticator()),
+	server.X509Auth(store.X509Authenticator()),
+)
+```
 
 ### Services
 

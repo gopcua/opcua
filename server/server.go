@@ -67,6 +67,9 @@ type serverConfig struct {
 	enabledSec  []security
 	enabledAuth []authMode
 
+	userNameAuth UserNameAuthenticator
+	x509Auth     X509Authenticator
+
 	cap ServerCapabilities
 
 	logger Logger
@@ -248,6 +251,7 @@ func (s *Server) Start(ctx context.Context) error {
 
 	// Register all service handlers
 	s.initHandlers()
+	s.warnAuthConfig()
 
 	if s.url == "" {
 		s.url = defaultListenAddr
@@ -361,6 +365,14 @@ func (s *Server) monitorConnections(ctx context.Context) {
 			if s.cfg.logger != nil && msg.SecureChannelID != 0 {
 				s.cfg.logger.Error("monitorConnections: Unknown SecureChannel: %d", msg.SecureChannelID)
 			}
+			continue
+		}
+
+		// ActivateSession calls the user authenticators, which can be slow on
+		// purpose (e.g. bcrypt). Handle it off the loop so one login does not
+		// stall the requests of all other clients.
+		if _, ok := msg.Request().(*ua.ActivateSessionRequest); ok {
+			go s.handleService(ctx, sc, msg.RequestID, msg.Request())
 			continue
 		}
 
