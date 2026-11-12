@@ -99,8 +99,9 @@ func TestReferenceDescriptionWithNilFieldsEncodes(t *testing.T) {
 		TypeDefinition:  ua.NewTwoByteExpandedNodeID(0),
 	})
 	if panicked != "" || err != nil {
-		t.Fatalf("could not set the test up: encoding a fully populated ReferenceDescription "+
-			"failed (err %v, panic %q)", err, panicked)
+		t.Errorf("gopcua's own behaviour made this run unscoreable: encoding a fully populated "+
+			"ReferenceDescription failed (err %v, panic %q)", err, panicked)
+		return
 	}
 
 	// All five left nil, as a server can build it.
