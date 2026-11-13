@@ -313,3 +313,70 @@ func TestMonitorSubscriptionsSurvivesPauseResumeRace(t *testing.T) {
 		baseline = errorCount(key)
 	}
 }
+
+// TestPauseAfterPublishErrorDoesNotOverrideRacingPauseResume guards a second
+// path to https://github.com/gopcua/opcua/issues/895: after a failed
+// Publish, monitorSubscriptions pauses itself. The publishPaused level
+// settles a pause/resume race by last writer wins, but the self-pause
+// must not override a pause or resume that lands in the window between
+// the failed publish and the self-pause -- e.g. a Subscribe racing a
+// connection that just dropped, or a forgetSubscription racing it.
+//
+// monitorSubscriptions therefore snapshots publishStateGen before it
+// publishes and hands the value to pauseAfterPublishError. Driving that
+// method directly makes the interleaving deterministic: no sleeps, no
+// timing luck.
+func TestPauseAfterPublishErrorDoesNotOverrideRacingPauseResume(t *testing.T) {
+	newPausedClient := func(t *testing.T) *Client {
+		c, err := NewClient("opc.tcp://example.com:4840")
+		require.NoError(t, err)
+		require.True(t, c.publishPaused.Load())
+		return c
+	}
+
+	t.Run("resume in the window keeps the loop running", func(t *testing.T) {
+		c := newPausedClient(t)
+		ctx := context.Background()
+
+		// The loop snapshots the generation, then a resume lands before the
+		// loop's self-pause after the failed publish.
+		stateGen := c.publishStateGen.Load()
+		c.resumeSubscriptions(ctx)
+		c.pauseAfterPublishError(ctx, stateGen)
+
+		// The racing resume is the last writer: the loop keeps running.
+		require.False(t, c.publishPaused.Load(),
+			"self-pause after a failed publish overwrote a resume that landed in the window (issue #895)")
+	})
+
+	t.Run("resume then pause in the window keeps the loop paused", func(t *testing.T) {
+		c := newPausedClient(t)
+		ctx := context.Background()
+
+		stateGen := c.publishStateGen.Load()
+		c.resumeSubscriptions(ctx)
+		c.pauseSubscriptions(ctx)
+		c.pauseAfterPublishError(ctx, stateGen)
+
+		// The racing pause is the last writer: the loop stays paused.
+		require.True(t, c.publishPaused.Load(),
+			"self-pause after a failed publish overwrote a pause that landed in the window")
+	})
+
+	t.Run("nothing in the window parks the loop", func(t *testing.T) {
+		c := newPausedClient(t)
+		ctx := context.Background()
+
+		// The loop must be running when the self-pause lands:
+		// NewClient hands over a paused client, so a subtest that skips
+		// the resume passes even if pauseAfterPublishError does nothing.
+		c.resumeSubscriptions(ctx)
+		require.False(t, c.publishPaused.Load())
+
+		stateGen := c.publishStateGen.Load()
+		c.pauseAfterPublishError(ctx, stateGen)
+
+		require.True(t, c.publishPaused.Load(),
+			"self-pause after a failed publish must park the loop when no pause or resume raced it")
+	})
+}

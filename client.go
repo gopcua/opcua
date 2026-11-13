@@ -185,6 +185,24 @@ type Client struct {
 	// https://github.com/gopcua/opcua/issues/895.
 	publishPaused atomic.Bool
 
+	// publishStateMu makes "write publishPaused and increment publishStateGen"
+	// one step in pauseSubscriptions and resumeSubscriptions, and lets
+	// pauseAfterPublishError check the generation and store the level as
+	// one step against them, so a pause or resume that races the
+	// self-pause after a failed publish is never overwritten by it and
+	// never invisible to it. publishPaused stays an atomic.Bool so readers
+	// need no lock. See https://github.com/gopcua/opcua/issues/895.
+	publishStateMu sync.Mutex
+
+	// publishStateGen counts every write of publishPaused by
+	// pauseSubscriptions/resumeSubscriptions, including the reconnect
+	// path. monitorSubscriptions snapshots the counter before each publish
+	// and hands the value to pauseAfterPublishError, which pauses only if
+	// no pause or resume landed in the window of a failed publish: the
+	// last writer in that window must win, not the self-pause.
+	// See https://github.com/gopcua/opcua/issues/895.
+	publishStateGen atomic.Uint64
+
 	// wakech nudges the publish loop to re-check publishPaused. It only carries
 	// a "something may have changed" hint, never state, so wake-ups are safe to
 	// coalesce or drop.
