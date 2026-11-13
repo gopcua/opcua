@@ -7,8 +7,13 @@ A row here drives the **in-tree gopcua server** — production code, not a
 scripted server — through its public API, with a real gopcua client
 connected over the wire, because the behaviours scored so far are
 properties of the server's own call graph: the re-entrancy of its
-notification path and the locking around its namespaces. A scripted
-server would score the script. Item 3's reading here is therefore the
+notification path and the locking around its namespaces. The fourth
+row keeps both halves real for the other reason: what it scores is the
+pair's survival of the secure channel's token renewals, and the
+answer that decides it — the in-tree server hands each renewal the
+same TokenId again — is the real server's own, so a scripted peer put
+in its place would score the script, the very thing the opening
+sentence forbids. Item 3's reading here is therefore the
 shared fixture in `harness.go`, which brings up the server, the
 MapNamespace and the client together; it is checkable the way it is in
 the other packages: `grep -c "See harness.go" tests/server/*_test.go`
@@ -74,6 +79,20 @@ about, or another stack's client. The three rows stand on the first three
 of those. What would not be evidence: anything scored by asking the
 gopcua client whether it liked what the gopcua server sent.
 
+The fourth row, `client_keeps_working_across_token_renewals_test.go`,
+stands deliberately on the far side of that line, and its header says
+so: its verdict is the pair's own liveness — no request fails across
+two token renewals and two expiries of old tokens — and a symmetric bug
+on both halves is invisible to it. It is not a delivery score and
+asserts no value that crossed the wire; it is the regression guard for
+a secure channel change that every other row passes, because the
+defect it guards against only appears when a real gopcua server's
+renewal answer — the same TokenId again — meets the client's own
+expiry of the old token, and no scripted peer holds that answer. The
+client-side obligations behind it are held row by row in
+`../securechannel`, whose expired-token row carries the knownBug for
+keying the expiry lookup wrong.
+
 Two consequences, one per kind of assertion a server row can make:
 
 - **The verdict may rest on the instrument; the trimmings may not.** The
@@ -106,7 +125,7 @@ against a known-good implementation. Where a row's verdict rests on a
 *client's* interpretation of what the server sent — any row whose
 evidence is "the client received" — the reading is another stack's
 *client*, because that is the half whose judgement is being trusted.
-None has been read for the three rows here; their headers say so, so
+None has been read for the rows here; their headers say so, so
 silence means nobody checked rather than nothing to report.
 
 ## The knownBug ledger, 2026-11-06
@@ -118,6 +137,7 @@ One constant stands per row below, declared inside its test function.
 | `read_while_writing_is_race_free_test.go` | `knownBug` stands: `MapNamespace.Attribute` reads `ns.Data` without the namespace lock (`server/namespace_map.go:195 and :256`) while `SetValue` writes it under the lock. Measured 2026-11-05: `WARNING: DATA RACE` under `go test -count=1 -race -run TestReadWhileWritingIsRaceFree ./tests/server/`. |
 | `setvalue_on_a_subscribed_tag_returns_test.go` | no constant; gopcua passes it as it stands (measured 2026-11-06, 1.41s under `-race`). It exists to catch the regression the fix for the row above invites: with an RLock added to `Attribute` — the obvious fix — `SetValue` wedges (measured, 6.35s, "did not return within 5s"). |
 | `setattribute_on_a_subscribed_tag_returns_test.go` | no constant; gopcua passes it as it stands (measured 2026-11-06, 1.45s under `-race`). Same guard, at the call site a client Write lands on. |
+| `client_keeps_working_across_token_renewals_test.go` | no constant; gopcua passes it as it stands (measured 2026-11-16, 17.1s, all three policy arms). It exists to catch a secure channel change that passes every other row and every unit test: an expiry keyed by the secure channel id instead of the token id empties the very bucket the chunk dispatch reads, and because the in-tree server answers each renewal with the same TokenId, the wipe takes the renewed token too — every response after an expiry is then dropped until the next renewal. Measured with that mutant applied: every arm's Read at the first expiry fails, `EOF` on this tree, `StatusBadTimeout` on one that drops silently instead of closing. |
 
 The constant in `read_while_writing_is_race_free_test.go` is expected to
 be closed by a change to `Attribute`'s locking. The two write-half rows
@@ -144,5 +164,5 @@ the calling goroutine while the caller holds the namespace lock
   verdict must rest on bytes the server actually sent. The recorder in
   `tests/reconnect/harness.go` is welded into that package's scripted
   server's accept loop; nothing in this tree can watch the in-tree
-  server's transport. Nothing here needs it yet — the three rows score
+  server's transport. Nothing here needs it yet — the rows score
   no bytes — so it is a named gap, not built.
