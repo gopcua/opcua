@@ -529,7 +529,7 @@ func TestArray(t *testing.T) {
 		}
 
 		_, err := Decode(b, MustVariant([]uint32{0}))
-		require.ErrorIs(t, err, errUnbalancedSlice)
+		require.ErrorIs(t, err, StatusBadDecodingError)
 	})
 	t.Run("length too big", func(t *testing.T) {
 		b := []byte{
@@ -839,7 +839,7 @@ func TestVariantDecodeArrayDimensionsOverflow(t *testing.T) {
 		}
 
 		_, err := Decode(b, &Variant{})
-		require.ErrorIs(t, err, errUnbalancedSlice)
+		require.ErrorIs(t, err, StatusBadDecodingError)
 	})
 	t.Run("consistent dimensions still decode", func(t *testing.T) {
 		b := []byte{
