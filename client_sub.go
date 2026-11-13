@@ -393,7 +393,10 @@ func (c *Client) notifySubscription(ctx context.Context, sub *Subscription, noti
 // to paused and nudging the loop to notice.
 // It has no effect if the publish loop is already paused.
 func (c *Client) pauseSubscriptions(ctx context.Context) {
+	c.publishStateMu.Lock()
 	c.publishPaused.Store(true)
+	c.publishStateGen.Add(1)
+	c.publishStateMu.Unlock()
 	c.wake()
 }
 
@@ -401,8 +404,32 @@ func (c *Client) pauseSubscriptions(ctx context.Context) {
 // to running and nudging the loop to notice.
 // It has no effect if the publish loop is not paused.
 func (c *Client) resumeSubscriptions(ctx context.Context) {
+	c.publishStateMu.Lock()
 	c.publishPaused.Store(false)
+	c.publishStateGen.Add(1)
+	c.publishStateMu.Unlock()
 	c.wake()
+}
+
+// pauseAfterPublishError pauses the publish loop after a failed publish.
+// The caller passes the publishStateGen value it read before publishing.
+// A pause or resume that wrote publishPaused in the window of the failed
+// publish -- e.g. a Subscribe racing a connection that just dropped -- is
+// the last writer of the level, so the self-pause must not override it.
+// publishStateMu makes the generation check and the store one step, so a
+// concurrent pauseSubscriptions/resumeSubscriptions lands either fully
+// before the check or fully after the store.
+// See https://github.com/gopcua/opcua/issues/895.
+func (c *Client) pauseAfterPublishError(ctx context.Context, stateGen uint64) {
+	c.publishStateMu.Lock()
+	defer c.publishStateMu.Unlock()
+	if c.publishStateGen.Load() != stateGen {
+		// A pause or resume won the window; publishPaused already holds
+		// its write and the loop re-checks the level at the top of each
+		// iteration, so no wake is needed here.
+		return
+	}
+	c.publishPaused.Store(true)
 }
 
 // wake nudges monitorSubscriptions to re-check publishPaused. The send is
@@ -450,9 +477,13 @@ func (c *Client) monitorSubscriptions(ctx context.Context) {
 			//
 			// publish() blocks until a PublishResponse
 			// is received or the context is cancelled.
+			// The snapshot must be read before c.publish: it is what lets
+			// pauseAfterPublishError detect writes that land while the
+			// publish is in flight.
+			stateGen := c.publishStateGen.Load()
 			if err := c.publish(ctx); err != nil {
 				dlog.Print("error: ", err.Error())
-				c.pauseSubscriptions(ctx)
+				c.pauseAfterPublishError(ctx, stateGen)
 			}
 		}
 	}
