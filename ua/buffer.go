@@ -19,6 +19,16 @@ const (
 	f64qnan = 0xfff8000000000000
 )
 
+// The range OPC 10000-6 §5.2.2.5 defines for a date/time: 1601-01-01 to
+// 9999-12-31T23:59:59Z, the latter as a tick count in 100 nanosecond
+// intervals since 1601-01-01.
+const maxDateTimeTicks = int64(2650467743990000000)
+
+var (
+	minDateTime = time.Date(1601, time.January, 1, 0, 0, 0, 0, time.UTC)
+	maxDateTime = time.Date(9999, time.December, 31, 23, 59, 59, 0, time.UTC)
+)
+
 type Buffer struct {
 	buf []byte
 	pos int
@@ -183,15 +193,25 @@ func (b *Buffer) ReadTime() time.Time {
 	if b.err != nil {
 		return time.Time{}
 	}
-	ts := binary.LittleEndian.Uint64(d)
-	if ts == 0 {
+	// the field is a signed Int64 (OPC 10000-6 §5.2.2.5), so read it as one
+	// and saturate tick counts outside the range the clause covers.
+	ts := int64(binary.LittleEndian.Uint64(d))
+	switch {
+	case ts <= 0:
+		// a value at or below 0 decodes as time.Time{}, the value tick 0
+		// decodes to - gopcua's null DateTime (see the IsZero callers).
 		return time.Time{}
+	case ts > maxDateTimeTicks:
+		// the clause names its high end to the second, so the ticks after
+		// 9999-12-31T23:59:59.0000000Z - the maximum Int64 included - are
+		// later than the latest time it can represent and decode as it.
+		return maxDateTime
 	}
 	// decode time in "100 nanosecond intervals since January 1, 1601" manner.
 	// A full-range tick count exceeds int64 nanoseconds, so the conversion
 	// goes through seconds and a sub-second remainder.
 	sec, rem := ts/1e7, ts%1e7
-	return time.Unix(int64(sec)-11644473600, int64(rem)*100).UTC()
+	return time.Unix(sec-11644473600, rem*100).UTC()
 }
 
 func (b *Buffer) ReadN(n int) []byte {
@@ -314,10 +334,20 @@ func (b *Buffer) WriteStruct(w interface{}) {
 func (b *Buffer) WriteTime(v time.Time) {
 	d := make([]byte, 8)
 	if !v.IsZero() {
-		// encode time in "100 nanosecond intervals since January 1, 1601"
+		// encode time in "100 nanosecond intervals since January 1, 1601",
+		// clamped to the range OPC 10000-6 §5.2.2.5 defines: a time at or
+		// before 1601-01-01 encodes as 0 and a time at or after
+		// 9999-12-31T23:59:59Z as the maximum Int64.
 		t := v.UTC()
-		ts := uint64(t.Unix())*1e7 + uint64(t.Nanosecond())/100 + 116444736000000000
-		binary.LittleEndian.PutUint64(d, ts)
+		switch {
+		case !t.After(minDateTime):
+			// d stays zero
+		case !t.Before(maxDateTime):
+			binary.LittleEndian.PutUint64(d, math.MaxInt64)
+		default:
+			ts := t.Unix()*1e7 + int64(t.Nanosecond())/100 + 116444736000000000
+			binary.LittleEndian.PutUint64(d, uint64(ts))
+		}
 	}
 	b.Write(d)
 }
