@@ -16,8 +16,8 @@ import (
 // pattern ExtensionObject.Encode established. Without the guards,
 // encoding a struct with a nil BinaryEncoder pointer field panics
 // (SIGSEGV observed in NodeID.Encode when a server response carried a
-// nil *NodeID field). ExpandedNodeID is deliberately unchanged: its
-// pre-existing nil-receiver contract returns an error, never panics.
+// nil *NodeID field). A nil *ExpandedNodeID encodes as the null
+// ExpandedNodeId (Part 6 §5.2.2.10) like the other types.
 func TestEncodeNilBinaryEncoderPointer(t *testing.T) {
 	t.Run("top-level nil *NodeID", func(t *testing.T) {
 		got, err := Encode((*NodeID)(nil))
@@ -29,10 +29,17 @@ func TestEncodeNilBinaryEncoderPointer(t *testing.T) {
 	})
 
 	t.Run("top-level nil *ExpandedNodeID", func(t *testing.T) {
-		// Pre-existing contract preserved: a nil *ExpandedNodeID is an
-		// error, not a panic and not a silent null.
-		_, err := Encode((*ExpandedNodeID)(nil))
-		require.EqualError(t, err, "opcua: e was nil")
+		got, err := Encode((*ExpandedNodeID)(nil))
+		require.NoError(t, err)
+		require.Equal(t, []byte{0x00, 0x00}, got,
+			"nil *ExpandedNodeID must encode as the null ExpandedNodeId (two-byte NodeID, i=0)")
+	})
+
+	t.Run("top-level nil *QualifiedName", func(t *testing.T) {
+		got, err := Encode((*QualifiedName)(nil))
+		require.NoError(t, err)
+		require.Equal(t, []byte{0x00, 0x00, 0xff, 0xff, 0xff, 0xff}, got,
+			"nil *QualifiedName must encode as the null QualifiedName (namespace index 0, null name)")
 	})
 
 	t.Run("top-level nil *LocalizedText", func(t *testing.T) {
@@ -71,9 +78,8 @@ func TestEncodeNilBinaryEncoderPointer(t *testing.T) {
 	t.Run("nil BinaryEncoder struct fields", func(t *testing.T) {
 		// Mirrors the field layout that triggered the panic: a struct
 		// whose BinaryEncoder pointer fields are nil (e.g. a masked-out
-		// ReferenceDescription built by a server). The *ExpandedNodeID
-		// field is non-nil on both sides because its nil-receiver
-		// contract is an error by design.
+		// ReferenceDescription built by a server). All nil fields on the
+		// left must encode as the explicit null values on the right.
 		type sample struct {
 			ReferenceTypeID *NodeID
 			IsForward       bool
@@ -81,7 +87,7 @@ func TestEncodeNilBinaryEncoderPointer(t *testing.T) {
 			DisplayName     *LocalizedText
 		}
 
-		got, err := Encode(&sample{NodeID: NewTwoByteExpandedNodeID(0)})
+		got, err := Encode(&sample{})
 		require.NoError(t, err)
 
 		want, err := Encode(&sample{

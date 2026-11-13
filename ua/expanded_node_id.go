@@ -105,7 +105,9 @@ func (e *ExpandedNodeID) Decode(b []byte) (int, error) {
 func (e *ExpandedNodeID) Encode() ([]byte, error) {
 	buf := NewBuffer(nil)
 	if e == nil {
-		return []byte{}, errors.New("e was nil")
+		// A nil ExpandedNodeID encodes as the null ExpandedNodeId
+		// (Part 6, 5.2.2.10).
+		e = &ExpandedNodeID{}
 	}
 	if e.NodeID == nil {
 		buf.WriteInt16(0)
