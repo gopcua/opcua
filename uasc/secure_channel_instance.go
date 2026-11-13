@@ -6,7 +6,6 @@ package uasc
 
 import (
 	"encoding/binary"
-	"math"
 	"sync"
 	"time"
 
@@ -52,7 +51,7 @@ func newChannelInstance(sc *SecureChannel) *channelInstance {
 func (c *channelInstance) nextSequenceNumber() uint32 {
 	// lock must be held
 	c.sequenceNumber++
-	if c.sequenceNumber > math.MaxUint32-1023 {
+	if c.sequenceNumber > maxSequenceNumber {
 		c.sequenceNumber = 1
 	}
 
