@@ -215,8 +215,10 @@ func (m *Variant) Decode(b []byte) (int, error) {
 				break
 			}
 		}
+		// Inconsistent dimensions make the message malformed
+		// (OPC 10000-6 §5.2.2.16): Bad_DecodingError.
 		if count != int64(m.arrayLength) {
-			return buf.Pos(), errUnbalancedSlice
+			return buf.Pos(), StatusBadDecodingError
 		}
 	}
 
@@ -447,6 +449,10 @@ func (m *Variant) encodeValue(buf *Buffer, v interface{}) {
 
 // errUnbalancedSlice indicates a multi-dimensional array has different
 // number of elements on the same level.
+//
+// It is an encode-side error only: sliceDim returns it when a Go value
+// cannot be encoded as a consistent multi-dimensional array. The decode
+// side reports the same defect as StatusBadDecodingError.
 var errUnbalancedSlice = errors.New("unbalanced multi-dimensional array")
 
 // sliceDim determines the element type, dimensions and the total length
