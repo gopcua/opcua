@@ -953,13 +953,17 @@ func (s *SecureChannel) scheduleExpiration(instance *channelInstance) {
 	// chunk dispatch uses to look them up: a token is valid for its
 	// channel until it expires (OPC 10000-4 §5.5.2, OPC 10000-6 §6.7.2.4),
 	// so expiring one must remove it from the bucket its chunks are
-	// found under.
+	// found under. Only the expiring instance itself is dropped, compared
+	// by identity rather than by token id: a renewal must issue a new
+	// token (OPC 10000-4 §5.5.2, OPC 10000-6 §6.7.2.3), but a server that
+	// reuses the TokenId, as gopcua's own server does, would otherwise
+	// lose the renewed token together with the expired one.
 	oldInstances := s.instances[instance.secureChannelID]
 
 	s.instances[instance.secureChannelID] = []*channelInstance{}
 
 	for _, oldInstance := range oldInstances {
-		if oldInstance.securityTokenID == instance.securityTokenID {
+		if oldInstance == instance {
 			continue
 		}
 		s.instances[instance.secureChannelID] = append(

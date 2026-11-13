@@ -51,3 +51,33 @@ func TestScheduleExpirationKeyedByChannelID(t *testing.T) {
 	require.Len(t, sc.instances[7], 1, "channel 7 after a token on channel 20 expired")
 	require.Equal(t, uint32(9), sc.instances[7][0].securityTokenID, "channel 7 token id")
 }
+
+// TestScheduleExpirationKeepsRenewalWithSameTokenID verifies that expiring
+// an instance removes only that instance, not every instance sharing its
+// token id. gopcua's own server answers every renewal with the same TokenId,
+// so the renewed instance must stay in the channel's bucket when the old one
+// expires.
+func TestScheduleExpirationKeepsRenewalWithSameTokenID(t *testing.T) {
+	sc := &SecureChannel{
+		c:         &uacp.Conn{},
+		closing:   make(chan struct{}),
+		instances: make(map[uint32][]*channelInstance),
+	}
+
+	expired := &channelInstance{
+		secureChannelID: 20,
+		securityTokenID: 15,
+	}
+	renewed := &channelInstance{
+		secureChannelID: 20,
+		securityTokenID: 15, // the server reused the TokenId on renewal
+	}
+	sc.instances[20] = []*channelInstance{expired, renewed}
+
+	// revisedLifetime is zero, so the timer fires at once and
+	// scheduleExpiration returns only after rewriting the bucket.
+	sc.scheduleExpiration(expired)
+
+	require.Len(t, sc.instances[20], 1, "channel 20 after the expired token's expiration")
+	require.Same(t, renewed, sc.instances[20][0], "channel 20 instance after expiration")
+}
