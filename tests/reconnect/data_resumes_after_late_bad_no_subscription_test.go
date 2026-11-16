@@ -73,8 +73,9 @@
 // Bad_NoSubscription.
 // That is not an exception in the sense of ../README.md's question 6: the
 // clause is the client's, Milo documents the case and fixed it, and two
-// stacks failing it is two stacks with gopcua's defect, which the row names
-// so a reader knows it is not a fixture artifact.
+// stacks failing it is two stacks with the defect gopcua carried until
+// https://github.com/gopcua/opcua/pull/957, which the row names so a reader
+// knows it is not a fixture artifact.
 
 package reconnect
 
@@ -98,10 +99,8 @@ import (
 const noSubscriptionBound = 3 * time.Second
 
 func TestDataResumesAfterLateBadNoSubscription(t *testing.T) {
-	// knownBug records that gopcua does not do this yet; the text is logged
-	// in place of a failure. ../README.md says when to delete it.
-	// https://github.com/gopcua/opcua/issues/895 tracks it.
-	const knownBug = "after a failed Publish the publish loop pauses itself, so a Bad_NoSubscription for the deleted subscription that arrives after the replacement's Subscribe has resumed the loop parks it, and the replacement never receives a notification"
+	// gopcua did not do this until
+	// https://github.com/gopcua/opcua/pull/957 merged; it passes since.
 
 	run := runLateBadNoSubscriptionScenario()
 
@@ -124,14 +123,6 @@ func TestDataResumesAfterLateBadNoSubscription(t *testing.T) {
 	published := publishesAfterFault(run)
 
 	switch {
-	case len(fresh) == 0 && knownBug != "":
-		t.Logf("known bug: %s (the client sent %d Publish after the fault was commanded)",
-			knownBug, published)
-	case len(fresh) > 0 && knownBug != "":
-		t.Errorf("this now passes (notifications %v, created for the replacement, reached the "+
-			"application after the held Publish was answered with Bad_NoSubscription) - delete the "+
-			"knownBug constant, every arm that reads it, and anything only those arms used, in "+
-			"the commit that fixed it", fresh)
 	case len(fresh) > 0:
 		t.Logf("notifications %v, created for the replacement, reached the application's own "+
 			"callback after the held Publish was answered with Bad_NoSubscription (the client "+

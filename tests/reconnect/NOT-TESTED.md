@@ -70,9 +70,10 @@ that half of it — the scheduling race — is covered by nothing in this tree.
 A test that can see it has to race pause against resume many times inside
 one run: a different instrument from this one, not a larger fixture for it.
 
-The defect has a second way in, and that one this harness reaches: the
-publish loop also pauses itself after a failed Publish, so a
-Bad_NoSubscription answered after a replacement subscription has resumed
-it parks the loop again with nothing left to wake it, and the replacement
-never receives a notification.
-`data_resumes_after_late_bad_no_subscription_test.go` scores it.
+The defect had a second way in, and that one this harness reaches:
+until https://github.com/gopcua/opcua/pull/957, the publish loop also
+paused itself after a failed Publish, so a Bad_NoSubscription answered
+after a replacement subscription had resumed it parked the loop again
+with nothing left to wake it, and the replacement never received a
+notification. `data_resumes_after_late_bad_no_subscription_test.go`
+scores it, and passes since the fix.
