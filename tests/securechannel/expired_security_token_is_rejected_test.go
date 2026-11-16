@@ -94,8 +94,8 @@
 // its own timeout error, and a fixed client returns the closed channel's
 // error instead, which is why the arm keys on the body - and that
 // the control arm's client does reject it: the control arm is the
-// instrument check - on this very tree the channel id = token id
-// arm's expiration happens to remove the right instance, so it shows
+// instrument check - even on an unfixed tree the channel id = token id
+// arm's expiration removes the right instance, so it shows
 // that the instrument can see a rejection at all, and a run in which
 // it does not see one proves nothing about the scored arm. It
 // declines, and does not score, when the fixture fails its half or
@@ -244,7 +244,7 @@ const (
 
 // The channel ids the arms differ in: the control arm's server
 // assigns the channel id and the token id the same number, so on
-// this very tree the expiration happens to remove the right
+// an unfixed tree the expiration still removes the right
 // instance, and the scored arm's assigns the two different numbers.
 // The ids are all that separates the arms.
 const (
@@ -263,8 +263,8 @@ func TestExpiredSecurityTokenIsRejected(t *testing.T) {
 		"the old-token signature still verifies (issue #941)"
 
 	// The control arm first: the server assigns the channel id and
-	// the token id the same number, and on this very tree the
-	// expiration happens to remove the right instance, so the arm
+	// the token id the same number, and even on an unfixed tree the
+	// expiration removes the right instance, so the arm
 	// is the instrument check - a run in which it sees no
 	// rejection proves nothing about the scored arm. Its four
 	// declines below - no renewal in the peer's records, the live
