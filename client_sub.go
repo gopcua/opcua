@@ -477,11 +477,11 @@ func (c *Client) monitorSubscriptions(ctx context.Context) {
 			//
 			// publish() blocks until a PublishResponse
 			// is received or the context is cancelled.
-			// The snapshot must be read before c.publish: it is what lets
+			// The snapshot must be read before the publish: it is what lets
 			// pauseAfterPublishError detect writes that land while the
 			// publish is in flight.
 			stateGen := c.publishStateGen.Load()
-			if err := c.publish(ctx); err != nil {
+			if err := c.publishFunc(ctx); err != nil {
 				dlog.Print("error: ", err.Error())
 				c.pauseAfterPublishError(ctx, stateGen)
 			}

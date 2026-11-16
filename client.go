@@ -203,6 +203,11 @@ type Client struct {
 	// See https://github.com/gopcua/opcua/issues/895.
 	publishStateGen atomic.Uint64
 
+	// publishFunc is the publish monitorSubscriptions performs. It is a
+	// field only so that tests can stand in for it; NewClient sets it
+	// to the publish method.
+	publishFunc func(ctx context.Context) error
+
 	// wakech nudges the publish loop to re-check publishPaused. It only carries
 	// a "something may have changed" hint, never state, so wake-ups are safe to
 	// coalesce or drop.
@@ -257,6 +262,7 @@ func NewClient(endpoint string, opts ...Option) (*Client, error) {
 		stateFunc:   cfg.stateFunc,
 	}
 	c.pauseSubscriptions(context.Background())
+	c.publishFunc = c.publish
 	c.setPublishTimeout(uasc.MaxTimeout)
 	// cannot use setState here since it would trigger the stateCh
 	c.atomicState.Store(Closed)

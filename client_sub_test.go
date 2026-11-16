@@ -3,6 +3,7 @@ package opcua
 import (
 	"context"
 	"expvar"
+	"io"
 	"sync"
 	"testing"
 	"time"
@@ -379,4 +380,62 @@ func TestPauseAfterPublishErrorDoesNotOverrideRacingPauseResume(t *testing.T) {
 		require.True(t, c.publishPaused.Load(),
 			"self-pause after a failed publish must park the loop when no pause or resume raced it")
 	})
+}
+
+// TestMonitorSubscriptionsSnapshotsStateBeforePublish pins where
+// monitorSubscriptions takes the publishStateGen snapshot: reading it after
+// the publish reintroduces https://github.com/gopcua/opcua/issues/895, because
+// a resume that lands while the failed publish is still in flight is then
+// invisible to pauseAfterPublishError and the loop parks on its own pause.
+// The other test for issue #895 drives pauseAfterPublishError directly, so it
+// cannot see where the snapshot is taken.
+//
+// The publishFunc seam makes the interleaving deterministic: the test stands
+// in a publish that blocks until a resume lands in its window, then fails.
+// The loop must not park and must publish again.
+func TestMonitorSubscriptionsSnapshotsStateBeforePublish(t *testing.T) {
+	c, err := NewClient("opc.tcp://example.com:4840")
+	require.NoError(t, err)
+
+	started := make(chan struct{}, 2)
+	proceed := make(chan struct{})
+	c.publishFunc = func(ctx context.Context) error {
+		started <- struct{}{}
+		select {
+		case <-proceed:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+		return io.EOF
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		c.monitorSubscriptions(ctx)
+	}()
+	defer func() {
+		cancel()
+		<-done
+	}()
+
+	// Let the loop enter the first publish.
+	c.resumeSubscriptions(ctx)
+	<-started
+
+	// A resume lands while that publish is in flight, then the publish fails.
+	c.resumeSubscriptions(ctx)
+	proceed <- struct{}{}
+
+	// The loop must publish again instead of parking on its self-pause.
+	// It is blocked inside that publish here, so publishPaused is read
+	// before the loop can touch it again.
+	select {
+	case <-started:
+	case <-time.After(5 * time.Second):
+		t.Fatal("publish loop parked after a resume landed during a failed publish (issue #895)")
+	}
+	require.False(t, c.publishPaused.Load(),
+		"self-pause after a failed publish overwrote a resume that landed during the publish (issue #895)")
 }
