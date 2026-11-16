@@ -194,7 +194,7 @@ func (b *Buffer) ReadTime() time.Time {
 		return time.Time{}
 	}
 	// the field is a signed Int64 (OPC 10000-6 §5.2.2.5), so read it as one
-	// and saturate tick counts outside the range the clause covers.
+	// and saturate tick counts outside the range encoding clamps to.
 	ts := int64(binary.LittleEndian.Uint64(d))
 	switch {
 	case ts <= 0:
@@ -202,9 +202,10 @@ func (b *Buffer) ReadTime() time.Time {
 		// decodes to - gopcua's null DateTime (see the IsZero callers).
 		return time.Time{}
 	case ts > maxDateTimeTicks:
-		// the clause names its high end to the second, so the ticks after
-		// 9999-12-31T23:59:59.0000000Z - the maximum Int64 included - are
-		// later than the latest time it can represent and decode as it.
+		// the clause decodes only the maximum Int64, and values the platform
+		// cannot represent, as "the latest time that can be represented on
+		// the platform". Go can represent later times; gopcua deliberately
+		// stops at 9999-12-31T23:59:59Z so decode mirrors the encode clamp.
 		return maxDateTime
 	}
 	// decode time in "100 nanosecond intervals since January 1, 1601" manner.

@@ -24,7 +24,9 @@ import (
 // symmetrically: a time at or before 1601-01-01 encodes as 0 and a time at
 // or after 9999-12-31T23:59:59Z as the maximum Int64.
 func TestDateTimeOutOfRangeSaturates(t *testing.T) {
-	// 9999-12-31T23:59:59Z in 100 nanosecond ticks since 1601-01-01.
+	// 9999-12-31T23:59:59Z in 100 nanosecond ticks since 1601-01-01,
+	// spelled out rather than reusing maxDateTimeTicks so it stays an
+	// independent oracle for the saturate-and-clamp bound.
 	const maxTicks = int64(2650467743990000000)
 	earliest := time.Time{}
 	latest := time.Date(9999, time.December, 31, 23, 59, 59, 0, time.UTC)
@@ -76,5 +78,15 @@ func TestDateTimeOutOfRangeSaturates(t *testing.T) {
 				require.Equal(t, c.want, binary.LittleEndian.Uint64(b.Bytes()))
 			})
 		}
+	})
+
+	t.Run("1601-01-01 decodes as null", func(t *testing.T) {
+		// 1601-01-01T00:00:00Z encodes as tick 0, but tick 0 is gopcua's
+		// null, so the earliest encodable time decodes back as time.Time{}.
+		b := NewBuffer(nil)
+		b.WriteTime(time.Date(1601, time.January, 1, 0, 0, 0, 0, time.UTC))
+		require.NoError(t, b.Error())
+		require.Equal(t, uint64(0), binary.LittleEndian.Uint64(b.Bytes()))
+		require.Equal(t, time.Time{}, NewBuffer(b.Bytes()).ReadTime())
 	})
 }
