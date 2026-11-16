@@ -71,9 +71,13 @@ that main.
 | `republish_after_reconnect_test.go` | the client never asked for the notification it missed |
 | `republish_asks_for_each_missed_number_test.go` | the client never asked for what it missed, so there was no loop to walk |
 
-One constant survives:
-`no_acknowledgements_when_nothing_is_available_test.go`, whose behaviour
-907 did not fix.
+Two rows carry a constant today.
+`no_acknowledgements_when_nothing_is_available_test.go` is the one 907
+did not fix. `data_resumes_after_late_bad_no_subscription_test.go` was
+written after 907 and scores the publish loop parking itself on a
+Bad_NoSubscription that arrives after a replacement subscription has
+resumed it (https://github.com/gopcua/opcua/issues/895); no merged change
+fixes it yet.
 
 ## Rows that score a pull request
 
