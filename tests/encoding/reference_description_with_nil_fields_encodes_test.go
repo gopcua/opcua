@@ -56,34 +56,33 @@ import (
 
 // TestReferenceDescriptionWithNilFieldsEncodes is the case PR #901's own
 // description names - "a server-built ReferenceDescription" - and the case
-// that PR does not reach. It stays measured here rather than being left to a
+// that PR did not reach. It stays measured here rather than being left to a
 // review document, because the two fields it turns on are both nullable by
-// §5.1.2 Table 1 and neither is covered.
+// §5.1.2 Table 1 and neither was covered by it.
 //
-// ReferenceDescription has five pointer fields. #901 guards ReferenceTypeID
-// (*NodeID) and DisplayName (*LocalizedText). It leaves:
+// ReferenceDescription has five pointer fields. #901 guarded ReferenceTypeID
+// (*NodeID) and DisplayName (*LocalizedText). It left:
 //
 //   - NodeID and TypeDefinition, both *ExpandedNodeID. Table 1 lists
-//     ExpandedNodeId as nullable with default "i=0", and gopcua returns an
+//     ExpandedNodeId as nullable with default "i=0", and gopcua returned an
 //     error for a nil receiver instead.
 //   - BrowseName, a *QualifiedName. Table 1 lists QualifiedName as nullable.
-//     It is not a BinaryEncoder, so a nil one takes the generic pointer arm
+//     It is not a BinaryEncoder, so a nil one took the generic pointer arm
 //     in ua/encode.go - "case reflect.Ptr: if val.IsNil() { return nil, nil }"
-//   - and contributes no bytes at all. The message is six bytes short and
-//     nothing reports it.
+//   - and contributed no bytes at all, leaving the message six bytes short
+//     with nothing to report it.
 //
-// Both are pre-existing: the same measurement on an unpatched tree gives the
-// same answer, so #901 introduces neither. What #901 does change is reach.
-// Before it, a ReferenceDescription with nil fields panicked, loudly. After
-// it, the panic is gone and a short, silently misframed message takes its
-// place. That is still the better trade, and it is the reason this row is
-// worth keeping after #901 merges rather than before.
+// Both were pre-existing: the same measurement on an unpatched tree gave the
+// same answer, so #901 introduced neither. What #901 did change was reach:
+// before it, a ReferenceDescription with nil fields panicked, loudly; after
+// it, the panic was gone and a short, silently misframed message took its
+// place. gopcua did not do this until the fix for
+// https://github.com/gopcua/opcua/pull/956, which gave a nil *ExpandedNodeID
+// its null value and a nil *QualifiedName its null bytes; it passes since,
+// and this row keeps the framing measured on every run.
 func TestReferenceDescriptionWithNilFieldsEncodes(t *testing.T) {
-	// knownBug records that gopcua does not do this yet; the text is logged
-	// in place of a failure. ../README.md says when to delete it.
-	const knownBug = "a ReferenceDescription with nil fields does not encode: its *ExpandedNodeID " +
-		"fields return an error on a nil receiver; and a nil *QualifiedName BrowseName silently " +
-		"contributes no bytes, leaving the message six bytes short"
+	// gopcua did not do this until https://github.com/gopcua/opcua/pull/956
+	// merged; it passes since.
 
 	// Every pointer field given the explicit null value its type has by
 	// Table 1. This encodes to the 18 bytes in want below - the bytes the
@@ -106,9 +105,9 @@ func TestReferenceDescriptionWithNilFieldsEncodes(t *testing.T) {
 	// All five left nil, as a server can build it.
 	allNil, allNilErr, allNilPanic := encodeRecovering(&ua.ReferenceDescription{})
 
-	// Only the two *ExpandedNodeID fields set, which is as far as #901's
-	// guards can carry it.
-	partial, partialErr, partialPanic := encodeRecovering(&ua.ReferenceDescription{
+	// Only the two *ExpandedNodeID fields set, which was as far as #901's
+	// guards could carry it.
+	partial, _, _ := encodeRecovering(&ua.ReferenceDescription{
 		NodeID:         ua.NewTwoByteExpandedNodeID(0),
 		TypeDefinition: ua.NewTwoByteExpandedNodeID(0),
 	})
@@ -126,47 +125,18 @@ func TestReferenceDescriptionWithNilFieldsEncodes(t *testing.T) {
 		"\x00\x00\x00\x00" + // NodeClass 0, Int32
 		"\x00\x00" // TypeDefinition, null ExpandedNodeID: as NodeID above
 
-	// The named defect is an event - the error the two *ExpandedNodeID
-	// fields return for a nil receiver, or a panic from one of the fields
-	// #901 does not guard - and an event is a presence, so the arms key on
-	// it rather than on the absence of a right outcome: while the all-nil
-	// message still fails on the nil receiver, the behaviour is still
-	// missing and the row stays green with the known bug logged; once it
-	// encodes, a fix has landed, and the row then demands the framing be
-	// right - a landed fix that still leaves the message short is red,
-	// not green.
-	event := allNilErr != nil || allNilPanic != ""
-
+	// The two facts the row scores, kept separate: that the all-nil
+	// message encodes at all, and that all three shapes encode to the
+	// same 18 bytes. A message that encodes to the wrong bytes, or one
+	// that does not encode, lands in the red arm with everything it left
+	// in the detail line.
 	encodes := allNilErr == nil && allNilPanic == ""
 	framed := string(full) == want && string(allNil) == want && string(partial) == want
 
-	// Arm order: the two passes arms come first, because an all-nil message
-	// that fails on the nil receiver never encodes, so they cannot take a
-	// state the event arm needs to see; the event arm comes before the
-	// wrong-fix arm, because a fix that guards only some of the fields
-	// leaves the event and must stay green, not red; and the wrong-fix arm
-	// reads the constant, so with the constant empty a missing behaviour
-	// lands in the default arm below it.
 	switch {
-	case encodes && framed && knownBug != "":
-		t.Errorf("this now passes (a ReferenceDescription with all fields nil encodes to the 18 "+
-			"bytes the reference stacks produce, the same as a fully populated one and one with "+
-			"only its ExpandedNodeIDs set: % x) - delete the knownBug constant, every arm that "+
-			"reads it, and anything only those arms used, in the commit that fixed it",
-			allNil)
 	case encodes && framed:
 		t.Logf("a ReferenceDescription with nil fields encodes to the 18 bytes the reference "+
 			"stacks produce, byte-identical to a fully populated one: % x", allNil)
-	case event && knownBug != "":
-		t.Logf("known bug: %s (all fields nil: err %v, panic %q; only the ExpandedNodeIDs set: "+
-			"%d bytes where the reference stacks produce %d)",
-			knownBug, allNilErr, allNilPanic, len(partial), len(want))
-	case knownBug != "":
-		t.Errorf("the nil-receiver failure is gone, but the outcome is still wrong - a fix "+
-			"for this landed and is wrong: with all fields nil the message now encodes, but the "+
-			"bytes are not the 18 the reference stacks produce (full % x, all-nil % x, "+
-			"ExpandedNodeIDs-only err %v panic %q % x, want % x)",
-			full, allNil, partialErr, partialPanic, partial, want)
 	default:
 		t.Errorf("§5.1.2 Table 1 lists every pointer field of ReferenceDescription as nullable, so "+
 			"one with nil fields has a value to encode; all fields nil gave err %v and panic %q, "+
