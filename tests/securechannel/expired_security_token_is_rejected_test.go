@@ -54,37 +54,44 @@
 // The peer hands out a short token and answers the client's own
 // renewal with a new token id on the same channel - a number the
 // issue token never carried, so the channel holds two tokens to tell
-// apart - and the row's Read goes out only after the old token's
-// lifetime plus 25 % has passed on the client's clock, so the
-// stimulus is expired on any tree that measures the window correctly.
-// The peer answers that Read with a response chunk whose symmetric
-// security header carries the old, expired token id and whose
-// signature is made with the old token's keys, chosen with the
-// harness's answerToken script: the scored arm's server assigned a
-// channel id that differs from the token id, the control arm's the
-// same number, and the ids are all that separates them. The arm then
-// sends a second Read, which the peer answers with a chunk secured
-// with the renewed token - the first Message from the server secured
-// with the new SecurityToken, the event OPC 10000-6 §6.7.4 names -
-// and its body must reach the caller on both arms: on the control arm
-// it is the instrument check's positive half, a client that accepts a
-// chunk the live token secures, so its rejection of the old-token
-// chunk is grounded in the token. On the scored arm it is the
-// precondition for the demand to delete the knownBug constant,
-// because a client that rejects every chunk - a channel dead for
-// every token, against §6.7.4's continuation duty - would otherwise
-// read the same as the fix. A client that closes the channel on the
-// failed check, as §6.7.7 orders, leaves the renewed answer
-// undelivered too, and the row declines it: the demand is earned by a
-// fix that keeps the channel alive, as the candidate rekeying - the
-// channel-id fix named further down this header - does.
+// apart. Once the renewal is in the peer's records, and before the
+// old token's lifetime plus 25 % has passed on the client's clock,
+// the arm sends a Read that the peer answers with a chunk secured
+// with the OLD token, and that body must reach the caller on both
+// arms: it is the instrument check's positive half, a client that
+// verifies and accepts a chunk under a live token, so the rejection
+// the row scores next is grounded in expiry and not in a token the
+// channel never held - OPC 10000-6 §6.7.4: "The Client shall
+// continue to accept the old SecurityToken until it expires or it
+// receives a Message from the Server secured with the new
+// SecurityToken" - and a client that hands no answer to its caller
+// cannot be measured, on either arm, and the run is declined. The
+// row's scored Read goes out only after the old token's lifetime
+// plus 25 % has passed, so the stimulus is expired on any tree that
+// measures the window correctly, and the peer answers it with a
+// response chunk whose symmetric security header carries the old,
+// expired token id and whose signature is made with the old token's
+// keys, chosen with the harness's answerToken script: the scored
+// arm's server assigned a channel id that differs from the token id,
+// the control arm's the same number, and the ids are all that
+// separates them. Nothing is ever answered with the renewed token,
+// before the scored Read or after it: §6.7.4 lets the client drop
+// the old token on the first Message the new one secures, and a
+// rejection grounded in that instead of in expiry is not the
+// behaviour the row scores. A client that closes the channel on
+// the failed check does what §6.7.7 orders - "If an error occurs
+// during Message verification the receiver shall close the
+// communication channel" - and the row accepts the close: it
+// asserts only that the expired-token body never reaches the
+// caller, and a fixed client that shuts the channel shows the same
+// shape a conforming one does.
 // See harness.go.
 //
 // The row asserts that the scored arm's client does not hand the
-// old-token response to its caller - per the README's definition of
+// expired-token response to its caller - per the README's definition of
 // the phrase, the response body never arrives at the caller; on
-// these unfixed trees that shows as the arm's Read returning its own
-// timeout error, and a fixed client returns the closed channel's
+// these unfixed trees that shows as the arm's scored Read returning
+// its own timeout error, and a fixed client returns the closed channel's
 // error instead, which is why the arm keys on the body - and that
 // the control arm's client does reject it: the control arm is the
 // instrument check - on this very tree the channel id = token id
@@ -94,7 +101,7 @@
 // declines, and does not score, when the fixture fails its half or
 // a stage the story needs never ran, whichever side caused it -
 // the peer's own failure, the channel never opening, the peer's OPN
-// records holding no renewal, the renewed-token answer never
+// records holding no renewal, the live old-token answer never
 // arriving at the caller - and it scores, never declines, a
 // client whose own behaviour leaves the scored arm unscoreable: a
 // frame the harness flags as the client's own bytes is that case's
@@ -105,15 +112,15 @@
 // connection generation it arrived on, whether it asked for a new
 // token or renewed the current one, and the moment it arrived, and
 // without a renewal there is no new token id on the same channel
-// for the scored answer to be old against. The row's Read never
-// reaching the peer is scored by arm: on the scored arm it is scored
+// for the scored answer to be old against. The row's scored Read
+// never reaching the peer is scored by arm: on the scored arm it is scored
 // as gopcua's failure - unhandled
 // it would read as a rejection, the body never arriving, a false
 // pass, and the harness's setupCheck already holds the peer's half
 // clean, so a Read that never arrives can only be the client's own
 // doing - and on the control arm it is a decline, because the
-// instrument check never ran: a control run whose Read never reached
-// the peer has no rejection to see, and proves nothing about the
+// instrument check never ran: a control run whose scored Read never
+// reached the peer has no rejection to see, and proves nothing about the
 // scored arm. The knownBug
 // constant, for issue #941, records that gopcua does not do this yet:
 // scheduleExpiration empties and rebuilds the instance map under the
@@ -127,10 +134,10 @@
 // not show - the control arm passing shows the row is not scoring an
 // instrument that rejects nothing - and what deletes the constant is
 // keying scheduleExpiration by the channel id instead of the token
-// id, after which both arms reject the old-token response and hand
-// the renewed-token answer to their callers, and only such a run
-// carries the demand - a client that rejects both answers is a
-// decline, never a fix; measured on main before and after #911 and
+// id, after which both arms hand the live old-token answer to their
+// callers and reject the expired-token response, and only such a run
+// carries the demand - a client that hands no answer to its caller
+// is a decline, never a fix; measured on main before and after #911 and
 // #904 merged, the scored arm still logs the known bug, because
 // neither touches the expiration's keying. When
 // the constant stands, the scored arm's acceptance is logged as the
@@ -152,7 +159,6 @@ import (
 	"fmt"
 	"math/big"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -163,17 +169,36 @@ import (
 )
 
 // tokenLifetime is the short lifetime the peer's issue token carries.
-// Measured on this tree, the client renews at half of it and wipes
-// the expired instance at its end - the 75 % and 125 % factors
-// truncate to whole seconds in uasc - so the arm's Read goes out
-// 900 ms past the wipe, not the 400 ms by which graceWait sits
-// past the window the specification names, and the stimulus is
-// expired on any tree that measures the window correctly either
-// way. Two seconds keep the arm's
-// whole wait short while leaving half a lifetime between the renewal
-// and the expiry, so a renewal that runs late on a loaded machine
-// still lands before the window the Read waits out.
-const tokenLifetime = 2 * time.Second
+// Measured on this tree, the client renews at three quarters of it
+// and wipes the expired instance at its lifetime plus the 25 %
+// grace window - for a whole number of seconds the 75 % and 125 %
+// factors in uasc truncate to exactly those points - so the arm's
+// scored Read goes out graceWait past both the wipe and the window
+// the specification names, and the stimulus is expired on any tree
+// that measures the window correctly either way. Four seconds
+// leave the arm a second of slack for the renewal, due at three
+// quarters of the lifetime, before the pre-expiry Read it sends
+// once the renewal is in the peer's records, and that Read still
+// has the second left before the window it must land inside closes,
+// so a renewal that runs late on a loaded machine still leaves the
+// arm its live-token answer.
+const tokenLifetime = 4 * time.Second
+
+// renewalSlack is how far past the 75 % of the issue token's
+// lifetime at which uasc schedules the client's own renewal the arm
+// waits for that renewal in the peer's records before it gives up:
+// the renewal is a timer on a goroutine, and a loaded machine
+// fires it late. The deadline it sets still leaves the pre-expiry
+// Read the rest of the token's lifetime plus its grace window to
+// land in.
+const renewalSlack = time.Second
+
+// preReadMargin is how far inside the issue token's lifetime plus
+// its 25 % grace window the pre-expiry Read's answer must land:
+// the bound on that Read ends this far before the window closes, so
+// a slow answer is never verified against a token the client has
+// already wiped on its own truncated schedule.
+const preReadMargin = 100 * time.Millisecond
 
 // renewalLifetime is the lifetime the renewal token carries: a full
 // minute, so neither the renewed token's own renewal at 75 % nor its
@@ -242,10 +267,10 @@ func TestExpiredSecurityTokenIsRejected(t *testing.T) {
 	// expiration happens to remove the right instance, so the arm
 	// is the instrument check - a run in which it sees no
 	// rejection proves nothing about the scored arm. Its four
-	// declines below - no renewal in the peer's records, the
-	// arm's Read never reaching the peer, the old-token response
-	// handed to the caller, the renewed-token answer not handed
-	// to it - each leaves the check unrun or its rejection
+	// declines below - no renewal in the peer's records, the live
+	// old-token answer never reaching the caller, the scored Read
+	// never reaching the peer, the expired-token response handed
+	// to the caller - each leaves the check unrun or its rejection
 	// ungrounded, whichever side caused the decline.
 	control, teardown := runRejectionArm(controlChannelID)
 	t.Cleanup(teardown)
@@ -262,21 +287,22 @@ func TestExpiredSecurityTokenIsRejected(t *testing.T) {
 			"no renewal, so the answer's token would be the channel's only " +
 			"one, not an old one, and this run cannot be scored")
 	}
+	if !control.preExpiryResponseArrived {
+		t.Fatalf("could not set the test up: the control arm's client did " +
+			"not hand the live old-token answer to its caller, so its " +
+			"rejection of the expired-token chunk is not grounded in " +
+			"expiry and this run cannot be scored")
+	}
 	if !control.readArrived {
-		t.Fatalf("could not set the test up: the control arm's Read never " +
-			"reached the peer, so the instrument check never ran and this " +
-			"run proves nothing about the scored arm")
+		t.Fatalf("could not set the test up: the control arm's scored Read " +
+			"never reached the peer, so the instrument check never ran and " +
+			"this run proves nothing about the scored arm")
 	}
 	if control.responseArrived {
 		t.Fatalf("could not set the test up: the control arm's client handed " +
-			"the old-token response to its caller, so the instrument cannot " +
-			"see a rejection at all and this run proves nothing about the " +
-			"scored arm")
-	}
-	if !control.renewedResponseArrived {
-		t.Fatalf("could not set the test up: the control arm's client did " +
-			"not hand the renewed-token answer to its caller, so its " +
-			"rejection of the old-token chunk is not grounded in the token")
+			"the expired-token response to its caller, so the instrument " +
+			"cannot see a rejection at all and this run proves nothing about " +
+			"the scored arm")
 	}
 
 	scored, teardown := runRejectionArm(scoredChannelID)
@@ -294,12 +320,18 @@ func TestExpiredSecurityTokenIsRejected(t *testing.T) {
 			"no renewal, so the answer's token would be the channel's only " +
 			"one, not an old one, and this run cannot be scored")
 	}
+	if !scored.preExpiryResponseArrived {
+		t.Fatalf("could not set the test up: the scored arm's client did " +
+			"not hand the live old-token answer to its caller, so a " +
+			"client that rejects every chunk cannot be told from one that " +
+			"rejected the expired token, and this run cannot be scored")
+	}
 	if !scored.readArrived {
-		t.Errorf("the scored arm's Read never reached the peer, so the arm " +
-			"scored nothing: the harness's setup check reports no " +
-			"failure on the peer's side, so the client's own behaviour " +
-			"stopped it, and that is scored as gopcua's failure, never " +
-			"declined")
+		t.Errorf("the scored arm's expired-token Read never reached the " +
+			"peer, so the arm scored nothing: the harness's setup check " +
+			"reports no failure on the peer's side, so the client's own " +
+			"behaviour stopped it, and that is scored as gopcua's " +
+			"failure, never declined")
 		return
 	}
 
@@ -313,21 +345,17 @@ func TestExpiredSecurityTokenIsRejected(t *testing.T) {
 			"rejected its own)",
 			knownBug, scoredChannelID, issueTokenID, issueTokenID)
 	case scored.responseArrived:
-		t.Errorf("the scored arm's client handed the old-token response to " +
-			"its caller, where the control arm's client rejected its own, " +
-			"and no knownBug constant stands")
-	case !scored.renewedResponseArrived:
-		t.Fatalf("could not set the test up: the scored arm's client did " +
-			"not hand the renewed-token answer to its caller, so its " +
-			"rejection of the old-token response cannot be told from a " +
-			"channel dead for every token, and this run cannot be scored")
+		t.Errorf("the scored arm's client handed the expired-token " +
+			"response to its caller, where the control arm's client rejected " +
+			"its own, and no knownBug constant stands")
 	case knownBug != "":
-		t.Errorf("this now passes (both arms rejected the old-token " +
-			"response, so its body never arrived at either caller, and " +
-			"both handed the renewed-token answer to their callers, so " +
-			"neither channel was dead) - delete the knownBug constant, " +
-			"every arm that reads it, and anything only those arms " +
-			"used, in the commit that fixed it")
+		t.Errorf("this now passes (both arms handed the live old-token " +
+			"answer to their callers and rejected the expired-token " +
+			"response, so its body never arrived at either caller - the " +
+			"close of the channel is what \u00a76.7.7 orders and the row " +
+			"accepts it) - delete the knownBug constant, every arm that " +
+			"reads it, and anything only those arms used, in the commit " +
+			"that fixed it")
 	default:
 		t.Logf("both arms rejected the old-token response: neither caller " +
 			"saw the body")
@@ -339,12 +367,22 @@ func TestExpiredSecurityTokenIsRejected(t *testing.T) {
 // peer's records after each stage of the arm's story has played,
 // so the row never races a live connection for it.
 type rejectionArmOutcome struct {
-	responseArrived        bool
-	renewedResponseArrived bool
-	renewalSeen            bool
-	readArrived            bool
-	setupWhy               string
-	setupFromGopcua        bool
+	// preExpiryResponseArrived reports whether the answer to the
+	// arm's pre-expiry Read - a chunk the peer secured with the old
+	// token while it was still live - reached the caller.
+	preExpiryResponseArrived bool
+	// responseArrived reports whether the answer to the arm's
+	// scored Read - the same old token, now past its lifetime plus
+	// the 25 % grace window - reached the caller.
+	responseArrived bool
+	renewalSeen     bool
+	readArrived     bool
+	// scoredReadSentAt is the moment the arm sent its scored Read,
+	// which tells that Read's record apart from the pre-expiry
+	// Read's in the peer's requests.
+	scoredReadSentAt time.Time
+	setupWhy         string
+	setupFromGopcua  bool
 }
 
 // runRejectionArm runs one arm of the row end to end: it mints the
@@ -354,19 +392,27 @@ type rejectionArmOutcome struct {
 // given and the token id issueTokenID and answers the client's own
 // renewal with the token id renewTokenID on the same channel; the
 // arm launches a fresh client - the real opcua.Client, driven
-// through Dial and no further. The arm waits out the issue token's
-// lifetime plus its 25 % grace window, then sends two Reads, each
-// bounded by readBound: the peer answers the first with a
-// response chunk stamped with the old, expired token and signed
-// with the old token's keys, and the second with a chunk secured
-// with the renewed token, mapped by the script's answerToken
-// hook. It returns what the arm's run left to score and the
-// peer's teardown for the row to register with t.Cleanup; keys
-// that could not be minted, a peer that could not be started or
-// a client that could not be built is a decline whichever side
-// caused it, reported through o.setupWhy and printed by the row
-// with "could not set the test up", per ../README.md. The runner
-// never aborts the test; it returns plain values.
+// through Dial and no further. The arm waits for the client's own
+// renewal in the peer's records - due at 75 % of the issue token's
+// lifetime, with renewalSlack for a late one - and then, still
+// inside the old token's lifetime plus its 25 % grace window, sends
+// the pre-expiry Read, bounded so its answer lands inside the
+// window: the peer answers it with a chunk stamped with the old
+// token and signed with the old token's keys, the token still live.
+// The arm waits out the rest of the window and sends the scored
+// Read, bounded by readBound: the peer answers it with a chunk
+// stamped and signed with the same old, now expired token. Both
+// answers are mapped by the script's answerToken hook, which never
+// picks the renewed token, because §6.7.4 lets the client drop the
+// old token on the first Message the new one secures and a
+// rejection grounded in that instead of in expiry is not the
+// behaviour the row scores. It returns what the arm's run left to
+// score and the peer's teardown for the row to register with
+// t.Cleanup; keys that could not be minted, a peer that could not
+// be started or a client that could not be built is a decline
+// whichever side caused it, reported through o.setupWhy and printed
+// by the row with "could not set the test up", per ../README.md. The
+// runner never aborts the test; it returns plain values.
 func runRejectionArm(channelID uint32) (o rejectionArmOutcome,
 	teardown func()) {
 	clientKey, clientCert, why := mintSigningCert(
@@ -395,9 +441,6 @@ func runRejectionArm(channelID uint32) (o rejectionArmOutcome,
 		createdAt: createdAt,
 		lifetime:  uint32(renewalLifetime / time.Millisecond),
 	}
-	// readAnswers is counted on the peer's serve goroutines, one per
-	// connection, so the count must be atomic.
-	var readAnswers atomic.Uint32
 	peer, teardown, why := startPeer(peerScript{
 		issue: issue,
 		renew: renew,
@@ -407,16 +450,15 @@ func runRejectionArm(channelID uint32) (o rejectionArmOutcome,
 			}
 			return nil
 		},
-		// The hook maps the arm's Reads to their tokens: the scored
-		// answer is stamped with the old, expired token - the chunk
-		// carries its token id and, under Sign, its signature is made
-		// with its keys - and the second Read's answer with the
-		// renewed one.
+		// The hook maps both the arm's Reads to the old token: the
+		// pre-expiry answer carries a token that is still live, the
+		// scored answer the same token now expired - each chunk carries
+		// its token id and, under Sign, its signature is made with its
+		// keys - and the renewed token answers nothing, because §6.7.4
+		// lets the client drop the old token on the first Message the
+		// new one secures.
 		answerToken: func(ua.Request) *channelToken {
-			if readAnswers.Add(1) == 1 {
-				return &issue
-			}
-			return &renew
+			return &issue
 		},
 		codec: newSignCodec(peerKey, peerCert),
 	})
@@ -442,31 +484,52 @@ func runRejectionArm(channelID uint32) (o rejectionArmOutcome,
 		return o, teardown
 	}
 
-	windowEnd := issue.createdAt.Add(tokenLifetime).
-		Add(tokenLifetime / 4).Add(graceWait)
-	if d := time.Until(windowEnd); d > 0 {
-		time.Sleep(d)
-	}
-
-	// The client's own renewal has had the whole window to arrive.
-	for _, opn := range peer.record().OPNs {
-		if opn.Type == ua.SecurityTokenRequestTypeRenew {
-			o.renewalSeen = true
-			break
+	// The client's own renewal is due at 75 % of the issue token's
+	// lifetime; wait for it in the peer's records before the
+	// pre-expiry Read, because that Read is the instrument check's
+	// positive half only once the channel holds both tokens.
+	renewalDeadline := issue.createdAt.Add(tokenLifetime * 3 / 4).
+		Add(renewalSlack)
+	for !o.renewalSeen && time.Now().Before(renewalDeadline) {
+		for _, opn := range peer.record().OPNs {
+			if opn.Type == ua.SecurityTokenRequestTypeRenew {
+				o.renewalSeen = true
+				break
+			}
+		}
+		if !o.renewalSeen {
+			time.Sleep(10 * time.Millisecond)
 		}
 	}
+
+	graceEnd := issue.createdAt.Add(tokenLifetime).Add(tokenLifetime / 4)
+	windowEnd := graceEnd.Add(graceWait)
 	if o.renewalSeen {
+		// The pre-expiry Read: the peer answers with the old token
+		// while it is still live, and the bound ends inside the
+		// window so the answer is never verified against a token
+		// the client has wiped on its own schedule.
+		preBound := time.Until(graceEnd.Add(-preReadMargin))
+		o.preExpiryResponseArrived = readBodyArrived(client, preBound)
+		if d := time.Until(windowEnd); d > 0 {
+			time.Sleep(d)
+		}
+		// The scored Read: the same old token on the answer, now
+		// past its lifetime plus the 25 % grace window.
+		o.scoredReadSentAt = time.Now()
 		o.responseArrived = readBodyArrived(client, readBound)
-		o.renewedResponseArrived = readBodyArrived(client, readBound)
 	}
 
 	closeCtx, cancel := context.WithTimeout(context.Background(), dialBound)
 	_ = client.Close(closeCtx)
 	cancel()
 
-	for _, r := range peer.record().Requests {
-		if _, ok := r.Req.(*ua.ReadRequest); ok {
-			o.readArrived = true
+	if !o.scoredReadSentAt.IsZero() {
+		for _, r := range peer.record().Requests {
+			if _, ok := r.Req.(*ua.ReadRequest); ok &&
+				r.At.After(o.scoredReadSentAt) {
+				o.readArrived = true
+			}
 		}
 	}
 	o.setupWhy, o.setupFromGopcua = peer.setupCheck()
