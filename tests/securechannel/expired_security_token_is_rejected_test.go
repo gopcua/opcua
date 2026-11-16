@@ -90,12 +90,12 @@
 // The row asserts that the scored arm's client does not hand the
 // expired-token response to its caller - per the README's definition of
 // the phrase, the response body never arrives at the caller; on
-// these unfixed trees that shows as the arm's scored Read returning
+// a tree without the fix that shows as the arm's scored Read returning
 // its own timeout error, and a fixed client returns the closed channel's
 // error instead, which is why the arm keys on the body - and that
 // the control arm's client does reject it: the control arm is the
-// instrument check - even on an unfixed tree the channel id = token id
-// arm's expiration removes the right instance, so it shows
+// instrument check - even before the fix the channel id = token id
+// arm's expiration removed the right instance, so it shows
 // that the instrument can see a rejection at all, and a run in which
 // it does not see one proves nothing about the scored arm. It
 // declines, and does not score, when the fixture fails its half or
@@ -121,29 +121,25 @@
 // doing - and on the control arm it is a decline, because the
 // instrument check never ran: a control run whose scored Read never
 // reached the peer has no rejection to see, and proves nothing about the
-// scored arm. The knownBug
-// constant, for issue #941, records that gopcua does not do this yet:
-// scheduleExpiration empties and rebuilds the instance map under the
-// TOKEN id (uasc/secure_channel.go:952, uasc/secure_channel.go:954,
-// uasc/secure_channel.go:964) while every arriving chunk is looked up
-// under the CHANNEL id (uasc/secure_channel.go:579,
-// uasc/secure_channel.go:603), so when the server assigns the two
-// different numbers the expired instance is never removed and the
-// old-token signature still verifies. The knownBug arm is the scored
-// arm accepting the old-token response, a presence a fixed client does
-// not show - the control arm passing shows the row is not scoring an
-// instrument that rejects nothing - and what deletes the constant is
-// keying scheduleExpiration by the channel id instead of the token
+// scored arm. gopcua did not do this until the fix for
+// https://github.com/gopcua/opcua/pull/951 (issue #941) merged:
+// before it, scheduleExpiration emptied and rebuilt the instance map
+// under the TOKEN id (uasc/secure_channel.go:952,
+// uasc/secure_channel.go:954, uasc/secure_channel.go:964) while every
+// arriving chunk was looked up under the CHANNEL id
+// (uasc/secure_channel.go:579, uasc/secure_channel.go:603), so when
+// the server assigned the two different numbers the expired instance
+// was never removed and the old-token signature still verified; the
+// fix keyed scheduleExpiration by the channel id instead of the token
 // id, after which both arms hand the live old-token answer to their
-// callers and reject the expired-token response, and only such a run
-// carries the demand - a client that hands no answer to its caller
-// is a decline, never a fix; measured on main before and after #911 and
-// #904 merged, the scored arm still logs the known bug, because
-// neither touches the expiration's keying. When
-// the constant stands, the scored arm's acceptance is logged as the
-// known bug; when both arms reject, that is a hard error telling
-// whoever runs it to delete the constant, every arm that reads it,
-// and anything only those arms used.
+// callers and reject the expired-token response. The red arm's
+// presence is the scored arm accepting the old-token response - a
+// presence a fixed client does not show, and the control arm passing
+// shows the row is not scoring an instrument that rejects nothing -
+// and a client that hands no answer to its caller is a decline,
+// never a fix; measured on main before and after #911 and #904
+// merged, the scored arm still accepted, because neither touches
+// the expiration's keying. When both arms reject, the row passes.
 //
 // No reference stack has been read for this behaviour; the measurement
 // on main before and after PRs #911 and #904 merged is the row's own.
@@ -208,12 +204,12 @@ const renewalLifetime = time.Minute
 // graceWait is how far past the issue token's lifetime plus its 25 %
 // grace window the arm waits before it sends the scored Read, and
 // the window is waited out from the stamp the peer put on the
-// token: the unfixed tree schedules the expiration from that stamp,
+// token: gopcua schedules the expiration from that stamp,
 // and a tree that measures from receipt ends its window a handshake
 // later, which the same wait covers. The wipe is a timer on a
 // goroutine, and the wait gives the goroutine time to fire and its
 // wipe to land on a loaded machine; a delay that outruns the wait
-// on the scored arm alone logs the known bug on a fixed tree, and
+// on the scored arm alone fails a fixed tree, and
 // the row cannot tell it from a real one.
 const graceWait = 400 * time.Millisecond
 
@@ -224,8 +220,8 @@ const graceWait = 400 * time.Millisecond
 // arm.
 const dialBound = 10 * time.Second
 
-// readBound is the bound on the arm's Reads. On these unfixed trees
-// a rejection shows as the Read returning this bound's own timeout
+// readBound is the bound on the arm's Reads. On a tree without the
+// fix a rejection shows as the Read returning this bound's own timeout
 // error - a rejected chunk reaches no handler - so the bound is
 // what a rejected answer costs the arm; a healthy answer crosses
 // the loopback in milliseconds, and one slower than the bound is
@@ -243,8 +239,8 @@ const (
 )
 
 // The channel ids the arms differ in: the control arm's server
-// assigns the channel id and the token id the same number, so on
-// an unfixed tree the expiration still removes the right
+// assigns the channel id and the token id the same number, so even
+// before the fix the expiration removed the right
 // instance, and the scored arm's assigns the two different numbers.
 // The ids are all that separates the arms.
 const (
@@ -253,18 +249,12 @@ const (
 )
 
 func TestExpiredSecurityTokenIsRejected(t *testing.T) {
-	// knownBug records that gopcua does not do this yet; the text is
-	// logged in place of a failure. ../README.md says when to delete
-	// it.
-	const knownBug = "scheduleExpiration empties and rebuilds the " +
-		"instance map under the token id while every arriving chunk is " +
-		"looked up under the channel id, so a server that assigns the " +
-		"two different numbers leaves the expired instance in place and " +
-		"the old-token signature still verifies (issue #941)"
+	// gopcua did not do this until
+	// https://github.com/gopcua/opcua/pull/951 merged; it passes since.
 
 	// The control arm first: the server assigns the channel id and
-	// the token id the same number, and even on an unfixed tree the
-	// expiration removes the right instance, so the arm
+	// the token id the same number, and even before the fix the
+	// expiration removed the right instance, so the arm
 	// is the instrument check - a run in which it sees no
 	// rejection proves nothing about the scored arm. Its four
 	// declines below - no renewal in the peer's records, the live
@@ -336,26 +326,11 @@ func TestExpiredSecurityTokenIsRejected(t *testing.T) {
 	}
 
 	switch {
-	case scored.responseArrived && knownBug != "":
-		t.Logf("known bug: %s (the scored arm's client, whose server "+
-			"assigned the channel id %d and the token id %d, handed its "+
-			"caller the response chunk stamped with the old, expired "+
-			"token id %d and signed with its keys, while the control "+
-			"arm's client, whose server assigned both the same number, "+
-			"rejected its own)",
-			knownBug, scoredChannelID, issueTokenID, issueTokenID)
 	case scored.responseArrived:
 		t.Errorf("the scored arm's client handed the expired-token " +
 			"response to its caller, where the control arm's client rejected " +
-			"its own, and no knownBug constant stands")
-	case knownBug != "":
-		t.Errorf("this now passes (both arms handed the live old-token " +
-			"answer to their callers and rejected the expired-token " +
-			"response, so its body never arrived at either caller - the " +
-			"close of the channel is what \u00a76.7.7 orders and the row " +
-			"accepts it) - delete the knownBug constant, every arm that " +
-			"reads it, and anything only those arms used, in the commit " +
-			"that fixed it")
+			"its own, and \u00a76.7.7 orders the receiver to close the " +
+			"communication channel on a failed Message verification")
 	default:
 		t.Logf("both arms rejected the old-token response: neither caller " +
 			"saw the body")
