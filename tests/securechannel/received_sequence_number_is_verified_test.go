@@ -94,28 +94,25 @@
 // the arm's Read never arriving at the peer - the setup check holds the
 // peer's half clean, so a Read that never arrives can only be the
 // client's own doing - a failure the row scores with t.Errorf and never
-// a decline. The knownBug constant records that gopcua does not do this
-// yet: the receive path decodes the sequence header at
-// uasc/secure_channel.go:563 (n, err :=
-// m.SequenceHeader.Decode(m.Data)) but never compares the number it
-// carries, a single-chunk message is returned without any look at it
+// a decline. gopcua did not do this until the fix for
+// https://github.com/gopcua/opcua/pull/952: before it, the receive path
+// decoded the sequence header at uasc/secure_channel.go:563 (n, err :=
+// m.SequenceHeader.Decode(m.Data)) but never compared the number it
+// carried, a single-chunk message was returned without any look at it
 // (uasc/secure_channel.go:1295-1296), and the only read of a received
-// SequenceNumber silently skips a duplicate within one chunked message
+// SequenceNumber silently skipped a duplicate within one chunked message
 // instead of raising the transport error (uasc/secure_channel.go:1302),
-// so a reused number and a skipped number are both accepted on every
-// tree measured. The knownBug arm is either arm's caller being handed
-// the response whose SequenceNumber was reused or skipped - a presence
-// a fixed client does not show - and what deletes the constant is a fix
-// that verifies the SequenceNumber of every received chunk and raises
-// the transport error; there is no pull request to name. When the
-// constant stands, the acceptance is logged as the known bug, with
-// which arm's caller was handed its response, so exactly one arm
-// accepting is still the known bug: a partial fix - a check that
-// catches a reused number and lets a skipped one by - stays logged and
-// visible, not mistaken for the whole fix; when both arms' responses
-// are rejected and both arms' well-formed answers handed to their
-// callers, that is a hard error telling whoever runs it to delete the
-// constant, every arm that reads it, and anything only those arms used.
+// so a reused number and a skipped number were both accepted on every
+// tree measured; the fix made the client verify the SequenceNumber of
+// every received chunk and raise the transport error. The red arm's
+// presence is either arm's caller being handed the response whose
+// SequenceNumber was reused or skipped - a presence a fixed client does
+// not show - and, with which arm's caller was handed its response named
+// in the message, exactly one arm accepting is still red, so a partial
+// fix - a check that catches a reused number and lets a skipped one by
+// - stays visible, not mistaken for the whole fix; when both arms'
+// responses are rejected and both arms' well-formed answers handed to
+// their callers, the row passes.
 //
 // No reference stack has been read for this behaviour; the measurement
 // on the trees this suite was authored against is the row's own.
@@ -158,13 +155,8 @@ const (
 )
 
 func TestReceivedSequenceNumberIsVerified(t *testing.T) {
-	// knownBug records that gopcua does not do this yet; the text is
-	// logged in place of a failure. ../README.md says when to delete
-	// it.
-	const knownBug = "the receive path decodes the sequence header but " +
-		"never compares the number it carries, so a response chunk that " +
-		"reuses a SequenceNumber within the same TokenId and one that " +
-		"skips a number are both handed to the caller"
+	// gopcua did not do this until https://github.com/gopcua/opcua/pull/952
+	// merged; it passes since.
 
 	reused, teardown := runSequenceNumberArm(reusedSeq)
 	t.Cleanup(teardown)
@@ -216,11 +208,9 @@ func TestReceivedSequenceNumberIsVerified(t *testing.T) {
 	}
 
 	switch {
-	case len(handed) > 0 && knownBug != "":
-		t.Logf("known bug: %s (%s)", knownBug,
-			strings.Join(handed, "; "))
 	case len(handed) > 0:
-		t.Errorf("%s, and no knownBug constant stands",
+		t.Errorf("%s, and §6.7.7 orders the receiver not to interpret "+
+			"the contents until the sequence number is verified",
 			strings.Join(handed, "; "))
 	case !reused.groundArrived:
 		t.Fatalf("could not set the test up: the reused arm's client did " +
@@ -232,16 +222,6 @@ func TestReceivedSequenceNumberIsVerified(t *testing.T) {
 			"not hand the well-formed answer to its caller, so its " +
 			"rejection of the skipped-number response is not grounded in " +
 			"the number, and this run cannot be scored")
-	case knownBug != "":
-		t.Errorf("this now passes (the reused arm's caller was not handed " +
-			"the response whose SequenceNumber repeated 2 within the same " +
-			"TokenId, and the skipped arm's caller was not handed the " +
-			"response whose SequenceNumber skipped 3, so neither violated " +
-			"body ever arrived at a caller, and both arms handed the " +
-			"well-formed answer to their callers, so neither channel was " +
-			"dead) - delete the knownBug constant, every arm that reads " +
-			"it, and anything only those arms used, in the commit that " +
-			"fixed it")
 	default:
 		t.Logf("both arms rejected their responses: neither caller saw " +
 			"the body")

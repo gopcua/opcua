@@ -80,15 +80,16 @@ Two rows - expired_security_token_is_rejected_test.go and
 received_sequence_number_is_verified_test.go - score a chunk the
 client must not hand to its caller, and the phrase means one
 observable: the response body arrives at the caller, or it does not.
-The rejection is the body never arriving; the acceptance, the knownBug
-arm, is the body arriving. On these unfixed trees the rejection shows
-as the request returning its own timeout error, the timeout the row
-bound it with, because a rejected chunk reaches no handler and so the
-request is never answered - but that is how the rejection shows here,
-not what it is: a fixed client that closes the channel on a failed
-check (§6.7.7) returns the closed channel's error, an EOF, not a
-timeout. So the rows key on the body and never on which error the
-request returns along the way.
+The rejection is the body never arriving; the acceptance - the
+knownBug arm in the row whose constant still stands, the red arm in
+the row that passes - is the body arriving. On a tree without the
+fix, the rejection shows as the request returning its own timeout
+error, the timeout the row bound it with, because a rejected chunk
+reaches no handler and so the request is never answered - but that is
+how the rejection shows here, not what it is: a fixed client that
+closes the channel on a failed check (§6.7.7) returns the closed
+channel's error, an EOF, not a timeout. So the rows key on the body and
+never on which error the request returns along the way.
 
 ## When a row declines
 
@@ -115,19 +116,19 @@ says which stages its own check covers; the check the rows share is
 
 ## The knownBug ledger
 
-Two constants stand, in the two rows that still need one, each
-declared in its row's test function, each naming the production lines
-that decide the outcome and what deletes it:
+One constant stands, in the one row that still needs it, declared in
+its row's test function, naming the production lines that decide the
+outcome and what deletes it:
 
 - `expired_security_token_is_rejected_test.go`: issue #941; the
   expiration is keyed by the token id where every lookup is by the
   channel id; keying it by the channel id deletes it.
-- `received_sequence_number_is_verified_test.go`: no pull request; the
-  receive path decodes the sequence header but never compares the
-  number; a fix that verifies it deletes it.
 
-Two rows pass on main and carry no constant:
+Three rows pass and carry no constant:
 `security_token_lifetime_is_measured_from_receipt_test.go`, which PR
-#911 closed by measuring the token's lifetime from receipt, and
+#911 closed by measuring the token's lifetime from receipt,
 `service_fault_leaves_the_channel_open_test.go`, which PR #904 closed
-by keeping a service fault off the channel-error path.
+by keeping a service fault off the channel-error path, and
+`received_sequence_number_is_verified_test.go`, which
+https://github.com/gopcua/opcua/pull/952 closed by making the receive
+path verify the SequenceNumber of every received chunk.
