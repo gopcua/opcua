@@ -75,8 +75,13 @@ func TestDateTimeEncodesEveryInstantInTheValidRange(t *testing.T) {
 	// 1601-01-01T00:00:00Z, so 1601-01-01T00:00:00Z is tick 0 (the instant is
 	// not gopcua's zero time, and encodes as that tick), one tick later is
 	// tick 1, 1970-01-01T00:00:00Z is 11644473600 seconds after the 1601 epoch
-	// and so tick 116444736000000000, and 9999-12-31T23:59:59Z is tick
-	// 2650467743990000000. Each is encoded and compared against its bytes
+	// and so tick 116444736000000000, and 9999-12-31T23:59:58Z is tick
+	// 2650467743980000000. The anchor stops a second short of the high end
+	// the clause names because §5.2.2.5 encodes that instant itself as the
+	// Int64 maximum - a DateTime "equal to or greater than 9999-12-31
+	// 11:59:59PM UTC" is one of its saturation cases - and open62541 does the
+	// same (ua_types_encoding_binary.c line 298 at 1deeb501, v >=
+	// UA_DATETIME_ENCODE_MAX). Each is encoded and compared against its bytes
 	// before the sweep, so the anchors hold even if the sweep never runs.
 	anchors := []struct {
 		instant time.Time
@@ -88,8 +93,8 @@ func TestDateTimeEncodesEveryInstantInTheValidRange(t *testing.T) {
 			[]byte{0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}},
 		{time.Date(1970, time.January, 1, 0, 0, 0, 0, time.UTC),
 			[]byte{0x00, 0x80, 0x3e, 0xd5, 0xde, 0xb1, 0x9d, 0x01}},
-		{time.Date(9999, time.December, 31, 23, 59, 59, 0, time.UTC),
-			[]byte{0x80, 0xa9, 0x27, 0xd1, 0x5e, 0x5a, 0xc8, 0x24}},
+		{time.Date(9999, time.December, 31, 23, 59, 58, 0, time.UTC),
+			[]byte{0x00, 0x13, 0x8f, 0xd0, 0x5e, 0x5a, 0xc8, 0x24}},
 	}
 	for _, a := range anchors {
 		got, err := ua.Encode(&wireDateTime{V: a.instant})

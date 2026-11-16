@@ -69,8 +69,10 @@ func validRangeInstants() []time.Time {
 		time.Date(2262, time.April, 11, 23, 47, 16, 854775800, time.UTC),
 		time.Date(2262, time.April, 11, 23, 47, 16, 854775900, time.UTC),
 	)
-	// The high end the clause names.
-	out = append(out, time.Date(lastValidYear, time.December, 31, 23, 59, 59, 0, time.UTC))
+	// One tick short of the high end the clause names: §5.2.2.5 encodes
+	// 9999-12-31T23:59:59Z itself as the Int64 maximum, so the last instant
+	// that goes onto the wire as its own tick count is the one before it.
+	out = append(out, time.Date(lastValidYear, time.December, 31, 23, 59, 58, 999999900, time.UTC))
 	return out
 }
 
