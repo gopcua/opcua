@@ -15,9 +15,10 @@
 // greater than zero, so the "greater than zero" clause leaves them alone,
 // and four elements are present, so the element decode succeeds. The
 // product is 2^32+4, not 4, so the dimensions are inconsistent with the
-// length and the decoder must stop. gopcua multiplies the dimensions in an
-// int32, the product wraps to exactly 4, the check passes, and the decode
-// succeeds with dimensions a four-element variant cannot have.
+// length and the decoder must stop. gopcua multiplied the dimensions in an
+// int32, so the product wrapped to exactly 4, the check passed, and the
+// decode succeeded with dimensions a four-element variant cannot have, until
+// the fix for https://github.com/gopcua/opcua/pull/953 made the decoder stop.
 //
 // The neighbouring rows are
 // variant_rejects_an_array_length_that_is_not_a_count_test.go, which is the
@@ -80,16 +81,8 @@ import (
 )
 
 func TestVariantRejectsDimensionsInconsistentWithTheArrayLength(t *testing.T) {
-	// knownBug records that gopcua does not do this yet; the text is logged
-	// in place of a failure. ../README.md says when to delete it. No open pull
-	// request closes this behaviour: neither
-	// https://github.com/gopcua/opcua/pull/892 nor
-	// https://github.com/gopcua/opcua/pull/893 nor
-	// https://github.com/gopcua/opcua/pull/936 fixes it, so the constant
-	// stands until whichever change makes the decoder stop does.
-	const knownBug = "dimensions whose product is not the array length are accepted when the " +
-		"product overflows: the consistency check multiplies the dimensions in an int32, so " +
-		"dimensions [4, 1073741825] wrap to exactly the array length 4 and the decode succeeds"
+	// gopcua did not do this until https://github.com/gopcua/opcua/pull/953
+	// merged; it passes since.
 
 	// The control: the same four Boolean elements with dimensions [2, 2],
 	// whose product is the array length. It decodes today and the row
@@ -119,49 +112,36 @@ func TestVariantRejectsDimensionsInconsistentWithTheArrayLength(t *testing.T) {
 		// and the wrong-fix arm below share.
 		inconsistent = "dimensions [4, 1073741825] have the product 2^32+4 " +
 			"against an array length of 4"
-		// shallStop is the clause's requirement, in the words the known-bug
-		// line and the wrong-fix arm below share.
+		// shallStop is the clause's requirement, in the words the detail
+		// line's arm and the wrong-fix arm below share.
 		shallStop = "§5.2.2.16 says the decoder shall stop"
 		// fixed is what the row says once the decoder stops, in the words the
-		// hard-error arm and the pass line below share.
+		// pass line below uses.
 		fixed = "dimensions whose product is not the array length are " +
 			"rejected, and consistent dimensions still decode"
 	)
-	// The presence the knownBug arm keys on, per the rule in tests/README.md,
-	// is the decode succeeding with the packet's own inconsistent dimensions
-	// still reported. A fixed library stops, so it never shows this presence;
-	// a change that accepts the packet some other way shows the acceptance
-	// without the presence, which is what lets the wrong-fix arm below fire.
+	// The presence the wrong-fix arm keys on, per the rule in
+	// tests/README.md, is the decode succeeding with the packet's own
+	// inconsistent dimensions still reported: a change that reaches this
+	// decode but still accepts the packet no longer shows the presence,
+	// which is what lets the wrong-fix arm below fire.
 	dims := v.ArrayDimensions()
 	dimsReported := len(dims) == 2 && dims[0] == 4 && dims[1] == 1073741825
-	decoded := err == nil && dimsReported
 	detail := fmt.Sprintf("\n    decoding % x, whose "+inconsistent+
 		", returned err %v, panicked (%s) and ArrayDimensions() %v", packet, err, panicked, dims)
 
-	// The arms, keyed as the rule asks for: the presence with the
-	// constant standing is the green known bug; the presence gone but the
-	// outcome still wrong - the packet still accepted, but no longer with
-	// its own dimensions on it, so a change has reached this decode - is a
-	// fix that landed wrong, and red; the outcome right with the constant
-	// standing asks for the constant to be deleted, and is red; the outcome
-	// right with the constant gone is the row's ordinary pass. What fits none
-	// of those - the decode still succeeding with its dimensions, and the
-	// constant deleted - falls to default, so deleting the constant without
-	// the fix is red rather than silent.
+	// The arms: the outcome right is the row's ordinary pass; a change that
+	// reaches this decode but leaves the outcome wrong - the packet still
+	// accepted, but no longer with its own dimensions on it - is a fix that
+	// landed wrong, and red. What fits neither - the decode succeeding with
+	// its dimensions - falls to default, red.
 	switch {
-	case decoded && knownBug != "":
-		t.Logf("known bug: %s; "+shallStop+" when the dimensions are "+
-			"inconsistent with the array length:%s", knownBug, detail)
 	case err == nil && !dimsReported:
 		t.Errorf("the decode no longer reports the packet's own dimensions, so a "+
 			"change has landed on this decode, but the outcome is still wrong: the "+
 			inconsistent+", "+shallStop+", and the decoder still accepts the "+
 			"packet - the change that altered the dimensions did "+
 			"not make the decoder stop:%s", detail)
-	case stops && knownBug != "":
-		t.Errorf("this now passes (" + fixed + ") - " +
-			"delete the knownBug constant, every arm that reads it, and " +
-			"anything only those arms used, in the commit that fixed it")
 	case stops:
 		t.Logf(fixed)
 	default:
