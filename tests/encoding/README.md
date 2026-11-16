@@ -45,18 +45,20 @@ all three stop, but Milo stops for a different reason than the product
 check that row requires. A row that
 cites it says so; a row that does not has not read it.
 
-## The knownBug ledger, 2026-11-06
+## The knownBug ledger
 
-One constant stands per row below, each declared inside its test
-function.
+No knownBug constant stands in this package: each row that carried one
+has been closed by the fix that deleted it.
 
-| row | closed by |
-|---|---|
-| `datetime_out_of_range_saturates_test.go` | nothing open closes this |
-| `reference_description_with_nil_fields_encodes_test.go` | nothing open closes this |
-| `variant_rejects_dimensions_inconsistent_with_the_array_length_test.go` | nothing open closes this |
-
-`variant_rejects_dimensions_inconsistent_with_the_array_length_test.go`
-names pull 892, pull 893 and pull 936 as checked and fixing none of it.
-892 and 893 closed unmerged and 936 merged, so its constant stands until
-another change fixes it.
+- `datetime_out_of_range_saturates_test.go` carried its constant until
+  https://github.com/gopcua/opcua/pull/955 made the decoder saturate
+  out-of-range tick counts.
+- `reference_description_with_nil_fields_encodes_test.go` carried its
+  constant until https://github.com/gopcua/opcua/pull/956 gave a nil
+  *ExpandedNodeID its null value and a nil *QualifiedName its null
+  bytes.
+- `variant_rejects_dimensions_inconsistent_with_the_array_length_test.go`,
+  which had named pull 892, pull 893 and pull 936 as checked and fixing
+  none of it, carried its constant until
+  https://github.com/gopcua/opcua/pull/953 made the decoder stop when
+  the dimensions' product is not the array length.

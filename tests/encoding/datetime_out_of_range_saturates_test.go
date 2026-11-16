@@ -112,34 +112,35 @@
 // clamps both groups to one instant, each leave a group collapsed to an
 // instant that is not the one named, which is the hard-failing arm below.
 //
-// gopcua implements none of the rules it probes: it feeds whatever tick
-// count arrives to its conversion arithmetic and returns the date that
-// falls out. Before PR #906 the latest group came back as three
+// gopcua implemented none of the rules it probes before the fix for
+// https://github.com/gopcua/opcua/pull/955: it fed whatever tick count
+// arrived to its conversion arithmetic and returned the date that fell
+// out. Before PR #906 the latest group came back as three
 // wrapped-overflow dates (two in 2185 and one in 1816), and the earliest
 // group as two wrapped-overflow dates in 2185 - none of them an end of the
-// clause's range. Since #906 the probes decode exactly but still do not
-// collapse: the latest group spreads over 9999-12-31T23:59:59.0000001Z
+// clause's range. Since #906 the probes decoded exactly but still did not
+// collapse: the latest group spread over 9999-12-31T23:59:59.0000001Z
 // and two dates in 30828, the earliest group over three dates in 60056,
 // 30828 and 45442. PR #906
 // fixed the in-range conversion and added no saturation, so the gap stayed
-// open through it, though the probes' decoded values moved. The row is here
-// so the gap is measured on every run rather than remembered in a
-// document, and so that whoever closes it finds out immediately.
+// open through it, though the probes' decoded values moved, until #955
+// closed it. The row is here so the saturation stays measured on every
+// run rather than remembered in a document, so that a regression finds
+// out immediately.
 //
-// Arm keying: the green arm keys on a presence, not an absence - a group
-// whose members decode to different instants. That presence is what
-// today's library shows and what a fixed library does not: the fix
-// collapses both groups onto the named instants, so the deletion arm
-// fires. A library that cannot be measured at all - one that returns the
-// same instant for every tick count, the zero time say - does not show the
-// presence either: it collapses both groups and lands in the wrong-fix
-// arm, red, not green. A decode error is not a decline: it is that
-// probe's outcome, it goes in the detail line, it counts as its group not
-// landing on the named instant, and it routes to a red arm of its own -
-// the decoder rejected what the clause saturates. Today's library does
-// not error, so an error is a change, and a change that is not the fix is
-// a wrong fix. The ticksFor anchors above still decline with a Fatalf:
-// they check the oracle, which ua.Decode cannot reach.
+// Arm keying: the red arm for an uncollapsed group keys on a presence,
+// not an absence - a group whose members decode to different instants,
+// which is what a library with no saturation shows. A library that cannot
+// be measured at all - one that returns the same instant for every tick
+// count, the zero time say - does not show the presence either: it
+// collapses both groups and lands in the wrong-fix arm, red. A decode
+// error is not a decline: it is that probe's outcome, it goes in the
+// detail line, it counts as its group not landing on the named instant,
+// and it routes to a red arm of its own - the decoder rejected what the
+// clause saturates. A library that saturates does not error, so an error
+// is a change away from the clause's rule, and red. The ticksFor anchors
+// above still decline with a Fatalf: they check the oracle, which
+// ua.Decode cannot reach.
 
 package encoding
 
@@ -170,12 +171,8 @@ func collapsed(instants []time.Time) bool {
 }
 
 func TestDateTimeOutOfRangeSaturates(t *testing.T) {
-	// knownBug records that gopcua does not do this yet; the text is logged
-	// in place of a failure. ../README.md says when to delete it.
-	const knownBug = "a tick count outside the range §5.2.2.5 defines decodes to whatever date " +
-		"the conversion arithmetic yields instead of saturating, so neither probe group " +
-		"collapses to the instant the clause names for it - the latest instant its range " +
-		"admits for the latest group, the instant tick 0 decodes to for the earliest"
+	// gopcua did not do this until https://github.com/gopcua/opcua/pull/955
+	// merged; it passes since.
 
 	// The instant the latest group must land on, under the bounded reading
 	// of "the platform" stated in the header. The earliest group's target
@@ -275,18 +272,12 @@ func TestDateTimeOutOfRangeSaturates(t *testing.T) {
 	// here.
 	atLatest := len(latestErrs) == 0 && latestCollapsed && latestGot[0].Equal(latest)
 	atEarliest := len(earliestErrs) == 0 && earliestCollapsed && earliestGot[0].Equal(earliest)
-	// The known bug's signature: a group whose members decode to different
-	// instants. The header's "Arm keying" paragraph says why the green arm
-	// keys on it.
+	// The signature of a library with no saturation: a group whose members
+	// decode to different instants. The header's "Arm keying" paragraph
+	// says why the red arm keys on it.
 	unresolved := !latestCollapsed || !earliestCollapsed
 
 	switch {
-	case atLatest && atEarliest && knownBug != "":
-		t.Errorf("this now passes (the earliest group decodes as the instant tick 0 decodes to, %s, "+
-			"and the latest group as %s) - "+
-			"delete the knownBug constant, every arm that reads it, and "+
-			"anything only those arms used, in the commit that fixed it",
-			earliest.Format(time.RFC3339Nano), latest.Format(time.RFC3339Nano))
 	case atLatest && atEarliest:
 		t.Logf("every out-of-range tick count decodes to the instant the clause names: "+
 			"the earliest group as the instant tick 0 decodes to (%s), the latest group as %s",
@@ -294,8 +285,8 @@ func TestDateTimeOutOfRangeSaturates(t *testing.T) {
 	case len(latestErrs) > 0 || len(earliestErrs) > 0:
 		rejected := append(append([]string{}, latestErrs...), earliestErrs...)
 		t.Errorf("§5.2.2.5 saturates out-of-range tick counts: it names no error for them, and "+
-			"today's library does not return one. The decoder returned an error for %s - a decode "+
-			"error is a change, and a change that is not the fix: these tick counts decode to the "+
+			"a library that saturates does not return one. The decoder returned an error for %s - a decode "+
+			"error is a change away from the clause's rule: these tick counts decode to the "+
 			"named instants, they are not declined:%s",
 			strings.Join(rejected, ", "), detail)
 	case latestCollapsed && earliestCollapsed:
@@ -306,9 +297,6 @@ func TestDateTimeOutOfRangeSaturates(t *testing.T) {
 			"clamps to the wrong ends of the range, or a library that returns one instant for "+
 			"every tick count and that instant is one of these. Either way it is not the "+
 			"saturation the clause states:%s", detail)
-	case unresolved && knownBug != "":
-		t.Logf("known bug: %s; §5.2.2.5 decodes the latest group as 9999-12-31T23:59:59Z and "+
-			"the earliest group as the instant tick 0 decodes to:%s", knownBug, detail)
 	case unresolved:
 		t.Errorf("§5.2.2.5 decodes the latest group as 9999-12-31T23:59:59Z and the earliest "+
 			"group as the instant tick 0 decodes to, and at least one group did not even "+
