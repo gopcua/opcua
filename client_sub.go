@@ -411,22 +411,18 @@ func (c *Client) resumeSubscriptions(ctx context.Context) {
 	c.wake()
 }
 
-// pauseAfterPublishError pauses the publish loop after a failed publish.
-// The caller passes the publishStateGen value it read before publishing.
-// A pause or resume that wrote publishPaused in the window of the failed
-// publish -- e.g. a Subscribe racing a connection that just dropped -- is
-// the last writer of the level, so the self-pause must not override it.
-// publishStateMu makes the generation check and the store one step, so a
-// concurrent pauseSubscriptions/resumeSubscriptions lands either fully
-// before the check or fully after the store.
+// pauseAfterPublishError pauses the publish loop after a failed publish,
+// unless a pause or resume happened while that publish was in flight.
+// stateGen is the publishStateGen value read before the publish; if the
+// counter has moved since, the newer pause or resume stands.
 // See https://github.com/gopcua/opcua/issues/895.
 func (c *Client) pauseAfterPublishError(ctx context.Context, stateGen uint64) {
 	c.publishStateMu.Lock()
 	defer c.publishStateMu.Unlock()
 	if c.publishStateGen.Load() != stateGen {
-		// A pause or resume won the window; publishPaused already holds
-		// its write and the loop re-checks the level at the top of each
-		// iteration, so no wake is needed here.
+		// The newer pause or resume already set publishPaused, and the
+		// loop re-reads it at the top of each iteration, so no wake is
+		// needed.
 		return
 	}
 	c.publishPaused.Store(true)
@@ -477,9 +473,8 @@ func (c *Client) monitorSubscriptions(ctx context.Context) {
 			//
 			// publish() blocks until a PublishResponse
 			// is received or the context is cancelled.
-			// The snapshot must be read before the publish: it is what lets
-			// pauseAfterPublishError detect writes that land while the
-			// publish is in flight.
+			// Read the counter before the publish, so a pause or resume
+			// made while the publish is in flight shows up as a change.
 			stateGen := c.publishStateGen.Load()
 			if err := c.publishFunc(ctx); err != nil {
 				dlog.Print("error: ", err.Error())

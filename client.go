@@ -185,27 +185,24 @@ type Client struct {
 	// https://github.com/gopcua/opcua/issues/895.
 	publishPaused atomic.Bool
 
-	// publishStateMu makes "write publishPaused and increment publishStateGen"
-	// one step in pauseSubscriptions and resumeSubscriptions, and lets
-	// pauseAfterPublishError check the generation and store the level as
-	// one step against them, so a pause or resume that races the
-	// self-pause after a failed publish is never overwritten by it and
-	// never invisible to it. publishPaused stays an atomic.Bool so readers
-	// need no lock. See https://github.com/gopcua/opcua/issues/895.
+	// publishStateMu makes two things one step each: a pause or resume
+	// setting publishPaused and incrementing publishStateGen, and
+	// pauseAfterPublishError checking the counter and pausing. A pause or
+	// resume therefore lands either before the check or after the
+	// self-pause, never between. Readers of publishPaused need no lock.
+	// See https://github.com/gopcua/opcua/issues/895.
 	publishStateMu sync.Mutex
 
-	// publishStateGen counts every write of publishPaused by
-	// pauseSubscriptions/resumeSubscriptions, including the reconnect
-	// path. monitorSubscriptions snapshots the counter before each publish
-	// and hands the value to pauseAfterPublishError, which pauses only if
-	// no pause or resume landed in the window of a failed publish: the
-	// last writer in that window must win, not the self-pause.
+	// publishStateGen counts calls to pauseSubscriptions and
+	// resumeSubscriptions, including those from reconnects. The publish
+	// loop reads it before each publish; after a failed publish it pauses
+	// itself only if the counter has not moved, so a pause or resume made
+	// while that publish was in flight is not undone.
 	// See https://github.com/gopcua/opcua/issues/895.
 	publishStateGen atomic.Uint64
 
-	// publishFunc is the publish monitorSubscriptions performs. It is a
-	// field only so that tests can stand in for it; NewClient sets it
-	// to the publish method.
+	// publishFunc is the publish the loop calls, c.publish outside tests.
+	// It is a field so a test can hold a publish open.
 	publishFunc func(ctx context.Context) error
 
 	// wakech nudges the publish loop to re-check publishPaused. It only carries

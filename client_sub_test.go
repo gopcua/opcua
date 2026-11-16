@@ -315,18 +315,15 @@ func TestMonitorSubscriptionsSurvivesPauseResumeRace(t *testing.T) {
 	}
 }
 
-// TestPauseAfterPublishErrorDoesNotOverrideRacingPauseResume guards a second
-// path to https://github.com/gopcua/opcua/issues/895: after a failed
-// Publish, monitorSubscriptions pauses itself. The publishPaused level
-// settles a pause/resume race by last writer wins, but the self-pause
-// must not override a pause or resume that lands in the window between
-// the failed publish and the self-pause -- e.g. a Subscribe racing a
-// connection that just dropped, or a forgetSubscription racing it.
+// TestPauseAfterPublishErrorDoesNotOverrideRacingPauseResume covers a second
+// way into https://github.com/gopcua/opcua/issues/895. After a failed publish
+// the publish loop pauses itself. That self-pause must not undo a pause or
+// resume made while the publish was in flight, such as a Subscribe right
+// after the connection dropped.
 //
-// monitorSubscriptions therefore snapshots publishStateGen before it
-// publishes and hands the value to pauseAfterPublishError. Driving that
-// method directly makes the interleaving deterministic: no sleeps, no
-// timing luck.
+// The test calls pauseAfterPublishError directly with the counter value the
+// loop would have read before publishing, so the order of events is fixed
+// and needs no sleeps.
 func TestPauseAfterPublishErrorDoesNotOverrideRacingPauseResume(t *testing.T) {
 	newPausedClient := func(t *testing.T) *Client {
 		c, err := NewClient("opc.tcp://example.com:4840")
@@ -339,13 +336,13 @@ func TestPauseAfterPublishErrorDoesNotOverrideRacingPauseResume(t *testing.T) {
 		c := newPausedClient(t)
 		ctx := context.Background()
 
-		// The loop snapshots the generation, then a resume lands before the
-		// loop's self-pause after the failed publish.
+		// The loop reads the counter and publishes; a resume lands before
+		// the publish fails.
 		stateGen := c.publishStateGen.Load()
 		c.resumeSubscriptions(ctx)
 		c.pauseAfterPublishError(ctx, stateGen)
 
-		// The racing resume is the last writer: the loop keeps running.
+		// The resume came last, so the loop keeps running.
 		require.False(t, c.publishPaused.Load(),
 			"self-pause after a failed publish overwrote a resume that landed in the window (issue #895)")
 	})
@@ -359,7 +356,7 @@ func TestPauseAfterPublishErrorDoesNotOverrideRacingPauseResume(t *testing.T) {
 		c.pauseSubscriptions(ctx)
 		c.pauseAfterPublishError(ctx, stateGen)
 
-		// The racing pause is the last writer: the loop stays paused.
+		// The pause came last, so the loop stays paused.
 		require.True(t, c.publishPaused.Load(),
 			"self-pause after a failed publish overwrote a pause that landed in the window")
 	})
@@ -368,9 +365,8 @@ func TestPauseAfterPublishErrorDoesNotOverrideRacingPauseResume(t *testing.T) {
 		c := newPausedClient(t)
 		ctx := context.Background()
 
-		// The loop must be running when the self-pause lands:
-		// NewClient hands over a paused client, so a subtest that skips
-		// the resume passes even if pauseAfterPublishError does nothing.
+		// NewClient returns a paused client. Without this resume the
+		// subtest would pass even if pauseAfterPublishError did nothing.
 		c.resumeSubscriptions(ctx)
 		require.False(t, c.publishPaused.Load())
 
@@ -382,17 +378,16 @@ func TestPauseAfterPublishErrorDoesNotOverrideRacingPauseResume(t *testing.T) {
 	})
 }
 
-// TestMonitorSubscriptionsSnapshotsStateBeforePublish pins where
-// monitorSubscriptions takes the publishStateGen snapshot: reading it after
-// the publish reintroduces https://github.com/gopcua/opcua/issues/895, because
-// a resume that lands while the failed publish is still in flight is then
-// invisible to pauseAfterPublishError and the loop parks on its own pause.
-// The other test for issue #895 drives pauseAfterPublishError directly, so it
-// cannot see where the snapshot is taken.
+// TestMonitorSubscriptionsSnapshotsStateBeforePublish checks that the publish
+// loop reads publishStateGen before the publish, not after. Read after, the
+// counter already includes a resume made while the failed publish was in
+// flight, so the loop pauses itself over that resume and stays paused
+// (https://github.com/gopcua/opcua/issues/895).
+// TestPauseAfterPublishErrorDoesNotOverrideRacingPauseResume calls
+// pauseAfterPublishError directly, so it cannot see where the loop reads it.
 //
-// The publishFunc seam makes the interleaving deterministic: the test stands
-// in a publish that blocks until a resume lands in its window, then fails.
-// The loop must not park and must publish again.
+// The test replaces publishFunc with a publish it holds open until a resume
+// has landed, then fails. The loop must publish again.
 func TestMonitorSubscriptionsSnapshotsStateBeforePublish(t *testing.T) {
 	c, err := NewClient("opc.tcp://example.com:4840")
 	require.NoError(t, err)
@@ -428,9 +423,9 @@ func TestMonitorSubscriptionsSnapshotsStateBeforePublish(t *testing.T) {
 	c.resumeSubscriptions(ctx)
 	proceed <- struct{}{}
 
-	// The loop must publish again instead of parking on its self-pause.
-	// It is blocked inside that publish here, so publishPaused is read
-	// before the loop can touch it again.
+	// The loop must publish again instead of staying paused. It then
+	// blocks inside that publish, so the check of publishPaused below
+	// cannot race it.
 	select {
 	case <-started:
 	case <-time.After(5 * time.Second):
