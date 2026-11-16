@@ -177,6 +177,22 @@ type SecureChannel struct {
 	requestID   uint32
 	requestIDMu sync.Mutex
 
+	// sendSequenceNumber is the SequenceNumber counter of the channel itself:
+	// all instances, i.e. all security tokens, draw from it since OPC
+	// 10000-6 §6.7.2.4 requires that a SequenceNumber "shall not be reused for
+	// any TokenId" and "does not reset when a new TokenId is issued".
+	//
+	// sendMu makes taking a message's SequenceNumber(s) and writing its
+	// chunks to the connection one step per channel: two instances of one
+	// channel hold two different instance locks, so without it a send on
+	// the old instance and one on the renewed instance could interleave and
+	// put a taken-but-lower number on the wire after a higher one, which
+	// receivers reject as a gap or a reuse. Senders take it before drawing
+	// the first number of a message and hold it until its last chunk is
+	// written, never while waiting for a response.
+	sendSequenceNumber uint32
+	sendMu             sync.Mutex
+
 	// instances maps secure channel IDs to a list to channel states
 	instances      map[uint32][]*channelInstance
 	activeInstance *channelInstance
@@ -253,7 +269,7 @@ func NewServerSecureChannel(endpoint string, c *uacp.Conn, cfg *Config, errCh ch
 
 	s.openingInstance = newChannelInstance(s)
 	s.openingInstance.secureChannelID = secureChannelID
-	s.openingInstance.sequenceNumber = sequenceNumber
+	s.sendSequenceNumber = sequenceNumber
 	s.openingInstance.securityTokenID = securityTokenID
 
 	return s, nil
@@ -746,14 +762,12 @@ func (s *SecureChannel) open(ctx context.Context, instance *channelInstance, req
 
 	s.openingInstance = newChannelInstance(s)
 	// s.openingInstance.secureChannelID = s.secureChannelID
-	// s.openingInstance.sequenceNumber = s.sequenceNumber
 	// s.openingInstance.securityTokenID = s.securityTokenID
 
 	if requestType == ua.SecurityTokenRequestTypeRenew {
-		// TODO: lock? sequenceNumber++?
-		// this seems racy. if another request goes out while the other open request is in flight then won't an error
-		// be raised on the server? can the sequenceNumber be as "global" as the request ID?
-		s.openingInstance.sequenceNumber = instance.sequenceNumber
+		// The SequenceNumber does not reset for a new TokenId (OPC 10000-6
+		// §6.7.2.4); both instances keep drawing from the channel's counter
+		// so there is nothing to hand over here.
 		s.openingInstance.secureChannelID = instance.secureChannelID
 	}
 
@@ -1147,6 +1161,12 @@ func (s *SecureChannel) sendAsyncWithTimeout(
 	instance.Lock()
 	defer instance.Unlock()
 
+	// Hold the channel's send lock from drawing the message's first
+	// SequenceNumber until its last chunk is on the wire, so chunks reach
+	// the connection in the order their numbers were assigned (see sendMu).
+	s.sendMu.Lock()
+	defer s.sendMu.Unlock()
+
 	m, err := instance.newRequestMessage(req, reqID, authToken, timeout)
 	if err != nil {
 		return nil, err
@@ -1288,6 +1308,12 @@ func (s *SecureChannel) SendMsgWithContext(ctx context.Context, instance *channe
 	instance.Lock()
 	defer instance.Unlock()
 
+	// Hold the channel's send lock from drawing the message's first
+	// SequenceNumber until its last chunk is on the wire, so chunks reach
+	// the connection in the order their numbers were assigned (see sendMu).
+	s.sendMu.Lock()
+	defer s.sendMu.Unlock()
+
 	m := instance.newMessage(resp, typeID, reqID)
 	if _, err := s.writeMessageChunks(ctx, instance, reqID, m, resp); err != nil {
 		return err
@@ -1312,6 +1338,12 @@ func (s *SecureChannel) sendResponseWithContext(ctx context.Context, instance *c
 	instance.Lock()
 	defer instance.Unlock()
 
+	// Hold the channel's send lock from drawing the message's first
+	// SequenceNumber until its last chunk is on the wire, so chunks reach
+	// the connection in the order their numbers were assigned (see sendMu).
+	s.sendMu.Lock()
+	defer s.sendMu.Unlock()
+
 	m := instance.newMessage(resp, typeID, reqID)
 	if _, err := s.writeMessageChunks(ctx, instance, reqID, m, resp); err != nil {
 		return err
@@ -1330,6 +1362,18 @@ func (s *SecureChannel) nextRequestID() uint32 {
 	}
 
 	return s.requestID
+}
+
+// nextSequenceNumber returns the next number to put in a chunk's
+// SequenceHeader. The caller must hold sendMu so that the numbers of a
+// message cannot overtake the chunks of an earlier one on the wire.
+func (s *SecureChannel) nextSequenceNumber() uint32 {
+	s.sendSequenceNumber++
+	if s.sendSequenceNumber > maxSequenceNumber {
+		s.sendSequenceNumber = 1
+	}
+
+	return s.sendSequenceNumber
 }
 
 // Close closes an existing secure channel
