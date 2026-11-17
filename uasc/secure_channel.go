@@ -27,6 +27,22 @@ import (
 const (
 	timeoutLeniency = 250 * time.Millisecond
 	MaxTimeout      = math.MaxUint32 * time.Millisecond
+
+	// The SequenceNumber wrap of OPC 10000-6 §6.7.2.4: a SequenceNumber
+	// "shall not wrap around until it is greater than 4 294 966 271
+	// (UInt32.MaxValue - 1024)" and the first number after the wrap "shall
+	// be less than 1024".
+	//
+	// maxSequenceNumber is the highest number the send side counts to
+	// before wrapping to 1 (see nextSequenceNumber).
+	maxSequenceNumber = math.MaxUint32 - 1023
+
+	// sequenceNumberWrapAfter and sequenceNumberWrapFloor bound the wrap the
+	// receive side accepts (see sequenceNumberSucceeds): any number greater
+	// than sequenceNumberWrapAfter may be followed by any number less than
+	// sequenceNumberWrapFloor.
+	sequenceNumberWrapAfter = math.MaxUint32 - 1024
+	sequenceNumberWrapFloor = 1024
 )
 
 type channelKind int
@@ -161,6 +177,22 @@ type SecureChannel struct {
 	requestID   uint32
 	requestIDMu sync.Mutex
 
+	// sendSequenceNumber is the SequenceNumber counter of the channel itself:
+	// all instances, i.e. all security tokens, draw from it since OPC
+	// 10000-6 §6.7.2.4 requires that a SequenceNumber "shall not be reused for
+	// any TokenId" and "does not reset when a new TokenId is issued".
+	//
+	// sendMu makes taking a message's SequenceNumber(s) and writing its
+	// chunks to the connection one step per channel: two instances of one
+	// channel hold two different instance locks, so without it a send on
+	// the old instance and one on the renewed instance could interleave and
+	// put a taken-but-lower number on the wire after a higher one, which
+	// receivers reject as a gap or a reuse. Senders take it before drawing
+	// the first number of a message and hold it until its last chunk is
+	// written, never while waiting for a response.
+	sendSequenceNumber uint32
+	sendMu             sync.Mutex
+
 	// instances maps secure channel IDs to a list to channel states
 	instances      map[uint32][]*channelInstance
 	activeInstance *channelInstance
@@ -178,6 +210,15 @@ type SecureChannel struct {
 	// chunks maintains a temporary list of chunks for a given request ID
 	chunks   map[uint32][]*MessageChunk
 	chunksMu sync.Mutex
+
+	// recvSequence is the SequenceNumber of the last received chunk, whatever
+	// TokenId secured it (OPC 10000-6 §6.7.2.4: the SequenceNumber "does not
+	// reset when a new TokenId is issued"), so one counter spans token renewals
+	// and chunk types alike. recvSequenceSeeded reports whether a first chunk
+	// has seeded recvSequence; 0 is a valid SequenceNumber, so it cannot mark
+	// the counter unseeded. Only the dispatcher goroutine reads and writes them.
+	recvSequence       uint32
+	recvSequenceSeeded bool
 
 	// openingInstance is a temporary var that allows the dispatcher know how to handle a open channel request
 	// note: we only allow a single "open" request in flight at any point in time. The mutex is held for the entire
@@ -228,7 +269,7 @@ func NewServerSecureChannel(endpoint string, c *uacp.Conn, cfg *Config, errCh ch
 
 	s.openingInstance = newChannelInstance(s)
 	s.openingInstance.secureChannelID = secureChannelID
-	s.openingInstance.sequenceNumber = sequenceNumber
+	s.sendSequenceNumber = sequenceNumber
 	s.openingInstance.securityTokenID = securityTokenID
 
 	return s, nil
@@ -566,6 +607,12 @@ func (s *SecureChannel) readChunk() (*MessageChunk, error) {
 	}
 	m.Data = m.Data[n:]
 
+	// OPC 10000-6 §6.7.7: "After the security validation is complete the
+	// receiver shall verify the RequestId and the SequenceNumber."
+	if err := s.verifyReceivedSequenceNumber(m.SequenceHeader.SequenceNumber); err != nil {
+		return nil, err
+	}
+
 	return m, nil
 }
 
@@ -594,6 +641,54 @@ func (s *SecureChannel) verifyAndDecrypt(m *MessageChunk, b []byte, instance *ch
 	}
 
 	return nil, err
+}
+
+// verifyReceivedSequenceNumber checks the SequenceNumber of a received chunk
+// against the previous chunk's, whatever TokenIds secured them: OPC 10000-6
+// §6.7.2.4: "A SequenceNumber shall not be reused for any TokenId. The
+// SecurityToken lifetime shall be short enough to ensure that this never
+// happens; however, if it does the receiver shall treat it as a transport error
+// and force a reconnect. The SequenceNumber does not reset when a new TokenId
+// is issued and it shall be incremented by exactly one for each MessageChunk
+// sent." The first chunk received seeds the counter with whatever number it
+// carries (a sender may have started counting before this channel
+// connected); every later chunk must carry the last number's successor:
+// the previous number plus one, or, once the previous number has passed
+// sequenceNumberWrapAfter, any number below sequenceNumberWrapFloor — the
+// wrap §6.7.2.4 allows (see sequenceNumberSucceeds).
+//
+// A violation is reported as Bad_SecurityChecksFailed and logged as
+// Bad_SequenceNumberInvalid (OPC 10000-6 §6.7.7: "If these checks fail a
+// Bad_SecurityChecksFailed error is reported. ... If the SequenceNumber is
+// not valid, the receiver shall log a Bad_SequenceNumberInvalid error."). It
+// is a channel error, so the dispatcher passes it to the client's monitor,
+// which closes the channel and reconnects: the "force a reconnect" of
+// §6.7.2.4.
+func (s *SecureChannel) verifyReceivedSequenceNumber(seq uint32) error {
+	if !s.recvSequenceSeeded {
+		s.recvSequence = seq
+		s.recvSequenceSeeded = true
+		return nil
+	}
+
+	if !sequenceNumberSucceeds(s.recvSequence, seq) {
+		debug.Printf("uasc %d: Bad_SequenceNumberInvalid: got SequenceNumber %d, want the successor of %d", s.c.ID(), seq, s.recvSequence)
+		return ua.StatusBadSecurityChecksFailed
+	}
+	s.recvSequence = seq
+	return nil
+}
+
+// sequenceNumberSucceeds reports whether seq is a valid successor of prev:
+// the previous number plus one, or, once prev has passed
+// sequenceNumberWrapAfter, any number below sequenceNumberWrapFloor — the
+// wrap OPC 10000-6 §6.7.2.4 allows, which also covers a peer that counts to
+// MaxUint32 and restarts at 0.
+func sequenceNumberSucceeds(prev, seq uint32) bool {
+	if prev < math.MaxUint32 && seq == prev+1 {
+		return true
+	}
+	return prev > sequenceNumberWrapAfter && seq < sequenceNumberWrapFloor
 }
 
 func (s *SecureChannel) getInstancesBySecureChannelID(id uint32) []*channelInstance {
@@ -667,14 +762,12 @@ func (s *SecureChannel) open(ctx context.Context, instance *channelInstance, req
 
 	s.openingInstance = newChannelInstance(s)
 	// s.openingInstance.secureChannelID = s.secureChannelID
-	// s.openingInstance.sequenceNumber = s.sequenceNumber
 	// s.openingInstance.securityTokenID = s.securityTokenID
 
 	if requestType == ua.SecurityTokenRequestTypeRenew {
-		// TODO: lock? sequenceNumber++?
-		// this seems racy. if another request goes out while the other open request is in flight then won't an error
-		// be raised on the server? can the sequenceNumber be as "global" as the request ID?
-		s.openingInstance.sequenceNumber = instance.sequenceNumber
+		// The SequenceNumber does not reset for a new TokenId (OPC 10000-6
+		// §6.7.2.4); both instances keep drawing from the channel's counter
+		// so there is nothing to hand over here.
 		s.openingInstance.secureChannelID = instance.secureChannelID
 	}
 
@@ -1068,6 +1161,12 @@ func (s *SecureChannel) sendAsyncWithTimeout(
 	instance.Lock()
 	defer instance.Unlock()
 
+	// Hold the channel's send lock from drawing the message's first
+	// SequenceNumber until its last chunk is on the wire, so chunks reach
+	// the connection in the order their numbers were assigned (see sendMu).
+	s.sendMu.Lock()
+	defer s.sendMu.Unlock()
+
 	m, err := instance.newRequestMessage(req, reqID, authToken, timeout)
 	if err != nil {
 		return nil, err
@@ -1209,6 +1308,12 @@ func (s *SecureChannel) SendMsgWithContext(ctx context.Context, instance *channe
 	instance.Lock()
 	defer instance.Unlock()
 
+	// Hold the channel's send lock from drawing the message's first
+	// SequenceNumber until its last chunk is on the wire, so chunks reach
+	// the connection in the order their numbers were assigned (see sendMu).
+	s.sendMu.Lock()
+	defer s.sendMu.Unlock()
+
 	m := instance.newMessage(resp, typeID, reqID)
 	if _, err := s.writeMessageChunks(ctx, instance, reqID, m, resp); err != nil {
 		return err
@@ -1233,6 +1338,12 @@ func (s *SecureChannel) sendResponseWithContext(ctx context.Context, instance *c
 	instance.Lock()
 	defer instance.Unlock()
 
+	// Hold the channel's send lock from drawing the message's first
+	// SequenceNumber until its last chunk is on the wire, so chunks reach
+	// the connection in the order their numbers were assigned (see sendMu).
+	s.sendMu.Lock()
+	defer s.sendMu.Unlock()
+
 	m := instance.newMessage(resp, typeID, reqID)
 	if _, err := s.writeMessageChunks(ctx, instance, reqID, m, resp); err != nil {
 		return err
@@ -1251,6 +1362,18 @@ func (s *SecureChannel) nextRequestID() uint32 {
 	}
 
 	return s.requestID
+}
+
+// nextSequenceNumber returns the next number to put in a chunk's
+// SequenceHeader. The caller must hold sendMu so that the numbers of a
+// message cannot overtake the chunks of an earlier one on the wire.
+func (s *SecureChannel) nextSequenceNumber() uint32 {
+	s.sendSequenceNumber++
+	if s.sendSequenceNumber > maxSequenceNumber {
+		s.sendSequenceNumber = 1
+	}
+
+	return s.sendSequenceNumber
 }
 
 // Close closes an existing secure channel
@@ -1293,6 +1416,9 @@ func (s *SecureChannel) timeNow() time.Time {
 	return time.Now()
 }
 
+// mergeChunks concatenates the bodies of a message's chunks. Chunks reach it
+// only after readChunk has verified their SequenceNumbers (OPC 10000-6
+// §6.7.2.4), so no chunk of a message can repeat another's number.
 func mergeChunks(chunks []*MessageChunk) ([]byte, error) {
 	if len(chunks) == 0 {
 		return nil, nil
@@ -1302,12 +1428,7 @@ func mergeChunks(chunks []*MessageChunk) ([]byte, error) {
 	}
 
 	var b []byte
-	var seqnr uint32
 	for _, c := range chunks {
-		if c.SequenceHeader.SequenceNumber == seqnr {
-			continue // duplicate chunk
-		}
-		seqnr = c.SequenceHeader.SequenceNumber
 		b = append(b, c.Data...)
 	}
 	return b, nil

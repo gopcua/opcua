@@ -76,16 +76,15 @@ func TestNewRequestMessage(t *testing.T) {
 			name: "subsequent-request",
 			sechan: buildSecureChannel(
 				&SecureChannel{
-					cfg:       &Config{},
-					requestID: 555,
+					cfg:                &Config{},
+					requestID:          555,
+					sendSequenceNumber: 777,
 					// reqhdr: &ua.RequestHeader{
 					// 	RequestHandle: 444,
 					// },
 					time: fixedTime,
 				},
-				&channelInstance{
-					sequenceNumber: 777,
-				},
+				nil,
 			),
 			req: &ua.ReadRequest{},
 			m: &Message{
@@ -114,13 +113,13 @@ func TestNewRequestMessage(t *testing.T) {
 			name: "counter-rollover",
 			sechan: buildSecureChannel(
 				&SecureChannel{
-					cfg:       &Config{},
-					requestID: math.MaxUint32,
-					time:      fixedTime,
+					cfg:                &Config{},
+					requestID:          math.MaxUint32,
+					sendSequenceNumber: math.MaxUint32 - 1023,
+					time:               fixedTime,
 				},
-				&channelInstance{
-					sequenceNumber: math.MaxUint32 - 1023,
-				}),
+				nil,
+			),
 			req: &ua.ReadRequest{},
 			m: &Message{
 				MessageHeader: &MessageHeader{

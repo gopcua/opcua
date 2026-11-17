@@ -25,7 +25,6 @@ func TestMessage(t *testing.T) {
 				}
 				instance := &channelInstance{
 					sc:              s,
-					sequenceNumber:  0,
 					securityTokenID: 0,
 				}
 				m := instance.newMessage(
@@ -124,7 +123,6 @@ func TestMessage(t *testing.T) {
 				}
 				instance := &channelInstance{
 					sc:              s,
-					sequenceNumber:  0,
 					securityTokenID: 0,
 				}
 				m := instance.newMessage(
@@ -195,7 +193,6 @@ func TestMessage(t *testing.T) {
 				}
 				instance := &channelInstance{
 					sc:              s,
-					sequenceNumber:  0,
 					securityTokenID: 0,
 				}
 				m := instance.newMessage(

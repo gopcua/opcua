@@ -6,7 +6,6 @@ package uasc
 
 import (
 	"encoding/binary"
-	"math"
 	"sync"
 	"time"
 
@@ -32,7 +31,6 @@ type channelInstance struct {
 	revisedLifetime time.Duration
 	secureChannelID uint32
 	securityTokenID uint32
-	sequenceNumber  uint32
 	algo            *uapolicy.EncryptionAlgorithm
 	maxBodySize     uint32
 
@@ -50,13 +48,8 @@ func newChannelInstance(sc *SecureChannel) *channelInstance {
 }
 
 func (c *channelInstance) nextSequenceNumber() uint32 {
-	// lock must be held
-	c.sequenceNumber++
-	if c.sequenceNumber > math.MaxUint32-1023 {
-		c.sequenceNumber = 1
-	}
-
-	return c.sequenceNumber
+	// sc.sendMu must be held
+	return c.sc.nextSequenceNumber()
 }
 
 func (c *channelInstance) newRequestMessage(req ua.Request, reqID uint32, authToken *ua.NodeID, timeout time.Duration) (*Message, error) {
