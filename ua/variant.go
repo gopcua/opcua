@@ -199,12 +199,23 @@ func (m *Variant) Decode(b []byte) (int, error) {
 
 	// validate that the total number of elements
 	// matches the product of the array dimensions
+	//
+	// The product is accumulated in an int64 and the loop stops as soon as
+	// it exceeds the array length: an int32 product overflows for dimensions
+	// like [4, 1073741825] and wraps to the array length, accepting
+	// dimensions inconsistent with the array length. OPC 10000-6 §5.2.2.16
+	// requires the decoder to reject them. All dimensions are
+	// greater than zero and arrayLength is at most MaxVariantArrayLength,
+	// so the product never decreases and the int64 cannot overflow.
 	if m.arrayDimensionsLength > 0 {
-		count := int32(1)
+		count := int64(1)
 		for i := range m.arrayDimensions {
-			count *= m.arrayDimensions[i]
+			count *= int64(m.arrayDimensions[i])
+			if count > int64(m.arrayLength) {
+				break
+			}
 		}
-		if count != m.arrayLength {
+		if count != int64(m.arrayLength) {
 			return buf.Pos(), errUnbalancedSlice
 		}
 	}
