@@ -3,6 +3,7 @@ package opcua
 import (
 	"context"
 	"expvar"
+	"io"
 	"sync"
 	"testing"
 	"time"
@@ -312,4 +313,114 @@ func TestMonitorSubscriptionsSurvivesPauseResumeRace(t *testing.T) {
 		}, time.Second, time.Millisecond, "iteration %d: publish loop appears stuck after a pause/resume race", i)
 		baseline = errorCount(key)
 	}
+}
+
+// TestPauseAfterPublishErrorDoesNotOverrideResume checks that the self-pause
+// after a failed publish does not undo a resume that landed while the publish
+// was in flight. It calls pauseAfterPublishError directly with the counter
+// value the loop reads before publishing, so the order is fixed.
+func TestPauseAfterPublishErrorDoesNotOverrideResume(t *testing.T) {
+	newPausedClient := func(t *testing.T) *Client {
+		c, err := NewClient("opc.tcp://example.com:4840")
+		require.NoError(t, err)
+		require.True(t, c.publishPaused.Load())
+		return c
+	}
+
+	t.Run("resume in the window keeps the loop running", func(t *testing.T) {
+		c := newPausedClient(t)
+		ctx := context.Background()
+
+		// The loop reads the counter and publishes; a resume lands before
+		// the publish fails.
+		resumeGen := c.publishResumeGen.Load()
+		c.resumeSubscriptions(ctx)
+		c.pauseAfterPublishError(resumeGen)
+
+		// The resume came last, so the loop keeps running.
+		require.False(t, c.publishPaused.Load(),
+			"self-pause overwrote a resume that landed in the window")
+	})
+
+	t.Run("resume then pause in the window keeps the loop paused", func(t *testing.T) {
+		c := newPausedClient(t)
+		ctx := context.Background()
+
+		resumeGen := c.publishResumeGen.Load()
+		c.resumeSubscriptions(ctx)
+		c.pauseSubscriptions(ctx)
+		c.pauseAfterPublishError(resumeGen)
+
+		// The pause came last, so the loop stays paused.
+		require.True(t, c.publishPaused.Load(),
+			"self-pause overwrote a pause that landed in the window")
+	})
+
+	t.Run("nothing in the window parks the loop", func(t *testing.T) {
+		c := newPausedClient(t)
+		ctx := context.Background()
+
+		// NewClient returns a paused client. Without this resume the
+		// subtest would pass even if pauseAfterPublishError did nothing.
+		c.resumeSubscriptions(ctx)
+		require.False(t, c.publishPaused.Load())
+
+		resumeGen := c.publishResumeGen.Load()
+		c.pauseAfterPublishError(resumeGen)
+
+		require.True(t, c.publishPaused.Load(),
+			"self-pause must park the loop when no resume raced it")
+	})
+}
+
+// TestMonitorSubscriptionsSnapshotsStateBeforePublish checks that the loop
+// reads the resume counter before the publish, not after. Read after, the
+// counter already includes a resume made while the publish was in flight, so
+// the loop parks over that resume. The test replaces publishFunc with a
+// publish it holds open until a resume has landed, then fails.
+func TestMonitorSubscriptionsSnapshotsStateBeforePublish(t *testing.T) {
+	c, err := NewClient("opc.tcp://example.com:4840")
+	require.NoError(t, err)
+
+	started := make(chan struct{}, 2)
+	proceed := make(chan struct{})
+	c.publishFunc = func(ctx context.Context) error {
+		started <- struct{}{}
+		select {
+		case <-proceed:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+		return io.EOF
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		c.monitorSubscriptions(ctx)
+	}()
+	defer func() {
+		cancel()
+		<-done
+	}()
+
+	// Let the loop enter the first publish.
+	c.resumeSubscriptions(ctx)
+	<-started
+
+	// A resume lands while that publish is in flight, then the publish fails.
+	c.resumeSubscriptions(ctx)
+	proceed <- struct{}{}
+
+	// The loop must publish again instead of staying paused. It then
+	// blocks inside that publish, so the check of publishPaused below
+	// cannot race it.
+	select {
+	case <-started:
+	case <-time.After(5 * time.Second):
+		t.Fatal("publish loop parked after a resume landed during a failed publish")
+	}
+	require.False(t, c.publishPaused.Load(),
+		"self-pause overwrote a resume that landed during the publish")
 }

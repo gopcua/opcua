@@ -185,6 +185,15 @@ type Client struct {
 	// https://github.com/gopcua/opcua/issues/895.
 	publishPaused atomic.Bool
 
+	// publishStateMu serializes resumeSubscriptions and pauseAfterPublishError.
+	publishStateMu sync.Mutex
+
+	// publishResumeGen counts calls to resumeSubscriptions.
+	publishResumeGen atomic.Uint64
+
+	// publishFunc is c.publish; tests replace it to hold a publish open.
+	publishFunc func(ctx context.Context) error
+
 	// wakech nudges the publish loop to re-check publishPaused. It only carries
 	// a "something may have changed" hint, never state, so wake-ups are safe to
 	// coalesce or drop.
@@ -239,6 +248,7 @@ func NewClient(endpoint string, opts ...Option) (*Client, error) {
 		stateFunc:   cfg.stateFunc,
 	}
 	c.pauseSubscriptions(context.Background())
+	c.publishFunc = c.publish
 	c.setPublishTimeout(uasc.MaxTimeout)
 	// cannot use setState here since it would trigger the stateCh
 	c.atomicState.Store(Closed)

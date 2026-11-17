@@ -401,8 +401,25 @@ func (c *Client) pauseSubscriptions(ctx context.Context) {
 // to running and nudging the loop to notice.
 // It has no effect if the publish loop is not paused.
 func (c *Client) resumeSubscriptions(ctx context.Context) {
+	c.publishStateMu.Lock()
 	c.publishPaused.Store(false)
+	c.publishResumeGen.Add(1)
+	c.publishStateMu.Unlock()
 	c.wake()
+}
+
+// pauseAfterPublishError pauses the publish loop after a failed publish,
+// unless resumeSubscriptions was called since resumeGen was read. That way a
+// resume made while the publish was in flight is not undone.
+func (c *Client) pauseAfterPublishError(resumeGen uint64) {
+	c.publishStateMu.Lock()
+	defer c.publishStateMu.Unlock()
+	if c.publishResumeGen.Load() != resumeGen {
+		// The resume already set publishPaused, and the loop re-reads it at
+		// the top of each iteration, so no wake is needed.
+		return
+	}
+	c.publishPaused.Store(true)
 }
 
 // wake nudges monitorSubscriptions to re-check publishPaused. The send is
@@ -446,13 +463,13 @@ func (c *Client) monitorSubscriptions(ctx context.Context) {
 			continue
 
 		default:
-			// send publish request and handle response
-			//
-			// publish() blocks until a PublishResponse
-			// is received or the context is cancelled.
-			if err := c.publish(ctx); err != nil {
+			// Read the counter before the publish, so a resume during the
+			// publish counts. publishFunc blocks until the Publish request is
+			// answered or ctx is done.
+			resumeGen := c.publishResumeGen.Load()
+			if err := c.publishFunc(ctx); err != nil {
 				dlog.Print("error: ", err.Error())
-				c.pauseSubscriptions(ctx)
+				c.pauseAfterPublishError(resumeGen)
 			}
 		}
 	}
