@@ -20,7 +20,11 @@
 // response and creates no notification for it, so however many Publishes a
 // client keeps outstanding, exactly one sequence number is created and
 // withheld -- the one availableSeqsLocked offers back and the one the rows
-// name. The one-lost check in runScenario guards the fixture itself: a
+// name. HeldPublishOnCommand's run is the one exception, and it is no drop
+// run: once the application's DeleteSubscriptions has been followed by its
+// CreateSubscription, publishStep answers a Publish rather than holding
+// it, so the replacement is served rather than starved; see the option. The
+// one-lost check in runScenario guards the fixture itself: a
 // held notification that is not the last one created means the fixture
 // created more than the one notification the tests describe, and the run is
 // reported as a setup failure instead.
@@ -118,6 +122,16 @@ type recorder struct {
 	requests []requestRecord
 	accepts  []time.Time // when each connection was accepted, refused ones included
 
+	// heldOnCommand is a copy of runOptions.HeldPublishOnCommand. The
+	// writes to subsDeleted and subsRecreated check it, and heldAnswered is
+	// set only by answerHeldPublish, which only a run with the option calls,
+	// so a run without the option never sees any of the three turn true.
+	heldOnCommand bool
+
+	// heldAnswered is set once answerHeldPublish has answered every Publish
+	// the server was holding, so publishStep hands fresh data out again:
+	// the stream the HeldPublishOnCommand run stops is the one it restarts.
+	heldAnswered bool
 	// dropStarted is set just before the connection is closed, so a client
 	// that redials the instant it sees the reset is already refused.
 	dropStarted bool
@@ -132,8 +146,25 @@ type recorder struct {
 	requestsAtDrop int      // len(requests) when the drop was applied; see requestTimelineAtDrop
 	heldSeq        uint32   // sequence of the first held Publish; 0 = none
 	queued         []uint32 // further sequence numbers kept for retransmission; see the package comment
-	heldConn       int      // connection the held Publish is outstanding on; 0 = none
+	heldConn       int      // connection the first held Publish is outstanding on; 0 = none
 	firstAnswered  bool     // the stream's first Publish has been answered, ever
+
+	// subsDeleted is set once the application's DeleteSubscriptions has been
+	// granted and cleared by the CreateSubscription that follows it. In
+	// between the Session has no Subscription, and answer() faults a Publish
+	// that arrives there with Bad_NoSubscription at once, which OPC 10000-4
+	// §5.14.8.1 has a server do with one. subsRecreated is that
+	// CreateSubscription's own mark, and it is the HeldPublishOnCommand
+	// run's restart: a Publish that arrives after it is answered with fresh
+	// data rather than held, because it belongs to the replacement the
+	// application has just built and the same clause has the server serve
+	// it. gopcua's own recreate path sends a DeleteSubscriptions too
+	// (subscription.go recreate_delete, from client_sub.go), so this state
+	// is kept only under HeldPublishOnCommand: without the option the
+	// DeleteSubscriptions arm faults the request unsupported and neither
+	// flag ever turns true.
+	subsDeleted   bool
+	subsRecreated bool
 
 	// acked and republished are the sequence numbers the client has
 	// acknowledged in a Publish and the ones a Republish has handed back.
@@ -389,6 +420,14 @@ func (o *recorder) isActivated(connID int) bool {
 	return o.activatedConns[connID]
 }
 
+// recordHeldAnswered marks the Publishes the server was holding as
+// answered, so publishStep creates and hands out notifications again.
+func (o *recorder) recordHeldAnswered() {
+	o.mu.Lock()
+	o.heldAnswered = true
+	o.mu.Unlock()
+}
+
 // recordItemsMonitored is the CreateMonitoredItems arm's one mutation, and
 // the only thing that turns the fixture's keep-alives back into data.
 func (o *recorder) recordItemsMonitored() {
@@ -451,12 +490,44 @@ func (o *recorder) recordNewSubscription() {
 		o.seqAtRecreate = o.lastSeq
 		o.recreateAfter = len(o.requests)
 	}
+	// The HeldPublishOnCommand run's delete is closed by this replacement:
+	// from here that run's stream answers a Publish rather than holding it.
+	// The heldOnCommand check keeps the write gated with the rest of the
+	// option's state, though the delete that reaches it is gated already.
+	if o.heldOnCommand && o.subsDeleted {
+		o.subsDeleted = false
+		o.subsRecreated = true
+	}
 }
 
 func (o *recorder) isAnyMonitored() bool {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	return o.anyMonitored
+}
+
+// recordSubscriptionsDeleted is the DeleteSubscriptions arm's one mutation:
+// the Session has no Subscription from here until the next
+// CreateSubscription, so a Publish that arrives in the gap is answered
+// Bad_NoSubscription at once rather than held for a command that has
+// nothing to do with it; see answer. It records nothing without
+// HeldPublishOnCommand, so no other run's delete reaches it.
+func (o *recorder) recordSubscriptionsDeleted() {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	if !o.heldOnCommand {
+		return
+	}
+	o.subsDeleted = true
+}
+
+// sessionHasNoSubscription reports whether the application has deleted its
+// Subscription and not yet built the replacement, which is the window
+// OPC 10000-4 §5.14.8.1 answers a Publish in with Bad_NoSubscription.
+func (o *recorder) sessionHasNoSubscription() bool {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	return o.subsDeleted
 }
 
 // peekNextSeq is the sequence number the next notification will carry.
@@ -549,11 +620,21 @@ func (o *recorder) heldPublishConn() int {
 // notification; every further Publish that arrives before the drop is held
 // with no response and consumes no sequence number, so exactly one
 // notification is withheld however many Publishes the client keeps
-// outstanding.
+// outstanding -- except in the HeldPublishOnCommand run, where a Publish
+// that arrives once the application's DeleteSubscriptions has been followed
+// by its CreateSubscription is answered with fresh data rather than held:
+// it is the replacement's own Publish, and OPC 10000-4 §5.14.8.1 has the
+// server serve the Subscription the application has just built.
 func (o *recorder) publishStep(connID int) (seq uint32, hold bool) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
-	if o.dropApplied {
+	// dropApplied is the drop run's restart, heldAnswered the
+	// HeldPublishOnCommand run's, and subsRecreated the point in that run
+	// where the replacement starts being served: once any of them holds,
+	// every later Publish is answered with fresh data again. The option's
+	// two flags are read only under heldOnCommand, so a run without the
+	// option sees the answer publishStep has always given.
+	if o.dropApplied || o.heldOnCommand && (o.heldAnswered || o.subsRecreated) {
 		o.lastSeq++
 		return o.lastSeq, false
 	}
@@ -865,6 +946,18 @@ type server struct {
 	dropCh chan struct{} // the scenario's one-shot drop command
 	opts   runOptions    // the run this server was scripted for
 
+	// heldMu guards what answerHeldPublish needs: every Publish the option
+	// is holding, each with the send onto the connection it arrived on and
+	// the request handle its ServiceFault has to carry, and, once the
+	// answers have gone out, the status they went out with, so a Publish
+	// captured after the command is faulted with the same one. serve
+	// captures every Publish the option holds, because a client may
+	// pipeline several.
+	heldMu      sync.Mutex
+	held        []heldPublish
+	heldFired   bool
+	firedStatus ua.StatusCode
+
 	mu    sync.Mutex         // guards conns
 	conns map[int]*uacp.Conn // by connection generation
 }
@@ -876,7 +969,7 @@ func newServer(ctx context.Context, opts runOptions) (*server, error) {
 		return nil, err
 	}
 	s := &server{
-		rec:      &recorder{},
+		rec:      &recorder{heldOnCommand: opts.HeldPublishOnCommand},
 		ln:       ln,
 		endpoint: "opc.tcp://" + ln.Addr().String(),
 		dropCh:   make(chan struct{}, 1),
@@ -895,6 +988,59 @@ func (s *server) drop() {
 	case s.dropCh <- struct{}{}:
 	default:
 	}
+}
+
+// heldPublish is one Publish the server is holding under
+// HeldPublishOnCommand: the send onto the connection it arrived on and its
+// request handle, which the ServiceFault that answers it has to carry.
+type heldPublish struct {
+	send   func(ua.Response)
+	handle uint32
+}
+
+// captureHeldPublish keeps what answering a Publish this server holds
+// needs. It is called only under HeldPublishOnCommand, and on every Publish
+// the option holds rather than only the first: a client that pipelines has
+// several queued, and §5.14.8.1 (see answerHeldPublish) has every one of
+// them answered when the last Subscription goes, so answering only the
+// first would leave the rest with nothing ever coming back. The one race
+// it closes is with the command itself: a Publish whose hold was decided
+// before the command fired but that reaches this capture after it gets the
+// fault then and there, because nothing would ever answer a hold taken
+// once the command has gone out.
+func (s *server) captureHeldPublish(send func(ua.Response), handle uint32) {
+	s.heldMu.Lock()
+	defer s.heldMu.Unlock()
+	if s.heldFired {
+		go send(newServiceFault(handle, s.firedStatus))
+		return
+	}
+	s.held = append(s.held, heldPublish{send: send, handle: handle})
+}
+
+// answerHeldPublish answers every Publish the server is holding with a
+// ServiceFault carrying status, on the test's command, and the stream goes
+// back to answering every later Publish with fresh data. It reports false
+// when no Publish is held for it to answer. The burst is §5.14.8.1's own
+// -- "all Publish requests still queued for that Session are de-queued
+// and shall be returned with Bad_NoSubscription" -- and the status is the
+// test's to name because the row it serves constructs the order the
+// de-queued answers land in.
+func (s *server) answerHeldPublish(status ua.StatusCode) bool {
+	s.heldMu.Lock()
+	defer s.heldMu.Unlock()
+	if len(s.held) == 0 {
+		return false
+	}
+	held := s.held
+	s.held = nil
+	s.heldFired = true
+	s.firedStatus = status
+	s.rec.recordHeldAnswered()
+	for _, hp := range held {
+		go hp.send(newServiceFault(hp.handle, status))
+	}
+	return true
 }
 
 // dropWatcher applies the commanded drop to the connection pinned by heldConn;
@@ -986,6 +1132,12 @@ func (s *server) serve(ctx context.Context, connID int, c *uacp.Conn) {
 		resp := s.answer(connID, req)
 		s.rec.recordActivationFault(req, resp)
 		if resp == nil {
+			// Under HeldPublishOnCommand these held Publishes are the ones
+			// the test answers later with answerHeldPublish, so keep what
+			// answering each of them needs.
+			if _, isPublish := req.(*ua.PublishRequest); isPublish && s.opts.HeldPublishOnCommand {
+				s.captureHeldPublish(func(r ua.Response) { send(msg.RequestID, r) }, req.Header().RequestHandle)
+			}
 			continue
 		}
 		if _, isPublish := req.(*ua.PublishRequest); isPublish {
@@ -1072,7 +1224,42 @@ func (s *server) answer(connID int, req ua.Request) ua.Response {
 			DiagnosticInfos: []*ua.DiagnosticInfo{},
 		}
 
+	case *ua.DeleteSubscriptionsRequest:
+		// The application's own delete, which OPC 10000-4 §5.14.8.1 answers
+		// by de-queuing the Session's still-queued Publish requests and
+		// returning each with Bad_NoSubscription. The harness grants the
+		// delete only under HeldPublishOnCommand -- gopcua's own recreate
+		// path sends one too (subscription.go recreate_delete, from
+		// client_sub.go), and the runs without the option faulted it
+		// unsupported before the option existed, so they still do. The held
+		// Publishes' fault is answerHeldPublish's to command, so the row that
+		// constructs the order owns the timing, while a Publish that arrives
+		// in the empty window this opens is the server's to answer at once,
+		// and the Publish arm does.
+		if !s.opts.HeldPublishOnCommand {
+			return newServiceFault(h, ua.StatusBadServiceUnsupported)
+		}
+		s.rec.recordSubscriptionsDeleted()
+		results := make([]ua.StatusCode, len(r.SubscriptionIDs))
+		for i := range results {
+			results[i] = ua.StatusOK
+		}
+		return &ua.DeleteSubscriptionsResponse{
+			ResponseHeader:  newResponseHeader(h, ua.StatusOK),
+			Results:         results,
+			DiagnosticInfos: []*ua.DiagnosticInfo{},
+		}
+
 	case *ua.PublishRequest:
+		// A Publish that arrives while the Session has no Subscription is
+		// answered at once with Bad_NoSubscription, which OPC 10000-4
+		// §5.14.8.1 has a conforming server do with it, rather than held for
+		// a command that has nothing to do with it. sessionHasNoSubscription
+		// reads state kept only under HeldPublishOnCommand, so without the
+		// option the check is never taken.
+		if s.opts.HeldPublishOnCommand && s.rec.sessionHasNoSubscription() {
+			return newServiceFault(h, ua.StatusBadNoSubscription)
+		}
 		// With nothing monitored there is no data, only keep-alives. Neither
 		// arm sleeps: the pacing is serve's, on a timer off the receive path.
 		if !s.rec.isAnyMonitored() {
@@ -1373,13 +1560,34 @@ type runOptions struct {
 	// has dropped a notification but keeps the rest of its queue: it rejects
 	// one acknowledgement and keeps advertising, so the client's requirement
 	// to acknowledge what it receives does not end with the rejection. The
-	// count is of answered acknowledgements: a held Publish is answered with
-	// nothing at all, so an acknowledgement it carried is not rejected but
+	// count is of answered acknowledgements: a held Publish is never answered
+	// with acknowledgement results at all - on the drop runs nothing answers
+	// it, and on the HeldPublishOnCommand run the fault that answers it
+	// carries none - so an acknowledgement it carried is not rejected but
 	// withheld. It cannot be combined with NoRetransmissionQueue, whose empty
 	// list tells the client to acknowledge nothing while later Good results
 	// would tell it the opposite. Without the option every Publish response
 	// keeps the empty Results list it has always carried.
 	RejectsFirstAck bool
+	// HeldPublishOnCommand holds the stream's second Publish - the first
+	// after the first answered one, whose notification the run withholds -
+	// and answers it with nothing until the test calls answerHeldPublish,
+	// which faults every Publish the server is holding with a status the
+	// test names and starts the stream answering every later Publish with
+	// fresh data again; see answerHeldPublish for the clause behind the
+	// burst and publishStep for the restart. The DeleteSubscriptions arm
+	// grants the delete only under it, and a Publish that arrives in the
+	// empty Session it leaves is faulted Bad_NoSubscription at once, while
+	// one that arrives after the CreateSubscription that follows is
+	// answered rather than held, so the replacement is served from its own
+	// first Publish on. Nothing the option adds is reachable with it unset:
+	// gopcua's own recreate path sends a DeleteSubscriptions too
+	// (subscription.go recreate_delete, from client_sub.go), and the runs
+	// without the option keep faulting it unsupported. gopcua keeps one
+	// Publish outstanding and is blocked inside the held one throughout, so
+	// none of this changes what gopcua is scored on. The run shape is the
+	// test's own rather than runScenario's, because that one is the drop's.
+	HeldPublishOnCommand bool
 	// ReconnectInterval is the client's wait between reconnection attempts;
 	// zero means 100ms.
 	ReconnectInterval time.Duration
