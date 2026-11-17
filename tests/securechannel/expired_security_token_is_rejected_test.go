@@ -377,12 +377,15 @@ type rejectionArmOutcome struct {
 	responseArrived bool
 	renewalSeen     bool
 	readArrived     bool
-	// scoredReadSentAt is the moment the arm sent its scored Read,
-	// which tells that Read's record apart from the pre-expiry
-	// Read's in the peer's requests.
-	scoredReadSentAt time.Time
-	setupWhy         string
-	setupFromGopcua  bool
+	// readsBefore is how many Reads the peer had recorded when the
+	// arm sent its scored Read, which tells that Read's record apart
+	// from the pre-expiry Read's. A count rather than a timestamp:
+	// on Windows the clock can give the send and the peer's receipt
+	// the same reading.
+	readsBefore     int
+	scoredSent      bool
+	setupWhy        string
+	setupFromGopcua bool
 }
 
 // runRejectionArm runs one arm of the row end to end: it mints the
@@ -516,7 +519,8 @@ func runRejectionArm(channelID uint32) (o rejectionArmOutcome,
 		}
 		// The scored Read: the same old token on the answer, now
 		// past its lifetime plus the 25 % grace window.
-		o.scoredReadSentAt = time.Now()
+		o.readsBefore = countReads(peer.record().Requests)
+		o.scoredSent = true
 		o.responseArrived = readBodyArrived(client, readBound)
 	}
 
@@ -524,16 +528,22 @@ func runRejectionArm(channelID uint32) (o rejectionArmOutcome,
 	_ = client.Close(closeCtx)
 	cancel()
 
-	if !o.scoredReadSentAt.IsZero() {
-		for _, r := range peer.record().Requests {
-			if _, ok := r.Req.(*ua.ReadRequest); ok &&
-				r.At.After(o.scoredReadSentAt) {
-				o.readArrived = true
-			}
-		}
+	if o.scoredSent {
+		o.readArrived = countReads(peer.record().Requests) > o.readsBefore
 	}
 	o.setupWhy, o.setupFromGopcua = peer.setupCheck()
 	return o, teardown
+}
+
+// countReads is how many of the peer's recorded requests are Reads.
+func countReads(reqs []requestRecord) int {
+	n := 0
+	for _, r := range reqs {
+		if _, ok := r.Req.(*ua.ReadRequest); ok {
+			n++
+		}
+	}
+	return n
 }
 
 // mintSigningCert mints a self-signed 2048-bit RSA key and X.509
