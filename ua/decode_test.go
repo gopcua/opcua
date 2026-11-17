@@ -217,10 +217,11 @@ func TestCodec(t *testing.T) {
 			b:    []byte{0xaf, 0xc7, 0x1f, 0x50, 0xf3, 0x5f, 0xe5, 0x02},
 		},
 		{
-			// Part 6 5.2.2.5 maximum DateTime
+			// Part 6 §5.2.2.5 maximum DateTime: a time at or after
+			// 9999-12-31T23:59:59Z encodes as the maximum Int64.
 			name: "DateTime9999",
 			v:    &struct{ V time.Time }{time.Date(9999, time.December, 31, 23, 59, 59, 0, time.UTC)},
-			b:    []byte{0x80, 0xa9, 0x27, 0xd1, 0x5e, 0x5a, 0xc8, 0x24},
+			b:    []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f},
 		},
 		{
 			// tick 1, underflowing the 1601 epoch subtraction
