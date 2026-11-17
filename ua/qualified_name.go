@@ -12,3 +12,15 @@ type QualifiedName struct {
 	NamespaceIndex uint16
 	Name           string
 }
+
+func (q *QualifiedName) Encode() ([]byte, error) {
+	if q == nil {
+		// A nil QualifiedName encodes as the null QualifiedName
+		// (Part 6, 5.2.2.13).
+		q = &QualifiedName{}
+	}
+	buf := NewBuffer(nil)
+	buf.WriteUint16(q.NamespaceIndex)
+	buf.WriteString(q.Name)
+	return buf.Bytes(), buf.Error()
+}
