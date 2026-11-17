@@ -393,10 +393,7 @@ func (c *Client) notifySubscription(ctx context.Context, sub *Subscription, noti
 // to paused and nudging the loop to notice.
 // It has no effect if the publish loop is already paused.
 func (c *Client) pauseSubscriptions(ctx context.Context) {
-	c.publishStateMu.Lock()
 	c.publishPaused.Store(true)
-	c.publishStateGen.Add(1)
-	c.publishStateMu.Unlock()
 	c.wake()
 }
 
@@ -406,23 +403,20 @@ func (c *Client) pauseSubscriptions(ctx context.Context) {
 func (c *Client) resumeSubscriptions(ctx context.Context) {
 	c.publishStateMu.Lock()
 	c.publishPaused.Store(false)
-	c.publishStateGen.Add(1)
+	c.publishResumeGen.Add(1)
 	c.publishStateMu.Unlock()
 	c.wake()
 }
 
 // pauseAfterPublishError pauses the publish loop after a failed publish,
-// unless a pause or resume happened while that publish was in flight.
-// stateGen is the publishStateGen value read before the publish; if the
-// counter has moved since, the newer pause or resume stands.
-// See https://github.com/gopcua/opcua/issues/895.
-func (c *Client) pauseAfterPublishError(ctx context.Context, stateGen uint64) {
+// unless resumeSubscriptions was called since resumeGen was read. That way a
+// resume made while the publish was in flight is not undone.
+func (c *Client) pauseAfterPublishError(resumeGen uint64) {
 	c.publishStateMu.Lock()
 	defer c.publishStateMu.Unlock()
-	if c.publishStateGen.Load() != stateGen {
-		// The newer pause or resume already set publishPaused, and the
-		// loop re-reads it at the top of each iteration, so no wake is
-		// needed.
+	if c.publishResumeGen.Load() != resumeGen {
+		// The resume already set publishPaused, and the loop re-reads it at
+		// the top of each iteration, so no wake is needed.
 		return
 	}
 	c.publishPaused.Store(true)
@@ -469,16 +463,13 @@ func (c *Client) monitorSubscriptions(ctx context.Context) {
 			continue
 
 		default:
-			// send publish request and handle response
-			//
-			// publish() blocks until a PublishResponse
-			// is received or the context is cancelled.
-			// Read the counter before the publish, so a pause or resume
-			// made while the publish is in flight shows up as a change.
-			stateGen := c.publishStateGen.Load()
+			// Read the counter before the publish, so a resume during the
+			// publish counts. publishFunc blocks until the Publish request is
+			// answered or ctx is done.
+			resumeGen := c.publishResumeGen.Load()
 			if err := c.publishFunc(ctx); err != nil {
 				dlog.Print("error: ", err.Error())
-				c.pauseAfterPublishError(ctx, stateGen)
+				c.pauseAfterPublishError(resumeGen)
 			}
 		}
 	}

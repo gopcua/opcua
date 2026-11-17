@@ -185,24 +185,13 @@ type Client struct {
 	// https://github.com/gopcua/opcua/issues/895.
 	publishPaused atomic.Bool
 
-	// publishStateMu makes two things one step each: a pause or resume
-	// setting publishPaused and incrementing publishStateGen, and
-	// pauseAfterPublishError checking the counter and pausing. A pause or
-	// resume therefore lands either before the check or after the
-	// self-pause, never between. Readers of publishPaused need no lock.
-	// See https://github.com/gopcua/opcua/issues/895.
+	// publishStateMu serializes resumeSubscriptions and pauseAfterPublishError.
 	publishStateMu sync.Mutex
 
-	// publishStateGen counts calls to pauseSubscriptions and
-	// resumeSubscriptions, including those from reconnects. The publish
-	// loop reads it before each publish; after a failed publish it pauses
-	// itself only if the counter has not moved, so a pause or resume made
-	// while that publish was in flight is not undone.
-	// See https://github.com/gopcua/opcua/issues/895.
-	publishStateGen atomic.Uint64
+	// publishResumeGen counts calls to resumeSubscriptions.
+	publishResumeGen atomic.Uint64
 
-	// publishFunc is the publish the loop calls, c.publish outside tests.
-	// It is a field so a test can hold a publish open.
+	// publishFunc is c.publish; tests replace it to hold a publish open.
 	publishFunc func(ctx context.Context) error
 
 	// wakech nudges the publish loop to re-check publishPaused. It only carries
