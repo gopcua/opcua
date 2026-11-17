@@ -19,7 +19,7 @@
 // client this fixture drives has ever pipelined.
 //
 // This is a test of the harness and not a row. The six review questions in
-// README.md are for rows, and question 2 -- whether the verdict turns on a
+// ../README.md are for rows, and question 2 -- whether the verdict turns on a
 // client fact -- is answered here by "no, deliberately": the records are
 // written by hand and the subject is the package's own readings of them.
 //
