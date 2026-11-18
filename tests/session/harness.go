@@ -4,58 +4,23 @@
 // with the clause it checks in the file's opening comment. This file holds
 // the fixture they all run against; it is not a row.
 //
-// The fixture is the in-tree gopcua server - production code, not a
-// scripted one - brought up on an ephemeral port, and a real gopcua client
-// connected to it over the wire. The conformance unit behind the rows,
-// OPC 10000-7's "Security User Name Password Client" (User Token - User
-// Name Password Client Facet), binds the client half: the rows score what
-// the client puts in the UserIdentityToken of its ActivateSession request
-// after reading the USERNAME UserTokenPolicies an EndpointDescription
-// lists. The in-tree server is what presents those descriptions:
-// initEndpoints (server/server.go:373) builds each endpoint's
-// UserIdentityTokens from the enabled auth modes crossed with the enabled
-// security policies, one USERNAME policy per policy, in the order the
-// policies were enabled (server/server.go:400-435), so the order this
-// harness enables them in is the order the client meets them in. Where a
-// row needs an endpoint list that order cannot produce, it rewrites the
-// UserIdentityTokens of the endpoint description it hands the client -
-// the narrowest surgery that presents the list, because everything else
-// about the description (its URL, its certificate, its policy and mode)
-// is the real server's own - and its header says so.
+// The fixture is the in-tree gopcua server on an ephemeral port, and a real
+// gopcua client connected to it over the wire. The rows score the
+// UserIdentityToken the client puts in its ActivateSession request after
+// reading an endpoint's USERNAME UserTokenPolicies. The server lists those
+// policies in the order the harness enables its security policies
+// (initEndpoints, server/server.go:373); a row that needs a list the server
+// cannot build rewrites only the UserIdentityTokens of the real endpoint
+// description.
 //
-// The server does not check user credentials at all: the in-tree
-// ActivateSession handler reads the UserIdentityToken and does nothing
-// with it (server/session_service.go), so the token's PolicyID and
-// EncryptionAlgorithm show in one place only - the request itself - and
-// the harness wraps the handler to record it.
-// (*server.Server).RegisterHandler (server/service_handlers.go:96) only
-// writes a handler that is not yet registered, so a handler registered
-// before Start is the one that stays: initHandlers' own RegisterHandler
-// for ActivateSession runs at Start (server/server.go:250), finds ours
-// already there, and leaves it. The wrapper records the request and then
-// answers it with the in-tree handler's own answer to a request whose
-// session it finds and whose client signature verifies - a Good
-// ServiceResult and a fresh 32-byte ServerNonce, the answer the handler
-// builds and returns (server/session_service.go:114-128) - and it
-// reproduces nothing else of that handler. The in-tree one also
-// resolves the request's AuthenticationToken to a session, refusing
-// with BadSessionIDInvalid when there is none, and runs
-// sc.VerifySessionSignature on the client's signature, refusing with
-// BadSecurityChecksFailed when that fails
-// (server/session_service.go:101-112); the wrapper looks up nothing and
-// verifies nothing, so a client completes its Connect here whatever
-// token it sent. Whether Connect succeeded is a symptom the rows do not
-// score.
+// The in-tree ActivateSession handler ignores the UserIdentityToken, so the
+// harness registers its own handler before Start, which RegisterHandler then
+// keeps (server/service_handlers.go:96). It records the request and answers
+// Good without looking up the session or verifying the client signature.
 //
-// Every helper here returns plain values. A helper does not call
-// t.Errorf or t.Fatalf; a row's test function turns a non-empty reason
-// string into the failure or the decline, and it, not the fixture,
-// registers the teardown with t.Cleanup. A stage that fails leaves the
-// harness partly up: teardown is non-nil for whatever came up, and the
-// row still owns calling it.
-//
-// The package name is session, as the directory is; the production
-// package github.com/gopcua/opcua/server is a different import path.
+// Every helper here returns plain values. A row's test function turns a
+// non-empty reason string into the failure or the decline, and registers the
+// teardown, which is non-nil even when a stage failed.
 package session
 
 import (
@@ -76,58 +41,37 @@ import (
 	"github.com/gopcua/opcua/uasc"
 )
 
-// connectBound is how long a stage of the exchange gets: a Connect, a
-// GetEndpoints. The bound is not a timing assumption: a correct client
-// and the loopback server under it finish each stage in well under a
-// second, so the bound exists to let a slow machine finish, not to wait
-// out a broken one; the teardown releases a pair that never does. The
-// wait for the recorded ActivateSession has its own shorter bound,
-// afterConnectBound, because it runs only once Connect has returned.
+// connectBound bounds each stage of the exchange: a Connect, a
+// GetEndpoints. A correct pair finishes in well under a second; the bound
+// only lets a slow machine finish.
 const connectBound = 10 * time.Second
 
-// afterConnectBound is how long a row waits for the recorded
-// ActivateSession request once the client's Connect has returned. The
-// wrapper records a request before it answers it, and the client's
-// Connect does not return before the answer arrives, so a Connect that
-// has returned has already put the request in the channel; the grace
-// covers the handoff alone and is not a second connectBound's wait for a
-// request that can no longer arrive.
+// afterConnectBound is how long a row waits for the recorded ActivateSession
+// request once Connect has returned. The handler records the request before
+// it answers, so by then the request is already in the channel.
 const afterConnectBound = time.Second
 
-// serverNonceLength is how many bytes the in-tree server's CreateSession
-// puts in the ServerNonce it hands the client (sessionNonceLength,
-// server/session_service.go:18), and therefore how many nonce bytes the
-// plaintext of a password the client encrypted carries after the password
-// itself. The row that reads that plaintext names where the length comes
-// from; the number is a literal here and never read from the server
-// package, whose constant is unexported.
+// serverNonceLength is the length of the ServerNonce the in-tree server's
+// CreateSession sends (sessionNonceLength, server/session_service.go:18).
+// The client appends that nonce to the password before encrypting it.
 const serverNonceLength = 32
 
 // rowUser and rowPass are the credentials every row's client activates
-// with. The password is the plaintext the byte-level row later looks for
-// inside the decrypted Password, so it is a literal here and never chosen
-// by the library.
-const rowUser = "gopcua-conformance"
+// with. They are literals so the byte-level row can look for rowPass in the
+// decrypted password.
+const (
+	rowUser = "gopcua-conformance"
+	rowPass = "conformance-password"
+)
 
-// rowPass is the password every row's client activates with; a literal for
-// the reason rowUser gives.
-const rowPass = "conformance-password"
-
-// rsaOAEPURI is the user-token encryption URI of every RSA-OAEP-SHA1
-// policy - Basic256Sha256's above all, the policy the rows' channel runs
-// - from Part 7's profile table for Basic256Sha256, which the tree quotes
-// at uapolicy/policyBasic256Sha256.go:38-42: "The URI is
-// http://www.w3.org/2001/04/xmlenc#rsa-oaep." A literal, never read from
-// uapolicy, whose EncryptionURI() would let the library grade itself.
+// rsaOAEPURI is the user-token encryption URI of Basic256Sha256, from
+// Part 7's profile table as quoted at uapolicy/policyBasic256Sha256.go:38-42.
+// It is a literal so the library does not grade itself.
 const rsaOAEPURI = "http://www.w3.org/2001/04/xmlenc#rsa-oaep"
 
 // sessionServer is the in-tree server with its ActivateSession handler
-// wrapped: the endpoint it listens on, the minted certificate and key it
-// signs and decrypts with, and the channel the first ActivateSession
-// request arrives on. A request the channel already holds is not
-// displaced: the wrapper records the first and drops the rest, because a
-// client that sends one Connect sends one activation, and a row that
-// needed the second would say so in its header.
+// replaced. activate receives the first ActivateSession request; later ones
+// are dropped.
 type sessionServer struct {
 	url  string
 	cert []byte // the server's minted DER certificate
@@ -136,31 +80,10 @@ type sessionServer struct {
 	activate chan *ua.ActivateSessionRequest
 }
 
-// startSessionServer brings the in-tree server up on the loopback
-// interface, on an ephemeral port, with its ActivateSession handler
-// wrapped to record the request, and returns it, a teardown for
-// everything that came up, and "" - or, when a stage failed, the reason
-// the run cannot be scored. Every stage here is the fixture's own half -
-// reserving the port, minting the key pair, bringing the server up - so
-// every one of its failures is a decline, the same event the server
-// package declines for its own harness (tests/server/harness.go returns
-// "server start: %v" and its rows print "could not set the test up: %s"
-// for it); the caller states that side, and a flag returned here could
-// only ever have said it one way.
-//
-// The security policies are enabled in this order - None, then
-// Basic128Rsa15 in mode SignAndEncrypt, then Basic256Sha256 in mode
-// SignAndEncrypt - because initEndpoints walks enabledSec twice, once per
-// endpoint and once per endpoint's UserIdentityTokens, in that order
-// (server/server.go:375 and 401), so the USERNAME policies of every
-// secured endpoint list the legacy Basic128Rsa15 first and the endpoint's
-// own Basic256Sha256 after it. That is the list the server's own construction
-// produces, and it is the list of the interop row the package exists to
-// hold; the harness does not reorder anything to get it.
-//
-// Both auth modes are enabled - Anonymous, then UserName - so the
-// endpoint lists carry both kinds of token policy, and the client has a
-// USERNAME policy to meet in every endpoint the rows connect to.
+// startSessionServer starts the in-tree server on a loopback ephemeral
+// port. It enables None, Basic128Rsa15 and Basic256Sha256, in that order, so
+// every secured endpoint lists the legacy username_basic128rsa15 policy
+// before its own. It returns "" or the reason the fixture could not start.
 func startSessionServer() (*sessionServer, func(), string) {
 	port, why := freePort()
 	if why != "" {
@@ -190,8 +113,7 @@ func startSessionServer() (*sessionServer, func(), string) {
 		server.EndPoint("127.0.0.1", port),
 	)
 
-	// Registered before Start, per the package comment: initHandlers'
-	// own registration at Start finds this one and leaves it.
+	// Registered before Start, so initHandlers keeps it.
 	srv.RegisterHandler(id.ActivateSessionRequest_Encoding_DefaultBinary,
 		s.recordActivateSession)
 
@@ -201,28 +123,13 @@ func startSessionServer() (*sessionServer, func(), string) {
 	return s, func() { _ = srv.Close() }, ""
 }
 
-// recordActivateSession is the wrapped ActivateSession handler: it
-// delivers the request to the row that is waiting for it - the first
-// one; a later activation finds the channel full and is dropped - and
-// answers with the in-tree handler's own answer to a request whose
-// session it finds and whose client signature verifies - a Good
-// ServiceResult and a fresh nonce (server/session_service.go:114-128).
-// It reproduces nothing else of that handler: the in-tree one also
-// resolves the request's AuthenticationToken to a session, refusing
-// with BadSessionIDInvalid when there is none, and runs
-// sc.VerifySessionSignature on the client's signature, refusing with
-// BadSecurityChecksFailed when that fails
-// (server/session_service.go:101-112); this wrapper does neither. It
-// checks nothing about the request's UserIdentityToken, the way the
-// in-tree handler does not: the request is the evidence, and the rows
-// hold the verdict.
+// recordActivateSession records the request and answers it the way the
+// in-tree handler answers a valid one: Good, with a fresh ServerNonce
+// (server/session_service.go:114-128).
 func (s *sessionServer) recordActivateSession(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
 	req, ok := r.(*ua.ActivateSessionRequest)
 	if !ok {
-		// The handler registry is keyed by the request's encoding id, so
-		// only an ActivateSessionRequest can reach here; the answer is
-		// the in-tree handler's own to a request it cannot cast
-		// (server/session_service.go:96-99).
+		// Unreachable: the registry is keyed by the encoding id.
 		return nil, ua.StatusBadRequestTypeInvalid
 	}
 
@@ -249,12 +156,9 @@ func (s *sessionServer) recordActivateSession(sc *uasc.SecureChannel, r ua.Reque
 	}, nil
 }
 
-// awaitActivateSession waits up to `within` for the client's ActivateSession
-// request to arrive and returns it with "". Otherwise it returns nil and
-// the reason the run cannot be scored: a client that never sent one and a
-// server that never answered its half land in the same reason, and the
-// row declines on it, because a red the row cannot pin on the library is
-// not a score.
+// awaitActivateSession waits up to within for the recorded ActivateSession
+// request. It returns "" or the reason none arrived; the row declines on
+// that, since it cannot tell which side failed.
 func (s *sessionServer) awaitActivateSession(within time.Duration) (*ua.ActivateSessionRequest, string) {
 	select {
 	case req := <-s.activate:
@@ -264,16 +168,9 @@ func (s *sessionServer) awaitActivateSession(within time.Duration) (*ua.Activate
 	}
 }
 
-// endpoint fetches the server's endpoint descriptions over the wire - a
-// real GetEndpoints from a real client, the same discovery an application
-// drives before it connects - and returns the one carrying the security
-// policy and mode it is asked for, with "" - or, when the exchange failed
-// or no endpoint matches, the reason the run cannot be scored, because
-// both halves of that exchange are the library under test: the in-tree
-// server's list is gopcua's own behaviour, and so is a GetEndpoints that
-// would not complete. Every failure here is gopcua's, so the caller
-// scores it as gopcua's own behaviour without asking this helper for the
-// side, which could only ever have said one thing.
+// endpoint fetches the server's endpoints with GetEndpoints and returns the
+// one with the given security policy and mode. It returns "" or the reason it
+// failed; both halves are gopcua, so the row scores that reason as gopcua's.
 func (s *sessionServer) endpoint(policy string, mode ua.MessageSecurityMode) (*ua.EndpointDescription, string) {
 	ctx, cancel := context.WithTimeout(context.Background(), connectBound)
 	defer cancel()
@@ -286,14 +183,12 @@ func (s *sessionServer) endpoint(policy string, mode ua.MessageSecurityMode) (*u
 			return ep, ""
 		}
 	}
-	return nil, fmt.Sprintf("no endpoint of %s carries security policy %q and mode %s; "+
-		"the server's own list is what a row's stimulus comes from, and it does not hold "+
-		"the one this row needs", s.url, policy, mode)
+	return nil, fmt.Sprintf("no endpoint of %s has security policy %q and mode %s",
+		s.url, policy, mode)
 }
 
-// usernamePolicies is the USERNAME UserTokenPolicies of the endpoint it is
-// given, in the order the endpoint lists them. SecurityFromEndpoint walks
-// that order (config.go:429), so it is the order the row scores.
+// usernamePolicies returns the endpoint's USERNAME policies in the order it
+// lists them, which is the order SecurityFromEndpoint walks (config.go:429).
 func usernamePolicies(ep *ua.EndpointDescription) []*ua.UserTokenPolicy {
 	var out []*ua.UserTokenPolicy
 	for _, t := range ep.UserIdentityTokens {
@@ -304,28 +199,17 @@ func usernamePolicies(ep *ua.EndpointDescription) []*ua.UserTokenPolicy {
 	return out
 }
 
-// withUsernameTokens returns a copy of the endpoint description with its
-// UserIdentityTokens replaced by the ones it is given: the narrowest
-// rewrite that presents an endpoint list the in-tree server's own
-// construction cannot produce, because every other field of the
-// description - its URL, its certificate, its security policy and mode -
-// stays the real server's own. The copy is shallow and the rows never
-// mutate what they are handed, so the caller's endpoint is not touched.
+// withUsernameTokens returns a shallow copy of ep with its
+// UserIdentityTokens replaced by tokens.
 func withUsernameTokens(ep *ua.EndpointDescription, tokens ...*ua.UserTokenPolicy) *ua.EndpointDescription {
 	clone := *ep
 	clone.UserIdentityTokens = tokens
 	return &clone
 }
 
-// usernameToken returns the UserNameIdentityToken the recorded
-// ActivateSession request carried in its UserIdentityToken, with "" - or,
-// when the request carries no such token, the reason and unscoreable,
-// which says which kind of not-scoring it is: an ExtensionObject the
-// server's decoder left untyped is a request the row cannot read, so the
-// run cannot be scored; a token of another type decoded fine and the row
-// scores it as the failure it is, because the client was configured to
-// send a UserNameIdentityToken and did not. Either way the bytes are the
-// client's own; the split only says whether the row can read them.
+// usernameToken returns the request's UserNameIdentityToken, or the reason
+// there is none. unscoreable reports that the token could not be read at all;
+// otherwise the token decoded as another type, which is a plain failure.
 func usernameToken(req *ua.ActivateSessionRequest) (tok *ua.UserNameIdentityToken, why string, unscoreable bool) {
 	if req.UserIdentityToken == nil {
 		return nil, "the ActivateSession request carries no UserIdentityToken at all", true
@@ -335,42 +219,18 @@ func usernameToken(req *ua.ActivateSessionRequest) (tok *ua.UserNameIdentityToke
 		return tok, "", false
 	}
 	if req.UserIdentityToken.Value == nil {
-		return nil, "the UserIdentityToken is an ExtensionObject the server's decoder " +
-			"left untyped, so the row cannot read the token the client named", true
+		return nil, "the server's decoder left the UserIdentityToken untyped", true
 	}
-	return nil, fmt.Sprintf("the ActivateSession request carried a %T instead of "+
-		"the UserNameIdentityToken the client was configured to send, so the "+
-		"endpoint's USERNAME policy was never used at all",
+	return nil, fmt.Sprintf("the ActivateSession request carried a %T, "+
+		"not the UserNameIdentityToken the client was configured to send",
 		req.UserIdentityToken.Value), false
 }
 
-// launchClient builds the client under test and runs its Connect on its
-// own goroutine, under a context bounded by connectBound. The row passes
-// the endpoint description whose USERNAME policies the client is to read -
-// the real one the server returned, or the row's rewrite of it - and the
-// username and password it is to activate with; the harness mints the
-// client's own certificate pair, adds SecurityFromEndpoint and
-// AuthUsername and AutoReconnect(false), so the behaviour the rows score -
-// which policy the client picks and how it encrypts the password - is the
-// library's own, and a failed connect is a returned error and not a retry
-// loop. The goroutine closes the client after Connect returns, so no
-// client outlives the row; Connect's own error is a symptom and no row
-// asserts it.
-//
-// It returns waitConnect, which blocks until that goroutine is done -
-// bounded by connectBound, so a Connect that ignores its own context
-// cannot hold the teardown past the bound - and "" - or, when the client
-// could not be built, the reason the run cannot be scored, a wait that
-// returns at once, and which side caused it: the certificate this
-// function mints is the fixture's own half, so a minting failure comes
-// from the environment's random source and is a decline, while
-// opcua.NewClient is the library under test and a client it would not
-// build is gopcua's own behaviour, which the row scores as unscoreable
-// and not a decline. A row waits for the client to finish before it
-// tears the server down: the recorded request arrives mid-Connect, and a
-// teardown that closes the server underneath a Connect still in flight
-// fails the client's own reads - the pair wedge the teardown then waits
-// out - for the fixture's timing and not for anything the row scores.
+// launchClient builds a client with SecurityFromEndpoint(ep) and
+// AuthUsername and runs its Connect in the background. waitConnect blocks
+// until Connect returns, at most connectBound; a row calls it before tearing
+// the server down. why is "" or the reason the client could not be built,
+// and fromGopcua reports whether opcua.NewClient, not the fixture, failed.
 func launchClient(s *sessionServer, ep *ua.EndpointDescription, user, pass string) (waitConnect func(), why string, fromGopcua bool) {
 	key, cert, why := mintCert("gopcua-conformance-session-client")
 	if why != "" {
@@ -404,21 +264,11 @@ func launchClient(s *sessionServer, ep *ua.EndpointDescription, user, pass strin
 	}, "", false
 }
 
-// mintCert mints one self-signed RSA key and X.509 certificate in memory,
-// for the common name it is given: the server's own pair, and each
-// client's. Nothing is written to disk and no key material is committed:
-// every run mints its own. The key is 2048 bits, and the size is not a
-// free choice: Basic128Rsa15's profile caps the asymmetric key at
-// 2048 bits (uapolicy/policyBasic128Rsa15.go:73-74), and on a tree where
-// the client picks the legacy policy - the interop row's known bug - it
-// encrypts the password under that policy with this very certificate, so
-// a longer server key would turn the row's red into an unscoreable run;
-// Basic256Sha256 requires at least 2048 bits
-// (uapolicy/policyBasic256Sha256.go:86), so 2048 is the one size that
-// lets every arm run. It returns the key, the DER certificate, and "" -
-// or, when the minting failed, the reason the run cannot be scored. A
-// minting failure is a decline ("could not set the test up"): it comes
-// from the environment's random source, not from gopcua.
+// mintCert mints a self-signed 2048-bit RSA key and certificate in memory.
+// 2048 bits is the only size both Basic128Rsa15 (at most,
+// uapolicy/policyBasic128Rsa15.go:73-74) and Basic256Sha256 (at least,
+// uapolicy/policyBasic256Sha256.go:86) accept. It returns "" or the reason
+// minting failed.
 func mintCert(commonName string) (key *rsa.PrivateKey, cert []byte, why string) {
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
@@ -439,16 +289,9 @@ func mintCert(commonName string) (key *rsa.PrivateKey, cert []byte, why string) 
 	return key, cert, ""
 }
 
-// freePort asks the kernel for an unused TCP port. The in-tree server's
-// EndPoint option wants a number, and a fixed one would collide with any
-// other OPC UA work on the same machine - port 4840 above all, which other
-// suites bind. It is the same shape as the server package's freePort
-// (tests/server/harness.go): the shared contract in ../README.md would
-// move a helper two packages call into tests/internal, and this one is
-// duplicated instead because moving it means editing tests/server, which
-// is not this package's to change; the first change that may touch both
-// is the one that moves it. It returns "" or the reason no port could be
-// reserved.
+// freePort returns an unused loopback TCP port, or the reason there is none.
+// It duplicates tests/server's freePort; moving both into tests/internal is
+// left to a change that may edit tests/server.
 func freePort() (int, string) {
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
