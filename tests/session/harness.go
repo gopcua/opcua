@@ -214,10 +214,12 @@ func usernameToken(req *ua.ActivateSessionRequest) (tok *ua.UserNameIdentityToke
 }
 
 // launchClient builds a client with SecurityFromEndpoint(ep) and
-// AuthUsername and runs its Connect in the background. waitConnect blocks
-// until Connect returns and reports false if that took longer than
-// connectBound; a row calls it before tearing the server down. why is "" or the reason the client could not be built,
-// and fromGopcua reports whether opcua.NewClient, not the fixture, failed.
+// AuthUsername and runs its Connect in the background, under a context
+// bounded by connectBound. waitConnect blocks until Connect returns and
+// reports false only if Connect is still running connectBound after the
+// call; a row calls it before tearing the server down. why is "" or the
+// reason the client could not be built, and fromGopcua reports whether
+// opcua.NewClient, not the fixture, failed.
 func launchClient(s *sessionServer, ep *ua.EndpointDescription, user, pass string) (waitConnect func() bool, why string, fromGopcua bool) {
 	key, cert, why := mintCert("gopcua-conformance-session-client")
 	if why != "" {

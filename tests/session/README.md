@@ -79,21 +79,23 @@ they do.
 ## When a row declines
 
 A row declines when the fixture fails: no free port, a key that would not
-mint, a server that would not start, a GetEndpoints or Connect that runs
-past `connectBound`, or no ActivateSession request within
-`afterConnectBound`. A run past a bound is a decline because a loaded
-machine can cause it, as `../README.md` says. The last one covers both a client that never sent the
+mint, a server that would not start, a GetEndpoints that runs past
+`connectBound`, or no ActivateSession request within `afterConnectBound`
+once Connect has returned. A run past a bound is a decline because a
+loaded machine can cause it, as `../README.md` says. Connect runs under a
+context bounded by `connectBound`, so a slow Connect is cut off and lands
+in the last case. That case covers both a client that never sent the
 request and a server that never received it, so the row cannot blame the
 library.
 
 A failure in gopcua's own code is scored with `t.Errorf` as "gopcua's own
 behaviour made this run unscoreable", because both halves are under test:
-a GetEndpoints that fails within its bound, a client `opcua.NewClient` will not build, a
-server-built token list without the shape the row needs, or a recorded
-token the row cannot read. Two cases differ. A token list the row rewrote
-itself without the needed shape is the row's mistake and declines. A token
-of the wrong type is an ordinary failure, because the client was
-configured to send a UserNameIdentityToken.
+a GetEndpoints that fails within its bound, a client `opcua.NewClient`
+will not build, a server-built token list without the shape the row
+needs, or a recorded token the row cannot read. Two cases differ. A token
+list the row rewrote itself without the needed shape is the row's mistake
+and declines. A token of the wrong type is an ordinary failure, because
+the client was configured to send a UserNameIdentityToken.
 
 ## The knownBug ledger, 2026-11-18
 
