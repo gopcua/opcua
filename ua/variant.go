@@ -141,7 +141,7 @@ func (m *Variant) Decode(b []byte) (int, error) {
 
 	// read flattened array elements
 	n := int(m.arrayLength)
-	if n > MaxVariantArrayLength {
+	if n < -1 || n > MaxVariantArrayLength {
 		return buf.Pos(), StatusBadEncodingLimitsExceeded
 	}
 
@@ -172,6 +172,15 @@ func (m *Variant) Decode(b []byte) (int, error) {
 		if m.arrayDimensionsLength < 0 {
 			return buf.Pos(), StatusBadEncodingLimitsExceeded
 		}
+		// arrayDimensionsLength comes straight off the wire and sizes the
+		// allocation below. Each dimension is an Int32 on the wire, so a
+		// count larger than the remaining bytes divided by four can never
+		// be satisfied. Dividing the remaining bytes instead of multiplying
+		// the count avoids arithmetic on the untrusted value.
+		maxDimensionsInRemainingBytes := buf.Len() / 4
+		if int(m.arrayDimensionsLength) > maxDimensionsInRemainingBytes {
+			return buf.Pos(), StatusBadEncodingLimitsExceeded
+		}
 		m.arrayDimensions = make([]int32, m.arrayDimensionsLength)
 		for i := 0; i < int(m.arrayDimensionsLength); i++ {
 			m.arrayDimensions[i] = buf.ReadInt32()
@@ -190,13 +199,26 @@ func (m *Variant) Decode(b []byte) (int, error) {
 
 	// validate that the total number of elements
 	// matches the product of the array dimensions
+	//
+	// The product is accumulated in an int64 and the loop stops as soon as
+	// it exceeds the array length: an int32 product overflows for dimensions
+	// like [4, 1073741825] and wraps to the array length, accepting
+	// dimensions inconsistent with the array length. OPC 10000-6 §5.2.2.16
+	// requires the decoder to reject them. All dimensions are
+	// greater than zero and arrayLength is at most MaxVariantArrayLength,
+	// so the product never decreases and the int64 cannot overflow.
 	if m.arrayDimensionsLength > 0 {
-		count := int32(1)
+		count := int64(1)
 		for i := range m.arrayDimensions {
-			count *= m.arrayDimensions[i]
+			count *= int64(m.arrayDimensions[i])
+			if count > int64(m.arrayLength) {
+				break
+			}
 		}
-		if count != m.arrayLength {
-			return buf.Pos(), errUnbalancedSlice
+		// Inconsistent dimensions make the message malformed
+		// (OPC 10000-6 §5.2.2.16): Bad_DecodingError.
+		if count != int64(m.arrayLength) {
+			return buf.Pos(), StatusBadDecodingError
 		}
 	}
 
@@ -329,6 +351,11 @@ func (m *Variant) decodeValue(buf *Buffer) interface{} {
 
 // Encode implements the codec interface.
 func (m *Variant) Encode() ([]byte, error) {
+	if m == nil {
+		// A nil Variant encodes as the null Variant (empty encoding
+		// mask) instead of panicking on the nil receiver.
+		m = &Variant{}
+	}
 	buf := NewBuffer(nil)
 	buf.WriteByte(m.mask)
 
@@ -422,6 +449,10 @@ func (m *Variant) encodeValue(buf *Buffer, v interface{}) {
 
 // errUnbalancedSlice indicates a multi-dimensional array has different
 // number of elements on the same level.
+//
+// It is an encode-side error only: sliceDim returns it when a Go value
+// cannot be encoded as a consistent multi-dimensional array. The decode
+// side reports the same defect as StatusBadDecodingError.
 var errUnbalancedSlice = errors.New("unbalanced multi-dimensional array")
 
 // sliceDim determines the element type, dimensions and the total length

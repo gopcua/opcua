@@ -27,6 +27,22 @@ import (
 const (
 	timeoutLeniency = 250 * time.Millisecond
 	MaxTimeout      = math.MaxUint32 * time.Millisecond
+
+	// The SequenceNumber wrap of OPC 10000-6 §6.7.2.4: a SequenceNumber
+	// "shall not wrap around until it is greater than 4 294 966 271
+	// (UInt32.MaxValue - 1024)" and the first number after the wrap "shall
+	// be less than 1024".
+	//
+	// maxSequenceNumber is the highest number the send side counts to
+	// before wrapping to 1 (see nextSequenceNumber).
+	maxSequenceNumber = math.MaxUint32 - 1023
+
+	// sequenceNumberWrapAfter and sequenceNumberWrapFloor bound the wrap the
+	// receive side accepts (see sequenceNumberSucceeds): any number greater
+	// than sequenceNumberWrapAfter may be followed by any number less than
+	// sequenceNumberWrapFloor.
+	sequenceNumberWrapAfter = math.MaxUint32 - 1024
+	sequenceNumberWrapFloor = 1024
 )
 
 type channelKind int
@@ -48,7 +64,47 @@ type MessageBody struct {
 	SecureChannelID uint32
 	Err             error
 
+	// serviceFault is set when Err is the ServiceResult of a response the
+	// server answered on an open channel, as opposed to a transport or
+	// decoding error. Such a fault names one request; it is handed to
+	// that request's handler and is a channel error only when the status
+	// says the channel or the session is gone (see channelLost).
+	serviceFault bool
+
 	body any
+}
+
+// channelLost reports whether a service result means the secure channel
+// or the session it carried can no longer be used, so that the client's
+// monitor has to reconnect. Every other service-level status is the
+// answer to the request that drew it: Bad_TooManyOperations,
+// Bad_ServiceUnsupported, Bad_UserAccessDenied and their like leave the
+// channel exactly as it was.
+func channelLost(code ua.StatusCode) bool {
+	switch code {
+	case ua.StatusBadSecureChannelIDInvalid,
+		ua.StatusBadSecureChannelClosed,
+		ua.StatusBadSecureChannelTokenUnknown,
+		ua.StatusBadSessionIDInvalid,
+		ua.StatusBadSessionClosed,
+		ua.StatusBadSessionNotActivated,
+		ua.StatusBadSubscriptionIDInvalid,
+		ua.StatusBadCertificateInvalid,
+		ua.StatusBadConnectionClosed:
+		return true
+	}
+	return false
+}
+
+// isChannelError reports whether Err should reach the client's monitor:
+// every transport and decoding error does, and a service fault only when
+// its status names the channel or the session as gone.
+func (b MessageBody) isChannelError() bool {
+	if !b.serviceFault {
+		return true
+	}
+	code, ok := b.Err.(ua.StatusCode)
+	return !ok || channelLost(code)
 }
 
 func (b MessageBody) Request() ua.Request {
@@ -121,6 +177,22 @@ type SecureChannel struct {
 	requestID   uint32
 	requestIDMu sync.Mutex
 
+	// sendSequenceNumber is the SequenceNumber counter of the channel itself:
+	// all instances, i.e. all security tokens, draw from it since OPC
+	// 10000-6 §6.7.2.4 requires that a SequenceNumber "shall not be reused for
+	// any TokenId" and "does not reset when a new TokenId is issued".
+	//
+	// sendMu makes taking a message's SequenceNumber(s) and writing its
+	// chunks to the connection one step per channel: two instances of one
+	// channel hold two different instance locks, so without it a send on
+	// the old instance and one on the renewed instance could interleave and
+	// put a taken-but-lower number on the wire after a higher one, which
+	// receivers reject as a gap or a reuse. Senders take it before drawing
+	// the first number of a message and hold it until its last chunk is
+	// written, never while waiting for a response.
+	sendSequenceNumber uint32
+	sendMu             sync.Mutex
+
 	// instances maps secure channel IDs to a list to channel states
 	instances      map[uint32][]*channelInstance
 	activeInstance *channelInstance
@@ -138,6 +210,15 @@ type SecureChannel struct {
 	// chunks maintains a temporary list of chunks for a given request ID
 	chunks   map[uint32][]*MessageChunk
 	chunksMu sync.Mutex
+
+	// recvSequence is the SequenceNumber of the last received chunk, whatever
+	// TokenId secured it (OPC 10000-6 §6.7.2.4: the SequenceNumber "does not
+	// reset when a new TokenId is issued"), so one counter spans token renewals
+	// and chunk types alike. recvSequenceSeeded reports whether a first chunk
+	// has seeded recvSequence; 0 is a valid SequenceNumber, so it cannot mark
+	// the counter unseeded. Only the dispatcher goroutine reads and writes them.
+	recvSequence       uint32
+	recvSequenceSeeded bool
 
 	// openingInstance is a temporary var that allows the dispatcher know how to handle a open channel request
 	// note: we only allow a single "open" request in flight at any point in time. The mutex is held for the entire
@@ -188,7 +269,7 @@ func NewServerSecureChannel(endpoint string, c *uacp.Conn, cfg *Config, errCh ch
 
 	s.openingInstance = newChannelInstance(s)
 	s.openingInstance.secureChannelID = secureChannelID
-	s.openingInstance.sequenceNumber = sequenceNumber
+	s.sendSequenceNumber = sequenceNumber
 	s.openingInstance.securityTokenID = securityTokenID
 
 	return s, nil
@@ -265,7 +346,7 @@ func (s *SecureChannel) dispatcher() {
 			return
 		default:
 			msg := s.Receive(ctx)
-			if msg.Err != nil {
+			if msg.Err != nil && msg.isChannelError() {
 				select {
 				case <-s.closing:
 					return
@@ -421,10 +502,13 @@ func (s *SecureChannel) Receive(ctx context.Context) *MessageBody {
 			}
 
 			// If the service status is not OK then bubble
-			// that error up to the caller.
+			// that error up to the caller. It is the caller's answer,
+			// and the monitor's only when the status says the channel
+			// or the session is gone.
 			if resp := msg.Response(); resp != nil {
 				if status := resp.Header().ServiceResult; status != ua.StatusOK {
 					msg.Err = status
+					msg.serviceFault = true
 					return msg
 				}
 			}
@@ -523,6 +607,12 @@ func (s *SecureChannel) readChunk() (*MessageChunk, error) {
 	}
 	m.Data = m.Data[n:]
 
+	// OPC 10000-6 §6.7.7: "After the security validation is complete the
+	// receiver shall verify the RequestId and the SequenceNumber."
+	if err := s.verifyReceivedSequenceNumber(m.SequenceHeader.SequenceNumber); err != nil {
+		return nil, err
+	}
+
 	return m, nil
 }
 
@@ -551,6 +641,54 @@ func (s *SecureChannel) verifyAndDecrypt(m *MessageChunk, b []byte, instance *ch
 	}
 
 	return nil, err
+}
+
+// verifyReceivedSequenceNumber checks the SequenceNumber of a received chunk
+// against the previous chunk's, whatever TokenIds secured them: OPC 10000-6
+// §6.7.2.4: "A SequenceNumber shall not be reused for any TokenId. The
+// SecurityToken lifetime shall be short enough to ensure that this never
+// happens; however, if it does the receiver shall treat it as a transport error
+// and force a reconnect. The SequenceNumber does not reset when a new TokenId
+// is issued and it shall be incremented by exactly one for each MessageChunk
+// sent." The first chunk received seeds the counter with whatever number it
+// carries (a sender may have started counting before this channel
+// connected); every later chunk must carry the last number's successor:
+// the previous number plus one, or, once the previous number has passed
+// sequenceNumberWrapAfter, any number below sequenceNumberWrapFloor — the
+// wrap §6.7.2.4 allows (see sequenceNumberSucceeds).
+//
+// A violation is reported as Bad_SecurityChecksFailed and logged as
+// Bad_SequenceNumberInvalid (OPC 10000-6 §6.7.7: "If these checks fail a
+// Bad_SecurityChecksFailed error is reported. ... If the SequenceNumber is
+// not valid, the receiver shall log a Bad_SequenceNumberInvalid error."). It
+// is a channel error, so the dispatcher passes it to the client's monitor,
+// which closes the channel and reconnects: the "force a reconnect" of
+// §6.7.2.4.
+func (s *SecureChannel) verifyReceivedSequenceNumber(seq uint32) error {
+	if !s.recvSequenceSeeded {
+		s.recvSequence = seq
+		s.recvSequenceSeeded = true
+		return nil
+	}
+
+	if !sequenceNumberSucceeds(s.recvSequence, seq) {
+		debug.Printf("uasc %d: Bad_SequenceNumberInvalid: got SequenceNumber %d, want the successor of %d", s.c.ID(), seq, s.recvSequence)
+		return ua.StatusBadSecurityChecksFailed
+	}
+	s.recvSequence = seq
+	return nil
+}
+
+// sequenceNumberSucceeds reports whether seq is a valid successor of prev:
+// the previous number plus one, or, once prev has passed
+// sequenceNumberWrapAfter, any number below sequenceNumberWrapFloor — the
+// wrap OPC 10000-6 §6.7.2.4 allows, which also covers a peer that counts to
+// MaxUint32 and restarts at 0.
+func sequenceNumberSucceeds(prev, seq uint32) bool {
+	if prev < math.MaxUint32 && seq == prev+1 {
+		return true
+	}
+	return prev > sequenceNumberWrapAfter && seq < sequenceNumberWrapFloor
 }
 
 func (s *SecureChannel) getInstancesBySecureChannelID(id uint32) []*channelInstance {
@@ -624,14 +762,12 @@ func (s *SecureChannel) open(ctx context.Context, instance *channelInstance, req
 
 	s.openingInstance = newChannelInstance(s)
 	// s.openingInstance.secureChannelID = s.secureChannelID
-	// s.openingInstance.sequenceNumber = s.sequenceNumber
 	// s.openingInstance.securityTokenID = s.securityTokenID
 
 	if requestType == ua.SecurityTokenRequestTypeRenew {
-		// TODO: lock? sequenceNumber++?
-		// this seems racy. if another request goes out while the other open request is in flight then won't an error
-		// be raised on the server? can the sequenceNumber be as "global" as the request ID?
-		s.openingInstance.sequenceNumber = instance.sequenceNumber
+		// The SequenceNumber does not reset for a new TokenId (OPC 10000-6
+		// §6.7.2.4); both instances keep drawing from the channel's counter
+		// so there is nothing to hand over here.
 		s.openingInstance.secureChannelID = instance.secureChannelID
 	}
 
@@ -648,7 +784,7 @@ func (s *SecureChannel) open(ctx context.Context, instance *channelInstance, req
 	s.openingInstance.algo = algo
 	s.openingInstance.SetMaximumBodySize(int(s.c.SendBufSize()))
 
-	localNonce, err := algo.MakeNonce()
+	localNonce, err := clientNonce(s.cfg, algo)
 	if err != nil {
 		return err
 	}
@@ -669,6 +805,27 @@ func (s *SecureChannel) open(ctx context.Context, instance *channelInstance, req
 		}
 		return s.handleOpenSecureChannelResponse(resp, localNonce, s.openingInstance)
 	})
+}
+
+// nonEmptyNonceLength is the length of the ClientNonce that
+// Config.ForceNonEmptyNonce sends. It is the minimum length below which a
+// Server shall return Bad_NonceInvalid (OPC 10000-4 §5.6.2.3).
+const nonEmptyNonceLength = 32
+
+// clientNonce returns the ClientNonce for an OpenSecureChannel request.
+func clientNonce(cfg *Config, algo *uapolicy.EncryptionAlgorithm) ([]byte, error) {
+	nonce, err := algo.MakeNonce()
+	if err != nil {
+		return nil, err
+	}
+	if len(nonce) > 0 || !cfg.ForceNonEmptyNonce {
+		return nonce, nil
+	}
+	nonce = make([]byte, nonEmptyNonceLength)
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		return nil, err
+	}
+	return nonce, nil
 }
 
 func (s *SecureChannel) handleOpenSecureChannelResponse(resp *ua.OpenSecureChannelResponse, localNonce []byte, instance *channelInstance) (err error) {
@@ -869,11 +1026,11 @@ func (s *SecureChannel) scheduleExpiration(instance *channelInstance) {
 	// https://reference.opcfoundation.org/v104/Core/docs/Part4/5.5.2/#5.5.2.1
 	// Clients should accept Messages secured by an expired SecurityToken for up to 25 % of the token lifetime.
 	const expireAfter = 1.25
-	when := instance.createdAt.Add(time.Second * time.Duration(instance.revisedLifetime.Seconds()*expireAfter))
+	when := time.Second * time.Duration(instance.revisedLifetime.Seconds()*expireAfter)
 
-	debug.Printf("uasc %d: security token expires at %s. channelID=%d tokenID=%d", s.c.ID(), when.UTC().Format(time.RFC3339), instance.secureChannelID, instance.securityTokenID)
+	debug.Printf("uasc %d: security token expires at %s (%s). channelID=%d tokenID=%d", s.c.ID(), time.Now().UTC().Add(when).Format(time.RFC3339), when, instance.secureChannelID, instance.securityTokenID)
 
-	t := time.NewTimer(time.Until(when))
+	t := time.NewTimer(when)
 	defer t.Stop()
 
 	select {
@@ -885,20 +1042,25 @@ func (s *SecureChannel) scheduleExpiration(instance *channelInstance) {
 	s.instancesMu.Lock()
 	defer s.instancesMu.Unlock()
 
-	oldInstances := s.instances[instance.securityTokenID]
+	// Instances are keyed by the secure channel id, the same key the
+	// chunk dispatch uses to look them up: a token is valid for its
+	// channel until it expires (OPC 10000-4 §5.5.2, OPC 10000-6 §6.7.2.4),
+	// so expiring one must remove it from the bucket its chunks are
+	// found under. Only the expiring instance itself is dropped, compared
+	// by identity rather than by token id: a renewal must issue a new
+	// token (OPC 10000-4 §5.5.2, OPC 10000-6 §6.7.2.3), but a server that
+	// reuses the TokenId, as gopcua's own server does, would otherwise
+	// lose the renewed token together with the expired one.
+	oldInstances := s.instances[instance.secureChannelID]
 
-	s.instances[instance.securityTokenID] = []*channelInstance{}
+	s.instances[instance.secureChannelID] = []*channelInstance{}
 
 	for _, oldInstance := range oldInstances {
-		if oldInstance.secureChannelID != instance.secureChannelID {
-			// something has gone horribly wrong!
-			debug.Printf("uasc %d: secureChannelID mismatch during scheduleExpiration!", s.c.ID())
-		}
-		if oldInstance.securityTokenID == instance.securityTokenID {
+		if oldInstance == instance {
 			continue
 		}
-		s.instances[instance.securityTokenID] = append(
-			s.instances[instance.securityTokenID],
+		s.instances[instance.secureChannelID] = append(
+			s.instances[instance.secureChannelID],
 			oldInstance,
 		)
 	}
@@ -998,6 +1160,12 @@ func (s *SecureChannel) sendAsyncWithTimeout(
 
 	instance.Lock()
 	defer instance.Unlock()
+
+	// Hold the channel's send lock from drawing the message's first
+	// SequenceNumber until its last chunk is on the wire, so chunks reach
+	// the connection in the order their numbers were assigned (see sendMu).
+	s.sendMu.Lock()
+	defer s.sendMu.Unlock()
 
 	m, err := instance.newRequestMessage(req, reqID, authToken, timeout)
 	if err != nil {
@@ -1140,6 +1308,12 @@ func (s *SecureChannel) SendMsgWithContext(ctx context.Context, instance *channe
 	instance.Lock()
 	defer instance.Unlock()
 
+	// Hold the channel's send lock from drawing the message's first
+	// SequenceNumber until its last chunk is on the wire, so chunks reach
+	// the connection in the order their numbers were assigned (see sendMu).
+	s.sendMu.Lock()
+	defer s.sendMu.Unlock()
+
 	m := instance.newMessage(resp, typeID, reqID)
 	if _, err := s.writeMessageChunks(ctx, instance, reqID, m, resp); err != nil {
 		return err
@@ -1164,6 +1338,12 @@ func (s *SecureChannel) sendResponseWithContext(ctx context.Context, instance *c
 	instance.Lock()
 	defer instance.Unlock()
 
+	// Hold the channel's send lock from drawing the message's first
+	// SequenceNumber until its last chunk is on the wire, so chunks reach
+	// the connection in the order their numbers were assigned (see sendMu).
+	s.sendMu.Lock()
+	defer s.sendMu.Unlock()
+
 	m := instance.newMessage(resp, typeID, reqID)
 	if _, err := s.writeMessageChunks(ctx, instance, reqID, m, resp); err != nil {
 		return err
@@ -1182,6 +1362,18 @@ func (s *SecureChannel) nextRequestID() uint32 {
 	}
 
 	return s.requestID
+}
+
+// nextSequenceNumber returns the next number to put in a chunk's
+// SequenceHeader. The caller must hold sendMu so that the numbers of a
+// message cannot overtake the chunks of an earlier one on the wire.
+func (s *SecureChannel) nextSequenceNumber() uint32 {
+	s.sendSequenceNumber++
+	if s.sendSequenceNumber > maxSequenceNumber {
+		s.sendSequenceNumber = 1
+	}
+
+	return s.sendSequenceNumber
 }
 
 // Close closes an existing secure channel
@@ -1224,6 +1416,9 @@ func (s *SecureChannel) timeNow() time.Time {
 	return time.Now()
 }
 
+// mergeChunks concatenates the bodies of a message's chunks. Chunks reach it
+// only after readChunk has verified their SequenceNumbers (OPC 10000-6
+// §6.7.2.4), so no chunk of a message can repeat another's number.
 func mergeChunks(chunks []*MessageChunk) ([]byte, error) {
 	if len(chunks) == 0 {
 		return nil, nil
@@ -1233,12 +1428,7 @@ func mergeChunks(chunks []*MessageChunk) ([]byte, error) {
 	}
 
 	var b []byte
-	var seqnr uint32
 	for _, c := range chunks {
-		if c.SequenceHeader.SequenceNumber == seqnr {
-			continue // duplicate chunk
-		}
-		seqnr = c.SequenceHeader.SequenceNumber
 		b = append(b, c.Data...)
 	}
 	return b, nil

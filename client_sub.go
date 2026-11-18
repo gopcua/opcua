@@ -48,7 +48,7 @@ func (c *Client) Subscribe(ctx context.Context, params *SubscriptionParameters, 
 	stats.Subscription().Add("Count", 1)
 
 	// start the publish loop if it isn't already running
-	c.resumech <- struct{}{}
+	c.resumeSubscriptions(ctx)
 
 	sub := &Subscription{
 		SubscriptionID:            res.SubscriptionID,
@@ -389,21 +389,45 @@ func (c *Client) notifySubscription(ctx context.Context, sub *Subscription, noti
 	}
 }
 
-// pauseSubscriptions suspends the publish loop by signalling the pausech.
+// pauseSubscriptions suspends the publish loop by setting the desired state
+// to paused and nudging the loop to notice.
 // It has no effect if the publish loop is already paused.
 func (c *Client) pauseSubscriptions(ctx context.Context) {
-	select {
-	case <-ctx.Done():
-	case c.pausech <- struct{}{}:
-	}
+	c.publishPaused.Store(true)
+	c.wake()
 }
 
-// resumeSubscriptions restarts the publish loop by signalling the resumech.
+// resumeSubscriptions restarts the publish loop by setting the desired state
+// to running and nudging the loop to notice.
 // It has no effect if the publish loop is not paused.
 func (c *Client) resumeSubscriptions(ctx context.Context) {
+	c.publishStateMu.Lock()
+	c.publishPaused.Store(false)
+	c.publishResumeGen.Add(1)
+	c.publishStateMu.Unlock()
+	c.wake()
+}
+
+// pauseAfterPublishError pauses the publish loop after a failed publish,
+// unless resumeSubscriptions was called since resumeGen was read. That way a
+// resume made while the publish was in flight is not undone.
+func (c *Client) pauseAfterPublishError(resumeGen uint64) {
+	c.publishStateMu.Lock()
+	defer c.publishStateMu.Unlock()
+	if c.publishResumeGen.Load() != resumeGen {
+		// The resume already set publishPaused, and the loop re-reads it at
+		// the top of each iteration, so no wake is needed.
+		return
+	}
+	c.publishPaused.Store(true)
+}
+
+// wake nudges monitorSubscriptions to re-check publishPaused. The send is
+// non-blocking and best-effort: a wake-up already queued is enough.
+func (c *Client) wake() {
 	select {
-	case <-ctx.Done():
-	case c.resumech <- struct{}{}:
+	case c.wakech <- struct{}{}:
+	default:
 	}
 }
 
@@ -413,43 +437,39 @@ func (c *Client) monitorSubscriptions(ctx context.Context) {
 	dlog := debug.NewPrefixLogger("sub: ")
 	defer dlog.Print("done")
 
-publish:
 	for {
+		if c.publishPaused.Load() {
+			dlog.Print("pause")
+			select {
+			case <-ctx.Done():
+				dlog.Print("pause: ctx.Done()")
+				return
+
+			case <-c.wakech:
+				// Re-check publishPaused rather than assuming this wake-up
+				// means "resume". Trusting the state, not the signal, is what
+				// makes the loop immune to wake-ups being coalesced or dropped.
+				continue
+			}
+		}
+
 		select {
 		case <-ctx.Done():
 			dlog.Println("ctx.Done()")
 			return
 
-		case <-c.resumech:
-			dlog.Print("resume")
-			// ignore since not paused
-
-		case <-c.pausech:
-			dlog.Print("pause")
-			for {
-				select {
-				case <-ctx.Done():
-					dlog.Print("pause: ctx.Done()")
-					return
-
-				case <-c.resumech:
-					dlog.Print("pause: resume")
-					continue publish
-
-				case <-c.pausech:
-					dlog.Print("pause: pause")
-					// ignore since already paused
-				}
-			}
+		case <-c.wakech:
+			// state may have changed (e.g. paused again); re-check publishPaused.
+			continue
 
 		default:
-			// send publish request and handle response
-			//
-			// publish() blocks until a PublishResponse
-			// is received or the context is cancelled.
-			if err := c.publish(ctx); err != nil {
+			// Read the counter before the publish, so a resume during the
+			// publish counts. publishFunc blocks until the Publish request is
+			// answered or ctx is done.
+			resumeGen := c.publishResumeGen.Load()
+			if err := c.publishFunc(ctx); err != nil {
 				dlog.Print("error: ", err.Error())
-				c.pauseSubscriptions(ctx)
+				c.pauseAfterPublishError(resumeGen)
 			}
 		}
 	}

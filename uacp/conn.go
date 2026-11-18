@@ -69,7 +69,12 @@ type Dialer struct {
 func (d *Dialer) Dial(ctx context.Context, endpoint string) (*Conn, error) {
 	debug.Printf("uacp: connecting to %s", endpoint)
 
-	_, raddr, err := ResolveEndpoint(ctx, endpoint)
+	// Dial the host as written, not one address resolved up front: for a
+	// name, net.Dialer tries every address it resolves to, in order, so a
+	// name whose first address does not answer (localhost resolving to an
+	// IPv6 ::1 the server does not listen on) still reaches the server on
+	// the next one.
+	_, raddr, err := parseEndpoint(endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -77,7 +82,6 @@ func (d *Dialer) Dial(ctx context.Context, endpoint string) (*Conn, error) {
 	dl := d.Dialer
 	if dl == nil {
 		dl = &net.Dialer{}
-
 	}
 
 	c, err := dl.DialContext(ctx, "tcp", raddr.Host)
@@ -222,7 +226,26 @@ func (c *Conn) close() error {
 	return c.TCPConn.Close()
 }
 
+// Handshake sends Hello and waits for Acknowledge, bounded by ctx: by its
+// deadline, and by its cancellation. The reconnect monitor dials with a
+// ctx that is cancelled on Client.Close but has no deadline; a server that
+// accepts the TCP connection and never answers Hello would otherwise hold
+// the read — and the monitor goroutine and its socket — past Close.
 func (c *Conn) Handshake(ctx context.Context, endpoint string) error {
+	stop := context.AfterFunc(ctx, func() {
+		// A deadline in the past unblocks the pending read or write.
+		_ = c.SetDeadline(time.Unix(1, 0))
+	})
+	err := c.handshake(ctx, endpoint)
+	if !stop() {
+		// ctx ended during the exchange. Whatever it returned, the
+		// connection's deadline is now in the past: report why.
+		return ctx.Err()
+	}
+	return err
+}
+
+func (c *Conn) handshake(ctx context.Context, endpoint string) error {
 	hel := &Hello{
 		Version:        c.ack.Version,
 		ReceiveBufSize: c.ack.ReceiveBufSize,

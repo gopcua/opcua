@@ -76,16 +76,15 @@ func TestNewRequestMessage(t *testing.T) {
 			name: "subsequent-request",
 			sechan: buildSecureChannel(
 				&SecureChannel{
-					cfg:       &Config{},
-					requestID: 555,
+					cfg:                &Config{},
+					requestID:          555,
+					sendSequenceNumber: 777,
 					// reqhdr: &ua.RequestHeader{
 					// 	RequestHandle: 444,
 					// },
 					time: fixedTime,
 				},
-				&channelInstance{
-					sequenceNumber: 777,
-				},
+				nil,
 			),
 			req: &ua.ReadRequest{},
 			m: &Message{
@@ -114,13 +113,13 @@ func TestNewRequestMessage(t *testing.T) {
 			name: "counter-rollover",
 			sechan: buildSecureChannel(
 				&SecureChannel{
-					cfg:       &Config{},
-					requestID: math.MaxUint32,
-					time:      fixedTime,
+					cfg:                &Config{},
+					requestID:          math.MaxUint32,
+					sendSequenceNumber: math.MaxUint32 - 1023,
+					time:               fixedTime,
 				},
-				&channelInstance{
-					sequenceNumber: math.MaxUint32 - 1023,
-				}),
+				nil,
+			),
 			req: &ua.ReadRequest{},
 			m: &Message{
 				MessageHeader: &MessageHeader{
@@ -889,4 +888,52 @@ func newTestTCPConnPair(t *testing.T) (*net.TCPConn, *net.TCPConn) {
 	}
 
 	return nil, nil
+}
+
+func TestScheduleExpiration_ClockSkew(t *testing.T) {
+	sc := &SecureChannel{
+		c:         &uacp.Conn{},
+		instances: make(map[uint32][]*channelInstance),
+		closing:   make(chan struct{}),
+	}
+	inst := &channelInstance{
+		secureChannelID: 1,
+		securityTokenID: 1,
+		createdAt:       time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC), // server clock in the past
+		revisedLifetime: 10 * time.Minute,
+	}
+	sc.instances[1] = []*channelInstance{inst}
+
+	go sc.scheduleExpiration(inst)
+
+	// Give a short period to verify the timer did not fire immediately
+	time.Sleep(50 * time.Millisecond)
+
+	sc.instancesMu.Lock()
+	instances := sc.instances[1]
+	sc.instancesMu.Unlock()
+
+	require.Len(t, instances, 1, "instance should not expire immediately when server createdAt is in the past")
+	close(sc.closing)
+}
+
+func TestClientNonce(t *testing.T) {
+	none, err := uapolicy.Asymmetric(ua.SecurityPolicyURINone, nil, nil)
+	require.NoError(t, err)
+
+	t.Run("null by default", func(t *testing.T) {
+		nonce, err := clientNonce(&Config{}, none)
+		require.NoError(t, err)
+		require.Empty(t, nonce)
+	})
+
+	t.Run("ForceNonEmptyNonce", func(t *testing.T) {
+		cfg := &Config{ForceNonEmptyNonce: true}
+		a, err := clientNonce(cfg, none)
+		require.NoError(t, err)
+		require.Len(t, a, nonEmptyNonceLength)
+		b, err := clientNonce(cfg, none)
+		require.NoError(t, err)
+		require.NotEqual(t, a, b)
+	})
 }

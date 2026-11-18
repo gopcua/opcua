@@ -80,6 +80,15 @@ type Config struct {
 	// RequestTimeout is timeout duration for all synchronous requests over SecureChannel.
 	// If the Server doesn't respond within RequestTimeout time, Client returns StatusBadTimeout
 	RequestTimeout time.Duration
+
+	// ForceNonEmptyNonce makes the client send a random ClientNonce of 32
+	// bytes in the OpenSecureChannel request when the nonce of the security
+	// policy is empty, which is only the case for SecurityPolicy None.
+	//
+	// By default the ClientNonce is null under None, as OPC 10000-6 §6.7.4
+	// recommends. Some servers close the connection when they receive a null
+	// ClientNonce. See https://github.com/gopcua/opcua/issues/894.
+	ForceNonEmptyNonce bool
 }
 
 // SessionConfig is a set of common configurations used in Session.

@@ -18,7 +18,7 @@ import (
 //	= 2*hashLenBytes + 2
 const (
 	RSAOAEPMinPaddingSHA1   = (2 * 20) + 2
-	RSAOAEPMinPaddingSHA256 = (2 * 64) + 2
+	RSAOAEPMinPaddingSHA256 = (2 * 32) + 2
 )
 
 type RSAOAEP struct {

@@ -223,6 +223,19 @@ func SecurityPolicy(s string) Option {
 	}
 }
 
+// ForceNonEmptyNonce makes the client send a random ClientNonce of 32 bytes
+// in the OpenSecureChannel request under SecurityPolicy None, for servers
+// that close the connection when the ClientNonce is null. It does not change
+// the nonces of the other security policies or the nonce in CreateSession.
+//
+// See https://github.com/gopcua/opcua/issues/894.
+func ForceNonEmptyNonce() Option {
+	return func(cfg *Config) error {
+		cfg.sechan.ForceNonEmptyNonce = true
+		return nil
+	}
+}
+
 // SessionName sets the name in the session configuration.
 func SessionName(s string) Option {
 	return func(cfg *Config) error {

@@ -166,3 +166,33 @@ NEXT:
 	got = got[:n]
 	require.Equal(t, want, got)
 }
+
+// A name whose first address does not answer still reaches the server on the
+// next one: localhost often resolves to ::1 before 127.0.0.1, and a server that
+// listens on IPv4 only must still be found through it.
+func TestDialTriesEveryAddressOfAName(t *testing.T) {
+	ln, err := Listen(context.Background(), "opc.tcp://127.0.0.1:0", nil)
+	require.NoError(t, err)
+	defer ln.Close()
+
+	_, port, err := net.SplitHostPort(ln.Addr().String())
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	accepted := make(chan error, 1)
+	go func() {
+		c, err := ln.Accept(ctx)
+		if err == nil {
+			c.Close()
+		}
+		accepted <- err
+	}()
+
+	c, err := Dial(ctx, "opc.tcp://localhost:"+port+"/foo/bar")
+	require.NoError(t, err)
+	defer c.Close()
+	require.Equal(t, "127.0.0.1", c.RemoteAddr().(*net.TCPAddr).IP.String())
+	require.NoError(t, <-accepted)
+}

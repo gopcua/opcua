@@ -529,7 +529,7 @@ func TestArray(t *testing.T) {
 		}
 
 		_, err := Decode(b, MustVariant([]uint32{0}))
-		require.ErrorIs(t, err, errUnbalancedSlice)
+		require.ErrorIs(t, err, StatusBadDecodingError)
 	})
 	t.Run("length too big", func(t *testing.T) {
 		b := []byte{
@@ -598,6 +598,34 @@ func TestArray(t *testing.T) {
 
 		_, err := Decode(b, MustVariant([][]uint32{{}, {}}))
 		require.ErrorIs(t, err, StatusBadEncodingLimitsExceeded)
+	})
+	t.Run("length negative", func(t *testing.T) {
+		b := []byte{
+			// variant encoding mask
+			0x87,
+			// array length
+			0xfe, 0xff, 0xff, 0xff, // -2
+		}
+
+		_, err := Decode(b, MustVariant([]uint32{0}))
+		require.ErrorIs(t, err, StatusBadEncodingLimitsExceeded)
+	})
+	t.Run("dimensions length exceeds remaining bytes", func(t *testing.T) {
+		b := []byte{
+			// variant encoding mask
+			0xc7,
+			// array length
+			0x00, 0x00, 0x00, 0x00,
+			// array values
+			// array dimensions length
+			0x00, 0x00, 0x10, 0x00, // 1048576, but no dimensions follow
+		}
+		v := MustVariant([]uint32{0})
+
+		_, err := Decode(b, v)
+
+		require.ErrorIs(t, err, StatusBadEncodingLimitsExceeded)
+		require.Empty(t, v.ArrayDimensions())
 	})
 }
 
@@ -786,6 +814,54 @@ func TestSliceDim(t *testing.T) {
 			require.Equal(t, tt.len, len)
 		})
 	}
+}
+
+func TestVariantDecodeArrayDimensionsOverflow(t *testing.T) {
+	// OPC 10000-6 §5.2.2.16: if ArrayDimensions are inconsistent with the
+	// ArrayLength, the decoder shall stop. The product of the dimensions
+	// must therefore be computed without overflow: dimensions
+	// [4, 1073741825] have the product 2^32+4 against an array length of 4
+	// and must be rejected, while the same elements with dimensions [2, 2]
+	// remain decodable.
+	t.Run("product overflows int32", func(t *testing.T) {
+		b := []byte{
+			// variant encoding mask: Boolean | array values | array dimensions
+			0xc1,
+			// array length
+			0x04, 0x00, 0x00, 0x00,
+			// array values
+			0x01, 0x01, 0x01, 0x01,
+			// array dimensions length
+			0x02, 0x00, 0x00, 0x00,
+			// array dimensions: [4, 1073741825]
+			0x04, 0x00, 0x00, 0x00,
+			0x01, 0x00, 0x00, 0x40,
+		}
+
+		_, err := Decode(b, &Variant{})
+		require.ErrorIs(t, err, StatusBadDecodingError)
+	})
+	t.Run("consistent dimensions still decode", func(t *testing.T) {
+		b := []byte{
+			// variant encoding mask: Boolean | array values | array dimensions
+			0xc1,
+			// array length
+			0x04, 0x00, 0x00, 0x00,
+			// array values
+			0x01, 0x01, 0x01, 0x01,
+			// array dimensions length
+			0x02, 0x00, 0x00, 0x00,
+			// array dimensions: [2, 2]
+			0x02, 0x00, 0x00, 0x00,
+			0x02, 0x00, 0x00, 0x00,
+		}
+
+		v := &Variant{}
+		_, err := Decode(b, v)
+		require.NoError(t, err)
+		require.Equal(t, []int32{2, 2}, v.ArrayDimensions())
+		require.Equal(t, [][]bool{{true, true}, {true, true}}, v.Value())
+	})
 }
 
 func TestVariantUnsupportedType(t *testing.T) {
