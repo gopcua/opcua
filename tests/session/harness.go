@@ -9,7 +9,7 @@
 // UserIdentityToken the client puts in its ActivateSession request after
 // reading an endpoint's USERNAME UserTokenPolicies. The server lists those
 // policies in the order the harness enables its security policies
-// (initEndpoints, server/server.go:373); a row that needs a list the server
+// (server/server.go:400-435); a row that needs a list the server
 // cannot build rewrites only the UserIdentityTokens of the real endpoint
 // description.
 //
@@ -73,9 +73,8 @@ const rsaOAEPURI = "http://www.w3.org/2001/04/xmlenc#rsa-oaep"
 // replaced. activate receives the first ActivateSession request; later ones
 // are dropped.
 type sessionServer struct {
-	url  string
-	cert []byte // the server's minted DER certificate
-	key  *rsa.PrivateKey
+	url string
+	key *rsa.PrivateKey
 
 	activate chan *ua.ActivateSessionRequest
 }
@@ -97,7 +96,6 @@ func startSessionServer() (*sessionServer, func(), string) {
 
 	s := &sessionServer{
 		url:      fmt.Sprintf("opc.tcp://127.0.0.1:%d", port),
-		cert:     cert,
 		key:      key,
 		activate: make(chan *ua.ActivateSessionRequest, 1),
 	}
@@ -170,33 +168,22 @@ func (s *sessionServer) awaitActivateSession(within time.Duration) (*ua.Activate
 
 // endpoint fetches the server's endpoints with GetEndpoints and returns the
 // one with the given security policy and mode. It returns "" or the reason it
-// failed; both halves are gopcua, so the row scores that reason as gopcua's.
-func (s *sessionServer) endpoint(policy string, mode ua.MessageSecurityMode) (*ua.EndpointDescription, string) {
+// failed. fromGopcua is false only when connectBound ran out, which a loaded
+// machine can cause; otherwise both halves are gopcua.
+func (s *sessionServer) endpoint(policy string, mode ua.MessageSecurityMode) (ep *ua.EndpointDescription, why string, fromGopcua bool) {
 	ctx, cancel := context.WithTimeout(context.Background(), connectBound)
 	defer cancel()
 	eps, err := opcua.GetEndpoints(ctx, s.url)
 	if err != nil {
-		return nil, fmt.Sprintf("GetEndpoints from %s: %v", s.url, err)
+		return nil, fmt.Sprintf("GetEndpoints from %s: %v", s.url, err), ctx.Err() == nil
 	}
 	for _, ep := range eps {
 		if ep.SecurityPolicyURI == policy && ep.SecurityMode == mode {
-			return ep, ""
+			return ep, "", false
 		}
 	}
 	return nil, fmt.Sprintf("no endpoint of %s has security policy %q and mode %s",
-		s.url, policy, mode)
-}
-
-// usernamePolicies returns the endpoint's USERNAME policies in the order it
-// lists them, which is the order SecurityFromEndpoint walks (config.go:429).
-func usernamePolicies(ep *ua.EndpointDescription) []*ua.UserTokenPolicy {
-	var out []*ua.UserTokenPolicy
-	for _, t := range ep.UserIdentityTokens {
-		if t.TokenType == ua.UserTokenTypeUserName {
-			out = append(out, t)
-		}
-	}
-	return out
+		s.url, policy, mode), true
 }
 
 // withUsernameTokens returns a shallow copy of ep with its
@@ -228,13 +215,13 @@ func usernameToken(req *ua.ActivateSessionRequest) (tok *ua.UserNameIdentityToke
 
 // launchClient builds a client with SecurityFromEndpoint(ep) and
 // AuthUsername and runs its Connect in the background. waitConnect blocks
-// until Connect returns, at most connectBound; a row calls it before tearing
-// the server down. why is "" or the reason the client could not be built,
+// until Connect returns and reports false if that took longer than
+// connectBound; a row calls it before tearing the server down. why is "" or the reason the client could not be built,
 // and fromGopcua reports whether opcua.NewClient, not the fixture, failed.
-func launchClient(s *sessionServer, ep *ua.EndpointDescription, user, pass string) (waitConnect func(), why string, fromGopcua bool) {
+func launchClient(s *sessionServer, ep *ua.EndpointDescription, user, pass string) (waitConnect func() bool, why string, fromGopcua bool) {
 	key, cert, why := mintCert("gopcua-conformance-session-client")
 	if why != "" {
-		return func() {}, why, false
+		return func() bool { return true }, why, false
 	}
 
 	client, err := opcua.NewClient(s.url,
@@ -245,7 +232,7 @@ func launchClient(s *sessionServer, ep *ua.EndpointDescription, user, pass strin
 		opcua.AutoReconnect(false),
 	)
 	if err != nil {
-		return func() {}, fmt.Sprintf("build the client: %v", err), true
+		return func() bool { return true }, fmt.Sprintf("build the client: %v", err), true
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), connectBound)
@@ -256,10 +243,12 @@ func launchClient(s *sessionServer, ep *ua.EndpointDescription, user, pass strin
 		cancel()
 		close(done)
 	}()
-	return func() {
+	return func() bool {
 		select {
 		case <-done:
+			return true
 		case <-time.After(connectBound):
+			return false
 		}
 	}, "", false
 }

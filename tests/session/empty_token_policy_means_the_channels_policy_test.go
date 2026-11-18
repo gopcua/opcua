@@ -56,9 +56,13 @@ func TestEmptyTokenPolicyMeansTheChannelsPolicy(t *testing.T) {
 		t.Fatalf("could not set the test up: %s", why)
 	}
 
-	ep, why := s.endpoint(ua.SecurityPolicyURIBasic256Sha256, ua.MessageSecurityModeSignAndEncrypt)
+	ep, why, fromGopcua := s.endpoint(ua.SecurityPolicyURIBasic256Sha256, ua.MessageSecurityModeSignAndEncrypt)
 	if why != "" {
-		t.Errorf("gopcua's own behaviour made this run unscoreable: %s", why)
+		if fromGopcua {
+			t.Errorf("gopcua's own behaviour made this run unscoreable: %s", why)
+		} else {
+			t.Fatalf("could not set the test up: %s", why)
+		}
 		return
 	}
 
@@ -76,7 +80,9 @@ func TestEmptyTokenPolicyMeansTheChannelsPolicy(t *testing.T) {
 		}
 		return
 	}
-	waitConnect()
+	if !waitConnect() {
+		t.Fatalf("could not set the test up: Connect did not return within %v", connectBound)
+	}
 
 	req, why := s.awaitActivateSession(afterConnectBound)
 	if why != "" {

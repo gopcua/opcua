@@ -154,9 +154,9 @@ func runArm(tokens []*ua.UserTokenPolicy) (o armOutcome, teardown func()) {
 		return o, teardown
 	}
 
-	ep, why := s.endpoint(ua.SecurityPolicyURIBasic256Sha256, ua.MessageSecurityModeSignAndEncrypt)
+	ep, why, fromGopcua := s.endpoint(ua.SecurityPolicyURIBasic256Sha256, ua.MessageSecurityModeSignAndEncrypt)
 	if why != "" {
-		o.setupWhy, o.fromGopcua = why, true
+		o.setupWhy, o.fromGopcua = why, fromGopcua
 		return o, teardown
 	}
 	if tokens != nil {
@@ -176,7 +176,10 @@ func runArm(tokens []*ua.UserTokenPolicy) (o armOutcome, teardown func()) {
 		o.setupWhy, o.fromGopcua = why, fromGopcua
 		return o, teardown
 	}
-	waitConnect()
+	if !waitConnect() {
+		o.setupWhy = fmt.Sprintf("Connect did not return within %v", connectBound)
+		return o, teardown
+	}
 
 	req, why := s.awaitActivateSession(afterConnectBound)
 	if why != "" {
@@ -195,6 +198,18 @@ func runArm(tokens []*ua.UserTokenPolicy) (o armOutcome, teardown func()) {
 	}
 	o.token = tok
 	return o, teardown
+}
+
+// usernamePolicies returns the endpoint's USERNAME policies in the order it
+// lists them, which is the order SecurityFromEndpoint walks (config.go:429).
+func usernamePolicies(ep *ua.EndpointDescription) []*ua.UserTokenPolicy {
+	var out []*ua.UserTokenPolicy
+	for _, t := range ep.UserIdentityTokens {
+		if t.TokenType == ua.UserTokenTypeUserName {
+			out = append(out, t)
+		}
+	}
+	return out
 }
 
 // stimulusShapeFailed returns "" if pols holds the row's premise: at least
