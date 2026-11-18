@@ -29,15 +29,14 @@
 // policy followed by one naming none. See harness.go.
 //
 // Each arm asserts the recorded token's PolicyID and that its
-// EncryptionAlgorithm is rsa-oaep. The known-bug arm fires only on the
-// defect itself, the legacy PolicyID with rsa-1_5, so a client that picks
-// the right policy but encrypts it under the legacy one fails outright.
-// The row asserts nothing about the anonymous policies or about the
+// EncryptionAlgorithm is rsa-oaep, so a client that picks the right
+// policy but encrypts it under the legacy one fails. The row asserts nothing about the anonymous policies or about the
 // server's own conformance.
 //
-// gopcua fails this row: SecurityFromEndpoint returns the first policy whose
-// TokenType matches (config.go:429-453), so both arms send the legacy
-// PolicyID with rsa-1_5.
+// gopcua passes this row since #914: SecurityFromEndpoint takes the first
+// USERNAME policy that names the endpoint's own SecurityPolicy or none
+// (config.go:436-447). Before it, both arms sent the legacy PolicyID with
+// rsa-1_5.
 //
 // A known-good client fails this: Eclipse Milo's UsernameProvider takes the
 // first usable USERNAME policy by default (ps -> ps.get(0)) and leaves the
@@ -58,19 +57,7 @@ import (
 	"github.com/gopcua/opcua/ua"
 )
 
-// rsa15URI is the user-token encryption URI of Basic128Rsa15, from Part 7's
-// profile table as quoted at uapolicy/policyBasic128Rsa15.go:30.
-const rsa15URI = "http://www.w3.org/2001/04/xmlenc#rsa-1_5"
-
 func TestLegacyFirstUsernamePoliciesUseTheEndpointsOwn(t *testing.T) {
-	// knownBug records that gopcua does not do this yet; the text is
-	// logged in place of a failure, and the arms below tell a pass that
-	// it is time to delete it. ../README.md says when.
-	const knownBug = "SecurityFromEndpoint takes the first USERNAME " +
-		"UserTokenPolicy in the endpoint's list, so a non-conforming server that " +
-		"lists a legacy policy first has the client encrypt its password under the " +
-		"legacy policy instead of the endpoint's own or one that names none"
-
 	arms := []struct {
 		name string
 		// tokens replaces the endpoint's list; nil keeps the server's own.
@@ -115,19 +102,12 @@ func TestLegacyFirstUsernamePoliciesUseTheEndpointsOwn(t *testing.T) {
 				return
 			}
 
-			got, want, conforming, legacyPick := scoreChosenPolicy(o, arm.wantPolicyID)
-			switch {
-			case legacyPick && knownBug != "":
-				t.Logf("known bug: %s (%s, not %s)", knownBug, got, want)
-			case conforming && knownBug != "":
-				t.Errorf("this now passes (%s) - delete the knownBug constant, "+
-					"every arm that reads it, and anything only those arms used, "+
-					"in the commit that fixed it", got)
-			case conforming:
-				t.Logf("%s - the conforming candidate", got)
-			default:
+			got, want, conforming := scoreChosenPolicy(o, arm.wantPolicyID)
+			if !conforming {
 				t.Errorf("%s, not %s", got, want)
+				return
 			}
+			t.Logf("%s - the conforming candidate", got)
 		})
 	}
 }
@@ -201,7 +181,7 @@ func runArm(tokens []*ua.UserTokenPolicy) (o armOutcome, teardown func()) {
 }
 
 // usernamePolicies returns the endpoint's USERNAME policies in the order it
-// lists them, which is the order SecurityFromEndpoint walks (config.go:429).
+// lists them, which is the order SecurityFromEndpoint walks (config.go:436).
 func usernamePolicies(ep *ua.EndpointDescription) []*ua.UserTokenPolicy {
 	var out []*ua.UserTokenPolicy
 	for _, t := range ep.UserIdentityTokens {
@@ -235,15 +215,13 @@ func stimulusShapeFailed(pols []*ua.UserTokenPolicy, ep *ua.EndpointDescription)
 
 // scoreChosenPolicy describes the recorded token (got) and the expectation
 // (want). conforming reports that the token carries wantPolicyID and
-// rsa-oaep; legacyPick reports that it carries the first policy's PolicyID
-// and rsa-1_5, the defect knownBug names.
-func scoreChosenPolicy(o armOutcome, wantPolicyID string) (got, want string, conforming, legacyPick bool) {
+// rsa-oaep.
+func scoreChosenPolicy(o armOutcome, wantPolicyID string) (got, want string, conforming bool) {
 	got = fmt.Sprintf("the endpoint listed %s, and the client sent PolicyID %q and EncryptionAlgorithm %q",
 		usernamePoliciesDesc(o.policies), o.token.PolicyID, o.token.EncryptionAlgorithm)
 	want = fmt.Sprintf("PolicyID %q and EncryptionAlgorithm %q", wantPolicyID, rsaOAEPURI)
 	conforming = o.token.PolicyID == wantPolicyID && o.token.EncryptionAlgorithm == rsaOAEPURI
-	legacyPick = o.token.PolicyID == o.policies[0].PolicyID && o.token.EncryptionAlgorithm == rsa15URI
-	return got, want, conforming, legacyPick
+	return got, want, conforming
 }
 
 // usernamePoliciesDesc formats pols as policyID="securityPolicyUri" pairs.

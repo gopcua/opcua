@@ -36,13 +36,13 @@ credentials.
   application configures it: GetEndpoints, then
   `SecurityFromEndpoint(ep, ua.UserTokenTypeUserName)` and `AuthUsername`.
   Choosing the policy and encrypting the password is library code
-  (config.go:429-453, uasc/secure_channel_crypto.go:66-98). A row that
+  (config.go:436-470, uasc/secure_channel_crypto.go:66-98). A row that
   needs a list the server cannot build replaces only the endpoint's
   UserIdentityTokens, and its header says so.
 - **Keys are 2048-bit RSA, minted in memory** for the server and each
   client. That is the only size both Basic128Rsa15 (at most 2048) and
-  Basic256Sha256 (at least 2048) accept, and while the known bug stands the
-  client encrypts under Basic128Rsa15 with the server's certificate.
+  Basic256Sha256 (at least 2048) accept, and the server's one certificate
+  serves both of its secured endpoints.
 - **Each stage has a bound**: `connectBound` for GetEndpoints and Connect,
   and the shorter `afterConnectBound` for the recorded request once
   Connect has returned. A row waits for Connect to return before tearing
@@ -99,17 +99,12 @@ the client was configured to send a UserNameIdentityToken.
 
 ## The knownBug ledger, 2026-11-18
 
-One constant stands, in
-`legacy_first_username_policies_use_the_endpoints_own_test.go`.
+No constant stands.
 
 | row | state |
 |---|---|
-| `empty_token_policy_means_the_channels_policy_test.go` | No constant; gopcua passes (measured 2026-11-18). Two library paths fall back to the channel's policy: `SecurityFromEndpoint`'s else-branch (config.go:448-452) and `EncryptUserPassword` (uasc/secure_channel_crypto.go:67-70). Measured mutants: setting the else-branch to `ua.SecurityPolicyURINone` sends the password in the clear and turns the row red. Deleting either fallback alone leaves it green, because the other one covers. Deleting both makes `uapolicy.Asymmetric("")` fail before anything is sent, and the row declines. |
-| `legacy_first_username_policies_use_the_endpoints_own_test.go` | `knownBug` stands. `SecurityFromEndpoint` returns the first policy whose TokenType matches (config.go:429-453), so both arms send the legacy PolicyID with `rsa-1_5` (measured 2026-11-18). The known-bug arm fires only on that exact pair. Any other wrong outcome fails even while the constant stands, including the right PolicyID with the wrong algorithm. Skipping non-matching policies in that loop turns both arms to "this now passes". |
-
-The expected fix is in `SecurityFromEndpoint`: skip USERNAME policies that
-name a policy the endpoint does not run, and take the first that names the
-endpoint's own or none.
+| `empty_token_policy_means_the_channels_policy_test.go` | No constant; gopcua passes (measured 2026-11-18). Two library paths fall back to the channel's policy: `SecurityFromEndpoint`'s else-branch (config.go:465-469) and `EncryptUserPassword` (uasc/secure_channel_crypto.go:67-70). Measured mutants: setting the else-branch to `ua.SecurityPolicyURINone` sends the password in the clear and turns the row red. Deleting either fallback alone leaves it green, because the other one covers. Deleting both makes `uapolicy.Asymmetric("")` fail before anything is sent, and the row declines. |
+| `legacy_first_username_policies_use_the_endpoints_own_test.go` | Constant deleted when the suite was rebased onto #914; gopcua passes (measured 2026-11-18). `SecurityFromEndpoint` takes the first USERNAME policy that names the endpoint's own SecurityPolicy or none (config.go:436-447). Before #914 it took the first policy whose TokenType matched, and both arms sent the legacy PolicyID with `rsa-1_5`. A half fix that sends the right PolicyID under the legacy algorithm fails both arms (measured). |
 
 ## What the package deliberately does not score
 

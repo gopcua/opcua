@@ -28,7 +28,7 @@
 // It asserts nothing about the UserName field, the nonce's own bytes, or
 // whether Connect succeeded.
 //
-// gopcua passes this row. Both SecurityFromEndpoint (config.go:448-452) and
+// gopcua passes this row. Both SecurityFromEndpoint (config.go:465-469) and
 // EncryptUserPassword (uasc/secure_channel_crypto.go:67-70) fall back to the
 // channel's policy, so the row stays green while either one does; the
 // package README lists the mutants that turn it red. UA-.NETStandard,

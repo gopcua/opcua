@@ -21,13 +21,13 @@ implemented.
 **Today's refusal is an accident.** Measured on this tree: for a None-mode
 endpoint whose USERNAME policy names a URI `uapolicy` does not know,
 `SecurityFromEndpoint` copies the URI into the auth policy
-(config.go:448-449), `uapolicy.Asymmetric` rejects it
+(config.go:465-466), `uapolicy.Asymmetric` rejects it
 (uapolicy/securitypolicy.go:32-35), and `Connect` fails with
 `opcua: unsupported security policy <uri>` before any ActivateSession is
 sent. That refusal comes from the missing policy, not from the
 SecurityMode: a None-mode endpoint whose USERNAME policy names
 Basic256Sha256 has the client encrypt and send. Nothing on the path
-(config.go:448-449, uasc/secure_channel_crypto.go:66-98) reads the
+(config.go:465-466, uasc/secure_channel_crypto.go:66-98) reads the
 SecurityMode, so a row that scored the refusal would stay green after ECC
 support landed without the check. What would close it: ECC policy URIs
 quoted from a Part 7 or profiles source, so a row can key on the recorded
