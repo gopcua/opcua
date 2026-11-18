@@ -609,7 +609,7 @@ func (s *SecureChannel) readChunk() (*MessageChunk, error) {
 
 	// OPC 10000-6 §6.7.7: "After the security validation is complete the
 	// receiver shall verify the RequestId and the SequenceNumber."
-	if err := s.verifyReceivedSequenceNumber(m.SequenceHeader.SequenceNumber); err != nil {
+	if err := s.verifyReceivedSequenceNumber(m.SecureChannelID, m.SequenceHeader.SequenceNumber); err != nil {
 		return nil, err
 	}
 
@@ -657,14 +657,16 @@ func (s *SecureChannel) verifyAndDecrypt(m *MessageChunk, b []byte, instance *ch
 // sequenceNumberWrapAfter, any number below sequenceNumberWrapFloor — the
 // wrap §6.7.2.4 allows (see sequenceNumberSucceeds).
 //
-// A violation is reported as Bad_SecurityChecksFailed and logged as
-// Bad_SequenceNumberInvalid (OPC 10000-6 §6.7.7: "If these checks fail a
+// A violation is reported as an error that wraps Bad_SecurityChecksFailed
+// (so errors.Is still matches the bare status) and names the violation,
+// Bad_SequenceNumberInvalid, together with the received number and the
+// expected one (OPC 10000-6 §6.7.7: "If these checks fail a
 // Bad_SecurityChecksFailed error is reported. ... If the SequenceNumber is
-// not valid, the receiver shall log a Bad_SequenceNumberInvalid error."). It
-// is a channel error, so the dispatcher passes it to the client's monitor,
+// not valid, the receiver shall log a Bad_SequenceNumberInvalid error.").
+// It is a channel error, so the dispatcher passes it to the client's monitor,
 // which closes the channel and reconnects: the "force a reconnect" of
 // §6.7.2.4.
-func (s *SecureChannel) verifyReceivedSequenceNumber(seq uint32) error {
+func (s *SecureChannel) verifyReceivedSequenceNumber(secureChannelID, seq uint32) error {
 	if !s.recvSequenceSeeded {
 		s.recvSequence = seq
 		s.recvSequenceSeeded = true
@@ -672,8 +674,26 @@ func (s *SecureChannel) verifyReceivedSequenceNumber(seq uint32) error {
 	}
 
 	if !sequenceNumberSucceeds(s.recvSequence, seq) {
-		debug.Printf("uasc %d: Bad_SequenceNumberInvalid: got SequenceNumber %d, want the successor of %d", s.c.ID(), seq, s.recvSequence)
-		return ua.StatusBadSecurityChecksFailed
+		if s.recvSequence == math.MaxUint32 {
+			// The counter has run past the wrap threshold, so every
+			// number below sequenceNumberWrapFloor is a valid
+			// successor and the previous number has no successor of
+			// its own left (see sequenceNumberSucceeds).
+			return errors.Errorf(
+				"sechan: Bad_SequenceNumberInvalid: SecureChannelID=%d: got SequenceNumber %d, want any number below %d: %w",
+				secureChannelID, seq, sequenceNumberWrapFloor, ua.StatusBadSecurityChecksFailed,
+			)
+		}
+		if s.recvSequence > sequenceNumberWrapAfter {
+			return errors.Errorf(
+				"sechan: Bad_SequenceNumberInvalid: SecureChannelID=%d: got SequenceNumber %d, want %d or any number below %d: %w",
+				secureChannelID, seq, s.recvSequence+1, sequenceNumberWrapFloor, ua.StatusBadSecurityChecksFailed,
+			)
+		}
+		return errors.Errorf(
+			"sechan: Bad_SequenceNumberInvalid: SecureChannelID=%d: got SequenceNumber %d, want %d: %w",
+			secureChannelID, seq, s.recvSequence+1, ua.StatusBadSecurityChecksFailed,
+		)
 	}
 	s.recvSequence = seq
 	return nil
