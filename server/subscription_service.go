@@ -69,6 +69,7 @@ func (s *SubscriptionService) CreateSubscription(sc *uasc.SecureChannel, r ua.Re
 	sub.RevisedPublishingInterval = req.RequestedPublishingInterval
 	sub.RevisedLifetimeCount = req.RequestedLifetimeCount
 	sub.RevisedMaxKeepAliveCount = req.RequestedMaxKeepAliveCount
+	sub.MaxNotificationsPerPublish = req.MaxNotificationsPerPublish
 
 	s.Subs[newsubid] = sub
 	sub.running = true
@@ -259,8 +260,8 @@ type PubReq struct {
 // This is the type that with its run() function will work in the bakground fullfilling subscription
 // publishes.
 //
-// MonitoredItems will send updates on the NotifyChannel to let the background task know that
-// an event has occured that needs to be published.
+// MonitoredItems queue their sampled values in the subscription. Each MonitoredItem has its own
+// queue; the background task sends the queued values with the next publish responses.
 type Subscription struct {
 	srv                       *SubscriptionService
 	Session                   *session
@@ -268,13 +269,26 @@ type Subscription struct {
 	RevisedPublishingInterval float64
 	RevisedLifetimeCount      uint32
 	RevisedMaxKeepAliveCount  uint32
-	Channel                   *uasc.SecureChannel
-	SequenceID                uint32
+	// MaxNotificationsPerPublish is the largest number of notifications
+	// the client accepts in one publish response. Zero means no limit.
+	MaxNotificationsPerPublish uint32
+	Channel                    *uasc.SecureChannel
+
+	// send sends a publish response. It is nil outside of tests, where the
+	// response goes to Channel.
+	send       func(reqID uint32, resp ua.Response) error
+	SequenceID uint32
 	//SeqNums                   map[uint32]struct{}
 	T *time.Ticker
 
-	NotifyChannel chan *ua.MonitoredItemNotification
 	ModifyChannel chan *ua.ModifySubscriptionRequest
+
+	// queues holds the notification queue of each MonitoredItem of the
+	// subscription by MonitoredItem id. queueSeq numbers the queued values
+	// in sample order across all queues.
+	queueMu  sync.Mutex
+	queues   map[uint32]*notificationQueue
+	queueSeq uint64
 
 	// the running flag and shutdown channel are used to signal the background task that it should stop.
 	// multiple places can kill the subscription so make sure you check the running flag using the mutex
@@ -287,8 +301,8 @@ type Subscription struct {
 func NewSubscription() *Subscription {
 	return &Subscription{
 		//SeqNums:       map[uint32]struct{}{},
-		NotifyChannel: make(chan *ua.MonitoredItemNotification, 100),
 		ModifyChannel: make(chan *ua.ModifySubscriptionRequest, 2),
+		queues:        map[uint32]*notificationQueue{},
 		shutdown:      make(chan struct{}),
 	}
 }
@@ -297,6 +311,7 @@ func (s *Subscription) Update(req *ua.ModifySubscriptionRequest) {
 	s.RevisedPublishingInterval = req.RequestedPublishingInterval
 	s.RevisedLifetimeCount = req.RequestedLifetimeCount
 	s.RevisedMaxKeepAliveCount = req.RequestedMaxKeepAliveCount
+	s.MaxNotificationsPerPublish = req.MaxNotificationsPerPublish
 }
 
 func (s *Subscription) Start() {
@@ -329,11 +344,27 @@ func (s *Subscription) keepalive(pubreq PubReq) error {
 		Results:                  []ua.StatusCode{},
 		DiagnosticInfos:          []*ua.DiagnosticInfo{},
 	}
-	err := s.Channel.SendResponseWithContext(context.Background(), pubreq.ID, response)
-	if err != nil {
-		return err
+	return s.sendResponse(pubreq.ID, response)
+}
+
+// sendResponse sends a publish response for the request with the given id.
+func (s *Subscription) sendResponse(reqID uint32, resp ua.Response) error {
+	if s.send != nil {
+		return s.send(reqID, resp)
 	}
-	return nil
+	return s.Channel.SendResponseWithContext(context.Background(), reqID, resp)
+}
+
+// notificationLimit returns the largest number of notifications for the next
+// publish response: the smaller of the client's maxNotificationsPerPublish
+// (Part 4 §5.14.2.2 Table 82, §5.14.3.2 Table 84) and the server's limit,
+// where zero means no limit.
+func (s *Subscription) notificationLimit() uint32 {
+	limit := s.MaxNotificationsPerPublish
+	if srvLimit := s.srv.srv.cfg.cap.MaxNotificationsPerPublish; srvLimit > 0 && (limit == 0 || srvLimit < limit) {
+		limit = srvLimit
+	}
+	return limit
 }
 
 // this function should be run as a go-routine and will handle sending data out
@@ -361,25 +392,26 @@ func (s *Subscription) run() {
 	// The sending state always runs to completion.
 	//
 	// L0 waits for our notification interval to expire.  Any notifications that come in
-	// while waiting will be stored in the publishQueue.  Once the interval expires, we'll move on to L2 if we've got notifications.
-	// In L2 we wait for a publish request.  If we get one, we'll publish the notifications in the publishQueue.  If we don't
+	// while waiting are held in the queues of their MonitoredItems.  Once the interval expires, we'll move on to L2 if we've got notifications.
+	// In L2 we wait for a publish request.  If we get one, we'll publish the queued notifications.  If we don't
 	// get a publish request, we'll continue to count intervals without a publish request.
 	//
 	// In L0 and L2, If we get to the lifetime count without a publish request, we'll kill the subscription.
+	//
+	// When a publish response could not carry every queued notification (more is set), the rest is sent
+	// with the next publish request without waiting for the interval, so we skip L0 (Part 4 §5.14.1.2,
+	// Table 79 rows 5 and 10: a Publish request received while MoreNotifications is TRUE returns notifications;
+	// §5.14.1.4 Table 81, ReturnNotifications).
+	more := false
 	for {
-		// we don't need to do anything if we don't have at least one thing to publish so lets get that first
-		publishQueue := make(map[uint32]*ua.MonitoredItemNotification)
-
 		// Collect notifications until our publication interval is ready
 	L0:
-		for {
+		for !more {
 			select {
 			case <-s.shutdown:
 				return
-			case newNotification := <-s.NotifyChannel:
-				publishQueue[newNotification.ClientHandle] = newNotification
 			case <-s.T.C:
-				if len(publishQueue) == 0 {
+				if !s.hasQueued() {
 					// nothing to publish, increment the keepalive counter and send a keepalive if it
 					// has been enough intervals.
 					keepalive_counter++
@@ -423,9 +455,6 @@ func (s *Subscription) run() {
 			case pubreq = <-s.Session.PublishRequests:
 				// once we get a publish request, we should move on to publish them back
 				break L2
-			case newNotification := <-s.NotifyChannel:
-				publishQueue[newNotification.ClientHandle] = newNotification
-
 			case <-s.T.C:
 				// we had another tick without a publish request.
 				lifetime_counter++
@@ -439,6 +468,23 @@ func (s *Subscription) run() {
 		}
 		lifetime_counter = 0
 		keepalive_counter = 0
+
+		// Take the values queued since the last publish response, in sample order, as many as
+		// the client and the server allow in one response.
+		var final_items []*ua.MonitoredItemNotification
+		final_items, more = s.drainQueues(s.notificationLimit())
+		if len(final_items) == 0 {
+			// The items that held the queued values were deleted in the meantime: answer with a
+			// keep-alive (Part 4 §5.14.1.2, Table 79 row 11: no notifications available). Table 79
+			// has no row for this while MoreNotifications is TRUE; a keep-alive is sent then too.
+			if err := s.keepalive(pubreq); err != nil {
+				if s.srv.srv.cfg.logger != nil {
+					s.srv.srv.cfg.logger.Warn("problem sending keepalive to subscription #%d: %v", s.ID, err)
+				}
+				return
+			}
+			continue
+		}
 
 		s.SequenceID++
 		if s.SequenceID == 0 {
@@ -454,13 +500,6 @@ func (s *Subscription) run() {
 		//a := pubreq.Req.SubscriptionAcknowledgements[x]
 		//delete(s.SeqNums, a.SequenceNumber)
 		//}
-
-		final_items := make([]*ua.MonitoredItemNotification, len(publishQueue))
-		i := 0
-		for k := range publishQueue {
-			final_items[i] = publishQueue[k]
-			i++
-		}
 
 		dcn := ua.DataChangeNotification{
 			MonitoredItems:  final_items,
@@ -487,13 +526,13 @@ func (s *Subscription) run() {
 				AdditionalHeader:   ua.NewExtensionObject(nil),
 			},
 			SubscriptionID:           s.ID,
-			MoreNotifications:        false,
+			MoreNotifications:        more,
 			NotificationMessage:      &msg,
 			AvailableSequenceNumbers: []uint32{}, // an empty array indicates taht we don't support retransmission of messages
 			Results:                  []ua.StatusCode{},
 			DiagnosticInfos:          []*ua.DiagnosticInfo{},
 		}
-		err := s.Channel.SendResponseWithContext(context.Background(), pubreq.ID, response)
+		err := s.sendResponse(pubreq.ID, response)
 		if err != nil {
 			if s.srv.srv.cfg.logger != nil {
 				s.srv.srv.cfg.logger.Error("problem sending channel response: %v", err)
@@ -502,7 +541,7 @@ func (s *Subscription) run() {
 			return
 		}
 		if s.srv.srv.cfg.logger != nil {
-			s.srv.srv.cfg.logger.Debug("Published %d items OK for %d", len(publishQueue), s.ID)
+			s.srv.srv.cfg.logger.Debug("Published %d items OK for %d", len(final_items), s.ID)
 		}
 		// wait till we've got a publish request.
 	}
