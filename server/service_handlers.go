@@ -111,7 +111,11 @@ func (s *Server) handleService(ctx context.Context, sc *uasc.SecureChannel, reqI
 	typeID := ua.ServiceTypeID(req)
 	h, ok := s.handlers[typeID]
 	if ok {
-		resp, err = h(sc, req, reqID)
+		if status := s.checkSession(typeID, req); status != ua.StatusOK {
+			err = status
+		} else {
+			resp, err = h(sc, req, reqID)
+		}
 	} else {
 		if typeID == 0 {
 			if s.cfg.logger != nil {
