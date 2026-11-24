@@ -359,3 +359,5 @@ func (b *Buffer) Write(d []byte) {
 	}
 	b.buf = append(b.buf, d...)
 }
+
+// CI filter test, not for merging.
