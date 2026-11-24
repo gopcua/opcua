@@ -50,7 +50,8 @@ jobs:
         id: filter-armv7
         with:
           # ua, uasc and the packages their tests import (go list -test -deps),
-          # plus the files that decide how they are built and tested.
+          # plus the files that decide how they are built and tested. The
+          # armv7 job also needs the code filter, so ua/uadoc.md alone runs nothing.
           filters: |
             armv7:
               - 'ua/**'
@@ -163,7 +164,9 @@ jobs:
   armv7:
     name: Test linux/arm/v7 (ua, uasc)
     needs: [detect-changes]
-    if: needs.detect-changes.outputs.all == 'true' || needs.detect-changes.outputs.armv7 == 'true'
+    if: >-
+      needs.detect-changes.outputs.all == 'true' ||
+      (needs.detect-changes.outputs.code == 'true' && needs.detect-changes.outputs.armv7 == 'true')
     runs-on: depot-ubuntu-24.04
     timeout-minutes: 30
 
@@ -240,7 +243,7 @@ jobs:
             [ "$TEST" = success ] || fail=1
             [ "$ARCH" = success ] || fail=1
           fi
-          if [ "$RUN_ALL" = true ] || [ "$RUN_ARMV7" = true ]; then
+          if [ "$RUN_ALL" = true ] || { [ "$RUN_CODE" = true ] && [ "$RUN_ARMV7" = true ]; }; then
             [ "$ARMV7" = success ] || fail=1
           fi
 
