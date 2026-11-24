@@ -4,28 +4,40 @@ on:
     branches:
       - main
   pull_request:
+  merge_group:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   test:
     name: Test ${{ matrix.os }} go${{ matrix.go }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
     strategy:
+      fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [depot-ubuntu-24.04, depot-windows-2025-4]
         go: ["1.23.x", "1.24.x"]
 
     steps:
       - name: Check out code into the Go module directory
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Setup Go ${{ matrix.go }}
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
           go-version: ${{ matrix.go }}
-        id: go
+          # Depot shares one cache across all branches of the repository, so a
+          # pull request from a fork must not write a cache that main restores.
+          cache: ${{ github.event_name != 'pull_request' }}
 
       - name: Setup Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.11.X"
           architecture: "x64"
@@ -37,3 +49,60 @@ jobs:
 
       - name: Run Tests
         run: make test integration conformance
+
+  # A field that needs 64-bit alignment, or an int that holds a wire value,
+  # behaves differently on 32-bit and arm. v0.9.2 shipped a panic on 386
+  # (#962) because CI only ran amd64.
+  arch:
+    name: Test ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux/386
+            runner: depot-ubuntu-24.04
+            target: test-386
+          - name: linux/arm64
+            runner: depot-ubuntu-24.04-arm
+            target: test conformance
+          # Graviton4 cannot run 32-bit arm code, so arm/v7 runs under QEMU.
+          - name: linux/arm/v7 (ua, uasc)
+            runner: depot-ubuntu-24.04
+            target: test-armv7
+            qemu: true
+
+    steps:
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Setup Go
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+        with:
+          go-version: "1.24.x"
+          # Depot shares one cache across all branches of the repository, so a
+          # pull request from a fork must not write a cache that main restores.
+          cache: ${{ github.event_name != 'pull_request' }}
+
+      - name: Setup QEMU
+        if: matrix.qemu
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3.7.0
+        with:
+          platforms: arm
+
+      - name: Run Tests
+        run: make ${{ matrix.target }}
+
+  # The one required check for branch protection: lists every job that
+  # blocks a merge and never skips.
+  ci:
+    name: CI
+    if: always()
+    needs: [test, arch]
+    runs-on: ubuntu-latest # only reads the results of the jobs above
+    timeout-minutes: 5
+    steps:
+      - name: Fail if any required job did not succeed
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped')
+        run: exit 1

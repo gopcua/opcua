@@ -23,6 +23,16 @@ selfintegration:
 examples:
 	go build -o build/ ./examples/...
 
+# The race detector is not available on 386 or arm/v7. Both targets need a
+# Linux host; for arm/v7 register QEMU first with
+# docker run --privileged --rm tonistiigi/binfmt --install arm
+test-386:
+	GOOS=linux GOARCH=386 go test -count=1 ./...
+
+# arm/v7 runs under emulation, so only the packages that decode and frame wire data.
+test-armv7:
+	GOOS=linux GOARCH=arm GOARM=7 go test -count=1 ./ua/... ./uasc/...
+
 test-race:
 	go test -count=1 -race ./...
 	go test -count=1 -race -v -tags=integration ./tests/python...
@@ -39,4 +49,4 @@ gen:
 release:
 	GITHUB_TOKEN=$$(security find-generic-password -gs GITHUB_TOKEN -w) goreleaser --clean
 
-.PHONY: all examples gen integration conformance test release
+.PHONY: all examples gen integration conformance test test-386 test-armv7 release
