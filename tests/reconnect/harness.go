@@ -136,10 +136,14 @@ type recorder struct {
 	// that redials the instant it sees the reset is already refused.
 	dropStarted bool
 	// dropApplied is set once the close has succeeded; the scenario waits for
-	// it. dropAt is that instant: a connection accepted before it is not a
-	// reconnection attempt.
+	// it.
 	dropApplied bool
-	dropAt      time.Time
+	// dropAt is taken with dropStarted, before the close. The reset goes out
+	// inside the close, and a client can redial, ask and be delivered to
+	// before the close returns, so an instant taken after it can postdate a
+	// delivery the drop caused. A connection accepted before dropAt is not a
+	// reconnection attempt.
+	dropAt time.Time
 
 	lastSeq        uint32   // highest notification sequence created so far
 	seqAtDrop      uint32   // lastSeq when the drop was applied
@@ -352,9 +356,12 @@ func (o *recorder) isDropStarted() bool {
 	return o.dropStarted
 }
 
+// recordDropStarted marks the drop as under way and takes dropAt; see that
+// field for why both happen before the close.
 func (o *recorder) recordDropStarted() {
 	o.mu.Lock()
 	o.dropStarted = true
+	o.dropAt = time.Now()
 	o.mu.Unlock()
 }
 
@@ -364,11 +371,11 @@ func (o *recorder) recordDropStarted() {
 // the further lost notifications are created, so they are not counted as
 // notifications the stream lost. It also freezes the length of the request
 // log, so requestTimelineAtDrop names the requests that arrived before the
-// loss and none that a redial recorded after it.
+// loss and none that a redial recorded after it. Unlike dropAt, both describe
+// the loss, which the close completes.
 func (o *recorder) recordDropApplied(furtherLost int) {
 	o.mu.Lock()
 	o.dropApplied = true
-	o.dropAt = time.Now()
 	o.seqAtDrop = o.lastSeq
 	o.requestsAtDrop = len(o.requests)
 	for i := 0; i < furtherLost; i++ {
@@ -396,7 +403,7 @@ func (o *recorder) requestTimelineAtDrop() string {
 	return strings.Join(parts, ", ")
 }
 
-func (o *recorder) dropAppliedAt() time.Time {
+func (o *recorder) dropStartedAt() time.Time {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	return o.dropAt
@@ -703,8 +710,8 @@ type runRecord struct {
 	HeldSeq uint32
 	// LastSeq is the highest sequence number the server created.
 	LastSeq uint32
-	// DropAt is when the connection was closed, not when the drop was
-	// commanded.
+	// DropAt is taken just before the connection is closed, not when the
+	// drop was commanded; see recorder.dropAt.
 	DropAt time.Time
 	// DropConn is the connection generation the drop was applied to. A
 	// request on a higher one arrived on a reconnect; a fixed 2 would miscount
@@ -1053,7 +1060,7 @@ func (s *server) dropWatcher() {
 	s.mu.Unlock()
 	applied := false
 	if conn != nil {
-		// Marked before the close, so a redial after the reset is refused.
+		// Marked and timestamped before the close; see recorder.dropAt.
 		s.rec.recordDropStarted()
 		_ = conn.SetLinger(0)
 		applied = conn.Close() == nil
@@ -1721,7 +1728,7 @@ func runScenario(opts runOptions) runRecord {
 	dropDeadline := time.After(2 * time.Second)
 	for {
 		if srv.rec.isDropApplied() {
-			out.DropAt = srv.rec.dropAppliedAt()
+			out.DropAt = srv.rec.dropStartedAt()
 			out.DropConn = srv.rec.heldPublishConn()
 			break
 		}
