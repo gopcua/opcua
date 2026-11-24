@@ -7,6 +7,7 @@ package uasc
 import (
 	"encoding/binary"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gopcua/opcua/debug"
@@ -34,7 +35,7 @@ type channelInstance struct {
 	algo            *uapolicy.EncryptionAlgorithm
 	maxBodySize     uint32
 
-	bytesSent uint64 // atomic.Load/Store - needs to be aligned for 32bit systems
+	bytesSent atomic.Uint64 // always 64-bit aligned, also on 32bit systems
 	// bytesReceived    uint64
 	messagesSent uint32 // atomic.Load/Store
 	// messagesReceived uint32
