@@ -21,7 +21,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [depot-ubuntu-24.04, depot-windows-2025]
+        os: [depot-ubuntu-24.04, depot-windows-2025-4]
         go: ["1.23.x", "1.24.x"]
 
     steps:
