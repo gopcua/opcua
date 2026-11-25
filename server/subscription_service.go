@@ -41,6 +41,18 @@ func (s *SubscriptionService) DeleteSubscription(id uint32) {
 
 }
 
+// hasSubscriptions reports whether the session owns at least one subscription.
+func (s *SubscriptionService) hasSubscriptions(session *session) bool {
+	s.Mu.Lock()
+	defer s.Mu.Unlock()
+	for _, sub := range s.Subs {
+		if sub.Session == session {
+			return true
+		}
+	}
+	return false
+}
+
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.13.2
 func (s *SubscriptionService) CreateSubscription(sc *uasc.SecureChannel, r ua.Request, reqID uint32) (ua.Response, error) {
 	if s.srv.cfg.logger != nil {
@@ -158,8 +170,20 @@ func (s *SubscriptionService) Publish(sc *uasc.SecureChannel, r ua.Request, reqI
 		return response, nil
 	}
 
+	// Part 4, 5.13.5: a session without subscriptions gets Bad_NoSubscription
+	// right away. Queueing the request would leave the client waiting forever.
+	if !s.hasSubscriptions(session) {
+		return &ua.PublishResponse{
+			ResponseHeader:           responseHeader(req.RequestHeader.RequestHandle, ua.StatusBadNoSubscription),
+			NotificationMessage:      &ua.NotificationMessage{NotificationData: []*ua.ExtensionObject{}},
+			AvailableSequenceNumbers: []uint32{},
+			Results:                  []ua.StatusCode{},
+			DiagnosticInfos:          []*ua.DiagnosticInfo{},
+		}, nil
+	}
+
 	select {
-	case session.PublishRequests <- PubReq{Req: req, ID: reqID}:
+	case session.PublishRequests <- PubReq{Req: req, ID: reqID, Channel: sc}:
 	default:
 		if s.srv.cfg.logger != nil {
 			s.srv.cfg.logger.Warn("Too many publish reqs.")
@@ -254,6 +278,20 @@ type PubReq struct {
 
 	// The request ID (from the header) of the publish request.  This has to be used when replying.
 	ID uint32
+
+	// The secure channel the publish request arrived on. The response has to
+	// go back on this channel: a client that lost its connection re-activates
+	// the session on a new secure channel and keeps publishing from there, while
+	// the subscription was created on the old, now dead, channel.
+	Channel *uasc.SecureChannel
+}
+
+// channelFor returns the secure channel a publish response has to be sent on.
+func (s *Subscription) channelFor(pubreq PubReq) *uasc.SecureChannel {
+	if pubreq.Channel != nil {
+		return pubreq.Channel
+	}
+	return s.Channel
 }
 
 // This is the type that with its run() function will work in the bakground fullfilling subscription
@@ -329,11 +367,7 @@ func (s *Subscription) keepalive(pubreq PubReq) error {
 		Results:                  []ua.StatusCode{},
 		DiagnosticInfos:          []*ua.DiagnosticInfo{},
 	}
-	err := s.Channel.SendResponseWithContext(context.Background(), pubreq.ID, response)
-	if err != nil {
-		return err
-	}
-	return nil
+	return s.channelFor(pubreq).SendResponseWithContext(context.Background(), pubreq.ID, response)
 }
 
 // this function should be run as a go-routine and will handle sending data out
@@ -366,9 +400,12 @@ func (s *Subscription) run() {
 	// get a publish request, we'll continue to count intervals without a publish request.
 	//
 	// In L0 and L2, If we get to the lifetime count without a publish request, we'll kill the subscription.
+
+	// notifications collected for the next publish response. The queue is only
+	// reset after a response was actually sent: if the send fails the data is
+	// kept for the next publish request.
+	publishQueue := make(map[uint32]*ua.MonitoredItemNotification)
 	for {
-		// we don't need to do anything if we don't have at least one thing to publish so lets get that first
-		publishQueue := make(map[uint32]*ua.MonitoredItemNotification)
 
 		// Collect notifications until our publication interval is ready
 	L0:
@@ -387,12 +424,13 @@ func (s *Subscription) run() {
 						keepalive_counter = 0
 						select {
 						case pubreq := <-s.Session.PublishRequests:
-							err := s.keepalive(pubreq)
-							if err != nil {
+							// A send error only means this publish request cannot be answered
+							// (its channel is gone). The subscription belongs to the session,
+							// not to the channel: it only expires via the lifetime counter.
+							if err := s.keepalive(pubreq); err != nil {
 								if s.srv.srv.cfg.logger != nil {
 									s.srv.srv.cfg.logger.Warn("problem sending keepalive to subscription #%d: %v", s.ID, err)
 								}
-								return
 							}
 						default:
 							lifetime_counter++
@@ -493,17 +531,19 @@ func (s *Subscription) run() {
 			Results:                  []ua.StatusCode{},
 			DiagnosticInfos:          []*ua.DiagnosticInfo{},
 		}
-		err := s.Channel.SendResponseWithContext(context.Background(), pubreq.ID, response)
-		if err != nil {
+		if err := s.channelFor(pubreq).SendResponseWithContext(context.Background(), pubreq.ID, response); err != nil {
+			// The channel of this publish request is gone (the client reconnected
+			// or went away). Keep the notifications for the next publish request;
+			// the subscription only expires via the lifetime counter.
 			if s.srv.srv.cfg.logger != nil {
-				s.srv.srv.cfg.logger.Error("problem sending channel response: %v", err)
-				s.srv.srv.cfg.logger.Error("Killing subscription %d", s.ID)
+				s.srv.srv.cfg.logger.Warn("problem sending publish response for subscription #%d: %v", s.ID, err)
 			}
-			return
+			continue
 		}
 		if s.srv.srv.cfg.logger != nil {
 			s.srv.srv.cfg.logger.Debug("Published %d items OK for %d", len(publishQueue), s.ID)
 		}
+		publishQueue = make(map[uint32]*ua.MonitoredItemNotification)
 		// wait till we've got a publish request.
 	}
 }
