@@ -23,6 +23,7 @@ import (
 	"crypto/x509/pkix"
 	"fmt"
 	"math/big"
+	"net"
 	"net/url"
 	"testing"
 	"time"
@@ -93,15 +94,18 @@ func TestSecurityModeRoundtrip_Part6_674(t *testing.T) {
 		name   string
 		policy string
 		mode   ua.MessageSecurityMode
-		port   int
 	}{
-		{"None", "None", ua.MessageSecurityModeNone, 48671},
-		{"Sign", "Basic256Sha256", ua.MessageSecurityModeSign, 48672},
-		{"SignAndEncrypt", "Basic256Sha256", ua.MessageSecurityModeSignAndEncrypt, 48673},
+		{"None", "None", ua.MessageSecurityModeNone},
+		{"Sign", "Basic256Sha256", ua.MessageSecurityModeSign},
+		{"SignAndEncrypt", "Basic256Sha256", ua.MessageSecurityModeSignAndEncrypt},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// A port the kernel picks, not a fixed one: 4867x lies in
+			// Linux's ephemeral range, where any outgoing connection of
+			// another test can hold it ("bind: address already in use").
+			port := freeTCPPort(t)
 			srvCert, srvKey := genSelfSignedCert(t, "urn:gopcua:conformance:server")
 			cliCert, cliKey := genSelfSignedCert(t, "urn:gopcua:conformance:client")
 
@@ -110,7 +114,7 @@ func TestSecurityModeRoundtrip_Part6_674(t *testing.T) {
 				server.EnableSecurity("Basic256Sha256", ua.MessageSecurityModeSign),
 				server.EnableSecurity("Basic256Sha256", ua.MessageSecurityModeSignAndEncrypt),
 				server.EnableAuthMode(ua.UserTokenTypeAnonymous),
-				server.EndPoint("localhost", tt.port),
+				server.EndPoint("localhost", port),
 				server.PrivateKey(srvKey),
 				server.Certificate(srvCert),
 			)
@@ -119,7 +123,7 @@ func TestSecurityModeRoundtrip_Part6_674(t *testing.T) {
 
 			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 			defer cancel()
-			addr := fmt.Sprintf("opc.tcp://localhost:%d", tt.port)
+			addr := fmt.Sprintf("opc.tcp://localhost:%d", port)
 
 			// Discover the endpoint the way a real client does, so the
 			// connection uses the server-provided certificate (chain).
@@ -169,4 +173,13 @@ func TestSecurityModeRoundtrip_Part6_674(t *testing.T) {
 			require.NoError(t, err, "symmetric request in mode %s", tt.mode)
 		})
 	}
+}
+
+// freeTCPPort returns a port free on localhost now, chosen by the kernel.
+func freeTCPPort(t *testing.T) int {
+	t.Helper()
+	ln, err := net.Listen("tcp", "localhost:0")
+	require.NoError(t, err)
+	defer ln.Close()
+	return ln.Addr().(*net.TCPAddr).Port
 }
