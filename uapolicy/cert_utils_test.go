@@ -1,10 +1,17 @@
 package uapolicy
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"crypto/sha1"
+	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/pem"
+	"math/big"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -121,4 +128,23 @@ func TestParseCertificate_Empty(t *testing.T) {
 	_, err := ParseCertificate(nil)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "no certificates found")
+}
+
+// PublicKey must report a certificate with no RSA key instead of panicking.
+func TestPublicKey_NonRSAKey(t *testing.T) {
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+
+	tmpl := &x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject:      pkix.Name{CommonName: "ecdsa"},
+		NotBefore:    time.Now().Add(-time.Hour),
+		NotAfter:     time.Now().Add(time.Hour),
+	}
+	cert, err := x509.CreateCertificate(rand.Reader, tmpl, tmpl, &key.PublicKey, key)
+	require.NoError(t, err)
+
+	got, err := PublicKey(cert)
+	require.ErrorIs(t, err, ErrNotRSA)
+	require.Nil(t, got)
 }

@@ -31,7 +31,12 @@ type DiagnosticInfo struct {
 }
 
 func (d *DiagnosticInfo) Decode(b []byte) (int, error) {
-	buf := NewBuffer(b)
+	return d.decode(b, 0)
+}
+
+// decode implements nestedDecoder.
+func (d *DiagnosticInfo) decode(b []byte, depth int) (int, error) {
+	buf := newBuffer(b, depth)
 	d.EncodingMask = buf.ReadByte()
 	if d.Has(DiagnosticInfoSymbolicID) {
 		d.SymbolicID = buf.ReadInt32()

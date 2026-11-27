@@ -8,6 +8,7 @@ import (
 	"encoding/binary"
 	"io"
 	"math"
+	"reflect"
 	"time"
 
 	"github.com/gopcua/opcua/errors"
@@ -33,10 +34,18 @@ type Buffer struct {
 	buf []byte
 	pos int
 	err error
+	// depth is the number of values the buffer is nested in, see ReadStruct.
+	depth int
 }
 
 func NewBuffer(b []byte) *Buffer {
 	return &Buffer{buf: b}
+}
+
+// newBuffer returns a Buffer for a value nested depth levels deep, which
+// keeps the nesting level of the decode it is part of.
+func newBuffer(b []byte, depth int) *Buffer {
+	return &Buffer{buf: b, depth: depth}
 }
 
 func (b *Buffer) Error() error {
@@ -169,17 +178,41 @@ func (b *Buffer) ReadBytes() []byte {
 	return d
 }
 
+// maxDecodeNesting is the number of nesting levels a decoder accepts.
+// OPC 10000-6 §5.1.8 requires decoders to support at least 100 nesting
+// levels and to report an error above what they support.
+const maxDecodeNesting = 100
+
+// nestedDecoder is implemented by the built-in types that hold other values
+// and therefore nest: a Variant can hold a Variant, and a DataValue, a
+// DiagnosticInfo and the body of an ExtensionObject nest the same way.
+type nestedDecoder interface {
+	// decode reads the value from b, which sits depth nesting levels deep
+	// in the value that holds it.
+	decode(b []byte, depth int) (int, error)
+}
+
 func (b *Buffer) ReadStruct(r interface{}) {
 	if b.err != nil {
+		return
+	}
+	// every value read here sits inside the value b decodes, one nesting
+	// level deeper.
+	depth := b.depth + 1
+	if depth > maxDecodeNesting {
+		b.err = StatusBadEncodingLimitsExceeded
 		return
 	}
 	var n int
 	var err error
 	switch x := r.(type) {
+	case nestedDecoder:
+		n, err = x.decode(b.buf[b.pos:], depth)
 	case BinaryDecoder:
 		n, err = x.Decode(b.buf[b.pos:])
 	default:
-		n, err = Decode(b.buf[b.pos:], r)
+		val := reflect.ValueOf(r)
+		n, err = decode(b.buf[b.pos:], val, val.Type().String(), depth)
 	}
 	if err != nil {
 		b.err = err

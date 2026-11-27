@@ -48,7 +48,12 @@ func NewExtensionObject(value interface{}) *ExtensionObject {
 }
 
 func (e *ExtensionObject) Decode(b []byte) (int, error) {
-	buf := NewBuffer(b)
+	return e.decode(b, 0)
+}
+
+// decode implements nestedDecoder.
+func (e *ExtensionObject) decode(b []byte, depth int) (int, error) {
+	buf := newBuffer(b, depth)
 	e.TypeID = new(ExpandedNodeID)
 	buf.ReadStruct(e.TypeID)
 
@@ -62,7 +67,9 @@ func (e *ExtensionObject) Decode(b []byte) (int, error) {
 		return buf.Pos(), buf.Error()
 	}
 
-	body := NewBuffer(buf.ReadN(int(length)))
+	// the body is what the extension object holds, so it nests at the same
+	// depth instead of starting a new decode.
+	body := newBuffer(buf.ReadN(int(length)), buf.depth)
 	if buf.Error() != nil {
 		return buf.Pos(), buf.Error()
 	}

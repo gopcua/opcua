@@ -15,6 +15,10 @@ import (
 var (
 	// MaxVariantArrayLength sets a limit on the number of elements in array
 	MaxVariantArrayLength = 0xffff
+
+	// MaxVariantArrayDimensions sets a limit on the number of dimensions of
+	// a multi-dimensional array. The default is 32.
+	MaxVariantArrayDimensions = 32
 )
 
 const (
@@ -116,7 +120,12 @@ func (m *Variant) Value() interface{} {
 
 // Decode implements the codec interface.
 func (m *Variant) Decode(b []byte) (int, error) {
-	buf := NewBuffer(b)
+	return m.decode(b, 0)
+}
+
+// decode implements nestedDecoder.
+func (m *Variant) decode(b []byte, depth int) (int, error) {
+	buf := newBuffer(b, depth)
 	m.mask = buf.ReadByte()
 
 	// a null value specifies that no other fields are encoded
@@ -170,6 +179,11 @@ func (m *Variant) Decode(b []byte) (int, error) {
 	if m.Has(VariantArrayDimensions) {
 		m.arrayDimensionsLength = buf.ReadInt32()
 		if m.arrayDimensionsLength < 0 {
+			return buf.Pos(), StatusBadEncodingLimitsExceeded
+		}
+		// the number of dimensions is an implementation limit, see
+		// MaxVariantArrayDimensions
+		if int(m.arrayDimensionsLength) > MaxVariantArrayDimensions {
 			return buf.Pos(), StatusBadEncodingLimitsExceeded
 		}
 		// arrayDimensionsLength comes straight off the wire and sizes the
@@ -335,12 +349,10 @@ func (m *Variant) decodeValue(buf *Buffer) interface{} {
 		buf.ReadStruct(v)
 		return v
 	case TypeIDVariant:
-		// todo(fs): limit recursion depth to 100
 		v := new(Variant)
 		buf.ReadStruct(v)
 		return v
 	case TypeIDDiagnosticInfo:
-		// todo(fs): limit recursion depth to 100
 		v := new(DiagnosticInfo)
 		buf.ReadStruct(v)
 		return v

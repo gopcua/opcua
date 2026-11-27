@@ -5,9 +5,11 @@
 // the fixture they all run against; it is not a row.
 //
 // The fixture is the in-tree gopcua server on an ephemeral port, and a real
-// gopcua client connected to it over the wire. The rows score the
-// UserIdentityToken the client puts in its ActivateSession request after
-// reading an endpoint's USERNAME UserTokenPolicies. The server lists those
+// gopcua client connected to it over the wire. The rows score the client's
+// end of the session handshake: the UserIdentityToken it puts in its
+// ActivateSession request after reading an endpoint's USERNAME
+// UserTokenPolicies, and its refusal of a CreateSession response whose
+// ServerSignature does not verify. The server lists those
 // policies in the order the harness enables its security policies
 // (server/server.go:400-435); a row that needs a list the server
 // cannot build rewrites only the UserIdentityTokens of the real endpoint
@@ -70,11 +72,14 @@ const (
 const rsaOAEPURI = "http://www.w3.org/2001/04/xmlenc#rsa-oaep"
 
 // sessionServer is the in-tree server with its ActivateSession handler
-// replaced. activate receives the first ActivateSession request; later ones
+// replaced. key and cert are the server's own; a row whose replacement
+// CreateSession handler must answer with the server's certificate reads
+// cert. activate receives the first ActivateSession request; later ones
 // are dropped.
 type sessionServer struct {
-	url string
-	key *rsa.PrivateKey
+	url  string
+	key  *rsa.PrivateKey
+	cert []byte
 
 	activate chan *ua.ActivateSessionRequest
 }
@@ -82,8 +87,12 @@ type sessionServer struct {
 // startSessionServer starts the in-tree server on a loopback ephemeral
 // port. It enables None, Basic128Rsa15 and Basic256Sha256, in that order, so
 // every secured endpoint lists the legacy username_basic128rsa15 policy
-// before its own. It returns "" or the reason the fixture could not start.
-func startSessionServer() (*sessionServer, func(), string) {
+// before its own. beforeStart, when given, runs after the ActivateSession
+// handler is registered and before Start, so a row can register a handler
+// of its own that initHandlers keeps (server/service_handlers.go:96); the
+// ServerSignature row replaces CreateSession this way. It returns "" or
+// the reason the fixture could not start.
+func startSessionServer(beforeStart ...func(s *sessionServer, srv *server.Server)) (*sessionServer, func(), string) {
 	port, why := freePort()
 	if why != "" {
 		return nil, func() {}, why
@@ -97,6 +106,7 @@ func startSessionServer() (*sessionServer, func(), string) {
 	s := &sessionServer{
 		url:      fmt.Sprintf("opc.tcp://127.0.0.1:%d", port),
 		key:      key,
+		cert:     cert,
 		activate: make(chan *ua.ActivateSessionRequest, 1),
 	}
 
@@ -114,6 +124,9 @@ func startSessionServer() (*sessionServer, func(), string) {
 	// Registered before Start, so initHandlers keeps it.
 	srv.RegisterHandler(id.ActivateSessionRequest_Encoding_DefaultBinary,
 		s.recordActivateSession)
+	for _, f := range beforeStart {
+		f(s, srv)
+	}
 
 	if err := srv.Start(context.Background()); err != nil {
 		return nil, func() {}, fmt.Sprintf("server start: %v", err)

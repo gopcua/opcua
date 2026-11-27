@@ -282,6 +282,14 @@ func (c *channelInstance) verifyAndDecrypt(m *MessageChunk, r []byte) ([]byte, e
 		b = append(b[:headerLength], p...)
 	}
 
+	if len(b) < headerLength+c.algo.RemoteSignatureLength() {
+		// OPC 10000-6 §6.7.7: "The contents of the MessageChunk shall not be
+		// interpreted until the Message is decrypted and the signature and
+		// sequence number verified." A chunk without room for the signature
+		// cannot validate it.
+		return nil, ua.StatusBadSecurityChecksFailed
+	}
+
 	signature := b[len(b)-c.algo.RemoteSignatureLength():]
 	messageToVerify := b[:len(b)-c.algo.RemoteSignatureLength()]
 
@@ -298,6 +306,14 @@ func (c *channelInstance) verifyAndDecrypt(m *MessageChunk, r []byte) ([]byte, e
 			paddingLength += 1
 		}
 		paddingLength += 1
+	}
+
+	// The padding fills the chunk to a block boundary (OPC 10000-6 §6.7.2.5),
+	// so it can never be longer than the body it pads. A PaddingSize that
+	// says otherwise fails the security check instead of slicing past the
+	// start of the body.
+	if paddingLength > len(messageToVerify)-headerLength {
+		return nil, ua.StatusBadSecurityChecksFailed
 	}
 
 	b = messageToVerify[headerLength : len(messageToVerify)-paddingLength]

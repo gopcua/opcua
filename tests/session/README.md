@@ -3,19 +3,23 @@
 The shared contract for these suites is in `../README.md`; this file holds
 only what is specific to the session package.
 
-The rows score what the **client** does with the `securityPolicyUri` of a
+Two rows score what the **client** does with the `securityPolicyUri` of a
 USERNAME UserTokenPolicy, as OPC 10000-4 §7.41 (v1.05) defines it: "The
 security policy to use when encrypting or signing the UserIdentityToken
 when it is passed to the Server in the ActivateSession request [...] The
 security policy for the SecureChannel is used if this value is null or
 empty." The conformance unit is OPC 10000-7's "Security User Name Password
 Client". The ISSUEDTOKEN halves of the same sentences are not scored;
-NOT-TESTED.md says why.
+NOT-TESTED.md says why. A third row, `unverified_server_signature_fails_connect_test.go`,
+scores the handshake those rows ride on: OPC 10000-4 §6.1.8 (v1.05),
+"The ClientSignature and UserTokenSignature shall not be computed until
+the ServerSignature is validated."
 
-Every row scores the UserIdentityToken of the ActivateSession request the
-server receives: its PolicyID and the EncryptionAlgorithm it names. No row
-keys on whether Connect succeeded, because the server checks no
-credentials.
+Each of the two UserTokenPolicy rows scores the UserIdentityToken of the
+ActivateSession request the server receives: its PolicyID and the
+EncryptionAlgorithm it names. Neither keys on whether Connect succeeded,
+because the server checks no credentials. The ServerSignature row keys on
+Connect failing and on no ActivateSession request arriving at all.
 
 ## The fixture
 
@@ -32,6 +36,9 @@ credentials.
   `Start` is kept (server/service_handlers.go:96). The replacement records
   the request and answers Good with a fresh ServerNonce. Unlike the in-tree
   handler, it does not look up the session or verify the client signature.
+  The ServerSignature row replaces the CreateSession handler the same way,
+  through a hook `startSessionServer` runs before `Start`; its replacement
+  answers with the signature the channel would sign, one byte flipped.
 - **The client is the real `opcua.Client`**, configured the way an
   application configures it: GetEndpoints, then
   `SecurityFromEndpoint(ep, ua.UserTokenTypeUserName)` and `AuthUsername`.
@@ -105,6 +112,7 @@ No constant stands.
 |---|---|
 | `empty_token_policy_means_the_channels_policy_test.go` | No constant; gopcua passes (measured 2026-11-18). Two library paths fall back to the channel's policy: `SecurityFromEndpoint`'s else-branch (config.go:465-469) and `EncryptUserPassword` (uasc/secure_channel_crypto.go:67-70). Measured mutants: setting the else-branch to `ua.SecurityPolicyURINone` sends the password in the clear and turns the row red. Deleting either fallback alone leaves it green, because the other one covers. Deleting both makes `uapolicy.Asymmetric("")` fail before anything is sent, and the row declines. |
 | `legacy_first_username_policies_use_the_endpoints_own_test.go` | Constant deleted when the suite was rebased onto #914; gopcua passes (measured 2026-11-18). `SecurityFromEndpoint` takes the first USERNAME policy that names the endpoint's own SecurityPolicy or none (config.go:436-447). Before #914 it took the first policy whose TokenType matched, and both arms sent the legacy PolicyID with `rsa-1_5`. A half fix that sends the right PolicyID under the legacy algorithm fails both arms (measured). |
+| `unverified_server_signature_fails_connect_test.go` | No constant; gopcua passes (measured 2026-11-26). CreateSession returns the verification error and Connect hands it back (client.go:860-866). Before the fix, the error was only logged, CreateSession returned no session, and Connect dereferenced the nil session and crashed; reverting the fix fails the row with that crash (measured). |
 
 ## What the package deliberately does not score
 

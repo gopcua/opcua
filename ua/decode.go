@@ -30,12 +30,28 @@ type BinaryDecoder interface {
 	Decode([]byte) (int, error)
 }
 
-func Decode(b []byte, v interface{}) (int, error) {
-	val := reflect.ValueOf(v)
-	return decode(b, val, val.Type().String())
+// decodeBinary decodes v at the nesting depth of the value that holds it.
+// Only the built-in types that nest carry the depth on; other BinaryDecoders
+// own their own recursion.
+func decodeBinary(b []byte, v BinaryDecoder, depth int) (int, error) {
+	if n, ok := v.(nestedDecoder); ok {
+		return n.decode(b, depth)
+	}
+	return v.Decode(b)
 }
 
-func decode(b []byte, val reflect.Value, name string) (n int, err error) {
+func Decode(b []byte, v interface{}) (int, error) {
+	val := reflect.ValueOf(v)
+	return decode(b, val, val.Type().String(), 0)
+}
+
+// decode decodes b into val, which sits depth nesting levels deep in the
+// value that holds it. A nesting level is a struct field, a slice or array
+// element, or a pointer target; past maxDecodeNesting it refuses to decode.
+func decode(b []byte, val reflect.Value, name string, depth int) (n int, err error) {
+	if depth > maxDecodeNesting {
+		return 0, StatusBadEncodingLimitsExceeded
+	}
 	if debugCodec {
 		fmt.Printf("decode: %s has type %v and is a %s, %d bytes\n", name, val.Type(), val.Type().Kind(), len(b))
 		defer func() {
@@ -47,7 +63,7 @@ func decode(b []byte, val reflect.Value, name string) (n int, err error) {
 	switch {
 	case isBinaryDecoder(val):
 		v := val.Interface().(BinaryDecoder)
-		return v.Decode(b)
+		return decodeBinary(b, v, depth)
 	case isTime(val):
 		val.Set(reflect.ValueOf(buf.ReadTime()).Convert(val.Type()))
 	default:
@@ -78,13 +94,13 @@ func decode(b []byte, val reflect.Value, name string) (n int, err error) {
 		case reflect.String:
 			val.SetString(buf.ReadString())
 		case reflect.Slice:
-			return decodeSlice(b, val, name)
+			return decodeSlice(b, val, name, depth)
 		case reflect.Array:
-			return decodeArray(b, val, name)
+			return decodeArray(b, val, name, depth)
 		case reflect.Ptr:
-			return decode(b, val.Elem(), name)
+			return decode(b, val.Elem(), name, depth+1)
 		case reflect.Struct:
-			return decodeStruct(b, val, name)
+			return decodeStruct(b, val, name, depth)
 		default:
 			return 0, errors.Errorf("unsupported type %s", val.Type())
 		}
@@ -92,7 +108,7 @@ func decode(b []byte, val reflect.Value, name string) (n int, err error) {
 	return buf.Pos(), buf.Error()
 }
 
-func decodeStruct(b []byte, val reflect.Value, name string) (int, error) {
+func decodeStruct(b []byte, val reflect.Value, name string, depth int) (int, error) {
 	pos := 0
 	valt := val.Type()
 	for i := 0; i < val.NumField(); i++ {
@@ -107,7 +123,7 @@ func decodeStruct(b []byte, val reflect.Value, name string) (int, error) {
 			// fmt.Printf("decode: %s has type %v and has new value %#v\n", fname, f.Type(), f.Interface())
 		}
 
-		n, err := decode(b[pos:], f, fname)
+		n, err := decode(b[pos:], f, fname, depth+1)
 		if err != nil {
 			return pos, err
 		}
@@ -116,7 +132,7 @@ func decodeStruct(b []byte, val reflect.Value, name string) (int, error) {
 	return pos, nil
 }
 
-func decodeSlice(b []byte, val reflect.Value, name string) (int, error) {
+func decodeSlice(b []byte, val reflect.Value, name string, depth int) (int, error) {
 	buf := NewBuffer(b)
 	n := buf.ReadUint32()
 	if buf.Error() != nil {
@@ -166,7 +182,7 @@ func decodeSlice(b []byte, val reflect.Value, name string) (int, error) {
 		}
 
 		ename := fmt.Sprintf("%s[%d]", name, i)
-		m, err := decode(b[pos:], a.Index(i), ename)
+		m, err := decode(b[pos:], a.Index(i), ename, depth+1)
 		if err != nil {
 			return pos, err
 		}
@@ -177,7 +193,7 @@ func decodeSlice(b []byte, val reflect.Value, name string) (int, error) {
 	return pos, nil
 }
 
-func decodeArray(b []byte, val reflect.Value, name string) (int, error) {
+func decodeArray(b []byte, val reflect.Value, name string, depth int) (int, error) {
 	buf := NewBuffer(b)
 	n := buf.ReadUint32()
 	if buf.Error() != nil {
@@ -220,7 +236,7 @@ func decodeArray(b []byte, val reflect.Value, name string) (int, error) {
 		}
 
 		ename := fmt.Sprintf("%s[%d]", name, i)
-		m, err := decode(b[pos:], a.Index(i), ename)
+		m, err := decode(b[pos:], a.Index(i), ename, depth+1)
 		if err != nil {
 			return pos, err
 		}

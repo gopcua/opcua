@@ -14,7 +14,9 @@
 //
 // Neighbouring rows: legacy_first_username_policies_use_the_endpoints_own_test.go
 // scores an endpoint that lists several USERNAME policies, where this row's
-// lists one. NOT-TESTED.md covers the clause's ECC and RSA_DH sentence.
+// lists one. unverified_server_signature_fails_connect_test.go scores the
+// handshake this row's ActivateSession request rides on. NOT-TESTED.md
+// covers the clause's ECC and RSA_DH sentence.
 //
 // The row runs against the in-tree server's Basic256Sha256 SignAndEncrypt
 // endpoint. It replaces the endpoint's UserIdentityTokens with a single

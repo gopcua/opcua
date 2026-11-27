@@ -860,8 +860,9 @@ func (c *Client) CreateSession(ctx context.Context, cfg *uasc.SessionConfig) (*S
 
 		err := sc.VerifySessionSignature(res.ServerCertificate, nonce, res.ServerSignature.Signature)
 		if err != nil {
-			log.Printf("error verifying session signature: %s", err)
-			return nil
+			// The server did not prove possession of the certificate it sent,
+			// so the session shall not be used (OPC 10000-4 §6.1.8).
+			return errors.Errorf("error verifying session signature: %w", err)
 		}
 
 		// Ensure we have a valid identity token that the server will accept before trying to activate a session
@@ -924,8 +925,8 @@ func (c *Client) ActivateSession(ctx context.Context, s *Session) error {
 	stats.Client().Add("ActivateSession", 1)
 	sig, sigAlg, err := sc.NewSessionSignature(s.serverCertificate, s.serverNonce)
 	if err != nil {
-		log.Printf("error creating session signature: %s", err)
-		return nil
+		// Without a ClientSignature the request is not sent (OPC 10000-4 §5.6.3.1).
+		return errors.Errorf("error creating session signature: %w", err)
 	}
 
 	switch tok := s.cfg.UserIdentityToken.(type) {

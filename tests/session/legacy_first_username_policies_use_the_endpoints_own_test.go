@@ -20,7 +20,9 @@
 // Neighbouring rows: empty_token_policy_means_the_channels_policy_test.go
 // scores an endpoint with one unnamed policy and holds the decryption proof
 // that the named algorithm is the one used, which this row relies on.
-// NOT-TESTED.md covers the clause's ECC and RSA_DH sentence.
+// unverified_server_signature_fails_connect_test.go scores the handshake
+// this row's ActivateSession request rides on. NOT-TESTED.md covers the
+// clause's ECC and RSA_DH sentence.
 //
 // The row runs against the in-tree server's Basic256Sha256 SignAndEncrypt
 // endpoint in two arms. The first presents the server's own list unedited:

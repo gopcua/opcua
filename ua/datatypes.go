@@ -37,7 +37,12 @@ type DataValue struct {
 }
 
 func (d *DataValue) Decode(b []byte) (int, error) {
-	buf := NewBuffer(b)
+	return d.decode(b, 0)
+}
+
+// decode implements nestedDecoder.
+func (d *DataValue) decode(b []byte, depth int) (int, error) {
+	buf := newBuffer(b, depth)
 	d.EncodingMask = buf.ReadByte()
 	d.Value = new(Variant)
 	if d.Has(DataValueValue) {

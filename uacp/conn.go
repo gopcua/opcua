@@ -26,7 +26,26 @@ const (
 	DefaultSendBufSize    = 0xffff
 	DefaultMaxChunkCount  = 512
 	DefaultMaxMessageSize = 2 * MB
+
+	// minLargeAckBufSize and minSmallAckBufSize are the floors OPC 10000-6
+	// §7.1.2.4 Table 75 sets under the buffer sizes of an Acknowledge,
+	// computed from the matching size of the Hello: "Shall be at least 8192
+	// bytes if the SendBufferSize requested in the Hello Message is >= 8192
+	// bytes. Shall be at least 1024 bytes otherwise."
+	minLargeAckBufSize = 8192
+	minSmallAckBufSize = 1024
 )
+
+// minAckBufSize returns the floor set under an Acknowledge's buffer
+// sizes for the matching buffer size the Hello requested: the
+// Acknowledge's ReceiveBufferSize answers the Hello's SendBufferSize,
+// and its SendBufferSize answers the Hello's ReceiveBufferSize.
+func minAckBufSize(helloBufSize uint32) uint32 {
+	if helloBufSize >= minLargeAckBufSize {
+		return minLargeAckBufSize
+	}
+	return minSmallAckBufSize
+}
 
 var (
 	// DefaultClientACK is the ACK handshake message sent to the server
@@ -282,6 +301,20 @@ func (c *Conn) handshake(ctx context.Context, endpoint string) error {
 		if ack.Version != 0 {
 			return errors.Errorf("uacp: invalid version %d", ack.Version)
 		}
+		// Refuse buffer sizes below the floor minAckBufSize returns for
+		// this Hello, the same way a wrong protocol version is refused
+		// above. Below the floor the buffer Receive allocates from this
+		// field cannot hold the 8-byte UACP header, and the first read
+		// panics; clamping is for sizes that still work, and this one does
+		// not, so the handshake refuses the Acknowledge.
+		if min := minAckBufSize(hel.SendBufSize); ack.ReceiveBufSize < min {
+			debug.Printf("uacp %d: server receive buffer %d is below the %d byte minimum of the HEL send buffer %d", c.id, ack.ReceiveBufSize, min, hel.SendBufSize)
+			return errors.Errorf("uacp: server receive buffer %d is below the %d byte minimum OPC 10000-6 §7.1.2.4 requires for a Hello send buffer of %d bytes", ack.ReceiveBufSize, min, hel.SendBufSize)
+		}
+		if min := minAckBufSize(hel.ReceiveBufSize); ack.SendBufSize < min {
+			debug.Printf("uacp %d: server send buffer %d is below the %d byte minimum of the HEL receive buffer %d", c.id, ack.SendBufSize, min, hel.ReceiveBufSize)
+			return errors.Errorf("uacp: server send buffer %d is below the %d byte minimum OPC 10000-6 §7.1.2.4 requires for a Hello receive buffer of %d bytes", ack.SendBufSize, min, hel.ReceiveBufSize)
+		}
 		if ack.MaxChunkCount == 0 {
 			ack.MaxChunkCount = DefaultMaxChunkCount
 			debug.Printf("uacp %d: server has no chunk limit. Using %d", c.id, ack.MaxChunkCount)
@@ -289,6 +322,33 @@ func (c *Conn) handshake(ctx context.Context, endpoint string) error {
 		if ack.MaxMessageSize == 0 {
 			ack.MaxMessageSize = DefaultMaxMessageSize
 			debug.Printf("uacp %d: server has no message size limit. Using %d", c.id, ack.MaxMessageSize)
+		}
+		// Receive allocates ReceiveBufSize bytes for every chunk, before it
+		// reads a header, so the buffer must not grow past what the Hello
+		// offered to receive: OPC 10000-6 §7.1.2.4 has the server answer
+		// with buffer sizes "not larger than" the matching sizes in the
+		// Hello, and the Hello's ReceiveBufferSize is the largest
+		// MessageChunk "that the sender can receive". But a server can
+		// answer with a larger buffer than offered and then send chunks
+		// that size (opc-plc answers 8192 to an offer of 4096), and 8192
+		// bytes is the smallest buffer OPC 10000-6 §7.1.2.4 lets a UACP
+		// endpoint have, so clamp to the offer, never below that.
+		recvBufSize := max(hel.ReceiveBufSize, minLargeAckBufSize)
+		if ack.ReceiveBufSize > recvBufSize {
+			debug.Printf("uacp %d: server receive buffer %d exceeds the %d bytes offered in HEL. Using %d", c.id, ack.ReceiveBufSize, recvBufSize, recvBufSize)
+			ack.ReceiveBufSize = recvBufSize
+		}
+		// The chunks the client sends are sized from this field too, by
+		// uasc's SetMaximumBodySize(int(SendBufSize())), and OPC 10000-6
+		// §7.1.2.4 bounds it the same way as the receive buffer above: the
+		// Acknowledge's SendBufferSize "shall not be larger than the
+		// ReceiveBufferSize requested in the Hello Message". Clamp it to the
+		// receive buffer the Hello offered, as above: a server that follows
+		// the spec sees no change, and on a 32-bit platform a size with the
+		// top bit set would not even fit the int it is handed to there.
+		if ack.SendBufSize > hel.ReceiveBufSize {
+			debug.Printf("uacp %d: server send buffer %d exceeds the %d bytes offered in HEL. Using %d", c.id, ack.SendBufSize, hel.ReceiveBufSize, hel.ReceiveBufSize)
+			ack.SendBufSize = hel.ReceiveBufSize
 		}
 		c.ack = ack
 		debug.Printf("uacp %d: recv %#v", c.id, ack)

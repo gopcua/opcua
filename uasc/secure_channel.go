@@ -521,7 +521,7 @@ func (s *SecureChannel) Receive(ctx context.Context) *MessageBody {
 func (s *SecureChannel) readChunk() (*MessageChunk, error) {
 	// read a full message from the underlying conn.
 	b, err := s.c.Receive()
-	if err == io.EOF || len(b) == 0 {
+	if err == io.EOF || (err == nil && len(b) == 0) {
 		return nil, io.EOF
 	}
 	// do not wrap this error since it hides conn error
@@ -534,6 +534,12 @@ func (s *SecureChannel) readChunk() (*MessageChunk, error) {
 	}
 
 	const hdrlen = 12 // TODO: move to pkg level const
+	if len(b) < hdrlen {
+		// uacp only guarantees its eight byte transport header, so a
+		// chunk shorter than hdrlen has no secure conversation header
+		// (OPC 10000-6 §6.7.2) and cannot be decoded.
+		return nil, ua.StatusBadDecodingError
+	}
 	h := new(Header)
 	if _, err := h.Decode(b[:hdrlen]); err != nil {
 		return nil, errors.Errorf("sechan: decode header failed: %s", err)
