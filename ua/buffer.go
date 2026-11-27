@@ -253,7 +253,11 @@ func (b *Buffer) ReadN(n int) []byte {
 		return nil
 	}
 	d := b.buf[b.pos:]
-	if n > len(d) {
+	// n can be negative when a wire value carries a length of 0x80000000
+	// or more and int is 32 bits wide, e.g. in ReadBytes and
+	// ExtensionObject.Decode. No bytes can satisfy such a length, so fail
+	// like an over-long positive length instead of slicing out of range.
+	if n < 0 || n > len(d) {
 		b.err = io.ErrUnexpectedEOF
 		return nil
 	}

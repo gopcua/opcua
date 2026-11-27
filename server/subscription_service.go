@@ -2,12 +2,34 @@ package server
 
 import (
 	"context"
+	"math"
 	"sync"
 	"time"
 
 	"github.com/gopcua/opcua/ua"
 	"github.com/gopcua/opcua/uasc"
 )
+
+const (
+	// fastest publishing interval the server supports, in ms
+	minPublishingInterval = 1.0
+	// slowest publishing interval the server supports, in ms
+	maxPublishingInterval = float64(math.MaxInt64 / int64(time.Millisecond))
+)
+
+// revisePublishingInterval returns the publishing interval the server will
+// use, in ms. Values the publishing ticker cannot represent (0, negative,
+// NaN, sub-ms, overflow) are revised to the nearest supported interval; see
+// OPC 10000-4 §5.14.2.2.
+func revisePublishingInterval(requested float64) float64 {
+	if math.IsNaN(requested) || requested < minPublishingInterval {
+		return minPublishingInterval
+	}
+	if requested > maxPublishingInterval {
+		return maxPublishingInterval
+	}
+	return requested
+}
 
 // SubscriptionService implements the Subscription Service Set.
 //
@@ -17,21 +39,38 @@ type SubscriptionService struct {
 	// pub sub stuff
 	Mu   sync.Mutex
 	Subs map[uint32]*Subscription
+
+	// id is the last subscription id handed out. OPC 10000-4 §5.14.2
+	// requires the SubscriptionId to be unique on the server, so the
+	// counter only grows and an id is never handed out twice.
+	id uint32
 }
 
 // get rid of all references to a subscription and all monitored items that are pointed at this subscription.
 func (s *SubscriptionService) DeleteSubscription(id uint32) {
+	s.deleteSubscription(id, nil)
+}
+
+// deleteSubscription removes the subscription registered under id together
+// with its monitored items. A subscription that removes itself passes its own
+// pointer and is then only removed while it is still the one registered
+// under id, so its expiry cannot take a newer subscription with it
+// (OPC 10000-4 §5.14.2).
+func (s *SubscriptionService) deleteSubscription(id uint32, sub *Subscription) {
 	s.Mu.Lock()
 	defer s.Mu.Unlock()
 
-	sub, ok := s.Subs[id]
-	if ok {
-		sub.Mu.Lock()
-		if sub.running {
-			sub.running = false
-			close(sub.shutdown)
+	cur, ok := s.Subs[id]
+	if !ok || (sub != nil && cur != sub) {
+		return
+	}
+	if cur != nil {
+		cur.Mu.Lock()
+		if cur.running {
+			cur.running = false
+			close(cur.shutdown)
 		}
-		sub.Mu.Unlock()
+		cur.Mu.Unlock()
 	}
 
 	delete(s.Subs, id)
@@ -39,6 +78,22 @@ func (s *SubscriptionService) DeleteSubscription(id uint32) {
 	// ask the monitored item service to purge out any items that use this subscription
 	s.srv.MonitoredItemService.DeleteSub(id)
 
+}
+
+// nextID returns the next free subscription id. Callers hold s.Mu.
+// OPC 10000-4 §5.14.2: the SubscriptionId is unique on the server, so the
+// counter only grows; 0 is never handed out and, should the counter wrap,
+// so is any id that is still in use.
+func (s *SubscriptionService) nextID() uint32 {
+	for {
+		s.id++
+		if s.id == 0 {
+			s.id = 1
+		}
+		if _, ok := s.Subs[s.id]; !ok {
+			return s.id
+		}
+	}
 }
 
 // https://reference.opcfoundation.org/Core/Part4/v105/docs/5.13.2
@@ -55,7 +110,13 @@ func (s *SubscriptionService) CreateSubscription(sc *uasc.SecureChannel, r ua.Re
 	s.Mu.Lock()
 	defer s.Mu.Unlock()
 
-	newsubid := uint32(len(s.Subs)) + 1
+	// Part 4 §7.32: the authenticationToken must name an existing session.
+	session := s.srv.Session(r.Header())
+	if session == nil {
+		return nil, ua.StatusBadSessionIDInvalid
+	}
+
+	newsubid := s.nextID()
 
 	if s.srv.cfg.logger != nil {
 		s.srv.cfg.logger.Info("New Sub %d for %v", newsubid, sc.RemoteAddr())
@@ -63,10 +124,10 @@ func (s *SubscriptionService) CreateSubscription(sc *uasc.SecureChannel, r ua.Re
 
 	sub := NewSubscription()
 	sub.srv = s
-	sub.Session = s.srv.Session(r.Header())
+	sub.Session = session
 	sub.Channel = sc
 	sub.ID = newsubid
-	sub.RevisedPublishingInterval = req.RequestedPublishingInterval
+	sub.RevisedPublishingInterval = revisePublishingInterval(req.RequestedPublishingInterval)
 	sub.RevisedLifetimeCount = req.RequestedLifetimeCount
 	sub.RevisedMaxKeepAliveCount = req.RequestedMaxKeepAliveCount
 
@@ -84,7 +145,7 @@ func (s *SubscriptionService) CreateSubscription(sc *uasc.SecureChannel, r ua.Re
 			AdditionalHeader:   ua.NewExtensionObject(nil),
 		},
 		SubscriptionID:            uint32(newsubid),
-		RevisedPublishingInterval: req.RequestedPublishingInterval,
+		RevisedPublishingInterval: sub.RevisedPublishingInterval,
 		RevisedLifetimeCount:      req.RequestedLifetimeCount,
 		RevisedMaxKeepAliveCount:  req.RequestedMaxKeepAliveCount,
 	}
@@ -209,6 +270,10 @@ func (s *SubscriptionService) DeleteSubscriptions(sc *uasc.SecureChannel, r ua.R
 		return nil, err
 	}
 	session := s.srv.Session(req.Header())
+	if session == nil {
+		// A token that names no session owns nothing: Bad_SessionIdInvalid.
+		return nil, ua.StatusBadSessionIDInvalid
+	}
 
 	s.Mu.Lock()
 	defer s.Mu.Unlock()
@@ -294,7 +359,7 @@ func NewSubscription() *Subscription {
 }
 
 func (s *Subscription) Update(req *ua.ModifySubscriptionRequest) {
-	s.RevisedPublishingInterval = req.RequestedPublishingInterval
+	s.RevisedPublishingInterval = revisePublishingInterval(req.RequestedPublishingInterval)
 	s.RevisedLifetimeCount = req.RequestedLifetimeCount
 	s.RevisedMaxKeepAliveCount = req.RequestedMaxKeepAliveCount
 }
@@ -345,7 +410,7 @@ func (s *Subscription) run() {
 		if s.srv.srv.cfg.logger != nil {
 			s.srv.srv.cfg.logger.Info("Subscription %d shutting down.", s.ID)
 		}
-		s.srv.DeleteSubscription(s.ID)
+		s.srv.deleteSubscription(s.ID, s)
 	}()
 
 	keepalive_counter := 0

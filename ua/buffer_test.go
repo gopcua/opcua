@@ -6,6 +6,8 @@ package ua
 
 import (
 	"encoding/binary"
+	"fmt"
+	"io"
 	"math"
 	"testing"
 	"time"
@@ -88,5 +90,44 @@ func TestDateTimeOutOfRangeSaturates(t *testing.T) {
 		require.NoError(t, b.Error())
 		require.Equal(t, uint64(0), binary.LittleEndian.Uint64(b.Bytes()))
 		require.Equal(t, time.Time{}, NewBuffer(b.Bytes()).ReadTime())
+	})
+}
+
+// a raw length >= 0x80000000 is a negative Int32 and no bytes can satisfy it (see ReadN)
+func TestReadNRejectsNegativeLength(t *testing.T) {
+	// the value int(uint32(raw)) produces on a 32-bit platform, spelled
+	// via int32 so the test exercises the same value on every
+	// architecture. -1 is included as the 'null' sentinel: callers reject
+	// it before reaching ReadN, but ReadN must not slice with it either.
+	for _, raw := range []uint32{0x80000000, 0xffffffff} {
+		t.Run(fmt.Sprintf("wire length %#x", raw), func(t *testing.T) {
+			b := NewBuffer(make([]byte, 8))
+			require.Nil(t, b.ReadN(int(int32(raw))))
+			require.Equal(t, io.ErrUnexpectedEOF, b.Error())
+		})
+	}
+}
+
+// OPC 10000-6 §5.2.2.4/§5.2.2.7: a raw length >= 0x80000000 is a negative Int32 other than the -1 'null' sentinel and cannot be satisfied (see ReadN).
+func TestReadBytesRejectsNegativeInt32Length(t *testing.T) {
+	t.Run("null and empty lengths still decode", func(t *testing.T) {
+		for _, n := range []uint32{0, 0xffffffff} {
+			d := make([]byte, 4)
+			binary.LittleEndian.PutUint32(d, n)
+			b := NewBuffer(d)
+			require.Nil(t, b.ReadBytes())
+			require.NoError(t, b.Error())
+			require.Equal(t, 4, b.Pos())
+		}
+	})
+
+	t.Run("a negative Int32 length decodes to an error", func(t *testing.T) {
+		for _, n := range []uint32{0x80000000} {
+			d := make([]byte, 4)
+			binary.LittleEndian.PutUint32(d, n)
+			b := NewBuffer(d)
+			require.Nil(t, b.ReadBytes())
+			require.Equal(t, io.ErrUnexpectedEOF, b.Error())
+		}
 	})
 }

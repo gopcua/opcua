@@ -58,6 +58,10 @@ type harness struct {
 	ns     *server.MapNamespace
 	client *opcua.Client
 
+	// endpoint is the server's opc.tcp URL, for a row that connects a
+	// client of its own besides the fixture's one.
+	endpoint string
+
 	// notify carries the subscription's notifications once subscribeTo has
 	// run. The initial one is consumed there, so what remains is the
 	// result of whatever the row did afterwards.
@@ -108,7 +112,7 @@ func startServerAndClient() (*harness, func(), string) {
 		return nil, func() {}, fmt.Sprintf("connect to %s: %v", endpoint, err)
 	}
 
-	return &harness{ns: ns, client: client}, func() {
+	return &harness{ns: ns, client: client, endpoint: endpoint}, func() {
 		_ = client.Close(ctx)
 		teardown()
 	}, ""

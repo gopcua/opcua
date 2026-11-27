@@ -5,7 +5,10 @@
 package ua
 
 import (
+	"io"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestExtensionObject(t *testing.T) {
@@ -26,4 +29,21 @@ func TestExtensionObject(t *testing.T) {
 		},
 	}
 	RunCodecTest(t, cases)
+}
+
+// OPC 10000-6 §5.2.2.15, Table 25: "The length shall be specified if the body is encoded" - a negative length cannot be satisfied (see ReadN).
+func TestExtensionObjectDecodeRejectsNegativeInt32BodyLength(t *testing.T) {
+	for _, n := range []uint32{0x80000000} {
+		d := []byte{
+			// TypeID
+			0x00, 0x00,
+			// EncodingMask: ExtensionObjectBinary
+			0x01,
+			// Length
+			byte(n), byte(n >> 8), byte(n >> 16), byte(n >> 24),
+		}
+		var e ExtensionObject
+		_, err := e.Decode(d)
+		require.Equal(t, io.ErrUnexpectedEOF, err)
+	}
 }
