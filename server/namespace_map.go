@@ -137,6 +137,16 @@ func (ns *MapNamespace) Browse(bd *ua.BrowseDescription) *ua.BrowseResult {
 }
 
 func (ns *MapNamespace) Attribute(n *ua.NodeID, a ua.AttributeID) *ua.DataValue {
+	// Attribute reads ns.Data below (directly, and indirectly via
+	// ns.Objects()), which SetValue/SetAttribute mutate under ns.Mu. Take
+	// the read lock for the whole call so concurrent SetValue/SetAttribute
+	// calls (e.g. from an application's own goroutine publishing tag
+	// updates) can't race with a Read request being served by the server's
+	// own request-handling goroutine. ns.Objects() below does not itself
+	// take ns.Mu, so this can't deadlock.
+	ns.Mu.RLock()
+	defer ns.Mu.RUnlock()
+
 	if ns.srv.cfg.logger != nil {
 		ns.srv.cfg.logger.Debug("read: node=%s attr=%s", n.String(), a)
 	}
